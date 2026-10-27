@@ -17,6 +17,8 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -66,7 +68,22 @@ class KafkaDeliverySinkTest {
         assertThat(message.getAudience()).isEqualTo(DeliveryAudience.MACHINE);
         assertThat(message.getPayload().get("delivery").get("dispatchId").asString()).isEqualTo(DISPATCH_ID);
         assertThat(message.getPayload().get("value").asString()).isEqualTo("issued");
+        assertThat(message.getNotBefore()).isNull();
         verify(metrics).recordDispatched(DeliveryType.TOOL_INSTALLATION, "kafka");
+    }
+
+    @Test
+    void accept_scheduledRequest_momentCarriedInTheHandOff() {
+        // setup
+        Instant notBefore = Instant.parse("2026-11-01T10:00:00Z");
+        DeliveryRequest<TestPayload> scheduled = request.toBuilder().notBefore(notBefore).build();
+
+        // execution
+        sink.accept(scheduled);
+
+        // verifications
+        verify(producer).sendAndAwait(eq(TOPIC), eq(MACHINE_ID), messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getNotBefore()).isEqualTo(notBefore);
     }
 
     @Test

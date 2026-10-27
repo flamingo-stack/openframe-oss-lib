@@ -45,16 +45,27 @@ public class DeliveryRecorder {
         }
         int sequence = sequenceOf(delivery);
         delivery.setSequence(sequence);
-        boolean online = onlineStatus.isOnline(machineId);
-        MachineDelivery row = pendingRow(request, id, online);
+        Instant now = Instant.now();
+        boolean scheduled = request.isScheduledAfter(now);
+        // a scheduled row waits for its moment whether the machine is online now or not
+        boolean online = !scheduled && onlineStatus.isOnline(machineId);
+        Instant runAt = scheduled ? request.getNotBefore() : now;
+        MachineDelivery row = pendingRow(request, id, online, runAt);
         boolean taken = repository.upsertPending(row);
         if (!taken) {
             log.info("Delivery outranked, a newer dispatch holds the row: type={} targetId={} machineId={} sequence={}",
                     type, targetId, machineId, sequence);
             return DeliveryRecordOutcome.OUTRANKED;
         }
-        log.info("Delivery recorded: type={} targetId={} machineId={} sequence={} online={}",
-                type, targetId, machineId, sequence, online);
+        log.info("Delivery recorded: type={} targetId={} machineId={} sequence={} online={} runAt={}",
+                type, targetId, machineId, sequence, online, runAt);
+        return outcome(scheduled, online);
+    }
+
+    private static DeliveryRecordOutcome outcome(boolean scheduled, boolean online) {
+        if (scheduled) {
+            return DeliveryRecordOutcome.SCHEDULED;
+        }
         return online ? DeliveryRecordOutcome.RECORDED : DeliveryRecordOutcome.HELD;
     }
 
@@ -64,9 +75,9 @@ public class DeliveryRecorder {
     }
 
     // core NATS keeps nothing: a publish before the agent subscribes is lost. A machine that is not online gets its
-    // row due at once, and the sweep publishes on its first tick after the machine shows up
-    private MachineDelivery pendingRow(DeliveryRequest<?> request, String id, boolean online) {
-        Instant now = Instant.now();
+    // row due at once, and the sweep publishes on its first tick after the machine shows up. A scheduled row runs at
+    // its moment, not now: due then, with its reconnect window and ttl counted from then
+    private MachineDelivery pendingRow(DeliveryRequest<?> request, String id, boolean online, Instant runAt) {
         DeliveryType type = request.getType();
         DeliveryPayload payload = request.getPayload();
         DeliveryRef delivery = payload.getDelivery();
@@ -75,7 +86,7 @@ public class DeliveryRecorder {
         Policy policy = properties.resolve(type);
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
         long ttlSeconds = policy.getTtlSeconds();
-        Instant dueAt = online ? now.plusSeconds(ackThresholdSeconds) : now;
+        Instant dueAt = online ? runAt.plusSeconds(ackThresholdSeconds) : runAt;
         return MachineDelivery.builder()
                 .id(id)
                 .type(type)
@@ -87,9 +98,9 @@ public class DeliveryRecorder {
                 .attempts(0)
                 .errors(0)
                 .payloadJson(json)
-                .dispatchedAt(now)
+                .dispatchedAt(runAt)
                 .dueAt(dueAt)
-                .expiresAt(now.plusSeconds(ttlSeconds))
+                .expiresAt(runAt.plusSeconds(ttlSeconds))
                 .build();
     }
 }

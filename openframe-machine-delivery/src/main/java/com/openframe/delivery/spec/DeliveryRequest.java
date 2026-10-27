@@ -4,8 +4,10 @@ import com.openframe.data.document.delivery.DeliveryType;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.time.Instant;
+
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class DeliveryRequest<P extends DeliveryPayload> {
     private final DeliveryType type;
     private final String targetId;
@@ -15,8 +17,15 @@ public class DeliveryRequest<P extends DeliveryPayload> {
     @Builder.Default
     private final DeliveryAudience audience = DeliveryAudience.MACHINE;
     private final P payload;
+    // the earliest the command may reach the machine; none = at once
+    private final Instant notBefore;
 
     public boolean isForEveryMachine() {
         return audience == DeliveryAudience.EVERY_MACHINE;
+    }
+
+    // a moment already past is no schedule: the command goes out the ordinary way
+    public boolean isScheduledAfter(Instant now) {
+        return notBefore != null && notBefore.isAfter(now);
     }
 }

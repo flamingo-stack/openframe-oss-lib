@@ -21,6 +21,8 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
+
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -140,6 +142,48 @@ class DeliveryRecorderTest {
         assertThat(saved.getAttempts()).isZero();
         assertThat(saved.getDueAt()).isEqualTo(saved.getDispatchedAt());
         assertThat(saved.getExpiresAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(TTL));
+    }
+
+    @Test
+    void record_scheduledLater_rowAnchoredAtItsMomentWithoutAskingIfTheMachineIsOnline() {
+        // setup
+        Instant notBefore = Instant.now().plusSeconds(TTL * 2);
+        DeliveryRequest<TestPayload> scheduled = request.toBuilder().notBefore(notBefore).build();
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        DeliveryRecordOutcome outcome = recorder.record(scheduled);
+
+        // verifications
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.SCHEDULED);
+        verifyNoInteractions(onlineStatus);
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(saved.getAttempts()).isZero();
+        // the reconnect window and the ttl run from the moment, so a far moment is neither failed offline nor expired
+        assertThat(saved.getDispatchedAt()).isEqualTo(notBefore);
+        assertThat(saved.getDueAt()).isEqualTo(notBefore);
+        assertThat(saved.getExpiresAt()).isEqualTo(notBefore.plusSeconds(TTL));
+    }
+
+    @Test
+    void record_scheduledMomentAlreadyPast_recordedTheOrdinaryWay() {
+        // setup
+        DeliveryRequest<TestPayload> late = request.toBuilder().notBefore(Instant.now().minusSeconds(60)).build();
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        DeliveryRecordOutcome outcome = recorder.record(late);
+
+        // verifications
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.RECORDED);
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getDueAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(ACK_THRESHOLD));
     }
 
     @Test

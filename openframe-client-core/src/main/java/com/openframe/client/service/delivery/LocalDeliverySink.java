@@ -54,8 +54,16 @@ public class LocalDeliverySink implements DeliverySink {
         switch (outcome) {
             case RECORDED -> publish(request);
             case HELD -> hold(request);
+            case SCHEDULED -> defer(request);
             default -> skip(request, outcome);
         }
+    }
+
+    private void defer(DeliveryRequest<?> request) {
+        DeliveryType type = request.getType();
+        metrics.recordDispatchScheduled(type);
+        log.info("Delivery scheduled, the sweep publishes it once due: type={} targetId={} machineId={} notBefore={}",
+                type, request.getTargetId(), request.getMachineId(), request.getNotBefore());
     }
 
     private void hold(DeliveryRequest<?> request) {

@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Slf4j
@@ -27,6 +28,23 @@ public class DeliveryDispatcher {
         DeliveryType type = seed.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         DeliveryRequest<DeliveryPayload> request = spec.request(seed);
+        send(type, spec, request);
+    }
+
+    public void schedule(DeliverySeed seed, Instant at) {
+        DeliveryType type = seed.getType();
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        DeliveryRequest<DeliveryPayload> request = spec.request(seed).toBuilder()
+                .notBefore(at)
+                .build();
+        if (request.isForEveryMachine()) {
+            throw new IllegalArgumentException("A rollout goes out at once, it cannot be scheduled: " + type);
+        }
+        send(type, spec, request);
+    }
+
+    private void send(DeliveryType type, DeliverySpec<DeliverySeed, DeliveryPayload> spec,
+                      DeliveryRequest<DeliveryPayload> request) {
         if (isWildcardOnASingleMachineType(request, spec)) {
             throw new IllegalArgumentException("Delivery type delivers to one machine at a time: " + type);
         }
