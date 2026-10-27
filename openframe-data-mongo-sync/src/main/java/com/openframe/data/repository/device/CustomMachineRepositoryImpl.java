@@ -74,7 +74,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     );
     private static final String DEFAULT_SORT_FIELD = "_id";
     // Sorting by status follows this explicit order, never the alphabetical one; DESC is its exact reverse.
-    static final List<String> STATUS_SORT_ORDER = List.of("ONLINE", "PENDING", "PENDING_DELETION", "OFFLINE");
+    static final List<String> STATUS_SORT_ORDER = List.of("ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
     private static final String STATUS_RANK_FIELD = "_statusRank";
 
     private static final String TENANT_ID_FIELD = "tenantId";

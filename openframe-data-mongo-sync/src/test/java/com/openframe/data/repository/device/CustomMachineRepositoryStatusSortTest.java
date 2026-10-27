@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 class CustomMachineRepositoryStatusSortTest {
 
     private static final String TENANT_ID = "tenant-1";
-    private static final List<String> EXPECTED_ORDER = List.of("ONLINE", "PENDING", "PENDING_DELETION", "OFFLINE");
+    private static final List<String> EXPECTED_ORDER = List.of("ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
     private static final int UNKNOWN_RANK = 4;
 
     @Mock private MongoTemplate mongoTemplate;
@@ -44,7 +44,7 @@ class CustomMachineRepositoryStatusSortTest {
     @InjectMocks private CustomMachineRepositoryImpl repository;
 
     @Test
-    @DisplayName("status ASC: rank from the explicit order, then sort by (rank, _id) ascending")
+    @DisplayName("status ASC: rank ONLINE, OFFLINE, PENDING, PENDING_DELETION, then sort by (rank, _id) ascending")
     void statusAsc_ranksByExplicitOrder() {
         // setup
         stubAggregate(List.of());
@@ -98,8 +98,8 @@ class CustomMachineRepositoryStatusSortTest {
         assertThat(stages).hasSize(5);
         List<Document> branches = stages.get(2).get("$match", Document.class).getList("$or", Document.class);
         assertThat(branches).containsExactly(
-                new Document("_statusRank", new Document("$gt", 1)),
-                new Document("_statusRank", 1).append("_id", new Document("$gt", cursorId)));
+                new Document("_statusRank", new Document("$gt", 2)),
+                new Document("_statusRank", 2).append("_id", new Document("$gt", cursorId)));
     }
 
     @Test
@@ -116,8 +116,8 @@ class CustomMachineRepositoryStatusSortTest {
         // verifications
         List<Document> branches = capturedStages().get(2).get("$match", Document.class).getList("$or", Document.class);
         assertThat(branches).containsExactly(
-                new Document("_statusRank", new Document("$lt", 3)),
-                new Document("_statusRank", 3).append("_id", new Document("$lt", cursorId)));
+                new Document("_statusRank", new Document("$lt", 1)),
+                new Document("_statusRank", 1).append("_id", new Document("$lt", cursorId)));
     }
 
     @Test
@@ -182,19 +182,19 @@ class CustomMachineRepositoryStatusSortTest {
     }
 
     @Test
-    @DisplayName("statusRank: ONLINE < PENDING < PENDING_DELETION < OFFLINE, missing status last")
+    @DisplayName("statusRank: ONLINE < OFFLINE < PENDING < PENDING_DELETION, missing status last")
     void statusRank_followsExplicitOrder() {
         assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.ONLINE)).isEqualTo(0);
-        assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.PENDING)).isEqualTo(1);
-        assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.PENDING_DELETION)).isEqualTo(2);
-        assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.OFFLINE)).isEqualTo(3);
+        assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.OFFLINE)).isEqualTo(1);
+        assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.PENDING)).isEqualTo(2);
+        assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.PENDING_DELETION)).isEqualTo(3);
         assertThat(CustomMachineRepositoryImpl.statusRank(null)).isEqualTo(UNKNOWN_RANK);
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"ONLINE", "PENDING", "PENDING_DELETION", "OFFLINE"},
+    @EnumSource(value = DeviceStatus.class, names = {"ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION"},
             mode = EnumSource.Mode.EXCLUDE)
-    @DisplayName("statusRank: every status outside the explicit order ranks after OFFLINE")
+    @DisplayName("statusRank: every status outside the explicit order ranks after PENDING_DELETION")
     void statusRank_otherStatusesRankLast(DeviceStatus status) {
         assertThat(CustomMachineRepositoryImpl.statusRank(status)).isEqualTo(UNKNOWN_RANK);
     }

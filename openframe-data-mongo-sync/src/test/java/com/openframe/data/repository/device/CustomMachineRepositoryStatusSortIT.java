@@ -50,12 +50,12 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("status ASC: ONLINE, PENDING, PENDING_DELETION, OFFLINE, then devices without a status")
+    @DisplayName("status ASC: ONLINE, OFFLINE, PENDING, PENDING_DELETION, then devices without a status")
     void ascFollowsExplicitOrder() {
         List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, null, 50, "status", "ASC");
 
         assertThat(machineIds(page)).containsExactly(
-                "online-1", "online-2", "pending-1", "deleting-1", "offline-1", "offline-2", "none-1");
+                "online-1", "online-2", "offline-1", "offline-2", "pending-1", "deleting-1", "none-1");
     }
 
     @Test
@@ -64,21 +64,21 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
         List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, null, 50, "status", "DESC");
 
         assertThat(machineIds(page)).containsExactly(
-                "none-1", "offline-2", "offline-1", "deleting-1", "pending-1", "online-2", "online-1");
+                "none-1", "deleting-1", "pending-1", "offline-2", "offline-1", "online-2", "online-1");
     }
 
     @Test
     @DisplayName("status ASC paged by cursor: pages join without gaps or duplicates, even inside a status group")
     void ascCursorPagesWithoutGapsOrDuplicates() {
         assertThat(pageThrough("ASC", 3)).containsExactly(
-                "online-1", "online-2", "pending-1", "deleting-1", "offline-1", "offline-2", "none-1");
+                "online-1", "online-2", "offline-1", "offline-2", "pending-1", "deleting-1", "none-1");
     }
 
     @Test
     @DisplayName("status DESC paged by cursor: pages join without gaps or duplicates, even inside a status group")
     void descCursorPagesWithoutGapsOrDuplicates() {
         assertThat(pageThrough("DESC", 2)).containsExactly(
-                "none-1", "offline-2", "offline-1", "deleting-1", "pending-1", "online-2", "online-1");
+                "none-1", "deleting-1", "pending-1", "offline-2", "offline-1", "online-2", "online-1");
     }
 
     @Test
