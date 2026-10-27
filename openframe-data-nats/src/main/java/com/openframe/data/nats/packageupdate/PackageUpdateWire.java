@@ -41,13 +41,10 @@ public class PackageUpdateWire {
     }
 
     public PackageUpdateDeliverySeed deadlineForce(String machineId, PackageUpdateRequest request) {
-        return PackageUpdateDeliverySeed.builder()
-                .machineId(machineId)
-                .requestId(request.getRequestId())
-                .source(source(request.getSource()))
-                .packageRef(reference(request.getPackageManager(), request.getPackageName(), request.getBrewPackageType()))
-                .mode(PackageUpdateMode.FORCE)
-                .countdownSeconds(request.getForceCountdownSeconds())
+        return seed(machineId, request.getRequestId(), request.getSource(), request.getPackageManager(),
+                request.getPackageName(), request.getBrewPackageType(), PackageUpdateMode.FORCE,
+                request.getForceCountdownSeconds())
+                .toBuilder()
                 .deadlineForce(true)
                 .build();
     }

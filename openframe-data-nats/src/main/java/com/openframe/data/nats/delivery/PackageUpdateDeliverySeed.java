@@ -9,7 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class PackageUpdateDeliverySeed implements DeliverySeed {
 
     private static final String DEADLINE_SUFFIX = ":deadline";
