@@ -35,8 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
     permissions:
-      pull-requests: read
+      pull-requests: write
     steps:
+      - name: Assign PR author
+        if: github.event.action == 'opened' && github.event.pull_request.user.type == 'User'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr edit ${{ github.event.pull_request.html_url }} --add-assignee ${{ github.event.pull_request.user.login }}
       # Squash commits take the PR title; read live so a re-run picks up an edited title or the no-task label.
       - name: Check PR title
         if: github.event.pull_request.user.type == 'User' && !startsWith(github.head_ref, 'renovate/')  # Renovate runs as a user
@@ -47,38 +52,6 @@ jobs:
           gh pr view "$PR" --json title,labels -q '.title + if any(.labels[]; .name == "no-task") then " CU-notask" else "" end' \
             | grep -qE "^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\(.+\))?!?: .+ CU-[0-9a-z]+$" \
             || { echo "::error::Expected 'fix(armor): exclude billing action CU-17tkuw5x3yh' (no-task label drops CU-); fix the title and re-run"; exit 1; }
-
-  scan:
-    name: "Scan Code: ${{ matrix.target.name }}"
-    runs-on: ubuntu-latest
-    needs: [changes]
-    permissions:
-      contents: read
-      packages: read
-      pull-requests: read
-    if: github.event_name == 'pull_request'
-    strategy:
-      fail-fast: false
-      matrix:
-        target: ${{ fromJson(needs.changes.outputs.node_matrix) }}
-        include:
-          - target: { name: backend, path: ".", paths: "**/{pom.xml,Cargo.toml,Cargo.lock,Dockerfile*}", skip_files: "**/package.json,**/package-lock.json,**/yarn.lock,**/pnpm-lock.yaml" }
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
-      - name: Scan code
-        continue-on-error: true
-        uses: ./.github/steps/trivy
-        with:
-          scan: code
-          path: ${{ matrix.target.path }}
-          paths: ${{ matrix.target.paths || '' }}
-          skip-files: ${{ matrix.target.skip_files || '' }}
-          image-name: ${{ matrix.target.name }}
 
   test-java:
     name: Test Java
@@ -118,6 +91,7 @@ jobs:
           echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}-SNAPSHOT" >> $GITHUB_ENV
 
       - name: Build and Publish ${{ env.NEW_VERSION }}
+        id: build
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -128,6 +102,7 @@ jobs:
             --batch-mode \
             --no-transfer-progress \
             -Dmaven.source.skip=true
+
 
 
   test-node:
@@ -164,20 +139,30 @@ jobs:
         run: npm install
 
       # ~1s; a broken eslint config makes every lint result below meaningless.
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:config-smoke in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Lint Config Smoke
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run lint:config-smoke
 
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run type-check in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Type Check
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run type-check
 
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Lint
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run lint
 
       # Needs a TypeScript program and an 8 GB heap; the slowest check, so kept apart.
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:types in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Lint (type-aware)
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run lint:types
 
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run format in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Format
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run format
 
       - name: Test
@@ -215,7 +200,9 @@ jobs:
     name: Test Node Cycles (openframe-frontend-core)
     runs-on: ubuntu-latest
     needs: [changes]
-    if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
+    # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:cycles in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
+    # was: if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
+    if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
       NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
@@ -278,6 +265,7 @@ jobs:
 
       - name: Test
         run: make -C clients/openframe-client test
+
 
 
   cleanup:

@@ -488,6 +488,9 @@ export interface EmbeddableChatProps {
   contextMemory?: {
     items: ChatContextItem[];
     onRemove?: (item: ChatContextItem) => void;
+    /** A record the host will remember is still being read (a record page loading): the empty strip draws its
+     *  loading form, so the composer does not grow when the record lands. */
+    pending?: boolean;
   };
   /**
    * Host content pinned between the thread and the composer: the thread
@@ -3181,6 +3184,7 @@ function EmbeddableChatInner({
                           onRemoveContextItem={removeContextItem}
                           contextMemoryItems={contextMemory?.items}
                           onRemoveContextMemoryItem={contextMemory?.onRemove}
+                          contextMemoryPending={contextMemory?.pending}
                           contextPickerOpen={contextPickerOpen}
                           onOpenContextPicker={openContextPicker}
                           onCloseContextPicker={closeContextPicker}

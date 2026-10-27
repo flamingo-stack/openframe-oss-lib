@@ -1,5 +1,6 @@
 'use client';
 
+import { AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { LoadingItems, useLoadingScope } from './loading-scope';
@@ -56,9 +57,8 @@ export interface AvatarStackProps {
   loading?: boolean;
 }
 
-/** Face diameter and how far each later face tucks under the previous one — the
- *  `SquareAvatar` buckets and the `-ml-*` classes below, in px, for `slots`. */
-const SIZE_PX: Record<AvatarStackSize, number> = { xs: 24, sm: 32, md: 40, lg: 48 };
+/** How far each later face tucks under the previous one: the `-ml-*` classes below, in px, for `slots`. A face's
+ *  diameter is the avatar scale's (`AVATAR_SIZE_PX`). */
 const OVERLAP_PX: Record<AvatarStackSize, number> = { xs: 8, sm: 12, md: 12, lg: 12 };
 
 const OVERFLOW_CIRCLE_SIZE: Record<AvatarStackSize, string> = {
@@ -73,7 +73,7 @@ const STACK_ROW_CLASS = 'flex items-center';
 const overlapClass = (size: AvatarStackSize) => (size === 'xs' ? '-ml-2' : '-ml-3');
 /** A fixed-width stack's width (`slots`). */
 const slotsWidthStyle = (size: AvatarStackSize, slots?: number) =>
-  slots ? { width: SIZE_PX[size] + (slots - 1) * (SIZE_PX[size] - OVERLAP_PX[size]) } : undefined;
+  slots ? { width: AVATAR_SIZE_PX[size] + (slots - 1) * (AVATAR_SIZE_PX[size] - OVERLAP_PX[size]) } : undefined;
 
 /** Faces a stack shows when the host states no `max`, and so the faces it draws while its people are read. */
 const AVATAR_STACK_MAX_FACES = 3;
@@ -102,8 +102,8 @@ function AvatarStackSkeleton({
             data-loading-item
             variant="circular"
             className={cn('relative shrink-0 ring-2 ring-ods-card', i > 0 && overlapClass(size))}
-            width={SIZE_PX[size]}
-            height={SIZE_PX[size]}
+            width={AVATAR_SIZE_PX[size]}
+            height={AVATAR_SIZE_PX[size]}
           />
         )}
       </LoadingItems>
