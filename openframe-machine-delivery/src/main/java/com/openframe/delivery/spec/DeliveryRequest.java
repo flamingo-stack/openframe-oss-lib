@@ -17,15 +17,15 @@ public class DeliveryRequest<P extends DeliveryPayload> {
     @Builder.Default
     private final DeliveryAudience audience = DeliveryAudience.MACHINE;
     private final P payload;
-    // the earliest the command may reach the machine; none = at once
-    private final Instant notBefore;
+    // when the command is due to reach the machine, recorded as the row's dueAt; none = at once
+    private final Instant dueAt;
 
     public boolean isForEveryMachine() {
         return audience == DeliveryAudience.EVERY_MACHINE;
     }
 
     // a moment already past is no schedule: the command goes out the ordinary way
-    public boolean isScheduledAfter(Instant now) {
-        return notBefore != null && notBefore.isAfter(now);
+    public boolean isDueAfter(Instant now) {
+        return dueAt != null && dueAt.isAfter(now);
     }
 }

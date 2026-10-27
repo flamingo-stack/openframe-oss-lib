@@ -146,21 +146,6 @@ class LocalDeliverySinkTest {
     }
 
     @Test
-    void accept_scheduledDispatch_rowLeftForTheSweepNothingPublished() {
-        // setup
-        when(recorder.record(request)).thenReturn(DeliveryRecordOutcome.SCHEDULED);
-
-        // execution
-        sink.accept(request);
-
-        // verifications
-        verifyNoInteractions(publisher, registry);
-        verify(metrics).recordDispatchScheduled(DeliveryType.TOOL_INSTALLATION);
-        verify(metrics, never()).recordDispatched(any(), any());
-        verify(metrics, never()).recordDispatchRejected(any());
-    }
-
-    @Test
     void accept_replayedHandOff_nothingPublished() {
         // setup
         when(recorder.record(request)).thenReturn(DeliveryRecordOutcome.REPLAYED);

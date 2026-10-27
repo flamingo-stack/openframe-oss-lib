@@ -35,7 +35,7 @@ public class DeliveryDispatcher {
         DeliveryType type = seed.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         DeliveryRequest<DeliveryPayload> request = spec.request(seed).toBuilder()
-                .notBefore(at)
+                .dueAt(at)
                 .build();
         if (request.isForEveryMachine()) {
             throw new IllegalArgumentException("A rollout goes out at once, it cannot be scheduled: " + type);

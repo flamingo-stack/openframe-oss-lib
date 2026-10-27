@@ -46,10 +46,10 @@ public class DeliveryRecorder {
         int sequence = sequenceOf(delivery);
         delivery.setSequence(sequence);
         Instant now = Instant.now();
-        boolean scheduled = request.isScheduledAfter(now);
-        // a scheduled row waits for its moment whether the machine is online now or not
+        boolean scheduled = request.isDueAfter(now);
+        // a row due later waits for its moment whether the machine is online now or not: held like an offline one
         boolean online = !scheduled && onlineStatus.isOnline(machineId);
-        Instant runAt = scheduled ? request.getNotBefore() : now;
+        Instant runAt = scheduled ? request.getDueAt() : now;
         MachineDelivery row = pendingRow(request, id, online, runAt);
         boolean taken = repository.upsertPending(row);
         if (!taken) {
@@ -59,13 +59,6 @@ public class DeliveryRecorder {
         }
         log.info("Delivery recorded: type={} targetId={} machineId={} sequence={} online={} runAt={}",
                 type, targetId, machineId, sequence, online, runAt);
-        return outcome(scheduled, online);
-    }
-
-    private static DeliveryRecordOutcome outcome(boolean scheduled, boolean online) {
-        if (scheduled) {
-            return DeliveryRecordOutcome.SCHEDULED;
-        }
         return online ? DeliveryRecordOutcome.RECORDED : DeliveryRecordOutcome.HELD;
     }
 

@@ -141,7 +141,7 @@ class DeliveryDispatcherTest {
         // verifications
         verify(sink).accept(requestCaptor.capture());
         DeliveryRequest<?> scheduled = requestCaptor.getValue();
-        assertThat(scheduled.getNotBefore()).isEqualTo(at);
+        assertThat(scheduled.getDueAt()).isEqualTo(at);
         assertThat(scheduled.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(scheduled.getPayload().getDelivery().getTargetId()).isEqualTo(TARGET_ID);
         assertThat(scheduled.getPayload().getDelivery().getDispatchId()).isNotBlank();
