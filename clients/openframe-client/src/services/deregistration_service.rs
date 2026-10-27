@@ -28,9 +28,9 @@ impl DeregistrationService {
         let config_service = AgentConfigurationService::new(directory_manager.clone())
             .context("Failed to initialize agent configuration service")?;
 
+        let base_url = format!("https://{}", initial_config_service.get_server_url()?);
         let http_client =
             Self::http_client(directory_manager, initial_config_service.is_local_mode()?)?;
-        let base_url = format!("https://{}", initial_config_service.get_server_url()?);
 
         // Loaded up front so the final retry still has them once the on-disk copy is wiped.
         Self::from_parts(base_url, http_client, load_credentials(&config_service))

@@ -33,7 +33,7 @@ async fn uninstall_call_carries_the_identity_headers() {
         "POST /clients/api/agents/uninstall HTTP/1.1"
     );
     let head = requests[0].head.to_ascii_lowercase();
-    let local_id = std::fs::read_to_string(dm.app_support_dir().join("machine_id")).unwrap();
+    let local_id = MachineIdService::new(&dm).get_or_create().unwrap();
     let hash = current_exe_sha256().unwrap();
     assert!(
         head.contains(&format!("{MACHINE_ID_HEADER}: server-machine-id")),
@@ -44,7 +44,7 @@ async fn uninstall_call_carries_the_identity_headers() {
     assert!(
         head.contains(&format!(
             "{AGENT_VERSION_HEADER}: {}",
-            env!("OPENFRAME_VERSION")
+            env!("OPENFRAME_VERSION").to_ascii_lowercase()
         )),
         "{head}"
     );
@@ -69,16 +69,19 @@ async fn other_calls_on_the_uninstall_client_send_the_local_machine_id() {
         .unwrap();
 
     let head = server.requests()[0].head.to_ascii_lowercase();
-    let local_id = std::fs::read_to_string(dm.app_support_dir().join("machine_id")).unwrap();
+    let local_id = MachineIdService::new(&dm).get_or_create().unwrap();
     assert!(!local_id.trim().is_empty());
     assert!(
         head.contains(&format!("{MACHINE_ID_HEADER}: {}", local_id.trim())),
         "{head}"
     );
-    assert!(head.contains(&format!(
-        "{BINARY_HASH_HEADER}: {}",
-        sha256_file(&std::env::current_exe().unwrap()).unwrap()
-    )));
+    assert!(
+        head.contains(&format!(
+            "{BINARY_HASH_HEADER}: {}",
+            sha256_file(&std::env::current_exe().unwrap()).unwrap()
+        )),
+        "{head}"
+    );
 }
 
 #[test]

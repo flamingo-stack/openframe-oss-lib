@@ -59,7 +59,10 @@ async fn every_request_carries_the_identity_headers() {
     let head = requests[0].head.to_ascii_lowercase();
     assert!(head.contains("x-machine-id: local-id"), "{head}");
     assert!(
-        head.contains(&format!("x-agent-version: {}", env!("OPENFRAME_VERSION"))),
+        head.contains(&format!(
+            "x-agent-version: {}",
+            env!("OPENFRAME_VERSION").to_ascii_lowercase()
+        )),
         "{head}"
     );
     assert!(head.contains(&format!("x-binary-hash: {HASH}")), "{head}");

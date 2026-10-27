@@ -5,10 +5,10 @@ pub struct OsVersion {
     pub build: String,
 }
 
-/// Builds on which `ProductName` still reads "Windows 10" although the OS is Windows 11.
+/// First build that is Windows 11 although `ProductName` still reads "Windows 10".
 const WINDOWS_11_FIRST_BUILD: u32 = 22000;
 
-/// Reads the running OS version; every failure logs a warning and leaves the field empty.
+/// Reads the running OS version; unknown parts stay empty and unreadable sources log a warning.
 pub fn detect() -> OsVersion {
     #[cfg(target_os = "macos")]
     {
