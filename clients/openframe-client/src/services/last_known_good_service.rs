@@ -72,6 +72,12 @@ impl LastKnownGoodService {
                 temp_reserve.display()
             )
         })?;
+        // Without the flush a power loss can keep the rename but drop the data, leaving a NUL-filled reserve.
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&temp_reserve)
+            .and_then(|file| file.sync_all())
+            .with_context(|| format!("Failed to flush temp reserve {}", temp_reserve.display()))?;
         fs::rename(&temp_reserve, &self.reserve_path).with_context(|| {
             format!(
                 "Failed to move temp reserve into place: {}",
