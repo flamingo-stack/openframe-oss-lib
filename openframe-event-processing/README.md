@@ -35,11 +35,17 @@ events.organizations ──> PublishedTypeListener             one per spec type
   `PublishedRecord.CURRENT_SCHEMA_VERSION` is refused and goes to the DLT, for a newer consumer to replay.
 - [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L29) runs each projection on its own, in name order: a
   failed projection does not stop the others.
-- Versions: before a projection runs, the runner reads the version it last stored for that projection, tenant and
-  aggregate in `event_projection_versions`. An older event is skipped; an equal or newer one is applied (so a backfill, which
-  sends the current version, still repairs drift), then its version is stored with a `$max` upsert. A delete stores
-  its version too, and an event handed over to a projection task is stored when the task is saved. This makes the
-  backfill race, a connector re-snapshot, a DLT replay and a group reset harmless.
+- Versions: each projection runs in one Mongo transaction. The runner reads the version it last stored for that
+  projection, tenant and aggregate in `event_projection_versions`; an older event is skipped. Otherwise it first stores
+  the event's version with a `$max` upsert, then applies the event (an equal version too, so a backfill, which sends the
+  current version, still repairs drift). A failed apply rolls the version back. Two consumers of one aggregate, after a
+  rebalance, conflict on that version document: the loser waits and tries again (up to 5 attempts, 750 ms in all), and its
+  retry skips the older event. A conflict that lasts longer is retried by the error handler, like Mongo down, so the
+  newer event waits instead of going to the DLT. A delete stores its version too. An event handed over to a projection
+  task stores its version first; the task is opened after the commit, unless a newer version was stored meanwhile. A
+  hand-over that keeps conflicting is retried like any conflict; any other failure sends the record to the DLT, and its
+  replay passes the equal stored version. This makes the backfill race, a connector re-snapshot, a DLT replay and a group
+  reset harmless.
 - Large updates: the runner first asks the projection's `countChanges`, up to the inline limit. Below it, `apply`
   writes inline. At the limit, or while the source already has a task, the event goes to a projection task of
   `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. Without that
@@ -146,7 +152,8 @@ registered from the spec at startup.
 | What fails | What happens |
 |---|---|
 | Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailability`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/util/MongoUnavailability.java#L15), retried as [`MongoUnavailableException`](src/main/java/com/openframe/processing/exception/MongoUnavailableException.java#L4)) | The record is retried without limit, with the back-off. The topic waits, then continues in order. |
-| A projection: any other exception, a write conflict too, and any `Error` but a broken JVM (`OutOfMemoryError`, `InternalError`) | The other projections still run. The record then goes to `<topic>-dlt` once. |
+| A write conflict that lasts past the runner's 5 attempts: another consumer of the same aggregate is still writing | Retried like Mongo down, without limit, until the other consumer commits; then the older event is skipped. |
+| A projection: any other exception, and any `Error` but a broken JVM (`OutOfMemoryError`, `InternalError`) | The other projections still run. The record then goes to `<topic>-dlt` once. |
 | An unreadable value, or a `schemaVersion` newer than this build | The record goes to `<topic>-dlt` without reaching a projection. |
 
 A record goes to the DLT unchanged: same key, same value bytes. Every such record logs one ERROR line with its key

@@ -2,6 +2,7 @@ package com.openframe.processing.config;
 
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
+import com.openframe.processing.exception.ProjectionConflictException;
 import com.openframe.processing.fixture.Widgets.RecordingProjection;
 import com.openframe.processing.fixture.Widgets.WidgetSpec;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
@@ -15,6 +16,7 @@ import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoCon
 import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
@@ -49,7 +51,8 @@ class EventProcessingKafkaAutoConfigurationTest {
                     "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-",
                     "openframe.events.processing.kafka.listener.auto-startup=false")
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-            .withBean(MongoOperations.class, () -> mock(MongoOperations.class));
+            .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+            .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class));
 
     @Test
     void theProjectionConsumer_readsFromEarliest_inSmallPolls_byDefault() {
@@ -116,6 +119,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                         "openframe.events.processing.kafka.topic-prefix=events.")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
                 .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+                .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class))
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().hasStackTraceContaining("openframe.events.processing.kafka.group-prefix is required"));
     }
@@ -154,6 +158,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                         "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
                 .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+                .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class))
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().rootCause().hasMessageContaining("bootstrap-servers is required"));
     }
@@ -178,16 +183,18 @@ class EventProcessingKafkaAutoConfigurationTest {
                         "openframe.events.processing.kafka.listener.auto-startup=false")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
                 .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+                .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class))
                 .run(context -> assertThat(organizationListenerOf(context).getTopics()).containsExactly("events.organizations"));
     }
 
     @Test
-    void onlyMongoDown_isRetried_andTheWrapperIsNeverRetried_whateverItsCause() {
+    void onlyMongoDownAndALastingConflict_areRetried_andTheWrapperIsNeverRetried_whateverItsCause() {
         runner.run(context -> {
             DefaultErrorHandler errorHandler = errorHandlerOf(context);
 
             // removeClassification returns how a type was classified: true retried, false not, null the default (not retried).
             assertThat(errorHandler.removeClassification(MongoUnavailableException.class)).isTrue();
+            assertThat(errorHandler.removeClassification(ProjectionConflictException.class)).isTrue();
             assertThat(errorHandler.removeClassification(EventProcessingFailedException.class)).isFalse();
             assertThat(errorHandler.removeClassification(OptimisticLockingFailureException.class)).isNull();
         });

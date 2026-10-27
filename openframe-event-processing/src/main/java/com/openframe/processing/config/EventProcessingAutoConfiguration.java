@@ -6,16 +6,19 @@ import com.openframe.processing.runner.EventProcessingMetrics;
 import com.openframe.processing.runner.ProjectionRunner;
 import com.openframe.processing.version.ProjectionVersionRepository;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
+import com.openframe.publishing.config.OutboxAutoConfiguration;
+import com.openframe.publishing.transaction.MongoTransactionRunner;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.core.MongoOperations;
 
 // Listed, not scanned (the projections come from the services' spec beans); off by default, so no listener runs before its topic exists.
-@AutoConfiguration(after = AggregateSpecAutoConfiguration.class)
+@AutoConfiguration(after = {AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class})
 @ConditionalOnBooleanProperty(name = "openframe.events.enabled")
 @EnableConfigurationProperties({EventProcessingKafkaProperties.class, LargeUpdateProperties.class})
 @Import({ProjectionRunner.class, EventProcessingMetrics.class})
@@ -26,5 +29,12 @@ public class EventProcessingAutoConfiguration {
     @ConditionalOnMissingBean
     public ProjectionVersionRepository projectionVersionRepository(MongoOperations mongoOperations) {
         return new ProjectionVersionRepository(mongoOperations);
+    }
+
+    // The outbox's runner when publishing is on here too; missing-bean as well for the tests that run without Mongo.
+    @Bean
+    @ConditionalOnMissingBean
+    public MongoTransactionRunner projectionTransactionRunner(MongoDatabaseFactory mongoDatabaseFactory) {
+        return new MongoTransactionRunner(mongoDatabaseFactory);
     }
 }
