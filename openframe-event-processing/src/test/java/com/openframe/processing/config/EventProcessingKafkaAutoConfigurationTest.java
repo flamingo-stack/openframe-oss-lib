@@ -70,22 +70,41 @@ class EventProcessingKafkaAutoConfigurationTest {
     }
 
     @Test
-    void theListenerOfASpecsType_readsItsTopic_inTheServicesOwnGroup() {
+    void theListenerOfAProjection_readsItsTypesTopic_inTheProjectionsOwnGroup() {
         runner.run(context -> {
-            ContainerProperties listener = organizationListenerOf(context);
+            ContainerProperties listener = findOnlyListener(context);
             assertThat(listener.getTopics()).containsExactly("events." + ORGANIZATIONS);
-            assertThat(listener.getGroupId()).isEqualTo("openframe-saas-stream.processing-" + ORGANIZATIONS);
+            assertThat(listener.getGroupId())
+                    .isEqualTo("openframe-saas-stream.processing-" + ORGANIZATIONS + ".widget-on-organizations");
         });
     }
 
     @Test
-    void theListenerOfASpecsType_takesTheConfiguredPrefixes_asTheDevSharedsDo() {
+    void twoProjectionsOfAType_getTwoListeners_onTheSameTopic_inTheirOwnGroups() {
+        runner.withAllowBeanDefinitionOverriding(true)
+                .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::buildTwoProjectionWidgetSpec)
+                .run(context -> {
+                    KafkaListenerEndpointRegistry registry = context.getBean(KafkaListenerEndpointRegistry.class);
+                    List<ContainerProperties> listeners = registry.getListenerContainers().stream()
+                            .map(MessageListenerContainer::getContainerProperties)
+                            .toList();
+                    assertThat(listeners).extracting(ContainerProperties::getGroupId).containsExactlyInAnyOrder(
+                            "openframe-saas-stream.processing-organizations.widget-on-index",
+                            "openframe-saas-stream.processing-organizations.widget-on-tickets");
+                    assertThat(listeners).allSatisfy(listener ->
+                            assertThat(listener.getTopics()).containsExactly("events." + ORGANIZATIONS));
+                });
+    }
+
+    @Test
+    void theListenerOfAProjection_takesTheConfiguredPrefixes_asTheDevSharedsDo() {
         runner.withPropertyValues("openframe.events.processing.kafka.topic-prefix=dev3.events.",
                         "openframe.events.processing.kafka.group-prefix=dev3.openframe-saas-stream.processing-")
                 .run(context -> {
-                    ContainerProperties listener = organizationListenerOf(context);
+                    ContainerProperties listener = findOnlyListener(context);
                     assertThat(listener.getTopics()).containsExactly("dev3.events.organizations");
-                    assertThat(listener.getGroupId()).isEqualTo("dev3.openframe-saas-stream.processing-organizations");
+                    assertThat(listener.getGroupId())
+                            .isEqualTo("dev3.openframe-saas-stream.processing-organizations.widget-on-organizations");
                 });
     }
 
@@ -142,7 +161,7 @@ class EventProcessingKafkaAutoConfigurationTest {
 
     @Test
     void aMissingTopic_stopsTheProjectionContainers_byDefault() {
-        runner.run(context -> assertThat(organizationListenerOf(context).isMissingTopicsFatal()).isTrue());
+        runner.run(context -> assertThat(findOnlyListener(context).isMissingTopicsFatal()).isTrue());
     }
 
     @Test
@@ -158,7 +177,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                         "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-",
                         "openframe.events.processing.kafka.listener.auto-startup=false")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-                .run(context -> assertThat(organizationListenerOf(context).getTopics()).containsExactly("events.organizations"));
+                .run(context -> assertThat(findOnlyListener(context).getTopics()).containsExactly("events.organizations"));
     }
 
     @Test
@@ -178,7 +197,13 @@ class EventProcessingKafkaAutoConfigurationTest {
         return new WidgetSpec(List.of(projection));
     }
 
-    private static ContainerProperties organizationListenerOf(AssertableApplicationContext context) {
+    private static WidgetSpec buildTwoProjectionWidgetSpec() {
+        RecordingProjection onTickets = new RecordingProjection("widget-on-tickets");
+        RecordingProjection onIndex = new RecordingProjection("widget-on-index");
+        return new WidgetSpec(List.of(onTickets, onIndex));
+    }
+
+    private static ContainerProperties findOnlyListener(AssertableApplicationContext context) {
         KafkaListenerEndpointRegistry registry = context.getBean(KafkaListenerEndpointRegistry.class);
         Collection<MessageListenerContainer> containers = registry.getListenerContainers();
         assertThat(containers).hasSize(1);

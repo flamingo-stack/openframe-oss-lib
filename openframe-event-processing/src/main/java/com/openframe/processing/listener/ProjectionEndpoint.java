@@ -11,14 +11,14 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 // One topic and one group, like an annotated @KafkaListener; the container comes from the processing container factory.
-public class PublishedTypeEndpoint implements KafkaListenerEndpoint {
+public class ProjectionEndpoint implements KafkaListenerEndpoint {
 
     private final String id;
     private final String groupId;
     private final String topic;
     private final MessageListener<String, byte[]> listener;
 
-    public PublishedTypeEndpoint(String id, String groupId, String topic, MessageListener<String, byte[]> listener) {
+    public ProjectionEndpoint(String id, String groupId, String topic, MessageListener<String, byte[]> listener) {
         this.id = id;
         this.groupId = groupId;
         this.topic = topic;

@@ -3,47 +3,22 @@ package com.openframe.processing.runner;
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.publishing.api.model.PublishedRecord;
-import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.api.util.MongoUnavailability;
-import com.openframe.publishing.registry.AggregateSpecRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
-// Applies one event to the projections of its aggregate type, each on its own: a failing projection does not stop the others.
+// Applies one event to one projection; each projection has its own listener, so the projections never wait on each other.
 @Slf4j
 public class ProjectionRunner {
 
-    private final Map<String, List<Projection<?, ?>>> projectionsByType;
     private final EventProcessingMetrics metrics;
 
-    // Sorted by name: the projections run, and the first failure is chosen, in the same order on every pod.
-    public ProjectionRunner(AggregateSpecRegistry specRegistry, EventProcessingMetrics metrics) {
-        Comparator<Projection<?, ?>> byName = Comparator.comparing(Projection::name);
-        Map<String, List<Projection<?, ?>>> byType = new HashMap<>();
-        for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
-            String type = spec.getType();
-            List<Projection<?, ?>> sorted = spec.projections().stream()
-                    .<Projection<?, ?>>map(projection -> projection)
-                    .sorted(byName)
-                    .toList();
-            byType.put(type, sorted);
-        }
-        this.projectionsByType = Map.copyOf(byType);
+    public ProjectionRunner(EventProcessingMetrics metrics) {
         this.metrics = metrics;
     }
 
-    public void process(String type, String aggregateId, PublishedRecord<?> record) {
+    public void process(String type, Projection<?, ?> projection, String aggregateId, PublishedRecord<?> record) {
         // A newer envelope may mean something this build does not know: refused, so the DLT keeps it for a newer consumer.
         int schemaVersion = record.getSchemaVersion();
         if (schemaVersion > PublishedRecord.CURRENT_SCHEMA_VERSION) {
@@ -55,23 +30,11 @@ public class ProjectionRunner {
             log.debug("Delete of {} {} skipped: no projection handles deletes", type, aggregateId);
             return;
         }
-
-        List<Projection<?, ?>> projections = projectionsByType.getOrDefault(type, List.of());
-        Map<String, Throwable> failures = projections.stream()
-            .flatMap(projection -> applyProjection(projection, aggregateId, record).stream())
-            .collect(Collectors.toMap(
-                ProjectionFailure::getProjectionName,
-                ProjectionFailure::getFailure,
-                (first, second) -> first, LinkedHashMap::new));
-
-        if (!failures.isEmpty()) {
-            throw new EventProcessingFailedException(failures);
-        }
+        applyProjection(projection, aggregateId, record);
     }
 
-    // Empty on success; Mongo down stops the stream; any Error but a broken JVM (StackOverflowError too) is the projection's.
-    private Optional<ProjectionFailure> applyProjection(Projection<?, ?> projection, String aggregateId,
-                                                        PublishedRecord<?> record) {
+    // Mongo down is retried; any other failure, any Error but a broken JVM (StackOverflowError too), sends the record to the DLT.
+    private void applyProjection(Projection<?, ?> projection, String aggregateId, PublishedRecord<?> record) {
         String name = projection.name();
         Timer.Sample sample = metrics.start();
         try {
@@ -79,7 +42,6 @@ public class ProjectionRunner {
             metrics.recordApplied(sample, name);
             log.debug("Projection {} applied {} version {} of tenant {}", name, aggregateId, record.getVersion(),
                 record.getTenantId());
-            return Optional.empty();
         } catch (OutOfMemoryError | InternalError | UnknownError brokenJvm) {
             throw brokenJvm;
         } catch (RuntimeException | Error failure) {
@@ -90,8 +52,7 @@ public class ProjectionRunner {
             metrics.recordFailed(sample, name);
             log.warn("Projection {} failed for {} version {} of tenant {}", name, aggregateId, record.getVersion(),
                 record.getTenantId(), failure);
-            ProjectionFailure projectionFailure = new ProjectionFailure(name, failure);
-            return Optional.of(projectionFailure);
+            throw new EventProcessingFailedException(name, failure);
         }
     }
 
@@ -99,13 +60,5 @@ public class ProjectionRunner {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static void applyTyped(Projection projection, PublishedRecord record) {
         projection.apply(record);
-    }
-
-    @Getter
-    @AllArgsConstructor
-    private static class ProjectionFailure {
-
-        private final String projectionName;
-        private final Throwable failure;
     }
 }
