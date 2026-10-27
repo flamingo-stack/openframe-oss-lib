@@ -54,13 +54,19 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
         }
     }
 
-    // The current run's save checks its version; the unique index on a current key stops a second current run.
+    // The current run's save checks its version, the unique index stops a second current run, and an older event is dropped.
     private void saveSubmitted(ProjectionTask opened) {
         String key = opened.getKey();
         Instant now = clock.instant();
         Optional<ProjectionTask> currentRun = taskRepository.findByKeyAndCurrentTrue(key);
         if (currentRun.isPresent()) {
-            ProjectionTask closed = currentRun.get().close(now);
+            ProjectionTask current = currentRun.get();
+            if (current.getEventVersion() > opened.getEventVersion()) {
+                log.info("Projection task {} keeps event version {}: version {} is older", current.getId(),
+                        current.getEventVersion(), opened.getEventVersion());
+                return;
+            }
+            ProjectionTask closed = current.close(now);
             taskRepository.save(closed);
             log.info("Projection task {} closed {} for a newer event", closed.getId(), closed.getStatus());
         }
