@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useContentBreakpoint } from '../../../hooks/ui/use-content-breakpoint';
 import { NotificationsProvider } from '../../features/notifications/notifications-context';
 import { PageActions } from '../../ui/page-actions';
@@ -178,6 +178,52 @@ describe('AppLayout floating composer dock', () => {
     render(layout({ composerDock: <p>dock</p> }));
     expect(screen.getByRole('main')).not.toHaveStyle({ paddingBottom: '132px' });
     expect(markup()).toContain('<div class="ods-content-area shrink-0"><div class="ods-content-scope"><p>dock</p>');
+  });
+});
+
+describe("AppLayout and a page's action bar on a phone", () => {
+  // The bar reports its height through a ResizeObserver: here one that measures on observe.
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        private readonly callback: ResizeObserverCallback;
+        constructor(callback: ResizeObserverCallback) {
+          this.callback = callback;
+        }
+        observe() {
+          this.callback([], this);
+        }
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 93 } as DOMRect);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(132);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const page = (
+    <PageActions variant="primary-buttons" actions={[{ label: 'Save', variant: 'accent', onClick: () => undefined }]} />
+  );
+
+  it('runs the page on by the bar, so its last line clears it', () => {
+    render(layout({}, page));
+    expect(screen.getByRole('main')).toHaveStyle({ paddingBottom: '93px' });
+  });
+
+  it('by the bar and a floating dock under it', () => {
+    render(layout({ composerDock: <p>dock</p>, composerDockFloats: true }, page));
+    expect(screen.getByRole('main')).toHaveStyle({ paddingBottom: '225px' });
+  });
+
+  it('by the bar alone over a dock that is a band of its own', () => {
+    render(layout({ composerDock: <p>dock</p> }, page));
+    expect(screen.getByRole('main')).toHaveStyle({ paddingBottom: '93px' });
   });
 });
 

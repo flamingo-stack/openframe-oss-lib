@@ -7,6 +7,7 @@ import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-
 import type { NavigationSidebarConfig } from '../../types/navigation';
 import { cn } from '../../utils';
 import { NotificationDrawer } from '../features/notifications/notification-drawer';
+import { useMobileActionBarHeight } from '../ui/mobile-action-bar';
 import { AppHeader, type AppHeaderProps } from './app-header';
 import {
   AppLayoutDrawerContainerContext,
@@ -175,6 +176,10 @@ export function AppLayout({
   const hasSidePanel = sidePanel !== undefined;
   const hasDock = composerDock !== undefined;
   const dockFloats = hasDock && composerDockFloats;
+  // A page's window-pinned action bar (`PageActions` below md) lies over the page's end
+  // as well, over the dock where there is one: the page runs on by its height too.
+  const actionBarHeight = useMobileActionBarHeight();
+  const bottomInset = (dockFloats ? dockHeight : 0) + actionBarHeight;
   const hasCorner = contentCorner !== undefined;
   // The page column lays out by its own width: something narrows it (the
   // panel) or shares it with the page (the dock).
@@ -393,8 +398,9 @@ export function AppLayout({
                       contentOverlapped && 'isolate',
                       mainClassName,
                     )}
-                    // A floating dock lies over the page's end: the page runs on by its height.
-                    style={dockFloats ? { paddingBottom: dockHeight } : undefined}
+                    // A floating dock and a page's action bar lie over the page's end: the
+                    // page runs on by their height, so its last line clears them.
+                    style={bottomInset > 0 ? { paddingBottom: bottomInset } : undefined}
                   >
                     <ContentAreaWidthContext.Provider value={contentAreaWidth}>
                       <ComposerDockHeightContext.Provider value={hasDock ? dockHeight : 0}>
