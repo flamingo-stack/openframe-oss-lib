@@ -123,6 +123,23 @@ class ProjectionTaskServiceIT {
     }
 
     @Test
+    void anOlderEvent_keepsTheNewerCurrentRun_soTwoConsumersAfterARebalanceCannotGoBack() {
+        // setup
+        service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 6, "Newer", RENAMED_AT));
+        ProjectionTask newerRun = currentRun(KEY);
+
+        // execution
+        serviceAt(NOW.plusSeconds(60)).submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 5, "Older", RENAMED_AT));
+
+        // verifications
+        ProjectionTask current = currentRun(KEY);
+        assertThat(current.getId()).isEqualTo(newerRun.getId());
+        assertThat(current.getEventVersion()).isEqualTo(6L);
+        assertThat(current.getStatus()).isEqualTo(EventJobStatus.RUNNING);
+        assertThat(repository.count()).isEqualTo(1);
+    }
+
+    @Test
     void afterANewerEvent_aWorkersCopyOfTheOldRunFailsToSave() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
