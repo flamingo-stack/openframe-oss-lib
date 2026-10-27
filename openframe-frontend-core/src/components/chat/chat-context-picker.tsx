@@ -31,7 +31,7 @@ import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { LoadingSuspense } from '../loading/loading-fallback';
 import { Button } from '../ui/button';
-import { LOADING_NOOP } from '../ui/loading-scope';
+import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
 import {
   CONTEXT_BACK_BAR_CLASS,
   CONTEXT_STATE_CLASS,
@@ -388,26 +388,16 @@ export function ChatContextPicker({
                   </div>
                 )}
               >
-                <LoadingSuspense
-                  label="Loading items"
-                  // The SAME list the host renders, in a scope: it draws one page of its own skeleton rows.
-                  fallback={
-                    <ContextItemsList
-                      items={[]}
-                      selectedKeys={NO_SELECTED_KEYS}
-                      onToggle={LOADING_NOOP}
-                      atLimit={false}
-                    />
-                  }
-                >
-                  {config.renderItems({
+                <ContextItems
+                  renderItems={config.renderItems}
+                  args={{
                     type: activeType.type,
                     query: debouncedQuery,
                     selectedKeys,
                     onToggle: onToggleItem,
                     atLimit,
-                  })}
-                </LoadingSuspense>
+                  }}
+                />
               </ContextErrorBoundary>
             )}
           </QueryErrorResetBoundary>
@@ -415,6 +405,30 @@ export function ChatContextPicker({
       ) : null}
     </div>
   );
+}
+
+type ContextItemsArgs = Parameters<ChatContextPickerConfig['renderItems']>[0];
+
+/** The host-rendered items of a type, with their own boundary: in its scope the reader draws the list's skeleton rows. */
+function ContextItems(props: { renderItems: ChatContextPickerConfig['renderItems']; args: ContextItemsArgs }) {
+  return (
+    <LoadingSuspense label="Loading items">
+      <ContextItemsReader {...props} />
+    </LoadingSuspense>
+  );
+}
+
+/** In a loading scope, the SAME list the host renders with no items (one page of its own skeleton rows); else the host's. */
+function ContextItemsReader({
+  renderItems,
+  args,
+}: {
+  renderItems: ChatContextPickerConfig['renderItems'];
+  args: ContextItemsArgs;
+}) {
+  if (useLoadingScope())
+    return <ContextItemsList items={[]} selectedKeys={NO_SELECTED_KEYS} onToggle={LOADING_NOOP} atLimit={false} />;
+  return <>{renderItems(args)}</>;
 }
 
 // ===========================================================================

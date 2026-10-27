@@ -1,6 +1,7 @@
 package com.openframe.data.retry;
 
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 
@@ -12,7 +13,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Retryable(
-        retryFor = OptimisticLockingFailureException.class,
+        retryFor = {OptimisticLockingFailureException.class, TransientDataAccessResourceException.class},
         maxAttempts = 5,
         backoff = @Backoff(delay = 50, multiplier = 2, random = true),
         listeners = "optimisticLockingRetryListener"

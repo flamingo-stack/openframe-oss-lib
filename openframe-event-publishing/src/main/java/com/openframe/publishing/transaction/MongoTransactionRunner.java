@@ -9,6 +9,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -66,17 +67,30 @@ public class MongoTransactionRunner {
         return false;
     }
 
+    private static boolean isTransientTransactionError(Throwable failure) {
+        for (Throwable cause = failure; cause != null && cause != cause.getCause(); cause = cause.getCause()) {
+            if (cause instanceof MongoException mongo && mongo.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static RuntimeException rethrow(Throwable failure) {
         Throwable translated = translated(failure);
         return sneakyThrow(translated);
     }
 
-    // Only a write conflict means another write touched the document; a failover is transient too, but not a 409.
+    // Only a write conflict means another write touched the document; a failover is transient too, retried but not a 409.
     private static Throwable translated(Throwable failure) {
+        String message = failure.getMessage();
         if (isWriteConflict(failure)) {
             log.debug("Outbox transaction hit a write conflict (112), reported as OptimisticLockingFailureException");
-            String message = failure.getMessage();
             return new OptimisticLockingFailureException(message, failure);
+        }
+        if (isTransientTransactionError(failure)) {
+            log.debug("Outbox transaction hit a transient error, reported as TransientDataAccessResourceException");
+            return new TransientDataAccessResourceException(message, failure);
         }
         return asDuplicateKey(failure);
     }

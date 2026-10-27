@@ -775,8 +775,7 @@ impl Service {
     /// Remove a directory from the Windows system PATH.
     /// Preserves the original registry value type (REG_EXPAND_SZ).
     #[cfg(target_os = "windows")]
-    #[allow(dead_code)] // retained for windows PATH cleanup; not currently called
-    fn remove_from_windows_path(dir: &std::path::Path) -> Result<()> {
+    pub(crate) fn remove_from_windows_path(dir: &std::path::Path) -> Result<()> {
         use winreg::enums::*;
         use winreg::RegKey;
 

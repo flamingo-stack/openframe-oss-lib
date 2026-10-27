@@ -90,7 +90,11 @@
 import type React from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { cn } from '../../utils/cn';
-import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import {
+  type TextLinesByBreakpoint,
+  TextLinesByBreakpointSkeleton,
+  UnifiedSkeleton,
+} from '../loading/unified-skeleton';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
 import { EntityImage } from '../ui/entity-image';
 import { FloatingTooltip } from '../ui/floating-tooltip';
@@ -168,14 +172,7 @@ export interface TitleBlockProps {
    * With `titleWrap`: the lines a typical title of the page takes per breakpoint, drawn by the loading title (a
    * record's title is read; a long one growing past them is a settle). Absent: one bar.
    */
-  titleSkeletonLines?: TitleSkeletonLines;
-}
-
-/** Lines a wrapping title's skeleton draws: on a phone, from `content-md`, from `content-lg`. */
-export interface TitleSkeletonLines {
-  phone: number;
-  md: number;
-  lg: number;
+  titleSkeletonLines?: TextLinesByBreakpoint;
 }
 
 /**
@@ -251,26 +248,7 @@ export function TitleBlock({
   );
   const titleNode =
     titleLoading && titleWrap && titleSkeletonLines ? (
-      <>
-        <TextLineSkeleton
-          type="inherit"
-          as="span"
-          lines={titleSkeletonLines.phone}
-          className="w-full content-md:hidden"
-        />
-        <TextLineSkeleton
-          type="inherit"
-          as="span"
-          lines={titleSkeletonLines.md}
-          className="hidden w-full content-md:flex content-lg:hidden"
-        />
-        <TextLineSkeleton
-          type="inherit"
-          as="span"
-          lines={titleSkeletonLines.lg}
-          className="hidden w-full content-lg:flex"
-        />
-      </>
+      <TextLinesByBreakpointSkeleton as="span" lines={titleSkeletonLines} />
     ) : titleLoading ? (
       <UnifiedSkeleton
         as="span"
