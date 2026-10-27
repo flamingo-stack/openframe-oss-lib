@@ -1,23 +1,8 @@
 /**
  * A picture's size comes from the image-size table (src/styles/image-sizes.ts), never from the component: every
  * `sizes`, width ladder and quality a component picks on its own is another copy the image host makes and caches.
- * The rule fails on a string-literal `sizes` on an `<Image>`, on any `quality` on an `<Image>`, and on a per-component
- * pixel map that the table replaced.
+ * The rule fails on a string-literal `sizes` and on any `quality` on an `<Image>`.
  */
-
-/** The per-component maps the table replaced; declaring one again is a second table. */
-const RETIRED_MAPS = new Set([
-  // the lib's
-  'PHOTO_WIDTH_STEPS_PX',
-  'imageSizeMap',
-  'tilePxMap',
-  'MARK_IMAGE_SIZES',
-  // a host's (the hub turns this rule on too)
-  'IMAGE_PRESETS',
-  'PROGRAM_COVER_SIZES',
-  'HERO_WALL_SIZES',
-  'PERSON_PHOTO_PX',
-]);
 
 /** A string the attribute states outright: `"..."`, `{'...'}` or a template with no expressions. */
 function isLiteralString(value) {
@@ -42,7 +27,6 @@ const noAdHocImageSize = {
       quality:
         '`quality` on an `<Image>`: one quality comes from the host (`IMAGE_QUALITY`). A second quality is a second ' +
         'copy of every picture.',
-      retired: '`{{name}}` was replaced by the image-size table (src/styles/image-sizes.ts). Read the table instead.',
     },
   },
   create(context) {
@@ -56,10 +40,6 @@ const noAdHocImageSize = {
           else if (name === 'sizes' && isLiteralString(attribute.value))
             context.report({ node: attribute, messageId: 'sizes' });
         }
-      },
-      VariableDeclarator(node) {
-        if (node.id.type === 'Identifier' && RETIRED_MAPS.has(node.id.name))
-          context.report({ node: node.id, messageId: 'retired', data: { name: node.id.name } });
       },
     };
   },

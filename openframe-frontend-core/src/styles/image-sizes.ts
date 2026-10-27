@@ -71,7 +71,6 @@ export const IMAGE_FIXED_PX = {
   glyph: 20,
   logo: 32,
   logoLg: 40,
-  logoXl: 48,
   tile: 56,
   thumb: 64,
   mark: 96,
