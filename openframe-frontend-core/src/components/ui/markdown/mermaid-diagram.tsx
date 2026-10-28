@@ -11,12 +11,14 @@
 import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react';
 import type { MermaidConfig } from 'mermaid';
 import type React from 'react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useIsHydrated } from '../../../hooks/ui/use-is-hydrated';
+import { absoluteHttpUrl, isAppOriginUrl, readAppOrigins, type AppOrigins } from '../../../utils/app-origins';
 import { AlertCircleIcon } from '../../icons-v2-generated';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../button';
 import { useLoadingScope } from '../loading-scope';
+import { ExternalMediaGate, MarkdownMediaOriginsContext } from './external-media-gate';
 
 /**
  * SECURITY SSOT for the mermaid renderer — the ONLY place these knobs are
@@ -194,10 +196,13 @@ const FRAME_CLASS: Record<MermaidFrame, string> = {
   fold: 'h-[70svh] min-h-[320px]',
 };
 
-export const MermaidDiagram: React.FC<{ chart: string; zoomable?: boolean; frame?: MermaidFrame }> = ({
+type MermaidDiagramProps = { chart: string; zoomable?: boolean; frame?: MermaidFrame };
+
+const MermaidDiagramView: React.FC<MermaidDiagramProps & { untrusted: boolean }> = ({
   chart: givenChart,
   zoomable = true,
   frame = 'content',
+  untrusted,
 }) => {
   // In a loading scope the diagram is not drawn: its frame shows the skeleton an empty chart shows.
   const chart = useLoadingScope() ? '' : givenChart;
@@ -399,11 +404,11 @@ export const MermaidDiagram: React.FC<{ chart: string; zoomable?: boolean; frame
         });
 
         const { svg: renderedSvg } = await withRenderTimeout(
-          mermaid.render(renderId, chart),
+          mermaid.render(renderId, untrusted ? withoutMermaidConfig(chart) : chart),
           MERMAID_RENDER_TIMEOUT_MS,
         );
         if (cancelled) return;
-        setSvg(renderedSvg);
+        setSvg(untrusted ? scrubMermaidSvg(renderedSvg) : renderedSvg);
         // A new diagram starts at 100%, top-left — zoom is per diagram, not per host.
         pendingAnchor.current = null;
         setZoom(1);
@@ -437,7 +442,7 @@ export const MermaidDiagram: React.FC<{ chart: string; zoomable?: boolean; frame
       document.getElementById(`d${renderId}`)?.remove();
       document.getElementById(renderId)?.remove();
     };
-  }, [chart, empty, mounted]);
+  }, [chart, empty, mounted, untrusted]);
 
   // `safe center` on both axes: a zoomed diagram larger than the frame scrolls
   // from its top-left corner instead of losing those edges to flex centering.
@@ -558,3 +563,107 @@ export const MermaidDiagram: React.FC<{ chart: string; zoomable?: boolean; frame
     </div>
   );
 };
+
+/**
+ * What, in untrusted diagram source, makes mermaid load something from the network while it renders. It renders into
+ * the live document to measure the layout, so neither `securityLevel` nor a scrub of the SVG it returns can stop
+ * these requests; the diagram has to wait for the reader instead. Each is a token mermaid's own lexer matches
+ * literally, so an escape inside a value cannot hide it:
+ *   - `@{`: shape data, which can name an `img` (flowchart, kanban) that mermaid fetches with `new Image()`.
+ *     The data is YAML, so the key and the URL can both be spelled with escapes: the block itself is the signal.
+ *   - a `properties` or `details` statement: a sequence participant's icon, drawn as `<image href>`. `details` reads
+ *     the JSON from any element of the PAGE by id, and markdown can put an element with an id there.
+ *   - a CSS function that loads a resource, or a backslash, in a `style` / `classDef` / `linkStyle` value.
+ * Over-matching only costs a click.
+ */
+const MERMAID_REMOTE_LOAD_RE =
+  /@\{|(?:^|[\n;])[ \t]*(?:properties|details)\b|url\s*\(|image(?:-set)?\s*\(|\bsrc\s*\(|@import|^[ \t]*(?:style|classDef|linkStyle)\b[^\n]*\\/im;
+
+/** Front matter (`---` … `---` at the top) and `%%{…}%%` directives: diagram config, which can carry CSS. */
+const MERMAID_FRONT_MATTER_RE = /^\s*---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+const MERMAID_DIRECTIVE_RE = /%%\{[\s\S]*?(?:\}%%|$)/g;
+
+/**
+ * Untrusted source without its config. `secure` locks the keys that turn the security off, but values such as
+ * `fontFamily` or `themeVariables` land in the SVG's `<style>` with only their braces balanced: a `url(…)` request,
+ * or `position:fixed` on the diagram itself, i.e. a full-page overlay. A reply has no reason to theme a diagram.
+ */
+function withoutMermaidConfig(chart: string): string {
+  return chart.replace(MERMAID_FRONT_MATTER_RE, '').replace(MERMAID_DIRECTIVE_RE, '');
+}
+
+/** A CSS declaration that loads a resource (see `CSS_RESOURCE_RE` in ./sanitize.ts), with its property. */
+const SVG_CSS_RESOURCE_DECL_RE = /[^;{}]*(?:url\s*\((?!\s*['"]?\s*#)|image(?:-set)?\s*\(|\bsrc\s*\(|\\)[^;{}]*;?/gi;
+
+/** SVG presentation attributes whose value is CSS that can name another document. */
+const CSS_URL_ATTRIBUTES = new Set([
+  'fill',
+  'stroke',
+  'marker-start',
+  'marker-mid',
+  'marker-end',
+  'clip-path',
+  'mask',
+  'filter',
+]);
+
+/**
+ * The rendered SVG of an untrusted diagram, scrubbed before it goes into the page: no `<image>`, no reference to
+ * another document except a link's, no CSS that loads a resource. What reaches here passed `MERMAID_REMOTE_LOAD_RE`,
+ * so this is the second line, for whatever mermaid can still emit that the first one did not foresee. An SVG that
+ * does not parse is not drawn.
+ */
+function scrubMermaidSvg(svg: string): string {
+  if (typeof DOMParser === 'undefined') return '';
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  if (doc.getElementsByTagName('parsererror').length) return '';
+  for (const el of Array.from(doc.querySelectorAll('image, feImage'))) el.remove();
+  for (const el of Array.from(doc.querySelectorAll('*'))) {
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      if ((name === 'href' || name === 'xlink:href') && el.localName !== 'a' && !attr.value.trim().startsWith('#')) {
+        el.removeAttribute(attr.name);
+      } else if (name === 'style' || CSS_URL_ATTRIBUTES.has(name)) {
+        const cleaned = attr.value.replace(SVG_CSS_RESOURCE_DECL_RE, '');
+        if (cleaned !== attr.value) el.setAttribute(attr.name, cleaned);
+      }
+    }
+  }
+  for (const style of Array.from(doc.querySelectorAll('style'))) {
+    style.textContent = (style.textContent ?? '').replace(/@import[^;]*;?/gi, '').replace(SVG_CSS_RESOURCE_DECL_RE, '');
+  }
+  return new XMLSerializer().serializeToString(doc.documentElement);
+}
+
+/** The host a diagram's source names first, for its stand-in; `null` when it names none plainly. */
+function firstMermaidUrl(chart: string, origins: AppOrigins): string | null {
+  for (const [candidate] of chart.matchAll(/(?:https?:)?\/\/[^\s"'`)<>\\]+/gi)) {
+    if (!isAppOriginUrl(candidate, origins)) return absoluteHttpUrl(candidate, origins);
+  }
+  return null;
+}
+
+/**
+ * On untrusted content (no `allowRemoteMedia` above) a diagram that can load from the network while it renders waits
+ * behind a click, like a markdown image (`ExternalMediaGate`), and every diagram renders without its config and with
+ * its SVG scrubbed: the source is model output on the chat path.
+ */
+export const MermaidDiagram: React.FC<MermaidDiagramProps> = props => {
+  const media = useContext(MarkdownMediaOriginsContext);
+  const origins = media === undefined ? readAppOrigins() : media;
+  if (origins === null) return <MermaidDiagramView {...props} untrusted={false} />;
+  const view = <MermaidDiagramView {...props} untrusted />;
+  if (!MERMAID_REMOTE_LOAD_RE.test(withoutMermaidConfig(props.chart))) return view;
+  return (
+    <ExternalMediaGate
+      url={firstMermaidUrl(props.chart, origins)}
+      approvalKey={`diagram ${props.chart}`}
+      kind="diagram"
+    >
+      {view}
+    </ExternalMediaGate>
+  );
+};
+
+export const __withoutMermaidConfigForTest = withoutMermaidConfig;
+export const __scrubMermaidSvgForTest = scrubMermaidSvg;
