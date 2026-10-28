@@ -11,6 +11,7 @@ use anyhow::{anyhow, Result};
 
 use crate::executor::tempfile::{temp_script_name, write_temp_script, TempFileGuard};
 use crate::executor::{ExecResult, ScriptParams};
+use crate::platform::directories::get_app_support_directory;
 use crate::platform::powershell::{get_powershell_path, resolve_system32_exe};
 
 pub(crate) struct Interpreter {
@@ -115,10 +116,7 @@ fn resolve_interpreter(shell: &str) -> Option<Interpreter> {
 }
 
 fn win_tmp_dir() -> Result<PathBuf> {
-    let base = std::env::var_os("PROGRAMDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
-    let dir = base.join("OpenFrame");
+    let dir = get_app_support_directory();
     std::fs::create_dir_all(&dir).map_err(|e| anyhow!("failed to create temp dir: {e}"))?;
     Ok(dir)
 }
