@@ -38,7 +38,7 @@ import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { LoadingItems, useLoadingScope } from '../loading-scope';
 import { buildBaseComponents, MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
-import { MarkdownMediaOriginsContext } from './external-media-gate';
+import { MarkdownMediaOriginsContext } from './external-media-notice';
 import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
 import {
   buildEffectiveTagSet,

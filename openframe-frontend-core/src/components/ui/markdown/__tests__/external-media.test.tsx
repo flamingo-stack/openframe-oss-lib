@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,15 +6,13 @@ import { setEmbedAuthAdapter } from '../../../../utils/embed-authed-fetch';
 import { RichMarkdownRenderer, SimpleMarkdownRenderer } from '../index';
 
 /**
- * Edge cases of the click-to-load stand-in (`ExternalMediaGate`) on the chat surface. jsdom's page is
+ * Edge cases of the blocked-media notice (`ExternalMediaNotice`) on the chat surface. jsdom's page is
  * `http://localhost:3000`; `attacker.example` stands for any third-party host.
  */
 
-/** The stand-ins on the page (or in `host`), by the action their button names (`Load image from attacker.example`). */
-const standIns = (host?: HTMLElement) =>
-  (host ? within(host) : screen)
-    .queryAllByRole('button', { name: /^Load (image|video|diagram)( from |$)/ })
-    .map(button => button.textContent);
+/** The notices on the page (or in `host`), by the reason they give. */
+const notices = (host?: HTMLElement) =>
+  (host ? within(host) : screen).queryAllByText(/blocked for your privacy\.$/).map(note => note.textContent);
 /** Where the drawn images load from. */
 const imgSrcs = (host?: HTMLElement) =>
   (host ? within(host) : screen).queryAllByRole('img').map(img => img.getAttribute('src'));
@@ -23,7 +21,7 @@ afterEach(() => {
   setEmbedAuthAdapter(null);
 });
 
-describe('stand-in placement: wherever markdown can put an image', () => {
+describe('notice placement: wherever markdown can put an image', () => {
   const PLACES: Record<string, string> = {
     'reference-style image': '![chart][r]\n\n[r]: https://attacker.example/r.png',
     'image with a title': '![chart](https://attacker.example/t.png "Quarterly")',
@@ -38,31 +36,55 @@ describe('stand-in placement: wherever markdown can put an image', () => {
   };
 
   for (const [name, md] of Object.entries(PLACES)) {
-    it(`draws one stand-in and no image: ${name}`, () => {
+    it(`draws one notice naming the host, and no image: ${name}`, () => {
       render(<SimpleMarkdownRenderer content={md} />);
       expect(imgSrcs()).toEqual([]);
-      expect(screen.getAllByRole('button', { name: 'Load image from attacker.example' })).toHaveLength(1);
+      expect(notices()).toEqual(['From attacker.example. Images from other sites are blocked for your privacy.']);
+      expect(screen.getByText('chart')).toBeTruthy();
     });
   }
+
+  it('calls an image without alt text "Image"', () => {
+    render(<SimpleMarkdownRenderer content={'<img src="https://attacker.example/x.png">'} />);
+    expect(screen.getByText('Image')).toBeTruthy();
+  });
+
+  // Nothing to click: no "load anyway", whose label the same content would write.
+  it('offers nothing to press', () => {
+    render(
+      <SimpleMarkdownRenderer content={'![Session expired - click to sign in](https://attacker.example/x.png)'} />,
+    );
+    expect(screen.queryAllByRole('button')).toEqual([]);
+    expect(screen.queryAllByRole('link')).toEqual([]);
+  });
+
+  it('gives each blocked image its own notice', () => {
+    render(
+      <SimpleMarkdownRenderer
+        content={'![one](https://attacker.example/same.png)\n\n![two](https://attacker.example/same.png)'}
+      />,
+    );
+    expect(notices()).toHaveLength(2);
+  });
 });
 
-describe('what never gets a stand-in', () => {
+describe('what never gets a notice', () => {
   it('drops data: and javascript: images outright (nothing to name, nothing to load)', () => {
     render(<SimpleMarkdownRenderer content={'![a](data:image/png;base64,AAAA)\n\n<img src="javascript:alert(1)">'} />);
     expect(imgSrcs()).toEqual([]);
-    expect(standIns()).toEqual([]);
+    expect(notices()).toEqual([]);
   });
 
   // hast-util-sanitize matches the scheme case-sensitively, so it drops the image before any origin check runs.
-  it('drops an image whose scheme is upper-case: no image, no stand-in, no request', () => {
+  it('drops an image whose scheme is upper-case: no image, no notice, no request', () => {
     const { container } = render(<SimpleMarkdownRenderer content={'![chart](HTTPS://attacker.example/U.PNG)'} />);
     expect(imgSrcs()).toEqual([]);
     expect(container.innerHTML).not.toContain('attacker.example');
   });
 
-  it('draws relative images in every spelling without asking', () => {
+  it('draws relative images in every spelling', () => {
     render(<SimpleMarkdownRenderer content={'![a](./a.png) ![b](../b.png) ![c](c.png) ![d](/d.png?x=1#f)'} />);
-    expect(standIns()).toEqual([]);
+    expect(notices()).toEqual([]);
     expect(imgSrcs()).toHaveLength(4);
   });
 
@@ -70,7 +92,7 @@ describe('what never gets a stand-in', () => {
     const { container } = render(
       <SimpleMarkdownRenderer content={'<img src="/ok.png" srcset="/ok.png 1x, https://attacker.example/x 2x">'} />,
     );
-    expect(standIns()).toEqual([]);
+    expect(notices()).toEqual([]);
     expect(imgSrcs()).toEqual(['/ok.png']);
     expect(container.innerHTML).not.toContain('attacker.example');
   });
@@ -82,33 +104,14 @@ describe('what never gets a stand-in', () => {
   });
 });
 
-describe('the reader loads it', () => {
-  // The pressed button unmounts with the stand-in; focus must land on what replaced it, not fall back to <body>.
-  it('moves focus to the loaded image, so a keyboard reader keeps their place', () => {
-    render(<SimpleMarkdownRenderer content={'![chart](https://attacker.example/focus.png)'} />);
-    const button = screen.getByRole('button', { name: 'Load image from attacker.example' });
-    button.focus();
-    fireEvent.click(button);
-    expect(screen.getByRole('group', { name: 'Image from attacker.example' })).toHaveFocus();
-    expect(screen.getByRole('img', { name: 'chart' })).toBeTruthy();
-  });
-
-  it('does not take focus for media the reader had already loaded', () => {
-    const md = '![chart](https://attacker.example/again.png)';
-    const { unmount } = render(<SimpleMarkdownRenderer content={md} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Load image from attacker.example' }));
-    unmount();
-    render(<SimpleMarkdownRenderer content={md} />);
-    expect(screen.getByRole('group', { name: 'Image from attacker.example' })).not.toHaveFocus();
-  });
-
-  // A stand-in's button inside a link would be a control inside a control: the image becomes the link's text.
+describe('images inside links', () => {
+  // A notice inside a link would turn the notice itself into the thing to click: the image becomes the link's text.
   it('turns a third-party image inside a link into the link’s text', () => {
     render(
       <SimpleMarkdownRenderer content={'[![chart](https://attacker.example/l.png)](https://example.com/report)'} />,
     );
     expect(screen.getByRole('link', { name: 'chart' })).toBeTruthy();
-    expect(standIns()).toEqual([]);
+    expect(notices()).toEqual([]);
     expect(imgSrcs()).toEqual([]);
   });
 
@@ -124,55 +127,29 @@ describe('the reader loads it', () => {
       />,
     );
     expect(screen.getByRole('link', { name: 'n' })).toBeTruthy();
-    expect(standIns()).toEqual([]);
+    expect(notices()).toEqual([]);
   });
+});
 
-  it('stops the click from reaching anything around the stand-in', () => {
-    const outer = vi.fn();
-    render(
-      <div onClick={outer}>
-        <SimpleMarkdownRenderer content={'![chart](https://attacker.example/p.png)'} />
-      </div>,
-    );
-    expect(fireEvent.click(screen.getByRole('button', { name: 'Load image from attacker.example' }))).toBe(false);
-    expect(outer).not.toHaveBeenCalled();
-  });
-
-  it('loads only the image the reader clicked, even when another one has the same URL', () => {
-    render(
-      <SimpleMarkdownRenderer
-        content={'![one](https://attacker.example/same.png)\n\n![two](https://attacker.example/same.png)'}
-      />,
-    );
-    fireEvent.click(screen.getAllByRole('button', { name: 'Load image from attacker.example' })[0]);
-    expect(imgSrcs()).toEqual(['https://attacker.example/same.png']);
-    expect(standIns()).toHaveLength(1);
-  });
-
-  it('keeps a loaded image when the streamed reply is parsed again as a whole', () => {
+describe('streaming', () => {
+  it('never draws a third-party image while the reply streams, nor after it completes', () => {
     const md = 'Here:\n\n![chart](https://attacker.example/stream.png)\n\nmore';
-    const { rerender } = render(<SimpleMarkdownRenderer content={md} streaming />);
-    fireEvent.click(screen.getByRole('button', { name: 'Load image from attacker.example' }));
-    rerender(<SimpleMarkdownRenderer content={`${md} text`} streaming />);
-    rerender(<SimpleMarkdownRenderer content={`${md} text, done.`} />);
-    expect(standIns()).toEqual([]);
-    expect(imgSrcs()).toEqual(['https://attacker.example/stream.png']);
-  });
-
-  it('holds a third-party image while the reply is still streaming', () => {
-    const { container } = render(
-      <SimpleMarkdownRenderer content={'Here:\n\n![chart](https://attacker.example/live.png'} streaming />,
-    );
+    const { container, rerender } = render(<SimpleMarkdownRenderer content={md.slice(0, 40)} streaming />);
     expect(container.innerHTML).not.toMatch(/src="https:\/\/attacker\.example/);
+    rerender(<SimpleMarkdownRenderer content={md} streaming />);
+    expect(container.innerHTML).not.toMatch(/src="https:\/\/attacker\.example/);
+    rerender(<SimpleMarkdownRenderer content={md} />);
+    expect(imgSrcs()).toEqual([]);
+    expect(notices()).toHaveLength(1);
   });
 });
 
 describe('the app’s origins can change after the first render', () => {
   it('draws a gateway image once the host sanctions the gateway', () => {
     render(<SimpleMarkdownRenderer content={'![kb](https://gateway.example/kb/1.png)'} />);
-    expect(standIns()).toHaveLength(1);
+    expect(notices()).toHaveLength(1);
     act(() => setEmbedAuthAdapter({ allowedOrigins: ['https://gateway.example'] }));
-    expect(standIns()).toEqual([]);
+    expect(notices()).toEqual([]);
     expect(imgSrcs()).toEqual(['https://gateway.example/kb/1.png']);
   });
 });
@@ -187,7 +164,7 @@ describe('inside a native shell', () => {
     Tauri: 'tauri://localhost/tickets/',
   };
   for (const [shell, href] of Object.entries(SHELLS)) {
-    it(`${shell}: draws the gateway's and the bundle's images, holds a third party's`, () => {
+    it(`${shell}: draws the gateway's and the bundle's images, blocks a third party's`, () => {
       // A mocked plain object (see the test setup), not a navigation.
       Object.assign(window.location, { href });
       setEmbedAuthAdapter({ allowedOrigins: ['https://acme.openframe.ai'] });
@@ -201,7 +178,7 @@ describe('inside a native shell', () => {
           />,
         );
         expect(imgSrcs()).toEqual(['https://acme.openframe.ai/api/knowledge-base/images/1', '/assets/logo.svg']);
-        expect(screen.getAllByRole('button', { name: 'Load image from attacker.example' })).toHaveLength(1);
+        expect(notices()).toEqual(['From attacker.example. Images from other sites are blocked for your privacy.']);
       } finally {
         window.location.href = 'http://localhost:3000/';
       }
@@ -214,7 +191,7 @@ describe('server render and hydration', () => {
 
   it('gives the server answer while hydrating, then the page’s, with no mismatch', () => {
     const serverHtml = renderToString(<SimpleMarkdownRenderer content={md} />);
-    // On the server only the relative image is the app's: the absolute same-origin one waits like a third party.
+    // On the server only the relative image is the app's: the absolute same-origin one is blocked like a third party.
     expect(serverHtml).toContain('src="/kb/1.png"');
     expect(serverHtml).not.toContain('src="http://localhost:3000/kb/2.png"');
     expect((serverHtml.match(/data-external-media/g) ?? []).length).toBe(2);
@@ -232,14 +209,16 @@ describe('server render and hydration', () => {
     errors.mockRestore();
     // After hydration the page knows its own origin: the absolute same-origin image is drawn.
     expect(imgSrcs(host)).toEqual(['/kb/1.png', 'http://localhost:3000/kb/2.png']);
-    expect(standIns(host)).toHaveLength(1);
+    expect(notices(host)).toHaveLength(1);
     host.remove();
   });
 });
 
 describe('mermaid diagrams that load images', () => {
   const diagram = (shape: string) => '```mermaid\nflowchart TD\n  ' + shape + '\n  A --> B\n```';
-  const GATED: Record<string, string> = {
+  const DIAGRAM_REASON = 'This diagram loads images from other sites, which are blocked for your privacy.';
+
+  const NAMED: Record<string, string> = {
     'double-quoted url': 'A@{ img: "https://attacker.example/i.png", w: 60, h: 60 }',
     'single-quoted url': "A@{ img: 'https://attacker.example/i.png', w: 60, h: 60 }",
     'unquoted url': 'A@{ img: https://attacker.example/i.png, w: 60, h: 60 }',
@@ -247,26 +226,32 @@ describe('mermaid diagrams that load images', () => {
     'second image is the third-party one': 'A@{ img: "/ok.png" }\n  C@{ img: "https://attacker.example/i.png" }',
     'protocol-relative': 'A@{ img: "//attacker.example/i.png" }',
   };
-  for (const [name, shape] of Object.entries(GATED)) {
-    it(`holds the diagram: ${name}`, () => {
+  for (const [name, shape] of Object.entries(NAMED)) {
+    it(`does not draw the diagram, and names the host: ${name}`, () => {
       render(<SimpleMarkdownRenderer content={diagram(shape)} />);
-      expect(screen.getByRole('button', { name: 'Load diagram from attacker.example' })).toBeTruthy();
+      expect(notices()).toEqual([`From attacker.example. ${DIAGRAM_REASON}`]);
+      expect(screen.queryByRole('group', { name: 'Diagram zoom' })).toBeNull();
     });
   }
 
-  it('draws a diagram with no shape data, icons or CSS loads without asking', () => {
+  it('draws a diagram with no shape data, icons or CSS loads', () => {
     render(<SimpleMarkdownRenderer content={diagram('A["img: label text"]')} />);
-    expect(standIns()).toEqual([]);
+    expect(notices()).toEqual([]);
   });
 
-  // Shape data is YAML, so neither the key nor the URL can be read reliably from the text: any `@{` waits.
-  it('holds any diagram with shape data, without naming a host it cannot read', () => {
+  // Shape data is YAML, so neither the key nor the URL can be read reliably from the text: any `@{` is blocked.
+  it('blocks any diagram with shape data, without naming a host it cannot read', () => {
     render(<SimpleMarkdownRenderer content={diagram('A@{ img: "/ok.png" }')} />);
-    expect(screen.getByRole('button', { name: 'Load diagram' })).toBeTruthy();
-    expect(screen.getByText(/Can load images from other sites/)).toBeTruthy();
+    expect(notices()).toEqual([DIAGRAM_REASON]);
   });
 
-  // The bypasses an adversarial review found against a regex on the `img` key; each must still wait.
+  it('blocks a diagram that asks for a javascript: image', () => {
+    render(<SimpleMarkdownRenderer content={diagram('A@{ img: "javascript:alert(1)" }')} />);
+    expect(notices()).toEqual([DIAGRAM_REASON]);
+    expect(screen.queryByRole('group', { name: 'Diagram zoom' })).toBeNull();
+  });
+
+  // The bypasses an adversarial review found against a regex on the `img` key; each must still be blocked.
   const BYPASSES: Record<string, string> = {
     'escaped key': 'flowchart TD\n  A@{ "\\x69mg": "https://attacker.example/x.png", label: "x" }',
     'escaped URL': 'flowchart TD\n  A@{ img: "https\\u003a//attacker.example/x.png", label: "x" }',
@@ -281,15 +266,15 @@ describe('mermaid diagrams that load images', () => {
     'classDef escaped url': 'flowchart TD\n  A --> B\n  classDef x fill:u\\72 l(https://attacker.example/p.svg#p)',
   };
   for (const [name, source] of Object.entries(BYPASSES)) {
-    it(`holds the diagram: ${name}`, () => {
+    it(`does not draw the diagram: ${name}`, () => {
       render(<SimpleMarkdownRenderer content={'```mermaid\n' + source + '\n```'} />);
-      expect(screen.getAllByRole('button', { name: /^Load diagram/ })).toHaveLength(1);
+      expect(notices()).toHaveLength(1);
       expect(screen.queryByRole('group', { name: 'Diagram zoom' })).toBeNull();
     });
   }
 
   it('leaves authored content (Rich) its diagrams', () => {
     render(<RichMarkdownRenderer content={diagram('A@{ img: "https://cdn.example.com/i.png" }')} />);
-    expect(standIns()).toEqual([]);
+    expect(notices()).toEqual([]);
   });
 });

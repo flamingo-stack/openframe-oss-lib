@@ -82,7 +82,7 @@ export function isAppOriginUrl(url: string, origins?: AppOrigins): boolean {
 }
 
 /**
- * `url` as an absolute http(s) URL against `origins`' page, for a stand-in to
+ * `url` as an absolute http(s) URL against `origins`' page, for a notice to
  * name its host; `null` when it is not http(s).
  */
 export function absoluteHttpUrl(url: string, origins: AppOrigins = readAppOrigins()): string | null {

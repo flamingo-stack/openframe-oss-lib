@@ -18,7 +18,7 @@ import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
 import { renderedLinkRel } from '../../../utils/markdown-link';
 import { getHashTargetElement, navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
 import { useLoadingScope } from '../loading-scope';
-import { ExternalMediaGate } from './external-media-gate';
+import { ExternalMediaNotice } from './external-media-notice';
 import { extractText, resolveFallbackHeadingId, useAssignedHeadingIds, useHeadingId } from './heading-ids';
 import { MermaidDiagram } from './mermaid-diagram';
 import type { TextSizeElement } from './text-size';
@@ -369,15 +369,9 @@ export function buildBaseComponents({
     //
     // A third-party `src` never reaches here unless the composition set
     // `allowRemoteMedia`: `rehypeStripUnsafe` moves it to `data-blocked-src`,
-    // and the image waits behind a click-to-load stand-in.
+    // and a notice stands where the image would have been. It is not loaded.
     img: ({ src, alt, 'data-blocked-src': blockedSrc }: MdRenderProps<'img'> & { 'data-blocked-src'?: string }) => {
-      if (hasRenderableSrc(blockedSrc)) {
-        return (
-          <ExternalMediaGate url={blockedSrc} kind="image" label={alt}>
-            <MarkdownContentImage src={blockedSrc} alt={alt} />
-          </ExternalMediaGate>
-        );
-      }
+      if (hasRenderableSrc(blockedSrc)) return <ExternalMediaNotice url={blockedSrc} kind="image" label={alt} />;
       if (!hasRenderableSrc(src)) return null;
       return <MarkdownContentImage src={src} alt={alt} />;
     },

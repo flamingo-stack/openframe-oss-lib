@@ -18,7 +18,7 @@ import { AlertCircleIcon } from '../../icons-v2-generated';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../button';
 import { useLoadingScope } from '../loading-scope';
-import { ExternalMediaGate, MarkdownMediaOriginsContext } from './external-media-gate';
+import { ExternalMediaNotice, MarkdownMediaOriginsContext } from './external-media-notice';
 
 /**
  * SECURITY SSOT for the mermaid renderer — the ONLY place these knobs are
@@ -567,14 +567,14 @@ const MermaidDiagramView: React.FC<MermaidDiagramProps & { untrusted: boolean }>
 /**
  * What, in untrusted diagram source, makes mermaid load something from the network while it renders. It renders into
  * the live document to measure the layout, so neither `securityLevel` nor a scrub of the SVG it returns can stop
- * these requests; the diagram has to wait for the reader instead. Each is a token mermaid's own lexer matches
+ * these requests; the diagram is not drawn at all. Each is a token mermaid's own lexer matches
  * literally, so an escape inside a value cannot hide it:
  *   - `@{`: shape data, which can name an `img` (flowchart, kanban) that mermaid fetches with `new Image()`.
  *     The data is YAML, so the key and the URL can both be spelled with escapes: the block itself is the signal.
  *   - a `properties` or `details` statement: a sequence participant's icon, drawn as `<image href>`. `details` reads
  *     the JSON from any element of the PAGE by id, and markdown can put an element with an id there.
  *   - a CSS function that loads a resource, or a backslash, in a `style` / `classDef` / `linkStyle` value.
- * Over-matching only costs a click.
+ * Over-matching costs a diagram that would have been safe to draw.
  */
 const MERMAID_REMOTE_LOAD_RE =
   /@\{|(?:^|[\n;])[ \t]*(?:properties|details)\b|url\s*\(|image(?:-set)?\s*\(|\bsrc\s*\(|@import|^[ \t]*(?:style|classDef|linkStyle)\b[^\n]*\\/im;
@@ -635,7 +635,7 @@ function scrubMermaidSvg(svg: string): string {
   return new XMLSerializer().serializeToString(doc.documentElement);
 }
 
-/** The host a diagram's source names first, for its stand-in; `null` when it names none plainly. */
+/** The host a diagram's source names first, for its notice; `null` when it names none plainly. */
 function firstMermaidUrl(chart: string, origins: AppOrigins): string | null {
   for (const [candidate] of chart.matchAll(/(?:https?:)?\/\/[^\s"'`)<>\\]+/gi)) {
     if (!isAppOriginUrl(candidate, origins)) return absoluteHttpUrl(candidate, origins);
@@ -644,25 +644,18 @@ function firstMermaidUrl(chart: string, origins: AppOrigins): string | null {
 }
 
 /**
- * On untrusted content (no `allowRemoteMedia` above) a diagram that can load from the network while it renders waits
- * behind a click, like a markdown image (`ExternalMediaGate`), and every diagram renders without its config and with
- * its SVG scrubbed: the source is model output on the chat path.
+ * On untrusted content (no `allowRemoteMedia` above) a diagram that can load from the network while it renders is not
+ * drawn: a notice stands in its place, like a markdown image (`ExternalMediaNotice`). Every other diagram renders
+ * without its config and with its SVG scrubbed: the source is model output on the chat path.
  */
 export const MermaidDiagram: React.FC<MermaidDiagramProps> = props => {
   const media = useContext(MarkdownMediaOriginsContext);
   const origins = media === undefined ? readAppOrigins() : media;
   if (origins === null) return <MermaidDiagramView {...props} untrusted={false} />;
-  const view = <MermaidDiagramView {...props} untrusted />;
-  if (!MERMAID_REMOTE_LOAD_RE.test(withoutMermaidConfig(props.chart))) return view;
-  return (
-    <ExternalMediaGate
-      url={firstMermaidUrl(props.chart, origins)}
-      approvalKey={`diagram ${props.chart}`}
-      kind="diagram"
-    >
-      {view}
-    </ExternalMediaGate>
-  );
+  if (MERMAID_REMOTE_LOAD_RE.test(withoutMermaidConfig(props.chart))) {
+    return <ExternalMediaNotice url={firstMermaidUrl(props.chart, origins)} kind="diagram" />;
+  }
+  return <MermaidDiagramView {...props} untrusted />;
 };
 
 export const __withoutMermaidConfigForTest = withoutMermaidConfig;

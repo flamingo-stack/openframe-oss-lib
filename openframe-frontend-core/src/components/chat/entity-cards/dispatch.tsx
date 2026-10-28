@@ -88,7 +88,7 @@ import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/tr
 import type { LoadedProductReleaseCardProps } from '../../shared/product-release/product-release-card';
 import { ProductReleaseCard } from '../../shared/product-release/product-release-card';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
-import { ExternalMediaGate } from '../../ui/markdown/external-media-gate';
+import { ExternalMediaNotice } from '../../ui/markdown/external-media-notice';
 import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
@@ -2252,19 +2252,16 @@ export function renderChatInlineEntityCard(
         metadata: { ...(chatRef.metadata ?? {}), ...decoded },
       };
       // An `mp4-` id carries any https URL the reply put in it, and the
-      // player fetches it on mount: from outside the app it waits for a click,
-      // like a markdown image (`ExternalMediaGate`). `mux-` and YouTube ids
+      // player fetches it on mount: from outside the app it is not played,
+      // like a markdown image (`ExternalMediaNotice`). `mux-` and YouTube ids
       // only ever reach their own fixed hosts.
-      const player = <ChatVideoEntityCard chatRef={displayRef} />;
       const externalUrl = chatRef.id.startsWith('mp4-') && decoded.videoUrl;
       return (
         <BlockCard inline={<ChatInlineVideoPill chatRef={displayRef} />}>
           {externalUrl && !isAppOriginUrl(externalUrl) ? (
-            <ExternalMediaGate url={externalUrl} kind="video" label={displayRef.title}>
-              {player}
-            </ExternalMediaGate>
+            <ExternalMediaNotice url={externalUrl} kind="video" label={displayRef.title} />
           ) : (
-            player
+            <ChatVideoEntityCard chatRef={displayRef} />
           )}
         </BlockCard>
       );

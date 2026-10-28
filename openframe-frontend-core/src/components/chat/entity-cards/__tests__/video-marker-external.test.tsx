@@ -1,8 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { setEmbedAuthAdapter } from '../../../../utils/embed-authed-fetch';
-import { ExternalMediaGate } from '../../../ui/markdown/external-media-gate';
+import { ExternalMediaNotice } from '../../../ui/markdown/external-media-notice';
 import type { ChatRef } from '../../chat-ref.types';
 import type { BlockCardProps } from '../block-card';
 import { ChatVideoEntityCard } from '../chat-video-entity-card';
@@ -19,40 +19,30 @@ function blockOf(ref: ChatRef): ReactNode {
   return (card as ReactElement<BlockCardProps>).props.children;
 }
 
-describe('video marker — a player from outside the app waits for a click', () => {
+describe('video marker — a player from outside the app is not drawn', () => {
   afterEach(() => {
     setEmbedAuthAdapter(null);
   });
 
-  it('draws the stand-in, not the player, for a third-party mp4', () => {
+  it('draws a notice, and no player, for a third-party mp4', () => {
     const block = blockOf(mp4Ref('https://attacker.example/v.mp4?d=secret'));
-    expect(isValidElement(block) && block.type).toBe(ExternalMediaGate);
+    expect(isValidElement(block) && block.type).toBe(ExternalMediaNotice);
+    // The player is not in the tree at all, not merely hidden: it would fetch on mount.
+    const { children } = isValidElement(block) ? (block.props as { children?: ReactNode }) : {};
+    expect(children).toBeUndefined();
     render(<>{block}</>);
     expect(screen.getByText('attacker.example')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Load video from attacker.example' })).toBeTruthy();
+    expect(screen.getByText(/Videos from other sites are blocked for your privacy\./)).toBeTruthy();
+    expect(screen.queryAllByRole('button')).toEqual([]);
   });
 
-  it('holds the player behind the click', () => {
-    const block = blockOf(mp4Ref('https://attacker.example/v.mp4'));
-    const { children: player } = isValidElement(block) ? (block.props as { children?: ReactNode }) : {};
-    expect(isValidElement(player) && player.type).toBe(ChatVideoEntityCard);
-    render(
-      <ExternalMediaGate url="https://attacker.example/v.mp4" kind="video">
-        <span data-testid="player" />
-      </ExternalMediaGate>,
-    );
-    expect(screen.queryByTestId('player')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Load video from attacker.example' }));
-    expect(screen.getByTestId('player')).toBeTruthy();
-  });
-
-  it('mounts a video from the app itself without asking (the gateway a native shell sanctions)', () => {
+  it('mounts a video from the app itself (the gateway a native shell sanctions)', () => {
     setEmbedAuthAdapter({ allowedOrigins: ['https://gateway.example'] });
     const block = blockOf(mp4Ref('https://gateway.example/media/v.mp4'));
     expect(isValidElement(block) && block.type).toBe(ChatVideoEntityCard);
   });
 
-  it('plays Mux and YouTube markers without asking: their ids only ever reach those fixed hosts', () => {
+  it('plays Mux and YouTube markers: their ids only ever reach those fixed hosts', () => {
     for (const id of ['mux-a1B2c3D4e5F6g7H8i9', 'dQw4w9WgXcQ']) {
       const block = blockOf({ type: 'video', id } as ChatRef);
       expect(isValidElement(block) && block.type, id).toBe(ChatVideoEntityCard);
@@ -63,6 +53,6 @@ describe('video marker — a player from outside the app waits for a click', () 
     const card = renderChatInlineEntityCard(mp4Ref('http://attacker.example/v.mp4'));
     const { children } = isValidElement(card) ? (card.props as { children?: ReactNode }) : {};
     expect(isValidElement(children) && children.type === ChatVideoEntityCard).toBe(false);
-    expect(isValidElement(children) && children.type === ExternalMediaGate).toBe(false);
+    expect(isValidElement(children) && children.type === ExternalMediaNotice).toBe(false);
   });
 });
