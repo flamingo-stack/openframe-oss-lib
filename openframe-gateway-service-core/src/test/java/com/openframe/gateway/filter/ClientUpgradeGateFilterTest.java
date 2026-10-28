@@ -89,6 +89,7 @@ class ClientUpgradeGateFilterTest {
             "ios/1.0.1 bundle/1.0.125-4-geae0416-dirty",
             "web/- bundle/1.0.100",
             "desktop/0.4.2 bundle/1.0.100",
+            "chat/1.0.100 bundle/1.0.100",
             "tv/1.0.1 bundle/1.0.100",
             "ios/1.0.1 bundle/-",
             "ios/1.0.1 bundle/1.0",
