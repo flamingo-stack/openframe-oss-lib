@@ -1132,6 +1132,12 @@ export interface EmbeddableChatHandle {
    * chat, else a new chat. Leaves the archive.
    */
   showWhatToAsk: () => void;
+  /**
+   * Opens the composer's context picker, as its `+` does, for a host that draws its
+   * own entry ("+ Add context" in the composer's context strip). Nothing without a
+   * `contextPicker`.
+   */
+  openContextPicker: () => void;
 }
 
 export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableChatProps>(
@@ -2609,8 +2615,11 @@ function EmbeddableChatInner({
         setPendingDraft({ text, mentions: mentions.slice(0, contextMaxItems) });
       },
       showWhatToAsk: () => whatToAskEntryRef.current(),
+      openContextPicker: () => {
+        if (contextPicker) openContextPicker();
+      },
     }),
-    [resetToNewChat, contextMaxItems],
+    [resetToNewChat, contextMaxItems, contextPicker, openContextPicker],
   );
 
   // Desktop split header ⋯ menu (active, non-archived conversation only).
