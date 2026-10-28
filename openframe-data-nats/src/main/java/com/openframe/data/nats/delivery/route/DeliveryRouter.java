@@ -37,7 +37,9 @@ public class DeliveryRouter {
     }
 
     // true when a route carried the command. False is a machine the type cannot reach, not a failure: an agent
-    // below the engine's floor on a type that never had a legacy subject, or a type switched off everywhere
+    // below the engine's floor on a type that never had a legacy subject (the flags) or whose legacy subject is a
+    // broadcast only (the updates), or a type switched off everywhere. Counted, not alerted: it is the expected
+    // state of an old agent
     public boolean dispatch(DeliverySeed seed) {
         if (seed.getAudience() == DeliveryAudience.EVERY_MACHINE) {
             return dispatchToEveryMachine(seed);
@@ -51,7 +53,7 @@ public class DeliveryRouter {
         route.ifPresent(reaching -> reaching.send(seed));
         if (route.isEmpty()) {
             metrics.recordUnreachable(type, DeliveryAudience.MACHINE);
-            log.warn("No delivery route reaches the machine: type={} machineId={} agentVersion={}", type, machineId, agentVersion);
+            log.info("No delivery route reaches the machine: type={} machineId={} agentVersion={}", type, machineId, agentVersion);
         }
         return route.isPresent();
     }
@@ -64,7 +66,7 @@ public class DeliveryRouter {
         routes.forEach(route -> route.sendToEveryMachine(seed));
         if (routes.isEmpty()) {
             metrics.recordUnreachable(type, DeliveryAudience.EVERY_MACHINE);
-            log.warn("No delivery route carries the type to every machine: type={} targetId={}", type, seed.getTargetId());
+            log.info("No delivery route carries the type to every machine: type={} targetId={}", type, seed.getTargetId());
         }
         return !routes.isEmpty();
     }

@@ -136,8 +136,8 @@ public class DeliveryMetrics {
         meterRegistry.counter(ROLLOUT_BELOW_FLOOR_COUNTER, TAG_TYPE, typeTag).increment(machines);
     }
 
-    // a command no route carried: an agent below the floor on a type without a legacy subject, or a type closed
-    // everywhere; a burst of these is a flag or a floor set wrong
+    // a command no route carried: an agent below the floor on a type without a per-machine legacy subject, or a
+    // type closed everywhere; a dashboard figure, not an alert
     public void recordUnreachable(DeliveryType type, DeliveryAudience audience) {
         String typeTag = tagValue(type.name());
         String audienceTag = tagValue(audience.name());
