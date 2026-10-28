@@ -2,6 +2,7 @@ package com.openframe.data.nats.delivery.route;
 
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.service.machine.AgentVersionService;
+import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliverySeed;
 import lombok.extern.slf4j.Slf4j;
@@ -26,9 +27,11 @@ public class DeliveryRouter {
 
     private final Map<DeliveryType, List<DeliveryRoute>> routesByType = new EnumMap<>(DeliveryType.class);
     private final AgentVersionService agentVersions;
+    private final DeliveryMetrics metrics;
 
-    public DeliveryRouter(ObjectProvider<DeliveryRoute> routes, AgentVersionService agentVersions) {
+    public DeliveryRouter(ObjectProvider<DeliveryRoute> routes, AgentVersionService agentVersions, DeliveryMetrics metrics) {
         this.agentVersions = agentVersions;
+        this.metrics = metrics;
         routes.orderedStream().sorted(NEWEST_FIRST).forEach(this::register);
         log.info("Delivery routes by type: {}", describeRoutes());
     }
@@ -47,7 +50,8 @@ public class DeliveryRouter {
                 .findFirst();
         route.ifPresent(reaching -> reaching.send(seed));
         if (route.isEmpty()) {
-            log.info("No delivery route reaches the machine: type={} machineId={} agentVersion={}", type, machineId, agentVersion);
+            metrics.recordUnreachable(type, DeliveryAudience.MACHINE);
+            log.warn("No delivery route reaches the machine: type={} machineId={} agentVersion={}", type, machineId, agentVersion);
         }
         return route.isPresent();
     }
@@ -59,7 +63,8 @@ public class DeliveryRouter {
                 .toList();
         routes.forEach(route -> route.sendToEveryMachine(seed));
         if (routes.isEmpty()) {
-            log.info("No delivery route carries the type to every machine: type={} targetId={}", type, seed.getTargetId());
+            metrics.recordUnreachable(type, DeliveryAudience.EVERY_MACHINE);
+            log.warn("No delivery route carries the type to every machine: type={} targetId={}", type, seed.getTargetId());
         }
         return !routes.isEmpty();
     }

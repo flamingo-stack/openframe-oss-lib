@@ -117,6 +117,7 @@ public class DeliveryRolloutService {
                 .toList();
         int left = machines.size() - admitted.size();
         if (left > 0) {
+            metrics.recordRolloutBelowFloor(type, left);
             log.info("Delivery rollout walked past {} machine(s) below the floor: type={} floor={}", left, type, floor);
         }
         return admitted;

@@ -208,6 +208,7 @@ class DeliveryRolloutServiceTest {
         assertThat(requestCaptor.getValue().getMachineId()).isEqualTo("m-2");
         verify(repository).advance(ROLLOUT_ID, SEQUENCE, "id-m-2", 1);
         verify(metrics).recordRolloutMachines(DeliveryType.CLIENT_UPDATE, 1);
+        verify(metrics).recordRolloutBelowFloor(DeliveryType.CLIENT_UPDATE, 1);
         verify(metrics, never()).recordRolloutMachineSkipped(any());
     }
 

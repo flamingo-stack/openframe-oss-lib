@@ -2,6 +2,7 @@ package com.openframe.delivery.metrics;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.spec.DeliveryAudience;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
@@ -39,11 +40,14 @@ public class DeliveryMetrics {
     private static final String ROLLOUT_MACHINES_COUNTER = "openframe.delivery.rollout.machines";
     private static final String ROLLOUT_DURATION_TIMER = "openframe.delivery.rollout.duration";
     private static final String ROLLOUT_RUNNING_GAUGE = "openframe.delivery.rollout.running";
+    private static final String ROLLOUT_BELOW_FLOOR_COUNTER = "openframe.delivery.rollout.below_floor";
+    private static final String ROUTE_UNREACHABLE_COUNTER = "openframe.delivery.route.unreachable";
     private static final String TAG_TYPE = "type";
     private static final String TAG_REASON = "reason";
     private static final String TAG_SINK = "sink";
     private static final String TAG_PASS = "pass";
     private static final String TAG_OUTCOME = "outcome";
+    private static final String TAG_AUDIENCE = "audience";
     private static final String OUTCOME_OK = "ok";
     private static final String OUTCOME_ERROR = "error";
 
@@ -124,6 +128,20 @@ public class DeliveryMetrics {
     public void recordRolloutMachineSkipped(DeliveryType type) {
         String typeTag = tagValue(type.name());
         meterRegistry.counter(ROLLOUT_MACHINE_SKIPPED_COUNTER, TAG_TYPE, typeTag).increment();
+    }
+
+    // machines a rollout walked past because their agent is below the type's floor
+    public void recordRolloutBelowFloor(DeliveryType type, int machines) {
+        String typeTag = tagValue(type.name());
+        meterRegistry.counter(ROLLOUT_BELOW_FLOOR_COUNTER, TAG_TYPE, typeTag).increment(machines);
+    }
+
+    // a command no route carried: an agent below the floor on a type without a legacy subject, or a type closed
+    // everywhere; a burst of these is a flag or a floor set wrong
+    public void recordUnreachable(DeliveryType type, DeliveryAudience audience) {
+        String typeTag = tagValue(type.name());
+        String audienceTag = tagValue(audience.name());
+        meterRegistry.counter(ROUTE_UNREACHABLE_COUNTER, TAG_TYPE, typeTag, TAG_AUDIENCE, audienceTag).increment();
     }
 
     public void recordRolloutStarted(DeliveryType type) {

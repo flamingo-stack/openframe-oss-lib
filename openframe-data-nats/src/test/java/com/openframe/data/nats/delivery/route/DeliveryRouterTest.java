@@ -5,6 +5,8 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientUninstallDeliverySeed;
 import com.openframe.data.nats.delivery.ClientUpdateDeliverySeed;
 import com.openframe.data.service.machine.AgentVersionService;
+import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryAudience;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +35,7 @@ class DeliveryRouterTest {
 
     @Mock private ObjectProvider<DeliveryRoute> routes;
     @Mock private AgentVersionService agentVersions;
+    @Mock private DeliveryMetrics metrics;
     @Mock private DeliveryRoute legacy;
     @Mock private DeliveryRoute engine;
 
@@ -47,7 +50,7 @@ class DeliveryRouterTest {
         lenient().when(engine.getGeneration()).thenReturn(1);
         lenient().when(engine.getTypes()).thenReturn(EnumSet.of(DeliveryType.CLIENT_UNINSTALL, DeliveryType.CLIENT_UPDATE, DeliveryType.CLIENT_FEATURE_FLAGS));
         when(routes.orderedStream()).thenReturn(Stream.of(legacy, engine));
-        router = new DeliveryRouter(routes, agentVersions);
+        router = new DeliveryRouter(routes, agentVersions, metrics);
         uninstall = new ClientUninstallDeliverySeed(MACHINE_ID);
         everyMachine = ClientUpdateDeliverySeed.forEveryMachine(OpenFrameClientConfiguration.builder().version("1.6.0").build());
     }
@@ -112,6 +115,7 @@ class DeliveryRouterTest {
         assertThat(carried).isFalse();
         verify(engine, never()).send(any());
         verify(legacy, never()).send(any());
+        verify(metrics).recordUnreachable(DeliveryType.CLIENT_UNINSTALL, DeliveryAudience.MACHINE);
     }
 
     @Test
@@ -143,6 +147,7 @@ class DeliveryRouterTest {
         assertThat(carried).isFalse();
         verify(engine, never()).sendToEveryMachine(any());
         verify(legacy, never()).sendToEveryMachine(any());
+        verify(metrics).recordUnreachable(DeliveryType.CLIENT_UPDATE, DeliveryAudience.EVERY_MACHINE);
     }
 
     @Test
@@ -154,7 +159,7 @@ class DeliveryRouterTest {
         when(routes.orderedStream()).thenReturn(Stream.of(legacy, engine, twin));
 
         // execution + verifications
-        assertThatThrownBy(() -> new DeliveryRouter(routes, agentVersions))
+        assertThatThrownBy(() -> new DeliveryRouter(routes, agentVersions, metrics))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("generation 1")
                 .hasMessageContaining("CLIENT_UNINSTALL");
@@ -164,7 +169,7 @@ class DeliveryRouterTest {
     void dispatch_typeWithoutAnyRoute_nothingSent() {
         // setup
         when(routes.orderedStream()).thenReturn(Stream.empty());
-        DeliveryRouter emptyRouter = new DeliveryRouter(routes, agentVersions);
+        DeliveryRouter emptyRouter = new DeliveryRouter(routes, agentVersions, metrics);
         when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.of("1.6.0"));
 
         // execution
