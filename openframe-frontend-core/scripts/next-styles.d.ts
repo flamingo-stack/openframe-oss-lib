@@ -1,7 +1,7 @@
 /** `nextConfig` (an object, or a config function) with every route's stylesheets written into its HTML. */
-export function withInlineStyles<T extends object>(
-  nextConfig: (...args: never[]) => T | Promise<T>,
-): (...args: never[]) => Promise<T & { experimental: { inlineCss: true } }>;
+export function withInlineStyles<A extends unknown[], T extends object>(
+  nextConfig: (...args: A) => T | Promise<T>,
+): (...args: A) => Promise<T & { experimental: { inlineCss: true } }>;
 export function withInlineStyles<T extends object>(nextConfig: T): T & { experimental: { inlineCss: true } };
 
 /** Options of {@link measureStylesheet}; each is described in `next-styles.cjs`. */
