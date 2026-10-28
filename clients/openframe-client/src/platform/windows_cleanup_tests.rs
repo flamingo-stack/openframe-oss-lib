@@ -21,7 +21,7 @@ fn script_removes_binary_install_dirs_and_itself() {
     )
     .unwrap();
 
-    let status = Command::new(get_powershell_path().unwrap())
+    let status = Command::new(get_powershell_path())
         .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
         .arg(&script)
         .status()

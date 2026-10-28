@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
@@ -198,7 +198,7 @@ pub fn execute_binary_cleanup_script(install_path: &Path, bin_dir: Option<&PathB
         const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x01000000;
         const ERROR_ACCESS_DENIED: i32 = 5;
 
-        let ps_path = get_powershell_path().map_err(|e| anyhow!(e))?;
+        let ps_path = get_powershell_path();
         info!("Using PowerShell: {}", ps_path);
 
         let spawn = |flags: u32| {

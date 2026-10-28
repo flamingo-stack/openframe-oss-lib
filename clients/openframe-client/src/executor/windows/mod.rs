@@ -11,6 +11,7 @@ use anyhow::{anyhow, Result};
 
 use crate::executor::tempfile::{temp_script_name, write_temp_script, TempFileGuard};
 use crate::executor::{ExecResult, ScriptParams};
+use crate::platform::powershell::{get_powershell_path, resolve_system32_exe};
 
 pub(crate) struct Interpreter {
     pub exe: String,
@@ -94,10 +95,7 @@ fn spawn_error(msg: String) -> ExecResult {
 fn resolve_interpreter(shell: &str) -> Option<Interpreter> {
     match shell {
         "powershell" => Some(Interpreter {
-            exe: resolve_exe(
-                r"System32\WindowsPowerShell\v1.0\powershell.exe",
-                "powershell.exe",
-            ),
+            exe: get_powershell_path(),
             flags: &[
                 "-NonInteractive",
                 "-NoProfile",
@@ -108,25 +106,12 @@ fn resolve_interpreter(shell: &str) -> Option<Interpreter> {
             ext: "ps1",
         }),
         "cmd" => Some(Interpreter {
-            exe: resolve_exe(r"System32\cmd.exe", "cmd.exe"),
+            exe: resolve_system32_exe(r"System32\cmd.exe", "cmd.exe"),
             flags: &["/C"],
             ext: "bat",
         }),
         _ => None,
     }
-}
-
-fn resolve_exe(system32_rel: &str, bare: &str) -> String {
-    let windir = std::env::var_os("WINDIR")
-        .or_else(|| std::env::var_os("SystemRoot"))
-        .map(PathBuf::from);
-    if let Some(windir) = windir {
-        let abs = windir.join(system32_rel);
-        if abs.is_file() {
-            return abs.to_string_lossy().into_owned();
-        }
-    }
-    bare.to_string()
 }
 
 fn win_tmp_dir() -> Result<PathBuf> {

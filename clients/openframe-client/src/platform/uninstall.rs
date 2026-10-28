@@ -87,6 +87,24 @@ pub fn remove_legacy_alias(install_path: &Path) {
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 fn remove_update_temp_files(install_path: &Path) {
     UpdateCleanupService::for_binary(install_path.to_path_buf()).sweep_temp_leftovers(None);
+
+    // The binary cleanup script removes Program Files\OpenFrame only once it is empty.
+    #[cfg(target_os = "windows")]
+    {
+        let staging_dir = crate::platform::directories::get_update_staging_directory();
+        match std::fs::remove_dir_all(&staging_dir) {
+            Ok(()) => info!(
+                "Removed update staging directory: {}",
+                staging_dir.display()
+            ),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => warn!(
+                "Failed to remove update staging directory {}: {}",
+                staging_dir.display(),
+                e
+            ),
+        }
+    }
 }
 
 /// Spawn a detached `openframe-client uninstall` that survives this service being stopped.

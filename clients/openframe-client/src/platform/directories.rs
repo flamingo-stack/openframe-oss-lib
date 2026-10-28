@@ -178,6 +178,25 @@ pub fn get_secured_directory() -> PathBuf {
     }
 }
 
+/// Returns where the self-update stages the new binary and the updater script.
+/// On Windows it is under Program Files\OpenFrame, which our published AV exclusions
+/// cover: script-blocking tools deny PowerShell reading scripts from SystemTemp.
+pub fn get_update_staging_directory() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        let program_files =
+            std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
+        PathBuf::from(program_files)
+            .join("OpenFrame")
+            .join("update")
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::env::temp_dir()
+    }
+}
+
 /// Sets the correct platform-specific permissions on a directory
 pub fn set_directory_permissions(path: &Path) -> io::Result<()> {
     #[cfg(target_os = "windows")]
