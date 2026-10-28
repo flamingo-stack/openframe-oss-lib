@@ -172,8 +172,8 @@ class NotificationEmitterTest {
         @Override public Optional<NotificationSettingGroup> getSettingsGroup() {
             return Optional.of(NotificationSettingGroup.TICKET_ASSIGNED);
         }
-        @Override public NotificationCategory getCategory() { return NotificationCategory.TICKETS; }
-        @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
+        @Override public NotificationCategory category(TestSeed seed) { return NotificationCategory.TICKETS; }
+        @Override public NotificationSeverity severity(TestSeed seed) { return NotificationSeverity.INFO; }
         @Override public Audience audience(TestSeed seed) { return audience; }
 
         @Override public Optional<NotificationEntityRef> entity(TestSeed seed) {
@@ -203,10 +203,8 @@ class NotificationEmitterTest {
         @Override public Class<AnnouncementSeed> getSeedClass() { return AnnouncementSeed.class; }
         @Override public Attrs attrs(AnnouncementSeed seed) { return Attrs.of(Map.of()); }
         @Override public Optional<NotificationSettingGroup> getSettingsGroup() { return Optional.empty(); }
-        @Override public NotificationCategory getCategory() { return NotificationCategory.GENERIC; }
         @Override public NotificationCategory category(AnnouncementSeed seed) { return seed.category(); }
         @Override public Optional<NotificationEntityRef> entity(AnnouncementSeed seed) { return Optional.empty(); }
-        @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
         @Override public NotificationSeverity severity(AnnouncementSeed seed) { return seed.severity(); }
         @Override public Audience audience(AnnouncementSeed seed) { return Audience.allActiveAdmins(); }
         @Override public String composeTitle(AnnouncementSeed seed) { return "Maintenance tonight"; }
