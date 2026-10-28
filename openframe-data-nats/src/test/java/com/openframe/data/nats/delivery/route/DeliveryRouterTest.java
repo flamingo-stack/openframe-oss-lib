@@ -17,9 +17,11 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -141,6 +143,21 @@ class DeliveryRouterTest {
         assertThat(carried).isFalse();
         verify(engine, never()).sendToEveryMachine(any());
         verify(legacy, never()).sendToEveryMachine(any());
+    }
+
+    @Test
+    void boot_twoRoutesOfOneGenerationOnOneType_refused() {
+        // setup
+        DeliveryRoute twin = mock(DeliveryRoute.class);
+        when(twin.getGeneration()).thenReturn(1);
+        when(twin.getTypes()).thenReturn(EnumSet.of(DeliveryType.CLIENT_UNINSTALL));
+        when(routes.orderedStream()).thenReturn(Stream.of(legacy, engine, twin));
+
+        // execution + verifications
+        assertThatThrownBy(() -> new DeliveryRouter(routes, agentVersions))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("generation 1")
+                .hasMessageContaining("CLIENT_UNINSTALL");
     }
 
     @Test

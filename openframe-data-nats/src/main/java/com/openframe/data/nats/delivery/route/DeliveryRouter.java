@@ -16,7 +16,8 @@ import java.util.Map;
 import java.util.Optional;
 
 // the one place a command leaves for the agent: the route is picked by the version the machine's client runs.
-// ObjectProvider: a service with no route on its classpath still boots, its commands then reach no one
+// ObjectProvider: a service with no route on its classpath still boots, its commands then reach no one. Two routes
+// of one generation on one type would make the pick an accident of bean order: the start fails instead
 @Slf4j
 @Component
 public class DeliveryRouter {
@@ -29,7 +30,7 @@ public class DeliveryRouter {
     public DeliveryRouter(ObjectProvider<DeliveryRoute> routes, AgentVersionService agentVersions) {
         this.agentVersions = agentVersions;
         routes.orderedStream().sorted(NEWEST_FIRST).forEach(this::register);
-        log.info("Delivery routes by type: {}", routesByType.keySet());
+        log.info("Delivery routes by type: {}", describeRoutes());
     }
 
     // true when a route carried the command. False is a machine the type cannot reach, not a failure: an agent
@@ -69,7 +70,26 @@ public class DeliveryRouter {
 
     private void register(DeliveryRoute route) {
         for (DeliveryType type : route.getTypes()) {
-            routesByType.computeIfAbsent(type, ignored -> new ArrayList<>()).add(route);
+            List<DeliveryRoute> routes = routesByType.computeIfAbsent(type, ignored -> new ArrayList<>());
+            requireNewGeneration(routes, route, type);
+            routes.add(route);
         }
+    }
+
+    private static void requireNewGeneration(List<DeliveryRoute> routes, DeliveryRoute route, DeliveryType type) {
+        int generation = route.getGeneration();
+        Optional<DeliveryRoute> sameGeneration = routes.stream()
+                .filter(registered -> registered.getGeneration() == generation)
+                .findFirst();
+        sameGeneration.ifPresent(registered -> {
+            throw new IllegalStateException("Two delivery routes of generation " + generation + " cover " + type + ": "
+                    + registered.getClass().getSimpleName() + " and " + route.getClass().getSimpleName());
+        });
+    }
+
+    private Map<DeliveryType, List<Integer>> describeRoutes() {
+        Map<DeliveryType, List<Integer>> generations = new EnumMap<>(DeliveryType.class);
+        routesByType.forEach((type, routes) -> generations.put(type, routes.stream().map(DeliveryRoute::getGeneration).toList()));
+        return generations;
     }
 }
