@@ -67,6 +67,8 @@ export interface TicketInfoSectionProps {
     isLoading?: boolean;
     isPending?: boolean;
     onAssign: (userId: string | null) => void;
+    /** Server search for the picker — see `AssigneeDropdownProps.onSearchChange`. */
+    onSearchChange?: (query: string) => void;
   };
   /** Created date string */
   createdAt?: string;
@@ -178,6 +180,7 @@ export function TicketInfoSection({
               isLoading={assigned.isLoading}
               isPending={assigned.isPending}
               onAssign={assigned.onAssign}
+              onSearchChange={assigned.onSearchChange}
             />
           ) : (
             <div className="min-w-0">

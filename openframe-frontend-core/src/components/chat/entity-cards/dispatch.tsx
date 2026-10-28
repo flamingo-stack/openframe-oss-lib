@@ -34,6 +34,7 @@ import type { ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
+import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
 import {
   TRUST_CENTER_DOCUMENT_TYPE,
@@ -46,6 +47,7 @@ import {
   type TrustCenterPublic,
   type TrustFrameworkMonitoringEntry,
 } from '../../../types/trust-center';
+import { isAppOriginUrl } from '../../../utils/app-origins';
 import { formatDateShort } from '../../../utils/date-formatters';
 import {
   DESIGN_DOC_READINESS_DISPLAY,
@@ -86,6 +88,7 @@ import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/tr
 import type { LoadedProductReleaseCardProps } from '../../shared/product-release/product-release-card';
 import { ProductReleaseCard } from '../../shared/product-release/product-release-card';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
+import { ExternalMediaNotice } from '../../ui/markdown/external-media-notice';
 import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
@@ -1260,7 +1263,14 @@ function RoadmapChatCard({
   ) : logoUrl ? (
     // Contained (not full-bleed) so the integration logo keeps its aspect
     // ratio inside the bordered icon box — matches RoadmapCard.
-    <Image src={logoUrl} alt="" className="size-6 object-contain" width={24} height={24} unoptimized />
+    <Image
+      src={logoUrl}
+      alt=""
+      className="size-6 object-contain"
+      width={IMAGE_FIXED_PX.glyph}
+      height={IMAGE_FIXED_PX.glyph}
+      unoptimized
+    />
   ) : (
     defaultIcon
   );
@@ -2241,9 +2251,18 @@ export function renderChatInlineEntityCard(
           (decoded.youtubeUrl ? `https://www.youtube.com/watch?v=${decoded.youtubeUrl}` : null),
         metadata: { ...(chatRef.metadata ?? {}), ...decoded },
       };
+      // An `mp4-` id carries any https URL the reply put in it, and the
+      // player fetches it on mount: from outside the app it is not played,
+      // like a markdown image (`ExternalMediaNotice`). `mux-` and YouTube ids
+      // only ever reach their own fixed hosts.
+      const externalUrl = chatRef.id.startsWith('mp4-') && decoded.videoUrl;
       return (
         <BlockCard inline={<ChatInlineVideoPill chatRef={displayRef} />}>
-          <ChatVideoEntityCard chatRef={displayRef} />
+          {externalUrl && !isAppOriginUrl(externalUrl) ? (
+            <ExternalMediaNotice url={externalUrl} kind="video" label={displayRef.title} />
+          ) : (
+            <ChatVideoEntityCard chatRef={displayRef} />
+          )}
         </BlockCard>
       );
     }

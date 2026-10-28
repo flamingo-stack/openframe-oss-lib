@@ -16,6 +16,7 @@ class ClientIdentityParserTest {
             "android/1.0.1 bundle/1.0.127,              ANDROID, 1.0.1, 1.0.127",
             "web/- bundle/1.0.127,                      WEB,     -,     1.0.127",
             "desktop/0.4.2 bundle/1.0.127,              DESKTOP, 0.4.2, 1.0.127",
+            "chat/1.5.107 bundle/1.5.107,               CHAT,    1.5.107, 1.5.107",
             "ios/- bundle/1.0.130,                      IOS,     -,     1.0.130",
             "ios/1.0.1 bundle/-,                        IOS,     1.0.1, -",
             "ios/1.0.1 bundle/1.0.125-4-geae0416-dirty, IOS,     1.0.1, 1.0.125-4-geae0416-dirty"

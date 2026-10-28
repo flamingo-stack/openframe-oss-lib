@@ -35,8 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
     permissions:
-      pull-requests: read
+      pull-requests: write
     steps:
+      - name: Assign PR author
+        if: github.event.action == 'opened' && github.event.pull_request.user.type == 'User'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr edit ${{ github.event.pull_request.html_url }} --add-assignee ${{ github.event.pull_request.user.login }}
       # Squash commits take the PR title; read live so a re-run picks up an edited title or the no-task label.
       - name: Check PR title
         if: github.event.pull_request.user.type == 'User' && !startsWith(github.head_ref, 'renovate/')  # Renovate runs as a user

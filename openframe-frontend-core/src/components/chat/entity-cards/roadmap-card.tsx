@@ -15,6 +15,7 @@ import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { MEDIA_ASPECT, TEXT_LINES_MIN, TILE_SIZE } from '../../../styles/component-sizes';
+import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import { cn } from '../../../utils/cn';
 import { ImageClassicIcon } from '../../icons-v2-generated/audio-and-visual/image-classic-icon';
 import { FigmaClassicIcon } from '../../icons-v2-generated/brand-logos/figma-classic-icon';
@@ -234,8 +235,8 @@ function LoadedRoadmapCard({
             <Image
               src={iconSrc}
               alt={`${item.title} logo`}
-              width={32}
-              height={32}
+              width={IMAGE_FIXED_PX.logo}
+              height={IMAGE_FIXED_PX.logo}
               unoptimized
               className="h-8 w-8 object-contain"
             />
@@ -330,8 +331,8 @@ function LoadedRoadmapCard({
             <Image
               src={iconSrc}
               alt={`${item.title} logo`}
-              width={40}
-              height={40}
+              width={IMAGE_FIXED_PX.logoLg}
+              height={IMAGE_FIXED_PX.logoLg}
               unoptimized
               className="object-contain p-1"
             />

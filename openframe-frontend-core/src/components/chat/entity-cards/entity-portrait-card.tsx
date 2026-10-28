@@ -36,6 +36,8 @@ import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
+import { AVATAR_SIZE_PX } from '../../../styles/component-sizes';
+import { IMAGE_SLOT } from '../../../styles/image-sizes';
 import { cn } from '../../../utils/cn';
 import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Card } from '../../ui/card';
@@ -145,7 +147,7 @@ export function EntityPortraitCard({
               src={src}
               alt={imageAlt}
               className={cn('h-full w-full', isWide === false ? 'object-contain' : 'object-cover')}
-              sizes="(min-width: 800px) 400px, 100vw"
+              sizes={IMAGE_SLOT.panel}
               fill
               priority={priority}
               unoptimized
@@ -183,8 +185,8 @@ export function EntityPortraitCard({
                     src={person.avatarUrl}
                     alt={person.name}
                     className="h-12 w-12 rounded-full border border-ods-border bg-ods-bg object-cover"
-                    width={48}
-                    height={48}
+                    width={AVATAR_SIZE_PX.lg}
+                    height={AVATAR_SIZE_PX.lg}
                     unoptimized
                   />
                 ) : (
@@ -201,8 +203,8 @@ export function EntityPortraitCard({
                       src={person.iconOverlayUrl}
                       alt=""
                       className="h-full w-full object-cover"
-                      width={24}
-                      height={24}
+                      width={AVATAR_SIZE_PX.xs}
+                      height={AVATAR_SIZE_PX.xs}
                       unoptimized
                     />
                   </div>
