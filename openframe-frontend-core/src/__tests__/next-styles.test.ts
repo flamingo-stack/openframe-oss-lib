@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -53,6 +53,16 @@ describe('next-styles: the stylesheet as the build builds it', () => {
     expect(resolveImports(join(root, 'src', 'app', 'remote.css'), root)).toBe(
       `@import 'https://fonts.example/x.css';\n@import "${join(root, 'src', 'app', 'tokens.css')}";`,
     );
+  });
+
+  it('builds a stylesheet that names its own config relative to its folder, and leaves no copy behind', async () => {
+    writeFileSync(
+      join(root, 'src', 'app', 'full.css'),
+      "@config '../../tailwind.config.cjs';\n@import './tokens.css';\n@tailwind utilities;\n",
+    );
+    const { css } = await measureStylesheet({ root, input: 'src/app/full.css', config: 'tailwind.config.cjs' });
+    expect(css).toContain('.p-4{');
+    expect(readdirSync(join(root, 'src', 'app')).filter(name => name.endsWith('.measure.css'))).toEqual([]);
   });
 
   it('holds the imported rules and only the classes the content uses, and measures them', async () => {
