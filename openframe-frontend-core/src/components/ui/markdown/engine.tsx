@@ -33,10 +33,12 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import type { PluggableList } from 'unified';
 import type { ResolveLinkResult } from '../../../types/doc-source';
+import { readAppOrigins, SERVER_APP_ORIGINS, subscribeAppOrigins } from '../../../utils/app-origins';
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { LoadingItems, useLoadingScope } from '../loading-scope';
 import { buildBaseComponents, MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
+import { MarkdownMediaOriginsContext } from './external-media-notice';
 import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
 import {
   buildEffectiveTagSet,
@@ -172,6 +174,13 @@ export interface MarkdownEngineProps {
    */
   extraAllowedHtmlTags?: string[];
   /**
+   * Let images and other media load from any origin. Off (the default), they
+   * load only from the app itself: the content is treated as untrusted, and a
+   * third-party image URL leaks whatever it carries the moment it renders. See
+   * `RehypeStripUnsafeOptions` in ./sanitize.ts.
+   */
+  allowRemoteMedia?: boolean;
+  /**
    * Set true for the actively streaming message ONLY. Enables atomic-block
    * memoization + fence tail-completion + an aria-live wrapper. The caller
    * MUST flip back to false on completion — that final render is one
@@ -260,6 +269,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
   additionalRemarkPlugins,
   textSize,
   extraAllowedHtmlTags,
+  allowRemoteMedia = false,
   streaming = false,
 }) => {
   const textSizes = useMemo(() => resolveTextSizeConfig(textSize), [textSize]);
@@ -308,6 +318,10 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     [additionalRemarkPlugins],
   );
 
+  // What "from the app" means for media: the server's answer while hydrating (only relative URLs), the page's own and
+  // the host's sanctioned origins after that, and again whenever a host registers its auth adapter later.
+  const appOrigins = useSyncExternalStore(subscribeAppOrigins, readAppOrigins, () => SERVER_APP_ORIGINS);
+
   const rehypeHighlight = useHighlightPlugin(processedContent);
   const { rehypePlugins, liveRehypePlugins } = useMemo(() => {
     const schema = buildSanitizeSchema({
@@ -315,9 +329,15 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     });
     // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
     // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
-    // defense-in-depth (srcset scanning, iframe[srcdoc]); the fence label
-    // goes on after sanitizing and before highlight, which runs last.
-    const safe: PluggableList = [rehypeRaw, [rehypeSanitize, schema], rehypeStripUnsafe, rehypeLabelBareFences];
+    // defense-in-depth (srcset scanning, iframe[srcdoc]) and drops media from
+    // outside the app; the fence label goes on after sanitizing and before
+    // highlight, which runs last.
+    const safe: PluggableList = [
+      rehypeRaw,
+      [rehypeSanitize, schema],
+      [rehypeStripUnsafe, { allowRemoteMedia, appOrigins }],
+      rehypeLabelBareFences,
+    ];
     // No language detection: it ran highlightAuto over every registered
     // grammar for each unlabelled fence (~2.5x the cost of opening a
     // thread) and often guessed wrong (PowerShell shown as "VBNET").
@@ -333,7 +353,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
       // `rehypePlugins`.
       liveRehypePlugins: safe,
     };
-  }, [extraTagsKey, rehypeHighlight]);
+  }, [extraTagsKey, allowRemoteMedia, appOrigins, rehypeHighlight]);
 
   const components: Components = useMemo(
     () => ({
@@ -408,7 +428,11 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
           override the cascade with the weaker `break-word` for this subtree. */}
       <div className={CONTENT_WRAPPER_CLASS}>
         <article className={ARTICLE_CLASS}>
-          <HeadingIdMapContext.Provider value={headingIds}>{body}</HeadingIdMapContext.Provider>
+          <HeadingIdMapContext.Provider value={headingIds}>
+            <MarkdownMediaOriginsContext.Provider value={allowRemoteMedia ? null : appOrigins}>
+              {body}
+            </MarkdownMediaOriginsContext.Provider>
+          </HeadingIdMapContext.Provider>
         </article>
       </div>
     </div>

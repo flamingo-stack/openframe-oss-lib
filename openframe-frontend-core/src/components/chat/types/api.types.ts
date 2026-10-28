@@ -3,6 +3,7 @@
  * Contains types for API interactions and React hooks
  */
 
+import type { NatsBeforeReconnect } from '../../../nats';
 import type { ChatType, ChatApprovalStatus } from './chat.types';
 import type { MessageSegment, TokenUsageData, ToolExecutionSegment } from './message.types';
 import type { ChunkData, NatsMessageType, FetchChunksFunction } from './network.types';
@@ -36,8 +37,11 @@ export interface UseNatsDialogSubscriptionOptions {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onSubscribed?: () => void;
-  /** Called on disconnect, before nats.ws attempts reconnection. Use to refresh auth (cookies/tokens). */
-  onBeforeReconnect?: () => Promise<void> | void;
+  /**
+   * Called on disconnect, before nats.ws attempts reconnection. Use to refresh auth (cookies/tokens).
+   * May return a verdict (`pause` / `terminal`) to stop the dial loop; see {@link NatsBeforeReconnect}.
+   */
+  onBeforeReconnect?: NatsBeforeReconnect;
   /**
    * Function to get the NATS WebSocket URL
    */
@@ -112,8 +116,8 @@ export interface UseJetStreamDialogSubscriptionOptions {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onSubscribed?: () => void;
-  /** Called on disconnect, before reconnect attempt. Use to refresh auth. */
-  onBeforeReconnect?: () => Promise<void> | void;
+  /** Called on disconnect, before reconnect attempt. Use to refresh auth. May return a verdict; see {@link NatsBeforeReconnect}. */
+  onBeforeReconnect?: NatsBeforeReconnect;
   /** Build the NATS WebSocket URL (or null when not yet available). */
   getNatsWsUrl: () => string | null;
   clientConfig?: {
