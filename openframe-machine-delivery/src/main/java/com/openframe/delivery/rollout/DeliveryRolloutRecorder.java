@@ -34,7 +34,7 @@ public class DeliveryRolloutRecorder {
 
     // the sequence is taken once, when the rollout starts: a dispatch recorded later outranks every row of this
     // rollout on the agent, however long the batches take
-    public void record(DeliveryRequest<?> request) {
+    public void record(DeliveryRequest<? extends DeliveryPayload> request) {
         DeliveryType type = request.getType();
         String targetId = request.getTargetId();
         String tenantId = tenants.getTenantId();

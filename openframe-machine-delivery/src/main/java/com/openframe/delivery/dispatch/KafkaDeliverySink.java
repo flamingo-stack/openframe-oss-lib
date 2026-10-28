@@ -23,13 +23,13 @@ public class KafkaDeliverySink implements DeliverySink {
     private final String topic;
 
     @Override
-    public void accept(DeliveryRequest<?> request) {
+    public void accept(DeliveryRequest<? extends DeliveryPayload> request) {
         DeliveryType type = request.getType();
         DeliveryAudience audience = request.getAudience();
         String machineId = request.getMachineId();
         DeliveryPayload payload = request.getPayload();
         JsonNode command = objectMapper.valueToTree(payload);
-        DeliveryDispatchMessage message = new DeliveryDispatchMessage(audience, machineId, command);
+        DeliveryDispatchMessage message = new DeliveryDispatchMessage(audience, machineId, command, request.getDueAt());
         try {
             producer.sendAndAwait(topic, keyOf(request), message);
         } catch (RuntimeException kafkaDown) {
@@ -41,7 +41,7 @@ public class KafkaDeliverySink implements DeliverySink {
     }
 
     // the key keeps one machine's hand-offs in order; a rollout has no machine, its target does the same job
-    private static String keyOf(DeliveryRequest<?> request) {
+    private static String keyOf(DeliveryRequest<? extends DeliveryPayload> request) {
         return request.isForEveryMachine() ? request.getTargetId() : request.getMachineId();
     }
 }

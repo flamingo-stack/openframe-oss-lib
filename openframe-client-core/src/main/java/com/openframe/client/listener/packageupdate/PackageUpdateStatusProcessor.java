@@ -1,13 +1,18 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
+import com.openframe.data.nats.packageupdate.PackageUpdateWire;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
+import com.openframe.delivery.dispatch.DeliveryDispatcher;
+import com.openframe.delivery.track.DeliveryTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,6 +35,8 @@ public class PackageUpdateStatusProcessor {
     private final PackageUpdateDeviceStateRepository deviceStateRepository;
     private final PackageUpdateRequestRepository requestRepository;
     private final PackageUpdateExecutionRecorder executionRecorder;
+    private final DeliveryDispatcher deliveryDispatcher;
+    private final DeliveryTracker deliveryTracker;
 
     public void process(String machineId, PackageUpdateStatusMessage event) {
         Machine machine = machineRepository.findByMachineId(machineId).orElse(null);
@@ -56,7 +63,9 @@ public class PackageUpdateStatusProcessor {
         }
 
         PackageUpdateRequest request = requestRepository.findByTenantIdAndRequestId(tenantId, requestId).orElse(null);
+        Instant deadlineBefore = state.getDeadlineAt();
         PackageUpdateDeviceStateReducer.apply(state, request, event);
+        driveDeadlineForce(state, request, deadlineBefore, machineId);
         executionRecorder.record(request, machineId, event);
         deviceStateRepository.save(state);
         log.info("[package-update] status applied requestId={} machineId={} eventId={} state={} status={} "
@@ -68,6 +77,26 @@ public class PackageUpdateStatusProcessor {
                 state.getFailedMessage(), state.getDeadlineAt());
 
         rollUp(tenantId, requestId, request);
+    }
+
+    private void driveDeadlineForce(PackageUpdateDeviceState state, PackageUpdateRequest request, Instant deadlineBefore, String machineId) {
+        Instant deadlineAt = state.getDeadlineAt();
+        if (deadlineAt == null) {
+            return;
+        }
+        String requestId = state.getRequestId();
+        if (deadlineBefore == null) {
+            deliveryDispatcher.schedule(PackageUpdateWire.deadlineForce(machineId, request), deadlineAt);
+            log.info("[package-update] deadline force scheduled requestId={} machineId={} deadlineAt={}",
+                    requestId, machineId, deadlineAt);
+            return;
+        }
+        if (isTerminal(state) && Instant.now().isBefore(deadlineAt)) {
+            deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, PackageUpdateDeliverySeed.deadlineTargetId(requestId),
+                    machineId, "update finished before its deadline");
+            log.info("[package-update] deadline force withdrawn requestId={} machineId={} status={}",
+                    requestId, machineId, state.getStatus());
+        }
     }
 
     private PackageUpdateDeviceState newState(String tenantId, String requestId, String machineId) {
