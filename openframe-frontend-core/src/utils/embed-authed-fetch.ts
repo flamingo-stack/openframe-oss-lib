@@ -20,6 +20,8 @@
  * (e.g. `/api/profile/me`) keep using vanilla `fetch`.
  */
 
+import { resolveAppOriginUrl } from './app-origins';
+import { readRegisteredAdapter, writeRegisteredAdapter } from './embed-auth-adapter-registry';
 import { applyProxyAuth } from './embed-proxy-auth-storage';
 
 // =============================================================================
@@ -139,28 +141,9 @@ export interface EmbedAuthAdapter {
   subscribe?: (listener: () => void) => () => void;
 }
 
-/**
- * The registered adapter is parked on `globalThis`, NOT in a module-private
- * `let`. Reason: this lib ships multiple entry points (`/utils`,
- * `/components/chat`, …) and a consumer's bundler can inline this file into
- * more than one chunk — giving each chunk its OWN module scope. If the host
- * calls `setEmbedAuthAdapter` from the `/utils` copy while the chat's
- * `embedAuthedFetch` runs from the `/components/chat` copy, a module-local
- * `let` would be set on one copy and read as `null` on the other (the exact
- * "credentials: same-origin, no Bearer, no refresh" symptom). A single
- * `globalThis` slot is shared across every copy, so registration always
- * reaches the fetch path.
- */
-const ADAPTER_GLOBAL_KEY = '__embedAuthedFetchAdapter__';
-
+/** The registered adapter: a `globalThis` slot shared by every copy of this module (see the registry). */
 function getRegisteredAuthAdapter(): EmbedAuthAdapter | null {
-  if (typeof globalThis === 'undefined') return null;
-  return ((globalThis as Record<string, unknown>)[ADAPTER_GLOBAL_KEY] as EmbedAuthAdapter | null) ?? null;
-}
-
-function storeRegisteredAuthAdapter(adapter: EmbedAuthAdapter | null): void {
-  if (typeof globalThis === 'undefined') return;
-  (globalThis as Record<string, unknown>)[ADAPTER_GLOBAL_KEY] = adapter;
+  return readRegisteredAdapter<EmbedAuthAdapter>();
 }
 
 /**
@@ -181,7 +164,7 @@ export function setEmbedAuthAdapter(adapter: EmbedAuthAdapter | null): void {
         'mount order and pass `null` from the unmounting provider.',
     );
   }
-  storeRegisteredAuthAdapter(adapter);
+  writeRegisteredAdapter(adapter);
 }
 
 /**
@@ -237,19 +220,8 @@ export function needsBearerAssetFetch(url: string): boolean {
   if (typeof window === 'undefined') return false;
   const adapter = getRegisteredAuthAdapter();
   if (!adapter || adapter.getHeaders?.().Authorization === undefined) return false;
-  let target: URL;
-  let pageOrigin: string;
-  try {
-    target = new URL(url, window.location.href);
-    // Same reason `assertSameOrigin` derives it this way: test environments
-    // mock `window.location` as a plain object with no `origin` field.
-    pageOrigin = new URL(window.location.href).origin;
-  } catch {
-    return false;
-  }
-  if (target.protocol !== 'http:' && target.protocol !== 'https:') return false;
-  if (target.origin === pageOrigin) return true;
-  return adapter.allowedOrigins?.includes(target.origin) ?? false;
+  const target = resolveAppOriginUrl(url);
+  return target !== null && (target.protocol === 'http:' || target.protocol === 'https:');
 }
 
 /**

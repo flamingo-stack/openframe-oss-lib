@@ -10,8 +10,8 @@
  * every hub/app call site compiles untouched. Deltas vs the old
  * implementation are the ones reviewed in the unification plan: the
  * sanitize stack + tag-escape pre-pass now apply to content surfaces
- * (`extraAllowedHtmlTags={['video','source']}` keeps authored video
- * working), the engine is memoized, and the dead light-mode branches are
+ * (`RICH_EXTRA_TAGS` and `allowRemoteMedia` keep authored video, embeds and
+ * CDN images working), the engine is memoized, and the dead light-mode branches are
  * gone.
  */
 import type React from 'react';
@@ -27,8 +27,12 @@ import { resolveTextSizeConfig } from '../text-size';
 import { buildRichEmbedOverrides } from './embed-overrides';
 import { processShortcodes } from './shortcodes';
 
-/** Raw-HTML tags authored content needs beyond the chat-safe baseline. */
-const RICH_EXTRA_TAGS = ['video', 'source'];
+/**
+ * Raw-HTML tags authored content needs beyond the chat-safe baseline. Authored
+ * content is also the one surface that loads media from anywhere
+ * (`allowRemoteMedia`): posts carry CDN images and pasted embeds.
+ */
+const RICH_EXTRA_TAGS = ['video', 'source', 'iframe'];
 
 /**
  * `/api/docs/resolve-link` is an untrusted wire boundary: `Response.json()`
@@ -58,11 +62,12 @@ const toResolveLinkResult = (body: unknown): ResolveLinkResult => {
 /**
  * The engine props this composition OWNS and therefore does not forward:
  * shortcode preprocessing, the embed component map, the `article` text
- * preset, the fetch link resolver, the rich tag allowlist, and streaming
+ * preset, the fetch link resolver, the rich tag allowlist, remote media, and streaming
  * (authored content is never streamed).
  */
 type RichOwnedEngineProps =
   | 'extraAllowedHtmlTags'
+  | 'allowRemoteMedia'
   | 'preprocessContent'
   | 'componentOverrides'
   | 'textSize'
@@ -150,6 +155,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
       componentOverrides={componentOverrides}
       textSize="article"
       extraAllowedHtmlTags={RICH_EXTRA_TAGS}
+      allowRemoteMedia
       skeletonSections={skeletonSections}
       skeletonLines={skeletonLines}
     />
