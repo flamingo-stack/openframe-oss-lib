@@ -2,10 +2,12 @@ package com.openframe.api.service.ticket;
 
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.service.AssignmentService;
+import com.openframe.api.service.device.ClientOwnerScopeResolver;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.model.ClientOwnerScope;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -23,6 +25,7 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,6 +54,7 @@ class TicketServiceStatusFilterTest {
     @Mock private AssignmentService assignmentService;
     @Mock private TicketLifecycleService ticketLifecycleService;
     @Mock private TicketResolverStamp ticketResolverStamp;
+    @Mock private ClientOwnerScopeResolver clientOwnerScopeResolver;
     @Mock private TicketEventListener listener;
 
     @Spy private List<TicketEventListener> listeners = new ArrayList<>();
@@ -97,11 +101,13 @@ class TicketServiceStatusFilterTest {
                 .actorType(ActorType.AGENT)
                 .machineId("machine-7")
                 .build();
+        ClientOwnerScope scope = new ClientOwnerScope("machine-7", "org-7");
+        when(clientOwnerScopeResolver.resolve(agent)).thenReturn(Optional.of(scope));
         givenRepositoryReturns(List.of());
 
         service.getTickets(agent, TicketFilterInput.builder().build(), null, null, null);
 
-        verify(ticketRepository).buildTicketQuery(any(), isNull(), any(), eq("machine-7"));
+        verify(ticketRepository).buildTicketQuery(any(), isNull(), any(), eq(scope));
     }
 
     private void givenRepositoryReturns(List<Ticket> page) {
