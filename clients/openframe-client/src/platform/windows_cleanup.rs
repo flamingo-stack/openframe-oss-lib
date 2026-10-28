@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
+use super::directories::get_update_staging_directory;
 #[cfg(windows)]
 use super::get_powershell_path;
 
@@ -10,15 +11,19 @@ use super::get_powershell_path;
 /// This script will:
 /// 1. Wait for the current process to exit
 /// 2. Force delete the binary file
-/// 3. Remove empty parent directories (bin, then OpenFrame)
-/// 4. Delete itself
+/// 3. Delete itself
+/// 4. Remove empty install directories (bin and the update staging dir, then OpenFrame)
 pub fn generate_binary_cleanup_script(
     install_path: &Path,
     current_pid: u32,
     bin_dir: Option<&PathBuf>,
+    staging_dir: Option<&PathBuf>,
 ) -> String {
     let install_path_str = install_path.to_string_lossy().replace('\'', "''");
     let bin_dir_str = bin_dir
+        .map(|p| p.to_string_lossy().replace('\'', "''"))
+        .unwrap_or_default();
+    let staging_dir_str = staging_dir
         .map(|p| p.to_string_lossy().replace('\'', "''"))
         .unwrap_or_default();
 
@@ -31,6 +36,28 @@ $ErrorActionPreference = "SilentlyContinue"
 $ProcessId = {current_pid}
 $BinaryPath = '{install_path_str}'
 $BinDir = '{bin_dir_str}'
+$StagingDir = '{staging_dir_str}'
+
+function Remove-EmptyDir([string]$Path) {{
+    if (($Path -eq "") -or -not (Test-Path -LiteralPath $Path)) {{
+        return $true
+    }}
+    $items = Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if ($items.Count -ne 0) {{
+        return $false
+    }}
+    for ($attempt = 1; $attempt -le 3; $attempt++) {{
+        try {{
+            Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+            return $true
+        }} catch {{
+            if ($attempt -lt 3) {{
+                Start-Sleep -Seconds 1
+            }}
+        }}
+    }}
+    return $false
+}}
 
 # Wait for main process to exit (max 30 seconds with verification)
 $waited = 0
@@ -102,56 +129,22 @@ if (Test-Path $BinaryPath) {{
     }}
 }}
 
-# Remove empty bin directory with retry
-if (($BinDir -ne "") -and (Test-Path $BinDir)) {{
-    try {{
-        $items = Get-ChildItem $BinDir -ErrorAction SilentlyContinue
-        if ($items.Count -eq 0) {{
-            $binRemoved = $false
+# This script lives in the staging dir, so delete it before the emptiness checks;
+# PowerShell has already read the whole file
+Remove-Item -LiteralPath $PSCommandPath -Force
 
-            for ($attempt = 1; $attempt -le 3; $attempt++) {{
-                try {{
-                    Remove-Item -Path $BinDir -Force -ErrorAction Stop
-                    $binRemoved = $true
-                    break
-                }} catch {{
-                    if ($attempt -lt 3) {{
-                        Start-Sleep -Seconds 1
-                    }}
-                }}
-            }}
-
-            # Try to remove OpenFrame parent directory if also empty
-            if ($binRemoved) {{
-                $parentDir = Split-Path -Parent $BinDir
-                if (Test-Path $parentDir) {{
-                    $items = Get-ChildItem $parentDir -ErrorAction SilentlyContinue
-                    if ($items.Count -eq 0) {{
-                        for ($attempt = 1; $attempt -le 3; $attempt++) {{
-                            try {{
-                                Remove-Item -Path $parentDir -Force -ErrorAction Stop
-                                break
-                            }} catch {{
-                                if ($attempt -lt 3) {{
-                                    Start-Sleep -Seconds 1
-                                }}
-                            }}
-                        }}
-                    }}
-                }}
-            }}
-        }}
-    }} catch {{
-        # Silent fail
-    }}
+$binRemoved = Remove-EmptyDir $BinDir
+$stagingRemoved = Remove-EmptyDir $StagingDir
+if (($BinDir -ne "") -and $binRemoved -and $stagingRemoved) {{
+    Remove-EmptyDir (Split-Path -Parent $BinDir) | Out-Null
 }}
 
-Remove-Item -LiteralPath $PSCommandPath -Force
 exit 0
 "#,
         current_pid = current_pid,
         install_path_str = install_path_str,
-        bin_dir_str = bin_dir_str
+        bin_dir_str = bin_dir_str,
+        staging_dir_str = staging_dir_str
     )
 }
 
@@ -169,15 +162,17 @@ pub fn execute_binary_cleanup_script(install_path: &Path, bin_dir: Option<&PathB
 
     info!("Creating binary cleanup script for PID: {}", current_pid);
 
-    // Generate unique script name
+    // Same dir as the updater script, for the same reason: tools that block SystemTemp scripts
+    let staging_dir = get_update_staging_directory();
+    fs::create_dir_all(&staging_dir).context("Failed to create update staging directory")?;
     let script_name = format!("openframe_binary_cleanup_{}.ps1", uuid::Uuid::new_v4());
-    let temp_dir = std::env::temp_dir();
-    let script_path = temp_dir.join(&script_name);
+    let script_path = staging_dir.join(&script_name);
 
     info!("Cleanup script path: {}", script_path.display());
 
     // Generate script content
-    let script_content = generate_binary_cleanup_script(install_path, current_pid, bin_dir);
+    let script_content =
+        generate_binary_cleanup_script(install_path, current_pid, bin_dir, Some(&staging_dir));
 
     // Write script to file
     let mut file =

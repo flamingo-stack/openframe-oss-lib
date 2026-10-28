@@ -7,17 +7,19 @@ fn script_removes_binary_install_dirs_and_itself() {
     let root = tempfile::tempdir().unwrap();
     let install_dir = root.path().join("Open'Frame");
     let bin_dir = install_dir.join("bin");
+    let staging_dir = install_dir.join("update");
     fs::create_dir_all(&bin_dir).unwrap();
+    fs::create_dir_all(&staging_dir).unwrap();
     let binary = bin_dir.join("openframe-client.exe");
     fs::write(&binary, b"x").unwrap();
 
     let mut exited = Command::new("cmd").args(["/C", "exit"]).spawn().unwrap();
     exited.wait().unwrap();
 
-    let script = root.path().join("cleanup.ps1");
+    let script = staging_dir.join("cleanup.ps1");
     fs::write(
         &script,
-        generate_binary_cleanup_script(&binary, exited.id(), Some(&bin_dir)),
+        generate_binary_cleanup_script(&binary, exited.id(), Some(&bin_dir), Some(&staging_dir)),
     )
     .unwrap();
 
