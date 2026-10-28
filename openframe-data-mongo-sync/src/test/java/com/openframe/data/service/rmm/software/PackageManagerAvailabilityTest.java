@@ -178,7 +178,7 @@ class PackageManagerAvailabilityTest {
 
     @ParameterizedTest
     @EnumSource(value = PackageManagerState.class, names = {"MISSING", "UNKNOWN"})
-    void requireSoftwareManageable_packageManagerNotYetUsable_badRequestNamesDeviceAndManager(PackageManagerState state) {
+    void requireSoftwareManageable_packageManagerNotYetUsable_passes(PackageManagerState state) {
         // setup
         Machine arm = machine("m-arm", Map.of(BREW, state, WINGET, UNSUPPORTED, CHOCO, UNSUPPORTED));
         stubMachines(Set.of("m-arm"), arm);
@@ -186,9 +186,7 @@ class PackageManagerAvailabilityTest {
         List<PackageManagerType> managers = List.of(BREW);
 
         // execution + verifications
-        assertThatThrownBy(() -> availability.requireSoftwareManageable(machineIds, managers))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("m-arm BREW=" + state);
+        assertThatCode(() -> availability.requireSoftwareManageable(machineIds, managers)).doesNotThrowAnyException();
     }
 
     @Test
