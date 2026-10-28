@@ -89,6 +89,8 @@ export const ICON_REGISTRY: Readonly<Record<string, IconRef>> = {
   clickup: fromSet('ClickupIcon'),
   hubspot: fromSet('HubspotIcon'),
   linkedin: fromSet('LinkedinClassicIcon'),
+  // Monochrome mark in the text colour: TikTok's brand black would vanish on dark surfaces.
+  tiktok: fromSet('TiktokIcon'),
   x: fromSet('XLogoIcon'),
   // The OpenFrame logo's frame takes the text colour of where it sits (its own
   // default is invisible on dark chat surfaces); the squares stay white.
@@ -170,6 +172,8 @@ const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
   YouTubeIcon: 'youtube',
   WhatsAppIcon: 'whatsapp',
   XLogo: 'x',
+  TiktokIcon: 'tiktok',
+  TikTokIcon: 'tiktok',
   OpenFrameLogo: 'openframe',
 };
 
