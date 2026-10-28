@@ -60,6 +60,7 @@ export default function SoftwareUpdateScreen({ compact = false }: ProductScreenV
           // The picture's arrangement: one package, the run choice and its start on one row, the devices right under.
           addRows={false}
           runModeLayout="inline"
+          showUpdateSettings={false}
           showDeviceHeading={false}
           onSubmit={noop}
           timing={fixture.timing}

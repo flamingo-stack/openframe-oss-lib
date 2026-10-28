@@ -16,7 +16,7 @@ const chrome: SelectedPackage = {
 const TONIGHT_11_PM = { value: '23:00', label: '11:00 PM' };
 
 /** A fixed reading of the schedule fields: tonight's late slots, nothing in the past. */
-const timing: SoftwareScheduleTiming = {
+export const SOFTWARE_DEMO_TIMING: SoftwareScheduleTiming = {
   timeReferenceOptions: [
     { value: 'SERVER', label: 'Your account timezone' },
     { value: 'DEVICE_LOCAL', label: 'Device local timezone' },
@@ -49,7 +49,7 @@ export function buildSoftwareUpdateFixture(cast: DemoCast) {
   return {
     action: 'UPDATE',
     package: chrome,
-    timing,
+    timing: SOFTWARE_DEMO_TIMING,
     initialValues,
     devices,
     selectedIds: new Set<string>([DEMO_DEVICES.reception.id, DEMO_DEVICES.samT14.id, DEMO_DEVICES.frontDesk.id]),

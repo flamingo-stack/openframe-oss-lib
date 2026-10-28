@@ -20,6 +20,8 @@ const base: SoftwareActionFormProps = {
   initialValues: { mode: 'schedule', time: '23:00', timeReference: 'SERVER' },
   renderPackageSearch: () => <span>package field</span>,
   renderDevicePicker: () => <span>device picker</span>,
+  // These cases count the run choice's radio group; Update Settings has its own (update-settings-fields.test.tsx).
+  showUpdateSettings: false,
 };
 
 describe('SoftwareActionForm layout options', () => {
