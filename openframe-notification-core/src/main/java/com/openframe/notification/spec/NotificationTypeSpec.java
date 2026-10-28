@@ -19,10 +19,18 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     NotificationCategory getCategory();
 
+    default NotificationCategory category(S seed) {
+        return getCategory();
+    }
+
     // Abstract on purpose — a default would let a spec ship with no entity and nobody would notice.
     Optional<NotificationEntityRef> entity(S seed);
 
     NotificationSeverity getSeverity();
+
+    default NotificationSeverity severity(S seed) {
+        return getSeverity();
+    }
 
     Audience audience(S seed);
 
