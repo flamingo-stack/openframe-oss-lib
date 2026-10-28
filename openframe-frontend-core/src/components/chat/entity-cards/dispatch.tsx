@@ -109,7 +109,7 @@ import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-
 import { BlockCard } from './block-card';
 import { BlogCard } from './blog-card';
 import { CaseStudyCard } from './case-study-card';
-import { ChatVideoEntityCard } from './chat-video-entity-card';
+import { ChatCollapsibleVideo, useChatVideoToggle } from './chat-video-toggle';
 import { CustomerInterviewCard } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
 import { designDocMetaLine } from './design-doc-card';
@@ -780,12 +780,15 @@ function ChatCardWithDiscuss({
   onDiscuss,
   onDisplay,
   displayAction,
+  footerAction,
   children,
 }: {
   chatRef: ChatRef;
   onDiscuss?: (ref: ChatRef) => void;
   onDisplay?: (ref: ChatRef) => void;
   displayAction?: boolean;
+  /** A further action in the footer row, beside Ask (the card's "Watch video"). */
+  footerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const { Icon: SourceIcon, label: sourceLabel } = resolveSourceIcon({
@@ -799,13 +802,15 @@ function ChatCardWithDiscuss({
     <span className="mb-2 mt-1.5 block w-full">
       {cardBody}
       <span className="mt-1 flex items-center justify-between gap-2 pl-0.5">
-        <SourceActionButton
-          chatRef={chatRef}
-          onDiscuss={useDisplay ? onDisplay : onDiscuss}
-          label={useDisplay ? 'Display' : undefined}
-          density="card"
-        />
-        {!onDiscuss && !useDisplay ? <span /> : null}
+        <span className="flex items-center gap-3">
+          <SourceActionButton
+            chatRef={chatRef}
+            onDiscuss={useDisplay ? onDisplay : onDiscuss}
+            label={useDisplay ? 'Display' : undefined}
+            density="card"
+          />
+          {footerAction}
+        </span>
         {idDisplay ? (
           <span
             className="inline-flex shrink-0 items-center gap-1 text-ods-text-secondary opacity-60 transition-opacity text-code hover:text-ods-text-primary hover:opacity-100"
@@ -2009,6 +2014,20 @@ interface ChatCardLoaderProps {
   extras?: ChatCardDispatchExtras;
 }
 
+/** A fetched card whose record carries a video: "Watch video" in the card's footer row, the player below once opened. */
+function CardWithVideo({ video, card }: { video: ChatRef; card: (action: ReactNode) => ReactNode }) {
+  const { action, player } = useChatVideoToggle(video);
+  return (
+    // Same 12px rhythm as the message renderer's block-sibling wrapper
+    // (`my-3` in chat-message-enhanced) so card→player spacing matches
+    // the spacing between any two hoisted blocks.
+    <div className="grid min-w-0 grid-cols-1 gap-3">
+      {card(action)}
+      {player}
+    </div>
+  );
+}
+
 /**
  * Generic fetch-mode card loader. Looks up the registry entry by
  * `chatRef.type`, fetches the full item via `useChatCardItem`, and
@@ -2131,15 +2150,19 @@ export function ChatCardLoader({
   // wrapper; everything else gets the ChatCardWithDiscuss chrome. Kept
   // here (not per-branch) so the two paths can never drift on the
   // discuss-menu wiring.
-  const finish = (node: React.ReactNode) =>
+  const finish = (node: React.ReactNode, footerAction?: React.ReactNode) =>
     entry.bareInline ? (
-      <>{navWrap(node)}</>
+      <>
+        {navWrap(node)}
+        {footerAction ? <span className="mt-1 flex items-center pl-0.5">{footerAction}</span> : null}
+      </>
     ) : (
       <ChatCardWithDiscuss
         chatRef={finalChatRef}
         onDiscuss={onDiscuss}
         onDisplay={onDisplay}
         displayAction={entry.displayAction}
+        footerAction={footerAction}
       >
         {navWrap(node)}
       </ChatCardWithDiscuss>
@@ -2181,14 +2204,10 @@ export function ChatCardLoader({
       ...finalChatRef,
       metadata: { ...(finalChatRef.metadata ?? {}), ...videoMeta },
     };
+    // Collapsed: the card's footer row carries "Watch video", and the player
+    // opens below the card only when asked (`chat-video-toggle.tsx`).
     return (
-      // Same 12px rhythm as the message renderer's block-sibling wrapper
-      // (`my-3` in chat-message-enhanced) so card→player spacing matches
-      // the spacing between any two hoisted blocks.
-      <div className="grid min-w-0 grid-cols-1 gap-3">
-        {finish(entry.render(item, finalChatRef, renderOpts))}
-        <ChatVideoEntityCard chatRef={videoRef} />
-      </div>
+      <CardWithVideo video={videoRef} card={action => finish(entry.render(item, finalChatRef, renderOpts), action)} />
     );
   }
   return finish(entry.render(item, finalChatRef, renderOpts));
@@ -2261,7 +2280,7 @@ export function renderChatInlineEntityCard(
           {externalUrl && !isAppOriginUrl(externalUrl) ? (
             <ExternalMediaNotice url={externalUrl} kind="video" label={displayRef.title} />
           ) : (
-            <ChatVideoEntityCard chatRef={displayRef} />
+            <ChatCollapsibleVideo chatRef={displayRef} />
           )}
         </BlockCard>
       );

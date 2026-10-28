@@ -43,6 +43,10 @@ export interface SourceActionButtonProps {
   label?: string;
 }
 
+/** A chat card's footer action (Ask, Display, Watch video): one look for every action in that row. */
+export const CARD_FOOTER_ACTION_CLASS =
+  '!h-auto !p-0 text-h6 font-normal text-ods-text-secondary opacity-60 hover:bg-transparent hover:opacity-100 hover:text-ods-text-primary';
+
 // Per-density styling lives in one map so the three call sites share the
 // SAME hover/opacity/transition rules. Adding a fourth density means
 // adding one entry here, not touching the render path.
@@ -66,8 +70,7 @@ const DENSITY_STYLES: Record<
     size: 'small',
     showLabel: true,
     iconSize: '!h-3 !w-3',
-    className:
-      '!h-auto !p-0 text-h6 font-normal text-ods-text-secondary opacity-60 hover:bg-transparent hover:opacity-100 hover:text-ods-text-primary',
+    className: CARD_FOOTER_ACTION_CLASS,
   },
   'list-row': {
     size: 'small',
