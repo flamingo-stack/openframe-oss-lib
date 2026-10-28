@@ -5,6 +5,7 @@ import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketActivityCriteria;
 import com.openframe.data.document.ticket.filter.TicketActivityFilter;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.model.ClientOwnerScope;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +23,7 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -50,6 +51,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_DEVICE_ID = "deviceId";
     private static final String FIELD_CREATION_SOURCE = "creationSource";
     private static final String FIELD_OWNER_MACHINE_ID = "owner.machineId";
+    private static final String FIELD_OWNER_ORGANIZATION_ID = "owner.organizationId";
     private static final String FIELD_TITLE = "title";
     private static final String FIELD_DEVICE_HOSTNAME = "deviceHostname";
     private static final String FIELD_ORGANIZATION_NAME = "organizationName";
@@ -89,7 +91,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
 
     @Override
     public Query buildTicketQuery(TicketQueryFilter filter, String search,
-                                   List<String> restrictToTicketIds, String ownerMachineId) {
+                                   List<String> restrictToTicketIds, ClientOwnerScope ownerScope) {
         Query query = new Query();
 
         if (filter != null) {
@@ -108,12 +110,22 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
 
         applyIdRestriction(query, restrictToTicketIds);
 
-        if (ownerMachineId != null) {
-            query.addCriteria(Criteria.where(FIELD_OWNER_MACHINE_ID).is(ownerMachineId));
-        }
-
+        applyOwnerScope(query, ownerScope);
         applySearchCriteria(query, search);
         return query;
+    }
+
+    // A null snapshot (written before the backfill) stays visible: $in with null matches a missing field too.
+    // Not an $or: the search clause already owns the top-level $or key of this query.
+    private void applyOwnerScope(Query query, ClientOwnerScope ownerScope) {
+        if (ownerScope == null) {
+            return;
+        }
+        query.addCriteria(Criteria.where(FIELD_OWNER_MACHINE_ID).is(ownerScope.machineId()));
+        if (ownerScope.organizationId() != null) {
+            query.addCriteria(Criteria.where(FIELD_OWNER_ORGANIZATION_ID)
+                    .in(Arrays.asList(ownerScope.organizationId(), null)));
+        }
     }
 
 

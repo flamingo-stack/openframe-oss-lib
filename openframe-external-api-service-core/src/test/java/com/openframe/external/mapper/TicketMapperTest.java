@@ -207,7 +207,7 @@ class TicketMapperTest {
 
     @Test
     void clientOwnerExposesOnlyTheMachineId() {
-        TicketOwnerResponse response = mapper.toOwnerResponse(new ClientTicketOwner("machine-7"));
+        TicketOwnerResponse response = mapper.toOwnerResponse(new ClientTicketOwner("machine-7", "org-7"));
 
         assertEquals(new TicketOwnerResponse(TicketOwnerType.CLIENT, "machine-7", null), response);
     }
