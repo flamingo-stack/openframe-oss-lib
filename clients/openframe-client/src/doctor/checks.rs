@@ -416,7 +416,6 @@ fn service_config_dir() -> std::path::PathBuf {
     }
     #[cfg(target_os = "windows")]
     {
-        let pf = std::env::var("ProgramFiles").unwrap_or_else(|_| r"C:\Program Files".into());
-        std::path::PathBuf::from(pf).join("OpenFrame").join("bin")
+        crate::platform::directories::get_install_directory().join("bin")
     }
 }
