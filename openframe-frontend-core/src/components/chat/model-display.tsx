@@ -32,6 +32,10 @@ const getProviderIcon = (provider?: string) => {
   }
 };
 
+/** What the tail's budget is: the agent's per-chat budget, not the model's window. */
+const CONTEXT_BUDGET_HINT =
+  'Tokens this chat holds in memory. Older messages are summarized before the budget fills up.';
+
 const formatTokenCount = (count: number): string => {
   if (count >= 1_000_000) {
     const val = count / 1_000_000;
@@ -77,12 +81,12 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     ref,
   ) => {
     // ONE switch: while the model metadata loads (or in the page's loading state) the SAME row draws the provider's
-    // mark box (only when the provider has a mark), the name as a bar, and the "tokens used" tail as a bar when the
+    // mark box (only when the provider has a mark), the name as a bar, and the "context budget" tail as a bar when the
     // loaded row would draw it (once the context window is known).
     const isLoading = useLoadingScope() || loading;
     const icon = getProviderIcon(provider);
     const name = displayName || modelName;
-    // v2 spells the counts out ("372 / 50,000 tokens used"); classic keeps them short.
+    // v2 spells the counts out ("372 / 50,000 context budget"); classic keeps them short.
     const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
     const formatCount = (count: number) => (isV2 ? count.toLocaleString('en-US') : formatTokenCount(count));
 
@@ -136,21 +140,31 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       label
     );
 
-    // Inline pill: provider icon + model name + "X / Y tokens used".
-    // The "tokens used" tail renders as soon as `contextWindow` is known
-    // (typically from the leading metadata frame). `usedTokens` lags by a
+    // Inline pill: provider icon + model name + "X / Y context budget".
+    // `contextWindow` is the agent's context budget, not the model's window:
+    // the chat's memory is compacted before it fills, so the tail says how
+    // close the chat is to that. It renders as soon as the budget is known
+    // (typically from the leading metadata frame); `usedTokens` lags by a
     // tick — it only becomes non-null after the first `message_start`
-    // usage frame. Showing "— / 200K tokens used" early gives users the
-    // model's capacity context without waiting for the first byte.
+    // usage frame, so the tail shows "— / 150K context budget" until then.
     const inline = (
       <div ref={ref} className={cn(MODEL_DISPLAY_ROW_CLASS, 'text-ods-text-secondary', className)} {...props}>
         {labelWithTooltip}
         {contextWindow != null && (
-          <span className="ml-auto opacity-70 text-h6">
-            {usedTokens != null ? formatCount(usedTokens) : '—'}
-            {isV2 ? ' / ' : '/'}
-            {formatCount(contextWindow)} tokens used
-          </span>
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="ml-auto opacity-70 text-h6">
+                  {usedTokens != null ? formatCount(usedTokens) : '—'}
+                  {isV2 ? ' / ' : '/'}
+                  {formatCount(contextWindow)} context budget
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="end">
+                {CONTEXT_BUDGET_HINT}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     );

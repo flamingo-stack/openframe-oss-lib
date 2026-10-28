@@ -311,7 +311,7 @@ describe('EmbeddableChat: the model row', () => {
   it('is left out with showModel={false}', () => {
     renderChat(createState(), { threadContainer: null, showModel: false });
     expect(screen.queryByText('Claude Opus')).not.toBeInTheDocument();
-    expect(screen.queryByText(/tokens used/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/context budget/)).not.toBeInTheDocument();
   });
 
   it('makes the model name a button with onModelClick', () => {

@@ -681,12 +681,13 @@ export interface AskDisplayProps extends Omit<HTMLAttributes<HTMLDivElement>, 'o
 // ========== Model Display Props ==========
 
 export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
-  /** The model metadata is still loading: the row draws its own skeleton (with the "tokens used" tail when
+  /** The model metadata is still loading: the row draws its own skeleton (with the "context budget" tail when
    *  `contextWindow` is known). Inside a `LoadingScope` it does so whatever this says. */
   loading?: boolean;
   provider?: string;
   modelName?: string;
   displayName?: string;
+  /** The agent's context budget for the chat (its memory is compacted before it fills), not the model's window. */
   contextWindow?: number;
   usedTokens?: number;
   showIcon?: boolean;
