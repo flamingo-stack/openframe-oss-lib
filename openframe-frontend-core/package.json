@@ -33,6 +33,11 @@
       "require": "./dist/build/style-sources.cjs",
       "default": "./dist/build/style-sources.cjs"
     },
+    "./next-styles": {
+      "types": "./dist/build/next-styles.d.ts",
+      "require": "./dist/build/next-styles.cjs",
+      "default": "./dist/build/next-styles.cjs"
+    },
     "./dist/*.js": {
       "import": "./dist/*.js",
       "default": "./dist/*.js"

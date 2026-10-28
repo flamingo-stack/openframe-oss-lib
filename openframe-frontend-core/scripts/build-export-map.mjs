@@ -143,6 +143,8 @@ function main() {
   copyFileSync(join(ROOT, 'scripts', 'optimize-imports-loader.cjs'), join(OUT_DIR, 'optimize-imports-loader.cjs'));
   copyFileSync(join(ROOT, 'scripts', 'style-sources.cjs'), join(OUT_DIR, 'style-sources.cjs'));
   copyFileSync(join(ROOT, 'scripts', 'style-sources.d.ts'), join(OUT_DIR, 'style-sources.d.ts'));
+  copyFileSync(join(ROOT, 'scripts', 'next-styles.cjs'), join(OUT_DIR, 'next-styles.cjs'));
+  copyFileSync(join(ROOT, 'scripts', 'next-styles.d.ts'), join(OUT_DIR, 'next-styles.d.ts'));
   console.log(`Export map: ${names} names over ${Object.keys(entries).length} entries`);
 }
 
