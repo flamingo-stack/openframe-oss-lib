@@ -29,13 +29,17 @@ public class ClientOwnerScopeResolver {
         if (!isAgent(principal)) {
             return Optional.empty();
         }
-        String machineId = principal.getMachineId();
+        return Optional.of(forMachine(principal.getMachineId()));
+    }
+
+    /** The scope of a device addressed by machineId, for deliveries that have no principal (notifications). */
+    public ClientOwnerScope forMachine(String machineId) {
         String organizationId = machineRepository.findByMachineId(machineId)
                 .map(Machine::getOrganizationId)
                 .orElse(null);
         if (organizationId == null) {
             log.debug("No current organization for machine {}; owner scope falls back to machine only", machineId);
         }
-        return Optional.of(new ClientOwnerScope(machineId, organizationId));
+        return new ClientOwnerScope(machineId, organizationId);
     }
 }

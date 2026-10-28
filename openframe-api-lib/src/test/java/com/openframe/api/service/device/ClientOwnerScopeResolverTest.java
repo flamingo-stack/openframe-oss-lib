@@ -55,6 +55,21 @@ class ClientOwnerScopeResolverTest {
     }
 
     @Test
+    void forMachine_knownMachine_scopeCarriesItsCurrentOrganization() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("machine-1");
+        machine.setOrganizationId("org-b");
+        when(machineRepository.findByMachineId("machine-1")).thenReturn(Optional.of(machine));
+
+        // execution
+        ClientOwnerScope scope = resolver.forMachine("machine-1");
+
+        // verifications
+        assertThat(scope).isEqualTo(new ClientOwnerScope("machine-1", "org-b"));
+    }
+
+    @Test
     void resolve_admin_noScopeAndNoMachineLookup() {
         // execution
         Optional<ClientOwnerScope> scope = resolver.resolve(ADMIN);
