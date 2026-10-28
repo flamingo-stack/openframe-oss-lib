@@ -44,7 +44,7 @@ class MobileVersionPolicyPropertiesTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ClientKind.class, names = {"WEB", "DESKTOP", "UNKNOWN"})
+    @EnumSource(value = ClientKind.class, names = {"WEB", "DESKTOP", "CHAT", "UNKNOWN"})
     void storeUrl_kindWithoutStore_nullReturned(ClientKind kind) {
         // setup - properties prepared in setUp
 
