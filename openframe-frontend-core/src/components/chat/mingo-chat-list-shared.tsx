@@ -95,6 +95,12 @@ export interface MingoChatListProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  /**
+   * How the section's list loads its next page: as its end scrolls into view
+   * (`'scroll'`, the default), or on a "Show more" under it (`'button'`). The
+   * search results and the rail always scroll.
+   */
+  loadMore?: 'scroll' | 'button';
   /** The first page is still loading: the list draws one page of loading rows. */
   isLoadingHistory?: boolean;
   /** The host's page size: how many rows the loading state draws. Default `CHAT_HISTORY_PAGE_SIZE`. */

@@ -287,6 +287,58 @@ describe('MingoChatRail variant="section"', () => {
     expect(screen.getByRole('button', { name: 'Filter chats' })).toHaveClass('text-ods-accent');
   });
 
+  it('loads the next page on "Show more", never as the end shows, with loadMore="button"', () => {
+    const live = new Set<IntersectionObserverCallback>();
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        private readonly callback: IntersectionObserverCallback;
+        constructor(callback: IntersectionObserverCallback) {
+          this.callback = callback;
+        }
+        observe() {
+          live.add(this.callback);
+        }
+        disconnect() {
+          live.delete(this.callback);
+        }
+        unobserve() {}
+        takeRecords() {
+          return [];
+        }
+      },
+    );
+    const onLoadMore = vi.fn();
+    const { rerender } = render(
+      <MingoChatRail variant="section" dialogs={DIALOGS} hasMore onLoadMore={onLoadMore} loadMore="button" />,
+    );
+    act(() => {
+      for (const notify of live)
+        notify([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+    });
+    expect(onLoadMore).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+    // While the page loads its rows stand in for the button; with no more, it goes.
+    rerender(
+      <MingoChatRail
+        variant="section"
+        dialogs={DIALOGS}
+        hasMore
+        isLoadingMore
+        onLoadMore={onLoadMore}
+        loadMore="button"
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument();
+    rerender(
+      <MingoChatRail variant="section" dialogs={DIALOGS} hasMore={false} onLoadMore={onLoadMore} loadMore="button" />,
+    );
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument();
+  });
+
   it('loads the next page when the end of the list shows, once per page', () => {
     // The observers alive now; a disconnected one never reports again.
     const live = new Set<IntersectionObserverCallback>();

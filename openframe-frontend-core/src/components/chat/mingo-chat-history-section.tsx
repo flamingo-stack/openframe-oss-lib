@@ -97,6 +97,8 @@ interface HistoryListProps extends Pick<
   | 'onRetry'
 > {
   onSelect?: (id: string) => void;
+  /** How the next page loads (`MingoChatListProps.loadMore`). Default `'scroll'`. */
+  loadMore?: 'scroll' | 'button';
   /** Each row's ⋯ (Rename, Copy link, Compact, Archive); none in the search results. */
   menuFor?: (dialog: DialogItem) => ActionsMenuItem[];
   hasSearch: boolean;
@@ -117,13 +119,20 @@ function HistoryList({
   loadError = false,
   onRetry,
   onSelect,
+  loadMore = 'scroll',
   menuFor,
   hasSearch,
 }: HistoryListProps) {
   // The viewport root: whatever scrolls the list (the sidebar body, the search
   // modal) clips the sentinel, and the viewport sees nothing in a closed drawer
   // or a collapsed rail.
-  const sentinelRef = useLoadMoreSentinel({ hasMore, isLoadingMore, onLoadMore, itemCount: dialogs.length });
+  const onScroll = loadMore === 'scroll';
+  const sentinelRef = useLoadMoreSentinel({
+    hasMore: hasMore && onScroll,
+    isLoadingMore,
+    onLoadMore,
+    itemCount: dialogs.length,
+  });
   // The page's loading state draws the list's own, as the first page loading does.
   const loading = useLoadingScope() || isLoadingHistory;
 
@@ -182,7 +191,19 @@ function HistoryList({
           <SkeletonRows count={3} />
         </LoadingRegion>
       )}
-      {hasMore && <div ref={sentinelRef} className="h-px shrink-0" aria-hidden />}
+      {hasMore && onScroll && <div ref={sentinelRef} className="h-px shrink-0" aria-hidden />}
+      {hasMore && !onScroll && !isLoadingMore && onLoadMore && (
+        <Button
+          variant="link"
+          size="compact"
+          type="button"
+          data-tone="neutral"
+          onClick={onLoadMore}
+          className="self-start px-[var(--spacing-system-xs)]"
+        >
+          Show more
+        </Button>
+      )}
     </div>
   );
 }
@@ -218,6 +239,7 @@ export function MingoChatHistorySection({
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
+  loadMore = 'scroll',
   isLoadingHistory = false,
   loadError = false,
   onRetry,
@@ -372,6 +394,7 @@ export function MingoChatHistorySection({
           hasSearch={hasSearch}
           draftTitle={draftTitle}
           onSelect={onSelectDialog}
+          loadMore={loadMore}
           menuFor={dialog =>
             chatDialogMenuItems({
               onCopyLink: onRequestCopyLink && (() => onRequestCopyLink(dialog)),
