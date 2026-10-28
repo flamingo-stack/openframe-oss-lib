@@ -107,7 +107,8 @@ export * from './utils';
 // once when something asks for it (an open event, `open` or `defaultOpen`). A
 // chat that starts closed costs a page nothing: it used to load on every page
 // once the browser was idle, about 650 KB of script most visitors never opened.
-// An open sent before it has loaded is held and delivered (`ask-ai-events`).
+// An open sent before it has loaded is held and delivered (`ask-ai-events`). The host's own stylesheet
+// for it loads at the same moment (`loadStyles`), so a page does not block on the chat's classes.
 export type { ChatPrefillDraft, EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
 const LoadedEmbeddableChat = lazy(() =>
   import('./embeddable-chat').then(module => ({ default: module.EmbeddableChat })),
@@ -116,6 +117,10 @@ export const EmbeddableChat = forwardRef<EmbeddableChatHandle, EmbeddableChatPro
   const [loadRequested, setLoadRequested] = useState(false);
   const load = loadRequested || Boolean(props.open) || Boolean(props.defaultOpen);
   useEffect(() => holdAskAiOpens(), []);
+  const { loadStyles } = props;
+  useEffect(() => {
+    if (load) loadStyles?.();
+  }, [load, loadStyles]);
   useEffect(() => {
     if (load) return undefined;
     const start = () => setLoadRequested(true);

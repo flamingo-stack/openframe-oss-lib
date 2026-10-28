@@ -193,6 +193,12 @@ export interface EmbeddableChatProps {
   /** Render the built-in floating "Ask AI" trigger. Defaults to `true`. */
   showInternalTrigger?: boolean;
   /**
+   * Loads the host's stylesheet for the chat, called once when the chat's module starts loading.
+   * A host whose page stylesheet leaves the chat's classes out (`firstPaint` in `style-sources`)
+   * passes its full stylesheet here, e.g. `() => import('./full-styles')`.
+   */
+  loadStyles?: () => unknown;
+  /**
    * Non-interactive display mode. When `true`, the whole panel becomes a
    * static visual — every hover state and click is blocked (via
    * `pointer-events-none` on the panel body) and the composer no longer

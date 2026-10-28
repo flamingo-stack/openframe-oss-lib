@@ -141,6 +141,8 @@ function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   writeFileSync(join(OUT_DIR, 'export-map.json'), `${JSON.stringify({ package: pkg.name, entries })}\n`);
   copyFileSync(join(ROOT, 'scripts', 'optimize-imports-loader.cjs'), join(OUT_DIR, 'optimize-imports-loader.cjs'));
+  copyFileSync(join(ROOT, 'scripts', 'style-sources.cjs'), join(OUT_DIR, 'style-sources.cjs'));
+  copyFileSync(join(ROOT, 'scripts', 'style-sources.d.ts'), join(OUT_DIR, 'style-sources.d.ts'));
   console.log(`Export map: ${names} names over ${Object.keys(entries).length} entries`);
 }
 
