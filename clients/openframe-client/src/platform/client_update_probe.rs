@@ -1,4 +1,5 @@
 use crate::platform::directories::get_secured_directory;
+use crate::utils::fs::atomic_write;
 use std::fs;
 
 pub const UPDATER_TOOL_AGENT_ID: &str = "openframe-client-updater";
@@ -40,11 +41,11 @@ pub fn updater_drain_request() -> Option<String> {
 }
 
 /// Tells the updater that the update started at `token` may stop this client now.
-pub fn write_drained_marker(token: &str) -> std::io::Result<()> {
-    let path = get_secured_directory().join(CLIENT_DRAINED_FILE_NAME);
-    let temp_path = path.with_extension("tmp");
-    fs::write(&temp_path, token)?;
-    fs::rename(&temp_path, &path)
+pub fn write_drained_marker(token: &str) -> anyhow::Result<()> {
+    atomic_write(
+        &get_secured_directory().join(CLIENT_DRAINED_FILE_NAME),
+        token,
+    )
 }
 
 fn read_updater_state() -> Option<UpdaterState> {

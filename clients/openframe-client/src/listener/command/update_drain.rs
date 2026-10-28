@@ -16,7 +16,7 @@ pub async fn follow_updater_drains(gate: RestartGate) {
                 match write_drained_marker(&token) {
                     Ok(()) => info!("Drained for the client update, the updater may stop the client"),
                     Err(e) => warn!(
-                        "Failed to confirm the drain, the updater stops the client after its own wait: {}",
+                        "Failed to confirm the drain, the updater stops the client after its own wait: {:#}",
                         e
                     ),
                 }

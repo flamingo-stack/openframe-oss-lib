@@ -1,4 +1,5 @@
 use crate::platform::directories::DirectoryManager;
+use crate::utils::fs::atomic_write;
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -65,13 +66,8 @@ impl BootMarkerService {
 }
 
 fn write_version(path: &Path) -> Result<()> {
-    let mut temp_path = path.as_os_str().to_owned();
-    temp_path.push(".tmp");
-    let temp_path = PathBuf::from(temp_path);
-    fs::write(&temp_path, env!("OPENFRAME_VERSION"))
-        .with_context(|| format!("Failed to write temp marker: {:?}", temp_path))?;
-    fs::rename(&temp_path, path)
-        .with_context(|| format!("Failed to move marker into place: {:?}", path))
+    atomic_write(path, env!("OPENFRAME_VERSION"))
+        .with_context(|| format!("Failed to write marker: {:?}", path))
 }
 
 fn legacy_last_known_good_artifacts(secured_dir: &Path, current_exe: &Path) -> Vec<PathBuf> {
