@@ -17,14 +17,13 @@ use crate::services::service_manager_service::ServiceManagerService;
 use crate::services::{GithubDownloadService, UpdateProgressPublisher, UpdaterStateService};
 use crate::utils::blocking::run_blocking;
 
-/// How an update request ended, for the listener to acknowledge.
+/// How an update request ended, answered to the delivery engine as DONE or FAILED.
 #[derive(Debug, PartialEq)]
 pub enum UpdateOutcome {
-    /// The client runs the requested version: updated now, or already on it.
-    Applied,
-    /// Refused before anything changed; the same request can never succeed.
-    Rejected(String),
-    /// Did not land and the previous client is in place, so a retry may succeed.
+    /// Nothing left to do: the client runs the requested version (updated now, or
+    /// already on it) or a newer one the request must not take back.
+    Done,
+    /// Did not land; the client keeps its previous binary.
     Failed(String),
 }
 
@@ -75,17 +74,16 @@ impl ClientUpdateService {
     pub async fn apply(
         &self,
         msg: &ClientUpdateMessage,
-        delivery: Option<&DeliveryRef>,
+        delivery: &DeliveryRef,
         _slot: UpdateSlot,
     ) -> UpdateOutcome {
         let version = match self.check_request(msg).await {
             Ok(Some(version)) => version,
-            Ok(None) => return UpdateOutcome::Applied,
-            Err(reason) => return UpdateOutcome::Rejected(reason),
+            Ok(None) => return UpdateOutcome::Done,
+            Err(reason) => return UpdateOutcome::Failed(reason),
         };
         info!("Starting update to v{}", version);
-        let mut state = UpdaterState::new(version);
-        state.delivery = delivery.cloned();
+        let mut state = UpdaterState::new(version, delivery.clone());
 
         let temp_path = match self.acquire_binary(msg, &mut state).await {
             Ok(path) => path,
@@ -97,8 +95,8 @@ impl ClientUpdateService {
         self.swap_and_verify(&mut state, &temp_path).await
     }
 
-    /// The version to install; `None` when the client already runs it, `Err`
-    /// with the reason when the request is refused.
+    /// The version to install; `None` when the client already runs it or a newer
+    /// one, `Err` with the reason when the request is refused.
     async fn check_request(&self, msg: &ClientUpdateMessage) -> Result<Option<String>, String> {
         let requested = match semver::Version::parse(msg.version.trim_start_matches('v')) {
             Ok(v) => v,
@@ -124,15 +122,16 @@ impl ClientUpdateService {
             return Ok(None);
         }
 
-        // A message redelivered after a newer update landed must not take the client back.
+        // Below the booted version: done without running, as openframe-client answered
+        // it, since FAILED would only have the engine retry what can never run.
         if let (false, Some(booted)) = (ALLOW_DOWNGRADE, booted.as_deref()) {
             match semver::Version::parse(booted.trim_start_matches('v')) {
                 Ok(booted_semver) if requested < booted_semver => {
-                    let reason = format!(
+                    warn!(
                         "Refusing downgrade to {} — client booted with {}",
                         version, booted
                     );
-                    return Err(self.refuse(&version, reason).await);
+                    return Ok(None);
                 }
                 Ok(_) => {}
                 Err(e) => warn!(
@@ -172,7 +171,7 @@ impl ClientUpdateService {
                 );
                 error!("{}", reason);
                 self.fail(state, &reason, false).await;
-                return Err(UpdateOutcome::Rejected(reason));
+                return Err(UpdateOutcome::Failed(reason));
             }
         };
 
@@ -334,7 +333,7 @@ impl ClientUpdateService {
         self.progress_publisher.publish_success(&version).await;
 
         info!("Update to v{} completed", version);
-        UpdateOutcome::Applied
+        UpdateOutcome::Done
     }
 
     /// Wait for the new client binary to write a boot marker with the target

@@ -45,12 +45,11 @@ pub struct UpdaterState {
     pub started_at: String,
     pub failure_reason: Option<String>,
     /// The delivery-engine command being applied, so crash recovery can still answer it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub delivery: Option<DeliveryRef>,
+    pub delivery: DeliveryRef,
 }
 
 impl UpdaterState {
-    pub fn new(target_version: String) -> Self {
+    pub fn new(target_version: String, delivery: DeliveryRef) -> Self {
         Self {
             target_version,
             phase: UpdaterPhase::Idle,
@@ -58,7 +57,7 @@ impl UpdaterState {
             downloaded_binary_path: None,
             started_at: chrono::Utc::now().to_rfc3339(),
             failure_reason: None,
-            delivery: None,
+            delivery,
         }
     }
 

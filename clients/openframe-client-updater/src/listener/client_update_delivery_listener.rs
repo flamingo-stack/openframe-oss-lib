@@ -135,12 +135,8 @@ impl ClientUpdateDeliveryListener {
         };
 
         self.reporter.acked(&delivery).await;
-        let result = match self
-            .update_service
-            .apply(&update, Some(&delivery), slot)
-            .await
-        {
-            UpdateOutcome::Applied => {
+        let result = match self.update_service.apply(&update, &delivery, slot).await {
+            UpdateOutcome::Done => {
                 if let Some(sequence) = delivery.sequence {
                     if let Err(e) = self.ledger.record_applied(sequence) {
                         warn!(%dispatch_id, sequence, "Failed to record the applied sequence: {:#}", e);
@@ -148,9 +144,7 @@ impl ClientUpdateDeliveryListener {
                 }
                 DeliveryResultMessage::done(delivery)
             }
-            UpdateOutcome::Rejected(reason) | UpdateOutcome::Failed(reason) => {
-                DeliveryResultMessage::failed(delivery, reason)
-            }
+            UpdateOutcome::Failed(reason) => DeliveryResultMessage::failed(delivery, reason),
         };
         self.reporter.settle(result).await;
     }

@@ -1,5 +1,14 @@
 use super::*;
 
+fn delivery() -> DeliveryRef {
+    DeliveryRef {
+        delivery_type: "CLIENT_UPDATE".to_string(),
+        target_id: "openframe-client".to_string(),
+        dispatch_id: "d-1".to_string(),
+        sequence: Some(3),
+    }
+}
+
 // openframe-client's ordering guard (platform/client_update_probe.rs) parses
 // updater_state.json and matches these exact strings — a rename here silently
 // disables the guard on the client side.
@@ -39,12 +48,12 @@ fn only_completed_and_failed_are_terminal() {
         UpdaterPhase::VerifyingBoot,
     ];
     for phase in terminal {
-        let mut state = UpdaterState::new("1.0.0".to_string());
+        let mut state = UpdaterState::new("1.0.0".to_string(), delivery());
         state.phase = phase;
         assert!(state.is_terminal());
     }
     for phase in non_terminal {
-        let mut state = UpdaterState::new("1.0.0".to_string());
+        let mut state = UpdaterState::new("1.0.0".to_string(), delivery());
         state.phase = phase;
         assert!(!state.is_terminal());
     }
@@ -52,7 +61,7 @@ fn only_completed_and_failed_are_terminal() {
 
 #[test]
 fn new_state_starts_idle_and_empty() {
-    let state = UpdaterState::new("1.2.3".to_string());
+    let state = UpdaterState::new("1.2.3".to_string(), delivery());
     assert_eq!(state.target_version, "1.2.3");
     assert_eq!(state.phase, UpdaterPhase::Idle);
     assert!(state.backup_path.is_none());
@@ -63,7 +72,7 @@ fn new_state_starts_idle_and_empty() {
 
 #[test]
 fn state_round_trips_through_json() {
-    let mut state = UpdaterState::new("2.0.0".to_string());
+    let mut state = UpdaterState::new("2.0.0".to_string(), delivery());
     state.phase = UpdaterPhase::ReplacingBinary;
     state.backup_path = Some("/tmp/openframe-client.backup".into());
     state.downloaded_binary_path = Some("/tmp/new-binary".into());
@@ -80,4 +89,5 @@ fn state_round_trips_through_json() {
     );
     assert_eq!(restored.failure_reason, state.failure_reason);
     assert_eq!(restored.started_at, state.started_at);
+    assert_eq!(restored.delivery, state.delivery);
 }

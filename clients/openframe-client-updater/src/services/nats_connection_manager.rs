@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
-use async_nats::{Client, Event};
-use std::sync::atomic::{AtomicBool, Ordering};
+use async_nats::Client;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tokio::sync::{broadcast, watch, RwLock};
+use tokio::sync::{watch, RwLock};
 use tokio::time::{interval, MissedTickBehavior};
 use tracing::{error, info, warn};
 
@@ -41,7 +41,6 @@ pub struct NatsConnectionManager {
     initial_configuration_service: InitialConfigurationService,
     token: Arc<RwLock<Option<String>>>,
     tls_config_provider: LocalTlsConfigProvider,
-    reconnect_tx: broadcast::Sender<()>,
 }
 
 impl NatsConnectionManager {
@@ -55,7 +54,6 @@ impl NatsConnectionManager {
         token: Arc<RwLock<Option<String>>>,
         tls_config_provider: LocalTlsConfigProvider,
     ) -> Self {
-        let (reconnect_tx, _) = broadcast::channel(16);
         let (client, _) = watch::channel(None);
         Self {
             client: Arc::new(client),
@@ -65,12 +63,7 @@ impl NatsConnectionManager {
             initial_configuration_service,
             token,
             tls_config_provider,
-            reconnect_tx,
         }
-    }
-
-    pub fn subscribe_reconnect(&self) -> broadcast::Receiver<()> {
-        self.reconnect_tx.subscribe()
     }
 
     pub fn on_client_replaced(&self) -> watch::Receiver<Option<Arc<Client>>> {
@@ -87,9 +80,7 @@ impl NatsConnectionManager {
         let token = self.token.clone();
         let nats_server_url = self.nats_server_url.clone();
         let nats_server_url_for_reconnect = self.nats_server_url.clone();
-        let reconnect_tx = self.reconnect_tx.clone();
         let last_activity = self.last_activity.clone();
-        let connected_once = Arc::new(AtomicBool::new(false));
 
         let mut connect_options = async_nats::ConnectOptions::new()
             .name(machine_id)
@@ -109,17 +100,8 @@ impl NatsConnectionManager {
                 std::time::Duration::from_secs(5)
             })
             .ping_interval(std::time::Duration::from_secs(10))
-            .event_callback(move |event| {
-                let reconnect_tx = reconnect_tx.clone();
-                let connected_once = connected_once.clone();
-                async move {
-                    info!("NATS event: {:?}", event);
-                    if matches!(event, Event::Connected)
-                        && connected_once.swap(true, Ordering::SeqCst)
-                    {
-                        let _ = reconnect_tx.send(());
-                    }
-                }
+            .event_callback(|event| async move {
+                info!("NATS event: {:?}", event);
             })
             .auth_url_callback(move |()| {
                 info!("Auth URL callback triggered — reading latest shared token");

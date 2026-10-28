@@ -8,7 +8,7 @@ use crate::config::updater_config::{
     BOOT_MARKER_POLL_INTERVAL_SECS, BOOT_MARKER_WAIT_SECS, CLIENT_SERVICE_FULL_NAME,
     DOWNLOAD_CLIENT_TIMEOUT_SECS, SERVICE_START_VERIFY_WAIT_SECS,
 };
-use crate::listener::{ClientUpdateDeliveryListener, ClientUpdateListener};
+use crate::listener::ClientUpdateDeliveryListener;
 use crate::models::{DeliveryRef, DeliveryResultMessage, UpdaterPhase};
 use crate::platform::DirectoryManager;
 use crate::services::boot_marker_service::BootMarkerService;
@@ -27,7 +27,7 @@ use crate::services::{
 /// published once NATS is up.
 struct RecoveryReport {
     version: String,
-    delivery: Option<DeliveryRef>,
+    delivery: DeliveryRef,
     outcome: RecoveryOutcome,
 }
 
@@ -166,13 +166,6 @@ impl UpdaterOrchestrator {
         );
 
         reporter.start_resend_loop();
-        let stream_listener = ClientUpdateListener::new(
-            nats_manager.clone(),
-            update_service.clone(),
-            agent_config_service.clone(),
-        )
-        .start()
-        .await;
         let delivery_listener = ClientUpdateDeliveryListener::new(
             nats_manager,
             update_service,
@@ -184,7 +177,7 @@ impl UpdaterOrchestrator {
         .await;
 
         info!("Updater ready — listening for update commands");
-        let _ = tokio::join!(stream_listener, delivery_listener);
+        let _ = delivery_listener.await;
 
         Ok(())
     }
@@ -207,10 +200,8 @@ impl UpdaterOrchestrator {
             }
         }
 
-        // A delivery-engine update the crash interrupted is answered now.
-        let Some(delivery) = report.delivery else {
-            return;
-        };
+        // The delivery the crash interrupted is answered now.
+        let delivery = report.delivery;
         let result = match report.outcome {
             RecoveryOutcome::Success => {
                 if let Some(sequence) = delivery.sequence {
@@ -240,7 +231,7 @@ impl UpdaterOrchestrator {
             Ok(Some(s)) => s,
             Err(e) => {
                 // An unreadable state file must not crash-loop the service via KeepAlive —
-                // drop it and start clean; the NATS message redelivers any lost update.
+                // drop it and start clean; the engine re-sends an update it gets no result for.
                 warn!(
                     "Updater state file unreadable — removing it and skipping crash recovery: {:#}",
                     e

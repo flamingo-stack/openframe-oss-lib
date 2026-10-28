@@ -1,7 +1,7 @@
 // Download retry settings
 pub const MAX_DOWNLOAD_RETRIES: u32 = 3;
 /// Per-attempt cap; the retry loop stops early once DOWNLOAD_TOTAL_BUDGET_SECS
-/// is spent so retries can never push the update past its ACK window.
+/// is spent so retries can never push the update past the delivery's result timeout.
 pub const DOWNLOAD_TIMEOUT_SECS: u64 = 180;
 /// Whole download phase (all attempts, backoff and CDN fallback included).
 pub const DOWNLOAD_TOTAL_BUDGET_SECS: u64 = 360;
@@ -11,18 +11,9 @@ pub const DOWNLOAD_TOTAL_BUDGET_SECS: u64 = 360;
 pub const DOWNLOAD_CLIENT_TIMEOUT_SECS: u64 = 300;
 pub const MIN_BINARY_SIZE_BYTES: u64 = 100 * 1024; // 100 KB
 
-// NATS consumer settings
-pub const CLIENT_UPDATE_STREAM: &str = "CLIENT_UPDATE";
-/// How long JetStream waits before redelivering a CLIENT_UPDATE the updater went
-/// quiet on. While an update runs, progress acks every PROGRESS_ACK_INTERVAL_SECS
-/// keep extending it, so a long download or drain never redelivers mid-update.
-pub const CLIENT_UPDATE_ACK_WAIT_SECS: u64 = 600;
-pub const PROGRESS_ACK_INTERVAL_SECS: u64 = 60;
-pub const CLIENT_UPDATE_MAX_DELIVER: i64 = 10;
-pub const RECONNECTION_DELAY_MS: u64 = 5000;
-
 // Delivery engine: CLIENT_UPDATE deliveries on machine.{id}.client-update.v2,
 // answered on machine.{id}.delivery.result.
+pub const RECONNECTION_DELAY_MS: u64 = 5000;
 pub const DELIVERY_LEDGER_FILE_NAME: &str = "updater_deliveries.json";
 /// Outlives the backend's longest delivery ttl, so a repeated dispatch is still recognised.
 pub const DELIVERY_LEDGER_TTL_SECS: i64 = 31 * 24 * 60 * 60;
@@ -30,12 +21,6 @@ pub const DELIVERY_LEDGER_MAX_SETTLED: usize = 100;
 pub const RESULT_PUBLISH_TIMEOUT_SECS: u64 = 30;
 /// How often results that did not reach the stream yet are published again.
 pub const RESULT_RESEND_INTERVAL_SECS: u64 = 30;
-
-// Consumer creation retry settings
-pub const CONSUMER_RETRY_ATTEMPTS_PER_CYCLE: u32 = 5;
-pub const CONSUMER_INITIAL_RETRY_DELAY_MS: u64 = 1000;
-pub const CONSUMER_MAX_RETRY_DELAY_MS: u64 = 30000;
-pub const CONSUMER_CYCLE_PAUSE_MS: u64 = 30000;
 
 // Service stop/start timeouts
 pub const SERVICE_STOP_TIMEOUT_SECS: u64 = 30;
@@ -69,7 +54,8 @@ pub const BOOT_MARKER_WAIT_SECS: u64 = 90;
 pub const BOOT_MARKER_POLL_INTERVAL_SECS: u64 = 2;
 /// Settle time between service start and the first Running-state check.
 pub const SERVICE_START_SETTLE_SECS: u64 = 3;
-/// Refuse update messages below the version the client booted with (flip to allow downgrades).
+/// A request below the version the client booted with is answered done without
+/// running, as openframe-client did (flip to allow downgrades).
 pub const ALLOW_DOWNGRADE: bool = false;
 /// Attempts to put the pre-swap backup back after a failed swap (file may be briefly locked).
 pub const BACKUP_RESTORE_ATTEMPTS: u32 = 3;

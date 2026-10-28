@@ -1,4 +1,5 @@
 use super::*;
+use crate::models::DeliveryRef;
 
 fn service(root: &std::path::Path) -> UpdaterStateService {
     let dm = DirectoryManager::with_custom_dirs(
@@ -7,6 +8,15 @@ fn service(root: &std::path::Path) -> UpdaterStateService {
         root.join("secured"),
     );
     UpdaterStateService::new(&dm)
+}
+
+fn delivery() -> DeliveryRef {
+    DeliveryRef {
+        delivery_type: "CLIENT_UPDATE".to_string(),
+        target_id: "openframe-client".to_string(),
+        dispatch_id: "d-1".to_string(),
+        sequence: Some(3),
+    }
 }
 
 #[test]
@@ -20,7 +30,7 @@ fn save_then_load_round_trips() {
     let dir = tempfile::tempdir().unwrap();
     let svc = service(dir.path());
 
-    let mut state = UpdaterState::new("1.2.3".to_string());
+    let mut state = UpdaterState::new("1.2.3".to_string(), delivery());
     state.phase = UpdaterPhase::ReplacingBinary;
     state.backup_path = Some("/tmp/backup".into());
     svc.save(&state).unwrap();
@@ -37,7 +47,8 @@ fn save_then_load_round_trips() {
 fn save_leaves_no_temp_file() {
     let dir = tempfile::tempdir().unwrap();
     let svc = service(dir.path());
-    svc.save(&UpdaterState::new("1.0.0".to_string())).unwrap();
+    svc.save(&UpdaterState::new("1.0.0".to_string(), delivery()))
+        .unwrap();
 
     let secured = dir.path().join("secured");
     let names: Vec<String> = std::fs::read_dir(&secured)
@@ -63,7 +74,8 @@ fn clear_removes_the_file_and_tolerates_absence() {
 
     svc.clear().unwrap();
 
-    svc.save(&UpdaterState::new("1.0.0".to_string())).unwrap();
+    svc.save(&UpdaterState::new("1.0.0".to_string(), delivery()))
+        .unwrap();
     svc.clear().unwrap();
     assert!(svc.load().unwrap().is_none());
 }
@@ -73,7 +85,7 @@ fn transition_updates_phase_and_persists() {
     let dir = tempfile::tempdir().unwrap();
     let svc = service(dir.path());
 
-    let mut state = UpdaterState::new("1.0.0".to_string());
+    let mut state = UpdaterState::new("1.0.0".to_string(), delivery());
     svc.transition(&mut state, UpdaterPhase::Downloading)
         .unwrap();
 
