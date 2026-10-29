@@ -82,8 +82,9 @@ export interface NavLinkTarget {
  * (the caller's `openIn`, else another origin opens a new tab).
  *
  * `hostRoute`: the host's `composeContentUrl` returned this href as a RELATIVE route of its own (a type it serves
- * in-app). It is the host's page, not the hub's, so it is never resolved against the hub's origin and never handed to
- * a new tab, in any mode (in embed mode a relative href is otherwise taken as hub-relative).
+ * in-app). It is the host's page, not the hub's, so it is never resolved against the hub's origin and stays in this
+ * tab in any mode (in embed mode a relative href is otherwise taken as hub-relative), unless the caller asks for a new
+ * tab itself (`openIn: 'new-tab'`).
  *
  * `openIn`: the caller names the tab itself (an admin preview always opens a new one). The embed rule still comes
  * first: an embedded guest never navigates its host page to the hub.

@@ -88,33 +88,67 @@ const DENSITY_STYLES: Record<
 };
 
 /**
- * A footer action's loading form: the real button, inert and unread, with its icon and label drawn as skeleton
- * bars, so the box is exactly the loaded action's (same paddings, same line height, same label width).
+ * A card footer's action: a small transparent button with an icon (and a trailing icon when it opens something below
+ * the card) and its label, or the icon alone when `showLabel` is off. Its loading form is the same button, inert and
+ * unread, with the icons and the label drawn as skeleton bars, so the box is exactly the loaded action's. THE one
+ * footer action: the Ask action and a card's "Watch video" both draw it.
  */
-export function FooterActionSkeleton({
+export function FooterAction({
   label,
+  icon,
+  trailingIcon,
   className,
   showLabel = true,
   size = 'small',
+  onClick,
+  ariaLabel,
+  ariaExpanded,
+  title,
+  loading,
 }: {
   label: string;
+  icon: React.ReactNode;
+  trailingIcon?: React.ReactNode;
   className: string;
   showLabel?: boolean;
   size?: 'small' | 'icon';
+  onClick?: (event: React.MouseEvent) => void;
+  ariaLabel?: string;
+  ariaExpanded?: boolean;
+  title?: string;
+  loading?: boolean;
 }): React.ReactElement {
-  const icon = <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3 w-3 rounded-sm')} />;
+  if (useLoadingScope() || loading) {
+    const mark = <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3 w-3 rounded-sm')} />;
+    return (
+      <span aria-hidden inert className="contents">
+        <Button
+          variant="transparent"
+          size={size}
+          tabIndex={-1}
+          leftIcon={showLabel ? mark : undefined}
+          rightIcon={trailingIcon ? mark : undefined}
+          className={cn(className, 'pointer-events-none')}
+        >
+          {showLabel ? <TextHold>{label}</TextHold> : mark}
+        </Button>
+      </span>
+    );
+  }
   return (
-    <span aria-hidden inert className="contents">
-      <Button
-        variant="transparent"
-        size={size}
-        tabIndex={-1}
-        leftIcon={showLabel ? icon : undefined}
-        className={cn(className, 'pointer-events-none')}
-      >
-        {showLabel ? <TextHold>{label}</TextHold> : icon}
-      </Button>
-    </span>
+    <Button
+      variant="transparent"
+      size={size}
+      leftIcon={showLabel ? icon : undefined}
+      rightIcon={trailingIcon}
+      onClick={onClick}
+      aria-label={ariaLabel}
+      aria-expanded={ariaExpanded}
+      title={title}
+      className={className}
+    >
+      {showLabel ? label : icon}
+    </Button>
   );
 }
 
@@ -126,19 +160,7 @@ export function SourceActionButton({
   label = 'Ask',
   loading,
 }: SourceActionButtonProps): React.ReactElement | null {
-  const isLoading = useLoadingScope() || loading;
   if (!chatRef || !onDiscuss) return null;
-  if (isLoading) {
-    const s = DENSITY_STYLES[density];
-    return (
-      <FooterActionSkeleton
-        label={label}
-        size={s.size}
-        showLabel={s.showLabel}
-        className={`${s.className}${className ? ` ${className}` : ''}`}
-      />
-    );
-  }
 
   // Label-driven icon. "Display" reads as a verbatim-content action so a
   // FileText icon reinforces "show me the body" semantics; the default
@@ -156,16 +178,16 @@ export function SourceActionButton({
   const icon = <IconComponent className={styles.iconSize} />;
 
   return (
-    <Button
-      variant="transparent"
+    <FooterAction
+      label={label}
+      icon={icon}
       size={styles.size}
-      leftIcon={styles.showLabel ? icon : undefined}
+      showLabel={styles.showLabel}
       onClick={handle}
-      aria-label={verbLabel}
+      ariaLabel={verbLabel}
       title={verbLabel}
       className={`${styles.className}${className ? ` ${className}` : ''}`}
-    >
-      {styles.showLabel ? label : icon}
-    </Button>
+      loading={loading}
+    />
   );
 }

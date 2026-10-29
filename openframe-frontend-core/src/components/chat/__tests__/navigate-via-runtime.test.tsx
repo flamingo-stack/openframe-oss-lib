@@ -41,7 +41,7 @@ describe('useNavigateViaRuntime', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('leaves a middle click to the browser', () => {
+  it('opens a new tab for a middle click, as on a link', () => {
     const navigate = vi.fn();
     const openExternal = vi.fn();
     const { result } = renderHook(() => useNavigateViaRuntime(), {
@@ -49,6 +49,19 @@ describe('useNavigateViaRuntime', () => {
     });
 
     result.current({ href: '/admin/jobs', modifierEvent: { button: 1 } });
+
+    expect(openExternal).toHaveBeenCalledWith('/admin/jobs');
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('navigates nowhere for a right click', () => {
+    const navigate = vi.fn();
+    const openExternal = vi.fn();
+    const { result } = renderHook(() => useNavigateViaRuntime(), {
+      wrapper: wrapperFor(runtimeWith({ navigate, openExternal })),
+    });
+
+    result.current({ href: '/admin/jobs', modifierEvent: { button: 2 } });
 
     expect(openExternal).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
@@ -65,10 +78,16 @@ describe('useNavigateViaRuntime', () => {
 });
 
 describe('useNavLinkViaRuntime', () => {
-  it.each([null, undefined, ''])('returns no link without a destination (%j)', href => {
+  it.each([null, undefined])('returns no link without a destination (%j)', href => {
     const { result } = renderHook(() => useNavLinkViaRuntime({ href }), { wrapper: wrapperFor(runtimeWith({})) });
 
     expect(result.current).toBeNull();
+  });
+
+  it('keeps returning a link for any string, as before', () => {
+    const { result } = renderHook(() => useNavLinkViaRuntime({ href: '' }), { wrapper: wrapperFor(runtimeWith({})) });
+
+    expect(result.current).toMatchObject({ href: '' });
   });
 
   it('draws a new-tab link when the caller asks for one', () => {

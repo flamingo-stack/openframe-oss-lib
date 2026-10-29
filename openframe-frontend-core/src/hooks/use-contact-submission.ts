@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { executeNavigationImperative } from '../components/chat/utils/execute-navigation';
+import { isRelativeHref } from '../components/chat/utils/new-tab-rel';
 import { useChatRuntime } from '../contexts/chat-runtime-context';
 import { useRequiredEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 import { apiErrorMessage } from '../utils/common';
@@ -110,7 +111,14 @@ export function useContactSubmission(options: ContactSubmissionOptions = {}) {
     console.log('🚀 Contact submission successful, redirecting to:', successRedirectUrl);
     const timer = setTimeout(() => {
       console.log('🎯 Performing redirect now to:', successRedirectUrl);
-      executeNavigationImperative({ runtime, href: successRedirectUrl, openIn: 'same-tab' });
+      // A relative redirect is the host's own page (`hostRoute`): it replaces this page in every mode, an embedded
+      // form's included. An absolute one follows the navigation rule.
+      executeNavigationImperative({
+        runtime,
+        href: successRedirectUrl,
+        openIn: 'same-tab',
+        hostRoute: isRelativeHref(successRedirectUrl),
+      });
     }, 1500);
 
     return () => clearTimeout(timer);

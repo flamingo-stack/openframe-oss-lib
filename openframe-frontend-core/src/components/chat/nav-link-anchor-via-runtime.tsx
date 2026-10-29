@@ -51,7 +51,8 @@ export interface NavLinkAnchorViaRuntimeProps extends Omit<
 }
 
 export interface NavLinkViaRuntimeInput {
-  /** The destination; with none (null, undefined or empty) the hook returns null and the caller draws no link. */
+  /** The destination. A string always gets a link (as before); `null` / `undefined` means there is none and the hook
+   *  returns null, so the caller draws no link. */
   href: string | null | undefined;
   path?: string | null;
   /** The platform that owns `href`, by name. */
@@ -82,6 +83,8 @@ export function useNavLinkTarget(href: string, targetPlatform?: string | null, o
  * A new-tab link to one of our own sites keeps the Referer (`newTabRel`: the
  * cross-domain analytics attribute the visit by it); any other gets `noreferrer`.
  */
+export function useNavLinkViaRuntime(input: NavLinkViaRuntimeInput & { href: string }): NavLinkViaRuntimeProps;
+export function useNavLinkViaRuntime(input: NavLinkViaRuntimeInput): NavLinkViaRuntimeProps | null;
 export function useNavLinkViaRuntime({
   href,
   path,
@@ -92,7 +95,7 @@ export function useNavLinkViaRuntime({
   const runtime = useRequiredChatRuntime();
   const panel = useChatPanel();
   const { href: resolvedHref, isNewTab } = useNavLinkTarget(href ?? '', targetPlatform, openIn);
-  if (!href) return null;
+  if (href == null) return null;
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
     onClickProp?.(e);
@@ -111,7 +114,7 @@ export interface NavigateViaRuntimeInput {
   targetPlatform?: string | null;
   /** The caller's explicit tab; absent = the rule decides. */
   openIn?: NavOpenIn;
-  /** The click that asked, when there was one: a modifier click opens a new tab, a middle click is the browser's. */
+  /** The click that asked, when there was one: a modifier click or a middle click opens a new tab, as on a link. */
   modifierEvent?: {
     button?: number;
     metaKey?: boolean;
@@ -131,10 +134,10 @@ export function useNavigateViaRuntime(): (input: NavigateViaRuntimeInput) => voi
     ({ href, path, targetPlatform, openIn, modifierEvent }: NavigateViaRuntimeInput) => {
       if (!href) return;
       if (modifierEvent && isModifierClick(modifierEvent)) {
-        // Not an anchor, so the browser opens nothing itself: a modifier click asks for a new tab.
-        if (modifierEvent.button === undefined || modifierEvent.button === 0) {
-          executeNewTabNavigation({ runtime, href, targetPlatform });
-        }
+        // Not an anchor, so the browser opens nothing itself: a modifier or middle click asks for a new tab, as it
+        // does on a link. Another button (a right click) navigates nowhere.
+        const button = modifierEvent.button ?? 0;
+        if (button === 0 || button === 1) executeNewTabNavigation({ runtime, href, targetPlatform });
         return;
       }
       executeNavigationImperative({ runtime, href, path, targetPlatform, openIn });

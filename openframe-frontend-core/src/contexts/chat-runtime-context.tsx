@@ -23,6 +23,9 @@
  * access codes). Each runtime stays an independent React context so
  * embedders can opt into either feature without forcing the other.
  *
+ * Without a provider, the lib's links follow its default rule: a link to another origin opens a new tab, any other
+ * stays in this tab (`navLinkTarget`).
+ *
  * IMPORTANT for embedders: memoize the value passed to
  * `<ChatRuntimeContext.Provider value={...}>` (e.g. via React.useMemo).
  * Every change to its reference identity invalidates downstream
