@@ -81,6 +81,8 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login",
                                 "/favicon.ico",
+                                "/fonts.css",
+                                "/fonts/**",
                                 "/tenant/**",
                                 "/mobile/version-policy",
                                 "/management/**",

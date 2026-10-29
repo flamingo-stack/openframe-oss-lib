@@ -82,6 +82,18 @@ describe('EmbeddableChat, loaded on its own', () => {
     expect(heard).toEqual([{ type: 'ask-ai:open', detail }]);
   });
 
+  it("loads the host's stylesheet when, and only when, the chat starts loading", async () => {
+    const loadStyles = vi.fn();
+    render(<EmbeddableChat loadStyles={loadStyles} />);
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    });
+    expect(loadStyles).not.toHaveBeenCalled();
+    pointAtATrigger();
+    await screen.findByTestId('chat');
+    expect(loadStyles).toHaveBeenCalledTimes(1);
+  });
+
   it('hears an open sent once it is listening exactly once', async () => {
     render(<EmbeddableChat />);
     pointAtATrigger();
