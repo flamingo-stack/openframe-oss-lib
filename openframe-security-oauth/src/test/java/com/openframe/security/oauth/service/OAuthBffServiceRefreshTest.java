@@ -78,6 +78,15 @@ class OAuthBffServiceRefreshTest {
     }
 
     @Test
+    void reproducesBug_oauthRefresh500_bare401FromAuthServerIsInvalidRefreshToken() {
+        OAuthBffService service = serviceRespondingWith(HttpStatus.UNAUTHORIZED, "");
+
+        StepVerifier.create(service.refreshTokensPublic("tenant-1", "orphaned-token", request))
+                .expectError(InvalidRefreshTokenException.class)
+                .verify();
+    }
+
+    @Test
     void shouldTreatInvalidClientAsServerFaultWithoutClearingSession() {
         OAuthBffService service = serviceRespondingWith(HttpStatus.UNAUTHORIZED, "{\"error\":\"invalid_client\"}");
 

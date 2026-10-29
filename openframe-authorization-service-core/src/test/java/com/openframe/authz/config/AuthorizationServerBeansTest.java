@@ -14,6 +14,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
@@ -91,7 +93,19 @@ class AuthorizationServerBeansTest {
 
         assertThatThrownBy(() -> config.tokenCustomizer(userService).customize(
                 context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.AUTHORIZATION_CODE, "owner@acme.com").build()))
-                .isInstanceOf(UsernameNotFoundException.class);
+                .isInstanceOfSatisfying(OAuth2AuthenticationException.class,
+                        e -> assertThat(e.getError().getErrorCode()).isEqualTo(OAuth2ErrorCodes.INVALID_GRANT));
+    }
+
+    @Test
+    void reproducesBug_oauthRefresh500_refreshForUserGoneFromTenantIsInvalidGrant() {
+        when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> config.tokenCustomizer(userService).customize(
+                context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.REFRESH_TOKEN, "owner@acme.com").build()))
+                .isInstanceOfSatisfying(OAuth2AuthenticationException.class,
+                        e -> assertThat(e.getError().getErrorCode()).isEqualTo(OAuth2ErrorCodes.INVALID_GRANT));
+        verify(userService, never()).touchLastLogin("owner@acme.com", TENANT);
     }
 
     @Test
