@@ -172,6 +172,10 @@ export interface EmbeddableChatProps {
    *  `externalUrl: null` resolve to `getPlatformUrl(chipBasePlatform) +
    *  '/knowledge-base/' + path` and open in a new tab. */
   chipBasePlatform?: string;
+  /** How many source chips the strip under an answer draws while the answer is written (default 1). `0` draws no
+   *  strip until the answer ends: for a host whose answers rarely cite sources, where a strip that appears and then
+   *  goes away would move the thread. */
+  sourceSkeletonCount?: number;
   /** DB-driven list of enabled RAG table ids (chip catalog filter).
    *  Prefetched server-side by the embedder's wrapper. Empty/null → no
    *  empty-state chips render. */
@@ -711,8 +715,9 @@ function dispatchSlashCommandAction(
 /** A no-break space: one line of the chip's text, so a bar that holds it is exactly one text line tall. */
 const ONE_TEXT_LINE = '\u00a0';
 
-/** How many chips the strip's loading form draws, at every width: one, the row a phone shows a strip's first chip in
- *  (a strip has no page size, so its loading form draws a typical count, and the strip is one row either way). */
+/** How many chips the strip's loading form draws by default, at every width: one, the row a phone shows a strip's
+ *  first chip in (a strip has no page size, so its loading form draws a typical count, and the strip is one row either
+ *  way). An embedder sets its own with `sourceSkeletonCount`. */
 const SOURCE_CHIP_SKELETON_COUNT = 1;
 
 /**
@@ -885,6 +890,7 @@ function SourceChips({
   chipBasePlatform,
   onDiscuss,
   loading,
+  skeletonCount,
 }: {
   cited: ChatSource[];
   uncited: ChatSource[];
@@ -894,6 +900,8 @@ function SourceChips({
   /** The answer is still being written: the strip's frame, heading and a row of chips in their loading form, so
    *  the strip does not appear under the answer when it finishes. */
   loading?: boolean;
+  /** How many chips the loading form draws (`EmbeddableChatProps.sourceSkeletonCount`). */
+  skeletonCount: number;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -906,9 +914,7 @@ function SourceChips({
         {/* One row at every width: a chip that does not fit is cut, never wrapped (a strip's chips fit one row in
             the answers measured, and a wrapped skeleton shrinks when the answer ends). */}
         <div className="flex flex-nowrap gap-1.5 overflow-hidden">
-          <LoadingItems count={SOURCE_CHIP_SKELETON_COUNT}>
-            {() => <SourceChipSkeleton data-loading-item />}
-          </LoadingItems>
+          <LoadingItems count={skeletonCount}>{() => <SourceChipSkeleton data-loading-item />}</LoadingItems>
         </div>
       </div>
     );
@@ -1033,6 +1039,7 @@ EmbeddableChat.displayName = 'EmbeddableChat';
 function EmbeddableChatInner({
   baseRoute,
   chipBasePlatform,
+  sourceSkeletonCount = SOURCE_CHIP_SKELETON_COUNT,
   enabledRagTableIds = null,
   emptyStateGreeting = null,
   suggestedQueries = null,
@@ -2065,10 +2072,12 @@ function EmbeddableChatInner({
       // for the duration of an unrelated turn.
       // Its strip is drawn in its loading form meanwhile, so the strip is already there when the answer ends.
       if (chatLoading && index === messages.length - 1) {
+        if (sourceSkeletonCount <= 0) return null;
         return (
           <div className="pb-2">
             <SourceChips
               loading
+              skeletonCount={sourceSkeletonCount}
               cited={[]}
               uncited={[]}
               baseRoute={resolvedBaseRoute}
@@ -2087,11 +2096,12 @@ function EmbeddableChatInner({
             baseRoute={resolvedBaseRoute}
             chipBasePlatform={chipBasePlatform}
             onDiscuss={askAbout}
+            skeletonCount={sourceSkeletonCount}
           />
         </div>
       );
     },
-    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, askAbout],
+    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, askAbout, sourceSkeletonCount],
   );
 
   // Host node for in-panel Radix portals (see the body wrapper below).
