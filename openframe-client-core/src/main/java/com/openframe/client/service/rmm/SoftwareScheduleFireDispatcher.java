@@ -99,8 +99,8 @@ public class SoftwareScheduleFireDispatcher {
                 .build();
 
         if (!orderTargets.isEmpty()) {
-            packageUpdateDispatchService.dispatchAdminUpdateNow(rows.toBuilder().machineIds(orderTargets).build(),
-                    pkg.getBrewPackageType());
+            packageUpdateDispatchService.dispatchAdminUpdate(rows.toBuilder().machineIds(orderTargets).build(),
+                    pkg.getBrewPackageType(), schedule.getUpdateSettings());
         }
         if (scriptTargets.isEmpty()) {
             return;
