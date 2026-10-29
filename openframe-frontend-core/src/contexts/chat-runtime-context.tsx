@@ -243,18 +243,10 @@ export interface ChatRuntime {
    *  Takes a single `ComposeContentUrlInput`: `type` + `identifier` (page
    *  views pass the slug; chat rows pass the id + `externalUrl`, whose path
    *  yields the slug for in-app routing) + optional `platforms` /
-   *  `externalUrl` / `targetPlatform`. */
+   *  `externalUrl` / `targetPlatform`. A document (a doc-table row: markdown,
+   *  data-room) arrives with its tree path as the `slug` and no `externalUrl`:
+   *  the composer decides where that type's viewer is, like any other type. */
   composeContentUrl?: ComposeContentUrl;
-  /** Per-`documentType` doc-viewer targets — the UNIFIED, DYNAMIC replacement for
-   *  the single `chipBasePlatform` prop. Maps a doc-table documentType
-   *  (`'markdown'`, `'data_room_doc'`, …) → `{ platform, basePath }` for the PUBLIC
-   *  doc viewer that hosts it. Doc chips with no `externalUrl` resolve PER ROW to
-   *  `getPlatformUrl(platform)/<basePath>/<path>`, so a chat mixing several doc sources
-   *  sends EACH to its own home (markdown→flamingo/knowledge-base,
-   *  data_room_doc→company-hub/data-room) instead of one static fallback. The hub
-   *  may keep using `chipBasePlatform` (one doc source per platform); embedders that
-   *  surface multiple doc sources wire this. Threaded into `resolveSourceRowCTA`. */
-  docPlatformTargets?: Record<string, { platform: string; basePath: string }>;
   /** Chat source / platform identifier — OPTIONAL. The hub sets it from
    *  `currentPlatform()`; EMBEDDERS leave it unset and stay platform-agnostic.
    *
