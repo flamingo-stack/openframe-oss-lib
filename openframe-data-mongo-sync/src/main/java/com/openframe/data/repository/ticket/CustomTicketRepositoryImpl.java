@@ -54,12 +54,15 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_DEVICE_HOSTNAME = "deviceHostname";
     private static final String FIELD_ORGANIZATION_NAME = "organizationName";
     private static final String FIELD_ASSIGNED_NAME = "assignedName";
+    private static final String FIELD_RESOLVED_BY_ID = "resolvedById";
+    private static final String FIELD_RESOLVED_BY_NAME = "resolvedByName";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_RESOLVED_AT = "resolvedAt";
     private static final String FIELD_ORDER = "order";
     private static final String FIELD_LAST_ACTIVITY_AT = "lastActivityAt";
     private static final String FIELD_AWAITING_CLIENT_SINCE = "awaitingClientSince";
+    private static final String FIELD_VERSION = "version";
     private static final String FIELD_ESCALATED_BY_USER = "escalatedByUser";
     private static final String FIELD_HAS_PENDING_APPROVAL = "hasPendingApproval";
 
@@ -445,7 +448,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     @Override
     public void updatePendingApproval(String ticketId, boolean pending) {
         Query query = new Query(Criteria.where(ID_FIELD).is(ticketId));
-        Update update = new Update().set(FIELD_HAS_PENDING_APPROVAL, pending);
+        // $inc by 0 keeps the version: the flag is derived on every save, so it must not make a concurrent save of the ticket conflict.
+        Update update = new Update().set(FIELD_HAS_PENDING_APPROVAL, pending).inc(FIELD_VERSION, 0);
         mongoTemplate.updateFirst(query, update, Ticket.class);
     }
 
@@ -457,6 +461,34 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
                 .set(FIELD_UPDATED_AT, Instant.now());
 
         mongoTemplate.updateFirst(query, update, Ticket.class);
+    }
+
+    @Override
+    public long updateAssignedName(String assignedTo, String assignedName) {
+        return updateCopiedField(FIELD_ASSIGNED_TO, assignedTo, FIELD_ASSIGNED_NAME, assignedName);
+    }
+
+    @Override
+    public long updateResolvedByName(String resolvedById, String resolvedByName) {
+        return updateCopiedField(FIELD_RESOLVED_BY_ID, resolvedById, FIELD_RESOLVED_BY_NAME, resolvedByName);
+    }
+
+    @Override
+    public long updateOrganizationName(String organizationId, String organizationName) {
+        return updateCopiedField(FIELD_ORGANIZATION_ID, organizationId, FIELD_ORGANIZATION_NAME, organizationName);
+    }
+
+    @Override
+    public long updateDeviceHostname(String deviceId, String deviceHostname) {
+        return updateCopiedField(FIELD_DEVICE_ID, deviceId, FIELD_DEVICE_HOSTNAME, deviceHostname);
+    }
+
+    // Passing Ticket.class makes Spring add $inc on @Version, so a stale copy of a renamed ticket fails to save.
+    private long updateCopiedField(String sourceField, String sourceId, String copyField, String value) {
+        Criteria outdatedCopies = Criteria.where(sourceField).is(sourceId).and(copyField).ne(value);
+        Query query = new Query(outdatedCopies);
+        Update update = new Update().set(copyField, value);
+        return mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
     }
 
     /**
@@ -488,6 +520,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     }
 
     private Optional<Ticket> stamp(Query query, Update update) {
+        // $inc by 0 stops Spring from adding its own +1, so a chat message never conflicts with a user edit.
+        update.inc(FIELD_VERSION, 0);
         FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
         return Optional.ofNullable(mongoTemplate.findAndModify(query, update, options, Ticket.class));
     }

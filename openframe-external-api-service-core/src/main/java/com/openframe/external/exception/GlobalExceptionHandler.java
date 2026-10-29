@@ -6,6 +6,7 @@ import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,13 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleLokiQueryException(LokiQueryException ex) {
         log.error("Loki query error: ", ex);
         return ErrorResponse.of(ErrorCode.LOKI_QUERY_ERROR, "Logs are temporarily unavailable. Please try again later.");
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleOptimisticLockingFailure(OptimisticLockingFailureException ex) {
+        log.warn("Conflict: {}", ex.getMessage());
+        return ErrorResponse.of(ErrorCode.CONFLICT, "This item was changed by someone else. Reload it and try again.");
     }
 
     @ExceptionHandler(DataAccessException.class)

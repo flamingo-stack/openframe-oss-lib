@@ -112,6 +112,18 @@ class CustomTicketRepositoryFilterTest {
                 .hasSize(1);
     }
 
+    // Spring adds $inc version +1 to an update unless the update already names the version.
+    @Test
+    void updatePendingApproval_keepsTheTicketVersion() {
+        // execution
+        repository.updatePendingApproval("t-1", false);
+
+        // verifications
+        verify(mongoTemplate).updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(Ticket.class));
+        assertThat(updateCaptor.getValue().getUpdateObject().get("$inc", Document.class))
+                .containsEntry("version", 0);
+    }
+
     @Test
     void buildTicketQuery_escalatedByUserOmitted_noNarrowing() {
         // setup
