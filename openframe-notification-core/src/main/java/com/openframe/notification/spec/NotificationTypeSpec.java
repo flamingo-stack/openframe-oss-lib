@@ -17,12 +17,12 @@ public interface NotificationTypeSpec<S extends NotificationSeed> {
 
     Optional<NotificationSettingGroup> getSettingsGroup();
 
-    NotificationCategory getCategory();
+    NotificationCategory category(S seed);
 
     // Abstract on purpose — a default would let a spec ship with no entity and nobody would notice.
     Optional<NotificationEntityRef> entity(S seed);
 
-    NotificationSeverity getSeverity();
+    NotificationSeverity severity(S seed);
 
     Audience audience(S seed);
 
