@@ -9,18 +9,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(name = {"spring.cloud.stream.enabled", "openframe.rmm.software.enabled"}, havingValue = "true")
+@ConditionalOnProperty(name = {"spring.cloud.stream.enabled", "openframe.rmm.software.enabled", "openframe.rmm.software.auto-update.trigger.enabled"}, havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class PackageAutoUpdateTriggerScheduler {
 
     private final PackageAutoUpdateTrigger trigger;
 
-    // the package catalog syncs brew every 15 minutes, winget every 30
-    @Scheduled(fixedDelayString = "${openframe.rmm.software.auto-update.trigger.interval:900000}")
+    @Scheduled(fixedDelayString = "${openframe.rmm.software.auto-update.trigger.interval}")
     @SchedulerLock(name = "packageAutoUpdateTrigger",
-            lockAtMostFor = "${openframe.rmm.software.auto-update.trigger.lock-at-most-for:10m}",
-            lockAtLeastFor = "${openframe.rmm.software.auto-update.trigger.lock-at-least-for:30s}"
+            lockAtMostFor = "${openframe.rmm.software.auto-update.trigger.lock-at-most-for}",
+            lockAtLeastFor = "${openframe.rmm.software.auto-update.trigger.lock-at-least-for}"
     )
     public void run() {
         try {
