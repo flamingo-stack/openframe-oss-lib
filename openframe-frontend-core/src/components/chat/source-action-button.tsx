@@ -21,8 +21,9 @@
 import { MessageSquare, FileText } from 'lucide-react';
 import type React from 'react';
 import { cn } from '../../utils/cn';
-import { Button } from '../ui/button';
+import { Button, type ButtonProps } from '../ui/button';
 import { TextHold } from '../ui/layout-hold';
+import { useLoadingScope } from '../ui/loading-scope';
 import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 import type { ChatRef } from './chat-ref.types';
 
@@ -117,6 +118,31 @@ export function FooterActionSkeleton({
   );
 }
 
+/**
+ * A card footer's action (Ask, Display, Watch video): the transparent button, or its loading form
+ * (`FooterActionSkeleton`) in a loading scope or while `loading`. The one switch every footer action goes through.
+ */
+export function FooterAction({
+  label,
+  loading = false,
+  showLabel = true,
+  size = 'small',
+  className = '',
+  ...props
+}: Omit<ButtonProps, 'variant' | 'size' | 'className'> & {
+  /** The action's name: what its loading form holds the width of. */
+  label: string;
+  loading?: boolean;
+  showLabel?: boolean;
+  size?: 'small' | 'icon';
+  className?: string;
+}): React.ReactElement {
+  if (useLoadingScope() || loading) {
+    return <FooterActionSkeleton label={label} size={size} showLabel={showLabel} className={className} />;
+  }
+  return <Button variant="transparent" size={size} className={className} {...props} />;
+}
+
 export function SourceActionButton({
   chatRef,
   onDiscuss,
@@ -126,17 +152,6 @@ export function SourceActionButton({
   loading,
 }: SourceActionButtonProps): React.ReactElement | null {
   if (!chatRef || !onDiscuss) return null;
-  if (loading) {
-    const s = DENSITY_STYLES[density];
-    return (
-      <FooterActionSkeleton
-        label={label}
-        size={s.size}
-        showLabel={s.showLabel}
-        className={`${s.className}${className ? ` ${className}` : ''}`}
-      />
-    );
-  }
 
   // Label-driven icon. "Display" reads as a verbatim-content action so a
   // FileText icon reinforces "show me the body" semantics; the default
@@ -154,9 +169,11 @@ export function SourceActionButton({
   const icon = <IconComponent className={styles.iconSize} />;
 
   return (
-    <Button
-      variant="transparent"
+    <FooterAction
+      label={label}
+      loading={loading}
       size={styles.size}
+      showLabel={styles.showLabel}
       leftIcon={styles.showLabel ? icon : undefined}
       onClick={handle}
       aria-label={verbLabel}
@@ -164,6 +181,6 @@ export function SourceActionButton({
       className={`${styles.className}${className ? ` ${className}` : ''}`}
     >
       {styles.showLabel ? label : icon}
-    </Button>
+    </FooterAction>
   );
 }

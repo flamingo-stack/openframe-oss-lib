@@ -28,11 +28,10 @@
 import type React from 'react';
 import { type ReactNode, useState } from 'react';
 import { PlayIcon } from '../../icons-v2-generated/media-playback/play-icon';
-import { Button } from '../../ui/button';
 import type { ChatRef } from '../chat-ref.types';
 import { ExpandChevron } from '../expand-chevron';
 import { useCollapsible } from '../hooks/use-collapsible';
-import { CARD_FOOTER_ACTION_CLASS, FooterActionSkeleton } from '../source-action-button';
+import { CARD_FOOTER_ACTION_CLASS, FooterAction } from '../source-action-button';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
 
 /** The kinds of content a chat card can open below itself. */
@@ -142,13 +141,13 @@ export function ChatCardDisclosureButton({
   loading?: boolean;
 }): React.ReactElement {
   const spec = CHAT_CARD_DISCLOSURES[kind];
-  if (loading) return <FooterActionSkeleton label={spec.label} className={CARD_FOOTER_ACTION_CLASS} />;
   const label = open ? spec.openLabel : spec.label;
   const Icon = spec.icon;
   return (
-    <Button
-      variant="transparent"
-      size="small"
+    <FooterAction
+      // The closed label: what a card that can carry this content shows while it loads.
+      label={loading ? spec.label : label}
+      loading={loading}
       leftIcon={<Icon className="!h-3 !w-3" />}
       rightIcon={<ExpandChevron expanded={open} className="!h-3 !w-3" />}
       onClick={(e: React.MouseEvent) => {
@@ -162,7 +161,7 @@ export function ChatCardDisclosureButton({
       className={CARD_FOOTER_ACTION_CLASS}
     >
       {label}
-    </Button>
+    </FooterAction>
   );
 }
 

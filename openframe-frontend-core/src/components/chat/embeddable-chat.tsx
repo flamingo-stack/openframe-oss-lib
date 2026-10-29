@@ -821,8 +821,8 @@ function dispatchSlashCommandAction(
 /** A no-break space: one line of the chip's text, so a bar that holds it is exactly one text line tall. */
 const ONE_TEXT_LINE = '\u00a0';
 
-/** How many chips the strip's loading form draws: the count real answers' strips showed (measured). On a phone,
- *  where a strip holds one chip a row, it draws one. */
+/** How many chips the strip's loading form draws: the count real answers' strips showed (measured). Drawn at every
+ *  width: a chip past the row's end is cut. */
 const SOURCE_CHIP_SKELETON_COUNT = 2;
 
 /**
@@ -831,7 +831,11 @@ const SOURCE_CHIP_SKELETON_COUNT = 2;
  */
 function SourceChipSkeleton({ className }: { className?: string }) {
   return (
-    <span aria-hidden className={cn('pointer-events-none inline-flex shrink-0 items-center', className)}>
+    <span
+      aria-hidden
+      data-loading-item
+      className={cn('pointer-events-none inline-flex shrink-0 items-center', className)}
+    >
       <span className={chatChipClass({ tone: 'secondary' })}>
         <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3.5 w-3.5 rounded-sm')} />
         <span className={cn(SKELETON_SURFACE_CLASS, 'w-28 rounded-sm')}>{ONE_TEXT_LINE}</span>
@@ -1059,11 +1063,11 @@ function SourceChips({
         <span className="uppercase text-ods-text-muted text-h6">
           <TextHold>Sources</TextHold>
         </span>
-        {/* One row at every width: a chip that does not fit is cut, never wrapped (a strip's chips fit one row in
-            the answers measured, and a wrapped skeleton shrinks when the answer ends). */}
+        {/* One row at every width: a chip that does not fit is cut, never wrapped or hidden (a strip's chips fit one
+            row in the answers measured, and a wrapped skeleton shrinks when the answer ends). */}
         <div className="flex flex-nowrap gap-1.5 overflow-hidden">
           {Array.from({ length: SOURCE_CHIP_SKELETON_COUNT }, (_, i) => (
-            <SourceChipSkeleton key={i} className={i > 0 ? 'max-md:hidden' : undefined} />
+            <SourceChipSkeleton key={i} />
           ))}
         </div>
       </div>
@@ -1100,14 +1104,16 @@ function SourceChips({
       <span className="uppercase text-ods-text-muted text-h6">Sources</span>
       <div className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}>
         {cited.map(src => (
-          <SourceChip
-            key={src.index}
-            src={src}
-            baseRoute={baseRoute}
-            chipBasePlatform={chipBasePlatform}
-            onClose={onClose}
-            onDiscuss={onDiscuss}
-          />
+          // The loaded list beside the loading form's: each chip an item of it (`contents`: no box of its own).
+          <span key={src.index} data-loading-item className="contents">
+            <SourceChip
+              src={src}
+              baseRoute={baseRoute}
+              chipBasePlatform={chipBasePlatform}
+              onClose={onClose}
+              onDiscuss={onDiscuss}
+            />
+          </span>
         ))}
         {expanded &&
           uncited.map(src => (
