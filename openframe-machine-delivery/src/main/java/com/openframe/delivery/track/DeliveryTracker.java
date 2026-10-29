@@ -72,6 +72,12 @@ public class DeliveryTracker {
         closer.failReported(ref.getType(), ref.getTargetId(), machineId, ref.getDispatchId(), error, now);
     }
 
+    // for a domain that closes its own records by what became of the row: the row as it is now, none when the request
+    // never went through the engine
+    public Optional<MachineDelivery> find(DeliveryType type, String targetId, String machineId) {
+        return currentRow(type, targetId, machineId);
+    }
+
     // the caller withdrew the request: an open row stops being re-published; the machine is told by the caller
     public void cancel(DeliveryType type, String targetId, String machineId, String reason) {
         Instant now = Instant.now();

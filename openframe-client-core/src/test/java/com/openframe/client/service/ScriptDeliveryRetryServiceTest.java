@@ -7,6 +7,10 @@ import com.openframe.client.service.rmm.watchdog.DeliveryRepublisher;
 import com.openframe.client.service.rmm.watchdog.DeliveryRepublisherRegistry;
 import com.openframe.client.service.rmm.watchdog.ScheduleJobExecutionWatchdogService;
 import com.openframe.client.service.rmm.watchdog.ScriptDeliveryRetryService;
+import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.delivery.DeliveryStatus;
+import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
@@ -14,6 +18,7 @@ import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.delivery.track.DeliveryTracker;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -59,6 +64,8 @@ class ScriptDeliveryRetryServiceTest {
 
     @Mock
     private MachineRepository machineRepository;
+    @Mock
+    private DeliveryTracker deliveryTracker;
 
     private ScriptDeliveryRetryService service;
 
@@ -66,13 +73,108 @@ class ScriptDeliveryRetryServiceTest {
     void setUp() {
         service = new ScriptDeliveryRetryService(repository, headerWatchdogService,
                 new ScriptExecutionWatchdogMetrics(new SimpleMeterRegistry()), retryStore, deliveryRepublisherRegistry,
-                machineRepository);
+                machineRepository, deliveryTracker);
         ReflectionTestUtils.setField(service, "retrySize", 3);
         ReflectionTestUtils.setField(service, "queuedThresholdSeconds", 30L);
         // Default: no target is offline; the SCHEDULE republisher is the one resolved. Tests override.
         lenient().when(machineRepository.findByMachineIdInAndStatus(any(), eq(DeviceStatus.OFFLINE)))
                 .thenReturn(List.of());
         lenient().when(deliveryRepublisherRegistry.get(any())).thenReturn(republisher);
+        // Default: the batch went the way before the engine, no row under its executionId. Tests override.
+        lenient().when(deliveryTracker.find(eq(DeliveryType.SCRIPT_SCHEDULE), any(), any())).thenReturn(Optional.empty());
+    }
+
+    @Test
+    @DisplayName("engine row still PENDING → the engine retries, nothing re-published or failed from here")
+    void engineRowPending_leftToTheEngine() {
+        ScriptExecution q = queued("exec-1", "m-1", "s-a");
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(q));
+        when(deliveryTracker.find(DeliveryType.SCRIPT_SCHEDULE, "exec-1", "m-1"))
+                .thenReturn(Optional.of(engineRow(DeliveryStatus.PENDING, null, 2)));
+        service.retryStuckQueuedDeliveries();
+        verify(republisher, never()).republish(any(), any());
+        verify(retryStore, never()).get(any(), any());
+        verify(repository, never()).saveAll(any());
+        assertThat(q.getStatus()).isEqualTo(ExecutionStatus.QUEUED);
+    }
+
+    @Test
+    @DisplayName("engine row FAILED after its attempts → leaves FAILED with the attempt count, retry state evicted, header finalized")
+    void engineRowExhausted_fails() {
+        ScriptExecution q = queued("exec-1", "m-1", "s-a");
+        q.setScheduleId("sch-1");
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(q));
+        when(deliveryTracker.find(DeliveryType.SCRIPT_SCHEDULE, "exec-1", "m-1"))
+                .thenReturn(Optional.of(engineRow(DeliveryStatus.FAILED, DeliveryFailure.EXHAUSTED, 7)));
+        service.retryStuckQueuedDeliveries();
+        verify(republisher, never()).republish(any(), any());
+        ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
+        verify(repository).saveAll(captor.capture());
+        assertThat(captor.getValue()).allMatch(r -> r.getStatus() == ExecutionStatus.FAILED);
+        assertThat(captor.getValue()).allMatch(r -> r.getError().equals("Agent could not receive the script after 7 delivery attempt(s)"));
+        verify(retryStore).evict("exec-1", "m-1");
+        verify(headerWatchdogService).finalizeAffectedHeaders(captor.getValue());
+    }
+
+    @Test
+    @DisplayName("engine row FAILED as OFFLINE → leaves FAILED with the offline text")
+    void engineRowOffline_failsAsOffline() {
+        ScriptExecution q = queued("exec-1", "m-1", "s-a");
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(q));
+        when(deliveryTracker.find(DeliveryType.SCRIPT_SCHEDULE, "exec-1", "m-1"))
+                .thenReturn(Optional.of(engineRow(DeliveryStatus.FAILED, DeliveryFailure.OFFLINE, 0)));
+        service.retryStuckQueuedDeliveries();
+        ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
+        verify(repository).saveAll(captor.capture());
+        assertThat(captor.getValue()).allMatch(r -> r.getError().contains("offline"));
+    }
+
+    @Test
+    @DisplayName("engine row CANCELLED while the machine is OFFLINE → the offline text; otherwise the cancelled text")
+    void engineRowCancelled_textByTheMachinesState() {
+        ScriptExecution offline = queued("exec-1", "m-1", "s-a");
+        ScriptExecution withdrawn = queued("exec-2", "m-2", "s-a");
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(offline, withdrawn));
+        when(machineRepository.findByMachineIdInAndStatus(any(), eq(DeviceStatus.OFFLINE)))
+                .thenReturn(List.of(machine("m-1")));
+        when(deliveryTracker.find(eq(DeliveryType.SCRIPT_SCHEDULE), any(), any()))
+                .thenReturn(Optional.of(engineRow(DeliveryStatus.CANCELLED, null, 0)));
+        service.retryStuckQueuedDeliveries();
+        verify(republisher, never()).republish(any(), any());
+        assertThat(offline.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(offline.getError()).contains("offline");
+        assertThat(withdrawn.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(withdrawn.getError()).contains("cancelled");
+    }
+
+    @Test
+    @DisplayName("engine row DONE with leaves still QUEUED (the ack closed the row, the leaves did not follow) → leaves RUNNING")
+    void engineRowDone_leavesFollowToRunning() {
+        ScriptExecution q = queued("exec-1", "m-1", "s-a");
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(q));
+        when(deliveryTracker.find(DeliveryType.SCRIPT_SCHEDULE, "exec-1", "m-1"))
+                .thenReturn(Optional.of(engineRow(DeliveryStatus.DONE, null, 1)));
+        service.retryStuckQueuedDeliveries();
+        ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
+        verify(repository).saveAll(captor.capture());
+        assertThat(captor.getValue()).containsExactly(q);
+        assertThat(q.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+        verify(retryStore).evict("exec-1", "m-1");
+        verify(headerWatchdogService, never()).finalizeAffectedHeaders(any());
+    }
+
+    private static MachineDelivery engineRow(DeliveryStatus status, DeliveryFailure failure, int attempts) {
+        MachineDelivery row = new MachineDelivery();
+        row.setType(DeliveryType.SCRIPT_SCHEDULE);
+        row.setStatus(status);
+        row.setFailure(failure);
+        row.setAttempts(attempts);
+        return row;
     }
 
     @Test

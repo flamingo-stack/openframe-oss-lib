@@ -65,7 +65,7 @@ class ScriptDispatchServiceTest {
     @Mock
     private ScriptExecutionService scriptExecutionService;
     @Mock
-    private com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private com.openframe.data.nats.delivery.route.DeliveryRouter deliveryRouter;
     @Mock
     private ScheduleScriptService scheduleScriptService;
     @Mock
@@ -438,10 +438,14 @@ class ScriptDispatchServiceTest {
 
         scriptDispatchService.runSchedule(scheduleId, USER_ID);
 
-        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleNatsPublisher).publish(eq(MACHINE_ID), msgCaptor.capture());
-        ScriptScheduleExecutionItem item = msgCaptor.getValue().getScripts().get(0);
+        ArgumentCaptor<com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed> seedCaptor =
+                ArgumentCaptor.forClass(com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(MACHINE_ID);
+        ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
+        assertThat(batch.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(batch.getScheduleId()).isEqualTo(scheduleId);
+        ScriptScheduleExecutionItem item = batch.getScripts().get(0);
         assertThat(item.getArgs()).containsExactly("--custom", "42");
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("OVERRIDE");
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).doesNotContain("BASE");

@@ -16,9 +16,10 @@ import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
@@ -51,7 +52,7 @@ public class ScheduleFireDispatcher {
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
-    private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private final DeliveryRouter deliveryRouter;
     private final MachineRepository machineRepository;
     private final DeviceOnlineDispatchRepository dispatchRepository;
     private final ScriptDeliveryRetryStore retryStore;
@@ -238,8 +239,10 @@ public class ScheduleFireDispatcher {
                     .initiatedBy(fire.initiatedBy())
                     .scripts(items)
                     .build();
-            scriptScheduleNatsPublisher.publish(machineId, message);
+            // the retry state serves the path without the engine; stored before the dispatch stamps the delivery block
             retryStore.store(fire.executionId(), machineId, DeliveryChannel.SCHEDULE, message);
+            ScriptScheduleDeliverySeed seed = new ScriptScheduleDeliverySeed(machineId, message);
+            deliveryRouter.dispatch(seed);
         });
     }
 

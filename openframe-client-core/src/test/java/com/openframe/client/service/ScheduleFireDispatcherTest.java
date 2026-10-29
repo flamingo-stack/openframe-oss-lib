@@ -19,7 +19,8 @@ import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
+import com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
@@ -65,7 +66,7 @@ class ScheduleFireDispatcherTest {
     @Mock private ScriptRepository scriptRepository;
     @Mock private ScriptExecutionRepository scriptExecutionRepository;
     @Mock private ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
-    @Mock private ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    @Mock private DeliveryRouter deliveryRouter;
     @Mock private MachineRepository machineRepository;
     @Mock private DeviceOnlineDispatchRepository dispatchRepository;
     @Mock private com.openframe.client.service.rmm.ScriptDeliveryRetryStore retryStore;
@@ -75,7 +76,7 @@ class ScheduleFireDispatcherTest {
     @BeforeEach
     void setUp() {
         dispatcher = new ScheduleFireDispatcher(targetResolver, scriptRepository,
-                scriptExecutionRepository, scheduleScriptExecutionRepository, scriptScheduleNatsPublisher,
+                scriptExecutionRepository, scheduleScriptExecutionRepository, deliveryRouter,
                 machineRepository, dispatchRepository, retryStore);
     }
 
@@ -122,18 +123,20 @@ class ScheduleFireDispatcherTest {
                 "script-a", "script-a", "script-b", "script-b");
 
         // 3. Wire: ONE batched message per machine (2 machines → 2 publishes), each with BOTH scripts.
-        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleNatsPublisher, times(2)).publish(anyString(), msgCaptor.capture());
-        assertThat(msgCaptor.getAllValues()).allSatisfy(m -> {
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter, times(2)).dispatch(seedCaptor.capture());
+        List<ScriptScheduleExecutionMessage> batches = seedCaptor.getAllValues().stream().map(ScriptScheduleDeliverySeed::getMessage).toList();
+        assertThat(seedCaptor.getAllValues()).allSatisfy(seed -> assertThat(seed.getMachineId()).isEqualTo(seed.getMessage().getMachineId()));
+        assertThat(batches).allSatisfy(m -> {
             assertThat(m.getScheduleId()).isEqualTo(SCHEDULE_ID);
             assertThat(m.getExecutionId()).isEqualTo(runExecutionId);
             assertThat(m.getInitiatedBy()).isEqualTo(OWNER);
             assertThat(m.getScripts()).extracting(ScriptScheduleExecutionItem::getScriptId)
                     .containsExactly("script-a", "script-b");
         });
-        assertThat(msgCaptor.getAllValues()).extracting(ScriptScheduleExecutionMessage::getMachineId)
+        assertThat(batches).extracting(ScriptScheduleExecutionMessage::getMachineId)
                 .containsExactlyInAnyOrder("m1", "m2");
+        verify(retryStore, times(2)).store(eq(runExecutionId), anyString(), any(), any());
     }
 
     @Test
@@ -144,7 +147,7 @@ class ScheduleFireDispatcherTest {
         dispatcher.dispatch(schedule(List.of("script-a")), Instant.now());
 
         verifyNoInteractions(scriptRepository, scriptExecutionRepository,
-                scheduleScriptExecutionRepository, scriptScheduleNatsPublisher);
+                scheduleScriptExecutionRepository, deliveryRouter);
     }
 
     @Test
@@ -159,7 +162,7 @@ class ScheduleFireDispatcherTest {
 
         verify(scheduleScriptExecutionRepository, never()).save(any());
         verify(scriptExecutionRepository, never()).saveAll(any());
-        verifyNoInteractions(scriptScheduleNatsPublisher);
+        verifyNoInteractions(deliveryRouter);
     }
 
     @Test
@@ -177,10 +180,10 @@ class ScheduleFireDispatcherTest {
 
         dispatcher.dispatch(schedule(List.of("script-a")), Instant.now());
 
-        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
-        assertThat(msgCaptor.getValue().getScripts().get(0).getArgs())
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
+        assertThat(batch.getScripts().get(0).getArgs())
                 .containsExactly("-Bucket", "BGCSouthVancouverIsland");   // name no longer leaks into the value
     }
 
@@ -194,10 +197,10 @@ class ScheduleFireDispatcherTest {
         dispatcher.dispatch(schedule, List.of("m9"), Instant.now());
 
         verifyNoInteractions(targetResolver);   // caller supplied the machine; no reverse lookup
-        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
-        assertThat(msgCaptor.getValue().getMachineId()).isEqualTo("m9");
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
+        assertThat(batch.getMachineId()).isEqualTo("m9");
     }
 
     @Test
@@ -225,10 +228,10 @@ class ScheduleFireDispatcherTest {
 
         dispatcher.dispatch(schedule, Instant.now());
 
-        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
-        List<ScriptScheduleExecutionItem> items = msgCaptor.getValue().getScripts();
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
+        List<ScriptScheduleExecutionItem> items = batch.getScripts();
 
         ScriptScheduleExecutionItem a = items.stream().filter(i -> i.getScriptId().equals("script-a")).findFirst().orElseThrow();
         assertThat(a.getArgs()).containsExactly("--custom", "42");                 // override args win
@@ -262,10 +265,10 @@ class ScheduleFireDispatcherTest {
 
         dispatcher.dispatch(schedule, Instant.now());
 
-        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
-        ScriptScheduleExecutionItem a = msgCaptor.getValue().getScripts().get(0);
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
+        ScriptScheduleExecutionItem a = batch.getScripts().get(0);
         assertThat(a.getArgs()).containsExactly("--custom");
         assertThat(a.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("BASE");   // inherited default env
     }
@@ -293,8 +296,9 @@ class ScheduleFireDispatcherTest {
         verify(scriptExecutionRepository).saveAll(rowsCaptor.capture());
         assertThat(rowsCaptor.getValue()).extracting(ScriptExecution::getMachineId).containsExactly("m-online");
 
-        verify(scriptScheduleNatsPublisher).publish(eq("m-online"), any());
-        verify(scriptScheduleNatsPublisher, never()).publish(eq("m-offline"), any());
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo("m-online");
         verifyNoInteractions(dispatchRepository);   // SKIP does not arm reconnect sentinels
     }
 
@@ -321,10 +325,10 @@ class ScheduleFireDispatcherTest {
         assertThat(sentinel.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
         assertThat(sentinel.getExpiresAt()).isEqualTo(now.plusSeconds(7200));
 
-        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleNatsPublisher).publish(anyString(), msgCaptor.capture());
-        assertThat(msgCaptor.getValue().getMachineId()).isEqualTo("m-online");
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
+        assertThat(batch.getMachineId()).isEqualTo("m-online");
         ArgumentCaptor<ScheduleScriptExecution> headerCaptor = ArgumentCaptor.forClass(ScheduleScriptExecution.class);
         verify(scheduleScriptExecutionRepository).save(headerCaptor.capture());
         assertThat(headerCaptor.getValue().getTotalMachineCount()).isEqualTo(1);
@@ -345,7 +349,7 @@ class ScheduleFireDispatcherTest {
 
         verify(dispatchRepository, times(2)).save(any(DeviceFirstOnlineDispatch.class));
         verify(scheduleScriptExecutionRepository, never()).save(any());   // no online target → no fire
-        verifyNoInteractions(scriptScheduleNatsPublisher);
+        verifyNoInteractions(deliveryRouter);
     }
 
     @Test
@@ -364,7 +368,7 @@ class ScheduleFireDispatcherTest {
         ArgumentCaptor<DeviceFirstOnlineDispatch> sentinelCaptor = ArgumentCaptor.forClass(DeviceFirstOnlineDispatch.class);
         verify(dispatchRepository).save(sentinelCaptor.capture());
         assertThat(sentinelCaptor.getValue().getMachineId()).isEqualTo("m-unknown");
-        verify(scriptScheduleNatsPublisher, never()).publish(any(), any());
+        verify(deliveryRouter, never()).dispatch(any());
     }
 
     @Test

@@ -17,9 +17,10 @@ import java.util.Set;
 
 import static java.lang.String.format;
 
-// the subjects the agents before the engine listen on, a JetStream stream behind each. The message is the spec's,
-// the one the engine sends, without the delivery block (the field stays out of the JSON while null). A client or
-// tool update is one broadcast there, the agent cannot be addressed one at a time
+// the subjects the agents before the engine listen on, a JetStream stream behind each but the script batch, which the
+// agent takes over core NATS. The message is the spec's, the one the engine sends, without the delivery block (the
+// field stays out of the JSON while null). A client or tool update is one broadcast there, the agent cannot be
+// addressed one at a time
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -32,7 +33,8 @@ public class LegacyDeliveryRoute implements DeliveryRoute {
             DeliveryType.CLIENT_UNINSTALL, LegacySubject.perMachine("machine.%s.client-uninstall"),
             DeliveryType.TOOL_INSTALLATION, LegacySubject.perMachine("machine.%s.tool-installation"),
             DeliveryType.CLIENT_UPDATE, LegacySubject.broadcast("machine.all.client-update"),
-            DeliveryType.TOOL_UPDATE, LegacySubject.broadcast("machine.all.tool.%s.update"));
+            DeliveryType.TOOL_UPDATE, LegacySubject.broadcast("machine.all.tool.%s.update"),
+            DeliveryType.SCRIPT_SCHEDULE, LegacySubject.perMachineWithoutStream("machine.%s.script-schedule-execution"));
 
     private final DeliverySpecRegistry specs;
     private final NatsMessagePublisher natsMessagePublisher;
@@ -76,7 +78,12 @@ public class LegacyDeliveryRoute implements DeliveryRoute {
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = specs.require(type);
         DeliveryRequest<DeliveryPayload> request = spec.request(seed);
         DeliveryPayload message = request.getPayload();
-        natsMessagePublisher.publishPersistent(subject, message);
+        LegacySubject legacySubject = subjectOf(type);
+        if (legacySubject.stream()) {
+            natsMessagePublisher.publishPersistent(subject, message);
+        } else {
+            natsMessagePublisher.publish(subject, message);
+        }
         log.info("Published {} on the legacy subject: subject={} targetId={}", type, subject, seed.getTargetId());
     }
 
@@ -88,14 +95,19 @@ public class LegacyDeliveryRoute implements DeliveryRoute {
         return subject;
     }
 
-    record LegacySubject(String template, boolean broadcast) {
+    record LegacySubject(String template, boolean broadcast, boolean stream) {
 
         static LegacySubject perMachine(String template) {
-            return new LegacySubject(template, false);
+            return new LegacySubject(template, false, true);
         }
 
         static LegacySubject broadcast(String template) {
-            return new LegacySubject(template, true);
+            return new LegacySubject(template, true, true);
+        }
+
+        // a plain publish: nothing keeps the message for an agent that is not subscribed at that moment
+        static LegacySubject perMachineWithoutStream(String template) {
+            return new LegacySubject(template, false, false);
         }
 
         String forMachine(String machineId) {
