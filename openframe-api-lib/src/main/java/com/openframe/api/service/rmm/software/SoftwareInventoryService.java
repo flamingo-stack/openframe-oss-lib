@@ -16,6 +16,7 @@ import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.BadRequestException;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
 import com.openframe.api.service.rmm.fleet.FleetCalls;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
@@ -90,6 +91,7 @@ public class SoftwareInventoryService {
     private final com.openframe.api.service.rmm.fleet.FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
     private final DeviceHostInventoryLoader deviceHostInventoryLoader;
+    private final SoftwareAutoUpdateService autoUpdateService;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -123,8 +125,14 @@ public class SoftwareInventoryService {
                     if (!fleetPaging) {
                         enrichRealDevicesCount(List.of(row));
                     }
+                    autoUpdateService.applyToSoftware(List.of(row));
                     return row;
                 });
+    }
+
+    public SoftwareResponse turnOffAutoUpdate(String softwareId, String actor) {
+        autoUpdateService.turnOff(softwareId, actor);
+        return findById(softwareId).orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
     }
 
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
@@ -135,7 +143,7 @@ public class SoftwareInventoryService {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
         if (fleetPaging) {
-            return softwarePageFromFleet(search, page, perPage, sort, vulnerable);
+            return withAutoUpdate(softwarePageFromFleet(search, page, perPage, sort, vulnerable));
         }
 
         List<SoftwareTitle> titles = fetchAllTitles(search, vulnerable);
@@ -148,7 +156,12 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> ordered = field == null
                 ? withDevices
                 : withDevices.stream().sorted(comparatorFor(field, desc)).toList();
-        return paginateList(ordered, page, perPage);
+        return withAutoUpdate(paginateList(ordered, page, perPage));
+    }
+
+    private PageResult<SoftwareResponse> withAutoUpdate(PageResult<SoftwareResponse> page) {
+        autoUpdateService.applyToSoftware(page.items());
+        return page;
     }
 
     private PageResult<SoftwareResponse> softwarePageFromFleet(String search, int page, Integer perPage,
@@ -336,7 +349,9 @@ public class SoftwareInventoryService {
         List<SoftwareOnDeviceResponse> all = allDevicesForSoftware(softwareId, search).stream()
                 .filter(row -> matchesStatusFilter(row, filter))
                 .toList();
-        return paginateList(all, page, perPage);
+        PageResult<SoftwareOnDeviceResponse> result = paginateList(all, page, perPage);
+        autoUpdateService.applyToDevices(softwareId, result.items());
+        return result;
     }
 
     private static boolean matchesStatusFilter(SoftwareOnDeviceResponse row, SoftwareOnDeviceFilterInput filter) {
@@ -356,7 +371,9 @@ public class SoftwareInventoryService {
             enrichDevicesCountFromHosts(rows);
         }
         List<SoftwareResponse> ordered = rows.stream().sorted(order).toList();
-        return paginateList(ordered, page, perPage);
+        PageResult<SoftwareResponse> result = paginateList(ordered, page, perPage);
+        autoUpdateService.applyToSoftwareOnDevice(machineId, result.items());
+        return result;
     }
 
     public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {

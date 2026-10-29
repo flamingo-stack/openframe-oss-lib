@@ -118,4 +118,24 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- The design system's fonts, from the one place they live (openframe-frontend-core's
+                 src/styles): fonts.css and its woff2 files, served at /fonts.css and /fonts/ for the
+                 sign-in page. Never a copy in this module. -->
+            <resource>
+                <directory>${project.basedir}/../openframe-frontend-core/src/styles</directory>
+                <targetPath>static</targetPath>
+                <includes>
+                    <include>fonts.css</include>
+                    <include>fonts/*.woff2</include>
+                    <include>fonts/LICENSE-*</include>
+                </includes>
+            </resource>
+        </resources>
+    </build>
 </project>
