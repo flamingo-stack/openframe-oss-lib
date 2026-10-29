@@ -86,6 +86,12 @@ export interface BoardProps {
   /** The lanes folded when the board mounts, by column id. Read only without `collapseStorageKey`. */
   initialCollapsed?: Record<string, boolean>;
   loadMoreRootMargin?: string;
+  /**
+   * A CSS length each lane keeps clear at the end of its list: a board that runs on
+   * under something lying over its bottom (the layout's floating composer dock,
+   * `var(--composer-dock-inset)`) scrolls a lane's last card out from under it.
+   */
+  laneEndInset?: string;
   className?: string;
 }
 
@@ -134,7 +140,7 @@ function laneJoins(columns: BoardColumnDef[], i: number) {
  * the drag board arranges them, each a `touchMode` lane (no drop target), none collapsed (the stored collapse is read
  * after hydration). Nothing in it can be used, so it is inert.
  */
-function BoardShell({ columns, className }: BoardProps) {
+function BoardShell({ columns, laneEndInset, className }: BoardProps) {
   return (
     <div inert aria-hidden className={cn('flex h-full min-h-0 flex-col', className)}>
       <div className="flex min-h-0 flex-1 overflow-x-hidden">
@@ -143,7 +149,13 @@ function BoardShell({ columns, className }: BoardProps) {
           return (
             <Fragment key={column.id}>
               {showGap && <div aria-hidden className="w-[var(--spacing-system-mf)] shrink-0" />}
-              <BoardColumn column={column} touchMode joinLeft={joinLeft} joinRight={joinRight} />
+              <BoardColumn
+                column={column}
+                touchMode
+                joinLeft={joinLeft}
+                joinRight={joinRight}
+                endInset={laneEndInset}
+              />
             </Fragment>
           );
         })}
@@ -176,6 +188,7 @@ function DragBoard({
   collapseStorageKey,
   initialCollapsed,
   loadMoreRootMargin,
+  laneEndInset,
   className,
 }: BoardProps) {
   const { collapsed, toggle } = useBoardCollapse(collapseStorageKey, initialCollapsed);
@@ -639,6 +652,7 @@ function DragBoard({
                       loadMoreRootMargin={loadMoreRootMargin}
                       joinLeft={joinLeft}
                       joinRight={joinRight}
+                      endInset={laneEndInset}
                     />
                   </Fragment>
                 );

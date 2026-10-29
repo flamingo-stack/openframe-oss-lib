@@ -173,11 +173,29 @@ describe('AppLayout floating composer dock', () => {
     );
   });
 
+  it('fades the page out to transparent over its height, with no colour of its own', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(132);
+    render(layout({ composerDock: <p>dock</p>, composerDockFloats: true }));
+    expect(screen.getByRole('main')).toHaveStyle({
+      maskImage: 'linear-gradient(to bottom, black calc(100% - 132px), transparent 100%)',
+    });
+    expect(markup()).not.toMatch(/backdrop-blur|linear-gradient\(to_bottom/);
+  });
+
+  it("hands a page that runs on under it the dock's height", () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(132);
+    render(layout({ composerDock: <p>dock</p>, composerDockFloats: true }));
+    expect(screen.getByRole('main')).toHaveStyle({ '--composer-dock-inset': '132px' });
+  });
+
   it('is a band of its own under the page by default', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(132);
     render(layout({ composerDock: <p>dock</p> }));
     expect(screen.getByRole('main')).not.toHaveStyle({ paddingBottom: '132px' });
     expect(markup()).toContain('<div class="ods-content-area shrink-0"><div class="ods-content-scope"><p>dock</p>');
+    expect(screen.getByRole('main')).not.toHaveStyle({
+      maskImage: 'linear-gradient(to bottom, black calc(100% - 132px), transparent 100%)',
+    });
   });
 });
 
@@ -219,6 +237,8 @@ describe("AppLayout and a page's action bar on a phone", () => {
   it('by the bar and a floating dock under it', () => {
     render(layout({ composerDock: <p>dock</p>, composerDockFloats: true }, page));
     expect(screen.getByRole('main')).toHaveStyle({ paddingBottom: '225px' });
+    // A page running on under the dock takes back the dock's share only, never the bar's.
+    expect(screen.getByRole('main')).toHaveStyle({ '--composer-dock-inset': '132px' });
   });
 
   it('by the bar alone over a dock that is a band of its own', () => {

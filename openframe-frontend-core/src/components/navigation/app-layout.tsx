@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { ContentAreaWidthContext, contentBreakpointFor } from '../../hooks/ui/use-content-breakpoint';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import type { NavigationSidebarConfig } from '../../types/navigation';
 import { cn } from '../../utils';
 import { NotificationDrawer } from '../features/notifications/notification-drawer';
+import { previewFadeMask } from '../ui/fade-preview';
 import { useMobileActionBarHeight } from '../ui/mobile-action-bar';
 import { AppHeader, type AppHeaderProps } from './app-header';
 import {
@@ -90,10 +91,17 @@ export interface AppLayoutProps {
   /**
    * The `composerDock` lies over the bottom of the page instead of taking its height:
    * the page scrolls on under it (`<main>` is padded by the dock's height, so its end
-   * still clears it) and fades out under a gradient from transparent to the ground.
-   * Where the dock is transparent the page takes the pointer and the wheel; the host
-   * makes its own content take them back (`pointer-events-auto`). Off: the dock is a
-   * band of its own under the page.
+   * still clears it) and fades out to fully transparent over the dock's height (the
+   * shared preview fade, `previewFadeMask`), seen either side of the composer. Where the
+   * dock is transparent the page takes the pointer and the wheel; the host makes its own
+   * content take them back (`pointer-events-auto`). Off: the dock is a band of its own
+   * under the page.
+   *
+   * `<main>` carries the floating dock's height as `--composer-dock-inset` (`0px`
+   * otherwise), for a page that fills `<main>`'s height and runs on under the dock
+   * rather than ending above it: it grows by the inset and gives it back as a negative
+   * margin (`h-[calc(100%+var(--composer-dock-inset,0px))]
+   * -mb-[var(--composer-dock-inset,0px)]`), and pads its own scroll areas' ends by it.
    */
   composerDockFloats?: boolean;
   /**
@@ -143,6 +151,9 @@ export interface AppLayoutProps {
    */
   onMobileMenuOpenChange?: (open: boolean) => void;
 }
+
+/** The floating dock's height on `<main>`, for a page that runs on under it (`composerDockFloats`). */
+const COMPOSER_DOCK_INSET_VAR = '--composer-dock-inset';
 
 export function AppLayout({
   children,
@@ -399,8 +410,19 @@ export function AppLayout({
                       mainClassName,
                     )}
                     // A floating dock and a page's action bar lie over the page's end: the
-                    // page runs on by their height, so its last line clears them.
-                    style={bottomInset > 0 ? { paddingBottom: bottomInset } : undefined}
+                    // page runs on by their height, so its last line clears them. The dock's
+                    // share is a variable too, for a page that runs on under it, and the
+                    // page fades out to transparent under the dock (the mask stays with
+                    // `<main>`'s box while its content scrolls).
+                    style={
+                      bottomInset > 0 || dockFloats
+                        ? ({
+                            paddingBottom: bottomInset,
+                            [COMPOSER_DOCK_INSET_VAR]: `${dockFloats ? dockHeight : 0}px`,
+                            ...(dockFloats && dockHeight > 0 ? previewFadeMask(`calc(100% - ${dockHeight}px)`) : {}),
+                          } as CSSProperties)
+                        : undefined
+                    }
                   >
                     <ContentAreaWidthContext.Provider value={contentAreaWidth}>
                       <ComposerDockHeightContext.Provider value={hasDock ? dockHeight : 0}>
@@ -436,10 +458,9 @@ export function AppLayout({
                       className={cn(
                         'ods-content-area shrink-0',
                         hasSheet && 'relative z-40',
-                        // Over the page's end, fading it out; the page keeps the pointer
-                        // where the dock is transparent.
-                        dockFloats &&
-                          'pointer-events-none absolute inset-x-0 bottom-0 z-40 bg-[linear-gradient(to_bottom,transparent,var(--color-bg)_60%)]',
+                        // Over the page's end; the page keeps the pointer where the dock
+                        // is transparent.
+                        dockFloats && 'pointer-events-none absolute inset-x-0 bottom-0 z-40',
                       )}
                     >
                       <ContentAreaWidthContext.Provider value={contentAreaWidth}>
