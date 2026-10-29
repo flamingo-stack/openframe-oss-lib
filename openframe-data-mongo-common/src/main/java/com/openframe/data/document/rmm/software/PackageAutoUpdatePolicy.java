@@ -36,6 +36,7 @@ public class PackageAutoUpdatePolicy implements TenantScoped {
 
     private boolean enabled;
     private PackageUpdateSettings settings;
+    private String lastVersion;
 
     private String createdBy;
     private Instant createdAt;

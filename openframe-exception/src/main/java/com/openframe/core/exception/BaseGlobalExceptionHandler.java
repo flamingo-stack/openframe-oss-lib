@@ -31,9 +31,17 @@ public class BaseGlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(BaseGlobalExceptionHandler.class);
 
+    /**
+     * A 4xx is the caller's mistake (unknown id, bad input, conflict): WARN without a stack trace, so it neither
+     * floods the logs nor looks like a server fault. A 5xx is ours: ERROR with the stack trace.
+     */
     @ExceptionHandler(BaseException.class)
     public ResponseEntity<ErrorResponse> handleBaseException(BaseException ex) {
-        log.error("{}: {}", ex.getErrorCode().getCode(), ex.getMessage(), ex);
+        if (ex.getHttpStatus().is5xxServerError()) {
+            log.error("{}: {}", ex.getErrorCode().getCode(), ex.getMessage(), ex);
+        } else {
+            log.warn("{}: {}", ex.getErrorCode().getCode(), ex.getMessage());
+        }
 
         ErrorResponse response = ErrorResponse.of(ex.getErrorCode(), ex.getMessage());
 
@@ -114,7 +122,7 @@ public class BaseGlobalExceptionHandler {
     @ExceptionHandler(MissingRequestHeaderException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleMissingRequestHeader(MissingRequestHeaderException ex) {
-        log.error("Missing required header: ", ex);
+        log.warn("Missing required header: {}", ex.getHeaderName());
         return ErrorResponse.of(ErrorCode.BAD_REQUEST, "Required header '" + ex.getHeaderName() + "' is missing");
     }
 
@@ -138,10 +146,14 @@ public class BaseGlobalExceptionHandler {
                 String.format("Invalid value '%s' for parameter '%s'", ex.getValue(), ex.getName()));
     }
 
+    /**
+     * Mapped to 400, but also thrown by our own code (a bad UUID or number read from stored data), so the stack
+     * trace is kept to tell the two apart.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleIllegalArgument(IllegalArgumentException ex) {
-        log.error("Invalid request: ", ex);
+        log.warn("Invalid request: {}", ex.getMessage(), ex);
         return ErrorResponse.of(ErrorCode.BAD_REQUEST, ex.getMessage());
     }
 
@@ -155,14 +167,14 @@ public class BaseGlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public ErrorResponse handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
-        log.error("Method not supported: ", ex);
+        log.warn("Method not supported: {}", ex.getMessage());
         return ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, ex.getMessage());
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
     public ErrorResponse handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
-        log.error("Media type not supported: ", ex);
+        log.warn("Media type not supported: {}", ex.getMessage());
         return ErrorResponse.of(ErrorCode.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
     }
 
