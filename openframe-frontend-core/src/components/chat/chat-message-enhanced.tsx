@@ -8,6 +8,7 @@ import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
 import { formatDate, formatTime } from '../../utils/format-date';
 import { AgentMark } from '../agent-mark';
+import { BrowserWindowIcon } from '../icons-v2-generated/coding/browser-window-icon';
 import type { MdRenderProps } from '../ui/markdown/base-components';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -31,7 +32,7 @@ import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
-import { InlineAppLinkChip } from './inline-app-link-chip';
+import { InlineChip } from './inline-chip';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
@@ -469,27 +470,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // flamingo hero-demo with mock content), fall back to a plain
           // `<a href>`. No cross-origin sniffing here — the OSS-lib does
           // not own routing decisions; the host does.
-          // A link that stays in this app is drawn as an inline box, the skin of the host's entity mentions, still
-          // routed through the host's `NavLinkAnchor`. Whether it stays is the runtime's ONE new-tab rule
-          // (`computeIsNewTab`, the decision the chat's cards and source chips make): a link it keeps in this window
-          // is a place in the app; one it sends to a new tab (another site, a hub page from an embedded chat, a
-          // `mailto:`) stays a plain link.
-          if (
-            typeof href === 'string' &&
-            !href.startsWith('#') &&
-            chatRuntime &&
-            !computeIsNewTab(chatRuntime, href, null)
-          ) {
-            return (
-              <InlineAppLinkChip href={href} anchor={NavLinkAnchor}>
-                {children}
-              </InlineAppLinkChip>
-            );
-          }
           if (typeof href === 'string' && NavLinkAnchor && !href.startsWith('#')) {
+            // Routing is untouched: the same anchor, href and props for every link. Only what it DRAWS changes for a
+            // link the runtime's own new-tab rule keeps in this window (a place in the app): the label as the inline
+            // box the host's entity mentions use.
+            const staysInApp = chatRuntime !== null && !computeIsNewTab(chatRuntime, href, null);
             return (
               <NavLinkAnchor href={href} className={linkClassName} {...rest}>
-                {children}
+                {staysInApp ? <InlineChip icon={<BrowserWindowIcon />} label={children} /> : children}
               </NavLinkAnchor>
             );
           }

@@ -17,7 +17,7 @@
  * is the lib rule with no target platform).
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
@@ -101,13 +101,14 @@ describe('ChatMessageEnhanced — in-app screen links', () => {
 
   it("draws a link that stays in the app as the inline box, by the runtime's own new-tab rule", () => {
     renderAnswer(ANSWER);
-    // The box is the anchor around the lib's InlineChip (`InlineAppLinkChip`), routed by the same host anchor.
-    for (const anchor of screen.getAllByRole('link')) expect(anchor).toHaveClass('no-underline');
+    // The same routed anchor as every link (see the routing case above); only its content is the lib's InlineChip.
+    for (const anchor of screen.getAllByRole('link')) expect(within(anchor).getByTestId('inline-chip')).toBeTruthy();
   });
 
   it('keeps a link the runtime sends to a new tab a plain link, not a box', () => {
     renderAnswer(ANSWER.replace(/\]\(\//g, `](${ORIGIN}/`));
-    expect(screen.getByRole('link', { name: 'Devices → Add Device' })).not.toHaveClass('no-underline');
+    const anchor = screen.getByRole('link', { name: 'Devices → Add Device' });
+    expect(within(anchor).queryByTestId('inline-chip')).toBeNull();
   });
 
   it('opens the same link written absolute in a new tab, even on the page origin', () => {
