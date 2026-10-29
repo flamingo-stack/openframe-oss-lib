@@ -1,5 +1,6 @@
 package com.openframe.authz.service.auth;
 
+import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -12,6 +13,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 class MongoAuthorizationMapper {
@@ -20,10 +22,15 @@ class MongoAuthorizationMapper {
     private static final String CODE_CHALLENGE_METHOD_KEY = "code_challenge_method";
     private static final String CODE_CHALLENGE_DOT_KEY = "code.challenge";
     private static final String CODE_CHALLENGE_METHOD_DOT_KEY = "code.challenge.method";
+    static final String TENANT_ID_ATTRIBUTE = "openframe.tenant_id";
 
     static MongoOAuth2Authorization toEntity(OAuth2Authorization auth) {
         MongoOAuth2Authorization entity = new MongoOAuth2Authorization();
         entity.setId(auth.getId());
+        // A re-saved authorization keeps the tenant it was loaded with: revokeAllForPrincipal re-saves other
+        // tenants' records too. The request tenant only stamps new ones, so tenant cleanup can find them.
+        entity.setTenantId(Optional.ofNullable(auth.<String>getAttribute(TENANT_ID_ATTRIBUTE))
+                .orElseGet(TenantContext::getTenantId));
         entity.setRegisteredClientId(auth.getRegisteredClientId());
         entity.setPrincipalName(auth.getPrincipalName());
         entity.setAuthorizationGrantType(auth.getAuthorizationGrantType().getValue());
@@ -159,6 +166,7 @@ class MongoAuthorizationMapper {
                 .authorizationGrantType(new org.springframework.security.oauth2.core.AuthorizationGrantType(e.getAuthorizationGrantType()))
                 .attributes(attrs -> {
                     if (e.getState() != null) attrs.put("state", e.getState());
+                    if (e.getTenantId() != null) attrs.put(TENANT_ID_ATTRIBUTE, e.getTenantId());
                     // Rehydrate principal for token exchange (not persisted)
                     Authentication principal = new UsernamePasswordAuthenticationToken(e.getPrincipalName(), "N/A", java.util.Collections.emptyList());
                     attrs.put(java.security.Principal.class.getName(), principal);

@@ -42,6 +42,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
@@ -176,9 +179,12 @@ public class AuthorizationServerConfig {
 
             String username = authentication != null ? authentication.getName().toLowerCase(Locale.ROOT) : null;
 
+            // invalid_grant, not a bare 401: a refresh token can outlive its user (or tenant), and clients
+            // only end the session on invalid_grant.
             AuthUser user = userService
                     .findActiveByEmailAndTenant(username, tenantId)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+                    .orElseThrow(() -> new OAuth2AuthenticationException(
+                            new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT, "User is not active in this tenant", null)));
 
             if ("access_token".equals(context.getTokenType().getValue())) {
                 try {
