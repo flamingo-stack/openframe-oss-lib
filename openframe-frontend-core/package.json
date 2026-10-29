@@ -9,6 +9,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "next-styles": "./dist/build/next-styles.cjs"
+  },
   "files": [
     "dist",
     "src",
@@ -27,6 +30,18 @@
     "./optimize-imports-loader": {
       "require": "./dist/build/optimize-imports-loader.cjs",
       "default": "./dist/build/optimize-imports-loader.cjs"
+    },
+    "./style-sources": {
+      "types": "./dist/build/style-sources.d.ts",
+      "import": "./dist/build/style-sources.cjs",
+      "require": "./dist/build/style-sources.cjs",
+      "default": "./dist/build/style-sources.cjs"
+    },
+    "./next-styles": {
+      "types": "./dist/build/next-styles.d.ts",
+      "import": "./dist/build/next-styles.cjs",
+      "require": "./dist/build/next-styles.cjs",
+      "default": "./dist/build/next-styles.cjs"
     },
     "./dist/*.js": {
       "import": "./dist/*.js",
@@ -478,6 +493,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",
     "date-fns": "^3.6.0",
+    "esbuild": "^0.28.2",
     "eslint-config-next": "^16.3.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^3.10.1",
@@ -540,7 +556,6 @@
     "@types/node": "^24.10.4",
     "@vitest/ui": "^4.0.16",
     "autoprefixer": "^10.4.23",
-    "esbuild": "^0.28.2",
     "eslint": "^9.39.0",
     "husky": "9.1.7",
     "jsdom": "^27.4.0",
