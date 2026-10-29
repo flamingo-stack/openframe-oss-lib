@@ -9,6 +9,8 @@ import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptType;
+import com.openframe.data.document.rmm.software.PackageUpdateMode;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
@@ -65,16 +67,20 @@ class SoftwareBundleOnlineDispatcherTest {
     }
 
     @Test
-    @DisplayName("update on a feature-enabled device: a package-update order under the bundle's execution id, no script")
+    @DisplayName("update on a feature-enabled device: a package-update order under the bundle's execution id and with its update settings, no script")
     void update_eligibleDevice_sendsOrder() {
         when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__brew-update", ScriptType.SOFTWARE))
                 .thenReturn(Optional.of(script("brew-update-id")));
         when(packageUpdateEligibility.isEligible(SoftwareAction.UPDATE, mac)).thenReturn(true);
+        PackageUpdateSettings settings = PackageUpdateSettings.builder()
+                .mode(PackageUpdateMode.WAIT).deadlineSeconds(86_400L).countdownSeconds(600).build();
+        SoftwareBundle bundle = bundle(SoftwareAction.UPDATE);
+        bundle.setUpdateSettings(settings);
 
-        dispatcher.dispatch(bundle(SoftwareAction.UPDATE), mac);
+        dispatcher.dispatch(bundle, mac);
 
         ArgumentCaptor<RunningExecutionRows> order = ArgumentCaptor.forClass(RunningExecutionRows.class);
-        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(order.capture(), eq(BrewPackageType.CASK));
+        verify(packageUpdateDispatchService).dispatchAdminUpdate(order.capture(), eq(BrewPackageType.CASK), eq(settings));
         RunningExecutionRows rows = order.getValue();
         assertThat(rows.getExecutionId()).isEqualTo(SoftwareExecutionId.forBundle("b-1", PackageManagerType.BREW, "slack"));
         assertThat(rows.getMachineIds()).containsExactly("m-1");
@@ -97,7 +103,7 @@ class SoftwareBundleOnlineDispatcherTest {
         verify(scriptExecutionRepository).saveQueued(rows.capture());
         assertThat(rows.getValue().getMachineIds()).containsExactly("m-1");
         verify(softwareNatsPublisher).publishSoftware(eq("m-1"), any());
-        verify(packageUpdateDispatchService, never()).dispatchAdminUpdateNow(any(), any());
+        verify(packageUpdateDispatchService, never()).dispatchAdminUpdate(any(), any(), any());
     }
 
     @Test

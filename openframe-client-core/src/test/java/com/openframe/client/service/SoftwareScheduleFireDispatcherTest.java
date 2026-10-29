@@ -16,6 +16,8 @@ import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptType;
+import com.openframe.data.document.rmm.software.PackageUpdateMode;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
@@ -138,7 +140,7 @@ class SoftwareScheduleFireDispatcherTest {
     }
 
     @Test
-    @DisplayName("update: feature-enabled devices get a package-update order, the rest the script, under the schedule's execution id")
+    @DisplayName("update: feature-enabled devices get a package-update order with the schedule's update settings, the rest the script, under the schedule's execution id")
     void dispatch_update_splitsOrderAndScriptTargets() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
@@ -147,19 +149,22 @@ class SoftwareScheduleFireDispatcherTest {
                 .thenReturn(Optional.of(script("brew-update-id", OsType.MAC_OS)));
         when(packageUpdateEligibility.eligibleMachines(SoftwareAction.UPDATE, List.of("m-1", "m-2")))
                 .thenReturn(Set.of("m-1"));
+        PackageUpdateSettings settings = PackageUpdateSettings.builder()
+                .mode(PackageUpdateMode.FORCE).countdownSeconds(120).build();
 
         SoftwareSchedule schedule = SoftwareSchedule.builder()
                 .id("ss-1").tenantId(TENANT).createdBy("user-1").action(SoftwareAction.UPDATE)
                 .packages(List.of(SoftwareSchedulePackage.builder()
                         .packageManager(PackageManagerType.BREW).packageName("slack").brewPackageType(BrewPackageType.CASK)
                         .build()))
+                .updateSettings(settings)
                 .build();
 
         dispatcher.dispatch(schedule, List.of("m-1", "m-2"), Instant.now());
 
         String executionId = SoftwareExecutionId.forSchedule("ss-1", PackageManagerType.BREW, "slack");
         ArgumentCaptor<RunningExecutionRows> order = ArgumentCaptor.forClass(RunningExecutionRows.class);
-        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(order.capture(), eq(BrewPackageType.CASK));
+        verify(packageUpdateDispatchService).dispatchAdminUpdate(order.capture(), eq(BrewPackageType.CASK), eq(settings));
         assertThat(order.getValue().getExecutionId()).isEqualTo(executionId);
         assertThat(order.getValue().getMachineIds()).containsExactly("m-1");
         assertThat(order.getValue().getScriptId()).isEqualTo("brew-update-id");
@@ -195,7 +200,7 @@ class SoftwareScheduleFireDispatcherTest {
         dispatcher.dispatch(schedule, List.of("m-1"), Instant.now());
 
         ArgumentCaptor<RunningExecutionRows> order = ArgumentCaptor.forClass(RunningExecutionRows.class);
-        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(order.capture(), eq(BrewPackageType.CASK));
+        verify(packageUpdateDispatchService).dispatchAdminUpdate(order.capture(), eq(BrewPackageType.CASK), any());
         assertThat(order.getValue().getMachineIds()).containsExactly("m-1");
         verify(scriptExecutionRepository, never()).saveQueued(any());
         verify(softwareNatsPublisher, never()).publishSoftware(any(), any());

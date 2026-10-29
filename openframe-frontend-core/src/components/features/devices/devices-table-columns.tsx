@@ -234,10 +234,13 @@ function OrganizationCell({ device }: { device: DeviceRow }) {
   );
 }
 
-/** The customer's name; a bar while the row is read. */
+/**
+ * The customer's name, clamped to the two lines the row's height holds (an unclamped one spilled into the rows
+ * around it); one bar while the row is read, as most names take one line.
+ */
 function OrganizationName({ name }: { name: string | undefined }) {
   if (useLoadingScope() && !name) return <TextLineSkeleton type="h4" className="w-3/4" />;
-  return <span className="break-words text-ods-text-primary text-h4">{name || ''}</span>;
+  return <TruncateText lines={2}>{name ?? ''}</TruncateText>;
 }
 
 /** When the device was last seen, under its status; a bar while the row is read. */

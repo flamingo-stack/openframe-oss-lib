@@ -13,6 +13,10 @@ public class SoftwareFilters {
     private List<SoftwareFilterOption> versionStatuses;
     private List<SoftwareFilterOption> severities;
 
+    // empty until the auto-update policy backs it: the schema field is non-null
+    @Builder.Default
+    private List<SoftwareFilterOption> autoUpdateStatuses = List.of();
+
     public static SoftwareFilters empty() {
         return SoftwareFilters.builder()
                 .sources(List.of())
