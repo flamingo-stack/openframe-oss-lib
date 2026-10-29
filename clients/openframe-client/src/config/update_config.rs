@@ -50,18 +50,6 @@ pub const ALLOW_DOWNGRADE: bool = false;
 pub const UPDATER_TRANSCRIPTS_KEPT: usize = 5;
 /// Minimum age before a temp update leftover is swept (a live updater's files are younger).
 pub const TEMP_LEFTOVER_MIN_AGE_SECS: u64 = 3600;
-/// How long a downloaded client binary gets to print its version before the update goes ahead unchecked.
-pub const STAGED_VERSION_CHECK_TIMEOUT_SECS: u64 = 30;
-
-// Saved client update (legacy broadcast path): retried until it applies
-/// Wait after each attempt at a saved client update; the last one repeats.
-pub const SAVED_UPDATE_RETRY_DELAYS_SECS: [u64; 4] = [15 * 60, 60 * 60, 4 * 60 * 60, 12 * 60 * 60];
-/// A saved client update that still fails this long after it arrived is dropped.
-pub const SAVED_UPDATE_MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
-/// How often the saved client update is checked, and busy tools with it.
-pub const SAVED_UPDATE_CHECK_INTERVAL_SECS: u64 = 120;
-/// How long a saved client update may park new tool operations while waiting for busy ones.
-pub const SAVED_UPDATE_BUSY_HOLD_SECS: u64 = 20 * 60;
 
 // NATS message settings
 pub const CONSUMER_ACK_WAIT_SECS: u64 = 120;
@@ -72,3 +60,13 @@ pub const RESTART_CONSUMER_MAX_DELIVER: i64 = 20; // Larger budget: restart may 
 // Client-before-tool update ordering
 pub const CLIENT_UPDATE_PENDING_TTL_SECS: u64 = 300; // > ack_wait (120s) so the flag survives redelivery gaps of a deferred client update
 pub const PROGRESS_ACK_INTERVAL_SECS: u64 = 60; // well inside ack_wait (120s)
+
+// Local retry of a failed legacy (broadcast) client update
+/// Wait after the 1st, 2nd, 3rd attempt; the last one repeats.
+pub const CLIENT_UPDATE_RETRY_DELAYS_SECS: [i64; 4] = [15 * 60, 60 * 60, 4 * 60 * 60, 12 * 60 * 60];
+/// Retries stop once an attempt that began this long after the message arrived has failed.
+pub const CLIENT_UPDATE_RETRY_GIVE_UP_SECS: i64 = 7 * 24 * 60 * 60;
+pub const CLIENT_UPDATE_RETRY_CHECK_SECS: u64 = 120;
+/// How long a retry waiting for busy tools parks new tool operations, as the 10 redeliveries 120s apart used to.
+pub const CLIENT_UPDATE_BUSY_PARK_SECS: u64 = 20 * 60;
+pub const STAGED_VERSION_PROBE_TIMEOUT_SECS: u64 = 30;

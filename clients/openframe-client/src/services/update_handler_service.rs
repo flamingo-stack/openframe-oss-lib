@@ -201,14 +201,6 @@ impl UpdateHandlerService {
 
         self.report_delivery(DeliveryResult::Done, None).await;
 
-        if let Err(e) = self
-            .state_service
-            .clear_saved_update_for(&state.target_version)
-            .await
-        {
-            warn!("Failed to drop the saved client update: {:#}", e);
-        }
-
         self.cleanup_service.cleanup_all().await;
         self.last_known_good_service
             .prune_transcripts(UPDATER_TRANSCRIPTS_KEPT)
@@ -249,14 +241,6 @@ impl UpdateHandlerService {
         });
         self.report_delivery(DeliveryResult::Failed, Some(reason))
             .await;
-
-        if let Err(e) = self
-            .state_service
-            .expire_saved_update(&state.target_version)
-            .await
-        {
-            warn!("Failed to check the saved client update: {:#}", e);
-        }
 
         self.cleanup_service.cleanup_all().await;
         self.last_known_good_service

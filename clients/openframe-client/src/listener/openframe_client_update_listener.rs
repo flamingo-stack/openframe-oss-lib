@@ -1,16 +1,14 @@
 use crate::config::update_config::{
     CONSUMER_ACK_WAIT_SECS, CONSUMER_CYCLE_PAUSE_MS, CONSUMER_MAX_DELIVER,
     CONSUMER_RETRY_ATTEMPTS_PER_CYCLE, INITIAL_RETRY_DELAY_MS, MAX_RETRY_DELAY_MS,
-    RECONNECTION_DELAY_MS, SAVED_UPDATE_BUSY_HOLD_SECS, SAVED_UPDATE_CHECK_INTERVAL_SECS,
+    RECONNECTION_DELAY_MS,
 };
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
+use crate::services::client_update_retry_service::ClientUpdateRetryService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
-use crate::services::openframe_client_update_service::{
-    OpenFrameClientUpdateService, SavedUpdateRun,
-};
+use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::AgentConfigurationService;
 use anyhow::Result;
-use async_nats::connection::State;
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::push;
 use async_nats::jetstream::consumer::DeliverPolicy;
@@ -19,17 +17,15 @@ use async_nats::jetstream::Message;
 use futures::StreamExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::Notify;
-use tokio::time::{Duration, Instant};
+use tokio::time::Duration;
 use tracing::{error, info, warn};
 
 #[derive(Clone)]
 pub struct OpenFrameClientUpdateListener {
     pub nats_connection_manager: NatsConnectionManager,
     pub openframe_client_update_service: OpenFrameClientUpdateService,
+    pub client_update_retry_service: ClientUpdateRetryService,
     pub config_service: AgentConfigurationService,
-    /// Wakes the retry loop when a new update is saved
-    saved_update_ready: Arc<Notify>,
 }
 
 impl OpenFrameClientUpdateListener {
@@ -38,19 +34,19 @@ impl OpenFrameClientUpdateListener {
     pub fn new(
         nats_connection_manager: NatsConnectionManager,
         openframe_client_update_service: OpenFrameClientUpdateService,
+        client_update_retry_service: ClientUpdateRetryService,
         config_service: AgentConfigurationService,
     ) -> Self {
         Self {
             nats_connection_manager,
             openframe_client_update_service,
+            client_update_retry_service,
             config_service,
-            saved_update_ready: Arc::new(Notify::new()),
         }
     }
 
     /// Start listening for messages in a background task
     pub async fn start(&self) -> Result<tokio::task::JoinHandle<()>> {
-        tokio::spawn(self.clone().retry_saved_update());
         let listener = self.clone();
         let handle = tokio::spawn(async move {
             loop {
@@ -158,82 +154,53 @@ impl OpenFrameClientUpdateListener {
 
         let version = client_update_message.version.clone();
 
-        // The retry loop runs the update from the saved copy, so the message is done once that is on disk
-        if let Err(e) = self
-            .openframe_client_update_service
-            .save_for_retry(client_update_message)
-            .await
+        if self
+            .client_update_retry_service
+            .remember(&client_update_message)
         {
-            error!(
-                "Failed to save client update message for version {}: {:#}",
-                version, e
-            );
-            info!(
-                "Leaving message unacked for potential redelivery: version {}",
-                version
-            );
+            // the saved copy is retried locally from here on, so redelivery would only duplicate it
+            if let Err(e) = message.ack().await {
+                warn!(
+                    "Failed to ack client update message for version {}: {}",
+                    version, e
+                );
+            }
+            self.client_update_retry_service.run_due().await;
             return Ok(());
         }
-        self.saved_update_ready.notify_one();
 
-        message
-            .ack()
+        match self
+            .openframe_client_update_service
+            .process_update(client_update_message)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to ack message: {}", e))?;
-        info!(
-            "Client update message acknowledged for version: {}",
-            version
-        );
-
-        Ok(())
-    }
-
-    /// Attempts the saved update when it is due: on every check interval and whenever a new one is saved
-    async fn retry_saved_update(self) {
-        let check_interval = Duration::from_secs(SAVED_UPDATE_CHECK_INTERVAL_SECS);
-        let busy_hold = Duration::from_secs(SAVED_UPDATE_BUSY_HOLD_SECS);
-        let mut busy_since: Option<Instant> = None;
-        let mut hold_ended_logged = false;
-
-        loop {
-            tokio::select! {
-                _ = self.saved_update_ready.notified() => {}
-                _ = tokio::time::sleep(check_interval) => {}
-            }
-
-            // Offline the download can only fail, so the attempt waits for the connection
-            let connected = self
-                .nats_connection_manager
-                .get_client()
-                .await
-                .is_ok_and(|client| matches!(client.connection_state(), State::Connected));
-            if !connected {
-                continue;
-            }
-
-            // Busy tools hold the update back; past the hold it waits for them without parking new ones
-            let hold_tools = busy_since.is_none_or(|since| since.elapsed() < busy_hold);
-            if !hold_tools && !hold_ended_logged {
+        {
+            Ok(_) => {
                 info!(
-                    "Tools still busy after {} minutes, the client update now waits for them without parking new tool operations",
-                    SAVED_UPDATE_BUSY_HOLD_SECS / 60
+                    "Acknowledging client update message for version: {}",
+                    version
                 );
-                hold_ended_logged = true;
+                message
+                    .ack()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to ack message: {}", e))?;
+                info!(
+                    "Client update message acknowledged for version: {}",
+                    version
+                );
             }
-            match self
-                .openframe_client_update_service
-                .run_saved_update(hold_tools)
-                .await
-            {
-                SavedUpdateRun::Deferred => {
-                    busy_since.get_or_insert_with(Instant::now);
-                }
-                SavedUpdateRun::Idle | SavedUpdateRun::Attempted => {
-                    busy_since = None;
-                    hold_ended_logged = false;
-                }
+            Err(e) => {
+                error!(
+                    "Failed to process client update message for version {}: {:#}",
+                    version, e
+                );
+                info!(
+                    "Leaving message unacked for potential redelivery: version {}",
+                    version
+                );
             }
         }
+
+        Ok(())
     }
 
     async fn create_consumer(&self, js: &jetstream::Context, machine_id: &str) -> PushConsumer {

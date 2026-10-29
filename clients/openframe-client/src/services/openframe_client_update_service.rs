@@ -1,4 +1,4 @@
-use crate::config::update_config::{ALLOW_DOWNGRADE, STAGED_VERSION_CHECK_TIMEOUT_SECS};
+use crate::config::update_config::{ALLOW_DOWNGRADE, STAGED_VERSION_PROBE_TIMEOUT_SECS};
 use crate::models::openframe_client_info::ClientUpdateStatus;
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
 use crate::models::update_state::{UpdatePhase, UpdateState};
@@ -8,7 +8,6 @@ use crate::service::FULL_SERVICE_NAME;
 use crate::services::github_download_service::GithubDownloadService;
 use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
-use crate::services::result_store::now_secs;
 use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
@@ -21,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::time::{timeout, Duration};
+use std::time::Duration;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -29,15 +28,6 @@ use uuid::Uuid;
 pub enum UpdateLaunch {
     Launched,
     Skipped,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum SavedUpdateRun {
-    /// Nothing saved, or not due yet
-    Idle,
-    /// A busy tool or another update holds the machine
-    Deferred,
-    Attempted,
 }
 
 /// Marks an update as in progress until dropped
@@ -93,6 +83,14 @@ impl OpenFrameClientUpdateService {
         }
     }
 
+    pub async fn process_update(
+        &self,
+        message: OpenFrameClientUpdateMessage,
+    ) -> Result<UpdateLaunch> {
+        let guard = self.reserve(&message)?;
+        self.apply(message, guard).await
+    }
+
     /// Takes the update slot and parks new tool operations, unless another update or a tool holds them
     pub fn reserve(&self, message: &OpenFrameClientUpdateMessage) -> Result<UpdateGuard> {
         let requested_version = message.version.trim();
@@ -108,8 +106,8 @@ impl OpenFrameClientUpdateService {
         };
         info!("Acquired update lock for version: {}", requested_version);
 
-        // apply() skips it, so neither park tools nor wait for busy ones
-        if Self::is_running_version(requested_version) {
+        // apply() skips it anyway, so neither wait for busy tools nor park them
+        if canonical_version(requested_version).as_deref() == Some(env!("OPENFRAME_VERSION")) {
             return Ok(guard);
         }
 
@@ -125,6 +123,10 @@ impl OpenFrameClientUpdateService {
             ));
         }
         Ok(guard)
+    }
+
+    pub fn tools_busy(&self) -> bool {
+        self.tool_ops.any_busy()
     }
 
     /// Update processing with version validation and safety checks, under a reserved update slot
@@ -311,26 +313,19 @@ impl OpenFrameClientUpdateService {
 
         info!("Update binary staged: {}", staged_path.display());
 
-        if let Some(staged_version) = Self::staged_binary_version(&staged_path).await {
-            if staged_version != update_state.target_version {
-                error!(
-                    "Downloaded binary is version {}, expected {}, not installing it",
-                    staged_version, update_state.target_version
+        // A wrong build would only be rolled back after the service stop and swap
+        if let Err(e) =
+            Self::verify_staged_version(&staged_path, &update_state.target_version).await
+        {
+            error!("{:#}", e);
+            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
+                warn!(
+                    "Failed to remove staged binary after the version check: {}",
+                    cleanup_err
                 );
-                if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
-                    warn!(
-                        "Failed to remove staged binary after the version check: {}",
-                        cleanup_err
-                    );
-                }
-                self.update_state_service.clear().await?;
-                return Err(anyhow!(
-                    "downloaded binary is version {}, expected {}",
-                    staged_version,
-                    update_state.target_version
-                ));
             }
-            info!("Downloaded binary reports version {}", staged_version);
+            self.update_state_service.clear().await?;
+            return Err(e);
         }
 
         // 5. Launch update process (platform-specific)
@@ -508,111 +503,45 @@ impl OpenFrameClientUpdateService {
         Ok(binary_path)
     }
 
-    /// Keeps a legacy update message for retries; one for the running version just drops the saved one
-    pub async fn save_for_retry(&self, message: OpenFrameClientUpdateMessage) -> Result<()> {
-        let version = message.version.trim().to_string();
-        if !Self::is_valid_version(&version) {
-            error!("Invalid version format: {}, not saving the update", version);
+    /// Fails only when the staged binary clearly reports another version; a probe that cannot tell lets the update go ahead.
+    async fn verify_staged_version(staged_path: &Path, expected_version: &str) -> Result<()> {
+        let Some(staged_version) = Self::staged_binary_version(staged_path).await else {
             return Ok(());
+        };
+        let Some(expected) = version_comparator::parse_version(expected_version) else {
+            return Ok(());
+        };
+        if version_comparator::precedence(&staged_version, &expected) != std::cmp::Ordering::Equal {
+            return Err(anyhow!(
+                "Downloaded binary reports version {}, expected {}; not installing it",
+                staged_version,
+                expected_version
+            ));
         }
-        if Self::is_running_version(&version) {
-            info!(
-                "Already running version {}, dropping any saved client update",
-                version
-            );
-            return self.update_state_service.clear_saved_update().await;
-        }
-        self.update_state_service.save_update(message).await?;
-        info!("Saved client update {} until it applies", version);
+        info!(
+            "Downloaded binary reports the expected version {}",
+            staged_version
+        );
         Ok(())
     }
 
-    /// Runs the saved legacy update if it is due; without `hold_tools` it waits for busy tools instead of parking new ones
-    pub async fn run_saved_update(&self, hold_tools: bool) -> SavedUpdateRun {
-        let Some(saved) = self.update_state_service.load_saved_update().await else {
-            return SavedUpdateRun::Idle;
-        };
-        if !saved.is_due(now_secs()) {
-            return SavedUpdateRun::Idle;
-        }
-        if !hold_tools && self.tool_ops.any_busy() {
-            return SavedUpdateRun::Deferred;
-        }
-
-        let message = saved.message;
-        let version = message.version.trim().to_string();
-        let Ok(guard) = self.reserve(&message) else {
-            return SavedUpdateRun::Deferred;
-        };
-
-        // Counted before the attempt can stop this process, so the next one waits its turn
-        match self
-            .update_state_service
-            .start_saved_attempt(&version)
-            .await
-        {
-            Ok(true) => {}
-            Ok(false) => {
-                self.tool_run_manager.clear_client_update_pending();
-                return SavedUpdateRun::Idle;
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to schedule the next attempt at client update {}, not attempting it now: {:#}",
-                    version, e
-                );
-                self.tool_run_manager.clear_client_update_pending();
-                return SavedUpdateRun::Idle;
-            }
-        }
-
-        let finished = match self.apply(message, guard).await {
-            Ok(UpdateLaunch::Launched) => Ok(()),
-            Ok(UpdateLaunch::Skipped) => {
-                self.update_state_service
-                    .clear_saved_update_for(&version)
-                    .await
-            }
-            Err(_) => {
-                // The next attempt is minutes away at least, so tools stop waiting behind this one
-                self.tool_run_manager.clear_client_update_pending();
-                self.update_state_service
-                    .expire_saved_update(&version)
-                    .await
-            }
-        };
-        if let Err(e) = finished {
-            warn!(
-                "Failed to update the saved client update {}: {:#}",
-                version, e
-            );
-        }
-        SavedUpdateRun::Attempted
-    }
-
-    /// A delivery-engine update supersedes a saved legacy one
-    pub async fn drop_saved_update(&self) {
-        if let Err(e) = self.update_state_service.clear_saved_update().await {
-            warn!("Failed to drop the saved client update: {:#}", e);
-        }
-    }
-
-    fn is_running_version(version: &str) -> bool {
-        Self::parse_version(version.trim())
-            .is_ok_and(|v| v.to_string() == env!("OPENFRAME_VERSION"))
-    }
-
-    /// The version the staged binary reports; None when it can't tell, and the update goes ahead unchecked
-    async fn staged_binary_version(path: &Path) -> Option<String> {
+    async fn staged_binary_version(staged_path: &Path) -> Option<Version> {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)) {
-                warn!("Failed to make the staged binary executable: {}", e);
+            if let Err(e) =
+                tokio::fs::set_permissions(staged_path, std::fs::Permissions::from_mode(0o755))
+                    .await
+            {
+                warn!(
+                    "Cannot make the downloaded binary executable to check its version, updating anyway: {}",
+                    e
+                );
+                return None;
             }
         }
 
-        let mut command = tokio::process::Command::new(path);
+        let mut command = tokio::process::Command::new(staged_path);
         command
             .arg("--version")
             .stdin(Stdio::null())
@@ -620,45 +549,47 @@ impl OpenFrameClientUpdateService {
             .stderr(Stdio::null())
             .kill_on_drop(true);
         #[cfg(windows)]
-        {
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            command.creation_flags(CREATE_NO_WINDOW);
-        }
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
 
-        let limit = Duration::from_secs(STAGED_VERSION_CHECK_TIMEOUT_SECS);
-        let output = match timeout(limit, command.output()).await {
+        let output = match tokio::time::timeout(
+            Duration::from_secs(STAGED_VERSION_PROBE_TIMEOUT_SECS),
+            command.output(),
+        )
+        .await
+        {
             Ok(Ok(output)) => output,
             Ok(Err(e)) => {
-                warn!("Could not run the staged binary to check its version, installing it unchecked: {}", e);
+                warn!(
+                    "Cannot run the downloaded binary to check its version, updating anyway: {}",
+                    e
+                );
                 return None;
             }
             Err(_) => {
                 warn!(
-                    "Staged binary did not print its version within {}s, installing it unchecked",
-                    STAGED_VERSION_CHECK_TIMEOUT_SECS
+                    "Downloaded binary did not print its version within {}s, updating anyway",
+                    STAGED_VERSION_PROBE_TIMEOUT_SECS
                 );
                 return None;
             }
         };
+        let stdout = String::from_utf8_lossy(&output.stdout);
         if !output.status.success() {
             warn!(
-                "Staged binary exited with {} when asked for its version, installing it unchecked",
-                output.status
+                "Downloaded binary exited with {} on --version, updating anyway: {}",
+                output.status,
+                stdout.trim()
             );
             return None;
         }
-
-        let version = Self::parse_reported_version(&String::from_utf8_lossy(&output.stdout));
+        let version = parse_version_output(&stdout);
         if version.is_none() {
-            warn!("Staged binary printed no version, installing it unchecked");
+            warn!(
+                "Downloaded binary printed no version, updating anyway: {}",
+                stdout.trim()
+            );
         }
         version
-    }
-
-    /// Takes the version from clap's `--version` line, e.g. "openframe-client 1.5.107"
-    fn parse_reported_version(stdout: &str) -> Option<String> {
-        let reported = stdout.lines().next()?.split_whitespace().last()?;
-        version_comparator::parse_version(reported).map(|version| version.to_string())
     }
 
     /// Parse version string into semver Version
@@ -681,6 +612,24 @@ impl OpenFrameClientUpdateService {
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+')
     }
+}
+
+/// The version as apply() compares it with the running one; None for a version apply() rejects.
+pub(crate) fn canonical_version(version: &str) -> Option<String> {
+    let version = version.trim();
+    if !OpenFrameClientUpdateService::is_valid_version(version) {
+        return None;
+    }
+    version_comparator::parse_version(version).map(|parsed| parsed.to_string())
+}
+
+/// Reads clap's `openframe-client <version>` line.
+fn parse_version_output(stdout: &str) -> Option<Version> {
+    stdout.lines().find_map(|line| {
+        line.split_whitespace()
+            .last()
+            .and_then(version_comparator::parse_version)
+    })
 }
 
 #[cfg(test)]

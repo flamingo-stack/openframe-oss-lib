@@ -8,6 +8,7 @@ use crate::models::{
     DeliveryRef, FeatureFlagsMessage, OpenFrameClientUpdateMessage, ToolAgentUpdateMessage,
     ToolInstallationMessage,
 };
+use crate::services::client_update_retry_service::ClientUpdateRetryService;
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::feature_flags_service::{FeatureFlagsService, FlagsApplied};
 use crate::services::openframe_client_update_service::{
@@ -173,13 +174,19 @@ impl CommandHandler for ToolUpdateHandler {
 #[derive(Clone)]
 pub struct ClientUpdateHandler {
     service: OpenFrameClientUpdateService,
+    legacy_retry: ClientUpdateRetryService,
     tool_run_manager: ToolRunManager,
 }
 
 impl ClientUpdateHandler {
-    pub fn new(service: OpenFrameClientUpdateService, tool_run_manager: ToolRunManager) -> Self {
+    pub fn new(
+        service: OpenFrameClientUpdateService,
+        legacy_retry: ClientUpdateRetryService,
+        tool_run_manager: ToolRunManager,
+    ) -> Self {
         Self {
             service,
+            legacy_retry,
             tool_run_manager,
         }
     }
@@ -199,7 +206,12 @@ impl CommandHandler for ClientUpdateHandler {
 
     fn begin(&self, command: &Self::Command) -> Begin<UpdateGuard> {
         match self.service.reserve(command) {
-            Ok(guard) => Begin::Accepted(guard),
+            Ok(guard) => {
+                // the backend re-runs a failed delivery itself, a saved broadcast would only compete with it
+                self.legacy_retry
+                    .discard("the delivery engine took the client update over");
+                Begin::Accepted(guard)
+            }
             Err(e) => Begin::Busy(format!("{e:#}")),
         }
     }
@@ -211,7 +223,6 @@ impl CommandHandler for ClientUpdateHandler {
         command: Self::Command,
         guard: UpdateGuard,
     ) -> Outcome {
-        self.service.drop_saved_update().await;
         match self.service.apply(command, guard).await {
             Ok(UpdateLaunch::Launched) => Outcome::Restarting,
             Ok(UpdateLaunch::Skipped) => Outcome::Done,

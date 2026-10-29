@@ -64,6 +64,7 @@ use crate::models::{
 use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
+use crate::services::client_update_retry_service::ClientUpdateRetryService;
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::encryption_service::EncryptionService;
@@ -180,6 +181,7 @@ pub struct Client {
     #[allow(dead_code)] // TODO: remove when tool-restart is implemented on backend
     tool_restart_message_listener: ToolRestartMessageListener,
     openframe_client_update_listener: OpenFrameClientUpdateListener,
+    client_update_retry_service: ClientUpdateRetryService,
     tool_agent_update_listener: ToolAgentUpdateListener,
     client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
@@ -544,10 +546,18 @@ impl Client {
             tool_run_manager.clone(),
         );
 
+        let client_update_retry_service = ClientUpdateRetryService::new(
+            &directory_manager,
+            openframe_client_update_service.clone(),
+            tool_run_manager.clone(),
+            nats_connection_manager.clone(),
+        );
+
         // Initialize OpenFrame client update listener
         let openframe_client_update_listener = OpenFrameClientUpdateListener::new(
             nats_connection_manager.clone(),
             openframe_client_update_service.clone(),
+            client_update_retry_service.clone(),
             config_service.clone(),
         );
 
@@ -616,7 +626,11 @@ impl Client {
             command_context.clone(),
         );
         let client_update_listener = CommandListener::new(
-            ClientUpdateHandler::new(openframe_client_update_service, tool_run_manager.clone()),
+            ClientUpdateHandler::new(
+                openframe_client_update_service,
+                client_update_retry_service.clone(),
+                tool_run_manager.clone(),
+            ),
             command_context.clone(),
         );
         let client_uninstall_listener = CommandListener::new(
@@ -703,6 +717,7 @@ impl Client {
             tool_uninstall_message_listener,
             tool_restart_message_listener,
             openframe_client_update_listener,
+            client_update_retry_service,
             tool_agent_update_listener,
             client_uninstall_message_listener,
             remote_access_message_listener,
@@ -874,6 +889,7 @@ impl Client {
 
         // Start OpenFrame client update listener in background
         self.openframe_client_update_listener.start().await?;
+        self.client_update_retry_service.start();
 
         // Start tool agent update listener in background
         self.tool_agent_update_listener.start().await?;
