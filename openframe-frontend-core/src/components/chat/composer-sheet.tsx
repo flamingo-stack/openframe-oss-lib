@@ -33,6 +33,11 @@ export interface ComposerSheetProps {
   defaultShare?: number;
   /** Default 320. */
   minHeight?: number;
+  /**
+   * Whether the tab on its top edge resizes it. Default `true`. Off (a phone, where
+   * the chat takes the screen) it has no tab, and its ceiling is the layer's height.
+   */
+  resizable?: boolean;
   /** The sheet's width — the composer's under it, e.g. `max-w-[880px]`. Centred. */
   className?: string;
   /** The dialog's accessible name. */
@@ -71,7 +76,8 @@ function TabGrip() {
  * The conversation sheet over a page: it rises from the docked composer, the page
  * stays beneath under a scrim, and a tab standing on its top edge resizes it from
  * `minHeight` to the full height of the layer (a drag, the arrow keys, Home / End; a
- * double click asks the host for the default height). Meant for `AppLayout`'s
+ * double click asks the host for the default height). Without `resizable` it has no
+ * tab and can take the whole layer. Meant for `AppLayout`'s
  * `composerSheet` layer, whose bottom is the dock's top edge: the sheet stands above
  * the composer as a card of its own, its header at its top border.
  *
@@ -88,6 +94,7 @@ export function ComposerSheet({
   onResetHeight,
   defaultShare = DEFAULT_SHARE,
   minHeight = DEFAULT_MIN_HEIGHT,
+  resizable = true,
   className,
   'aria-label': ariaLabel,
   children,
@@ -113,8 +120,9 @@ export function ComposerSheet({
   // The first render of an open sheet comes before the layer is measured: no ceiling
   // yet (CSS `max-height` holds it to the layer), or a given height would draw at the
   // floor for that frame and grow from it. The tab above the sheet stays in the layer.
+  const tabHeight = resizable ? TAB_HEIGHT : 0;
   const measured = layerHeight > 0;
-  const maxHeight = measured ? Math.max(minHeight, layerHeight - TAB_HEIGHT) : Number.POSITIVE_INFINITY;
+  const maxHeight = measured ? Math.max(minHeight, layerHeight - tabHeight) : Number.POSITIVE_INFINITY;
   const clamp = (next: number) => Math.round(Math.min(maxHeight, Math.max(minHeight, next)));
   // Until the layer is measured the share is a percentage, so the first frame is right.
   const resolved = height === null ? (measured ? clamp(layerHeight * defaultShare) : null) : clamp(height);
@@ -148,32 +156,34 @@ export function ComposerSheet({
         style={{
           height: resolved ?? `${Math.round(defaultShare * 100)}%`,
           minHeight,
-          maxHeight: `calc(100% - ${TAB_HEIGHT}px)`,
+          maxHeight: `calc(100% - ${tabHeight}px)`,
         }}
       >
         {/* The tab: over the card's top border by a pixel, so the two read as one
             outline, the feet curving it into the border. */}
-        <div
-          data-testid="composer-sheet-tab"
-          className="absolute bottom-[calc(100%-1px)] left-1/2 z-10 h-5 w-16 -translate-x-1/2 rounded-t-md border border-b-0 border-ods-border bg-ods-bg"
-          onDoubleClick={onResetHeight}
-        >
-          <TabFoot side="left" />
-          <TabFoot side="right" />
-          <PanelResizeHandle
-            side="bottom"
-            size={resolved ?? minHeight}
-            minSize={minHeight}
-            maxSize={measured ? maxHeight : (resolved ?? minHeight)}
-            onSize={next => onHeightChange(clamp(next))}
-            clampSize={clamp}
-            panelRef={panelRef}
-            variant="overlay"
-            ariaLabel="Resize the chat"
-            className="inset-0 h-auto w-auto items-center justify-center p-0"
-            grip={<TabGrip />}
-          />
-        </div>
+        {resizable && (
+          <div
+            data-testid="composer-sheet-tab"
+            className="absolute bottom-[calc(100%-1px)] left-1/2 z-10 h-5 w-16 -translate-x-1/2 rounded-t-md border border-b-0 border-ods-border bg-ods-bg"
+            onDoubleClick={onResetHeight}
+          >
+            <TabFoot side="left" />
+            <TabFoot side="right" />
+            <PanelResizeHandle
+              side="bottom"
+              size={resolved ?? minHeight}
+              minSize={minHeight}
+              maxSize={measured ? maxHeight : (resolved ?? minHeight)}
+              onSize={next => onHeightChange(clamp(next))}
+              clampSize={clamp}
+              panelRef={panelRef}
+              variant="overlay"
+              ariaLabel="Resize the chat"
+              className="inset-0 h-auto w-auto items-center justify-center p-0"
+              grip={<TabGrip />}
+            />
+          </div>
+        )}
         <div
           data-testid="composer-sheet-card"
           className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-ods-border bg-ods-bg shadow-xl"

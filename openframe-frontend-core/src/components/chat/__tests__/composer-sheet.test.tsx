@@ -86,6 +86,18 @@ describe('ComposerSheet', () => {
     vi.restoreAllMocks();
   });
 
+  it('has no tab when it is not resizable, and takes the whole layer', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(800);
+    render(sheet({ resizable: false, defaultShare: 1 }));
+    expect(screen.queryByTestId('composer-sheet-tab')).not.toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Mingo chat' })).toHaveStyle({
+      height: '800px',
+      maxHeight: 'calc(100% - 0px)',
+    });
+    vi.restoreAllMocks();
+  });
+
   it('runs its scrim on under the composer dock, by the dock height AppLayout hands it', () => {
     render(<ComposerDockHeightContext.Provider value={120}>{sheet()}</ComposerDockHeightContext.Provider>);
     expect(screen.getByTestId('composer-sheet-scrim')).toHaveStyle({ bottom: '-120px' });
