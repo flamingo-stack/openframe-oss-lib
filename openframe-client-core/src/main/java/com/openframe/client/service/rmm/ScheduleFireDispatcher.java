@@ -232,10 +232,10 @@ public class ScheduleFireDispatcher {
                 .toList();
 
         fire.machineIds().forEach(machineId -> {
+            // the same batch for every machine of the fire: the machine is the seed's, the engine keeps one body per fire
             ScriptScheduleExecutionMessage message = ScriptScheduleExecutionMessage.builder()
                     .executionId(fire.executionId())
                     .scheduleId(fire.scheduleId())
-                    .machineId(machineId)
                     .initiatedBy(fire.initiatedBy())
                     .scripts(items)
                     .build();

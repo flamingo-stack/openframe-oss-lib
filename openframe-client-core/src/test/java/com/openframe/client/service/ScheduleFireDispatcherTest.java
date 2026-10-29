@@ -126,7 +126,7 @@ class ScheduleFireDispatcherTest {
         ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
         verify(deliveryRouter, times(2)).dispatch(seedCaptor.capture());
         List<ScriptScheduleExecutionMessage> batches = seedCaptor.getAllValues().stream().map(ScriptScheduleDeliverySeed::getMessage).toList();
-        assertThat(seedCaptor.getAllValues()).allSatisfy(seed -> assertThat(seed.getMachineId()).isEqualTo(seed.getMessage().getMachineId()));
+        assertThat(batches).allSatisfy(m -> assertThat(m.getMachineId()).isNull());   // one body for the whole fire
         assertThat(batches).allSatisfy(m -> {
             assertThat(m.getScheduleId()).isEqualTo(SCHEDULE_ID);
             assertThat(m.getExecutionId()).isEqualTo(runExecutionId);
@@ -134,7 +134,7 @@ class ScheduleFireDispatcherTest {
             assertThat(m.getScripts()).extracting(ScriptScheduleExecutionItem::getScriptId)
                     .containsExactly("script-a", "script-b");
         });
-        assertThat(batches).extracting(ScriptScheduleExecutionMessage::getMachineId)
+        assertThat(seedCaptor.getAllValues()).extracting(ScriptScheduleDeliverySeed::getMachineId)
                 .containsExactlyInAnyOrder("m1", "m2");
         verify(retryStore, times(2)).store(eq(runExecutionId), anyString(), any(), any());
     }
@@ -200,7 +200,7 @@ class ScheduleFireDispatcherTest {
         ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
         verify(deliveryRouter).dispatch(seedCaptor.capture());
         ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
-        assertThat(batch.getMachineId()).isEqualTo("m9");
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo("m9");
     }
 
     @Test
@@ -328,7 +328,7 @@ class ScheduleFireDispatcherTest {
         ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
         verify(deliveryRouter).dispatch(seedCaptor.capture());
         ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
-        assertThat(batch.getMachineId()).isEqualTo("m-online");
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo("m-online");
         ArgumentCaptor<ScheduleScriptExecution> headerCaptor = ArgumentCaptor.forClass(ScheduleScriptExecution.class);
         verify(scheduleScriptExecutionRepository).save(headerCaptor.capture());
         assertThat(headerCaptor.getValue().getTotalMachineCount()).isEqualTo(1);

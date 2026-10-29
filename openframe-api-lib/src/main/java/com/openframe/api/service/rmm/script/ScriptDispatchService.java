@@ -231,7 +231,6 @@ public class ScriptDispatchService {
             ScriptScheduleExecutionMessage message = ScriptScheduleExecutionMessage.builder()
                     .executionId(executionId)
                     .scheduleId(scheduleId)
-                    .machineId(machineId)
                     .initiatedBy(initiatedBy)
                     .scripts(scheduledScripts)
                     .build();

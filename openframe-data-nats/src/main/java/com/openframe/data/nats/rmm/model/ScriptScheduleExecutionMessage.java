@@ -41,6 +41,8 @@ public class ScriptScheduleExecutionMessage implements DeliveryPayload {
 
     private String scheduleId;
 
+    // no longer set: the agent takes its own id and never read this one, and a batch without it is the same body for
+    // every machine of the fire. Kept so a retry state stored before this change still reads
     private String machineId;
 
     private String initiatedBy;

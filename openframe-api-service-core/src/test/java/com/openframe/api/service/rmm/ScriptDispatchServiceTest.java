@@ -443,7 +443,7 @@ class ScriptDispatchServiceTest {
         verify(deliveryRouter).dispatch(seedCaptor.capture());
         assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(MACHINE_ID);
         ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
-        assertThat(batch.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(batch.getMachineId()).isNull();
         assertThat(batch.getScheduleId()).isEqualTo(scheduleId);
         ScriptScheduleExecutionItem item = batch.getScripts().get(0);
         assertThat(item.getArgs()).containsExactly("--custom", "42");
