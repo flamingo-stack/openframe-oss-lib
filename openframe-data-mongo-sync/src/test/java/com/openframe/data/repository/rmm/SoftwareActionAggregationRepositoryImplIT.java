@@ -1,6 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.SoftwareAction;
@@ -107,6 +108,43 @@ class SoftwareActionAggregationRepositoryImplIT extends BaseMongoIntegrationTest
         assertThat(byExec.get("exec-sched2").getRespondedMachineCount()).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("a waiting device makes the action WAITING and counts in waitingMachineCount")
+    void waitingDevices() {
+        action("exec-wait", 3, SoftwareActionStatus.IN_PROGRESS);
+        leaf("exec-wait", "m1", ExecutionStatus.SUCCESS);
+        waitingLeaf("exec-wait", "m2");
+        leaf("exec-wait", "m3", ExecutionStatus.RUNNING);
+
+        action("exec-run", 1, SoftwareActionStatus.IN_PROGRESS);
+        leaf("exec-run", "m1", ExecutionStatus.RUNNING);
+
+        Map<String, SoftwareActionSummary> byExec = allRows();
+        assertThat(byExec.get("exec-wait").getStatus()).isEqualTo(SoftwareActionStatus.WAITING);
+        assertThat(byExec.get("exec-wait").getWaitingMachineCount()).isEqualTo(1);
+        assertThat(byExec.get("exec-wait").getRespondedMachineCount()).isEqualTo(1);
+        assertThat(byExec.get("exec-run").getStatus()).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
+        assertThat(byExec.get("exec-run").getWaitingMachineCount()).isZero();
+
+        SoftwareActionQueryFilter waitingOnly = SoftwareActionQueryFilter.builder()
+                .statuses(List.of(SoftwareActionStatus.WAITING)).build();
+        assertThat(repository.count(TENANT, waitingOnly, null)).isEqualTo(1);
+        assertThat(repository.facet(TENANT, null, null, "status"))
+                .containsEntry("WAITING", 1).containsEntry("IN_PROGRESS", 1);
+    }
+
+    @Test
+    @DisplayName("the action's version comes through on the row")
+    void versionIsProjected() {
+        mongoTemplate.save(SoftwareActionResult.builder()
+                .id("exec-v").tenantId(TENANT).executionId("exec-v")
+                .action(SoftwareAction.INSTALL).packageManager(PackageManagerType.BREW).packageName("slack")
+                .version("4.36.140").status(SoftwareActionStatus.IN_PROGRESS).totalMachineCount(1)
+                .dispatchedAt(Instant.now()).build());
+
+        assertThat(repository.findByExecutionId(TENANT, "exec-v").orElseThrow().getVersion()).isEqualTo("4.36.140");
+    }
+
     private Map<String, SoftwareActionSummary> allRows() {
         return repository.findPage(TENANT, null, null, "dispatchedAt", Sort.Direction.DESC, 0, 50).stream()
                 .collect(Collectors.toMap(SoftwareActionSummary::getExecutionId, Function.identity()));
@@ -127,13 +165,22 @@ class SoftwareActionAggregationRepositoryImplIT extends BaseMongoIntegrationTest
                 .build());
     }
 
+    private void waitingLeaf(String executionId, String machineId) {
+        leaf(executionId, machineId, ExecutionStatus.RUNNING, true);
+    }
+
     private void leaf(String executionId, String machineId, ExecutionStatus status) {
+        leaf(executionId, machineId, status, null);
+    }
+
+    private void leaf(String executionId, String machineId, ExecutionStatus status, Boolean waiting) {
         mongoTemplate.save(ScriptExecution.builder()
                 .tenantId(TENANT)
                 .executionId(executionId)
                 .scriptId("script-1")
                 .machineId(machineId)
                 .status(status)
+                .waiting(waiting)
                 .softwareAction(SoftwareAction.INSTALL)
                 .packageManager(PackageManagerType.BREW)
                 .packageName("slack")

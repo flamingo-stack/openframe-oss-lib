@@ -14,6 +14,8 @@ import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdate;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareBundleOnlineDispatch;
@@ -134,15 +136,19 @@ public class SoftwareBundleService {
         packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
         Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         rejectDevicesWithoutCompatiblePackage(machineIds, packages, deviceOsTypes);
+        PackageUpdateSettings updateSettings = PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings());
+        SoftwareAutoUpdate autoUpdate = PackageUpdateSettingsMapper.autoUpdate(input.getAction(), input.getAutoUpdate());
 
         entity.setAction(input.getAction());
         entity.setPackages(packages);
+        entity.setUpdateSettings(updateSettings);
+        entity.setAutoUpdate(autoUpdate);
 
         Instant now = Instant.now();
         if (input.getSchedule() != null) {
             entity.setMode(SoftwareBundleMode.SCHEDULED);
             entity.setStartAt(input.getSchedule().getStartAt());
-            submitScheduled(entity, input.getSchedule(), actor);
+            submitScheduled(entity, input, actor);
         } else {
             entity.setMode(SoftwareBundleMode.NOW);
             armOnlineDispatch(entity, now);
@@ -250,7 +256,8 @@ public class SoftwareBundleService {
         return packageManager == PackageManagerType.BREW ? OsType.MAC_OS : OsType.WINDOWS;
     }
 
-    private void submitScheduled(SoftwareBundle bundle, SoftwareBundleScheduleInput sched, String actor) {
+    private void submitScheduled(SoftwareBundle bundle, SubmitSoftwareBundleInput submit, String actor) {
+        SoftwareBundleScheduleInput sched = submit.getSchedule();
         CreateSoftwareScheduleInput input = new CreateSoftwareScheduleInput();
         input.setName(sched.getName() != null ? sched.getName() : scheduleName(bundle));
         input.setDescription(sched.getDescription());
@@ -263,6 +270,8 @@ public class SoftwareBundleService {
         input.setStartAt(sched.getStartAt());
         input.setRepeat(sched.getRepeat());
         input.setMachineIds(bundle.getMachineIds());
+        input.setUpdateSettings(submit.getUpdateSettings());
+        input.setAutoUpdate(submit.getAutoUpdate());
 
         SoftwareScheduleResponse schedule = softwareScheduleService.create(input, actor);
         bundle.setScheduleId(schedule.getId());
@@ -361,6 +370,8 @@ public class SoftwareBundleService {
                 .status(b.getStatus())
                 .machineIds(b.getMachineIds() == null ? List.of() : b.getMachineIds())
                 .packages(b.getPackages() == null ? List.of() : b.getPackages())
+                .updateSettings(b.getUpdateSettings())
+                .autoUpdate(b.getAutoUpdate())
                 .startAt(b.getStartAt())
                 .scheduleId(b.getScheduleId())
                 .createdBy(b.getCreatedBy())
