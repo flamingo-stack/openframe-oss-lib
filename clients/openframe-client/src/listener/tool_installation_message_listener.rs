@@ -160,14 +160,10 @@ impl ToolInstallationMessageListener {
         );
 
         let listener = self.clone();
-        park_or_dispatch(
-            self.tool_run_manager.clone(),
-            message,
-            format!("tool-installation:{}", tool_agent_id),
-            move |msg| async move {
-                listener.dispatch(msg, tool_installation_message).await;
-            },
-        )
+        let label = format!("tool-installation:{}", tool_agent_id);
+        park_or_dispatch(message, label, move |msg| async move {
+            listener.dispatch(msg, tool_installation_message).await;
+        })
         .await;
 
         Ok(())

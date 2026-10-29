@@ -46,11 +46,10 @@ use crate::config::update_config::{
 };
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::command::{
-    ClientUninstallHandler, ClientUpdateHandler, CommandContext, CommandListener,
+    follow_updater_drains, ClientUninstallHandler, CommandContext, CommandListener,
     FeatureFlagsHandler, RestartGate, ToolInstallationHandler, ToolUpdateHandler,
 };
 use crate::listener::execution_listener::ExecutionListener;
-use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
 use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
@@ -82,7 +81,6 @@ use crate::services::mesh_self_heal_service::MeshSelfHealService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
-use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::package_manager::report_publisher::PackageManagerReportPublisher;
 use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
 use crate::services::package_manager::PackageManagerUpdateRunManager;
@@ -97,6 +95,7 @@ use crate::services::tool_connection_message_publisher::ToolConnectionMessagePub
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_installation_service::ToolInstallationService;
 use crate::services::tool_restart_service::ToolRestartService;
+use crate::services::tool_run_manager::ClientUpdatePending;
 use crate::services::tool_uninstall_service::ToolUninstallService;
 use crate::services::InstalledToolsService;
 use crate::services::MachineIdService;
@@ -105,10 +104,7 @@ use crate::services::{
     ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolOps,
     ToolRunManager, ToolUrlParamsResolver,
 };
-use crate::services::{
-    LastKnownGoodService, LogKeyService, UpdateCleanupService, UpdateHandlerService,
-    UpdateStateService,
-};
+use crate::services::{BootMarkerService, LogKeyService};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -179,14 +175,12 @@ pub struct Client {
     tool_uninstall_message_listener: ToolUninstallMessageListener,
     #[allow(dead_code)] // TODO: remove when tool-restart is implemented on backend
     tool_restart_message_listener: ToolRestartMessageListener,
-    openframe_client_update_listener: OpenFrameClientUpdateListener,
     tool_agent_update_listener: ToolAgentUpdateListener,
     client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
     tool_installation_listener: CommandListener<ToolInstallationHandler>,
     tool_update_listener: CommandListener<ToolUpdateHandler>,
-    client_update_listener: CommandListener<ClientUpdateHandler>,
     client_uninstall_listener: CommandListener<ClientUninstallHandler>,
     restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
@@ -205,9 +199,8 @@ pub struct Client {
     machine_timezone_run_manager: MachineTimezoneRunManager,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
-    update_handler_service: UpdateHandlerService,
     openframe_client_info_service: OpenFrameClientInfoService,
-    last_known_good_service: LastKnownGoodService,
+    boot_marker_service: BootMarkerService,
     // Services needed for log streaming initialization
     initial_configuration_service: InitialConfigurationService,
     agent_configuration_service: AgentConfigurationService,
@@ -388,7 +381,7 @@ impl Client {
         // Initialize tool kill service
         let tool_kill_service = ToolKillService::new();
 
-        let tool_ops = ToolOps::default();
+        let tool_ops = ToolOps::new(ClientUpdatePending::default());
 
         let feature_flags_service = Arc::new(FeatureFlagsService::load(
             directory_manager.secured_dir().join("feature_flags.json"),
@@ -443,18 +436,12 @@ impl Client {
             OpenFrameClientInfoService::new(directory_manager.clone())
                 .context("Failed to initialize OpenFrame client info service")?;
 
-        // Initialize GitHub download service (used by update and installation services)
+        // Initialize GitHub download service (used by tool installation and update services)
         let github_download_service =
             GithubDownloadService::new(download_client.clone(), DmgExtractor::new());
 
-        // Initialize update state and cleanup services (needed by update service)
-        let update_state_service = UpdateStateService::new(directory_manager.clone())
-            .context("Failed to initialize update state service")?;
-        let update_cleanup_service =
-            UpdateCleanupService::new().context("Failed to initialize update cleanup service")?;
-
-        let last_known_good_service = LastKnownGoodService::new(directory_manager.clone())
-            .context("Failed to initialize last-known-good service")?;
+        let boot_marker_service = BootMarkerService::new(directory_manager.clone())
+            .context("Failed to initialize boot marker service")?;
 
         let result_store = Arc::new(ResultStore::open_or_degrade(
             directory_manager
@@ -462,17 +449,6 @@ impl Client {
                 .join("scheduled_outbox.redb"),
         ));
         let flush_notify = Arc::new(tokio::sync::Notify::new());
-
-        // Initialize update handler service (boot-time and in-process failure handling)
-        let update_handler_service = UpdateHandlerService::new(
-            update_state_service.clone(),
-            openframe_client_info_service.clone(),
-            update_cleanup_service.clone(),
-            last_known_good_service.clone(),
-            installed_agent_message_publisher.clone(),
-            config_service.clone(),
-            result_store.clone(),
-        );
 
         // Initialize tool installation service
         let tool_installation_service = ToolInstallationService::new(
@@ -488,17 +464,6 @@ impl Client {
             config_service.clone(),
             installed_agent_message_publisher.clone(),
             tool_connection_service.clone(),
-        );
-
-        // Initialize OpenFrame client update service
-        let openframe_client_update_service = OpenFrameClientUpdateService::new(
-            openframe_client_info_service.clone(),
-            github_download_service.clone(),
-            update_state_service.clone(),
-            last_known_good_service.clone(),
-            tool_run_manager.clone(),
-            tool_ops.clone(),
-            update_handler_service.clone(),
         );
 
         // Initialize tool agent update service
@@ -540,14 +505,6 @@ impl Client {
         let tool_restart_message_listener = ToolRestartMessageListener::new(
             nats_connection_manager.clone(),
             tool_restart_service,
-            config_service.clone(),
-            tool_run_manager.clone(),
-        );
-
-        // Initialize OpenFrame client update listener
-        let openframe_client_update_listener = OpenFrameClientUpdateListener::new(
-            nats_connection_manager.clone(),
-            openframe_client_update_service.clone(),
             config_service.clone(),
         );
 
@@ -613,10 +570,6 @@ impl Client {
                 tool_ops.clone(),
                 tool_run_manager.client_update_pending(),
             ),
-            command_context.clone(),
-        );
-        let client_update_listener = CommandListener::new(
-            ClientUpdateHandler::new(openframe_client_update_service, tool_run_manager.clone()),
             command_context.clone(),
         );
         let client_uninstall_listener = CommandListener::new(
@@ -702,14 +655,12 @@ impl Client {
             tool_installation_message_listener,
             tool_uninstall_message_listener,
             tool_restart_message_listener,
-            openframe_client_update_listener,
             tool_agent_update_listener,
             client_uninstall_message_listener,
             remote_access_message_listener,
             feature_flags_listener,
             tool_installation_listener,
             tool_update_listener,
-            client_update_listener,
             client_uninstall_listener,
             restart_gate,
             command_execution_listener,
@@ -728,9 +679,8 @@ impl Client {
             machine_timezone_run_manager,
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
-            update_handler_service,
             openframe_client_info_service,
-            last_known_good_service,
+            boot_marker_service,
             initial_configuration_service,
             agent_configuration_service: config_service,
             installed_tools_service,
@@ -757,17 +707,11 @@ impl Client {
             error!("Failed to reconcile client version at startup: {:#}", e);
         }
 
-        if let Err(e) = self.last_known_good_service.write_boot_marker().await {
+        if let Err(e) = self.boot_marker_service.write_boot_marker().await {
             error!("Failed to write boot marker: {:#}", e);
         }
 
-        if let Err(e) = self.last_known_good_service.seed_if_missing().await {
-            error!("Failed to seed last-known-good anchor: {:#}", e);
-        }
-
-        if let Err(e) = self.update_handler_service.record_boot_attempt().await {
-            error!("Failed to record boot attempt: {:#}", e);
-        }
+        self.boot_marker_service.remove_legacy_artifacts();
 
         LogStreamingRunManager::new(
             &self.initial_configuration_service,
@@ -794,13 +738,9 @@ impl Client {
 
         self.nats_connection_manager.start_connection_watchdog();
 
-        // Handle any pending update from previous run (after NATS is connected)
-        if let Err(e) = self.update_handler_service.handle_pending_update().await {
-            error!("Failed to handle pending update: {:#}", e);
-            // Continue startup even if update handling fails - don't block the client
-        }
-
         self.feature_flags_listener.start().await?;
+        // A client update stops this process as well: drain for it the way a restart does
+        tokio::spawn(follow_updater_drains(self.restart_gate.clone()));
         let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {
             restart_gate.requested().await;
@@ -870,19 +810,16 @@ impl Client {
         // TODO: uncomment when implemented on backend
         // self.tool_restart_message_listener.start().await?;
 
-        // Start OpenFrame client update listener in background
-        self.openframe_client_update_listener.start().await?;
-
         // Start tool agent update listener in background
         self.tool_agent_update_listener.start().await?;
 
         // Start client uninstall listener in background
         self.client_uninstall_message_listener.start().await?;
 
-        // Delivery-engine counterparts of the JetStream listeners above; the backend picks one path per type
+        // Delivery-engine counterparts of the JetStream listeners above; the backend picks one path per type.
+        // Client updates on either path are openframe-client-updater's.
         self.tool_installation_listener.start().await?;
         self.tool_update_listener.start().await?;
-        self.client_update_listener.start().await?;
         self.client_uninstall_listener.start().await?;
 
         self.remote_access_message_listener.start().await?;

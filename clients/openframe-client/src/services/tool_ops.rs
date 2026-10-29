@@ -1,12 +1,23 @@
+use crate::config::update_config::CLIENT_UPDATE_POLL_SECS;
+use crate::services::tool_run_manager::ClientUpdatePending;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, PoisonError};
 use tokio::sync::OwnedMutexGuard;
+use tokio::time::{sleep, Duration};
 use tracing::info;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ToolOps {
     locks: Arc<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
     state: Arc<Mutex<OpState>>,
+    // the swap of a client update would cut a new operation short, so none starts while one holds the client
+    client_update: ClientUpdatePending,
+}
+
+impl Default for ToolOps {
+    fn default() -> Self {
+        Self::new(ClientUpdatePending::never())
+    }
 }
 
 #[derive(Default)]
@@ -46,12 +57,28 @@ pub struct ToolOpGuard {
 }
 
 impl ToolOps {
+    pub fn new(client_update: ClientUpdatePending) -> Self {
+        Self {
+            locks: Arc::default(),
+            state: Arc::default(),
+            client_update,
+        }
+    }
+
+    /// Waits out a client update holding the client, then for the tool lock.
     pub async fn lock(&self, tool_agent_id: &str) -> ToolLock {
+        while self.client_update.is_pending() {
+            sleep(Duration::from_secs(CLIENT_UPDATE_POLL_SECS)).await;
+        }
         let lock = self.lock_for(tool_agent_id).lock_owned().await;
         self.tool_lock(tool_agent_id, lock)
     }
 
+    /// Busy while another operation holds the tool or a client update holds the client.
     pub fn try_lock(&self, tool_agent_id: &str) -> Result<ToolLock, Busy> {
+        if self.client_update.is_pending() {
+            return Err(Busy);
+        }
         let lock = self
             .lock_for(tool_agent_id)
             .try_lock_owned()

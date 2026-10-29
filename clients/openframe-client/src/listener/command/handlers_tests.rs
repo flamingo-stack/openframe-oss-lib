@@ -47,10 +47,6 @@ fn the_subjects_are_machine_scoped_and_match_the_backend() {
         "machine.abc123.tool-update.v2"
     );
     assert_eq!(
-        ClientUpdateHandler::subject("abc123"),
-        "machine.abc123.client-update.v2"
-    );
-    assert_eq!(
         ClientUninstallHandler::subject("abc123"),
         "machine.abc123.client-uninstall.v2"
     );

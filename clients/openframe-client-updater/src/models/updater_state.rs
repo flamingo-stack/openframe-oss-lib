@@ -1,0 +1,71 @@
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+use super::DeliveryRef;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum UpdaterPhase {
+    Idle,
+    Downloading,
+    Verifying,
+    Draining,
+    StoppingService,
+    ReplacingBinary,
+    StartingService,
+    VerifyingBoot,
+    Completed,
+    Failed,
+}
+
+impl std::fmt::Display for UpdaterPhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            UpdaterPhase::Idle => "idle",
+            UpdaterPhase::Downloading => "downloading",
+            UpdaterPhase::Verifying => "verifying",
+            UpdaterPhase::Draining => "draining",
+            UpdaterPhase::StoppingService => "stopping_service",
+            UpdaterPhase::ReplacingBinary => "replacing_binary",
+            UpdaterPhase::StartingService => "starting_service",
+            UpdaterPhase::VerifyingBoot => "verifying_boot",
+            UpdaterPhase::Completed => "completed",
+            UpdaterPhase::Failed => "failed",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdaterState {
+    pub target_version: String,
+    pub phase: UpdaterPhase,
+    pub backup_path: Option<PathBuf>,
+    pub downloaded_binary_path: Option<PathBuf>,
+    pub started_at: String,
+    pub failure_reason: Option<String>,
+    /// The delivery-engine command being applied, so crash recovery can still answer it.
+    pub delivery: DeliveryRef,
+}
+
+impl UpdaterState {
+    pub fn new(target_version: String, delivery: DeliveryRef) -> Self {
+        Self {
+            target_version,
+            phase: UpdaterPhase::Idle,
+            backup_path: None,
+            downloaded_binary_path: None,
+            started_at: chrono::Utc::now().to_rfc3339(),
+            failure_reason: None,
+            delivery,
+        }
+    }
+
+    pub fn is_terminal(&self) -> bool {
+        matches!(self.phase, UpdaterPhase::Completed | UpdaterPhase::Failed)
+    }
+}
+
+#[cfg(test)]
+#[path = "updater_state_tests.rs"]
+mod tests;

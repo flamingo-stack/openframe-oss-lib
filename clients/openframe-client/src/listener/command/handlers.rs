@@ -5,18 +5,14 @@ use serde::de::IgnoredAny;
 
 use super::{Begin, CommandHandler, Outcome};
 use crate::models::{
-    DeliveryRef, FeatureFlagsMessage, OpenFrameClientUpdateMessage, ToolAgentUpdateMessage,
-    ToolInstallationMessage,
+    DeliveryRef, FeatureFlagsMessage, ToolAgentUpdateMessage, ToolInstallationMessage,
 };
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::feature_flags_service::{FeatureFlagsService, FlagsApplied};
-use crate::services::openframe_client_update_service::{
-    OpenFrameClientUpdateService, UpdateGuard, UpdateLaunch,
-};
 use crate::services::tool_agent_update_service::ToolAgentUpdateService;
 use crate::services::tool_installation_service::ToolInstallationService;
 use crate::services::tool_ops::{ToolOpGuard, ToolOps};
-use crate::services::tool_run_manager::{ClientUpdatePending, ToolRunManager};
+use crate::services::tool_run_manager::ClientUpdatePending;
 
 const TOOL_BUSY: &str = "tool busy with another operation";
 const CLIENT_UPDATE_PENDING: &str = "client update pending";
@@ -167,59 +163,6 @@ impl CommandHandler for ToolUpdateHandler {
         op: ToolOpGuard,
     ) -> Outcome {
         self.service.process_update_locked(command, op).await.into()
-    }
-}
-
-#[derive(Clone)]
-pub struct ClientUpdateHandler {
-    service: OpenFrameClientUpdateService,
-    tool_run_manager: ToolRunManager,
-}
-
-impl ClientUpdateHandler {
-    pub fn new(service: OpenFrameClientUpdateService, tool_run_manager: ToolRunManager) -> Self {
-        Self {
-            service,
-            tool_run_manager,
-        }
-    }
-}
-
-impl CommandHandler for ClientUpdateHandler {
-    type Command = OpenFrameClientUpdateMessage;
-    type Guard = UpdateGuard;
-
-    const KIND: &'static str = "client-update";
-    const SEQUENCED: bool = true;
-    const RESTARTS_AGENT: bool = true;
-
-    fn subject(machine_id: &str) -> String {
-        format!("machine.{}.client-update.v2", machine_id)
-    }
-
-    fn begin(&self, command: &Self::Command) -> Begin<UpdateGuard> {
-        match self.service.reserve(command) {
-            Ok(guard) => Begin::Accepted(guard),
-            Err(e) => Begin::Busy(format!("{e:#}")),
-        }
-    }
-
-    async fn run(
-        &self,
-        _machine_id: &str,
-        _delivery: &DeliveryRef,
-        command: Self::Command,
-        guard: UpdateGuard,
-    ) -> Outcome {
-        match self.service.apply(command, guard).await {
-            Ok(UpdateLaunch::Launched) => Outcome::Restarting,
-            Ok(UpdateLaunch::Skipped) => Outcome::Done,
-            Err(e) => {
-                // nothing re-sends a failed command, so tool operations stop waiting behind it
-                self.tool_run_manager.clear_client_update_pending();
-                Outcome::Failed(format!("{e:#}"))
-            }
-        }
     }
 }
 

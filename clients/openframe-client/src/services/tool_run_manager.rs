@@ -1,5 +1,5 @@
 use crate::models::installed_tool::{Installation, InstalledTool, ToolRecordState};
-use crate::platform::system_service;
+use crate::platform::{in_flight_client_update_phase, system_service};
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
 use crate::services::tool_kill_service::ToolKillService;
@@ -47,43 +47,45 @@ async fn shutdown_break(
     true
 }
 
-#[derive(Clone, Default)]
-pub(crate) struct ClientUpdatePendingFlag {
-    since: Arc<std::sync::Mutex<Option<std::time::Instant>>>,
-}
-
-impl ClientUpdatePendingFlag {
-    pub(crate) fn mark(&self) {
-        *self.since() = Some(std::time::Instant::now());
-    }
-
-    pub(crate) fn is_pending(&self, ttl: Duration) -> bool {
-        matches!(*self.since(), Some(since) if since.elapsed() < ttl)
-    }
-
-    pub(crate) fn clear(&self) {
-        *self.since() = None;
-    }
-
-    pub(crate) fn view(&self) -> ClientUpdatePending {
-        ClientUpdatePending(self.clone())
-    }
-
-    fn since(&self) -> std::sync::MutexGuard<'_, Option<std::time::Instant>> {
-        self.since
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-    }
-}
-
+/// Whether openframe-client-updater is mid-swap, read from its state file; new tool operations wait it out
 #[derive(Clone)]
-pub struct ClientUpdatePending(ClientUpdatePendingFlag);
+pub struct ClientUpdatePending(Arc<dyn Fn() -> bool + Send + Sync>);
+
+impl Default for ClientUpdatePending {
+    fn default() -> Self {
+        Self(Arc::new(|| in_flight_client_update_phase().is_some()))
+    }
+}
 
 impl ClientUpdatePending {
     pub fn is_pending(&self) -> bool {
-        self.0.is_pending(Duration::from_secs(
-            crate::config::update_config::CLIENT_UPDATE_PENDING_TTL_SECS,
-        ))
+        (self.0)()
+    }
+
+    /// Never pending, for tool operations that are not this client's to hold back.
+    pub fn never() -> Self {
+        Self(Arc::new(|| false))
+    }
+}
+
+/// Stands in for the updater's state file in tests
+#[cfg(test)]
+#[derive(Clone, Default)]
+pub(crate) struct ClientUpdatePendingFlag(Arc<AtomicBool>);
+
+#[cfg(test)]
+impl ClientUpdatePendingFlag {
+    pub(crate) fn mark(&self) {
+        self.0.store(true, Ordering::Release);
+    }
+
+    pub(crate) fn clear(&self) {
+        self.0.store(false, Ordering::Release);
+    }
+
+    pub(crate) fn view(&self) -> ClientUpdatePending {
+        let flag = self.0.clone();
+        ClientUpdatePending(Arc::new(move || flag.load(Ordering::Acquire)))
     }
 }
 
@@ -95,9 +97,8 @@ pub struct ToolRunManager {
     tool_ops: ToolOps,
     running_tools: Arc<RwLock<HashSet<String>>>,
     shutting_down: Arc<AtomicBool>,
-    /// Set by a deactivation stop, which a failed self-update must not undo
+    /// Set by a deactivation stop
     tools_stopped: Arc<AtomicBool>,
-    client_update_pending: ClientUpdatePendingFlag,
 }
 
 impl ToolRunManager {
@@ -115,12 +116,10 @@ impl ToolRunManager {
             running_tools: Arc::new(RwLock::new(HashSet::new())),
             shutting_down: Arc::new(AtomicBool::new(false)),
             tools_stopped: Arc::new(AtomicBool::new(false)),
-            client_update_pending: ClientUpdatePendingFlag::default(),
         }
     }
 
     /// Signal all run loops to stop launching new processes.
-    /// Called by self-update before the updater kills the service.
     pub fn signal_shutdown(&self) {
         self.shutting_down.store(true, Ordering::Release);
         info!("Tool run manager: shutdown signalled, no new launches will occur");
@@ -130,7 +129,7 @@ impl ToolRunManager {
     /// Used when the tenant is gone, to stop tools hammering their now-unreachable endpoints.
     pub async fn stop_all(&self) -> Result<()> {
         {
-            // Under the supervision lock so a concurrent resume_after_update_failure cannot undo the stop
+            // Under the supervision lock so a concurrent restart_all cannot interleave with the stop
             let mut set = self.running_tools.write().await;
             self.tools_stopped.store(true, Ordering::Release);
             self.signal_shutdown();
@@ -185,50 +184,8 @@ impl ToolRunManager {
         self.run().await
     }
 
-    /// Undo [`signal_shutdown`] after the updater failed without stopping the service: live supervisors carry on, tools whose loop already exited are relaunched.
-    pub async fn resume_after_update_failure(&self) -> Result<()> {
-        {
-            let _set = self.running_tools.write().await;
-            if self.tools_stopped.load(Ordering::Acquire) {
-                info!("Tool run manager: tools are stopped by deactivation, not resuming");
-                return Ok(());
-            }
-            self.shutting_down.store(false, Ordering::Release);
-        }
-
-        let tools = self
-            .installed_tools_service
-            .get_all()
-            .await
-            .context("Failed to list installed tools for resume")?;
-        for tool in tools {
-            if tool.installation.is_service() || !self.try_mark_running(&tool.tool_agent_id).await {
-                continue;
-            }
-            let tool_id = tool.tool_agent_id.clone();
-            info!(tool_id = %tool_id, "Relaunching tool supervisor after the aborted update");
-            self.run_tool(tool, false).await;
-        }
-        info!("Tool run manager: supervision resumed after the aborted update");
-        Ok(())
-    }
-
-    pub fn mark_client_update_pending(&self) {
-        self.client_update_pending.mark();
-        info!("Client update pending: new tool operations will be parked");
-    }
-
-    pub fn is_client_update_pending(&self) -> bool {
-        self.client_update_pending.view().is_pending()
-    }
-
     pub fn client_update_pending(&self) -> ClientUpdatePending {
-        self.client_update_pending.view()
-    }
-
-    pub fn clear_client_update_pending(&self) {
-        self.client_update_pending.clear();
-        info!("Client update no longer pending: parked tool operations released");
+        ClientUpdatePending::default()
     }
 
     pub async fn run(&self) -> Result<()> {

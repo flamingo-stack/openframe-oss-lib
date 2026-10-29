@@ -14,7 +14,6 @@ pub mod installed_tool;
 pub mod machine_heartbeat_message;
 pub mod machine_timezone_message;
 pub mod openframe_client_info;
-pub mod openframe_client_update_message;
 pub mod remote_access_mode;
 pub mod tool_agent_update_message;
 pub mod tool_connection;
@@ -24,7 +23,6 @@ pub mod tool_installation_result;
 pub mod tool_restart_message;
 pub mod tool_uninstall_message;
 pub mod tool_version_overrides;
-pub mod update_state;
 
 pub use execution::{
     requires_stream_ack, BootstrapRoute, BootstrapScriptMessage, CommandMessage, ExecutionAck,
@@ -56,7 +54,6 @@ pub use installed_tool::{
 pub use machine_heartbeat_message::MachineHeartbeatMessage;
 pub use machine_timezone_message::MachineTimezoneMessage;
 pub use openframe_client_info::OpenFrameClientInfo;
-pub use openframe_client_update_message::OpenFrameClientUpdateMessage;
 pub use remote_access_mode::RemoteAccessMode;
 pub use tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 pub use tool_connection::ToolConnection;
@@ -65,4 +62,3 @@ pub use tool_installation_message::ToolInstallationMessage;
 pub use tool_installation_result::ToolInstallationResult;
 pub use tool_restart_message::ToolRestartMessage;
 pub use tool_uninstall_message::ToolUninstallMessage;
-pub use update_state::{UpdatePhase, UpdateState};

@@ -1,49 +1,8 @@
-use super::{launchable_gui_app, shutdown_break, ClientUpdatePendingFlag};
+use super::{launchable_gui_app, shutdown_break};
 use crate::models::{Installation, InstalledTool, ToolRecordState};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
 use tokio::sync::RwLock;
-
-const LONG_TTL: Duration = Duration::from_secs(3600);
-
-#[test]
-fn not_pending_before_first_mark() {
-    let flag = ClientUpdatePendingFlag::default();
-    assert!(!flag.is_pending(LONG_TTL));
-}
-
-#[test]
-fn pending_after_mark_within_ttl() {
-    let flag = ClientUpdatePendingFlag::default();
-    flag.mark();
-    assert!(flag.is_pending(LONG_TTL));
-}
-
-#[test]
-fn expired_when_ttl_elapsed() {
-    let flag = ClientUpdatePendingFlag::default();
-    flag.mark();
-    assert!(!flag.is_pending(Duration::ZERO));
-}
-
-#[tokio::test]
-async fn remark_refreshes_the_ttl() {
-    let flag = ClientUpdatePendingFlag::default();
-    flag.mark();
-    tokio::time::sleep(Duration::from_millis(30)).await;
-    assert!(!flag.is_pending(Duration::from_millis(10)));
-    flag.mark();
-    assert!(flag.is_pending(Duration::from_millis(10)));
-}
-
-#[test]
-fn clones_share_state() {
-    let flag = ClientUpdatePendingFlag::default();
-    let clone = flag.clone();
-    clone.mark();
-    assert!(flag.is_pending(LONG_TTL));
-}
 
 #[tokio::test]
 async fn shutdown_break_drops_supervision_only_once_signalled() {
@@ -55,28 +14,6 @@ async fn shutdown_break_drops_supervision_only_once_signalled() {
     shutting_down.store(true, Ordering::Release);
     assert!(shutdown_break(&shutting_down, &running_tools, "mesh").await);
     assert!(!running_tools.read().await.contains("mesh"));
-}
-
-#[test]
-fn clear_releases_the_flag() {
-    let flag = ClientUpdatePendingFlag::default();
-    flag.mark();
-    assert!(flag.is_pending(LONG_TTL));
-    flag.clear();
-    assert!(!flag.is_pending(LONG_TTL));
-}
-
-#[test]
-fn the_view_follows_the_flag() {
-    let flag = ClientUpdatePendingFlag::default();
-    let view = flag.view();
-    assert!(!view.is_pending());
-
-    flag.mark();
-    assert!(view.is_pending());
-
-    flag.clear();
-    assert!(!view.is_pending());
 }
 
 fn gui_app_record(state: ToolRecordState) -> InstalledTool {
