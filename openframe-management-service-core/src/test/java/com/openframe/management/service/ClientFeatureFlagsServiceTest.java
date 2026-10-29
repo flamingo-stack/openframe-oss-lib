@@ -1,11 +1,9 @@
 package com.openframe.management.service;
 
 import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
-import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientFeatureFlagsDeliverySeed;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
-import com.openframe.delivery.config.DeliveryProperties;
-import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import com.openframe.delivery.spec.DeliveryAudience;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,30 +32,28 @@ class ClientFeatureFlagsServiceTest {
     private static final Map<String, ClientFeatureFlag> FLAGS = Map.of("delivery-tool-installation", new ClientFeatureFlag(true, "1.6.0"));
 
     @Mock private OpenFrameClientConfigurationService clientConfigurationService;
-    @Mock private DeliveryDispatcher deliveryDispatcher;
+    @Mock private DeliveryRouter deliveryRouter;
     @Captor private ArgumentCaptor<ClientFeatureFlagsDeliverySeed> seedCaptor;
 
-    private DeliveryProperties properties;
     private ClientFeatureFlagsService service;
 
     @BeforeEach
     void setUp() {
-        properties = new DeliveryProperties();
-        service = new ClientFeatureFlagsService(clientConfigurationService, properties, deliveryDispatcher);
+        service = new ClientFeatureFlagsService(clientConfigurationService, deliveryRouter);
     }
 
     @Test
-    void process_flagsMovedAndTypeOnTheEngine_rolledOutToEveryMachineThenStored() {
+    void process_flagsMoved_sentToEveryMachineThenStored() {
         // setup
-        properties.getEnabled().put(DeliveryType.CLIENT_FEATURE_FLAGS, true);
         when(clientConfigurationService.haveFeatureFlagsMoved(FLAGS)).thenReturn(true);
+        when(deliveryRouter.dispatch(any())).thenReturn(true);
 
         // execution
         service.process(FLAGS);
 
         // verifications
-        InOrder inOrder = inOrder(deliveryDispatcher, clientConfigurationService);
-        inOrder.verify(deliveryDispatcher).dispatch(seedCaptor.capture());
+        InOrder inOrder = inOrder(deliveryRouter, clientConfigurationService);
+        inOrder.verify(deliveryRouter).dispatch(seedCaptor.capture());
         inOrder.verify(clientConfigurationService).updateFeatureFlags(FLAGS);
         ClientFeatureFlagsDeliverySeed seed = seedCaptor.getValue();
         assertThat(seed.getAudience()).isEqualTo(DeliveryAudience.EVERY_MACHINE);
@@ -67,36 +63,34 @@ class ClientFeatureFlagsServiceTest {
     @Test
     void process_sameFlagsAgain_nothingSentNothingStored() {
         // setup
-        properties.getEnabled().put(DeliveryType.CLIENT_FEATURE_FLAGS, true);
         when(clientConfigurationService.haveFeatureFlagsMoved(FLAGS)).thenReturn(false);
 
         // execution
         service.process(FLAGS);
 
         // verifications
-        verify(deliveryDispatcher, never()).dispatch(any());
+        verify(deliveryRouter, never()).dispatch(any());
         verify(clientConfigurationService, never()).updateFeatureFlags(any());
     }
 
     @Test
-    void process_typeOff_flagsStoredWithoutTheEngine() {
+    void process_noRouteCarriesThem_flagsStoredAnyway() {
         // setup
         when(clientConfigurationService.haveFeatureFlagsMoved(FLAGS)).thenReturn(true);
+        when(deliveryRouter.dispatch(any())).thenReturn(false);
 
         // execution
         service.process(FLAGS);
 
         // verifications
         verify(clientConfigurationService).updateFeatureFlags(FLAGS);
-        verify(deliveryDispatcher, never()).dispatch(any());
     }
 
     @Test
     void process_handOffFails_flagsNotStoredSoTheNextStartRetries() {
         // setup
-        properties.getEnabled().put(DeliveryType.CLIENT_FEATURE_FLAGS, true);
         when(clientConfigurationService.haveFeatureFlagsMoved(FLAGS)).thenReturn(true);
-        doThrow(new IllegalStateException("kafka down")).when(deliveryDispatcher).dispatch(any());
+        doThrow(new IllegalStateException("kafka down")).when(deliveryRouter).dispatch(any());
 
         // execution + verifications
         assertThatThrownBy(() -> service.process(FLAGS)).isInstanceOf(IllegalStateException.class);
@@ -112,6 +106,6 @@ class ClientFeatureFlagsServiceTest {
         assertThatThrownBy(() -> service.process(flags))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("delivery-client-update");
-        verifyNoInteractions(clientConfigurationService, deliveryDispatcher);
+        verifyNoInteractions(clientConfigurationService, deliveryRouter);
     }
 }

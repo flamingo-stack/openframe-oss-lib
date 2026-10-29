@@ -7,4 +7,8 @@ public enum SoftwareAction {
     public <T> T select(T install, T update) {
         return this == INSTALL ? install : update;
     }
+
+    public SoftwareActionKind kind() {
+        return select(SoftwareActionKind.INSTALL, SoftwareActionKind.UPDATE);
+    }
 }

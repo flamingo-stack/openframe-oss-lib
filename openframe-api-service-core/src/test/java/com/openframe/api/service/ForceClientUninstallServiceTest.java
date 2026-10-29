@@ -3,14 +3,11 @@ package com.openframe.api.service;
 import com.openframe.api.dto.force.request.ForceClientUninstallRequest;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
-import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.nats.delivery.ClientUninstallDeliverySeed;
-import com.openframe.data.nats.publisher.ClientUninstallNatsPublisher;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.delivery.config.DeliveryProperties;
-import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,8 +21,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,13 +31,9 @@ class ForceClientUninstallServiceTest {
 
     private static final String MACHINE_ID = "mach-42";
 
-    @Mock private ClientUninstallNatsPublisher clientUninstallNatsPublisher;
     @Mock private MachineRepository machineRepository;
-    @Mock private DeliveryProperties deliveryProperties;
-    @Mock private DeliveryDispatcher deliveryDispatcher;
-
+    @Mock private DeliveryRouter deliveryRouter;
     @Captor private ArgumentCaptor<ClientUninstallDeliverySeed> seedCaptor;
-
     @InjectMocks private ForceClientUninstallService service;
 
     private Machine machine;
@@ -56,35 +50,45 @@ class ForceClientUninstallServiceTest {
     }
 
     @Test
-    void process_flagOff_publishedToJetStreamAndMarkedPendingDeletion() {
+    void process_routeCarriesIt_sentAndMarkedPendingDeletion() {
         // setup
-        when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UNINSTALL)).thenReturn(false);
+        when(deliveryRouter.dispatch(any())).thenReturn(true);
 
         // execution
         ForceClientUninstallResponse response = service.process(request);
 
         // verifications
-        verify(clientUninstallNatsPublisher).publish(MACHINE_ID);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(machine.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
         verify(machineRepository).save(machine);
-        verifyNoInteractions(deliveryDispatcher);
         assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.PROCESSED);
     }
 
     @Test
-    void process_flagOn_dispatchedThroughEngineAndMarkedPendingDeletion() {
+    void process_noRouteReachesTheMachine_failedAndStatusLeftAlone() {
         // setup
-        when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UNINSTALL)).thenReturn(true);
+        when(deliveryRouter.dispatch(any())).thenReturn(false);
 
         // execution
         ForceClientUninstallResponse response = service.process(request);
 
         // verifications
-        verify(deliveryDispatcher).dispatch(seedCaptor.capture());
-        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
-        verify(machineRepository).save(machine);
-        verifyNoInteractions(clientUninstallNatsPublisher);
-        assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.PROCESSED);
+        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.ONLINE);
+        verify(machineRepository, never()).save(any());
+        assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.FAILED);
+    }
+
+    @Test
+    void process_machineAlreadyDeleted_skipped() {
+        // setup
+        machine.setStatus(DeviceStatus.DELETED);
+
+        // execution
+        ForceClientUninstallResponse response = service.process(request);
+
+        // verifications
+        verify(deliveryRouter, never()).dispatch(any());
+        assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.FAILED);
     }
 }

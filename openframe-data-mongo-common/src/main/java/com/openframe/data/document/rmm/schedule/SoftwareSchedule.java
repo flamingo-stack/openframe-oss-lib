@@ -1,7 +1,9 @@
 package com.openframe.data.document.rmm.schedule;
 
 import com.openframe.data.document.TenantScoped;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdate;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -38,6 +40,9 @@ public class SoftwareSchedule implements TenantScoped {
     private SoftwareAction action;
 
     private List<SoftwareSchedulePackage> packages;
+    // UPDATE only; null for INSTALL
+    private PackageUpdateSettings updateSettings;
+    private SoftwareAutoUpdate autoUpdate;
 
     @Builder.Default
     private ScheduleDeviceSelectionMode selectionMode = ScheduleDeviceSelectionMode.SPECIFIC;
