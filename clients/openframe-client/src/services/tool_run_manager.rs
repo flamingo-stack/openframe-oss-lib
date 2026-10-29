@@ -3,32 +3,35 @@ use crate::platform::system_service;
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
 use crate::services::tool_kill_service::ToolKillService;
+use crate::services::tool_ops::ToolOps;
 use crate::utils::failure_log_backoff::FailureLogBackoff;
 use anyhow::{Context, Result};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::{Mutex, RwLock};
-use tokio::time::sleep;
+use tokio::sync::RwLock;
+use tokio::time::{sleep, timeout};
 use tracing::{debug, error, info, warn};
 
-#[cfg(target_os = "windows")]
-use crate::utils::windows_helpers::{build_command_line, to_wide, wcslen};
-#[cfg(windows)]
-use windows::{
-    core::{PCWSTR, PWSTR},
-    Win32::Foundation::*,
-    Win32::Security::*,
-    Win32::System::RemoteDesktop::*,
-    Win32::System::Threading::*,
-    Win32::UI::WindowsAndMessaging::SW_SHOW,
-};
-
 const RETRY_DELAY_SECONDS: u64 = 5;
+/// Ceiling for the escalating retry delay after a leftover process refuses to die.
+const KILL_RETRY_MAX_DELAY_SECONDS: u64 = 300;
+/// A tool that exits sooner than this after starting counts as a failed start.
+const QUICK_EXIT_WINDOW: Duration = Duration::from_secs(60);
+/// Restart delays along a streak of failed starts; the last one repeats.
+const FAILED_START_RETRY_DELAYS_SECONDS: [u64; 5] = [5, 30, 120, 300, 900];
+#[cfg(any(windows, target_os = "macos"))]
+fn gui_launch_flag(tool_agent_id: &str) -> Option<&'static str> {
+    if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
+        Some("--background")
+    } else {
+        None
+    }
+}
 
 /// Under the supervision lock, so a concurrent resume either finds the loop alive or relaunches its tool.
 async fn shutdown_break(
@@ -44,385 +47,43 @@ async fn shutdown_break(
     true
 }
 
-#[cfg(windows)]
-fn get_active_user_session() -> Option<u32> {
-    unsafe {
-        info!("=== Starting active user session detection ===");
-
-        // 1. Try to get Session Id of current process
-        let current_pid = GetCurrentProcessId();
-        info!("Current process PID: {}", current_pid);
-
-        let mut session_id = 0;
-        if ProcessIdToSessionId(current_pid, &mut session_id).is_ok() {
-            info!("Current process session ID: {}", session_id);
-            if session_id != 0 {
-                info!(
-                    "Not running as service - using current process session ID: {}",
-                    session_id
-                );
-                return Some(session_id);
-            }
-            info!("Session ID is 0 - running as service, need to find active user session");
-        } else {
-            warn!("Failed to get current process session ID");
-        }
-
-        // 2. If session_id == 0 (service), enumerate all sessions to find active user
-        info!("Enumerating all Windows Terminal Services sessions...");
-        let mut pp_session_info: *mut WTS_SESSION_INFOW = std::ptr::null_mut();
-        let mut count: u32 = 0;
-
-        if WTSEnumerateSessionsW(
-            WTS_CURRENT_SERVER_HANDLE,
-            0,
-            1,
-            &mut pp_session_info,
-            &mut count,
-        )
-        .is_ok()
-        {
-            info!("Found {} total sessions", count);
-            let sessions = std::slice::from_raw_parts(pp_session_info, count as usize);
-
-            // First, log ALL sessions for visibility
-            let mut active_sessions = Vec::new();
-
-            for (idx, session) in sessions.iter().enumerate() {
-                let session_name = if session.pWinStationName.is_null() {
-                    String::from("(null)")
-                } else {
-                    String::from_utf16_lossy(std::slice::from_raw_parts(
-                        session.pWinStationName.0,
-                        wcslen(session.pWinStationName.0),
-                    ))
-                };
-
-                info!(
-                    "  Session {}: ID={}, Name='{}', State={:?}",
-                    idx, session.SessionId, session_name, session.State
-                );
-
-                // Collect all active sessions (State == 0 = WTSActive)
-                if session.State == WTSActive {
-                    active_sessions.push((session.SessionId, session_name.clone()));
-                    info!("    → Active session detected");
-                }
-            }
-
-            // Choose the best active session
-            if !active_sessions.is_empty() {
-                info!("Found {} active session(s)", active_sessions.len());
-
-                // Strategy: Prefer RDP sessions over Console, or use the highest session ID (most recent)
-                let best_session = active_sessions
-                    .iter()
-                    .filter(|(id, name)| {
-                        // Filter out session 0 (Services) and listen sessions
-                        *id > 0 && !name.to_lowercase().contains("listen")
-                    })
-                    .max_by_key(|(id, name)| {
-                        // Prefer RDP sessions (rdp-tcp) over Console, then by highest ID
-                        let is_rdp = name.to_lowercase().contains("rdp-tcp");
-                        let is_console = name.to_lowercase().contains("console");
-
-                        // Priority: RDP > Console, then by session ID
-                        if is_rdp && !name.to_lowercase().contains("listen") {
-                            (2, *id) // Highest priority for active RDP sessions
-                        } else if is_console {
-                            (1, *id) // Medium priority for console
-                        } else {
-                            (0, *id) // Lowest priority for others
-                        }
-                    });
-
-                if let Some((id, name)) = best_session {
-                    info!("Selected active user session: ID={}, Name='{}'", id, name);
-                    WTSFreeMemory(pp_session_info as _);
-                    return Some(*id);
-                } else {
-                    warn!("Active sessions found but none suitable (filtered out session 0 and listen sessions)");
-                }
-            } else {
-                warn!(
-                    "No active (WTSActive) session found among {} sessions",
-                    count
-                );
-            }
-
-            WTSFreeMemory(pp_session_info as _);
-        } else {
-            error!("Failed to enumerate Windows Terminal Services sessions");
-        }
-
-        error!("=== Failed to find any active user session ===");
-        None
-    }
-}
-
-#[cfg(windows)]
-#[allow(dead_code)] // alternate launch path retained for windows console-session use
-fn launch_process_in_console_session(command_path: &str, args: &[String]) -> Result<(u32, HANDLE)> {
-    unsafe {
-        let session_id = WTSGetActiveConsoleSessionId();
-        info!("Physical console session ID: {}", session_id);
-        if session_id == u32::MAX {
-            anyhow::bail!("No active user session found");
-        }
-
-        let mut user_token = HANDLE(0);
-        if let Err(e) = WTSQueryUserToken(session_id, &mut user_token) {
-            anyhow::bail!(
-                "Failed to get user token for session {}: {:?}",
-                session_id,
-                e
-            );
-        }
-
-        // Build command line with arguments
-        let mut cmdline = command_path.to_string();
-        for arg in args {
-            cmdline.push(' ');
-            // Quote argument if it contains spaces
-            if arg.contains(' ') {
-                cmdline.push('"');
-                cmdline.push_str(arg);
-                cmdline.push('"');
-            } else {
-                cmdline.push_str(arg);
-            }
-        }
-
-        let si = STARTUPINFOW {
-            cb: std::mem::size_of::<STARTUPINFOW>() as u32,
-            ..Default::default()
-        };
-        let mut pi = PROCESS_INFORMATION::default();
-
-        let mut cmdline_wide = to_wide(&cmdline);
-
-        // Use DETACHED_PROCESS | CREATE_NO_WINDOW to run without visible console
-        use windows::Win32::System::Threading::{CREATE_NO_WINDOW, DETACHED_PROCESS};
-
-        let result = CreateProcessAsUserW(
-            user_token,
-            PCWSTR(to_wide(command_path).as_ptr()),
-            PWSTR(cmdline_wide.as_mut_ptr()),
-            None,
-            None,
-            false,
-            DETACHED_PROCESS | CREATE_NO_WINDOW,
-            None,
-            None,
-            &si,
-            &mut pi,
-        );
-
-        let _ = CloseHandle(user_token);
-
-        if let Err(e) = result {
-            anyhow::bail!("Failed to launch process in user session: {:?}", e);
-        }
-
-        let pid = pi.dwProcessId;
-        let process_handle = pi.hProcess;
-
-        // Close thread handle as we don't need it
-        let _ = CloseHandle(pi.hThread);
-
-        info!("Process launched in user session, PID: {}", pid);
-        Ok((pid, process_handle))
-    }
-}
-
-#[cfg(windows)]
-pub(crate) fn launch_process_in_user_session(
-    command_path: &str,
-    args: &[String],
-) -> Result<(u32, HANDLE)> {
-    let session_id = get_active_user_session().context("No active user session found")?;
-    launch_process_in_target_session(command_path, args, session_id)
-}
-
-#[cfg(target_os = "windows")]
-pub(crate) fn launch_process_in_target_session(
-    command_path: &str,
-    args: &[String],
-    session_id: u32,
-) -> Result<(u32, HANDLE)> {
-    unsafe {
-        info!("Step 1: Querying user token for session {}", session_id);
-        let mut user_token = HANDLE(0);
-        if let Err(e) = WTSQueryUserToken(session_id, &mut user_token) {
-            error!(
-                "Failed to get user token for session {}: {:?}",
-                session_id, e
-            );
-            anyhow::bail!(
-                "Failed to get user token for session {}: {:?}",
-                session_id,
-                e
-            );
-        }
-
-        info!(
-            "Successfully obtained user token for session {} (handle: {:?})",
-            session_id, user_token
-        );
-
-        // Duplicate token to get primary token (required for CreateProcessAsUserW)
-        info!("Step 2: Duplicating token to get primary token (required for CreateProcessAsUserW)");
-        let mut primary_token = HANDLE(0);
-        if let Err(e) = DuplicateTokenEx(
-            user_token,
-            TOKEN_ALL_ACCESS,
-            None,
-            SECURITY_IMPERSONATION_LEVEL(2), // SecurityImpersonation
-            TokenPrimary,
-            &mut primary_token,
-        ) {
-            error!("Failed to duplicate token: {:?}", e);
-            let _ = CloseHandle(user_token);
-            anyhow::bail!(
-                "Failed to duplicate token for session {}: {:?}",
-                session_id,
-                e
-            );
-        }
-
-        let _ = CloseHandle(user_token);
-        info!(
-            "Successfully duplicated token to primary token (handle: {:?})",
-            primary_token
-        );
-
-        // Build command line with full path in quotes + arguments
-        info!("Step 3: Building command line");
-        let cmdline = build_command_line(command_path, args);
-        info!("Command line: {}", cmdline);
-
-        info!("Step 4: Setting up STARTUPINFOW structure");
-        // For GUI applications, set the desktop to winsta0\default
-        let desktop = to_wide("winsta0\\default");
-        let mut si = STARTUPINFOW {
-            cb: std::mem::size_of::<STARTUPINFOW>() as u32,
-            lpDesktop: PWSTR(desktop.as_ptr() as *mut u16),
-            dwFlags: windows::Win32::System::Threading::STARTF_USESHOWWINDOW,
-            wShowWindow: SW_SHOW.0 as u16,
-            ..Default::default()
-        };
-        info!("  Desktop: winsta0\\default");
-        info!("  Show window: SW_SHOW");
-        info!("  STARTUPINFOW size: {} bytes", si.cb);
-
-        let mut pi = PROCESS_INFORMATION::default();
-
-        let mut cmdline_wide = to_wide(&cmdline);
-
-        info!("Step 5: Calling CreateProcessAsUserW");
-        info!("  lpApplicationName: NULL (using command line parsing)");
-        info!("  lpCommandLine: {}", cmdline);
-        info!("  Creation flags: CREATE_NEW_PROCESS_GROUP");
-
-        // For GUI applications, use CREATE_NEW_PROCESS_GROUP for proper process isolation
-        use windows::Win32::System::Threading::CREATE_NEW_PROCESS_GROUP;
-
-        // Try with lpApplicationName = NULL and full command line
-        let result = CreateProcessAsUserW(
-            primary_token,
-            PCWSTR::null(), // lpApplicationName = NULL
-            PWSTR(cmdline_wide.as_mut_ptr()),
-            None,
-            None,
-            false,
-            CREATE_NEW_PROCESS_GROUP,
-            None,
-            None,
-            &si,
-            &mut pi,
-        );
-
-        if let Err(e) = result {
-            // Fallback: try without desktop specification
-            error!(
-                "✗ CreateProcessAsUserW failed with desktop specification: {:?}",
-                e
-            );
-            warn!("Attempting fallback: retrying without desktop specification");
-
-            info!("Step 6: Fallback attempt - removing desktop specification");
-            si.lpDesktop = PWSTR::null();
-            info!("  Desktop: NULL (removed)");
-            let mut cmdline_wide_retry = to_wide(&cmdline);
-
-            let result_retry = CreateProcessAsUserW(
-                primary_token,
-                PCWSTR::null(),
-                PWSTR(cmdline_wide_retry.as_mut_ptr()),
-                None,
-                None,
-                false,
-                CREATE_NEW_PROCESS_GROUP,
-                None,
-                None,
-                &si,
-                &mut pi,
-            );
-
-            let _ = CloseHandle(primary_token);
-
-            if let Err(e2) = result_retry {
-                error!(
-                    "✗ CreateProcessAsUserW failed again without desktop specification: {:?}",
-                    e2
-                );
-                error!("Both attempts to launch process failed");
-                anyhow::bail!("Failed to launch process in user session: {:?}", e2);
-            }
-
-            info!("Fallback successful - process launched without desktop specification");
-        } else {
-            info!("CreateProcessAsUserW succeeded on first attempt");
-            let _ = CloseHandle(primary_token);
-        }
-
-        let pid = pi.dwProcessId;
-        let process_handle = pi.hProcess;
-
-        info!("Step 7: Process created successfully");
-        info!("  Process ID (PID): {}", pid);
-        info!("  Process handle: {:?}", process_handle);
-        info!("  Thread ID: {}", pi.dwThreadId);
-        info!("  Thread handle: {:?}", pi.hThread);
-
-        // Close thread handle as we don't need it
-        let _ = CloseHandle(pi.hThread);
-        info!("  Closed thread handle (not needed for monitoring)");
-
-        info!(
-            "=== Process launched successfully in user session {} with PID {} ===",
-            session_id, pid
-        );
-        Ok((pid, process_handle))
-    }
-}
-
 #[derive(Clone, Default)]
 pub(crate) struct ClientUpdatePendingFlag {
-    since: Arc<RwLock<Option<std::time::Instant>>>,
+    since: Arc<std::sync::Mutex<Option<std::time::Instant>>>,
 }
 
 impl ClientUpdatePendingFlag {
-    pub(crate) async fn mark(&self) {
-        *self.since.write().await = Some(std::time::Instant::now());
+    pub(crate) fn mark(&self) {
+        *self.since() = Some(std::time::Instant::now());
     }
 
-    pub(crate) async fn is_pending(&self, ttl: Duration) -> bool {
-        matches!(*self.since.read().await, Some(since) if since.elapsed() < ttl)
+    pub(crate) fn is_pending(&self, ttl: Duration) -> bool {
+        matches!(*self.since(), Some(since) if since.elapsed() < ttl)
     }
 
-    pub(crate) async fn clear(&self) {
-        *self.since.write().await = None;
+    pub(crate) fn clear(&self) {
+        *self.since() = None;
+    }
+
+    pub(crate) fn view(&self) -> ClientUpdatePending {
+        ClientUpdatePending(self.clone())
+    }
+
+    fn since(&self) -> std::sync::MutexGuard<'_, Option<std::time::Instant>> {
+        self.since
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+#[derive(Clone)]
+pub struct ClientUpdatePending(ClientUpdatePendingFlag);
+
+impl ClientUpdatePending {
+    pub fn is_pending(&self) -> bool {
+        self.0.is_pending(Duration::from_secs(
+            crate::config::update_config::CLIENT_UPDATE_PENDING_TTL_SECS,
+        ))
     }
 }
 
@@ -431,9 +92,8 @@ pub struct ToolRunManager {
     installed_tools_service: InstalledToolsService,
     params_processor: ToolCommandParamsResolver,
     tool_kill_service: ToolKillService,
+    tool_ops: ToolOps,
     running_tools: Arc<RwLock<HashSet<String>>>,
-    updating_tools: Arc<RwLock<HashMap<String, usize>>>,
-    tool_locks: Arc<RwLock<HashMap<String, Arc<Mutex<()>>>>>,
     shutting_down: Arc<AtomicBool>,
     /// Set by a deactivation stop, which a failed self-update must not undo
     tools_stopped: Arc<AtomicBool>,
@@ -445,25 +105,18 @@ impl ToolRunManager {
         installed_tools_service: InstalledToolsService,
         params_processor: ToolCommandParamsResolver,
         tool_kill_service: ToolKillService,
+        tool_ops: ToolOps,
     ) -> Self {
         Self {
             installed_tools_service,
             params_processor,
             tool_kill_service,
+            tool_ops,
             running_tools: Arc::new(RwLock::new(HashSet::new())),
-            updating_tools: Arc::new(RwLock::new(HashMap::new())),
-            tool_locks: Arc::new(RwLock::new(HashMap::new())),
             shutting_down: Arc::new(AtomicBool::new(false)),
             tools_stopped: Arc::new(AtomicBool::new(false)),
             client_update_pending: ClientUpdatePendingFlag::default(),
         }
-    }
-
-    pub async fn tool_lock(&self, tool_id: &str) -> Arc<Mutex<()>> {
-        let mut map = self.tool_locks.write().await;
-        map.entry(tool_id.to_string())
-            .or_insert_with(|| Arc::new(Mutex::new(())))
-            .clone()
     }
 
     /// Signal all run loops to stop launching new processes.
@@ -554,65 +207,28 @@ impl ToolRunManager {
             }
             let tool_id = tool.tool_agent_id.clone();
             info!(tool_id = %tool_id, "Relaunching tool supervisor after the aborted update");
-            if let Err(e) = self.run_tool(tool, false).await {
-                warn!(tool_id = %tool_id, "Failed to relaunch tool after the aborted update: {:#}", e);
-                self.clear_running_tool(&tool_id).await;
-            }
+            self.run_tool(tool, false).await;
         }
         info!("Tool run manager: supervision resumed after the aborted update");
         Ok(())
     }
 
-    pub async fn mark_client_update_pending(&self) {
-        self.client_update_pending.mark().await;
+    pub fn mark_client_update_pending(&self) {
+        self.client_update_pending.mark();
         info!("Client update pending: new tool operations will be parked");
     }
 
-    pub async fn is_client_update_pending(&self) -> bool {
-        self.client_update_pending
-            .is_pending(Duration::from_secs(
-                crate::config::update_config::CLIENT_UPDATE_PENDING_TTL_SECS,
-            ))
-            .await
+    pub fn is_client_update_pending(&self) -> bool {
+        self.client_update_pending.view().is_pending()
     }
 
-    pub async fn clear_client_update_pending(&self) {
-        self.client_update_pending.clear().await;
+    pub fn client_update_pending(&self) -> ClientUpdatePending {
+        self.client_update_pending.view()
+    }
+
+    pub fn clear_client_update_pending(&self) {
+        self.client_update_pending.clear();
         info!("Client update no longer pending: parked tool operations released");
-    }
-
-    pub async fn mark_updating(&self, tool_id: &str) {
-        let mut map = self.updating_tools.write().await;
-        let count = map.entry(tool_id.to_string()).or_insert(0);
-        *count += 1;
-        info!(
-            "Tool {} marked as updating (in-flight ops: {})",
-            tool_id, *count
-        );
-    }
-
-    pub async fn clear_updating(&self, tool_id: &str) {
-        let mut map = self.updating_tools.write().await;
-        if let Some(count) = map.get_mut(tool_id) {
-            *count -= 1;
-            if *count == 0 {
-                map.remove(tool_id);
-                info!("Tool {} update flag cleared", tool_id);
-            } else {
-                info!(
-                    "Tool {} op finished (in-flight ops remaining: {})",
-                    tool_id, *count
-                );
-            }
-        }
-    }
-
-    pub async fn is_updating(&self, tool_id: &str) -> bool {
-        self.updating_tools.read().await.contains_key(tool_id)
-    }
-
-    pub async fn any_tool_op_in_progress(&self) -> bool {
-        !self.updating_tools.read().await.is_empty()
     }
 
     pub async fn run(&self) -> Result<()> {
@@ -664,11 +280,12 @@ impl ToolRunManager {
         }
 
         for tool in tools {
-            if self.try_mark_running(&tool.tool_agent_id).await {
-                info!("Running tool {}", tool.tool_agent_id);
-                self.run_tool(tool, false).await?;
+            let tool_id = tool.tool_agent_id.clone();
+            if self.try_mark_running(&tool_id).await {
+                info!("Running tool {}", tool_id);
+                self.run_tool(tool, false).await;
             } else {
-                warn!("Tool {} is already running - skipping", tool.tool_agent_id);
+                warn!("Tool {} is already running - skipping", tool_id);
             }
         }
 
@@ -685,7 +302,28 @@ impl ToolRunManager {
         }
 
         info!("Running new single tool {}", installed_tool.tool_agent_id);
-        self.run_tool(installed_tool, true).await
+        self.run_tool(installed_tool, true).await;
+        Ok(())
+    }
+
+    /// Relaunch a GuiApp that may have exited; a running instance or one mid-update is left alone.
+    pub async fn ensure_gui_app_running(&self, tool_agent_id: &str) -> Result<()> {
+        if self.tool_ops.is_busy(tool_agent_id) {
+            info!(tool_id = %tool_agent_id, "Tool is being updated, the updater relaunches it");
+            return Ok(());
+        }
+        let tool = self
+            .installed_tools_service
+            .get_by_tool_agent_id(tool_agent_id)
+            .await
+            .with_context(|| format!("Failed to look up tool {} in the registry", tool_agent_id))?;
+        match launchable_gui_app(tool) {
+            Some(tool) => self.run_new_tool(tool).await,
+            None => {
+                info!(tool_id = %tool_agent_id, "Not installed as a GuiApp, nothing to start");
+                Ok(())
+            }
+        }
     }
 
     async fn try_mark_running(&self, tool_id: &str) -> bool {
@@ -703,40 +341,39 @@ impl ToolRunManager {
         set.remove(tool_id);
     }
 
+    #[cfg(test)]
+    pub(crate) async fn supervise_for_test(&self, tool_id: &str) {
+        self.try_mark_running(tool_id).await;
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn is_supervised(&self, tool_id: &str) -> bool {
+        self.running_tools.read().await.contains(tool_id)
+    }
+
     #[allow(unused_variables)]
-    async fn run_tool(&self, tool: InstalledTool, new_tool: bool) -> Result<()> {
+    async fn run_tool(&self, tool: InstalledTool, launch_now: bool) {
         if tool.installation.is_service() {
             info!(
                 "Installation::Service for {} - self-managed, skipping launch",
                 tool.tool_agent_id
             );
             self.clear_running_tool(&tool.tool_agent_id).await;
-            return Ok(());
+            return;
         }
 
-        #[cfg(not(target_os = "windows"))]
-        self.tool_kill_service
-            .stop_tool(&tool.tool_agent_id)
-            .await?;
-
-        // Windows GUI apps are owned by the HKLM Run autorun, not us — never kill them.
-        #[cfg(target_os = "windows")]
-        if !tool.installation.is_gui_app() {
-            self.tool_kill_service
-                .stop_tool(&tool.tool_agent_id)
-                .await?;
-        }
-
-        let updating_tools = self.updating_tools.clone();
+        let tool_ops = self.tool_ops.clone();
         let shutting_down = self.shutting_down.clone();
         let params_processor = self.params_processor.clone();
         let running_tools = self.running_tools.clone();
         let installed_tools_service = self.installed_tools_service.clone();
+        let tool_kill_service = self.tool_kill_service.clone();
         let mut installation = tool.installation.clone();
         let mut run_command_args = tool.run_command_args.clone();
 
         tokio::spawn(async move {
             let mut launch_backoff = FailureLogBackoff::new();
+            let mut kill_leftovers_now = true;
             loop {
                 // Self-update in progress — stop the loop entirely
                 if shutdown_break(&shutting_down, &running_tools, &tool.tool_agent_id).await {
@@ -744,11 +381,7 @@ impl ToolRunManager {
                     break;
                 }
 
-                while updating_tools
-                    .read()
-                    .await
-                    .contains_key(&tool.tool_agent_id)
-                {
+                while tool_ops.is_busy(&tool.tool_agent_id) {
                     info!(tool_id = %tool.tool_agent_id, "Tool is being updated, waiting...");
                     sleep(Duration::from_secs(1)).await;
                 }
@@ -766,7 +399,31 @@ impl ToolRunManager {
                     break;
                 }
 
-                let log_attempt = launch_backoff.should_log();
+                // An attempt a finished tool op asked for is logged in full.
+                let relaunch_asked = tool_ops.take_released(&tool.tool_agent_id);
+                let log_attempt = launch_backoff.should_log() || relaunch_asked;
+
+                // Windows GUI apps belong to the HKLM Run autorun — never kill them.
+                #[cfg(target_os = "windows")]
+                let kill_leftovers = !installation.is_gui_app();
+                #[cfg(not(target_os = "windows"))]
+                let kill_leftovers = true;
+
+                if kill_leftovers && kill_leftovers_now {
+                    if let Err(e) = tool_kill_service.stop_tool(&tool.tool_agent_id).await {
+                        let failures = launch_backoff.record_failure(log_attempt);
+                        let delay =
+                            (RETRY_DELAY_SECONDS * failures).min(KILL_RETRY_MAX_DELAY_SECONDS);
+                        if log_attempt {
+                            error!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                   "Failed to stop leftover tool processes - not launching, retrying in {} seconds: {:#}",
+                                   delay, e);
+                        }
+                        sleep(Duration::from_secs(delay)).await;
+                        continue;
+                    }
+                    kill_leftovers_now = false;
+                }
 
                 let processed_args =
                     match params_processor.process(&tool.tool_agent_id, run_command_args.clone()) {
@@ -786,10 +443,7 @@ impl ToolRunManager {
                         }
                     };
 
-                debug!(
-                    "Running tool {} with args: {:?}",
-                    tool.tool_agent_id, processed_args
-                );
+                debug!("Running tool {}", tool.tool_agent_id);
 
                 let command_path = params_processor
                     .directory_manager
@@ -815,24 +469,27 @@ impl ToolRunManager {
                                 break;
                             }
 
-                            // Fresh install: launch once now (Run autorun only fires at next logon); else autorun owns it.
-                            if new_tool {
+                            // Fresh install or relaunch: launch once now (Run autorun only fires at logon); else autorun owns it.
+                            if launch_now
+                                && tool_kill_service.is_installed_tool_running(&tool).await
+                            {
+                                info!(tool_id = %tool.tool_agent_id,
+                                      "GuiApp already running in a user session, not launching another");
+                            } else if launch_now {
                                 let mut launch_args = processed_args.clone();
-                                // For openframe-chat, add --background flag to start in tray
-                                if tool.tool_agent_id == "openframe-chat" {
-                                    launch_args.push("--background".to_string());
-                                }
-                                match launch_process_in_user_session(&command_path, &launch_args) {
-                                    Ok((pid, process_handle)) => {
+                                launch_args
+                                    .extend(gui_launch_flag(&tool.tool_agent_id).map(String::from));
+                                match crate::platform::user_session::launch_in_user_session(
+                                    &command_path,
+                                    &launch_args,
+                                ) {
+                                    Ok(pid) => {
                                         info!(tool_id = %tool.tool_agent_id, pid,
-                                              "GuiApp launched once in user session after install (fire-and-forget)");
-                                        unsafe {
-                                            let _ = CloseHandle(process_handle);
-                                        }
+                                              "GuiApp launched once in user session (fire-and-forget)");
                                     }
                                     Err(e) => {
                                         warn!(tool_id = %tool.tool_agent_id, error = %e,
-                                              "Failed to launch GuiApp in user session after install");
+                                              "Failed to launch GuiApp in user session");
                                     }
                                 }
                             } else {
@@ -880,17 +537,30 @@ impl ToolRunManager {
                                     if let Err(e) =
                                         crate::platform::preferences_writer::write(bid, prefs)
                                     {
-                                        error!(tool_id = %tool.tool_agent_id, "Failed to write preferences: {:#}", e);
+                                        let failures = launch_backoff.record_failure(log_attempt);
+                                        if log_attempt {
+                                            error!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                                   "Failed to write GuiApp preferences - not launching, retrying in {} seconds: {:#}",
+                                                   RETRY_DELAY_SECONDS, e);
+                                        }
+                                        sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+                                        continue;
                                     }
 
-                                    if tool.tool_agent_id == "openframe-chat" {
-                                        vec!["--background".to_string()]
-                                    } else {
-                                        vec![]
-                                    }
+                                    gui_launch_flag(&tool.tool_agent_id)
+                                        .map(String::from)
+                                        .into_iter()
+                                        .collect()
                                 }
                                 None => processed_args.clone(),
                             };
+
+                            // The waits above can outlast an app start (e.g. macOS resuming it at login): re-check before launching.
+                            if is_process_running(&command_path).await {
+                                info!(tool_id = %tool.tool_agent_id, "Already running after the session wait, skipping launch");
+                                running_tools.write().await.remove(&tool.tool_agent_id);
+                                return;
+                            }
 
                             match launch_as_user(&command_path, &launch_args, &user).await {
                                 Ok(mut child) => {
@@ -974,14 +644,7 @@ impl ToolRunManager {
                     .stderr(Stdio::piped())
                     .spawn()
                 {
-                    Ok(child) => {
-                        if let Some((failures, failing_for)) = launch_backoff.record_success() {
-                            info!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
-                                  failing_for_secs = failing_for.as_secs(),
-                                  "Tool process started after repeated launch failures");
-                        }
-                        child
-                    }
+                    Ok(child) => child,
                     Err(e) => {
                         let failures = launch_backoff.record_failure(log_attempt);
                         if log_attempt {
@@ -993,14 +656,20 @@ impl ToolRunManager {
                     }
                 };
 
+                // Forwarded output follows the attempt's log decision until the tool has stayed up.
+                let forward_output = Arc::new(AtomicBool::new(log_attempt));
+
                 // Capture stdout
                 if let Some(stdout) = child.stdout.take() {
                     let tool_id_clone = tool.tool_agent_id.clone();
+                    let forward_output = forward_output.clone();
                     tokio::spawn(async move {
                         let reader = BufReader::new(stdout);
                         let mut lines = reader.lines();
                         while let Ok(Some(line)) = lines.next_line().await {
-                            info!(tool_id = %tool_id_clone, "[stdout] {}", line);
+                            if forward_output.load(Ordering::Acquire) {
+                                info!(tool_id = %tool_id_clone, "[stdout] {}", line);
+                            }
                         }
                     });
                 }
@@ -1008,37 +677,81 @@ impl ToolRunManager {
                 // Capture stderr
                 if let Some(stderr) = child.stderr.take() {
                     let tool_id_clone = tool.tool_agent_id.clone();
+                    let forward_output = forward_output.clone();
                     tokio::spawn(async move {
                         let reader = BufReader::new(stderr);
                         let mut lines = reader.lines();
                         while let Ok(Some(line)) = lines.next_line().await {
-                            info!(tool_id = %tool_id_clone, "[stderr] {}", line);
+                            if forward_output.load(Ordering::Acquire) {
+                                info!(tool_id = %tool_id_clone, "[stderr] {}", line);
+                            }
                         }
                     });
                 }
 
-                match child.wait().await {
-                    Ok(status) => {
-                        if status.success() {
-                            warn!(tool_id = %tool.tool_agent_id,
-                                  "Tool completed successfully but should keep running - restarting in {} seconds",
-                                  RETRY_DELAY_SECONDS);
-                        } else {
-                            error!(tool_id = %tool.tool_agent_id, exit_status = %status,
-                                   "Tool failed with exit status - restarting in {} seconds", RETRY_DELAY_SECONDS);
+                // Only a run that outlives the window counts as started.
+                let (exit, stayed_up) = match timeout(QUICK_EXIT_WINDOW, child.wait()).await {
+                    Ok(exit) => (exit, false),
+                    Err(_) => {
+                        forward_output.store(true, Ordering::Release);
+                        if let Some((failures, failing_for)) = launch_backoff.record_success() {
+                            info!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                  failing_for_secs = failing_for.as_secs(),
+                                  "Tool process stayed up after repeated launch failures");
+                        }
+                        (child.wait().await, true)
+                    }
+                };
+
+                // A stop by a tool op in flight is deliberate, not a failed start.
+                let failed_start = !stayed_up && !tool_ops.is_busy(&tool.tool_agent_id);
+                let (delay, failures) = if failed_start {
+                    let failures = launch_backoff.record_failure(log_attempt);
+                    let step = (failures as usize)
+                        .saturating_sub(1)
+                        .min(FAILED_START_RETRY_DELAYS_SECONDS.len() - 1);
+                    (FAILED_START_RETRY_DELAYS_SECONDS[step], failures)
+                } else {
+                    (RETRY_DELAY_SECONDS, 0)
+                };
+
+                if !failed_start || log_attempt {
+                    match exit {
+                        Ok(status) => {
+                            if status.success() {
+                                warn!(tool_id = %tool.tool_agent_id, failed_attempts = failures,
+                                      "Tool completed successfully but should keep running - restarting in {} seconds",
+                                      delay);
+                            } else {
+                                error!(tool_id = %tool.tool_agent_id, exit_status = %status, failed_attempts = failures,
+                                       "Tool failed with exit status - restarting in {} seconds", delay);
+                            }
+                        }
+                        Err(e) => {
+                            error!(tool_id = %tool.tool_agent_id, error = %e, failed_attempts = failures,
+                                   "Failed to wait for tool process - restarting in {} seconds: {:#}", delay, e);
                         }
                     }
-                    Err(e) => {
-                        error!(tool_id = %tool.tool_agent_id, error = %e,
-                               "Failed to wait for tool process - restarting in {} seconds: {:#}", RETRY_DELAY_SECONDS, e);
-                    }
                 }
-                sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
+                kill_leftovers_now = true;
+
+                // Slept in slices, so shutdown, unsupervision or a finished tool op cuts a long delay short.
+                let deadline = Instant::now() + Duration::from_secs(delay);
+                while Instant::now() < deadline
+                    && !shutting_down.load(Ordering::Acquire)
+                    && running_tools.read().await.contains(&tool.tool_agent_id)
+                    && !tool_ops.is_released(&tool.tool_agent_id)
+                {
+                    sleep(Duration::from_secs(1)).await;
+                }
             }
         });
-
-        Ok(())
     }
+}
+
+// Only a fully installed GuiApp record is launched; an install still in progress launches itself when it completes.
+pub(crate) fn launchable_gui_app(tool: Option<InstalledTool>) -> Option<InstalledTool> {
+    tool.filter(|t| t.installation.is_gui_app() && t.state == ToolRecordState::Installed)
 }
 
 #[cfg(test)]

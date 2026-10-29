@@ -1,13 +1,16 @@
 import { useMemo } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { AnnouncementBar } from '@flamingo-stack/openframe-frontend-core/components'
+import { AnnouncementBar, useLegalDocuments } from '@flamingo-stack/openframe-frontend-core/components'
 import {
-  Header,
-  type HeaderConfig,
+  SiteHeader,
+  TicketAlertsButton,
+  type SiteNav,
 } from '@flamingo-stack/openframe-frontend-core/components/navigation'
 import { AskAi } from './ask-ai'
+import { useAssistantIdentity } from '../providers/assistant-identity'
 import { WalkthroughVideo } from './walkthrough-video'
 import { DOCS_BASE_ROUTE } from '../config/content'
+import { EP } from '../config/endpoints'
 
 const NAV = [
   // No "Home" item — the header wordmark links home.
@@ -18,53 +21,63 @@ const NAV = [
   { to: '/releases', label: 'Releases' },
   { to: '/authors', label: 'Authors' },
   { to: '/faqs', label: 'FAQ' },
-  { to: '/legal/privacy', label: 'Legal' },
+  { to: '/trust-center', label: 'Trust' },
+  { to: '/download', label: 'Download' },
   { to: '/contact', label: 'Contact' },
   { to: '/schedule-a-call', label: 'Schedule' },
   { to: '/tickets', label: 'Tickets' },
   { to: '/mcp', label: 'MCP' },
 ] as const
 
+// The site navigation model: plain data, the same shape every hub platform
+// hands the shared `SiteHeader`. Each entry is a plain link (no panels), and
+// `match` marks the current section. The legal documents follow, one link
+// each, from the hub's list: the host names none of them.
+function siteNav(legal: ReadonlyArray<{ docType: string; title: string }>): SiteNav {
+  const links = [...NAV, ...legal.map((doc) => ({ to: `/legal/${doc.docType}`, label: doc.title }))]
+  return {
+    menus: links.map((n) => ({
+      id: n.to,
+      label: n.label,
+      href: n.to,
+      match: [n.to],
+    })),
+    footerColumns: [],
+    primaryCta: 'none',
+    legal: { company: 'OpenFrame', notes: [], links: [] },
+    brand: { name: 'OpenFrame', tagline: '', social: [] },
+  }
+}
+
 export function AppShell() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  // The launcher shows the SERVER's identity (name and glyph), the same one the
+  // FAQ's ask card uses; with none configured, the lib's own defaults.
+  const assistant = useAssistantIdentity()
+  const { documents: legalDocuments } = useLegalDocuments({ apiEndpoint: EP.legalDocuments })
+  const nav = useMemo(() => siteNav(legalDocuments), [legalDocuments])
+  const mingo = useMemo(
+    () => ({ label: assistant.name ?? undefined, icon: assistant.icon }),
+    [assistant.name, assistant.icon],
+  )
 
-  // The SHARED lib header — the same `Header` shell every hub platform
-  // mounts, proving it embeds cleanly too. Nav links soft-navigate because
+  // The SHARED lib header, the same `SiteHeader` every hub platform mounts,
+  // proving it embeds cleanly too. Its links soft-navigate because
   // react-router is registered into the lib's embed-shims Link (see
-  // providers/embed-router-bridge); no per-item onClick wiring needed.
-  const headerConfig = useMemo<HeaderConfig>(
-    () => ({
-      logo: {
-        // Platform name as the wordmark — the example proxies the OpenFrame
-        // platform's content, so the shell says so.
-        element: <span className="font-semibold text-ods-text-primary">OpenFrame</span>,
-        href: '/',
-      },
-      navigation: {
-        items: NAV.map((n) => ({
-          id: n.to,
-          label: n.label,
-          href: n.to,
-          isActive: pathname.startsWith(n.to),
-        })),
-        position: 'center',
-      },
-      // Support-ticket alerts cell — attention-only (appears with unread
-      // replies, count pill, deep-links to the newest-unread ticket).
-      // Fed by the app-wide <TicketLiveProvider> in app-providers.tsx.
-      tickets: {
-        href: '/tickets',
-        onClick: (href) => navigate(href),
-      },
-      // Mingo launcher in the header — THE chat entry (dispatches
-      // `ask-ai:open`; the always-mounted panel in <AskAi /> listens).
-      // Same retired-floating-dock model as the hub. No mobile burger:
-      // the demo's nav collapses into the shell's center zone; real
-      // hosts opt into `mobile.enabled` with their own icons.
-      mingo: { enabled: true },
-    }),
-    [pathname, navigate],
+  // providers/embed-router-bridge); no `renderLink` needed.
+  const sideActions = useMemo(
+    () => (
+      // Support-ticket alerts cell: attention-only (appears with unread
+      // replies, count pill, deep-links to the newest-unread ticket). Fed by
+      // the app-wide <TicketLiveProvider> in app-providers.tsx.
+      <TicketAlertsButton
+        href="/tickets"
+        onNavigate={(href) => navigate(href)}
+        className="border-l border-ods-border"
+      />
+    ),
+    [navigate],
   )
 
   return (
@@ -79,7 +92,16 @@ export function AppShell() {
           cookie on THIS embed's domain. SSR hosts use the other mode: resolve
           server-side and pass `initialAnnouncement`. */}
       <AnnouncementBar />
-      <Header config={headerConfig} />
+      <SiteHeader
+        nav={nav}
+        pathname={pathname}
+        logo={<span className="font-semibold text-ods-text-primary">OpenFrame</span>}
+        logoHref="/"
+        // Mingo launcher in the header: THE chat entry (dispatches
+        // `ask-ai:open`; the always-mounted panel in <AskAi /> listens).
+        mingo={mingo}
+        sideActions={sideActions}
+      />
       {/* No container constraint here — each route's lib component manages its
        *  own width (e.g. <DocsHubPage> uses `max-w-[1920px]`, <HelpCenterList>
        *  uses <DevSectionPage>). Wrapping in `max-w-6xl` clipped the docs
@@ -87,7 +109,7 @@ export function AppShell() {
       <main className="w-full">
         <Outlet />
       </main>
-      {/* Always-mounted chat panel (headless — opened by the header's
+      {/* Always-mounted chat panel (headless: opened by the header's
           Mingo launcher via the ask-ai:open event; no floating trigger). */}
       <AskAi />
       {/* Floating walkthrough-video widget (bottom-left), fetched via /content. */}

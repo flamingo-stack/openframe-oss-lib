@@ -192,3 +192,48 @@ host's own fallback in the same box and the same type:
   `BookingConfirmation`, `MeetingBookingErrorCode`, `SUPPORTED_FORM_FIELD_TYPES`,
   `MAX_MONTH_OFFSET`.
 - `utils/hubspot-meetings-convention` — the slug parser + label helpers.
+
+## The modal layout (`layout="modal"`)
+
+The card above is a page embed: a context panel beside (or over) the calendar. A 600px
+window has no room for a side column, so the onboarding "Book an Onboarding Call" modal
+asks for `layout="modal"`:
+
+```tsx
+<HubSpotMeetingScheduler meetingId={link.id} layout="modal" onBack={onClose} onBooked={...} />
+```
+
+- The host strip runs across the top with the length on its right: chips when the link
+  offers several lengths, the length alone otherwise. The timezone row sits under it at
+  every width on the calendar step only; the form restates the zone in its summary line.
+- The calendar keeps its width; the times run down one column beside it and scroll inside
+  the calendar's height. On a phone the two stack and the times are four across.
+- A time is chosen, not submitted. Continue, in a footer under the card, opens the details
+  form; Back on the form returns to the calendar. On a phone Cancel sits beside Continue and
+  calls `onBack` (the window has no X there); from the tablet step up the window's own X is
+  the exit and Cancel is not drawn.
+- Opt-in: the default `layout="card"` is byte for byte what every existing embed renders.
+  `flow="details-first"` has no modal arrangement and keeps the card.
+
+## The booking window (`<MeetingSchedulerModal>`)
+
+The whole window, not just its body: a 600px `ModalV2` with the title, the scheduler in
+`layout="modal"`, a "Call booked" toast, and closing on a confirmed booking or a phone's
+Cancel. Prefer it to wrapping `HubSpotMeetingScheduler` in a modal of your own.
+
+```tsx
+<MeetingSchedulerModal
+  isOpen={open}
+  onClose={close}
+  title="Book an Onboarding Call"
+  link={link}            // a SchedulingLink from your /api/meetings payload; null while read or when none
+  loading={isLoading}    // the scheduler draws its loading state until the link lands
+  apiBaseUrl={CONTENT_PREFIX}
+/>
+```
+
+The host passes the link it resolved rather than a meeting id: the same read usually
+decides whether the entry point is offered at all, so the window does not read the
+directory again. With no link and not `loading`, `emptyMessage` is shown in place of the
+scheduler. `onBooked` fires after the toast, before the window closes.
+

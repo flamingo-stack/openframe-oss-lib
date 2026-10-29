@@ -2,10 +2,12 @@
 
 import { useState, useRef, memo, useCallback, type KeyboardEvent, type TouchEvent } from 'react';
 import { Image, Link } from '../embed-shims';
+import { IMAGE_SLOT } from '../styles/image-sizes';
 import { cn } from '../utils/cn';
 import type { MediaItem } from '../utils/media-carousel-utils-stub';
 import { Video } from './features/video';
 import { ImageOffIcon } from './icons-v2-generated/audio-and-visual/image-off-icon';
+import { UnifiedSkeleton } from './loading/unified-skeleton';
 import { Button } from './ui/button';
 
 // Navigation icons
@@ -214,7 +216,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
     const imageLoaded = loadedImageSrc === rawSrc;
     return (
       <div className="absolute inset-0 bg-ods-bg">
-        {!imageLoaded && <div className="absolute inset-0 z-[1] animate-pulse bg-ods-card/90" aria-hidden />}
+        {!imageLoaded && <UnifiedSkeleton className="absolute inset-0 z-[1] h-full rounded-none" aria-hidden />}
         <Image
           src={displayImageSrc(rawSrc)}
           alt={item.alt || `Media ${index + 1}`}
@@ -225,7 +227,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
           )}
           priority={mainImagePriority}
           loading={mainImagePriority ? 'eager' : 'lazy'}
-          sizes="(max-width: 1279px) 100vw, 1428px"
+          sizes={IMAGE_SLOT.full}
           width={1428}
           height={802}
           unoptimized
@@ -293,7 +295,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
             <Button
               variant="transparent"
               onClick={prevSlide}
-              className="absolute left-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 md:h-auto"
+              className="absolute left-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 content-md:h-auto"
               aria-label="Previous media"
             >
               <ChevronLeftIcon />
@@ -302,7 +304,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
             <Button
               variant="transparent"
               onClick={nextSlide}
-              className="absolute right-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 md:h-auto"
+              className="absolute right-3 top-1/2 z-10 h-auto -translate-y-1/2 rounded-full bg-black/50 p-2 text-ods-text-on-dark opacity-0 transition-opacity duration-200 hover:bg-black/70 group-hover:opacity-100 content-md:h-auto"
               aria-label="Next media"
             >
               <ChevronRightIcon />
@@ -326,7 +328,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
                   aria-current={isActive ? 'true' : undefined}
                   aria-label={`Go to slide ${index + 1}`}
                   onClick={() => selectSlide(index)}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full p-0 md:h-6"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full p-0 content-md:h-6"
                 >
                   <span
                     className={cn(
@@ -342,7 +344,3 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
     </div>
   );
 });
-
-// The carousel's item shape is the lib-wide SSOT — re-exported here so hub
-// code can `import type { MediaItem } from '.../components'`.
-export type { MediaItem };

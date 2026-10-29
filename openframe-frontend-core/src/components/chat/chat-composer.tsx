@@ -12,10 +12,20 @@ import { ModelDisplay } from './model-display';
 import type { ChatInputRef, ModelDisplayProps } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 
+/** Why the composer takes no input, in the user's words — shown where the prompt would be. */
+export interface ChatComposerLock {
+  placeholder: string;
+}
+
 export interface ChatComposerProps {
   /** Read-only archived chat → render the unarchive placeholder instead of the
    *  input (Figma node 7361:426949). */
   archived?: boolean;
+  /** The host cannot take a message right now — e.g. the AI balance is spent
+   *  and the agents are paused (Figma 954:28455). The composer keeps its place
+   *  but takes no input: the editor is disabled with the lock's copy in the
+   *  prompt's place, and the `+` menu, the chips and Send are inert. */
+  lock?: ChatComposerLock | null;
   inputRef: Ref<ChatInputRef>;
   onSend: (text: string) => void;
   onStop: () => void;
@@ -51,6 +61,8 @@ export interface ChatComposerProps {
   contextMemoryItems?: ChatContextItem[];
   /** Drop one entity from the context memory (dropdown row ×). */
   onRemoveContextMemoryItem?: (item: ChatContextItem) => void;
+  /** The host is reading a record it will add to the context memory: the empty strip draws its loading form. */
+  contextMemoryPending?: boolean;
   /** Controlled picker open state. */
   contextPickerOpen?: boolean;
   /** Open the picker (the `+` menu's "Assign Item"). */
@@ -80,6 +92,7 @@ export interface ChatComposerProps {
  */
 export function ChatComposer({
   archived = false,
+  lock = null,
   inputRef,
   onSend,
   onStop,
@@ -98,6 +111,7 @@ export function ChatComposer({
   onRemoveContextItem,
   contextMemoryItems,
   onRemoveContextMemoryItem,
+  contextMemoryPending,
   contextPickerOpen = false,
   onOpenContextPicker,
   onCloseContextPicker,
@@ -107,6 +121,7 @@ export function ChatComposer({
   previewText,
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived;
+  const locked = lock != null;
   const selected = selectedContextItems ?? [];
   const memory = contextMemoryItems ?? [];
 
@@ -131,11 +146,15 @@ export function ChatComposer({
       onStop={onStop}
       sending={sending}
       placeholder={placeholder}
+      // Locked: the editor is disabled and the lock's copy stands where the
+      // prompt would; there is nothing to focus, so autofocus stands down too.
+      disabled={locked}
+      disabledPlaceholder={lock?.placeholder}
       previewText={previewText}
       fullWidth
       className="px-0"
       reserveAvatarOffset={false}
-      autoFocus={autoFocus}
+      autoFocus={locked ? false : autoFocus}
       slashCommands={slashCommands}
       onMentionQueryChange={contextEnabled ? onMentionQueryChange : undefined}
       onValueChange={contextEnabled ? onValueChange : undefined}
@@ -148,7 +167,7 @@ export function ChatComposer({
           <ChatComposerPlusMenu
             onToggle={() => (contextPickerOpen ? onCloseContextPicker?.() : onOpenContextPicker?.())}
             open={contextPickerOpen}
-            disabled={attachmentsDisabled}
+            disabled={attachmentsDisabled || locked}
             dropdown={
               contextPicker ? (
                 <ChatContextPicker
@@ -201,8 +220,9 @@ export function ChatComposer({
               <ChatContextMemoryBar
                 items={memory}
                 onRemove={onRemoveContextMemoryItem}
+                pending={contextMemoryPending}
                 resolveIcon={resolveContextIcon}
-                disabled={sending}
+                disabled={sending || locked}
                 className="rounded-t-md"
               />
               {selected.length > 0 && (
@@ -210,7 +230,7 @@ export function ChatComposer({
                   items={selected}
                   onRemove={onRemoveContextItem}
                   resolveIcon={resolveContextIcon}
-                  disabled={sending}
+                  disabled={sending || locked}
                   className={cn(
                     'border-b border-ods-border bg-ods-bg p-2',
                     // Only the TOP strip rounds into the card corner.
@@ -236,7 +256,7 @@ export function ChatComposer({
             attachmentsEnabled
             attachmentsCount={attachmentsCount}
             onAddFiles={onAddFiles}
-            disabled={attachmentsDisabled}
+            disabled={attachmentsDisabled || locked}
           />
         )}
         <div className="min-w-0 flex-1">

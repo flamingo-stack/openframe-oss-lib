@@ -3,6 +3,8 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 const statusBadgeVariants = cva('inline-flex items-center justify-center rounded', {
   variants: {
@@ -52,11 +54,15 @@ const statusBadgeVariants = cva('inline-flex items-center justify-center rounded
  * Per product direction: the TEXT colour is constant (the full platform
  * `--ods-accent`) so every generation stays equally legible; only the BACKGROUND
  * opacity steps down (Gen1 strongest → later gens fainter). Returns the % of the
- * accent mixed into the badge background. */
+ * accent mixed into the badge background.
+ *
+ * The strongest step is 10%: the text is the accent itself, so the more accent
+ * the background holds the less the text stands out from it. On a card, pink on
+ * 10% of itself is 4.65:1; the former 30% was 3.4:1 and 18% was 4.1:1. */
 export function genBadgeBgOpacity(gen: number): number {
-  if (gen <= 1) return 30;
-  if (gen === 2) return 18;
-  return Math.max(10 - (gen - 3) * 6, 4);
+  if (gen <= 1) return 10;
+  if (gen === 2) return 7;
+  return Math.max(4 - (gen - 3), 2);
 }
 
 /** Parse the whole-number gen tier out of a ClickUp Target Version label
@@ -87,9 +93,48 @@ export interface StatusBadgeProps
    * gen badge — do NOT build a parallel component.
    */
   gen?: number;
+  /** The badge's text is still being read: it draws its skeleton (its own padding and type step). A loading scope does
+   *  the same. */
+  loading?: boolean;
+  /** The text is written copy (a content-type chip, "Beta"), not read data: the badge stays real in a loading scope.
+   *  `loading` still switches it. */
+  staticText?: boolean;
 }
 
-function StatusBadge({ text, variant, colorScheme, className, singleLine, gen, style, ...props }: StatusBadgeProps) {
+/**
+ * A badge while its text is read: one skeleton box with the badge's own padding and type step, its content one line
+ * of that step (`box-content`: the padding adds to the line, as it does around the badge's text). `align-top`: an
+ * empty inline box's baseline is its bottom edge, so on its own line it would add the line's descent below it (5 to
+ * 7px taller than the badge with its text).
+ */
+function StatusBadgeSkeleton({ variant, className }: { variant?: 'card' | 'button' | null; className?: string }) {
+  return (
+    <UnifiedSkeleton
+      as="span"
+      className={cn(
+        statusBadgeVariants({ variant, colorScheme: null }),
+        'box-content h-[1lh] w-12 border-transparent align-top',
+        className,
+      )}
+    />
+  );
+}
+
+function StatusBadge({
+  text,
+  variant,
+  colorScheme,
+  className,
+  singleLine,
+  gen,
+  style,
+  loading: loadingProp,
+  staticText = false,
+  ...props
+}: StatusBadgeProps) {
+  const inScope = useLoadingScope();
+  const loading = (inScope && !staticText) || !!loadingProp;
+  if (loading) return <StatusBadgeSkeleton variant={variant} className={className} />;
   // Generation mode: constant full-accent text, progressive-opacity accent bg,
   // SSOT casing (textTransform:none overrides the base `uppercase`). Inline
   // style so it wins over any colorScheme class regardless of CSS source order.

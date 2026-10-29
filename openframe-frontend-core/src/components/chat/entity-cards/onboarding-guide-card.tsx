@@ -17,17 +17,18 @@
  * mounted → same-tab + same-origin relative placeholder.
  */
 
-import { Clock, ExternalLink, GraduationCap, Play } from 'lucide-react';
+import { Clock, ExternalLink, GraduationCap } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { formatDurationMMSS } from '../../../utils/format';
+import { CardHoverPlay } from '../../features/video-center-badge';
+import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import type { OnboardingGuide } from '../types/entities/onboarding-guide';
 import {
   COMPACT_CARD_OUTER,
   COMPACT_CARD_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE_ROW,
   COMPACT_CARD_TITLE,
@@ -35,13 +36,20 @@ import {
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_ROW_FILLER,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { BlogImagePlaceholder } from './blog-image-placeholder';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { EntityAuthorCard } from './entity-author-card';
 import { EntityPortraitCard } from './entity-portrait-card';
+
+/** The content-type chip a portrait guide shows (a static label). */
+const GUIDE_TYPE_LABEL = 'Guide';
+import { MEDIA_ASPECT, TEXT_LINES_MIN } from '../../../styles/component-sizes';
+import { IMAGE_SLOT, fixedImageSlot } from '../../../styles/image-sizes';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-export interface OnboardingGuideCardProps {
+interface LoadedOnboardingGuideCardProps {
   guide: OnboardingGuide;
   /** Detail URL resolved by the caller. */
   href: string;
@@ -57,6 +65,17 @@ export interface OnboardingGuideCardProps {
   showTypeBadge?: boolean | 'default' | 'sm' | 'portrait';
   className?: string;
 }
+
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope.
+ */
+export type OnboardingGuideCardProps =
+  | (LoadedOnboardingGuideCardProps & { loading?: boolean })
+  | (Partial<LoadedOnboardingGuideCardProps> & {
+      loading: true;
+      /** `catalog`: the loading card draws its Published cell. Default true. */ published?: boolean;
+    });
 
 /** Markdown source → clean one-line preview prose. The guide cards preview
  *  `video_summary || content`, and `content` is raw markdown — without this,
@@ -80,6 +99,19 @@ function stripMarkdownPreview(text: string): string {
   );
 }
 
+// The catalog card's boxes, read by the card AND its skeleton, so the two are one size at every width.
+const CATALOG_BODY = 'flex flex-col gap-4 p-6';
+const CATALOG_ROW = 'flex flex-col gap-4 md:flex-row md:gap-6';
+const CATALOG_COVER_COL = 'w-full flex-shrink-0 md:w-[256px]';
+const CATALOG_COVER = `relative ${MEDIA_ASPECT.og} w-full overflow-hidden rounded-lg`;
+const CATALOG_TEXT = 'flex min-w-0 flex-1 flex-col';
+/** Two `text-h2` lines at most. */
+const CATALOG_TITLE_ROW = `mb-3 flex items-start text-h2 ${TEXT_LINES_MIN[2]}`;
+/** Two `text-h6` lines. */
+const CATALOG_SUMMARY_ROW = `text-h6 ${TEXT_LINES_MIN[2]}`;
+/** The catalog card's metadata cells before Published (the card's own label). */
+const CATALOG_EXTRA_CELL_LABELS = ['Section'];
+
 const HORIZONTAL_SIZE_TOKENS = {
   default: {
     padding: 'p-4',
@@ -89,83 +121,99 @@ const HORIZONTAL_SIZE_TOKENS = {
   },
 } as const;
 
-export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'catalog' | 'default' | 'sm' }) {
+/** A guide card while it is read, one per density; `portrait` is the shared portrait skeleton with the static chip. */
+function OnboardingGuideCardSkeleton({
+  size = 'default',
+  showTypeBadge = true,
+  published = true,
+  className,
+}: {
+  size?: 'catalog' | 'default' | 'sm' | 'portrait';
+  /**
+   * `catalog`: the metadata grid has its Published cell (the card shows one when the guide carries `published_at`;
+   * the related-content rail's rows do not).
+   */
+  published?: boolean;
+  /** `portrait`: the card shows the "Guide" chip. */
+  showTypeBadge?: boolean;
+  className?: string;
+}) {
+  if (size === 'portrait') {
+    return (
+      <EntityPortraitCard
+        loading
+        href=""
+        imageAlt=""
+        title=""
+        typeLabel={showTypeBadge ? GUIDE_TYPE_LABEL : undefined}
+        className={className}
+      />
+    );
+  }
   if (size === 'catalog') {
     return (
-      <div className="flex animate-pulse flex-col gap-4 overflow-hidden rounded-lg border border-ods-border bg-ods-card p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className="aspect-[1200/630] w-full flex-shrink-0 rounded-lg bg-ods-border md:w-[256px]" />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="mb-3 flex min-h-[60px] flex-col justify-start gap-1.5 md:min-h-[72px]">
-              <div className="h-[25px] w-3/4 rounded bg-ods-border md:h-[30px]" />
-              <div className="h-[25px] w-1/2 rounded bg-ods-border md:h-[30px]" />
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'block', className)} aria-hidden>
+        <div className={CATALOG_BODY}>
+          <div className={CATALOG_ROW}>
+            <div className={CATALOG_COVER_COL}>
+              <UnifiedSkeleton className={CATALOG_COVER} />
             </div>
-            <div className="flex min-h-[46px] flex-col justify-start gap-2 md:min-h-[52px]">
-              <div className="h-3 w-full rounded bg-ods-border/70" />
-              <div className="h-3 w-5/6 rounded bg-ods-border/70" />
-            </div>
-          </div>
-        </div>
-        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border md:grid-cols-3">
-          {[0, 1].map(i => (
-            <div
-              key={`cell-${i}`}
-              className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r"
-            >
-              <div className="flex flex-col gap-2">
-                <div className="h-6 w-32 rounded bg-ods-bg" />
-                <div className="h-3 w-20 rounded bg-ods-bg/60" />
+            <div className={CATALOG_TEXT}>
+              <div className={CATALOG_TITLE_ROW}>
+                {/* The loaded title's clamp, two `text-h2` lines, wherever a typical title wraps (a phone, a tablet's
+                    column); one line from lg, where the text column holds a typical title. */}
+                <TextLineSkeleton type="h2" lines={2} className="w-3/4 lg:hidden" />
+                <TextLineSkeleton type="h2" className="hidden w-3/4 lg:flex" />
+              </div>
+              <div className={CATALOG_SUMMARY_ROW}>
+                <TextLineSkeleton type="h6" lines={2} className="w-full" />
               </div>
             </div>
-          ))}
-          <div className="flex items-center gap-3 bg-ods-card p-4">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-bg" />
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <div className="h-4 w-3/4 rounded bg-ods-bg" />
-              <div className="h-3 w-1/2 rounded bg-ods-bg/60" />
-            </div>
           </div>
+          <EntityAuthorCard
+            loading
+            author={null}
+            extraCells={CATALOG_EXTRA_CELL_LABELS.map(label => ({ value: '', label }))}
+            publishedAt={published ? null : undefined}
+          />
         </div>
       </div>
     );
   }
   if (size === 'sm') {
-    return (
-      <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-        <span className={COMPACT_CARD_TEXT_COL}>
-          <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className="h-3.5 w-3/5 rounded bg-ods-bg" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-2/5 rounded bg-ods-bg/70" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
-          </span>
-        </span>
-        <span className="flex h-5 shrink-0 items-center self-start">
-          <span className="h-3.5 w-3.5 rounded bg-ods-bg" />
-        </span>
-      </span>
-    );
+    return <CompactCardSkeleton trailingIcon className={className} />;
   }
   const t = HORIZONTAL_SIZE_TOKENS.default;
   return (
     <span
-      className={`flex items-start gap-3 rounded-md border border-ods-border bg-ods-card ${t.padding} animate-pulse`}
+      className={cn(`flex items-start gap-3 rounded-md border border-ods-border bg-ods-card ${t.padding}`, className)}
     >
       <span className={`inline-flex shrink-0 items-center justify-center rounded-full bg-ods-bg ${t.step}`} />
       <span className="flex min-w-0 flex-1 flex-col gap-2">
-        <span className="block h-4 w-2/3 rounded bg-ods-bg" />
-        <span className="block h-3 w-1/3 rounded bg-ods-bg/70" />
-        <span className="block h-3 w-full rounded bg-ods-bg/40" />
+        <UnifiedSkeleton as="span" className="block h-4 w-2/3 rounded" />
+        <UnifiedSkeleton as="span" className="block h-3 w-1/3 rounded" />
+        <UnifiedSkeleton as="span" className="block h-3 w-full rounded" />
       </span>
     </span>
   );
 }
 
-export function OnboardingGuideCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function OnboardingGuideCard(props: OnboardingGuideCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return (
+      <OnboardingGuideCardSkeleton
+        size={props.size}
+        showTypeBadge={props.showTypeBadge !== false}
+        published={'published' in props ? props.published : props.guide ? props.guide.published_at != null : true}
+        className={props.className}
+      />
+    );
+  }
+  return <LoadedOnboardingGuideCard {...props} />;
+}
+
+function LoadedOnboardingGuideCard({
   guide,
   href,
   target: targetProp,
@@ -175,7 +223,7 @@ export function OnboardingGuideCard({
   size = 'default',
   showTypeBadge = true,
   className,
-}: OnboardingGuideCardProps) {
+}: LoadedOnboardingGuideCardProps) {
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -197,7 +245,7 @@ export function OnboardingGuideCard({
         href={href}
         target={target}
         rel={rel}
-        typeLabel={showTypeBadge ? 'Guide' : undefined}
+        typeLabel={showTypeBadge ? GUIDE_TYPE_LABEL : undefined}
         imageUrl={coverImage}
         placeholderUrl={placeholderUrl}
         imageAlt={guide.title}
@@ -223,26 +271,18 @@ export function OnboardingGuideCard({
         target={target}
         rel={rel}
         prefetch={false}
-        className={cn(
-          'group block bg-ods-card no-underline',
-          'overflow-hidden rounded-lg border border-ods-border',
-          'transition-all duration-300 ease-out',
-          'transform hover:translate-y-[-2px]',
-          'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',
-          className,
-        )}
-        aria-label={`Open ${guide.title}`}
+        className={cn(CONTENT_CARD_FRAME_CLASS, 'block no-underline', className)}
       >
-        <div className="flex flex-col gap-4 p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-            <div className="w-full flex-shrink-0 md:w-[256px]">
-              <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-lg bg-ods-bg">
+        <div className={CATALOG_BODY}>
+          <div className={CATALOG_ROW}>
+            <div className={CATALOG_COVER_COL}>
+              <div className={cn(CATALOG_COVER, 'bg-ods-bg')}>
                 {coverImage ? (
                   <Image
                     src={coverImage}
                     alt={guide.title}
                     fill
-                    sizes="(max-width: 768px) 100vw, 256px"
+                    sizes={IMAGE_SLOT.panel}
                     className="object-cover"
                     unoptimized
                   />
@@ -253,11 +293,7 @@ export function OnboardingGuideCard({
                     className="absolute inset-0"
                   />
                 )}
-                {hasVideoCover && coverImage && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <Play className="h-10 w-10 text-ods-text-on-dark" fill="white" />
-                  </span>
-                )}
+                {hasVideoCover && coverImage && <CardHoverPlay size="md" />}
                 {durationLabel && (
                   <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-ods-text-on-dark text-code">
                     <Clock className="h-3 w-3" />
@@ -267,11 +303,11 @@ export function OnboardingGuideCard({
               </div>
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col">
-              <div className="mb-3 flex min-h-[60px] items-start md:min-h-[72px]">
+            <div className={CATALOG_TEXT}>
+              <div className={CATALOG_TITLE_ROW}>
                 <h3 className="line-clamp-2 text-ods-text-primary text-h2">{guide.title}</h3>
               </div>
-              <div className="min-h-[46px] md:min-h-[52px]">
+              <div className={CATALOG_SUMMARY_ROW}>
                 <p className="line-clamp-2 text-ods-text-secondary text-h6">
                   {stripMarkdownPreview(guide.video_summary || guide.content || '')}
                 </p>
@@ -286,7 +322,7 @@ export function OnboardingGuideCard({
             extraCells={[
               {
                 value: `${guide.section} · Step ${stepLabel}`,
-                label: 'Section',
+                label: CATALOG_EXTRA_CELL_LABELS[0],
                 uppercase: false,
               },
             ]}
@@ -306,20 +342,30 @@ export function OnboardingGuideCard({
       (s): s is string => typeof s === 'string' && s.length > 0,
     );
     return (
-      <Link href={href} target={target} rel={rel} prefetch={false} className={cn(COMPACT_CARD_OUTER, className)}>
+      <Link
+        href={href}
+        target={target}
+        rel={rel}
+        prefetch={false}
+        // `group`: the play mark on a video cover shows on the card's hover.
+        className={cn(COMPACT_CARD_OUTER, 'group', className)}
+      >
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
-            <Image src={compactCover} alt={guide.title} fill sizes="56px" className="object-contain" unoptimized />
+            <Image
+              src={compactCover}
+              alt={guide.title}
+              fill
+              sizes={fixedImageSlot('tile')}
+              className="object-contain"
+              unoptimized
+            />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-ods-accent">
               <GraduationCap className="h-4 w-4" />
             </span>
           )}
-          {hasVideoCover && compactCover && (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Play className="h-4 w-4 text-ods-text-on-dark" fill="white" />
-            </span>
-          )}
+          {hasVideoCover && compactCover && <CardHoverPlay size="sm" />}
         </span>
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>

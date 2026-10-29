@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { useRichMarkdownRuntime } from './rich-markdown-runtime';
 
 /**
@@ -31,6 +34,8 @@ const DISPLAY_W = 768; // logical width hint; the optimizer handles srcset + ret
 
 export function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
   const { transformImageSrc } = useRichMarkdownRuntime();
+  // In a loading scope the image is the box it reserves while probing, and nothing is fetched.
+  const held = useLoadingScope();
   // Tagged with the src it was measured from. That tag IS the reset: a reused
   // instance handed a new `src` stops matching immediately, so it can never
   // size the new image with the previous image's ratio — where the old explicit
@@ -40,6 +45,7 @@ export function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
   const ratio = probed?.src === src ? probed.ratio : null; // width / height
 
   useEffect(() => {
+    if (held) return undefined;
     let cancelled = false;
     // Probe a tiny aspect-preserving variant so we learn the real ratio without
     // downloading the full image; the display copy is then fetched once, at the right size.
@@ -58,14 +64,15 @@ export function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
     return () => {
       cancelled = true;
     };
-  }, [src, transformImageSrc]);
+  }, [src, transformImageSrc, held]);
 
   // Reserve a neutral box while probing so the layout doesn't jump when the image appears.
-  if (!ratio) {
+  if (!ratio || held) {
     return (
-      <span
-        className="mx-auto my-2 block w-full max-w-full animate-pulse rounded-lg bg-ods-card"
-        style={{ aspectRatio: '3 / 2', maxHeight: `${MAX_H_REM}rem` }}
+      <UnifiedSkeleton
+        as="span"
+        className="mx-auto my-2 block aspect-[3/2] w-full max-w-full rounded-lg"
+        style={{ maxHeight: `${MAX_H_REM}rem` }}
         aria-hidden
       />
     );
@@ -77,7 +84,7 @@ export function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
       alt={alt ?? 'No image available'}
       width={DISPLAY_W}
       height={Math.round(DISPLAY_W / ratio)}
-      sizes="(max-width: 768px) 100vw, 768px"
+      sizes={IMAGE_SLOT.column}
       loading="lazy"
       // `object-contain` → SupabaseOptimizedImage uses `resize=contain` (no crop).
       // `w-full` (not `w-auto`) gives the img a definite width so it lays out + lazy-loads

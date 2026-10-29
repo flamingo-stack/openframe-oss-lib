@@ -7,17 +7,16 @@ import {
   releaseClient,
   startConnectionLifecycle,
   type AcquireClientOptions,
+  type NatsBeforeReconnect,
   type NatsReconnectionBackoff,
 } from './shared-connection';
-
-export type { NatsReconnectionBackoff } from './shared-connection';
 
 export interface NatsProviderProps {
   children: ReactNode;
   /** Return the current NATS WebSocket URL (or null when not yet available, e.g. unauthenticated). */
   getWsUrl: () => string | null;
-  /** Called before each reconnect attempt. */
-  onBeforeReconnect?: () => Promise<void> | void;
+  /** Called before each reconnect attempt. May return a verdict; see `NatsReconnectVerdict`. */
+  onBeforeReconnect?: NatsBeforeReconnect;
   clientConfig?: AcquireClientOptions;
   reconnectionBackoff?: NatsReconnectionBackoff;
   /**
@@ -32,6 +31,12 @@ export interface NatsContextValue {
   status: NatsStatus;
   isReady: boolean;
   reconnectionCount: number;
+  /**
+   * A `terminal` verdict stopped reconnecting; `status` stays `disconnected`. Reset when this
+   * provider re-acquires (`urlRevision` changes); the connection itself stays terminal while
+   * another consumer still holds it.
+   */
+  terminal: boolean;
 }
 
 const NatsContext = createContext<NatsContextValue | null>(null);
@@ -47,6 +52,7 @@ export function NatsProvider({
   const [client, setClient] = useState<NatsClient | null>(null);
   const [status, setStatus] = useState<NatsStatus>('closed');
   const [reconnectionCount, setReconnectionCount] = useState(0);
+  const [terminal, setTerminal] = useState(false);
 
   const getWsUrlRef = useRef(getWsUrl);
   useEffect(() => {
@@ -97,9 +103,10 @@ export function NatsProvider({
     const lifecycle = startConnectionLifecycle({
       conn,
       wsUrl,
-      onBeforeReconnect: () => onBeforeReconnectRef.current?.(),
+      onBeforeReconnect: ctx => onBeforeReconnectRef.current?.(ctx),
       backoff: reconnectionBackoffRef.current,
       getFreshUrl: () => getWsUrlRef.current(),
+      onTerminal: () => setTerminal(true),
       onStatusChange: newStatus => {
         if (newStatus === 'error') return;
         setStatus(newStatus);
@@ -120,6 +127,7 @@ export function NatsProvider({
       }
       setClient(null);
       setStatus('closed');
+      setTerminal(false);
     };
   }, [urlRevision]);
 
@@ -129,8 +137,9 @@ export function NatsProvider({
       status,
       isReady: status === 'connected' && client !== null,
       reconnectionCount,
+      terminal,
     }),
-    [client, status, reconnectionCount],
+    [client, status, reconnectionCount, terminal],
   );
 
   return <NatsContext.Provider value={value}>{children}</NatsContext.Provider>;

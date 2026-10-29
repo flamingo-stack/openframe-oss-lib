@@ -10,9 +10,10 @@ import {
   SearchIcon,
 } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
+import { ActionsMenuDropdown } from '../ui/actions-menu';
+import { Button } from '../ui/button';
 import { SquareAvatar } from '../ui/square-avatar';
-import { ChatHeaderIconButton } from './chat-header-icon-button';
+import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
 
@@ -37,15 +38,18 @@ export interface ChatPanelHeaderProps {
   /** Back-chevron handler. Required only when `showBack` — the list view has no
    *  back affordance. */
   onBack?: () => void;
-  /** Close the panel. */
-  onClose: () => void;
+  /** Close the panel. Omit for a panel that cannot close (docked in the
+   *  layout): the close button is left out. */
+  onClose?: () => void;
   /** Restore/unarchive — renders the refresh button (archived view only). */
   onRestore?: () => void;
-  /** Rename — adds the "Rename chat" item to the ⋯ menu. */
+  /** Rename — adds the "Rename Chat" item to the ⋯ menu. */
   onRename?: () => void;
-  /** Archive — adds the "Archive chat" item to the ⋯ menu. */
+  /** Archive — adds the "Archive Chat" item to the ⋯ menu. */
   onArchive?: () => void;
-  /** Copy a shareable link to the open conversation — adds the "Copy chat link"
+  /** Compact — adds the "Compact Chat Memory" item to the ⋯ menu. */
+  onCompact?: () => void;
+  /** Copy a shareable link to the open conversation — adds the "Copy Chat Link"
    *  item to the ⋯ menu. The host owns the URL and the copy. */
   onCopyLink?: () => void;
   /** Open the Chat Archive page — renders the clock button (list view only). */
@@ -87,6 +91,7 @@ export function ChatPanelHeader({
   onRestore,
   onRename,
   onArchive,
+  onCompact,
   onCopyLink,
   onOpenArchive,
   compact = false,
@@ -97,12 +102,8 @@ export function ChatPanelHeader({
 }: ChatPanelHeaderProps) {
   // Search open (with a wired handler) swaps the title for the inline field.
   const searchInline = searchActive && !!onSearchChange;
-  // Desktop ⋯ menu (active, non-archived conversation only) — rename / archive.
-  const menuItems = [
-    onCopyLink && { id: 'copy-link', label: 'Copy chat link', onClick: onCopyLink },
-    onRename && { id: 'rename', label: 'Rename chat', onClick: onRename },
-    onArchive && { id: 'archive', label: 'Archive chat', onClick: onArchive },
-  ].filter(Boolean) as ActionsMenuItem[];
+  // Desktop ⋯ menu (active, non-archived conversation only).
+  const menuItems = chatDialogMenuItems({ onCopyLink, onRename, onCompact, onArchive });
 
   return (
     <>
@@ -122,6 +123,7 @@ export function ChatPanelHeader({
           onRestore={onRestore}
           onRename={onRename}
           onArchive={onArchive}
+          onCompact={onCompact}
           onCopyLink={onCopyLink}
           onOpenArchive={onOpenArchive}
         />
@@ -131,16 +133,16 @@ export function ChatPanelHeader({
           bar with full-height divider action cells. */}
       <div
         className={cn(
-          'h-14 w-full flex-shrink-0 overflow-hidden border-b border-ods-border bg-ods-card',
+          'h-14 w-full flex-shrink-0 divide-x divide-ods-border overflow-hidden border-b border-ods-border bg-ods-card',
           compact ? 'flex' : 'hidden md:flex',
         )}
       >
         {/* Back — a full-height leading cell (right divider), the same
-            `ChatHeaderIconButton` primitive as the trailing ⋯ / close cells. */}
+            ``Button variant="cell"`` primitive as the trailing ⋯ / close cells. */}
         {showBack && (
-          <ChatHeaderIconButton divider="right" onClick={onBack} aria-label={backAriaLabel}>
+          <Button variant="cell" className="w-14" onClick={onBack} aria-label={backAriaLabel}>
             <Chevron02LeftIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
         )}
         {searchInline ? (
           // Search open — the inline field takes over the title area in place
@@ -174,9 +176,9 @@ export function ChatPanelHeader({
 
         {/* Restore (refresh) — archived chat header (Figma node 7361:425441). */}
         {isArchivedView && onRestore && (
-          <ChatHeaderIconButton onClick={onRestore} aria-label="Unarchive chat">
+          <Button variant="cell" className="w-14" onClick={onRestore} aria-label="Unarchive chat">
             <Refresh01LeftIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
         )}
 
         {/* Rename / Archive menu — active (non-archived) conversation only. */}
@@ -186,9 +188,9 @@ export function ChatPanelHeader({
             onCloseAutoFocus={e => e.preventDefault()}
             groups={[{ items: menuItems }]}
             customTrigger={
-              <ChatHeaderIconButton aria-label="Chat actions">
+              <Button variant="cell" className="w-14" aria-label="Chat actions">
                 <Ellipsis01Icon size={24} />
-              </ChatHeaderIconButton>
+              </Button>
             }
           />
         )}
@@ -196,21 +198,29 @@ export function ChatPanelHeader({
         {/* Dialog search toggle — list view only, before the archive entry.
             Hidden while search is open (the inline field owns the magnifier). */}
         {!showBack && !searchInline && onToggleSearch && (
-          <ChatHeaderIconButton onClick={onToggleSearch} aria-label="Search chats" aria-pressed={searchActive}>
+          <Button
+            variant="cell"
+            className="w-14"
+            onClick={onToggleSearch}
+            aria-label="Search chats"
+            aria-pressed={searchActive}
+          >
             <SearchIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
         )}
 
         {/* Chat Archive entry (Figma node 7532:225034) — list view only. */}
         {!showBack && onOpenArchive && (
-          <ChatHeaderIconButton onClick={onOpenArchive} aria-label="Chat archive">
+          <Button variant="cell" className="w-14" onClick={onOpenArchive} aria-label="Chat archive">
             <ClockHistoryIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
         )}
 
-        <ChatHeaderIconButton onClick={onClose} aria-label="Close">
-          <XmarkIcon size={24} />
-        </ChatHeaderIconButton>
+        {onClose && (
+          <Button variant="cell" className="w-14" onClick={onClose} aria-label="Close">
+            <XmarkIcon size={24} />
+          </Button>
+        )}
       </div>
     </>
   );

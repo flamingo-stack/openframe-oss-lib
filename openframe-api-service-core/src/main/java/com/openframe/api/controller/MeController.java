@@ -1,6 +1,8 @@
 package com.openframe.api.controller;
 
+import com.openframe.api.service.tenant.SuperUserResolver;
 import com.openframe.security.authentication.AuthPrincipal;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -11,7 +13,10 @@ import java.util.Map;
 
 @Slf4j
 @RestController
+@RequiredArgsConstructor
 public class MeController {
+
+    private final SuperUserResolver superUserResolver;
 
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal AuthPrincipal principal) {
@@ -32,8 +37,9 @@ public class MeController {
                         "email", principal.getEmail(),
                         "displayName", principal.getDisplayName(),
                         "roles", principal.getRoles(),
-                        "tenantId", principal.getTenantId()
+                        "tenantId", principal.getTenantId(),
+                        "isSuperUser", superUserResolver.isSuperUser(principal)
                 )
         ));
     }
-} 
+}

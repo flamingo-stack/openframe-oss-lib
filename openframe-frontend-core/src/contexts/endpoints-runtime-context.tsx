@@ -34,6 +34,11 @@ export interface EndpointsRuntime {
   };
   /** POST contact-form submission. */
   contactUrl: string;
+  /** Base of the host's form-rescue draft endpoints: `POST <base>` saves a
+   *  half-filled public form (upsert by `attempt_id`), `GET <base>/resume/<token>` reads one
+   *  back for a resume link (`useFormRescue`). OPTIONAL: a host without them
+   *  omits it and forms keep only this device's local draft. */
+  formDraftsUrl?: string;
   /** GET base of the host's private-storage view proxy
    *  (`<base>/<bucket>/<object>`). `ClaudeEmbed` derives artifact mirror
    *  urls under it (`<base>/design-briefs/<uuid>.html`). OPTIONAL: a host

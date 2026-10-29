@@ -59,10 +59,10 @@
  * responsive action layout on md+. This one intentionally CHANGES the baseline
  * for every caller, per the approved design (Figma open-design-system node
  * 2200-7452): instead of tablet always stacking actions below the title
- * (`md:flex-col`) and desktop always keeping one row (long titles clipped),
+ * (`content-md:flex-col`) and desktop always keeping one row (long titles clipped),
  * md+ is a single `flex-wrap` row — actions stay inline with a short title on
  * BOTH tablet and desktop, and wrap to a second row only when the title is
- * long enough to overflow. The title column is `md:flex-none md:max-w-full`
+ * long enough to overflow. The title column is `content-md:flex-none content-md:max-w-full`
  * so its natural width drives the wrap while `truncate` still clamps a title
  * that alone exceeds the container. The mobile (base) layout is untouched.
  * This is the new frozen baseline; do NOT re-introduce breakpoint stacking.
@@ -79,27 +79,40 @@
  * a `div` inside a `p` is auto-closed by the HTML parser, which would split the
  * subtitle paragraph and desync hydration. The `titleWrap` branch is untouched
  * (wrapped text never clips, so it never needs a tooltip).
+ *
+ * SANCTIONED EXCEPTION (2026-10, explicit human sign-off): loading scopes. In a
+ * `LoadingScope` a title or subtitle that is READ arrives as '' (an absent one
+ * is undefined) and is drawn exactly as `loading` draws it: its bar inside the
+ * real `h1`/`p`. A given title or subtitle is the page's own words, drawn as
+ * is. Outside a scope every caller is byte-identical.
  * ========================================================================== */
 
 import type React from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { cn } from '../../utils/cn';
+import {
+  type TextLinesByBreakpoint,
+  TextLinesByBreakpointSkeleton,
+  UnifiedSkeleton,
+} from '../loading/unified-skeleton';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
 import { EntityImage } from '../ui/entity-image';
 import { FloatingTooltip } from '../ui/floating-tooltip';
+import { useLoadingScope } from '../ui/loading-scope';
 import { PageActions, type PageActionButton } from '../ui/page-actions';
 import { BackButton } from './back-button';
+import { PageTitle } from './page-picture';
 
 /**
  * Minimum height of the title block's content column, matched to the action
  * button height: the icon button on mobile (`h-11` → 44px) and the default
- * button on desktop (`md:h-12` → 48px). Applied to the inner title column (which
+ * button on desktop (`content-md:h-12` → 48px). Applied to the inner title column (which
  * has no padding) rather than the root — the root's `pt`/`mb` are box-sizing
  * border-box and would otherwise absorb the floor. Keeps the header a consistent
  * height across pages whether or not they render action buttons, so the content
  * below starts at the same baseline. Exported so other page chrome can reuse it.
  */
-export const TITLE_BLOCK_MIN_HEIGHT = 'min-h-11 md:min-h-12';
+export const TITLE_BLOCK_MIN_HEIGHT = 'min-h-11 content-md:min-h-12';
 
 export interface TitleBlockProps {
   title?: string;
@@ -155,24 +168,24 @@ export interface TitleBlockProps {
    *  ellipsis clamp. For content detail pages whose h1 is CMS data of arbitrary length.
    *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
   titleWrap?: boolean;
+  /**
+   * The lines a typical title of the page takes per breakpoint, drawn by the loading title (a record's title is read; a
+   * long one growing past them is a settle). Absent: one bar. Without `titleWrap` the loaded title wraps where the
+   * window is narrow, so the lines follow the viewport step (`phone` below `md`): a caller states `md: 1, lg: 1` and
+   * the phone count it measured.
+   */
+  titleSkeletonLines?: TextLinesByBreakpoint;
 }
 
 /**
- * Inline text skeleton — used only in `loading` mode, placed directly inside the real
- * `h1`/`p`. It is a single `inline-block` bar whose height is intentionally SHORTER than the
- * typography line-height, and it uses the default baseline alignment. That way the element's
+ * The inline text skeleton, used only in `loading` mode, placed directly inside the real
+ * `h1`/`p`: a single `inline-block` `UnifiedSkeleton` span whose height is intentionally SHORTER
+ * than the typography line-height, on the default baseline alignment. That way the element's
  * own line-box STRUT (text-h2 → 40px, text-h6 → 20px) sets the height exactly as it would for
- * real text — the bar fits within the ascent and never inflates the line. So a loading header
+ * real text: the bar fits within the ascent and never inflates the line. So a loading header
  * is pixel-identical in height to the loaded one. Phrasing-valid (`span` only).
  */
-function TitleTextSkeleton({ widthClass, heightClass }: { widthClass: string; heightClass: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn('inline-block max-w-full animate-pulse rounded-md bg-ods-border', widthClass, heightClass)}
-    />
-  );
-}
+const TITLE_TEXT_SKELETON_CLASS = 'inline-block max-w-full rounded-md';
 
 /**
  * Bar geometry per title size, following the ODS type scale across breakpoints
@@ -183,11 +196,11 @@ function TitleTextSkeleton({ widthClass, heightClass }: { widthClass: string; he
  * 32/40 from tablet up. `text-h1` scales at both breakpoints (40 → 48 → 56), so
  * its bar does too — reusing the h2 bar there would leave a stamp-sized smudge
  * inside a 64px line. Heights stay well under the line box's ascent on purpose;
- * see `TitleTextSkeleton` for why that is what keeps the header height honest.
+ * see `TITLE_TEXT_SKELETON_CLASS` for why that is what keeps the header height honest.
  */
 const TITLE_SKELETON_SIZE = {
-  h1: { width: 'w-56 md:w-80 lg:w-96', height: 'h-7 md:h-8 lg:h-9' },
-  h2: { width: 'w-48 md:w-72', height: 'h-4 md:h-6' },
+  h1: { width: 'w-56 content-md:w-80 content-lg:w-96', height: 'h-7 content-md:h-8 content-lg:h-9' },
+  h2: { width: 'w-48 content-md:w-72', height: 'h-4 content-md:h-6' },
 } as const;
 
 export function TitleBlock({
@@ -207,8 +220,17 @@ export function TitleBlock({
   loadingActions,
   subtitleRow = 'when-set',
   titleWrap = false,
+  titleSkeletonLines,
 }: TitleBlockProps) {
-  const hasSubtitleRow = !!subtitle || subtitleRow === 'always' || (subtitleRow === 'while-loading' && !!loading);
+  // In a loading scope a read title / subtitle ('' there) is drawn as `loading` draws it.
+  const scoped = useLoadingScope();
+  const titleLoading = !!loading || (scoped && title === '');
+  const subtitleLoading = !!loading || (scoped && subtitle === '');
+  const hasSubtitleRow =
+    !!subtitle ||
+    subtitleRow === 'always' ||
+    (subtitleRow === 'while-loading' && !!loading) ||
+    (scoped && subtitle === '');
   const hasActions = actions && actions.length > 0;
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0);
   const titleClass = titleSize === 'h1' ? 'text-h1' : 'text-h2';
@@ -220,15 +242,41 @@ export function TitleBlock({
   // Exactly one title element renders per pass, so one ref covers every branch.
   // The tooltip arms itself only on real clipping — repeating a fully visible
   // title back to the user is noise, and `titleWrap`/loading never clip at all.
-  const { ref: titleRef, isTruncated: titleTruncated } = useIsTruncated<HTMLHeadingElement>(loading ? null : title);
+  const { ref: titleRef, isTruncated: titleTruncated } = useIsTruncated<HTMLHeadingElement>(
+    titleLoading ? null : title,
+  );
   const { ref: subtitleRef, isTruncated: subtitleTruncated } = useIsTruncated<HTMLParagraphElement>(
-    loading ? null : subtitle,
+    subtitleLoading ? null : subtitle,
   );
-  const titleNode = loading ? (
-    <TitleTextSkeleton widthClass={skeletonSize.width} heightClass={skeletonSize.height} />
-  ) : (
-    title
-  );
+  const titleNode =
+    titleLoading && titleSkeletonLines && titleWrap ? (
+      <TextLinesByBreakpointSkeleton as="span" lines={titleSkeletonLines} />
+    ) : titleLoading && titleSkeletonLines ? (
+      // An unclamped title wraps where the WINDOW is narrow (a phone), not where a docked panel narrows the content:
+      // its loading lines follow the viewport step, the phone count below `md` and the `md` count above it.
+      <>
+        <span className="contents md:hidden">
+          <TextLinesByBreakpointSkeleton
+            as="span"
+            lines={{ phone: titleSkeletonLines.phone, md: titleSkeletonLines.phone, lg: titleSkeletonLines.phone }}
+          />
+        </span>
+        <span className="hidden md:contents">
+          <TextLinesByBreakpointSkeleton
+            as="span"
+            lines={{ phone: titleSkeletonLines.md, md: titleSkeletonLines.md, lg: titleSkeletonLines.lg }}
+          />
+        </span>
+      </>
+    ) : titleLoading ? (
+      <UnifiedSkeleton
+        as="span"
+        aria-hidden
+        className={cn(TITLE_TEXT_SKELETON_CLASS, skeletonSize.width, skeletonSize.height)}
+      />
+    ) : (
+      title
+    );
 
   return (
     <div
@@ -236,15 +284,15 @@ export function TitleBlock({
         'flex items-end justify-between gap-[var(--spacing-system-m)]',
         // md+: one wrapping row — actions stay inline with a short title and
         // wrap to a second row only when the title overflows (ClickUp 86ahd6uy5).
-        'md:flex-wrap md:content-end',
+        'content-md:flex-wrap content-md:content-end',
         'pt-[var(--spacing-system-l)]',
         variant === 'card'
           ? cn(
               'border-b border-ods-border bg-ods-card',
               'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
-              'md:border-b-0 md:bg-transparent',
-              'md:px-0 md:pb-0',
-              'md:mb-[var(--spacing-system-l)]',
+              'content-md:border-b-0 content-md:bg-transparent',
+              'content-md:px-0 content-md:pb-0',
+              'content-md:mb-[var(--spacing-system-l)]',
             )
           : 'mb-[var(--spacing-system-l)]',
         className,
@@ -255,18 +303,21 @@ export function TitleBlock({
           wrap line; a short title leaves them inline. Base (mobile) keeps flex-1. */}
       <div
         className={cn(
-          'flex min-w-0 flex-1 flex-col justify-center gap-[var(--spacing-system-xs)] md:max-w-full md:flex-none',
+          'flex min-w-0 flex-1 flex-col justify-center gap-[var(--spacing-system-xs)] content-md:max-w-full content-md:flex-none',
           TITLE_BLOCK_MIN_HEIGHT,
+          // A wrapping title's loading lines stand for a title that fills the row (its typical lines are full ones), so the
+          // column takes the row's width: sized to content it would shrink to the bars' minimum.
+          titleLoading && titleWrap && titleSkeletonLines && 'content-md:w-full',
         )}
       >
         {backButton && (
-          <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden md:inline-flex" />
+          <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden content-md:inline-flex" />
         )}
-        {image || hasSubtitleRow || loading ? (
+        {image || hasSubtitleRow || titleLoading ? (
           <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
             {image && <EntityImage src={image.src} alt={image.alt} fallbackText={image.alt || title} />}
             <div className="flex min-w-0 flex-1 flex-col justify-center">
-              {(loading || title) &&
+              {(titleLoading || title) &&
                 (titleAdornment ? (
                   <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
                     {/* `min-w-0` moves onto the tooltip's wrapper: the wrapper is
@@ -278,20 +329,20 @@ export function TitleBlock({
                       disabled={!titleTruncated}
                       triggerClassName="min-w-0"
                     >
-                      <h1
+                      <PageTitle
                         ref={titleRef}
                         className={cn(titleClass, 'min-w-0 text-ods-text-primary', titleOverflowClass)}
                       >
                         {titleNode}
-                      </h1>
+                      </PageTitle>
                     </FloatingTooltip>
                     <span className="shrink-0">{titleAdornment}</span>
                   </div>
                 ) : (
                   <FloatingTooltip content={title} side="bottom" disabled={!titleTruncated}>
-                    <h1 ref={titleRef} className={cn(titleClass, 'text-ods-text-primary', titleOverflowClass)}>
+                    <PageTitle ref={titleRef} className={cn(titleClass, 'text-ods-text-primary', titleOverflowClass)}>
                       {titleNode}
-                    </h1>
+                    </PageTitle>
                   </FloatingTooltip>
                 ))}
               {hasSubtitleRow && (
@@ -303,10 +354,14 @@ export function TitleBlock({
                   <p
                     ref={subtitleRef}
                     className="truncate text-ods-text-secondary text-h6"
-                    aria-hidden={!loading && !subtitle ? true : undefined}
+                    aria-hidden={!subtitleLoading && !subtitle ? true : undefined}
                   >
-                    {loading ? (
-                      <TitleTextSkeleton widthClass="w-28 md:w-36" heightClass="h-2.5 md:h-3" />
+                    {subtitleLoading ? (
+                      <UnifiedSkeleton
+                        as="span"
+                        aria-hidden
+                        className={cn(TITLE_TEXT_SKELETON_CLASS, 'h-2.5 w-28 content-md:h-3 content-md:w-36')}
+                      />
                     ) : (
                       subtitle || '\u00A0'
                     )}
@@ -320,9 +375,12 @@ export function TitleBlock({
           (titleAdornment ? (
             <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
               <FloatingTooltip content={title} side="bottom" disabled={!titleTruncated} triggerClassName="min-w-0">
-                <h1 ref={titleRef} className={cn(titleClass, 'min-w-0 text-ods-text-primary', titleOverflowClass)}>
+                <PageTitle
+                  ref={titleRef}
+                  className={cn(titleClass, 'min-w-0 text-ods-text-primary', titleOverflowClass)}
+                >
                   {title}
-                </h1>
+                </PageTitle>
               </FloatingTooltip>
               <span className="shrink-0">{titleAdornment}</span>
             </div>
@@ -331,7 +389,9 @@ export function TitleBlock({
                  wraps; `titleWrap` only adds break-words for pathological
                  unbroken tokens. No class change when the prop is unset —
                  the frozen baseline stays byte-identical. */
-            <h1 className={cn(titleClass, 'text-ods-text-primary', titleWrap && 'break-words')}>{title}</h1>
+            <PageTitle className={cn(titleClass, 'text-ods-text-primary', titleWrap && 'break-words')}>
+              {title}
+            </PageTitle>
           ))
         )}
       </div>

@@ -48,7 +48,7 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
                 maybeMarkEmailVerifiedFromSso(authentication, tenantId, email);
             }
         } catch (Exception e) {
-            log.warn("Failed to update lastLogin on authentication success: {}", e.getMessage());
+            log.warn("Failed to update lastLogin on authentication success", e);
         }
 
         ssoFlowSuccessHandler.onAuthenticationSuccess(request, response, authentication);

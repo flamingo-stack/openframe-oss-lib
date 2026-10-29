@@ -4,6 +4,7 @@ import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { PenEditIcon, UserIcon, UserPlusIcon } from '../icons-v2-generated';
 import { Autocomplete, type AutocompleteOption } from './autocomplete';
+import { Button } from './button';
 import { DeletedUserAvatar } from './deleted-user-avatar';
 import { SearchableSelect, type SearchableSelectOption } from './searchable-select';
 import { SquareAvatar } from './square-avatar';
@@ -34,6 +35,16 @@ export interface AssigneeDropdownProps {
    * open a Take Over confirmation for tickets still worked by the AI.
    */
   onTriggerClick?: () => void;
+  /**
+   * Server search. When set, `options` is the server's answer to the query
+   * reported here and is not filtered locally: called with the picker's raw
+   * query on every keystroke (debounce in the caller), and with `''` when the
+   * picker resets — it closes, or a pick clears it — so the caller can go back
+   * to its unfiltered first page. While `isLoading`, the previous rows stay
+   * listed. The selection renders from `currentAssignee`, so it holds whether
+   * or not the current answer includes it.
+   */
+  onSearchChange?: (query: string) => void;
 }
 
 export function AssigneeDropdown(props: AssigneeDropdownProps) {
@@ -50,6 +61,7 @@ function CompactAssigneeDropdown({
   onAssign,
   className,
   onTriggerClick,
+  onSearchChange,
 }: AssigneeDropdownProps) {
   const hasAssignee = !!currentAssignee;
 
@@ -90,14 +102,12 @@ function CompactAssigneeDropdown({
     : undefined;
 
   const trigger = hasAssignee ? (
-    <button
+    <Button
+      variant="card"
       type="button"
       onClick={handleTriggerClick}
       aria-label="Change assignee"
-      className={cn(
-        'shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
-        className,
-      )}
+      className={cn('w-auto shrink-0', className)}
     >
       {currentAssignee.deleted ? (
         <DeletedUserAvatar size="sm" accessibleLabel={`Deleted user: ${currentAssignee.name || currentAssignee.id}`} />
@@ -110,21 +120,18 @@ function CompactAssigneeDropdown({
           variant="round"
         />
       )}
-    </button>
+    </Button>
   ) : (
-    <button
+    <Button
+      variant="transparent"
+      size="icon-sm"
       type="button"
       onClick={handleTriggerClick}
       aria-label="Assign user"
-      className={cn(
-        'flex size-8 shrink-0 items-center justify-center rounded-full border border-ods-border',
-        'text-ods-text-secondary transition-colors hover:border-ods-accent hover:text-ods-accent',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
-        className,
-      )}
+      className={cn('shrink-0', className)}
     >
-      <UserPlusIcon className="size-4" />
-    </button>
+      <UserPlusIcon />
+    </Button>
   );
 
   // Intercepted trigger: render the plain button — no dropdown to open.
@@ -138,6 +145,7 @@ function CompactAssigneeDropdown({
       searchPlaceholder="Search users..."
       emptyText="No users found"
       isLoading={isLoading}
+      onSearchChange={onSearchChange}
       trigger={trigger}
       align="end"
       contentClassName="w-72"
@@ -145,9 +153,23 @@ function CompactAssigneeDropdown({
   );
 }
 
-function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign, className }: AssigneeDropdownProps) {
+function DefaultAssigneeDropdown({
+  currentAssignee,
+  options,
+  isLoading,
+  onAssign,
+  className,
+  onSearchChange,
+}: AssigneeDropdownProps) {
   const [isEditing, setIsEditing] = useState(false);
   const hasAssignee = !!currentAssignee;
+  // Under server search the current assignee is often not in the answer (not
+  // on the first page, or not matching the query), and the field would then
+  // read the raw id. `currentAssignee` already names them.
+  const selectedOptions: TicketAssigneeOption[] | undefined =
+    onSearchChange && currentAssignee
+      ? [{ value: currentAssignee.id, label: currentAssignee.name, imageUrl: currentAssignee.avatarSrc }]
+      : undefined;
 
   const renderOption = useCallback((option: AutocompleteOption) => {
     const opt = option as TicketAssigneeOption;
@@ -180,6 +202,8 @@ function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign
           }}
           placeholder="Search users..."
           loading={isLoading}
+          onSearchChange={onSearchChange}
+          selectedOptions={selectedOptions}
           showChevron={false}
           startAdornment={
             hasAssignee ? (
@@ -231,12 +255,15 @@ function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex flex-col justify-center">
             <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-xxs)]">
-              <button
+              <Button
+                variant="link"
+                size="compact"
+                noPaddingX
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="group flex cursor-pointer items-center gap-[var(--spacing-system-xxs)] text-left"
+                className="min-w-0"
               >
-                <PenEditIcon className="size-4 shrink-0 text-ods-text-secondary transition-colors group-hover:text-ods-accent" />
+                <PenEditIcon />
                 <span
                   className={cn(
                     'truncate text-h4',
@@ -246,7 +273,7 @@ function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign
                 >
                   {currentAssignee.name}
                 </span>
-              </button>
+              </Button>
             </div>
             <span className="truncate text-ods-text-secondary text-h6">Assigned</span>
           </div>
@@ -257,14 +284,17 @@ function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign
 
   return (
     <div className={cn('min-w-0', className)}>
-      <button
+      <Button
+        variant="link"
+        size="compact"
+        noPaddingX
         type="button"
         onClick={() => setIsEditing(true)}
-        className="flex cursor-pointer items-center gap-[var(--spacing-system-xxs)] truncate text-left text-ods-accent underline transition-opacity text-h4 hover:opacity-80"
+        className="max-w-full"
+        leftIcon={<UserIcon />}
       >
-        <UserIcon className="size-4 shrink-0" />
-        <span>Assign User</span>
-      </button>
+        Assign User
+      </Button>
       <span className="block truncate text-ods-text-secondary text-h6">Assigned</span>
     </div>
   );

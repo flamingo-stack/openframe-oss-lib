@@ -49,7 +49,9 @@
 
 export interface ScrollElementIntoViewOptions {
   /** Pixels to subtract from the target element's `top` so it lands BELOW
-   *  sticky chrome. Defaults to 0. Pass `96` for the standard hub header. */
+   *  sticky chrome. Defaults to 0. Pass `96` for the standard hub header.
+   *  A target that declares a larger `scroll-margin-top` in CSS wins: see
+   *  {@link declaredScrollMarginTop}. */
   headerOffset?: number;
   /** `'smooth'` (default) runs the self-driven tween; `'instant'` / `'auto'`
    *  jump in one synchronous write (deep-link land, programmatic focus moves). */
@@ -85,8 +87,13 @@ const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
 /** Nearest ancestor that is a *real* scroll container, or `null` when the
  *  window/document is the scroller. Only `auto | scroll | overlay` count —
  *  `clip` / `hidden` are intentionally excluded (a wrapper using `overflow-clip`
- *  purely to round corners must let the scroll bubble to the page). */
-function getScrollableAncestor(el: HTMLElement): HTMLElement | null {
+ *  purely to round corners must let the scroll bubble to the page).
+ *
+ *  THE one rule for "what scrolls this element": `useScrollSpy` resolves the
+ *  scroller it listens to with it, so the section a spy highlights is the
+ *  section this helper scrolls to — inside a `<main overflow-y-auto>` shell as
+ *  much as on a window-scrolled page. */
+export function getScrollableAncestor(el: HTMLElement): HTMLElement | null {
   for (let node = el.parentElement; node; node = node.parentElement) {
     const overflowY = getComputedStyle(node).overflowY;
     if (
@@ -97,6 +104,21 @@ function getScrollableAncestor(el: HTMLElement): HTMLElement | null {
     }
   }
   return null;
+}
+
+/**
+ * The offset the target ITSELF declares in CSS (`scroll-margin-top`), in px.
+ *
+ * A page with more sticky chrome than the standard header (a second bar under
+ * it) says so on its anchors with `scroll-margin-top`, which is what a native
+ * anchor jump (a URL that loads with the hash, the router's own hash scroll)
+ * honours. The tween honours the same declaration, so a link clicked on the
+ * page and a link that loads the page land on the same pixel: the caller's
+ * `headerOffset` is the floor, the anchor's own margin wins when it is larger.
+ */
+export function declaredScrollMarginTop(target: HTMLElement): number {
+  const margin = Number.parseFloat(getComputedStyle(target).scrollMarginTop);
+  return Number.isFinite(margin) ? margin : 0;
 }
 
 /**
@@ -125,11 +147,10 @@ export function scrollElementIntoView(
   // the page reflows (a sibling drawer collapsing) and the reachable max grows
   // as the just-opened drawer expands. Clamp to the LIVE max each frame.
   const computeTarget = (): number => {
+    const offset = Math.max(headerOffset, declaredScrollMarginTop(target));
     const raw = container
-      ? container.scrollTop +
-        (target.getBoundingClientRect().top - container.getBoundingClientRect().top) -
-        headerOffset
-      : target.getBoundingClientRect().top + window.scrollY - headerOffset;
+      ? container.scrollTop + (target.getBoundingClientRect().top - container.getBoundingClientRect().top) - offset
+      : target.getBoundingClientRect().top + window.scrollY - offset;
     const adjusted = adjustTargetY ? adjustTargetY(raw) : raw;
     const maxScroll = container
       ? Math.max(0, container.scrollHeight - container.clientHeight)

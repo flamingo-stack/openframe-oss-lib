@@ -6,6 +6,7 @@ import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleFilterInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
+import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
@@ -18,6 +19,7 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
@@ -37,9 +39,11 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -76,7 +80,8 @@ public class ScheduleScriptService {
         validateOsTypes(input.getSupportedPlatforms(), input.getScriptIds());
         validateCustomParams(input.getScriptIds(), input.getScriptCustomParams());
 
-        ScheduleScript entity = scheduleMapper.toEntity(tenantId, input);
+        Map<String, List<ScriptEnvVar>> scriptDefaults = scriptDefaultsByScriptId(input.getScriptIds());
+        ScheduleScript entity = scheduleMapper.toEntity(tenantId, input, scriptDefaults);
         entity.setCreatedBy(createdBy);
         entity.setNextRunAt(seedNextRunAt(trigger, timeReference, entity.getStartAt()));
         ScheduleScript saved = scheduleRepository.save(entity);
@@ -202,7 +207,8 @@ public class ScheduleScriptService {
 
         Instant priorStartAt = existing.getStartAt();
         Long priorRepeat = existing.getRepeat();
-        scheduleMapper.updateEntity(existing, input);
+        Map<String, List<ScriptEnvVar>> scriptDefaults = scriptDefaultsByScriptId(input.getScriptIds());
+        scheduleMapper.updateEntity(existing, input, scriptDefaults);
         rescheduleAfterUpdate(existing, trigger, timeReference, priorStartAt, priorRepeat, tenantId);
 
         ScheduleScript saved = scheduleRepository.save(existing);
@@ -407,6 +413,39 @@ public class ScheduleScriptService {
                 .hasPreviousPage(hasPreviousPage)
                 .startCursor(startCursor)
                 .endCursor(endCursor)
+                .build();
+    }
+
+    private Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId(List<String> scriptIds) {
+        if (scriptIds == null || scriptIds.isEmpty()) {
+            return Map.of();
+        }
+        List<ScriptResponse> scripts = scriptService.getScriptsByIds(scriptIds);
+        return scripts.stream()
+                .filter(s -> s.getId() != null)
+                .collect(Collectors.toMap(
+                        ScriptResponse::getId,
+                        s -> toEntityEnvVars(s.getEnvVars()),
+                        (a, b) -> a));
+    }
+
+    private static List<ScriptEnvVar> toEntityEnvVars(List<ScriptEnvVarInput> input) {
+        if (input == null) {
+            return List.of();
+        }
+        return input.stream()
+                .map(ScheduleScriptService::toEntityEnvVar)
+                .toList();
+    }
+
+    private static ScriptEnvVar toEntityEnvVar(ScriptEnvVarInput v) {
+        String name = v.getName();
+        String value = v.getValue();
+        boolean secret = v.isSecret();
+        return ScriptEnvVar.builder()
+                .name(name)
+                .value(value)
+                .secret(secret)
                 .build();
     }
 }

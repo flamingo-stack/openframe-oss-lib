@@ -77,7 +77,12 @@ for repo in "$OSS_LIB_REPO" "$SAAS_LIB_REPO" "$SAAS_SHARED_REPO" "$SAAS_TENANT_R
     fi
     continue
   fi
-  [ "$FETCH" = 1 ] && git -C "$repo" fetch origin --quiet --tags
+  # No --tags: the analysis reads branches only, and an explicit tag refspec refuses to move a local
+  # tag the remote has moved (the floating `dev` tag), which fails the whole fetch.
+  if [ "$FETCH" = 1 ] && ! git -C "$repo" fetch origin --quiet; then
+    echo "error: git fetch failed in $repo; rerun with --no-fetch to analyse its current refs" >&2
+    exit 1
+  fi
   ref="$REF"
   [ "$repo" = "$FRONTEND_REPO" ] && ref="$FRONTEND_REF"
   echo "$(basename "$repo"): $ref = $(git -C "$repo" rev-parse --short "$ref") ($(git -C "$repo" log -1 --format=%ad --date=short "$ref"))"

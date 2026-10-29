@@ -23,12 +23,14 @@
 
 import { useEffect, useRef } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
+import { LoadingRegion } from '../loading/loading-region';
 import { formatRelativeTime } from './../../utils/date-utils';
-import { ChatMessageRow, ChatMessageRowSkeleton } from './../chat/chat-message-row';
+import { ChatMessageRow } from './../chat/chat-message-row';
 import { useChatIdentity } from './../chat/hooks/use-chat-identity';
 import type { ChatAttachment } from './../chat/utils/chat-attachment-markdown';
 import { EmptyState } from './../empty-state';
 import { Button } from './../ui/button';
+import { LoadingItems } from './../ui/loading-scope';
 import { SquareAvatar } from './../ui/square-avatar';
 import { TicketAttachmentsList, type TicketAttachment } from './../ui/ticket-attachments-list';
 import { useTicketEngagements } from './hooks/use-ticket-engagements';
@@ -159,7 +161,7 @@ const TURN_SEPARATOR_RE = /[\s]{1,16}---[\s]{1,16}/g;
 // Slack-channel feed framing — ported from the hub's live community feed
 // (`components/slack/chat-interface.tsx`: `:62` bounded card, `:83` padding +
 // `overflow-y-auto`, `:85` `gap-4 md:gap-6` message column). Single source
-// within the ticket feed; the delivery `DevCardRowSkeletonList` keeps its own
+// within the ticket feed; the Help Center rows keep their own
 // (separate, untouched) frame literal. `max-h` is responsive (vs Slack's fixed
 // height).
 const TICKET_FEED_FRAME = 'bg-ods-card border border-ods-border rounded-[6px] overflow-y-auto w-full';
@@ -297,11 +299,11 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
     // the skeleton would snap-to-bottom on skeleton height, then again on content).
     return (
       <div className={`${TICKET_FEED_FRAME} ${TICKET_FEED_HEIGHT}`}>
-        <div className={TICKET_FEED_INNER}>
-          {Array.from({ length: TICKET_FEED_SKELETON_ROWS }, (_, i) => (
-            <ChatMessageRowSkeleton key={i} />
-          ))}
-        </div>
+        <LoadingRegion label="Loading messages" className={TICKET_FEED_INNER}>
+          <LoadingItems count={TICKET_FEED_SKELETON_ROWS}>
+            {() => <ChatMessageRow loading displayName="" body="" data-loading-item />}
+          </LoadingItems>
+        </LoadingRegion>
       </div>
     );
   }
@@ -345,6 +347,7 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           return (
             <ChatMessageRow
               key={`body-${i}-${turn.slice(0, 24)}`}
+              data-loading-item
               displayName={customerName}
               avatarUrl={customerAvatar}
               body={text}
@@ -442,6 +445,7 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           return (
             <ChatMessageRow
               key={eng.id}
+              data-loading-item
               displayName={author}
               avatarUrl={avatarSrc}
               timeLabel={eng.createdAt ? formatRelativeTime(eng.createdAt) : null}

@@ -15,7 +15,7 @@ export { ClaudeEmbed } from './claude-embed';
 export type { ClaudeEmbedProps, ClaudeEmbedKind } from './claude-embed';
 
 export { OGLinkPreview, OGLinkErrorBoundary } from './og-link-preview';
-export type { OGLinkPreviewProps, OGData, BuildPlaceholderUrl } from './og-link-preview';
+export type { OGLinkPreviewProps, OGData } from './og-link-preview';
 
 export { FileDownloadCard } from './file-download-card';
 export type { FileDownloadCardProps } from './file-download-card';

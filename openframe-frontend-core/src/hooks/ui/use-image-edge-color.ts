@@ -1,6 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useLoadingScope } from '../../components/ui/loading-scope';
+import { resizedImageUrl } from '../../embed-shims/next-image';
+import { IMAGE_FIXED_WIDTHS } from '../../styles/image-sizes';
+
+/**
+ * The sample is drawn this wide at most, so that is all of the picture that is downloaded. A width of the image-size
+ * table's fixed ladder (128), so the sample is a cached file a thumbnail of the same picture already asked for.
+ */
+const EDGE_SAMPLE_WIDTH = IMAGE_FIXED_WIDTHS[2];
 
 /**
  * Extract the dominant edge color from an image using color bucketing.
@@ -13,7 +22,7 @@ function extractEdgeColor(img: HTMLImageElement): string {
   const ctx = canvas.getContext('2d');
   if (!ctx) return '#000000';
 
-  const maxSize = 100;
+  const maxSize = EDGE_SAMPLE_WIDTH;
   const scale = Math.min(maxSize / img.naturalWidth, maxSize / img.naturalHeight);
   const w = Math.round(img.naturalWidth * scale);
   const h = Math.round(img.naturalHeight * scale);
@@ -96,7 +105,9 @@ function extractEdgeColor(img: HTMLImageElement): string {
  * @param fallback - Fallback color if extraction fails (default: '#000000')
  * @returns CSS color string (e.g., 'rgb(34, 28, 22)')
  */
-export function useImageEdgeColor(imageUrl: string | undefined | null, fallback = '#000000'): string {
+export function useImageEdgeColor(givenUrl: string | undefined | null, fallback = '#000000'): string {
+  // In a loading scope the picture is not drawn, so its colour is not sampled.
+  const imageUrl = useLoadingScope() ? null : givenUrl;
   const [color, setColor] = useState(fallback);
 
   // Losing the url (or being given a different fallback) is a prop-driven
@@ -125,12 +136,22 @@ export function useImageEdgeColor(imageUrl: string | undefined | null, fallback 
       }
     };
 
+    // The picture is asked for at the sample's size (a card's cover is often a
+    // multi-hundred-KB original, and this is a second request for it). When the
+    // host cannot serve that size, the original is tried once.
+    const sampleUrl = resizedImageUrl(imageUrl, EDGE_SAMPLE_WIDTH);
+    let triedOriginal = sampleUrl === imageUrl;
     img.onerror = () => {
       if (cancelled) return;
+      if (!triedOriginal) {
+        triedOriginal = true;
+        img.src = imageUrl;
+        return;
+      }
       setColor(fallback);
     };
 
-    img.src = imageUrl;
+    img.src = sampleUrl;
 
     return () => {
       cancelled = true;

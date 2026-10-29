@@ -22,7 +22,7 @@ import static com.openframe.data.document.ticket.TicketStatusKind.AI_ASSISTANCE;
  * {@code _id} and every {@code ticket.statusId} pointing at it stay exactly as they are, so no
  * ticket, transition or board ordering moves.
  *
- * <p>Needed because {@link MigrateTicketStatusesChangeUnit} seeds system statuses with
+ * <p>Needed because {@link SeedTicketStatusesChangeUnit} seeds system statuses with
  * {@code saveIfMissing} — a tenant that already has the row keeps its stored name forever, so
  * changing {@code TicketStatusSeedCatalog.NAME_AI_ASSISTANCE} alone only reaches fresh tenants.
  *

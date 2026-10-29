@@ -3,6 +3,7 @@
 import { useSearchParams, usePathname } from '../embed-shims/next-navigation';
 import { withQuery } from '../utils/search-params';
 import { Pagination } from './pagination';
+import { useLoadingScope } from './ui/loading-scope';
 
 interface UnifiedPaginationProps {
   currentPage: number;
@@ -20,6 +21,8 @@ interface UnifiedPaginationProps {
    * nothing. Stops a one-page result from shifting the content above it.
    */
   reserveSpace?: boolean;
+  /** The list is still being read: the pager draws its own skeleton (also in a page's loading scope). */
+  loading?: boolean;
 }
 
 export function UnifiedPagination({
@@ -29,9 +32,22 @@ export function UnifiedPagination({
   className = 'mt-8 flex justify-center w-full',
   syncUrl = true,
   reserveSpace = false,
+  loading: loadingProp = false,
 }: UnifiedPaginationProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const loading = useLoadingScope() || loadingProp;
+
+  /**
+   * The address of a page of this list: the current URL with `page` set. Page 1
+   * is the list's own address (no `page`), so the first page has one URL.
+   */
+  const pageHref = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page <= 1) params.delete('page');
+    else params.set('page', page.toString());
+    return withQuery(pathname, params.toString());
+  };
 
   const handlePageChange = (page: number) => {
     // Preserve current scroll position
@@ -42,13 +58,12 @@ export function UnifiedPagination({
       onPageChange(page);
     }
 
-    // Update URL for bookmarking without navigation — unless the caller owns
-    // the URL (`syncUrl={false}`), in which case a second writer here would
-    // race the caller's own param write.
+    // Update the address bar in place (a bookmark, a shared link), unless the
+    // caller owns the URL (`syncUrl={false}`): a second writer here would race
+    // the caller's own param write. The address is the one the page's link
+    // carries (`pageHref`), so a click and a new-tab open land on the same URL.
     if (syncUrl) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('page', page.toString());
-      window.history.replaceState(null, '', withQuery(pathname, params.toString()));
+      window.history.replaceState(null, '', pageHref(page));
     }
 
     // Restore scroll position after a brief delay to allow content to render
@@ -59,6 +74,16 @@ export function UnifiedPagination({
       });
     }, 0);
   };
+
+  // While the list is read its page count may not be known (0 in a loading state): the pager draws its own skeleton,
+  // never left out, so the content above it keeps its place.
+  if (loading) {
+    return (
+      <div className={className}>
+        <Pagination loading currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+      </div>
+    );
+  }
 
   // Don't render pagination if there's only one page (optionally holding the
   // row's height so the content above it does not shift).
@@ -79,7 +104,13 @@ export function UnifiedPagination({
 
   return (
     <div className={className}>
-      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+      {/* Real links only while this component owns `?page=`: a caller that owns the URL names its own parameter. */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+        getPageHref={syncUrl ? pageHref : undefined}
+      />
     </div>
   );
 }

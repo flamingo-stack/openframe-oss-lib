@@ -19,8 +19,20 @@ import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collisi
 import { cn } from '../../utils/cn';
 import { SearchIcon } from '../icons-v2-generated';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { LoadingRegion } from '../loading/loading-region';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { HiddenTagsPopup } from './hidden-tags-popup';
+import { LoadingItems } from './loading-scope';
 import { Tag } from './tag';
+
+/** A result row's frame, read by the rows and by their loading state. */
+const SEARCH_RESULT_ROW_CLASS = 'flex min-h-10 items-center border-b border-ods-border px-3 last:border-b-0';
+/**
+ * Rows the results' loading state draws when its host states no `loadingRows`: a typical count. A host whose search
+ * answers a limited number of results passes that limit.
+ */
+const SEARCH_RESULTS_LOADING_ROWS = 8;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,12 +63,18 @@ export interface SearchInputProps {
   defaultValue?: string;
   /** Called when input value changes (raw, not debounced) */
   onChange?: (value: string) => void;
-  /** Called when user presses Enter */
+  /**
+   * Called when the user presses Enter, AND with `''` when the box is emptied (the clear button, or deleting the
+   * text): a search that was submitted must not stay applied after its text is gone. Read the argument, never the
+   * host's own state, which has not re-rendered yet when this fires.
+   */
   onSubmit?: (value: string) => void;
   /** Search results to display in the dropdown */
   results?: SearchResult[];
   /** Whether results are loading */
   isLoading?: boolean;
+  /** Result rows drawn while `isLoading`: the results the host's search answers (its limit). Default a typical count. */
+  loadingRows?: number;
   /** Called when a result row is selected.
    *
    *  `modifiers` carries the click event's modifier-key state when the
@@ -113,7 +131,7 @@ export interface SearchInputProps {
 
 const containerStyles = cn(
   // Layout & spacing — matches lib Input component
-  'flex h-11 cursor-text items-center gap-2 rounded-[6px] border px-3 md:h-12',
+  'flex h-11 cursor-text items-center gap-2 rounded-[6px] border px-3 content-md:h-12',
   'has-[:focus-visible]:outline-none',
   'group',
   'transition-colors duration-200',
@@ -161,6 +179,7 @@ export function SearchInput({
   onSubmit,
   results = [],
   isLoading = false,
+  loadingRows = SEARCH_RESULTS_LOADING_ROWS,
   onResultSelect,
   debounceMs = 300,
   renderResult,
@@ -292,6 +311,7 @@ export function SearchInput({
     } else {
       setInternalValue(newVal);
     }
+    if (newVal === '' && currentValue !== '') onSubmit?.('');
     if (!isOpen) setIsOpen(true);
     setHighlightedIndex(-1);
   };
@@ -304,6 +324,7 @@ export function SearchInput({
     } else {
       setInternalValue('');
     }
+    if (currentValue !== '') onSubmit?.('');
     inputRef.current?.focus();
   };
 
@@ -385,10 +406,12 @@ export function SearchInput({
     return (
       <div
         key={result.id}
+        data-loading-item
         role="option"
         aria-selected={isHighlighted}
         className={cn(
-          'flex min-h-10 cursor-pointer items-center border-b border-ods-border px-3 transition-colors last:border-b-0',
+          SEARCH_RESULT_ROW_CLASS,
+          'cursor-pointer transition-colors',
           isHighlighted && 'bg-ods-bg-hover',
           !isHighlighted && 'hover:bg-ods-bg-hover',
         )}
@@ -403,7 +426,18 @@ export function SearchInput({
   // ---- Dropdown content ----
   const renderDropdownContent = () => {
     if (isLoading) {
-      return <div className="px-4 py-3 text-ods-text-secondary text-h6">Loading...</div>;
+      // The results while they are read: the dropdown's own rows, a title bar each.
+      return (
+        <LoadingRegion label="Loading results">
+          <LoadingItems count={loadingRows}>
+            {() => (
+              <div className={SEARCH_RESULT_ROW_CLASS} aria-hidden data-loading-item>
+                <TextLineSkeleton type="h6" className="w-2/3" />
+              </div>
+            )}
+          </LoadingItems>
+        </LoadingRegion>
+      );
     }
 
     if (flatResults.length === 0) {
@@ -450,7 +484,7 @@ export function SearchInput({
             }}
           >
             {/* Start Adornment — pinned left, shrink-0 */}
-            <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent [&_svg]:size-4 md:[&_svg]:size-6">
+            <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 group-has-[:focus]:text-ods-accent [&_svg]:size-4 content-md:[&_svg]:size-6">
               {startAdornment !== undefined ? startAdornment : <SearchIcon />}
             </span>
 
@@ -470,23 +504,19 @@ export function SearchInput({
               {/* "+N" overflow badge */}
               {hiddenCount > 0 && (
                 <div ref={hiddenTagsRef} className="shrink-0">
-                  <button
+                  <Button
+                    variant="chip"
                     ref={badgeRef}
                     type="button"
+                    aria-expanded={showHiddenTags}
                     onClick={e => {
                       e.stopPropagation();
                       setShowHiddenTags(prev => !prev);
                     }}
-                    className={cn(
-                      'flex h-8 items-center px-2',
-                      'rounded-[6px] border border-ods-border bg-ods-card',
-                      'text-ods-text-secondary text-h5',
-                      'cursor-pointer transition-colors hover:bg-ods-bg-hover',
-                    )}
                     aria-label={`${hiddenCount} more selected filters`}
                   >
                     {getLimitTagsText(hiddenCount)}
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -511,14 +541,15 @@ export function SearchInput({
             {/* End adornment / Clear — pinned right, shrink-0 */}
             <div className="ml-auto flex shrink-0 items-center gap-1">
               {hasValue && !disabled && (
-                <button
+                <Button
+                  variant="transparent"
+                  size="icon-sm"
                   type="button"
                   onClick={handleClear}
-                  className="flex items-center justify-center transition-opacity hover:opacity-70"
                   aria-label="Clear search"
                 >
-                  <XmarkCircleIcon className="text-ods-text-secondary" size={24} />
-                </button>
+                  <XmarkCircleIcon className="text-ods-text-secondary" />
+                </Button>
               )}
               {endAdornment}
             </div>
@@ -554,7 +585,9 @@ export function SearchInput({
         >
           <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
             <ScrollAreaPrimitive.Viewport className="max-h-[320px] min-h-0 w-full">
-              <div role="listbox">{renderDropdownContent()}</div>
+              {/* A listbox owns options only: while the results are read the box is the loading region's (a status
+                  and hidden rows), with no listbox role around it. */}
+              <div role={isLoading ? undefined : 'listbox'}>{renderDropdownContent()}</div>
             </ScrollAreaPrimitive.Viewport>
             <ScrollAreaPrimitive.Scrollbar className="hidden" orientation="vertical">
               <ScrollAreaPrimitive.Thumb />

@@ -13,6 +13,8 @@ import java.util.List;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class NotificationReadEventNatsListenerTest {
 
@@ -41,6 +43,15 @@ class NotificationReadEventNatsListenerTest {
                 "u1", RecipientType.USER, List.of("n-1"), NotificationReadEvent.Transition.DELETED));
 
         verify(publisher).publishReadStateToUser("u1", List.of("n-1"), NotificationEventType.DELETED);
+    }
+
+    @ParameterizedTest
+    @EnumSource(NotificationReadEvent.Transition.class)
+    @DisplayName("Given any read-state transition, when the listener reacts, then the wire event type carries the same name — a transition without a wire counterpart fails here, not in production")
+    void every_transition_has_a_wire_event_type(NotificationReadEvent.Transition transition) {
+        listener.onReadStateChanged(new NotificationReadEvent("u1", RecipientType.USER, List.of("n-1"), transition));
+
+        verify(publisher).publishReadStateToUser("u1", List.of("n-1"), NotificationEventType.valueOf(transition.name()));
     }
 
     @Test

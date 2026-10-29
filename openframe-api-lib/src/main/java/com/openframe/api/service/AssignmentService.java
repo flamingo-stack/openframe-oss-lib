@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.assignment.AssignmentTarget;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -18,11 +19,15 @@ import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -94,6 +99,13 @@ public class AssignmentService {
         return trimmedField;
     }
 
+    public List<String> findAssignedItemIds(AssignmentItemType itemType, AssignmentTarget target) {
+        if (!target.resolvable()) {
+            return List.of();
+        }
+        return repository.findItemIdsByTarget(itemType, target.targetType(), target.targetId());
+    }
+
     @Transactional
     public ItemAssignment assignItem(String itemId, AssignmentItemType itemType,
                                       AssignmentTargetType targetType, String targetId) {
@@ -106,13 +118,53 @@ public class AssignmentService {
                 .targetId(targetId)
                 .displayName(displayName)
                 .build();
-        return repository.save(assignment);
+        try {
+            return repository.save(assignment);
+        } catch (DuplicateKeyException alreadyAssigned) {
+            log.debug("{}:{} is already assigned to item {}", targetType, targetId, itemId);
+            return repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
+                    .orElseThrow(() -> alreadyAssigned);
+        }
     }
 
     @Transactional
     public void unassignItem(String itemId, AssignmentTargetType targetType, String targetId) {
         log.info("Unassigning {}:{} from item {}", targetType, targetId, itemId);
         repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
+    }
+
+    /**
+     * Makes the item's assignments of one target type exactly {@code targetIds}: assigns the missing
+     * ones, unassigns the rest and leaves the ones already there alone.
+     */
+    @Transactional
+    public void replaceAssignments(String itemId, AssignmentItemType itemType,
+                                   AssignmentTargetType targetType, List<String> targetIds) {
+        Set<String> wanted = new LinkedHashSet<>(targetIds);
+        Set<String> current = repository.findByItemIdAndTargetType(itemId, targetType).stream()
+                .map(ItemAssignment::getTargetId)
+                .collect(Collectors.toSet());
+
+        current.stream()
+                .filter(targetId -> !wanted.contains(targetId))
+                .forEach(targetId -> unassignItem(itemId, targetType, targetId));
+        wanted.stream()
+                .filter(targetId -> !current.contains(targetId))
+                .forEach(targetId -> assignIfAbsent(itemId, itemType, targetType, targetId));
+    }
+
+    /**
+     * assignItem answers the existing row when the target was assigned in between; it only
+     * throws when that row is gone again by the time it is read, which here means an unassign
+     * raced too. The wanted state is "assigned", and the next save will see it; not a failure.
+     */
+    private void assignIfAbsent(String itemId, AssignmentItemType itemType,
+                                AssignmentTargetType targetType, String targetId) {
+        try {
+            assignItem(itemId, itemType, targetType, targetId);
+        } catch (DuplicateKeyException assignedAndUnassignedMeanwhile) {
+            log.debug("{}:{} was assigned to item {} and unassigned again meanwhile", targetType, targetId, itemId);
+        }
     }
 
     @Transactional

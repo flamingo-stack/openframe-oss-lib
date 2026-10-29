@@ -3,6 +3,7 @@ package com.openframe.test.api;
 import com.openframe.test.data.dto.apikey.ApiKeyResponse;
 import com.openframe.test.data.dto.apikey.CreateApiKeyRequest;
 import com.openframe.test.data.dto.apikey.CreateApiKeyResponse;
+import com.openframe.test.data.dto.apikey.UpdateApiKeyRequest;
 import io.restassured.response.Response;
 
 import java.util.List;
@@ -22,6 +23,7 @@ public class ApiKeyApi {
 
     private static final String API_KEYS = "api/api-keys";
     private static final String BY_ID = API_KEYS + "/{keyId}";
+    private static final String REGENERATE = BY_ID + "/regenerate";
 
     /**
      * Mints a key. The returned {@link CreateApiKeyResponse#getFullKey()} is the only time the secret is
@@ -43,11 +45,42 @@ public class ApiKeyApi {
     }
 
     public static ApiKeyResponse getApiKey(String keyId) {
-        return given(getAuthorizedSpec())
-                .pathParam("keyId", keyId)
-                .get(BY_ID)
+        return getApiKeyRaw(keyId)
                 .then().statusCode(200)
                 .extract().as(ApiKeyResponse.class);
+    }
+
+    /** Raw form, for asserting that a deleted or replaced key is gone (404). */
+    public static Response getApiKeyRaw(String keyId) {
+        return given(getAuthorizedSpec())
+                .pathParam("keyId", keyId)
+                .get(BY_ID);
+    }
+
+    /** Partial update: only the non-null fields of {@code request} are applied. */
+    public static ApiKeyResponse updateApiKey(String keyId, UpdateApiKeyRequest request) {
+        return given(getAuthorizedSpec())
+                .pathParam("keyId", keyId)
+                .body(request)
+                .put(BY_ID)
+                .then().statusCode(200)
+                .extract().as(ApiKeyResponse.class);
+    }
+
+    /**
+     * Issues a new secret. The service deletes the key and saves a new one with the same name, description
+     * and expiry, so the returned key has a <em>new</em> {@code ak_*} id — the old id stops resolving.
+     */
+    public static CreateApiKeyResponse regenerateApiKey(String keyId) {
+        return regenerateApiKeyRaw(keyId)
+                .then().statusCode(200)
+                .extract().as(CreateApiKeyResponse.class);
+    }
+
+    public static Response regenerateApiKeyRaw(String keyId) {
+        return given(getAuthorizedSpec())
+                .pathParam("keyId", keyId)
+                .post(REGENERATE);
     }
 
     /** Deletes the key and its statistics document. */

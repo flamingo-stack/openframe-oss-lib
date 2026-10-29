@@ -1,15 +1,16 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.stream.mapping.SourceEventTypes;
 import com.openframe.stream.util.TimestampParser;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +27,9 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
     private static final String FIELD_DOMAIN = "domain";
     private static final String FIELD_TIME = "time";
     private static final String FIELD_DATE = "$date";
+    private static final String FIELD_MSG_ID = "msgid";
+    private static final String FIELD_MSG_ARGS = "msgArgs";
+    private static final List<String> AGENT_LOG_FIELDS = List.of(FIELD_MSG_ID, FIELD_MSG_ARGS);
 
     public MeshCentralEventDeserializer(ObjectMapper mapper) {
         super(mapper,
@@ -85,13 +89,16 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
     }
 
     private Optional<JsonNode> parseJson(JsonNode rawNode) {
+        if (rawNode != null && rawNode.isObject()) {
+            return Optional.of(rawNode);
+        }
         return Optional.ofNullable(rawNode)
-                .map(JsonNode::asText)
+                .map(node -> node.asString(""))
                 .filter(StringUtils::isNotBlank)
                 .flatMap(json -> {
                     try {
                         return Optional.of(mapper.readTree(json));
-                    } catch (IOException e) {
+                    } catch (JacksonException e) {
                         log.error("Failed to parse JSON from node: {}, error: {}",
                                  rawNode, e.getMessage(), e);
                         return Optional.empty();
@@ -106,7 +113,7 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
 
     private Optional<String> extractField(JsonNode event, String fieldName) {
         return Optional.ofNullable(event.get(fieldName))
-                .map(JsonNode::asText)
+                .map(node -> node.asString(""))
                 .filter(StringUtils::isNotBlank);
     }
 
@@ -115,9 +122,9 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
         if (idNode == null) return Optional.empty();
 
         return Optional.ofNullable(idNode.get(FIELD_OID))
-                .map(JsonNode::asText)
+                .map(node -> node.asString(""))
                 .filter(StringUtils::isNotBlank)
-                .or(() -> Optional.of(idNode.asText())
+                .or(() -> Optional.of(idNode.asString(""))
                         .filter(StringUtils::isNotBlank));
     }
 
@@ -127,14 +134,47 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
                 .flatMap(event -> {
                     JsonNode timeNode = event.get(FIELD_TIME);
                     if (timeNode != null && timeNode.has(FIELD_DATE)) {
-                        return Optional.of(timeNode.get(FIELD_DATE).asLong());
+                        return Optional.of(timeNode.get(FIELD_DATE).asLong(0L));
                     }
                     return Optional.empty();
                 });
     }
 
     @Override
+    protected JsonNode toEventNode(JsonNode after) {
+        return parseJson(after).orElse(after);
+    }
+
+    @Override
+    protected Optional<Integer> getSourceMessageId(JsonNode after) {
+        return parseJson(after)
+                .map(event -> event.get(FIELD_MSG_ID))
+                .filter(this::isMessageId)
+                .map(JsonNode::asInt);
+    }
+
+    @Override
     protected String getDetails(JsonNode after) {
-        return null;
+        return parseJson(after)
+                .map(this::agentLogDetails)
+                .map(ObjectNode::toString)
+                .orElse(null);
+    }
+
+    private boolean isMessageId(JsonNode msgId) {
+        return msgId.isNumber() && msgId.canConvertToExactIntegral() && msgId.canConvertToInt();
+    }
+
+    private ObjectNode agentLogDetails(JsonNode event) {
+        ObjectNode details = mapper.createObjectNode();
+        AGENT_LOG_FIELDS.stream()
+                .filter(event::has)
+                .forEach(field -> copyField(event, details, field));
+        return details;
+    }
+
+    private static void copyField(JsonNode from, ObjectNode to, String field) {
+        JsonNode value = from.get(field);
+        to.set(field, value);
     }
 }

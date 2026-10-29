@@ -9,16 +9,17 @@
  * `componentOverrides` exactly as before.
  */
 import type React from 'react';
-import type { ResolveLinkResult } from '../../../types/doc-source';
 import { MarkdownEngine, type MarkdownEngineProps } from './engine';
 
-export type { ResolveLinkResult };
-
-export interface SimpleMarkdownRendererProps extends Omit<MarkdownEngineProps, 'extraAllowedHtmlTags'> {}
+export interface SimpleMarkdownRendererProps extends Omit<
+  MarkdownEngineProps,
+  'extraAllowedHtmlTags' | 'allowRemoteMedia'
+> {}
 
 /**
  * A type-narrowed ALIAS of the engine, not a wrapper: the composition adds
- * no behavior (it only hides `extraAllowedHtmlTags` from the prop surface),
+ * no behavior (it only hides `extraAllowedHtmlTags` and `allowRemoteMedia`
+ * from the prop surface, so chat content can never widen the sanitizer),
  * and `MarkdownEngine` is already `memo`'d. Wrapping it in a second `memo`
  * bought nothing and cost an extra shallow-compare pass plus a fiber per
  * chat segment.

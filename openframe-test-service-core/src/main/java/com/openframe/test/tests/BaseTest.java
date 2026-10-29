@@ -9,6 +9,14 @@ import static com.openframe.test.data.generator.DeviceGenerator.inOrganization;
 
 public abstract class BaseTest {
 
+    /**
+     * Starts every class as the configured user.
+     *
+     * <p>This used to throw the session away and log in again — six HTTP steps per class, on every
+     * worker. It now drops only this thread's override, if a previous class installed one (a freshly
+     * registered owner, a rotated token), and falls back to the session {@link AuthHelper} established
+     * once for the run. The guarantee is the same; the six steps are gone.
+     */
     @BeforeAll
     public static void setup() {
         AuthHelper.clearCookies();

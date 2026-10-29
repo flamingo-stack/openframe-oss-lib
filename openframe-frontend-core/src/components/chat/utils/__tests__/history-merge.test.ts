@@ -332,6 +332,68 @@ describe('mergeHistoryWithRealtime', () => {
     expect(ids(merged)).toEqual([U0.id, A0.id, persistedFirst.id, asstFirst.id, synSecond.id]);
   });
 
+  // Technician and system lines render under role `user` on every host, so a
+  // user row's twin must match on author kind too. Repro (tickets client chat):
+  // the technician typed "?", the end user replied "?", the refetch raced the
+  // persistence of the reply - the reply's bubble was taken for the twin of
+  // the technician's row and dropped, and the user's message vanished.
+  it('keeps the own `user-` bubble when only a TECHNICIAN row holds the same text', () => {
+    const techQ: TestMessage = { id: 'aaaa0008', role: 'user', authorType: 'admin', content: '?', timestamp: t(3000) };
+    const ownQ: TestMessage = { id: 'user-4000-q', role: 'user', content: '?', timestamp: t(4000) };
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, techQ],
+      existingMessages: [U0, A0, techQ, ownQ],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, techQ.id, ownQ.id]);
+  });
+
+  it('still drops the own `user-` bubble once its OWN row is persisted beside a same-text technician row', () => {
+    const techQ: TestMessage = { id: 'aaaa0008', role: 'user', authorType: 'admin', content: '?', timestamp: t(3000) };
+    const ownPersisted: TestMessage = {
+      id: 'aaaa0009',
+      role: 'user',
+      authorType: 'user',
+      content: '?',
+      timestamp: t(4500),
+    };
+    const ownQ: TestMessage = { id: 'user-4000-q', role: 'user', content: '?', timestamp: t(4000) };
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, techQ, ownPersisted],
+      existingMessages: [U0, A0, techQ, ownQ],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, techQ.id, ownPersisted.id]);
+  });
+
+  it('twins an admin-authored optimistic row with its admin-authored persisted row (Mingo)', () => {
+    // The rule is per author kind, not "admin rows never twin": on Mingo the
+    // operator IS the admin, so the host stamps `admin` on both copies.
+    const adminRow: TestMessage = {
+      id: 'aaaa0010',
+      role: 'user',
+      authorType: 'admin',
+      content: 'hello',
+      timestamp: t(3000),
+    };
+    const adminOpt: TestMessage = {
+      id: 'optimistic-2500-a',
+      role: 'user',
+      authorType: 'admin',
+      content: 'hello',
+      timestamp: t(2500),
+    };
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U0, A0, adminRow],
+      existingMessages: [U0, A0, adminOpt],
+      streamingMessageId: null,
+      historyFetchedAt: 5000,
+    });
+    expect(ids(merged)).toEqual([U0.id, A0.id, adminRow.id]);
+  });
+
   it('KEEPS a `user-` synthetic when a seq-stamped ASSISTANT row raised the global max but the user turn is not persisted', () => {
     // The reload+stop loss: history has a seq-stamped assistant row (so
     // anyHistoryRowSeq is true and the global max is high) and a live `user-`
@@ -1519,5 +1581,95 @@ describe('computeHistoryPrepend after a window slide', () => {
     const result = computeHistoryPrepend(olderPages, [...live, ...snapshot]);
     if (!result) throw new Error('computeHistoryPrepend returned null for a page with older messages');
     expect(ids(result.newMessages)).toEqual(['cccc0001', 'cccc0002', 'cccc0003']);
+  });
+});
+
+describe('ticket lifecycle receipts (standalone TICKET_EVENT rows)', () => {
+  // A dialog Fae never answered this session (e.g. a ticket opened from the
+  // header button): every receipt lands in ONE live bubble, whose streamSeq
+  // follows the newest receipt.
+  const receipt = (kind: string, streamSeq?: number): MessageSegment => ({
+    type: 'ticket_event',
+    data: { kind, actorName: 'Admin' },
+    ...(streamSeq !== undefined ? { streamSeq } : {}),
+  });
+  const kinds = (msgs: TestMessage[]) =>
+    msgs
+      .flatMap(m => (Array.isArray(m.content) ? m.content : []))
+      .flatMap(s => (s.type === 'ticket_event' ? [s.data.kind] : []));
+
+  const U: TestMessage = { id: 'dddd0001', role: 'user', content: 'Printer is down', timestamp: t(100) };
+  const persistedReceipt = (n: number, kind: string, seq: number): TestMessage => ({
+    id: `dddd000${n}`,
+    role: 'assistant',
+    content: [receipt(kind, seq)],
+    timestamp: t(100 + n),
+    streamSeq: seq,
+  });
+
+  it('renders a receipt once when history persisted it but not the newer one in the same bubble', () => {
+    const live: TestMessage[] = [
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: [receipt('RESOLVED', 10), receipt('REOPENED', 11)],
+        timestamp: t(5_000),
+        streamSeq: 11,
+      },
+    ];
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U, persistedReceipt(2, 'RESOLVED', 10)],
+      existingMessages: live,
+      streamingMessageId: null,
+      historyFetchedAt: 6_000,
+      historyMaxStreamSeq: 10,
+    });
+    expect(kinds(merged)).toEqual(['RESOLVED', 'REOPENED']);
+    expect(ids(merged)).toEqual(['dddd0001', 'dddd0002', 'assistant-1']);
+  });
+
+  it('keeps a repeated resolve whose seq differs from the persisted one', () => {
+    const live: TestMessage[] = [
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: [receipt('RESOLVED', 10), receipt('REOPENED', 11), receipt('RESOLVED', 12)],
+        timestamp: t(5_000),
+        streamSeq: 12,
+      },
+    ];
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U, persistedReceipt(2, 'RESOLVED', 10)],
+      existingMessages: live,
+      streamingMessageId: null,
+      historyFetchedAt: 6_000,
+      historyMaxStreamSeq: 10,
+    });
+    expect(kinds(merged)).toEqual(['RESOLVED', 'REOPENED', 'RESOLVED']);
+  });
+
+  it('drops a kept bubble whose receipts are all persisted, but never the streaming one', () => {
+    // Unstamped bubble minted after the fetch: wall-clock keeps it whole.
+    const stale: TestMessage = {
+      id: 'assistant-1',
+      role: 'assistant',
+      content: [receipt('RESOLVED', 10)],
+      timestamp: t(7_000),
+    };
+    const history = [U, persistedReceipt(2, 'RESOLVED', 10)];
+    const base = { processedHistory: history, historyFetchedAt: 6_000, historyMaxStreamSeq: 10 };
+
+    expect(ids(mergeHistoryWithRealtime({ ...base, existingMessages: [stale], streamingMessageId: null }))).toEqual([
+      'dddd0001',
+      'dddd0002',
+    ]);
+
+    const streaming = mergeHistoryWithRealtime({
+      ...base,
+      existingMessages: [stale],
+      streamingMessageId: 'assistant-1',
+    });
+    expect(ids(streaming)).toEqual(['dddd0001', 'dddd0002', 'assistant-1']);
+    expect(kinds(streaming)).toEqual(['RESOLVED']);
   });
 });

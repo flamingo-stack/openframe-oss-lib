@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform, useMotionValue, useSpring } from 'fram
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import Image from '../../embed-shims/next-image';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
 
 interface ParallaxImageShowcaseProps {
   images: {
@@ -127,7 +128,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
   if (layout === 'grid') {
     return (
       <div ref={componentRef} className={`relative flex h-full w-full items-center ${className}`}>
-        <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid w-full grid-cols-1 gap-4 content-md:grid-cols-3">
           {/* Image #1 - Left */}
           {leftImage && (
             <motion.div
@@ -142,7 +143,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 alt={leftImage.alt}
                 width={800}
                 height={500}
-                sizes="(max-width: 768px) 100vw, 33vw"
+                sizes={IMAGE_SLOT.card}
                 className="h-auto w-full object-contain"
                 style={shadow ? { boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' } : {}}
               />
@@ -163,7 +164,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 alt={centerImage.alt}
                 width={800}
                 height={500}
-                sizes="(max-width: 768px) 100vw, 33vw"
+                sizes={IMAGE_SLOT.card}
                 className="h-auto w-full object-contain"
                 style={shadow ? { boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' } : {}}
               />
@@ -184,7 +185,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 alt={rightImage.alt}
                 width={800}
                 height={500}
-                sizes="(max-width: 768px) 100vw, 33vw"
+                sizes={IMAGE_SLOT.card}
                 className="h-auto w-full object-contain"
                 style={shadow ? { boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' } : {}}
               />
@@ -206,12 +207,15 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
         <div className="absolute inset-x-0 top-32 h-80">
           {/* Left half: Image overlaps to the left */}
           {leftImage && (
-            <motion.div className="absolute left-20 z-10 h-full w-full lg:w-1/2" style={{ x: x, y: y, rotate: rotate }}>
+            <motion.div
+              className="absolute left-20 z-10 h-full w-full content-lg:w-1/2"
+              style={{ x: x, y: y, rotate: rotate }}
+            >
               <Image
                 src={leftImage.src}
                 alt={leftImage.alt}
                 fill
-                sizes="50vw"
+                sizes={IMAGE_SLOT.half}
                 className="ods-card/50 border border-ods-border object-cover object-[left_top]"
               />
               <div className="absolute inset-0 shadow-2xl" />
@@ -221,14 +225,14 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
           {/* Right half: Image overlaps to the right */}
           {centerImage && (
             <motion.div
-              className="absolute right-20 top-20 z-20 h-full w-full lg:w-1/2"
+              className="absolute right-20 top-20 z-20 h-full w-full content-lg:w-1/2"
               style={{ x: x, y: y, rotate: rotate }}
             >
               <Image
                 src={centerImage.src}
                 alt={centerImage.alt}
                 fill
-                sizes="50vw"
+                sizes={IMAGE_SLOT.half}
                 className="ods-card/50 border border-ods-border object-cover object-[left_top]"
               />
               <div className="absolute inset-0 shadow-2xl" />
@@ -245,60 +249,42 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
       {/* Image #3 - Behind all - z-index 1 */}
       {rightImage && (
         <motion.div
-          className="absolute right-[5%] top-[5%] z-[1] h-[60%] w-[80%] lg:right-[-15%] lg:top-[-10%] lg:h-[85%] lg:w-[120%]"
+          className="absolute right-[5%] top-[5%] z-[1] h-[60%] w-[80%] content-lg:right-[-15%] content-lg:top-[-10%] content-lg:h-[85%] content-lg:w-[120%]"
           style={{
             x: x,
             y: y,
             rotate: rotate,
           }}
         >
-          <Image
-            src={rightImage.src}
-            alt={rightImage.alt}
-            fill
-            sizes="(max-width: 1024px) 80vw, 120vw"
-            className="object-contain"
-          />
+          <Image src={rightImage.src} alt={rightImage.alt} fill sizes={IMAGE_SLOT.full} className="object-contain" />
         </motion.div>
       )}
 
       {/* Image #2 - Middle layer - z-index 2 */}
       {centerImage && (
         <motion.div
-          className="absolute bottom-[10%] right-[0%] z-[2] h-[55%] w-[75%] lg:bottom-[-15%] lg:right-[-20%] lg:h-[80%] lg:w-[100%]"
+          className="absolute bottom-[10%] right-[0%] z-[2] h-[55%] w-[75%] content-lg:bottom-[-15%] content-lg:right-[-20%] content-lg:h-[80%] content-lg:w-[100%]"
           style={{
             x: x,
             y: y,
             rotate: rotate,
           }}
         >
-          <Image
-            src={centerImage.src}
-            alt={centerImage.alt}
-            fill
-            sizes="(max-width: 1024px) 75vw, 100vw"
-            className="object-contain"
-          />
+          <Image src={centerImage.src} alt={centerImage.alt} fill sizes={IMAGE_SLOT.full} className="object-contain" />
         </motion.div>
       )}
 
       {/* Image #1 - On top - z-index 3 */}
       {leftImage && (
         <motion.div
-          className="absolute left-[-5%] top-[10%] z-[3] h-[65%] w-[85%] lg:left-[-25%] lg:top-[0%] lg:h-[90%] lg:w-[110%]"
+          className="absolute left-[-5%] top-[10%] z-[3] h-[65%] w-[85%] content-lg:left-[-25%] content-lg:top-[0%] content-lg:h-[90%] content-lg:w-[110%]"
           style={{
             x: x,
             y: y,
             rotate: rotate,
           }}
         >
-          <Image
-            src={leftImage.src}
-            alt={leftImage.alt}
-            fill
-            sizes="(max-width: 1024px) 85vw, 110vw"
-            className="object-contain"
-          />
+          <Image src={leftImage.src} alt={leftImage.alt} fill sizes={IMAGE_SLOT.full} className="object-contain" />
         </motion.div>
       )}
     </div>

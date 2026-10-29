@@ -37,6 +37,7 @@ const defaultNavigationItems: NavigationSidebarConfig['items'] = [
     label: 'Scripts',
     icon: <BracketCurlyIcon size={24} />,
     path: '/scripts',
+    badge: 'Beta',
   },
 ];
 

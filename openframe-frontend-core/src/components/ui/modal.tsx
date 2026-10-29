@@ -1,7 +1,9 @@
 'use client';
 
 import { usePreventScroll } from '@react-aria/overlays';
-import { type ReactNode, forwardRef, useEffect } from 'react';
+import { type ReactNode, forwardRef, useEffect, useLayoutEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
 
 /**
@@ -58,10 +60,18 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(({ isOpen, onClose, childre
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  // <body> is known only after mount (ModalV2's rule): an open modal renders nothing on the server.
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => setPortalTarget(document.body), []);
 
-  return (
-    <div className="fixed inset-0 z-[1300] flex items-center justify-center">
+  if (!isOpen || !portalTarget) return null;
+
+  // Rendered into <body>, never where the caller sits: a `fixed` element inside an ancestor with a
+  // transform, filter, `contain` or its own stacking context (a card strip, a marquee, a blurred
+  // header) is positioned and layered inside THAT box, so the site header and the next section
+  // painted over the dialog (the gathering gallery on /careers).
+  return createPortal(
+    <div className="ods-viewport-layer fixed inset-0 z-[1300] flex items-center justify-center">
       <div className="absolute inset-0 bg-ods-overlay" onClick={onClose} aria-hidden="true" />
       <div
         ref={ref}
@@ -72,9 +82,10 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(({ isOpen, onClose, childre
         role="dialog"
         aria-modal="true"
       >
-        {children}
+        <ViewportBreakpoints>{children}</ViewportBreakpoints>
       </div>
-    </div>
+    </div>,
+    portalTarget,
   );
 });
 Modal.displayName = 'Modal';

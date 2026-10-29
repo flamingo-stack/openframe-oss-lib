@@ -1,6 +1,5 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'node:path'
 import { CONTENT_PREFIX } from './proxy/content-prefix.mjs'
 import { hubTarget, rewrite } from './proxy/inject.mjs'
 
@@ -29,11 +28,6 @@ export default defineConfig(({ mode }) => {
       // call", and the QueryClient / router / chat-runtime contexts would split into two
       // instances (provider on one, consumer on the other → "called outside provider").
       dedupe: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
-      alias: {
-        // Guard: the lib's ./fonts entry imports next/font/google (a Next compiler macro). No
-        // surface here imports ./fonts, but stub it so an accidental import can't break the build.
-        'next/font/google': path.resolve(__dirname, 'src/stubs/next-font-google.ts'),
-      },
     },
     // Pre-bundle the yalc-linked lib (esbuild → ONE cached copy in node_modules/.vite/deps)
     // instead of reading its dist on demand via /@fs. Fixes two dev-only issues:

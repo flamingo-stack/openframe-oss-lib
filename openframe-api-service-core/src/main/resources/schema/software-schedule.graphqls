@@ -41,6 +41,12 @@ extend type Mutation {
 
     """Incrementally unassign the given devices (the trash / "Remove selected" actions). Missing ids are no-ops."""
     removeDevicesFromSoftwareSchedule(scheduleId: ID!, machineIds: [ID!]!): SoftwareSchedule!
+
+    """Switch a software schedule to CRITERIA device selection and store its rule (customer / type / OS) —
+    backs "Select Devices by Criteria" → Save Devices. The target device set is then resolved live at
+    dispatch and display time, so devices registered later that match the rule are included automatically.
+    Reuses the same ScheduleDeviceCriteriaInput as script schedules. Returns the updated schedule."""
+    setSoftwareScheduleDeviceCriteria(scheduleId: ID!, criteria: ScheduleDeviceCriteriaInput!): SoftwareSchedule!
 }
 
 type SoftwareSchedule implements Node {
@@ -51,8 +57,12 @@ type SoftwareSchedule implements Node {
     action: SoftwareAction!
     """The packages this schedule installs/updates."""
     packages: [SoftwareSchedulePackage!]!
-    """How this schedule targets devices. Always SPECIFIC for now (criteria out of scope)."""
+    """How this schedule targets devices: SPECIFIC (an explicit machine set) or CRITERIA (a live rule;
+    devices registered later that match are included automatically). Never null — legacy schedules read as SPECIFIC."""
     selectionMode: ScheduleDeviceSelectionMode!
+    """The device-selection rule when selectionMode is CRITERIA (customer / type / OS). Null for SPECIFIC schedules.
+    Reuses the ScheduleDeviceCriteria type from script schedules."""
+    deviceCriteria: ScheduleDeviceCriteria
     """How a DATE_TIME schedule reads its startAt: SERVER (an absolute instant) or DEVICE_LOCAL (a wall-clock re-based into each device's own timezone). Never null; defaults to SERVER."""
     timeReference: ScheduleTimeReference!
     """What to do when a target device is offline at the scheduled time. Never null; defaults to SKIP."""

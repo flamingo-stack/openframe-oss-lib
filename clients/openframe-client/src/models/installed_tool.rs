@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub const CHAT_TOOL_AGENT_ID: &str = "openframe-chat";
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Installation {
@@ -86,3 +88,7 @@ pub struct InstalledTool {
     #[serde(default)]
     pub state: ToolRecordState,
 }
+
+#[cfg(test)]
+#[path = "installed_tool_tests.rs"]
+mod tests;

@@ -1,10 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useLoadingScope } from '../components/ui/loading-scope';
 import { contentFetch } from '../utils/embed-content-fetch';
 
 export interface UseSelfFetchResult<T> {
   data: T | null;
+  /** The url `data` came from (`null` until something lands). While a new url
+   *  loads, `data` still holds the previous one — compare before trusting it. */
+  dataUrl: string | null;
   /** Imperatively patch the fetched data (e.g. optimistic vote updates). */
   setData: Dispatch<SetStateAction<T | null>>;
   isLoading: boolean;
@@ -42,13 +46,21 @@ export interface UseSelfFetchResult<T> {
  * url string (the url IS the cache key).
  */
 export function useSelfFetch<T>(
-  url: string | null,
+  givenUrl: string | null,
   options?: { initialData?: T; revalidateOnVisibleAfterMs?: number },
 ): UseSelfFetchResult<T> {
+  // In a loading scope nothing is fetched: the view draws itself with the data it was given (its loading state
+  // when it was given none).
+  const held = useLoadingScope();
+  const url = held ? null : givenUrl;
   const initialData = options?.initialData;
   const revalidateOnVisibleAfterMs = options?.revalidateOnVisibleAfterMs;
   const [data, setData] = useState<T | null>(initialData ?? null);
-  const [isLoading, setIsLoading] = useState(initialData === undefined && url !== null);
+  const [dataUrl, setDataUrl] = useState<string | null>(initialData !== undefined ? givenUrl : null);
+  // From `givenUrl`, not the held `url`, on purpose: a view held in a loading scope with no data IS loading
+  // (callers such as RoadmapView draw their skeleton from `isLoading && !data`). When the scope ends, `url` becomes
+  // `givenUrl` and the fetch below settles it.
+  const [isLoading, setIsLoading] = useState(initialData === undefined && givenUrl !== null);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   // When the held data was obtained: seeded at mount for SSR-hydrated data,
@@ -63,7 +75,7 @@ export function useSelfFetch<T>(
   // rendered data isn't re-fetched on mount). A VALUE compare (not a one-shot flag) so the
   // SSR-hydration skip survives React 18 StrictMode's mount→unmount→remount in dev;
   // `reload()` nulls it to force a re-fetch of the same url.
-  const dataUrlRef = useRef<string | null>(initialData !== undefined ? url : null);
+  const dataUrlRef = useRef<string | null>(initialData !== undefined ? givenUrl : null);
 
   // Both resets below are prop-driven, so they use React's "adjust state while
   // rendering" pattern rather than an effect. From an effect each one commits a
@@ -78,6 +90,7 @@ export function useSelfFetch<T>(
     // `initialData` is `undefined`.
     if (syncedProps.initialData !== initialData && initialData !== undefined) {
       setData(initialData);
+      setDataUrl(url);
     }
     // Fetching just got disabled — nothing will land to clear the spinner.
     if (syncedProps.url !== url && url === null) {
@@ -101,6 +114,7 @@ export function useSelfFetch<T>(
         const json = (await res.json()) as T;
         if (!cancelled) {
           setData(json);
+          setDataUrl(url);
           dataUrlRef.current = url; // remember the url we now hold data for
           dataAtRef.current = Date.now();
         }
@@ -149,6 +163,7 @@ export function useSelfFetch<T>(
 
   return {
     data,
+    dataUrl,
     setData,
     isLoading,
     error,

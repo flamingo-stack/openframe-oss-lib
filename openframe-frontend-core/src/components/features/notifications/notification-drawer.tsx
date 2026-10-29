@@ -5,9 +5,11 @@ import { useNotificationPermission } from '../../../hooks/ui';
 import { cn } from '../../../utils/cn';
 import { ClockHistoryIcon, ArrowRightUpIcon } from '../../icons-v2-generated';
 import { BellOffIcon } from '../../icons-v2-generated/interface/bell-off-icon';
+import { LoadingRegion } from '../../loading/loading-region';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { useAppLayoutDrawerContainer } from '../../navigation/app-layout-context';
 import { AppLayoutDrawer, AppLayoutDrawerContent } from '../../navigation/app-layout-drawer';
-import { SplitButton } from '../../ui/button';
+import { Button, SplitButton } from '../../ui/button';
 import { Drawer, DrawerContent, DrawerTitle } from '../../ui/drawer';
 import { Switch } from '../../ui/switch';
 import { NotificationTile } from './notification-tile';
@@ -68,14 +70,18 @@ export function NotificationDrawer({
           hideClose
           className="truncate"
           actions={
-            <button
+            <Button
+              variant="link"
+              size="compact"
+              noPaddingX
               type="button"
+              data-tone="neutral"
               disabled={unreadCount === 0}
               onClick={markAllRead}
-              className="self-center text-ods-text-secondary underline transition-colors text-h6 hover:text-ods-text-primary disabled:opacity-40 max-md:focus:outline-none max-md:focus-visible:outline-none"
+              className="self-center"
             >
               Mark All Complete
-            </button>
+            </Button>
           }
         >
           New Notifications
@@ -231,16 +237,11 @@ function DrawerScrollList({
 
 function DrawerLoadingTiles() {
   return (
-    <>
-      <div
-        aria-hidden="true"
-        className="h-16 w-full shrink-0 animate-pulse rounded-md border border-ods-border bg-ods-card"
-      />
-      <div
-        aria-hidden="true"
-        className="h-16 w-full shrink-0 animate-pulse rounded-md border border-ods-border bg-ods-card"
-      />
-    </>
+    // `contents`: the tiles stay the list's own items; the region adds the one announcement.
+    <LoadingRegion label="Loading more notifications" className="contents">
+      <UnifiedSkeleton className="h-16 w-full shrink-0 rounded-md border border-ods-border" />
+      <UnifiedSkeleton className="h-16 w-full shrink-0 rounded-md border border-ods-border" />
+    </LoadingRegion>
   );
 }
 

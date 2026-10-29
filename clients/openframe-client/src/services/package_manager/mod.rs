@@ -2,7 +2,10 @@
 mod brew;
 #[cfg(target_os = "windows")]
 mod choco;
-pub mod presence_report;
+pub mod report_publisher;
+pub mod report_run_manager;
+mod state;
+mod support;
 #[cfg(target_os = "windows")]
 mod winget;
 
@@ -17,7 +20,7 @@ const UPDATE_INTERVAL: Duration = Duration::from_secs(3600);
 const UPDATE_TIMEOUT_SECS: u32 = 600;
 const SETUP_FAILURE_RETCODE: i32 = 85;
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ManagerId {
     Brew,
@@ -33,20 +36,7 @@ pub enum Presence {
 }
 
 impl ManagerId {
-    pub fn for_current_platform() -> &'static [ManagerId] {
-        #[cfg(target_os = "macos")]
-        {
-            &[ManagerId::Brew]
-        }
-        #[cfg(target_os = "windows")]
-        {
-            &[ManagerId::Winget]
-        }
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        {
-            &[]
-        }
-    }
+    pub const ALL: &'static [ManagerId] = &[ManagerId::Brew, ManagerId::Choco, ManagerId::Winget];
 
     fn updater(self) -> Option<Box<dyn ManagerUpdater>> {
         match self {
@@ -204,7 +194,7 @@ fn interpret_markers(result: &ExecResult) -> UpdateOutcome {
 }
 
 fn managers() -> Vec<Box<dyn ManagerUpdater>> {
-    ManagerId::for_current_platform()
+    ManagerId::ALL
         .iter()
         .filter_map(|id| id.updater())
         .collect()

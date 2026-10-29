@@ -116,6 +116,7 @@ public class OrganizationQueryService {
                 .status(filterOptions.getStatus())
                 .lastActivityFrom(filterOptions.getLastActivityFrom())
                 .lastActivityTo(filterOptions.getLastActivityTo())
+                .excludeOrganizationIds(filterOptions.getExcludeOrganizationIds())
                 .build();
     }
     

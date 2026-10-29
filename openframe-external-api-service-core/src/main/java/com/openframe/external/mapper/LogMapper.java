@@ -33,6 +33,8 @@ public class LogMapper extends BaseRestMapper {
                 .deviceId(logEvent.getDeviceId())
                 .hostname(logEvent.getHostname())
                 .nickname(logEvent.getNickname())
+                .executionSource(logEvent.getExecutionSource())
+                .scriptCreationSource(logEvent.getScriptCreationSource())
                 .customerId(logEvent.getOrganizationId())
                 .customerName(logEvent.getOrganizationName())
                 .summary(logEvent.getSummary())
@@ -49,7 +51,7 @@ public class LogMapper extends BaseRestMapper {
                     .build();
         }
 
-        List<LogResponse> logs = result.getItems().stream()
+        List<LogResponse> logs = result.getItems() == null ? List.of() : result.getItems().stream()
                 .map(this::toLogResponse)
                 .collect(Collectors.toList());
 
@@ -64,7 +66,7 @@ public class LogMapper extends BaseRestMapper {
             return LogFilterResponse.builder().build();
         }
 
-        List<CustomerFilterResponse> customers = filters.getOrganizations().stream()
+        List<CustomerFilterResponse> customers = filters.getOrganizations() == null ? List.of() : filters.getOrganizations().stream()
                 .map(org -> new CustomerFilterResponse(org.getId(), org.getName()))
                 .collect(Collectors.toList());
 
@@ -92,6 +94,8 @@ public class LogMapper extends BaseRestMapper {
                 .deviceId(logDetails.getDeviceId())
                 .hostname(logDetails.getHostname())
                 .nickname(logDetails.getNickname())
+                .executionSource(logDetails.getExecutionSource())
+                .scriptCreationSource(logDetails.getScriptCreationSource())
                 .customerId(logDetails.getOrganizationId())
                 .customerName(logDetails.getOrganizationName())
                 .summary(logDetails.getSummary())

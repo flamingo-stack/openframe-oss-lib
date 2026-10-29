@@ -18,15 +18,19 @@ import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareScheduleInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.rmm.schedule.ScheduleDeviceCriteriaInput;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.software.SoftwareScheduleService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.security.authentication.AuthPrincipal;
-import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +44,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+import static com.openframe.graphql.relay.NodeType.SOFTWARE_SCHEDULE;
+
 @DgsComponent
 @RequiredArgsConstructor
 @Slf4j
@@ -47,15 +54,16 @@ import java.util.concurrent.CompletableFuture;
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 public class SoftwareScheduleDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final SoftwareScheduleService scheduleService;
     private final DeviceService deviceService;
     private final GraphQLDeviceMapper deviceMapper;
+    private final PackageManagerAvailability packageManagerAvailability;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public SoftwareScheduleResponse softwareSchedule(@InputArgument @NotBlank String id) {
-        return scheduleService.get(decodeId(id));
+        String scheduleId = relayIdCodec.decode(id, SOFTWARE_SCHEDULE);
+        return scheduleService.get(scheduleId);
     }
 
     @DgsQuery
@@ -66,46 +74,62 @@ public class SoftwareScheduleDataFetcher {
     @DgsMutation
     public SoftwareScheduleResponse createSoftwareSchedule(@InputArgument @Valid CreateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
-        input.setMachineIds(decodeIds(input.getMachineIds()));
-        return scheduleService.create(input, principal.getId());
+        List<String> machineGlobalIds = input.getMachineIds();
+        List<String> machineIds = relayIdCodec.decodeAll(machineGlobalIds, MACHINE);
+        input.setMachineIds(machineIds);
+        String userId = principal.getId();
+        return scheduleService.create(input, userId);
     }
 
     @DgsMutation
     public SoftwareScheduleResponse updateSoftwareSchedule(@InputArgument @Valid UpdateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
-        input.setId(decodeId(input.getId()));
-        input.setMachineIds(decodeIds(input.getMachineIds()));
-        return scheduleService.update(input, principal.getId());
+        String scheduleGlobalId = input.getId();
+        List<String> machineGlobalIds = input.getMachineIds();
+        String scheduleId = relayIdCodec.decode(scheduleGlobalId, SOFTWARE_SCHEDULE);
+        List<String> machineIds = relayIdCodec.decodeAll(machineGlobalIds, MACHINE);
+        input.setId(scheduleId);
+        input.setMachineIds(machineIds);
+        String userId = principal.getId();
+        return scheduleService.update(input, userId);
     }
 
     @DgsMutation
     public String deleteSoftwareSchedule(@InputArgument @NotBlank String id) {
-        return scheduleService.delete(decodeId(id));
+        String scheduleId = relayIdCodec.decode(id, SOFTWARE_SCHEDULE);
+        return scheduleService.delete(scheduleId);
     }
 
     @DgsMutation
     public SoftwareScheduleResponse archiveSoftwareSchedule(@InputArgument @NotBlank String id) {
-        return scheduleService.archive(decodeId(id));
+        String scheduleId = relayIdCodec.decode(id, SOFTWARE_SCHEDULE);
+        return scheduleService.archive(scheduleId);
     }
 
     @DgsMutation
     public SoftwareScheduleResponse unarchiveSoftwareSchedule(@InputArgument @NotBlank String id) {
-        return scheduleService.unarchive(decodeId(id));
+        String scheduleId = relayIdCodec.decode(id, SOFTWARE_SCHEDULE);
+        return scheduleService.unarchive(scheduleId);
     }
 
     @DgsMutation
     public SoftwareScheduleResponse setSoftwareScheduleDevices(@InputArgument @NotBlank String scheduleId,
                                                               @InputArgument List<String> machineIds,
                                                               @AuthenticationPrincipal AuthPrincipal principal) {
-        return scheduleService.setDevices(decodeId(scheduleId), decodeIds(machineIds), principal.getId());
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SOFTWARE_SCHEDULE);
+        List<String> rawMachineIds = relayIdCodec.decodeAll(machineIds, MACHINE);
+        String userId = principal.getId();
+        return scheduleService.setDevices(rawScheduleId, rawMachineIds, userId);
     }
 
     @DgsMutation
     public SoftwareScheduleResponse addDevicesToSoftwareSchedule(@InputArgument @NotBlank String scheduleId,
                                                                 @InputArgument List<String> machineIds,
                                                                 @AuthenticationPrincipal AuthPrincipal principal) {
-        String rawScheduleId = decodeId(scheduleId);
-        scheduleService.addDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SOFTWARE_SCHEDULE);
+        List<String> rawMachineIds = relayIdCodec.decodeAll(machineIds, MACHINE);
+        String userId = principal.getId();
+        scheduleService.addDevices(rawScheduleId, rawMachineIds, userId);
         return scheduleService.get(rawScheduleId);
     }
 
@@ -113,15 +137,25 @@ public class SoftwareScheduleDataFetcher {
     public SoftwareScheduleResponse removeDevicesFromSoftwareSchedule(@InputArgument @NotBlank String scheduleId,
                                                                      @InputArgument List<String> machineIds,
                                                                      @AuthenticationPrincipal AuthPrincipal principal) {
-        String rawScheduleId = decodeId(scheduleId);
-        scheduleService.removeDevices(rawScheduleId, decodeIds(machineIds), principal.getId());
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SOFTWARE_SCHEDULE);
+        List<String> rawMachineIds = relayIdCodec.decodeAll(machineIds, MACHINE);
+        String userId = principal.getId();
+        scheduleService.removeDevices(rawScheduleId, rawMachineIds, userId);
         return scheduleService.get(rawScheduleId);
     }
 
-    @DgsData(parentType = "SoftwareSchedule", field = "id")
-    public String softwareScheduleNodeId(DgsDataFetchingEnvironment dfe) {
-        SoftwareScheduleResponse schedule = dfe.getSource();
-        return RELAY.toGlobalId("SoftwareSchedule", schedule.getId());
+    @DgsMutation
+    public SoftwareScheduleResponse setSoftwareScheduleDeviceCriteria(@InputArgument @NotBlank String scheduleId,
+                                                                     @InputArgument @Valid ScheduleDeviceCriteriaInput criteria,
+                                                                     @AuthenticationPrincipal AuthPrincipal principal) {
+        ScheduleDeviceCriteria domainCriteria = ScheduleDeviceCriteria.builder()
+                .organizationIds(criteria.getOrganizationIds())
+                .deviceTypes(criteria.getDeviceTypes())
+                .osTypes(criteria.getOsTypes())
+                .build();
+        String rawScheduleId = relayIdCodec.decode(scheduleId, SOFTWARE_SCHEDULE);
+        String userId = principal.getId();
+        return scheduleService.setDeviceCriteria(rawScheduleId, domainCriteria, userId);
     }
 
     @DgsData(parentType = "SoftwareSchedule", field = "assignedDevices")
@@ -155,7 +189,8 @@ public class SoftwareScheduleDataFetcher {
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
         SoftwareScheduleResponse schedule = dfe.getSource();
-        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
         ConnectionArgs args = ConnectionArgs.builder().first(first).after(after).last(last).before(before).build();
         CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(args);
         Set<String> assigned = new HashSet<>(scheduleService.getMachineIds(schedule.getId()));
@@ -178,7 +213,9 @@ public class SoftwareScheduleDataFetcher {
     public DeviceFilters availableDeviceFilters(DgsDataFetchingEnvironment dfe,
                                                 @InputArgument @Valid DeviceFilterInput filter,
                                                 @InputArgument String search) {
-        return deviceService.getAvailableDeviceFilters(null, deviceMapper.toDeviceFilterCriteria(filter), search);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
+        return deviceService.getAvailableDeviceFilters(null, filterOptions, search);
     }
 
     @DgsData(parentType = "SoftwareSchedule", field = "deviceCount")
@@ -195,13 +232,5 @@ public class SoftwareScheduleDataFetcher {
         }
         DataLoader<String, UserResponse> loader = dfe.getDataLoader("userDataLoader");
         return loader.load(schedule.getCreatedBy());
-    }
-
-    private static String decodeId(String globalId) {
-        return globalId == null ? null : RELAY.fromGlobalId(globalId).getId();
-    }
-
-    private static List<String> decodeIds(List<String> globalIds) {
-        return globalIds == null ? null : globalIds.stream().map(SoftwareScheduleDataFetcher::decodeId).toList();
     }
 }

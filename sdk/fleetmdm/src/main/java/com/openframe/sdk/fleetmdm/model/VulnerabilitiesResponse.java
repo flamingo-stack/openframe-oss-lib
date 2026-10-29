@@ -2,12 +2,11 @@ package com.openframe.sdk.fleetmdm.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Data;
 
 import java.util.List;
 
-/**
- * Response wrapper for vulnerability list results from Fleet MDM
- */
+@Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class VulnerabilitiesResponse {
 
@@ -18,27 +17,16 @@ public class VulnerabilitiesResponse {
     @JsonProperty("counts_updated_at")
     private String countsUpdatedAt;
 
-    public List<Vulnerability> getVulnerabilities() {
-        return vulnerabilities;
-    }
+    private Meta meta;
 
-    public void setVulnerabilities(List<Vulnerability> vulnerabilities) {
-        this.vulnerabilities = vulnerabilities;
-    }
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Meta {
 
-    public Long getCount() {
-        return count;
-    }
+        @JsonProperty("has_next_results")
+        private Boolean hasNextResults;
 
-    public void setCount(Long count) {
-        this.count = count;
-    }
-
-    public String getCountsUpdatedAt() {
-        return countsUpdatedAt;
-    }
-
-    public void setCountsUpdatedAt(String countsUpdatedAt) {
-        this.countsUpdatedAt = countsUpdatedAt;
+        @JsonProperty("has_previous_results")
+        private Boolean hasPreviousResults;
     }
 }

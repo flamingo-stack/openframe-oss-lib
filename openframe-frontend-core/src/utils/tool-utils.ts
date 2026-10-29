@@ -76,6 +76,24 @@ const toolAliasMap: Record<string, ToolType> = {
   // OSQUERY
   OSQUERY: 'OSQUERY',
 
+  // Google Workspace (directory tenant)
+  GOOGLE_WORKSPACE: 'GOOGLE_WORKSPACE',
+  'GOOGLE-WORKSPACE': 'GOOGLE_WORKSPACE',
+  GOOGLEWORKSPACE: 'GOOGLE_WORKSPACE',
+  google_workspace: 'GOOGLE_WORKSPACE',
+  'google-workspace': 'GOOGLE_WORKSPACE',
+  googleworkspace: 'GOOGLE_WORKSPACE',
+
+  // Microsoft 365 (directory tenant)
+  MICROSOFT_365: 'MICROSOFT_365',
+  'MICROSOFT-365': 'MICROSOFT_365',
+  MICROSOFT365: 'MICROSOFT_365',
+  microsoft_365: 'MICROSOFT_365',
+  'microsoft-365': 'MICROSOFT_365',
+  microsoft365: 'MICROSOFT_365',
+  M365: 'MICROSOFT_365',
+  m365: 'MICROSOFT_365',
+
   // System
   SYSTEM: 'SYSTEM',
   system: 'SYSTEM',

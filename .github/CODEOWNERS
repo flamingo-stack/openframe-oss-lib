@@ -1,0 +1,9 @@
+# CODEOWNERS
+# Last-match-wins: put broader patterns above more specific ones.
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# Trivy reads both; either one can silence a scan.
+/.trivyignore              @flamingo-stack/devops-engineers
+/trivy.yaml                @flamingo-stack/devops-engineers
+
+# The workflows and steps, so the scan cannot be dropped without a devops review.
+/.github/                  @flamingo-stack/devops-engineers

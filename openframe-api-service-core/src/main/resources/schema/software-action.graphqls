@@ -1,0 +1,124 @@
+# Software Actions — the "Software Actions" page: one row per install/update of a package across its devices.
+# A row is aggregated from the execution leaves by executionId; the X/Y ratio is respondedMachineCount / totalMachineCount.
+# Gated behind openframe.rmm.software.enabled=true. Reuses SoftwareAction, PackageManagerType, Instant, SortInput.
+
+extend type Query {
+    """One software action by id. Null when unknown."""
+    softwareAction(id: ID!): SoftwareActionRun
+
+    """Software actions for the tenant (install/update runs + scheduled ones), newest first."""
+    softwareActions(
+        filter: SoftwareActionFilterInput,
+        first: Int,
+        after: String,
+        last: Int,
+        before: String,
+        search: String,
+        sort: SortInput
+    ): SoftwareActionRunConnection!
+
+    """
+    Device drill-down for one action: every target device with its result. Pass the SoftwareActionRun's
+    opaque id as actionId (it carries the execution / bundle / schedule keys). Executed devices come from
+    their execution leaves (with output for "Show Result"); devices still offline come from the action's
+    reconnect sentinels, and a not-yet-fired schedule lists its assigned devices — all as SCHEDULED.
+    Optional filter (Status / Customer) and search (hostname or machine id).
+    """
+    softwareActionExecutions(
+        actionId: String!,
+        filter: SoftwareActionDeviceFilterInput,
+        search: String
+    ): [SoftwareActionDevice!]!
+
+    """Available filter options (with live counts) for the softwareActions list — the ACTION / ENGINE /
+    STATUS dropdowns. Same filter/search scope as softwareActions; each facet is counted under the active
+    filters. filteredCount = total rows (executed + scheduled) matching them."""
+    softwareActionFilters(
+        filter: SoftwareActionFilterInput,
+        search: String
+    ): SoftwareActionFilters!
+}
+
+"""A single install/update of one package across its target devices."""
+type SoftwareActionRun {
+    id: ID!
+    executionId: String!
+    "Package name (the SOFTWARE column)."
+    software: String!
+    "INSTALL or UPDATE."
+    action: SoftwareAction!
+    "Package manager engine — BREW / WINGET / CHOCO."
+    engine: PackageManagerType!
+    status: SoftwareActionStatus!
+    "Total target devices (Y in X / Y)."
+    totalMachineCount: Int!
+    "Devices that have finished (X in X / Y)."
+    respondedMachineCount: Int!
+    "When a SCHEDULED action will fire. Null once dispatched / for NOW."
+    scheduledAt: Instant
+    "When the action was dispatched. Null while SCHEDULED."
+    dispatchedAt: Instant
+    finishedAt: Instant
+    initiatedBy: String
+    "Source bundle of a NOW action — pass to softwareActionExecutions. Null for SCHEDULE."
+    bundleId: String
+    "Source schedule of a SCHEDULE action — pass to softwareActionExecutions. Null for NOW."
+    scheduleId: String
+}
+
+enum SoftwareActionStatus {
+    SCHEDULED
+    IN_PROGRESS
+    COMPLETED
+    FAILED
+}
+
+"""One target device of a software action, with its result. Customer = the device's organization."""
+type SoftwareActionDevice {
+    machineId: ID!
+    hostname: String
+    organizationId: String
+    organizationName: String
+    status: SoftwareActionStatus!
+    exitCode: Int
+    stdout: String
+    stdoutTruncated: Boolean
+    stderr: String
+    stderrTruncated: Boolean
+    error: String
+    dispatchedAt: Instant
+    finishedAt: Instant
+}
+
+"""Filter for softwareActionExecutions. All fields optional; null/empty = no constraint.
+organizationIds is the Customer filter."""
+input SoftwareActionDeviceFilterInput {
+    statuses: [SoftwareActionStatus!]
+    organizationIds: [ID!]
+}
+
+type SoftwareActionRunConnection {
+    edges: [SoftwareActionRunEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type SoftwareActionRunEdge {
+    node: SoftwareActionRun!
+    cursor: String!
+}
+
+input SoftwareActionFilterInput {
+    statuses: [SoftwareActionStatus!]
+    actions: [SoftwareAction!]
+    engines: [PackageManagerType!]
+}
+
+"""Faceted filter options (with live counts) for the "Software Actions" page. Reuses ScriptFilterOption
+(value / label / count); values are enum names. filteredCount = total rows matching all active filters."""
+type SoftwareActionFilters {
+    statuses: [ScriptFilterOption!]!
+    actions: [ScriptFilterOption!]!
+    engines: [ScriptFilterOption!]!
+    filteredCount: Int!
+}

@@ -6,17 +6,21 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
+import com.openframe.api.dto.device.MachinePackageManagersResponse;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.device.DeviceTagService;
@@ -29,7 +33,7 @@ import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
-import graphql.relay.Relay;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import graphql.schema.DataFetchingFieldSelectionSet;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -44,13 +48,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+import static com.openframe.graphql.relay.NodeType.TAG;
+
 @DgsComponent
 @Slf4j
 @Validated
 @RequiredArgsConstructor
 public class DeviceDataFetcher {
-
-    private static final Relay RELAY = new Relay();
 
     private final DeviceService deviceService;
     private final DeviceFilterService deviceFilterService;
@@ -58,6 +63,8 @@ public class DeviceDataFetcher {
     private final TagService tagService;
     private final FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     private final GraphQLDeviceMapper mapper;
+    private final PackageManagerAvailability packageManagerAvailability;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public CompletableFuture<DeviceFilters> deviceFilters(@InputArgument @Valid DeviceFilterInput filter,
@@ -115,7 +122,7 @@ public class DeviceDataFetcher {
 
     @DgsQuery
     public Machine deviceById(@InputArgument @NotBlank String id) {
-        String machineId = RELAY.fromGlobalId(id).getId();
+        String machineId = relayIdCodec.decode(id, MACHINE);
         log.debug("Fetching device by global ID: {}, machineId: {}", id, machineId);
         return deviceService.findByMachineId(machineId).orElse(null);
     }
@@ -152,21 +159,9 @@ public class DeviceDataFetcher {
     @DgsMutation
     public boolean removeDeviceTag(@InputArgument @NotBlank String machineId,
                                    @InputArgument @NotBlank String tagId) {
-        String rawTagId = RELAY.fromGlobalId(tagId).getId();
+        String rawTagId = relayIdCodec.decode(tagId, TAG);
         log.debug("Removing tag {} (rawId: {}) from machineId: {}", tagId, rawTagId, machineId);
         return deviceTagService.removeTag(machineId, rawTagId);
-    }
-
-    @DgsData(parentType = "Machine", field = "id")
-    public String machineNodeId(DgsDataFetchingEnvironment dfe) {
-        Machine machine = dfe.getSource();
-        return RELAY.toGlobalId("Machine", machine.getMachineId());
-    }
-
-    @DgsData(parentType = "ToolConnection", field = "id")
-    public String toolConnectionNodeId(DgsDataFetchingEnvironment dfe) {
-        ToolConnection tc = dfe.getSource();
-        return RELAY.toGlobalId("ToolConnection", tc.getId());
     }
 
     @DgsData(parentType = "ToolConnection", field = "vulnerabilitiesUpdatedAt")
@@ -176,12 +171,6 @@ public class DeviceDataFetcher {
             return null;
         }
         return fleetVulnerabilityStatusService.getLastCompletedVulnerabilityRunAt();
-    }
-
-    @DgsData(parentType = "InstalledAgent", field = "id")
-    public String installedAgentNodeId(DgsDataFetchingEnvironment dfe) {
-        InstalledAgent agent = dfe.getSource();
-        return RELAY.toGlobalId("InstalledAgent", agent.getId());
     }
 
     @DgsData(parentType = "Machine")
@@ -199,6 +188,14 @@ public class DeviceDataFetcher {
     }
 
     @DgsData(parentType = "Machine")
+    public CompletableFuture<DeviceEnrollmentResponse> enrollment(DgsDataFetchingEnvironment dfe) {
+        DataLoader<String, List<ToolConnection>> dataLoader = dfe.getDataLoader("toolConnectionDataLoader");
+        Machine machine = dfe.getSource();
+        return dataLoader.load(machine.getMachineId())
+                .thenApply(toolConnections -> mapper.toEnrollment(machine, toolConnections));
+    }
+
+    @DgsData(parentType = "Machine")
     public CompletableFuture<List<InstalledAgent>> installedAgents(DgsDataFetchingEnvironment dfe) {
         DataLoader<String, List<InstalledAgent>> dataLoader = dfe.getDataLoader("installedAgentDataLoader");
         Machine machine = dfe.getSource();
@@ -207,7 +204,7 @@ public class DeviceDataFetcher {
 
     @DgsData(parentType = "Machine")
     public CompletableFuture<Organization> organization(DgsDataFetchingEnvironment dfe) {
-        DataLoader<String, Organization> dataLoader = dfe.getDataLoader("organizationDataLoader");
+        DataLoader<String, Organization> dataLoader = dfe.getDataLoader(OrganizationDataLoader.NAME);
         Machine machine = dfe.getSource();
         String organizationId = machine.getOrganizationId();
         
@@ -217,6 +214,18 @@ public class DeviceDataFetcher {
         
         return dataLoader.load(organizationId)
                 .thenApply(org -> org != null && org.getStatus() == OrganizationStatus.ACTIVE ? org : null);
+    }
+
+    @DgsData(parentType = "Machine")
+    public MachinePackageManagersResponse packageManagers(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return mapper.toPackageManagers(machine.getPackageManagers());
+    }
+
+    @DgsData(parentType = "Machine")
+    public boolean softwareManagementSupported(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return packageManagerAvailability.isSoftwareManageable(machine);
     }
 
 }

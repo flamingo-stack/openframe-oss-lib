@@ -53,18 +53,16 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_FINISHED_AT = "finishedAt";
     private static final String FIELD_STATUS_CHANGED_AT = "statusChangedAt";
+    private static final String FIELD_TEST_RUN = "testRun";
     private static final String FIELD_COUNT = "count";
 
-    /** Sort-field allowlist. Anything not in here falls back to {@link #getDefaultSortField()}. */
     private static final Set<String> SORTABLE_FIELDS = Set.of(
             FIELD_ID, FIELD_DISPATCHED_AT, FIELD_FINISHED_AT, FIELD_STATUS_CHANGED_AT);
 
-    /** Owner-scope type → the Mongo field that narrows the base predicate for that owner. */
     private static final Map<ExecutionOwnerScope.Type, String> OWNER_FIELDS = new EnumMap<>(Map.of(
             ExecutionOwnerScope.Type.SCRIPT, "scriptId",
             ExecutionOwnerScope.Type.SCHEDULE, "scheduleId"));
 
-    /** Facet enum → the Mongo field to group by / drop from the filter. */
     private static final Map<ExecutionFacetField, String> FACET_FIELDS = new EnumMap<>(Map.of(
             ExecutionFacetField.STATUS, FIELD_STATUS,
             ExecutionFacetField.INITIATOR, FIELD_INITIATED_BY,
@@ -98,6 +96,10 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                         .packageManager(request.getPackageManager())
                         .packageName(request.getPackageName())
                         .softwareAction(request.getSoftwareAction())
+                        .softwareBundleId(request.getSoftwareBundleId())
+                        .softwareScheduleId(request.getSoftwareScheduleId())
+                        .packageUpdateRequestId(request.getPackageUpdateRequestId())
+                        .testRun(request.isTestRun())
                         .status(initialStatus)
                         .dispatchedAt(now)
                         .statusChangedAt(now)
@@ -216,6 +218,9 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         if (filter.getExcludedSources() != null && !filter.getExcludedSources().isEmpty()) {
             criteria.and(FIELD_SOURCE).nin(filter.getExcludedSources());
         }
+        if (filter.isExcludeTestRuns()) {
+            criteria.and(FIELD_TEST_RUN).ne(true);
+        }
         if (!FIELD_STATUS.equals(excludedField)
                 && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
             criteria.and(FIELD_STATUS).in(filter.getStatuses());
@@ -258,7 +263,6 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         return new Criteria().andOperator(base, match);
     }
 
-    /** Run a {@code match → group(field).count()} aggregation and collapse it to {@code value → count}. */
     private Map<String, Integer> facetCounts(Criteria criteria, String groupField) {
         AggregationResults<Document> results = mongoTemplate.aggregate(
                 Aggregation.newAggregation(
@@ -317,7 +321,6 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                             Criteria.where(FIELD_ID).gt(cursorId)),
                     Criteria.where(sortField).ne(null));
         }
-        // Non-null cursor.
         if (desc) {
             return new Criteria().orOperator(
                     Criteria.where(sortField).lt(cursorValue),
@@ -334,11 +337,8 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         // ASC: nulls come first — already passed by definition of a non-null cursor.
     }
 
-    /**
-     * Parse the hex portion of a cursor as {@link ObjectId} — fail-fast rather than
-     * silent-fallback, because a dropped cursor with {@code backward=true} would flip the
-     * page into ASC order and return the oldest rows as if that were a valid "before" page.
-     */
+    // Fail-fast rather than silent fallback: a dropped cursor with backward=true would flip the
+    // page into ASC order and return the oldest rows as if that were a valid "before" page.
     private static ObjectId parseObjectId(String hex) {
         try {
             return new ObjectId(hex);
@@ -348,7 +348,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         }
     }
 
-    /** Same fail-fast rationale as {@link #parseObjectId}. Empty means "null cursor sort value". */
+    // Empty means a null cursor sort value; otherwise fail-fast like parseObjectId.
     private static Instant parseInstantOrNull(String millis) {
         if (millis.isEmpty()) {
             return null;

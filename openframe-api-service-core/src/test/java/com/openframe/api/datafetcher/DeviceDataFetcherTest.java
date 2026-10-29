@@ -1,5 +1,7 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.graphql.relay.RelayIdCodec;
+import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
@@ -11,18 +13,24 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
-import graphql.relay.Relay;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.dataloader.DataLoader;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.graphql.relay.NodeType.TAG;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,6 +45,7 @@ class DeviceDataFetcherTest {
     @Mock private GraphQLDeviceMapper mapper;
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     @Mock private DgsDataFetchingEnvironment dfe;
+    @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private DeviceDataFetcher fetcher;
 
@@ -135,7 +144,7 @@ class DeviceDataFetcherTest {
     @Test
     @DisplayName("removeDeviceTag: decodes the Relay global id before delegating")
     void removeDeviceTag_decodesGlobalId() {
-        String globalId = new Relay().toGlobalId("Tag", "tag-1");
+        String globalId = relayIdCodec.encode(TAG, "tag-1");
         when(deviceTagService.removeTag("m1", "tag-1")).thenReturn(true);
 
         boolean result = fetcher.removeDeviceTag("m1", globalId);
@@ -150,8 +159,28 @@ class DeviceDataFetcherTest {
     void removeDeviceTag_notAssigned() {
         when(deviceTagService.removeTag("m1", "tag-1")).thenReturn(false);
 
-        boolean result = fetcher.removeDeviceTag("m1", new Relay().toGlobalId("Tag", "tag-1"));
+        boolean result = fetcher.removeDeviceTag("m1", relayIdCodec.encode(TAG, "tag-1"));
 
         assertThat(result).isFalse();
+    }
+
+    @Test
+    @DisplayName("enrollment: loads the machine's tool connections through toolConnectionDataLoader and maps them")
+    void enrollment_loadsToolConnectionsForTheMachineAndMaps() throws Exception {
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        List<ToolConnection> connections = List.of(new ToolConnection());
+        DeviceEnrollmentResponse mapped = DeviceEnrollmentResponse.builder().ready(true).build();
+        when(dfe.getSource()).thenReturn(machine);
+        @SuppressWarnings("unchecked")
+        DataLoader<String, List<ToolConnection>> loader = mock(DataLoader.class);
+        doReturn(loader).when(dfe).getDataLoader("toolConnectionDataLoader");
+        when(loader.load("m1")).thenReturn(CompletableFuture.completedFuture(connections));
+        when(mapper.toEnrollment(machine, connections)).thenReturn(mapped);
+
+        DeviceEnrollmentResponse result = fetcher.enrollment(dfe).get();
+
+        assertThat(result).isSameAs(mapped);
+        verify(mapper).toEnrollment(machine, connections);
     }
 }

@@ -40,14 +40,35 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   podcasts: 'headphones',
   'customer-interviews': 'users',
   faqs: 'info',
+  // Not a chat source: listed so the site menus and the admin sidebar draw the
+  // media library with one glyph, from this registry like every other kind.
+  media: 'image',
+
+  // Admin sections that are not chat sources, and the case-study audiences:
+  // listed so every glyph a menu, a sidebar or a dashboard tile shows is named
+  // here and nowhere else.
+  campaigns: 'megaphone-01',
+  'contact-submissions': 'email',
+  'code-documentation': 'book-open',
+  'audience-msp': 'hierarchy-02',
+  'audience-mssp': 'shield-lock',
+  'audience-it-team': 'buildings',
+
+  // Trust (single-record live source over the public Vanta projection): the icon its menu entry draws
+  'trust-center': 'shield-check',
+  // The public website's own pages (live source): the site's own mark, as a glyph in the slot's colour
+  'website-pages': 'flamingo-logo-grey',
+  'openframe-pricing': 'money-bill-dollar',
+  // The OpenMSP vendor directory: the icon the site menu's "Tool directory" entry draws (it reads this one)
+  vendors: 'package-search',
 
   // Financials
   'investor-updates': 'mail',
-  'financial-kpis': 'activity',
-  'financial-cap-table': 'table',
-  'financial-pnl': 'trending-up',
-  'financial-balance-sheet': 'dollar-sign',
-  'financial-cash-flow': 'banknote',
+  'financial-kpis': 'chart-bar-01-ver',
+  'financial-cap-table': 'chart-pie',
+  'financial-pnl': 'money-bill-dollar',
+  'financial-balance-sheet': 'bank',
+  'financial-cash-flow': 'coins-exchange-currency',
 
   // ClickUp
   'clickup-roadmap': 'clickup',
@@ -71,14 +92,24 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'slack-messages': 'slack',
 
   // People-hub employee content
-  'what-i-shipped': 'package',
-  'how-i-work': 'book-open',
-  'ai-prompts': 'message-square',
+  'what-i-shipped': 'rocket-02',
+  'how-i-work': 'clipboard-list',
+  'ai-prompts': 'chat-quote',
 
   // Product-hub internal
   'design-docs': 'file-text',
   'openframe-tenants': 'openframe',
-  'prospect-calls': 'phone',
+  'prospect-calls': 'call',
+
+  // Code intelligence
+  'code-rules': 'bracket-curly-check',
+  'code-graph-repos': 'coding-branch',
+  'code-graph-deployments': 'package',
+  'code-graph-files': 'file-code',
+  'code-symbols': 'code-square',
+  'code-duplicates': 'copy-01',
+  'code-impact': 'coding-pull-request',
+  'change-sets': 'coding-merge',
 };
 
 /** Lookup an icon name by RagTableConfig.id. Returns undefined when
@@ -116,6 +147,12 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   podcasts: 'Podcasts',
   'customer-interviews': 'Customer Interviews',
   faqs: 'FAQs',
+
+  // Trust
+  'trust-center': 'Trust Center',
+  'website-pages': 'Website',
+  'openframe-pricing': 'OpenFrame pricing',
+  vendors: 'Vendor Directory',
 
   // Financials
   'investor-updates': 'Investor Updates',
@@ -161,6 +198,16 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   'design-docs': 'Design Docs',
   'openframe-tenants': 'OpenFrame Tenants',
   'prospect-calls': 'Prospect calls',
+
+  // Code intelligence
+  'code-rules': 'Code Rules',
+  'code-graph-repos': 'Repositories',
+  'code-graph-deployments': 'Deployments',
+  'code-graph-files': 'Code Files',
+  'code-symbols': 'Code Symbols',
+  'code-duplicates': 'Duplicates',
+  'code-impact': 'Change Impact',
+  'change-sets': 'Change Sets',
 };
 
 /** Lookup a human-readable label by RagTableConfig.id. Falls back
@@ -185,7 +232,7 @@ export function getSourceLabel(tableId: string): string {
  *
  * Embedders that need a CUSTOM mapping (e.g. polymorphic types whose
  * tableId depends on per-tenant config) still pass their own
- * `tableIdForDocumentType` callback to `useEmbeddedChat`; this default
+ * `tableIdForDocumentType` callback to `useSseChatAdapter`; this default
  * only applies when no callback is supplied.
  *
  * Inverse mapping audited 2026-05-24 against the hub registry — every
@@ -206,6 +253,12 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   podcast: 'podcasts',
   customer_interview: 'customer-interviews',
   faq: 'faqs',
+
+  // Trust
+  trust_center: 'trust-center',
+  site_page: 'website-pages',
+  openframe_price: 'openframe-pricing',
+  vendor: 'vendors',
 
   // Financials
   investor_update: 'investor-updates',
@@ -245,10 +298,20 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   design_doc: 'design-docs',
   openframe_tenant: 'openframe-tenants',
   prospect_call: 'prospect-calls',
+
+  // Code intelligence
+  code_rule: 'code-rules',
+  code_repo: 'code-graph-repos',
+  code_deployment: 'code-graph-deployments',
+  code_file: 'code-graph-files',
+  code_symbol: 'code-symbols',
+  code_duplicate: 'code-duplicates',
+  code_impact: 'code-impact',
+  change_set: 'change-sets',
 };
 
 /**
- * Default `tableIdForDocumentType` resolver used by `useEmbeddedChat` when
+ * Default `tableIdForDocumentType` resolver used by `useSseChatAdapter` when
  * the caller didn't pass an explicit callback. Returns `null` for
  * unrecognized document types so downstream `discussRef` / `displayRef`
  * still short-circuits gracefully on stale or custom types.

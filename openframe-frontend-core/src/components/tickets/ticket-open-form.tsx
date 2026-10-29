@@ -25,6 +25,7 @@ import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { TICKET_TEXT_MAX_CHARS } from './types';
 
@@ -92,9 +93,9 @@ export function TicketOpenForm({ onSubmit, isSubmitting, supportSystemDown }: Ti
 
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <div>
-            <label htmlFor="ticket-subject" className="mb-1 block text-ods-text-primary text-h6">
+            <Label htmlFor="ticket-subject" className="mb-1">
               Ticket Subject
-            </label>
+            </Label>
             <Input
               id="ticket-subject"
               type="text"
@@ -107,9 +108,9 @@ export function TicketOpenForm({ onSubmit, isSubmitting, supportSystemDown }: Ti
           </div>
 
           <div>
-            <label htmlFor="ticket-content" className="mb-1 block text-ods-text-primary text-h6">
+            <Label htmlFor="ticket-content" className="mb-1">
               Your Message
-            </label>
+            </Label>
             <Textarea
               id="ticket-content"
               placeholder="Describe your issue or question in detail..."

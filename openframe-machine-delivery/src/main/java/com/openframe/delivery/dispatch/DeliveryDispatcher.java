@@ -1,0 +1,62 @@
+package com.openframe.delivery.dispatch;
+
+import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.spec.DeliveryPayload;
+import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliveryRequest;
+import com.openframe.delivery.spec.DeliverySeed;
+import com.openframe.delivery.spec.DeliverySpec;
+import com.openframe.delivery.spec.DeliverySpecRegistry;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.stereotype.Component;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class DeliveryDispatcher {
+
+    private final DeliverySpecRegistry registry;
+    // ObjectProvider: the dispatcher boots in services with neither NATS nor Kafka, where no sink bean exists
+    private final ObjectProvider<DeliverySink> sink;
+
+    public void dispatch(DeliverySeed seed) {
+        DeliveryType type = seed.getType();
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        DeliveryRequest<DeliveryPayload> request = spec.request(seed);
+        send(type, spec, request);
+    }
+
+    public void schedule(DeliverySeed seed, Instant at) {
+        DeliveryType type = seed.getType();
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        DeliveryRequest<DeliveryPayload> request = spec.request(seed).toBuilder()
+                .dueAt(at)
+                .build();
+        if (request.isForEveryMachine()) {
+            throw new IllegalArgumentException("A rollout goes out at once, it cannot be scheduled: " + type);
+        }
+        send(type, spec, request);
+    }
+
+    private void send(DeliveryType type, DeliverySpec<DeliverySeed, DeliveryPayload> spec,
+                      DeliveryRequest<DeliveryPayload> request) {
+        if (isWildcardOnASingleMachineType(request, spec)) {
+            throw new IllegalArgumentException("Delivery type delivers to one machine at a time: " + type);
+        }
+        DeliveryPayload payload = request.getPayload();
+        String dispatchId = UUID.randomUUID().toString();
+        String targetId = request.getTargetId();
+        DeliveryRef delivery = new DeliveryRef(type, targetId, dispatchId);
+        payload.setDelivery(delivery);
+        sink.getObject().accept(request);
+    }
+
+    private static boolean isWildcardOnASingleMachineType(DeliveryRequest<? extends DeliveryPayload> request, DeliverySpec<?, ?> spec) {
+        return request.isForEveryMachine() && !spec.canDeliverToEveryMachine();
+    }
+}

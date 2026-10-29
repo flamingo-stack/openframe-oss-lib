@@ -3,7 +3,7 @@
 import { ExternalLink } from 'lucide-react';
 import { useClaudeMirrorSrc } from '../../hooks/use-claude-mirror-src';
 import { toClaudeEmbedUrl } from '../../utils/embed-url-converters';
-import { ClaudeIcon } from '../icons/claude-icon';
+import { ClaudeIcon } from '../icons-v2-generated/brand-logos/claude-icon';
 import { Button } from '../ui/button/button';
 import { EmbedViewerFrame } from './embed-viewer-frame';
 
@@ -79,7 +79,7 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
           openInNewTab
           leftIcon={<ClaudeIcon className="h-4 w-4" />}
           rightIcon={<ExternalLink className="h-4 w-4" />}
-          className="w-full sm:w-auto"
+          className="w-full content-sm:w-auto"
         >
           Open in Claude
         </Button>

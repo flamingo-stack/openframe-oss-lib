@@ -8,6 +8,9 @@ import com.openframe.api.service.rmm.schedule.ScheduleGrid;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
@@ -18,6 +21,7 @@ import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedReposito
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -42,6 +46,7 @@ public class SoftwareScheduleService {
     private final SoftwareScheduleMachineAssignedRepository assignedRepository;
     private final SoftwareScheduleTargetResolver targetResolver;
     private final TenantIdProvider tenantIdProvider;
+    private final PackageManagerAvailability packageManagerAvailability;
 
     public SoftwareScheduleResponse create(CreateSoftwareScheduleInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -51,13 +56,16 @@ public class SoftwareScheduleService {
 
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
         validateTiming(input.getStartAt(), input.getRepeat());
+        List<SoftwareSchedulePackage> packages = toPackages(input.getPackages());
+        List<PackageManagerType> managers = managersOf(packages);
+        packageManagerAvailability.requireSoftwareManageable(input.getMachineIds(), managers);
 
         SoftwareSchedule entity = SoftwareSchedule.builder()
                 .tenantId(tenantId)
                 .name(input.getName())
                 .description(input.getDescription())
                 .action(input.getAction())
-                .packages(toPackages(input.getPackages()))
+                .packages(packages)
                 .trigger(ScheduleScriptTrigger.DATE_TIME)
                 .timeReference(timeReference)
                 .offlineBehavior(input.getOfflineBehavior())
@@ -84,11 +92,14 @@ public class SoftwareScheduleService {
 
         ScheduleTimeReference timeReference = defaultTimeReference(input.getTimeReference());
         validateTiming(input.getStartAt(), input.getRepeat());
+        List<SoftwareSchedulePackage> packages = toPackages(input.getPackages());
+        List<PackageManagerType> managers = managersOf(packages);
+        packageManagerAvailability.requireSoftwareManageable(input.getMachineIds(), managers);
 
         entity.setName(input.getName());
         entity.setDescription(input.getDescription());
         entity.setAction(input.getAction());
-        entity.setPackages(toPackages(input.getPackages()));
+        entity.setPackages(packages);
         entity.setTimeReference(timeReference);
         entity.setOfflineBehavior(input.getOfflineBehavior());
         entity.setReconnectWindowSeconds(input.getReconnectWindowSeconds());
@@ -118,7 +129,6 @@ public class SoftwareScheduleService {
                 .stream().map(this::toResponse).toList();
     }
 
-    /** Soft-delete (status DELETED). Idempotent; returns the id. */
     public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = scheduleRepository.findByTenantIdAndId(tenantId, id)
@@ -131,12 +141,10 @@ public class SoftwareScheduleService {
         return id;
     }
 
-    /** Archive a schedule (idempotent). */
     public SoftwareScheduleResponse archive(String id) {
         return transitionTo(id, ScriptStatus.ARCHIVED);
     }
 
-    /** Restore an archived schedule back to ACTIVE (idempotent). */
     public SoftwareScheduleResponse unarchive(String id) {
         return transitionTo(id, ScriptStatus.ACTIVE);
     }
@@ -152,22 +160,26 @@ public class SoftwareScheduleService {
         return toResponse(entity);
     }
 
-    /** Replace the full assigned device set (PUT — backs "Edit Devices"). */
     public SoftwareScheduleResponse setDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
+        List<PackageManagerType> managers = managersOf(entity.getPackages());
+        packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
+        ensureSpecificMode(entity);
         replaceDevices(tenantId, scheduleId, machineIds, actor);
         return toResponse(entity);
     }
 
-    /** Incrementally assign devices (idempotent — already-assigned ids are skipped). */
     public void addDevices(String scheduleId, List<String> machineIds, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
-        loadVisibleOrThrow(tenantId, scheduleId);
+        SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
         if (machineIds == null || machineIds.isEmpty()) {
             return;
         }
-        Set<String> existing = new HashSet<>(getMachineIds(scheduleId));
+        List<PackageManagerType> managers = managersOf(entity.getPackages());
+        packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
+        ensureSpecificMode(entity);
+        Set<String> existing = new HashSet<>(assignedMachineIds(tenantId, scheduleId));
         List<SoftwareScheduleMachineAssigned> rows = machineIds.stream().distinct()
                 .filter(id -> !existing.contains(id))
                 .map(machineId -> SoftwareScheduleMachineAssigned.builder()
@@ -187,13 +199,43 @@ public class SoftwareScheduleService {
         assignedRepository.deleteByTenantIdAndSoftwareScheduleIdAndMachineIdIn(tenantId, scheduleId, machineIds);
     }
 
+    public SoftwareScheduleResponse setDeviceCriteria(String scheduleId, ScheduleDeviceCriteria criteria, String actor) {
+        String tenantId = tenantIdProvider.getTenantId();
+        SoftwareSchedule entity = loadVisibleOrThrow(tenantId, scheduleId);
+        entity.setSelectionMode(ScheduleDeviceSelectionMode.CRITERIA);
+        entity.setDeviceCriteria(criteria);
+        SoftwareSchedule saved = scheduleRepository.save(entity);
+        log.info("Applied device criteria to software schedule id={} tenantId={} by user={}: {}",
+                scheduleId, tenantId, actor, criteria);
+        return toResponse(saved);
+    }
+
     public List<String> getMachineIds(String scheduleId) {
-        return targetResolver.resolveMachineIds(tenantIdProvider.getTenantId(), scheduleId);
+        return targetResolver.resolveMachineIds(loadVisibleOrThrow(tenantIdProvider.getTenantId(), scheduleId));
     }
 
     public int deviceCount(String scheduleId) {
-        return (int) assignedRepository
-                .countByTenantIdAndSoftwareScheduleId(tenantIdProvider.getTenantId(), scheduleId);
+        return getMachineIds(scheduleId).size();
+    }
+
+    private List<String> assignedMachineIds(String tenantId, String scheduleId) {
+        return assignedRepository.findByTenantIdAndSoftwareScheduleId(tenantId, scheduleId).stream()
+                .map(SoftwareScheduleMachineAssigned::getMachineId).toList();
+    }
+
+    private static List<PackageManagerType> managersOf(List<SoftwareSchedulePackage> packages) {
+        return packages.stream()
+                .map(SoftwareSchedulePackage::getPackageManager)
+                .distinct()
+                .toList();
+    }
+
+    private void ensureSpecificMode(SoftwareSchedule schedule) {
+        if (schedule.getSelectionMode() != ScheduleDeviceSelectionMode.SPECIFIC) {
+            schedule.setSelectionMode(ScheduleDeviceSelectionMode.SPECIFIC);
+            schedule.setDeviceCriteria(null);
+            scheduleRepository.save(schedule);
+        }
     }
 
     private void replaceDevices(String tenantId, String scheduleId, List<String> machineIds, String actor) {
@@ -218,7 +260,7 @@ public class SoftwareScheduleService {
         return timeReference != null ? timeReference : ScheduleTimeReference.SERVER;
     }
 
-    /** SERVER runs off {@code nextRunAt}=startAt; DEVICE_LOCAL is timezone-driven, so its nextRunAt is null. */
+    // DEVICE_LOCAL is timezone-driven → no seeded nextRunAt; SERVER runs off startAt.
     private static Instant seedNextRunAt(ScheduleTimeReference timeReference, Instant startAt) {
         return timeReference == ScheduleTimeReference.DEVICE_LOCAL ? null : startAt;
     }
@@ -244,7 +286,8 @@ public class SoftwareScheduleService {
         return SoftwareScheduleResponse.builder()
                 .id(s.getId()).name(s.getName()).description(s.getDescription())
                 .action(s.getAction()).packages(s.getPackages())
-                .selectionMode(s.getSelectionMode()).trigger(s.getTrigger()).timeReference(s.getTimeReference())
+                .selectionMode(s.getSelectionMode()).deviceCriteria(s.getDeviceCriteria())
+                .trigger(s.getTrigger()).timeReference(s.getTimeReference())
                 .offlineBehavior(s.getOfflineBehavior()).reconnectWindowSeconds(s.getReconnectWindowSeconds())
                 .startAt(s.getStartAt()).repeat(s.getRepeat())
                 .nextRunAt(s.getNextRunAt()).lastRunAt(s.getLastRunAt())

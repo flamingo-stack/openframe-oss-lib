@@ -17,6 +17,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useLoadingScope } from '../ui/loading-scope';
 import { useCaptions } from './use-captions';
 import type { WalkthroughVideoData } from './walkthrough-video';
 
@@ -39,7 +40,10 @@ export interface UseWalkthroughVideoResult {
 }
 
 export function useWalkthroughVideo(opts: UseWalkthroughVideoOptions): UseWalkthroughVideoResult {
-  const { endpoint, initialData, enabled = true, transformCaptionsUrl } = opts;
+  const { endpoint, initialData, enabled: enabledGiven = true, transformCaptionsUrl } = opts;
+  // In a loading scope nothing is fetched.
+  const inScope = useLoadingScope();
+  const enabled = enabledGiven && !inScope;
   const captions = useCaptions();
 
   const query = useQuery<WalkthroughVideoData | null>({

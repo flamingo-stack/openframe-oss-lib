@@ -8,7 +8,7 @@ import lombok.Value;
 import java.util.List;
 
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class RunningExecutionRows {
 
     String tenantId;
@@ -24,4 +24,10 @@ public class RunningExecutionRows {
     PackageManagerType packageManager;
     String packageName;
     SoftwareAction softwareAction;
+
+    String softwareBundleId;
+    String softwareScheduleId;
+    String packageUpdateRequestId;
+
+    boolean testRun;
 }

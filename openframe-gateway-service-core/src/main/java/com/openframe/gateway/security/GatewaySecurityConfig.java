@@ -6,8 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.autoconfigure.web.server.ManagementServerProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
-import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.server.autoconfigure.ServerProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -114,9 +114,7 @@ public class GatewaySecurityConfig {
                                 CLIENTS_PREFIX + "/api/agents/reinstall",
                                 CLIENTS_PREFIX + "/api/agents/uninstall",
                                 CLIENTS_PREFIX + "/api/release-version",
-                                CLIENTS_PREFIX + "/oauth/token",
-                                // TODO: removxxe after migration artifacts to GitHub
-                                CLIENTS_PREFIX + "/tool-agent/**"
+                                CLIENTS_PREFIX + "/oauth/token"
                         ).permitAll()
                         .pathMatchers(API_PREFIX + "/**").hasRole(ADMIN)
                         .pathMatchers(TOOLS_PREFIX + "/agent/**").hasRole(AGENT)

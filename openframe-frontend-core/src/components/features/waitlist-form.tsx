@@ -5,13 +5,16 @@ import type { CountryCode } from 'libphonenumber-js';
 import { useEffect, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { useFormRescue } from '../../hooks/use-form-rescue';
 import { useHumanitySignals } from '../../hooks/use-humanity-signals';
 import { useToast } from '../../hooks/use-toast';
 import { cn } from '../../utils/cn';
 import { formatPhoneE164 } from '../../utils/country-phone-utils';
+import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { hasGenericEmailDomain } from '../../utils/generic-domain-utils';
 import type { HumanitySignals } from '../../utils/humanity-signals';
-import { OpenFrameLogo } from '../icons';
+import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { CheckboxBlock } from '../ui/checkbox-block';
 import { HoneypotField } from '../ui/honeypot-field';
@@ -30,7 +33,14 @@ export interface WaitlistFormProps {
    * POST body. Must throw on failure (toast is handled by the form). `signals`
    * is optional for backward compatibility with older callers.
    */
-  onRegister: (email: string, phone?: string, signals?: HumanitySignals) => Promise<void>;
+  /** `rescue` carries the form-rescue keys (`form_attempt_id`, …) to merge into the
+   *  POST body, so the host closes the half-filled draft this submit completes. */
+  onRegister: (
+    email: string,
+    phone?: string,
+    signals?: HumanitySignals,
+    rescue?: Record<string, string>,
+  ) => Promise<void>;
   /** Whether a registration request is currently in flight */
   isSubmitting?: boolean;
   /** Whether registration completed successfully */
@@ -57,6 +67,8 @@ export interface WaitlistFormProps {
   privacyPolicyUrl?: string;
   /** SMS consent text shown below the checkbox label */
   consentText?: string;
+  /** Form rescue (save a half-filled form for follow-up), e.g. `RESCUE_FORMS.waitlist`. OPT-IN: omitted or `null` saves nothing. */
+  rescue?: FormRescueDefinition | null;
 }
 
 /**
@@ -90,6 +102,7 @@ export function WaitlistForm({
   invalidPhoneHint = 'Invalid phone number format.',
   termsOfServiceUrl,
   privacyPolicyUrl,
+  rescue: rescueForm = null,
   consentText = 'I agree to receive recurring automated text messages at the phone number provided. Msg & data rates may apply. Msg frequency varies. Reply HELP for help and STOP to cancel.',
 }: WaitlistFormProps) {
   const [email, setEmail] = useState(defaultEmail);
@@ -101,6 +114,18 @@ export function WaitlistForm({
   const isClient = useIsHydrated();
   const [isPhoneInvalid, setIsPhoneInvalid] = useState(false);
   const [showConsentError, setShowConsentError] = useState(false);
+  const rescue = useFormRescue({
+    form: rescueForm,
+    // The phone is reported as filled only; its value never leaves the form early.
+    fieldNames: ['email', 'phone'],
+    getSignals,
+    onRestore: values => {
+      if (values.email) setEmail(current => current || values.email);
+    },
+  });
+  useEffect(() => {
+    rescue.track({ email, phone }, null);
+  }, [email, phone, rescue]);
 
   const isMailDomainGeneric = hasGenericEmailDomain(email);
 
@@ -160,7 +185,8 @@ export function WaitlistForm({
     const finalPhone = phone ? formatPhoneE164(phone, countryCode) : undefined;
 
     try {
-      await onRegister(email, finalPhone, getSignals());
+      await onRegister(email, finalPhone, getSignals(), rescue.submitFields());
+      rescue.complete();
       resetSignals();
     } catch {
       // caller's onRegister should handle its own error toasts if needed
@@ -176,16 +202,16 @@ export function WaitlistForm({
         )}
       >
         {/* Email input skeleton */}
-        <div className="h-12 w-full animate-pulse rounded-[6px] border border-ods-border bg-ods-card" />
+        <UnifiedSkeleton className="h-12 w-full rounded-[6px] border border-ods-border" />
         {/* Phone input skeleton */}
         <div className="flex w-full gap-[var(--spacing-system-xs)]">
-          <div className="h-12 w-[130px] shrink-0 animate-pulse rounded-[6px] border border-ods-border bg-ods-card" />
-          <div className="h-12 flex-1 animate-pulse rounded-[6px] border border-ods-border bg-ods-card" />
+          <UnifiedSkeleton className="h-12 w-[130px] shrink-0 rounded-[6px] border border-ods-border" />
+          <UnifiedSkeleton className="h-12 flex-1 rounded-[6px] border border-ods-border" />
         </div>
         {/* Disclaimer + button skeleton */}
         <div className="flex w-full flex-col items-end gap-[var(--spacing-system-m)]">
-          <div className="w-full animate-pulse rounded-[6px] border border-ods-border bg-ods-bg px-4 py-6" />
-          <div className="h-12 w-[200px] animate-pulse rounded-[6px] border border-ods-border bg-ods-card" />
+          <UnifiedSkeleton className="h-auto w-full rounded-[6px] border border-ods-border px-4 py-6" />
+          <UnifiedSkeleton className="h-12 w-[200px] rounded-[6px] border border-ods-border" />
         </div>
       </div>
     );
@@ -278,9 +304,15 @@ export function WaitlistForm({
           type="button"
           loading={isSubmitting}
           disabled={isSubmitting}
-          leftIcon={<OpenFrameLogo />}
+          leftIcon={
+            <OpenframeLogoIcon
+              color="var(--color-text-on-accent)"
+              secondaryColor="var(--color-text-primary)"
+              size={32}
+            />
+          }
           onClick={handleSubmit}
-          className="w-full md:w-auto"
+          className="w-full content-md:w-auto"
         >
           {isSuccess ? successLabel : submitLabel}
         </Button>

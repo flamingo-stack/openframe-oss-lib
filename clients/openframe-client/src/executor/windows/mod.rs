@@ -1,13 +1,15 @@
-mod job;
+pub(crate) mod job;
 mod process;
 mod run_as_user;
+
+pub(crate) use run_as_user::console_user_present;
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 
-use crate::executor::tempfile::{temp_script_name, TempFileGuard};
+use crate::executor::tempfile::{temp_script_name, write_temp_script, TempFileGuard};
 use crate::executor::{ExecResult, ScriptParams};
 
 pub(crate) struct Interpreter {
@@ -139,8 +141,7 @@ fn win_tmp_dir() -> Result<PathBuf> {
 fn create_temp_script(code: &str, ext: &str) -> Result<PathBuf> {
     let dir = win_tmp_dir()?;
     let path = dir.join(temp_script_name(ext));
-    std::fs::write(&path, code.as_bytes())
-        .map_err(|e| anyhow!("failed to write temp script: {e}"))?;
+    write_temp_script(&path, code, ext).map_err(|e| anyhow!("failed to write temp script: {e}"))?;
     Ok(path)
 }
 

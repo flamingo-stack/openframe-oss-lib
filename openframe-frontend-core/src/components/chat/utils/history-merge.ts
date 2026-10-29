@@ -24,6 +24,12 @@ export interface MergeableChatMessage {
   role: string;
   content: MessageContent;
   timestamp?: Date;
+  /** Who authored a `user`-role row: the host's own user (`'user'` / unset),
+   *  a technician (`'admin'`) or the system (`'system'`). Every host renders
+   *  technician and system lines under role `user`, so a user row's twin must
+   *  match on this as well as on text - otherwise the end user's "?" is taken
+   *  for the twin of the technician's "?" and dropped from the thread. */
+  authorType?: string;
   /** Highest CONTENT chunk streamSeq that composed this message (text / tool /
    *  approval / error / compaction — never the non-persisted MESSAGE_END /
    *  TOKEN_USAGE control chunks). Hosts stamp it on realtime synthetics so the
@@ -154,10 +160,56 @@ function sharesRequestKey(keys: ReadonlySet<string>, others: ReadonlySet<string>
   return false;
 }
 
-/** A user row's identity is its text; empty text is no identity (system rows
- *  persist with `content: ''`). `''` for any other row. */
-function userText(m: MergeableChatMessage): string {
-  return m.role === 'user' && typeof m.content === 'string' ? m.content : '';
+/** Stream seqs of the ticket lifecycle receipts a set of rows renders. A
+ *  `TICKET_EVENT` is persisted as its own row, so history stamps the row's seq
+ *  onto the segment and it is the receipt's exact identity. */
+function ticketEventSeqs(messages: readonly MergeableChatMessage[]): Set<number> {
+  const seqs = new Set<number>();
+  for (const m of messages) {
+    if (!Array.isArray(m.content)) continue;
+    for (const seg of m.content) {
+      if (seg.type === 'ticket_event' && typeof seg.streamSeq === 'number') seqs.add(seg.streamSeq);
+    }
+  }
+  return seqs;
+}
+
+/**
+ * A kept realtime row without the ticket receipts the window already renders.
+ *
+ * Receipts arrive standalone, so a live bubble made of them grows with every
+ * status change while its `streamSeq` follows the newest one - and coverage
+ * keeps or drops a row WHOLE. Once history persisted the older receipts but
+ * not the newest, the bubble was kept and its older cards rendered a second
+ * time beside their persisted twins (resolve → reopen in a dialog Fae never
+ * answered this session). Returns `null` for a row left with nothing to show;
+ * the streaming row is never removed, it is the bubble chunks are landing in.
+ */
+function withoutPersistedTicketEvents<M extends MergeableChatMessage>(
+  m: M,
+  persistedSeqs: ReadonlySet<number>,
+  streamingMessageId: string | null,
+): M | null {
+  if (persistedSeqs.size === 0 || !Array.isArray(m.content)) return m;
+  const content = m.content.filter(
+    seg => !(seg.type === 'ticket_event' && typeof seg.streamSeq === 'number' && persistedSeqs.has(seg.streamSeq)),
+  );
+  if (content.length === m.content.length) return m;
+  if (content.length === 0 && m.id !== streamingMessageId) return null;
+  return { ...m, content };
+}
+
+/** A user row's identity is its text under its author kind; empty text is no
+ *  identity (system rows persist with `content: ''`). `''` for any other row.
+ *  The kind is part of the key because technician (`authorType: 'admin'`) and
+ *  system rows share role `user` with the host's own sends: without it a
+ *  technician who typed the same text is the own bubble's "twin", and the own
+ *  bubble is dropped while its row is not in the snapshot yet. An unset
+ *  authorType is the own user (hosts stamp `'admin'` on their own sends where
+ *  the operator IS the admin, so the rule stays symmetric per host). */
+function userTwinKey(m: MergeableChatMessage): string {
+  if (m.role !== 'user' || typeof m.content !== 'string' || m.content === '') return '';
+  return `${m.authorType ?? 'user'}\u0000${m.content}`;
 }
 
 /** What a set of rows says about the turns they render, so another copy of one
@@ -182,8 +234,8 @@ function collectTwinSignals(rows: readonly MergeableChatMessage[]): TwinSignals 
       if (text !== '') signals.assistantTexts.set(text, (signals.assistantTexts.get(text) ?? 0) + 1);
       continue;
     }
-    const text = userText(row);
-    if (text !== '') signals.userContents.set(text, (signals.userContents.get(text) ?? 0) + 1);
+    const key = userTwinKey(row);
+    if (key !== '') signals.userContents.set(key, (signals.userContents.get(key) ?? 0) + 1);
   }
   return signals;
 }
@@ -198,9 +250,9 @@ type TwinVerdict = 'twin' | 'distinct' | 'unknown';
  *  request id, no answer text), so "no match" says nothing about it. */
 function twinVerdict(signals: TwinSignals, m: MergeableChatMessage): TwinVerdict {
   if (m.role !== 'assistant') {
-    const text = userText(m);
-    if (text === '') return 'unknown';
-    return signals.userContents.has(text) ? 'twin' : 'distinct';
+    const key = userTwinKey(m);
+    if (key === '') return 'unknown';
+    return signals.userContents.has(key) ? 'twin' : 'distinct';
   }
   const keys = turnRequestKeys(m.content);
   if (keys.size > 0) return sharesRequestKey(keys, signals.requestKeys) ? 'twin' : 'distinct';
@@ -529,7 +581,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       // optimistic messages are minted on send, never by chunk replay, so
       // their timestamps are trustworthy.
       const canBeInSnapshot = (m.timestamp?.getTime() ?? 0) <= historyFetchedAt;
-      return !(canBeInSnapshot && windowSignals.userContents.has(m.content));
+      return !(canBeInSnapshot && windowSignals.userContents.has(userTwinKey(m)));
     }
     // Freshness rule: a synthetic whose turn is represented in the snapshot
     // (under its persisted Mongo id) must be dropped or the turn renders
@@ -560,10 +612,11 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
       // already does for DIRECT/SYSTEM), which also stops the replay at the
       // source via a correct `optStartSeq`.
       if (m.role === 'user' && isUserRequestSyntheticId(m.id) && typeof m.content === 'string') {
-        const seen = (seenUserSyntheticByContent.get(m.content) ?? 0) + 1;
-        seenUserSyntheticByContent.set(m.content, seen);
+        const twinKey = userTwinKey(m);
+        const seen = (seenUserSyntheticByContent.get(twinKey) ?? 0) + 1;
+        seenUserSyntheticByContent.set(twinKey, seen);
         // No persisted row for THIS occurrence slot → keep (nothing renders it).
-        if ((windowSignals.userContents.get(m.content) ?? 0) < seen) return true;
+        if ((windowSignals.userContents.get(twinKey) ?? 0) < seen) return true;
         // A same-text persisted twin exists for this slot. User rows carry no
         // persisted seq, so that twin may be THIS message's OWN row (drop — it
         // renders the message) OR an OLDER identical-text turn while this is a
@@ -582,7 +635,7 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
         if (typeof m.streamSeq !== 'number' || historyMaxStreamSeq <= 0) return false;
         if (historyMaxStreamSeq >= m.streamSeq) return false;
         const lastPersisted = processedToUse[processedToUse.length - 1];
-        if (lastPersisted && lastPersisted.role === 'user' && lastPersisted.content === m.content) return false;
+        if (lastPersisted && userTwinKey(lastPersisted) === twinKey) return false;
         return true;
       }
       // Per-message seq coverage for the remaining synthetics (assistant /
@@ -651,7 +704,13 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
     if (keepRealtime(m)) realtimeMessages.push(m);
   }
 
-  return [...olderThanWindowMessages, ...processedToUse, ...realtimeMessages];
+  const persistedTicketEventSeqs = ticketEventSeqs(processedToUse);
+  const dedupedRealtimeMessages = realtimeMessages.flatMap(m => {
+    const kept = withoutPersistedTicketEvents(m, persistedTicketEventSeqs, streamingMessageId);
+    return kept ? [kept] : [];
+  });
+
+  return [...olderThanWindowMessages, ...processedToUse, ...dedupedRealtimeMessages];
 }
 
 export interface HistoryPrependResult<M extends MergeableChatMessage> {
@@ -701,10 +760,10 @@ export function computeHistoryPrepend<M extends MergeableChatMessage>(
     for (let i = newEnd - 1; i >= 0; i--) {
       const pm = processedHistory[i];
       if (pm.role === 'user') {
-        const text = userText(pm);
-        const left = text === '' ? 0 : (userTwinsLeft.get(text) ?? 0);
+        const key = userTwinKey(pm);
+        const left = key === '' ? 0 : (userTwinsLeft.get(key) ?? 0);
         if (left === 0) continue;
-        userTwinsLeft.set(text, left - 1);
+        userTwinsLeft.set(key, left - 1);
         twinIndices.add(i);
       } else if (pm.role === 'assistant') {
         const keys = turnRequestKeys(pm.content);

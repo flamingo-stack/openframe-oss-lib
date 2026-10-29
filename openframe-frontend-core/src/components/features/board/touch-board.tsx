@@ -33,10 +33,11 @@ export function TouchBoard({
   onApprove,
   onReject,
   collapseStorageKey,
+  initialCollapsed,
   loadMoreRootMargin,
   className,
 }: BoardProps) {
-  const { collapsed, toggle } = useBoardCollapse(collapseStorageKey);
+  const { collapsed, toggle } = useBoardCollapse(collapseStorageKey, initialCollapsed);
 
   return (
     <div className={cn('flex h-full min-h-0 flex-col', className)}>

@@ -9,6 +9,4 @@ import java.util.Optional;
 @Repository
 public interface TenantKeyRepository extends MongoRepository<TenantKey, String> {
     Optional<TenantKey> findFirstByTenantIdAndActiveTrue(String tenantId);
-
-    long countByTenantIdAndActiveTrue(String tenantId);
 }

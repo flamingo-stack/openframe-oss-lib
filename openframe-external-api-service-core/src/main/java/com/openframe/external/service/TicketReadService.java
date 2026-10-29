@@ -1,7 +1,9 @@
 package com.openframe.external.service;
 
+import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.service.ticket.TicketLifecycleService;
 import com.openframe.api.service.ticket.TicketNoteService;
+import com.openframe.api.service.ticket.TicketService;
 import com.openframe.api.service.ticket.TicketStatusService;
 import com.openframe.api.service.ticket.TicketTagService;
 import com.openframe.data.document.tag.Tag;
@@ -10,7 +12,9 @@ import com.openframe.data.document.ticket.TicketAttachment;
 import com.openframe.data.document.ticket.TicketNote;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.repository.ticket.TicketAttachmentRepository;
+import com.openframe.data.repository.ticket.TicketNoteRepository;
 import com.openframe.external.dto.ticket.TicketResponse;
+import com.openframe.external.exception.TicketNoteNotFoundException;
 import com.openframe.external.mapper.TicketMapper;
 import com.openframe.external.mapper.TicketMapper.TicketRelations;
 import com.openframe.security.authentication.AuthPrincipal;
@@ -25,18 +29,33 @@ import java.util.stream.Collectors;
 
 /**
  * Assembles full ticket representations (tags, notes, attachments, lifecycle status and allowed
- * transitions) for the REST API, batching the related lookups per page.
+ * transitions) for the REST API, batching the related lookups per page. Also the place where an
+ * unknown id turns into a 404 before a domain service that reports it as a generic bad argument.
  */
 @Service
 @RequiredArgsConstructor
 public class TicketReadService {
 
+    private final TicketService ticketService;
     private final TicketTagService ticketTagService;
     private final TicketNoteService ticketNoteService;
     private final TicketAttachmentRepository ticketAttachmentRepository;
+    private final TicketNoteRepository ticketNoteRepository;
     private final TicketStatusService ticketStatusService;
     private final TicketLifecycleService ticketLifecycleService;
     private final TicketMapper ticketMapper;
+
+    public Ticket requireTicket(AuthPrincipal principal, String id) {
+        return ticketService.getTicket(principal, id)
+                .orElseThrow(() -> new TicketNotFoundException(id));
+    }
+
+    /** 404 for an unknown note id, and also for a note that belongs to another ticket. */
+    public TicketNote requireNote(String ticketId, String noteId) {
+        return ticketNoteRepository.findById(noteId)
+                .filter(note -> ticketId.equals(note.getTicketId()))
+                .orElseThrow(() -> new TicketNoteNotFoundException(noteId));
+    }
 
     public TicketResponse toResponse(AuthPrincipal principal, Ticket ticket) {
         return toResponses(principal, List.of(ticket), true).getFirst();

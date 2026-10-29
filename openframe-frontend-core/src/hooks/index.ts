@@ -4,6 +4,8 @@ export * from './platform';
 export * from './use-toast';
 export * from './use-contact-submission';
 export * from './use-copy-to-clipboard';
+export * from './use-agent-identities';
+export * from './use-downloads';
 
 // Image authentication hooks
 export * from './use-batch-images';
@@ -19,6 +21,9 @@ export * from './nats/use-nats-client';
 
 // Viewport / lazy-mount primitive (shared IO singleton)
 export * from './use-near-viewport';
+
+// The clock of a looping scripted demo (scenarios x steps, hold, pause, jump)
+export * from './use-scenario-player';
 
 // Access code integration — pairs with the standalone helpers in
 // `utils/access-code-client`. Lives in `hooks/` so the createContext
@@ -36,8 +41,13 @@ export * from './use-claude-mirror-src';
 // Deep-link "scroll to URL hash" after data loads. Pairs with URL
 // composers that emit `?<filter>=<id>#<prefix>-<id>` — the filter
 // narrows the list, the hash scrolls the matching DOM id.
+export * from './use-location-hash';
 export * from './use-scroll-to-hash';
 
 // Invisible bot-protection client primitive (honeypot ref + submit-timing).
 // Pairs with the server-safe decision fn in `utils/humanity-signals`.
 export * from './use-humanity-signals';
+// Saves a half-filled public form so a visitor who leaves can be followed up with.
+// Pairs with the server-safe rules in `utils/form-rescue`.
+export * from './use-form-rescue';
+export * from './use-rescued-form';

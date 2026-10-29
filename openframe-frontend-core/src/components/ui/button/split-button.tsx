@@ -1,89 +1,15 @@
 'use client';
 
-import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
-import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
-import { buttonSurfaceClasses, splitDividerColorClasses, splitGlyphSizeClasses } from './button-styles';
+import { Button } from './button';
 
-// Two independent interactive halves: each a `<button>` or `<a>`. The seam is
-// a 1px border on the left edge of the icon half, colored per variant. For a
-// single-target variant (decorative trailing icon), use `<Button splitIcon>`.
+// Two independent interactive halves, each the lib's `Button` (a `<button>`, or a link with `href`) attached to the
+// other (`attach="start"` / `"end"`): one surface with a seam. For a single-target variant (decorative trailing icon),
+// use `<Button splitIcon>`.
 
-const splitHalfBase = [
-  'relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)]',
-  'whitespace-nowrap transition-colors duration-200',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus focus-visible:z-10',
-  'disabled:pointer-events-none',
-  '[&_svg]:pointer-events-none [&_svg]:shrink-0',
-];
-
-const splitHalfVariants = cva(splitHalfBase, {
-  variants: {
-    variant: {
-      accent: buttonSurfaceClasses.accent,
-      outline: buttonSurfaceClasses.outline, // Outline border lives in compoundVariants so we can omit the seam edge.
-      transparent: buttonSurfaceClasses.transparent,
-      destructive: buttonSurfaceClasses.destructive,
-      warning: buttonSurfaceClasses.warning,
-    },
-    size: {
-      default: `h-10 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 md:h-12 ${splitGlyphSizeClasses}`,
-      small: 'h-6 px-[var(--spacing-system-xs)] text-h5 md:h-8 [&_svg]:h-3 [&_svg]:w-3 md:[&_svg]:h-4 md:[&_svg]:w-4',
-    },
-    side: { main: '', icon: '' },
-    soloOnMobile: { true: '', false: '' },
-  },
-  compoundVariants: [
-    // Rounded corners + per-variant seam. The icon-side's left border is the divider.
-    { variant: 'accent', side: 'main', class: 'rounded-l-md' },
-    {
-      variant: 'accent',
-      side: 'icon',
-      class: cn(
-        'rounded-r-md border-l',
-        splitDividerColorClasses.accent,
-        'disabled:border-ods-disabled aria-disabled:border-ods-disabled',
-      ),
-    },
-    { variant: 'destructive', side: 'main', class: 'rounded-l-md' },
-    {
-      variant: 'destructive',
-      side: 'icon',
-      class: cn(
-        'rounded-r-md border-l',
-        splitDividerColorClasses.destructive,
-        'disabled:border-ods-disabled aria-disabled:border-ods-disabled',
-      ),
-    },
-    { variant: 'warning', side: 'main', class: 'rounded-l-md' },
-    {
-      variant: 'warning',
-      side: 'icon',
-      class: cn(
-        'rounded-r-md border-l',
-        splitDividerColorClasses.warning,
-        'disabled:border-ods-disabled aria-disabled:border-ods-disabled',
-      ),
-    },
-    { variant: 'outline', side: 'main', class: 'rounded-l-md border-y border-l border-ods-border' },
-    { variant: 'outline', side: 'icon', class: 'rounded-r-md border border-ods-border' },
-    { variant: 'transparent', side: 'main', class: 'rounded-md' },
-    { variant: 'transparent', side: 'icon', class: cn('rounded-md', splitDividerColorClasses.transparent) },
-
-    // Icon half: per Figma, narrower than main height (default: 40×48; small: 32×32).
-    { side: 'icon', size: 'default', class: 'w-10 px-0' },
-    { side: 'icon', size: 'small', class: 'w-6 px-0 md:w-8' },
-
-    { side: 'icon', soloOnMobile: true, class: 'max-md:hidden' },
-    { side: 'main', soloOnMobile: true, class: 'max-md:rounded-r-md' },
-    { variant: 'outline', side: 'main', soloOnMobile: true, class: 'max-md:border-r' },
-  ],
-  defaultVariants: { variant: 'accent', size: 'default', side: 'main', soloOnMobile: false },
-});
-
-type SplitButtonVariant = NonNullable<VariantProps<typeof splitHalfVariants>['variant']>;
-type SplitButtonSize = NonNullable<VariantProps<typeof splitHalfVariants>['size']>;
+type SplitButtonVariant = 'accent' | 'outline' | 'transparent' | 'destructive' | 'warning';
+type SplitButtonSize = 'default' | 'small';
 
 interface SplitButtonIconAction {
   icon: React.ReactNode;
@@ -157,30 +83,23 @@ function Half({
   ariaLabel,
   children,
 }: HalfOptions) {
-  const classes = cn(splitHalfVariants({ variant, size, side, soloOnMobile }), grow && 'flex-1');
-
-  if (href) {
-    return (
-      <Link
-        href={href}
-        prefetch={prefetch}
-        target={openInNewTab ? '_blank' : undefined}
-        rel={openInNewTab ? 'noopener noreferrer' : undefined}
-        aria-disabled={disabled || undefined}
-        tabIndex={disabled ? -1 : undefined}
-        aria-label={ariaLabel}
-        className={cn(classes, disabled && 'pointer-events-none')}
-        onClick={onClick}
-      >
-        {children}
-      </Link>
-    );
-  }
-
   return (
-    <button type={type} className={classes} disabled={disabled} aria-label={ariaLabel} onClick={onClick}>
+    <Button
+      type={type}
+      variant={variant}
+      size={side === 'main' ? size : size === 'small' ? 'small' : 'icon'}
+      attach={side === 'main' ? 'start' : 'end'}
+      href={href}
+      openInNewTab={openInNewTab}
+      prefetch={prefetch}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      // Layout only: the main half fills the group's free space; a new-tab icon half is dropped below md.
+      className={cn(grow && 'flex-1', side === 'icon' && soloOnMobile && 'max-md:hidden')}
+    >
       {children}
-    </button>
+    </Button>
   );
 }
 

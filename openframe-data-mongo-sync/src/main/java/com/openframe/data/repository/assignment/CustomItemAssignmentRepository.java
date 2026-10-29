@@ -1,5 +1,6 @@
 package com.openframe.data.repository.assignment;
 
+import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
 
@@ -15,6 +16,8 @@ public interface CustomItemAssignmentRepository {
     long countAssignments(String itemId, AssignmentTargetType targetType, String search);
 
     Map<AssignmentTargetType, Long> countByItemIdGroupedByTargetType(String itemId);
+
+    List<String> findItemIdsByTarget(AssignmentItemType itemType, AssignmentTargetType targetType, String targetId);
 
     boolean isSortableField(String field);
 

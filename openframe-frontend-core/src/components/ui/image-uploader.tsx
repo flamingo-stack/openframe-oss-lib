@@ -4,10 +4,13 @@ import { Loader2 } from 'lucide-react';
 import { type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
+import { fileMediaType, IMAGE_FILE_ACCEPT } from '../../utils/media-type';
 import { ImagePlusIcon } from '../icons-v2-generated/audio-and-visual/image-plus-icon';
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
 import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02-vr-icon';
+import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
 
 export interface ImageUploaderProps {
@@ -70,7 +73,10 @@ function matchesAccept(file: File, accept: string): boolean {
   const fileName = file.name.toLowerCase();
   return patterns.some(pattern => {
     if (pattern.startsWith('.')) return fileName.endsWith(pattern);
-    if (pattern.endsWith('/*')) return fileType.startsWith(pattern.slice(0, -1));
+    // `image/*` / `video/*`: the shared rule (MIME type, else extension), so a HEIC
+    // photo the browser states no type for is still a picture.
+    if (pattern.endsWith('/*'))
+      return fileType.startsWith(pattern.slice(0, -1)) || fileMediaType(file) === pattern.slice(0, -2);
     return fileType === pattern;
   });
 }
@@ -79,7 +85,7 @@ export function ImageUploader({
   value,
   onChange,
   onRemove,
-  accept = 'image/*',
+  accept = IMAGE_FILE_ACCEPT,
   maxSize = DEFAULT_MAX_SIZE,
   label = 'Cover Image',
   description = '(Click Here or Drag and Drop)',
@@ -211,7 +217,7 @@ export function ImageUploader({
                   src={resolvedValue}
                   alt={alt}
                   fill
-                  sizes="100vw"
+                  sizes={IMAGE_SLOT.full}
                   // `useAuthedImageSrc` yields a `blob:` URL under bearer-token
                   // hosts, which no image optimizer can fetch.
                   unoptimized
@@ -229,11 +235,11 @@ export function ImageUploader({
 
             <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-4">
               <ActionIconButton onClick={openDialog} disabled={!interactive} ariaLabel="Replace image">
-                <Refresh02VrIcon className="size-6" />
+                <Refresh02VrIcon />
               </ActionIconButton>
               {onRemove && (
                 <ActionIconButton onClick={onRemove} disabled={!interactive} ariaLabel="Remove image">
-                  <TrashIcon className="size-6" />
+                  <TrashIcon />
                 </ActionIconButton>
               )}
             </div>
@@ -272,7 +278,9 @@ interface ActionIconButtonProps {
 
 function ActionIconButton({ onClick, disabled, ariaLabel, children }: ActionIconButtonProps) {
   return (
-    <button
+    <Button
+      variant="overlay"
+      size="icon-sm"
       type="button"
       onClick={e => {
         e.stopPropagation();
@@ -280,17 +288,9 @@ function ActionIconButton({ onClick, disabled, ariaLabel, children }: ActionIcon
       }}
       disabled={disabled}
       aria-label={ariaLabel}
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-md p-3',
-        'bg-[var(--ods-system-greys-white)] text-ods-text-on-accent',
-        'transition-colors duration-150',
-        'hover:bg-[var(--ods-system-greys-white-hover)]',
-        'active:bg-[var(--ods-system-greys-white-action)]',
-        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ods-accent',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-      )}
+      className="shrink-0"
     >
       {children}
-    </button>
+    </Button>
   );
 }

@@ -74,6 +74,31 @@ async fn powershell_happy_path() {
 }
 
 #[tokio::test]
+async fn powershell_preserves_unicode_script_literals() {
+    assert_powershell_unicode("").await;
+}
+
+#[tokio::test]
+async fn powershell_preserves_unicode_with_existing_boms() {
+    assert_powershell_unicode("\u{feff}\u{feff}").await;
+}
+
+async fn assert_powershell_unicode(prefix: &str) {
+    let code = format!(
+        "{prefix}$text = '—Привет café'\n\
+         $actual = ($text.ToCharArray() | ForEach-Object {{ [int]$_ }}) -join ','\n\
+         if ($actual -ne '8212,1055,1088,1080,1074,1077,1090,32,99,97,102,233') {{ throw 'Unicode script literal corrupted' }}\n\
+         Write-Output 'UNICODE_OK'"
+    );
+
+    let r = run("powershell", &code, &[], &[], 30).await;
+
+    assert_eq!(r.retcode, 0, "stderr: {}", r.stderr);
+    assert_eq!(r.stdout.trim_end(), "UNICODE_OK");
+    assert!(!r.timed_out);
+}
+
+#[tokio::test]
 async fn cmd_happy_path() {
     let r = run("cmd", "@echo hi", &[], &[], 30).await;
     assert_eq!(r.retcode, 0, "stderr: {}", r.stderr);

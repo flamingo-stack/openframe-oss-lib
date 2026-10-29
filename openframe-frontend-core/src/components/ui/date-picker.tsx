@@ -9,6 +9,7 @@ import { cn } from '../../utils/cn';
 import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
+import { usePortalContainer } from './portal-container';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 import type { SortDirection } from './sort-column-item';
 
@@ -63,8 +64,10 @@ export type DatePickerProps = SingleDatePickerProps | RangeDatePickerProps;
 
 // A picked date is a LOCAL calendar date (the grid builds it from y/m/d in the
 // browser's zone), so it renders in the viewer's zone — UTC would move it a day
-// for anyone east of Greenwich.
-const defaultFormatDate = (date: Date): string => formatDateWithTimezone(date, VIEWER_TIMEZONE, 'numeric');
+// for anyone east of Greenwich — and in the viewer's locale: the field reads the
+// way its user writes dates (`03/20/2026` in en-US, `20/03/2026` in en-AU).
+const defaultFormatDate = (date: Date): string =>
+  formatDateWithTimezone(date, VIEWER_TIMEZONE, 'numeric', { viewerLocale: true });
 
 const formatDateRange = (range: DateRange | undefined, formatFn: (date: Date) => string): string => {
   if (!range?.from) return '';
@@ -463,7 +466,8 @@ export function DatePickerCalendar({
   const handlePreviousMonth = () => shiftMonth(-1);
   const handleNextMonth = () => shiftMonth(1);
 
-  const formatMonthYear = (date: Date): string => formatDateWithTimezone(date, VIEWER_TIMEZONE, 'monthYear');
+  const formatMonthYear = (date: Date): string =>
+    formatDateWithTimezone(date, VIEWER_TIMEZONE, 'monthYear', { viewerLocale: true });
 
   const getSecondMonth = (date: Date): Date => {
     const next = new Date(date);
@@ -619,31 +623,6 @@ export function DatePickerCalendar({
   );
 }
 
-// ============================================================================
-// Trigger button styles (shared)
-// ============================================================================
-
-const triggerButtonStyles = cn(
-  // Layout
-  'flex w-full items-center gap-2',
-  'h-11 rounded-[6px] border px-3 md:h-12',
-  // Colors
-  'border-ods-border bg-ods-card',
-  // Typography
-  'text-h4',
-  // Hover & active (not disabled)
-  'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
-  'focus:outline-none',
-  // Disabled - match Input exactly. The value/placeholder span inside sets its
-  // own colour, so the child rule (higher specificity) greys it too. Scoped to
-  // DIRECT children like every other field, so nested content that owns its
-  // colour keeps it.
-  'disabled:!cursor-not-allowed disabled:bg-ods-bg',
-  'disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled',
-  // Animation
-  'transition-colors duration-200',
-);
-
 const timeSelectTriggerStyles = cn(
   'flex items-center justify-between gap-1',
   'h-11 min-h-0 rounded-[6px] border px-3 md:h-12',
@@ -652,10 +631,24 @@ const timeSelectTriggerStyles = cn(
   'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
   'focus:outline-none',
   'disabled:!cursor-not-allowed disabled:bg-ods-bg',
-  'disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled',
+  'disabled:text-ods-text-disabled [&>span]:disabled:text-ods-text-disabled [&_svg]:disabled:text-ods-text-disabled',
   'cursor-pointer transition-colors duration-200',
   'text-ods-text-primary',
 );
+
+// ============================================================================
+// Popover bounds (shared by every date popover in this file)
+// ============================================================================
+
+/**
+ * Keeps a date popover inside the window. Radix flips a popover to the other
+ * side only when it fits there whole and never shrinks it, so near the bottom
+ * of a short window (a list too short to scroll) the lower part, Apply
+ * included, ended up below the screen. The content is capped at the space
+ * Radix measures and scrolls inside instead.
+ */
+const DATE_POPOVER_COLLISION_PADDING = 16;
+const datePopoverBounds = 'max-h-[var(--radix-popover-content-available-height)]';
 
 // ============================================================================
 // DatePicker Component
@@ -677,6 +670,7 @@ export function DatePicker(props: DatePickerProps) {
   } = props;
 
   const [open, setOpen] = useState(false);
+  const portalContainer = usePortalContainer();
   const isInvalid = invalid || !!error;
 
   const displayValue = useMemo(() => {
@@ -704,42 +698,40 @@ export function DatePicker(props: DatePickerProps) {
   const picker = (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button
+        <Button
+          variant="field"
           type="button"
           disabled={disabled}
           // Same marker Input/Textarea/Select expose — it is how a form finds
           // (and scrolls to) the first field that failed validation.
           data-invalid={isInvalid || undefined}
-          className={cn(
-            triggerButtonStyles,
-            'group',
-            open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
-            isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
-            className,
-          )}
+          className={className}
         >
           <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
           <span
             className={cn(
               'flex-1 truncate text-left',
-              displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+              disabled ? 'text-ods-text-disabled' : displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
             )}
           >
             {displayValue || placeholder}
           </span>
-        </button>
+        </Button>
       </Popover.Trigger>
 
-      <Popover.Portal>
+      <Popover.Portal container={portalContainer ?? undefined}>
         <Popover.Content
           className={cn(
             'z-[9999]',
+            datePopoverBounds,
+            'overflow-y-auto',
             'animate-in fade-in-0 zoom-in-95',
             'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
             'data-[side=bottom]:slide-in-from-top-2',
             'data-[side=top]:slide-in-from-bottom-2',
           )}
           sideOffset={8}
+          collisionPadding={DATE_POPOVER_COLLISION_PADDING}
           align="start"
         >
           <DatePickerCalendar
@@ -757,7 +749,7 @@ export function DatePicker(props: DatePickerProps) {
   );
 
   return (
-    <FieldWrapper label={label} error={error}>
+    <FieldWrapper label={label} error={error} errorSlot={'error' in props}>
       {picker}
     </FieldWrapper>
   );
@@ -790,24 +782,26 @@ const generateMinuteOptions = (): string[] => {
   return Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 };
 
-export function DatePickerInput({
-  placeholder = 'Select date',
-  formatDate = defaultFormatDate,
-  disabled = false,
-  className,
-  numberOfMonths = 1,
-  fromDate,
-  toDate,
-  locale,
-  value,
-  onChange,
-  showTime = false,
-  use24HourFormat = false,
-  label,
-  error,
-  invalid = false,
-}: DatePickerInputProps) {
+export function DatePickerInput(props: DatePickerInputProps) {
+  const {
+    placeholder = 'Select date',
+    formatDate = defaultFormatDate,
+    disabled = false,
+    className,
+    numberOfMonths = 1,
+    fromDate,
+    toDate,
+    locale,
+    value,
+    onChange,
+    showTime = false,
+    use24HourFormat = false,
+    label,
+    error,
+    invalid = false,
+  } = props;
   const [open, setOpen] = useState(false);
+  const portalContainer = usePortalContainer();
   const isInvalid = invalid || !!error;
 
   const displayValue = value ? formatDate(value) : '';
@@ -886,42 +880,44 @@ export function DatePickerInput({
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
-          <button
+          <Button
+            variant="field"
             type="button"
             disabled={disabled}
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
             data-invalid={isInvalid || undefined}
-            className={cn(
-              triggerButtonStyles,
-              'group',
-              open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
-              isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
-              'flex-1',
-            )}
+            className="flex-1"
           >
             <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
             <span
               className={cn(
                 'flex-1 truncate text-left',
-                displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                disabled
+                  ? 'text-ods-text-disabled'
+                  : displayValue
+                    ? 'text-ods-text-primary'
+                    : 'text-ods-text-secondary',
               )}
             >
               {displayValue || placeholder}
             </span>
-          </button>
+          </Button>
         </Popover.Trigger>
 
-        <Popover.Portal>
+        <Popover.Portal container={portalContainer ?? undefined}>
           <Popover.Content
             className={cn(
               'z-[9999]',
+              datePopoverBounds,
+              'overflow-y-auto',
               'animate-in fade-in-0 zoom-in-95',
               'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
               'data-[side=bottom]:slide-in-from-top-2',
               'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
+            collisionPadding={DATE_POPOVER_COLLISION_PADDING}
             align="start"
           >
             <DatePickerCalendar
@@ -988,7 +984,7 @@ export function DatePickerInput({
   );
 
   return (
-    <FieldWrapper label={label} error={error} className={className}>
+    <FieldWrapper label={label} error={error} errorSlot={'error' in props} className={className}>
       {content}
     </FieldWrapper>
   );
@@ -1036,25 +1032,27 @@ const generateTimeOptions = (intervalMinutes: number, use24Hour: boolean): { val
   return options;
 };
 
-export function DatePickerInputSimple({
-  placeholder = 'Select date',
-  formatDate = defaultFormatDate,
-  disabled = false,
-  className,
-  numberOfMonths = 1,
-  fromDate,
-  toDate,
-  locale,
-  value,
-  onChange,
-  showTime = false,
-  timeInterval = 30,
-  use24HourFormat = false,
-  label,
-  error,
-  invalid = false,
-}: DatePickerInputSimpleProps) {
+export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
+  const {
+    placeholder = 'Select date',
+    formatDate = defaultFormatDate,
+    disabled = false,
+    className,
+    numberOfMonths = 1,
+    fromDate,
+    toDate,
+    locale,
+    value,
+    onChange,
+    showTime = false,
+    timeInterval = 30,
+    use24HourFormat = false,
+    label,
+    error,
+    invalid = false,
+  } = props;
   const [open, setOpen] = useState(false);
+  const portalContainer = usePortalContainer();
   const isInvalid = invalid || !!error;
 
   const displayValue = value ? formatDate(value) : '';
@@ -1111,42 +1109,44 @@ export function DatePickerInputSimple({
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
-          <button
+          <Button
+            variant="field"
             type="button"
             disabled={disabled}
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
             data-invalid={isInvalid || undefined}
-            className={cn(
-              triggerButtonStyles,
-              'group',
-              open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
-              isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
-              'flex-1',
-            )}
+            className="flex-1"
           >
             <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
             <span
               className={cn(
                 'flex-1 truncate text-left',
-                displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                disabled
+                  ? 'text-ods-text-disabled'
+                  : displayValue
+                    ? 'text-ods-text-primary'
+                    : 'text-ods-text-secondary',
               )}
             >
               {displayValue || placeholder}
             </span>
-          </button>
+          </Button>
         </Popover.Trigger>
 
-        <Popover.Portal>
+        <Popover.Portal container={portalContainer ?? undefined}>
           <Popover.Content
             className={cn(
               'z-[9999]',
+              datePopoverBounds,
+              'overflow-y-auto',
               'animate-in fade-in-0 zoom-in-95',
               'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
               'data-[side=bottom]:slide-in-from-top-2',
               'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
+            collisionPadding={DATE_POPOVER_COLLISION_PADDING}
             align="start"
           >
             <DatePickerCalendar
@@ -1181,7 +1181,7 @@ export function DatePickerInputSimple({
   );
 
   return (
-    <FieldWrapper label={label} error={error} className={className}>
+    <FieldWrapper label={label} error={error} errorSlot={'error' in props} className={className}>
       {content}
     </FieldWrapper>
   );
@@ -1348,6 +1348,7 @@ export function DateFilterMenu({
   'aria-label': ariaLabel = 'Open date filter',
 }: DateFilterMenuProps) {
   const [open, setOpen] = useState(false);
+  const portalContainer = usePortalContainer();
 
   // Drafted selection — initialized from props each time the menu opens.
   const [draftSort, setDraftSort] = useState<SortDirection>(sort);
@@ -1410,10 +1411,11 @@ export function DateFilterMenu({
         )}
       </Popover.Trigger>
 
-      <Popover.Portal>
+      <Popover.Portal container={portalContainer ?? undefined}>
         <Popover.Content
           className={cn(
             'z-[9999] w-80 max-w-[calc(100vw-2rem)]',
+            datePopoverBounds,
             'flex flex-col gap-4 rounded-[6px] border border-ods-border bg-ods-bg p-4',
             'animate-in fade-in-0 zoom-in-95',
             'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
@@ -1421,24 +1423,27 @@ export function DateFilterMenu({
             'data-[side=top]:slide-in-from-bottom-2',
           )}
           sideOffset={8}
+          collisionPadding={DATE_POPOVER_COLLISION_PADDING}
           align={align}
         >
-          {/* Sort + calendar (shared panel) */}
-          <DateFilterPanel
-            mode={mode}
-            sort={draftSort}
-            onSortChange={setDraftSort}
-            selected={draftSelected}
-            onSelect={setDraftSelected}
-            fromDate={fromDate}
-            toDate={toDate}
-            locale={locale}
-            ascLabel={ascLabel}
-            descLabel={descLabel}
-          />
+          {/* Sort + calendar (shared panel). Scrolls when the window is short, so the actions stay on screen. */}
+          <div className="min-h-0 overflow-y-auto">
+            <DateFilterPanel
+              mode={mode}
+              sort={draftSort}
+              onSortChange={setDraftSort}
+              selected={draftSelected}
+              onSelect={setDraftSelected}
+              fromDate={fromDate}
+              toDate={toDate}
+              locale={locale}
+              ascLabel={ascLabel}
+              descLabel={descLabel}
+            />
+          </div>
 
           {/* Actions */}
-          <div className="flex w-full items-stretch gap-4">
+          <div className="flex w-full shrink-0 items-stretch gap-4">
             <Button type="button" variant="outline" fullWidth onClick={hasChanges ? handleReset : handleClose}>
               {hasChanges ? 'Reset' : 'Close'}
             </Button>
@@ -1451,9 +1456,3 @@ export function DateFilterMenu({
     </Popover.Root>
   );
 }
-
-// ============================================================================
-// Exports
-// ============================================================================
-
-export { type DateRange };

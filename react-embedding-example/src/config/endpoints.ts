@@ -1,7 +1,8 @@
 // Every hub path derived from CONTENT, exactly once. The runtime factory, the
 // data layer, and the pages all read from EP — no page re-interpolates `${CONTENT}`,
 // no endpoint literal exists twice.
-import { CONTENT } from './content'
+import { DOWNLOADS_API_PATH, TRUST_CENTER_API_PATH } from '@flamingo-stack/openframe-frontend-core/types'
+import { CONTENT, CONTENT_PREFIX } from './content'
 
 // approvalToolUrl + the three conversational ticket tool paths derive from
 // this one agent base, so `/chat/agent` lives in a single spot. Ticket
@@ -12,6 +13,10 @@ const AGENT_BASE = `${CONTENT}/chat/agent`
 export const EP = {
   // chat
   chatStream: `${CONTENT}/docs/chat`,
+  // The server-side conversation list behind the chat's "Current Chats" rail,
+  // archive and rename (GET list, PATCH `/<id>`). Never derived by the lib: a
+  // runtime that leaves it out gets the single-thread chat with no history.
+  chatConversations: `${CONTENT}/docs/chat/conversations`,
   // MCP server (streamable HTTP JSON-RPC) — the /mcp playground page's
   // official-SDK transport points here; the proxy injects Bearer + act-as.
   mcp: `${CONTENT}/mcp`,
@@ -24,6 +29,12 @@ export const EP = {
   // OpenFrame AI agents (Fae/Mingo) — public per-agent display config. Drives
   // EmbeddableChat "agent mode" via runtime.endpoints.aiAgentConfigUrl.
   aiAgent: (slug: string) => `${CONTENT}/ai-agents/${slug}`,
+  // The active agents' public identities (name, icon, audience): where the assistant's
+  // identity comes from on a platform that configured none of its own.
+  aiAgents: `${CONTENT}/ai-agents`,
+  // The questions an "ask" surface offers (the FAQ's card): `?count&topic&exclude`.
+  // `topic` is the surface's topic, any FAQ topic the hub knows.
+  askPrompts: `${CONTENT}/faqs/questions`,
   docsSearch: `${CONTENT}/docs/search`,
   // doc sources (knowledge-base mounts <DocsHubPage> against these)
   docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,
@@ -78,8 +89,17 @@ export const EP = {
   // product releases (the hub's public routes are /api/releases + /api/releases/[slug])
   productReleases: `${CONTENT}/releases`,
   productReleaseBySlug: (slug: string) => `${CONTENT}/releases/${slug}`,
+  // trust center (Vanta-fed public projection). The lib owns the hub path
+  // (`TRUST_CENTER_API_PATH` = `/api/trust-center`), so it is prefixed rather
+  // than re-spelled.
+  trustCenter: `${CONTENT_PREFIX}${TRUST_CENTER_API_PATH}`,
+  // downloads (desktop installers + install commands). The lib owns the hub path
+  // (`DOWNLOADS_API_PATH` = `/api/downloads`), prefixed the same way.
+  downloads: `${CONTENT_PREFIX}${DOWNLOADS_API_PATH}`,
   // misc surfaces
   legal: (docType: string) => `${CONTENT}/legal/${docType}`,
+  // The hub's list of legal documents: the home page shows one card per published document.
+  legalDocuments: `${CONTENT}/legal`,
   contact: `${CONTENT}/contact`,
   announcements: `${CONTENT}/announcements/active`,
   // Private-storage view proxy base — ClaudeEmbed derives artifact

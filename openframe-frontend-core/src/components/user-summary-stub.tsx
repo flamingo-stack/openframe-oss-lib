@@ -1,7 +1,8 @@
 'use client';
 
 import Image from '../embed-shims/next-image';
-import { getProxiedImageUrl } from '../utils/image-proxy-stub';
+import { AVATAR_SIZE_PX } from '../styles/component-sizes';
+import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
 
 /**
  * NOTE — this is the STUB user summary (see the filename). Five props below are
@@ -38,7 +39,7 @@ interface Props {
   } | null;
   /** Compact mode (avatar + name row, used in comment headers) */
   compact?: boolean;
-  /** Avatar size in px for compact mode (defaults 40) */
+  /** Avatar size in px for compact mode (defaults to the avatar scale's `md`) */
   avatarSize?: number;
 
   /** NOT IMPLEMENTED in the stub. Would swap the avatar for ProfilePhotoUpload. */
@@ -88,8 +89,10 @@ export function UserSummary({
   showEditButton = false,
   mspPreview,
   compact = false,
-  avatarSize = 40,
+  avatarSize = AVATAR_SIZE_PX.md,
 }: Props) {
+  const avatarSrc = useProxiedImageUrl(avatarUrl, { directHttps: false });
+  const mspLogoSrc = useProxiedImageUrl(mspPreview?.logoUrl, { directHttps: false });
   // Compact variant: minimal horizontal row
   if (compact) {
     return (
@@ -97,7 +100,7 @@ export function UserSummary({
         <div className="relative shrink-0">
           {avatarUrl ? (
             <Image
-              src={getProxiedImageUrl(avatarUrl) ?? avatarUrl}
+              src={avatarSrc}
               alt={name}
               width={avatarSize}
               height={avatarSize}
@@ -117,10 +120,10 @@ export function UserSummary({
           )}
           {mspPreview && mspPreview.logoUrl && (
             <Image
-              src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
+              src={mspLogoSrc}
               alt={mspPreview.name || 'MSP'}
-              width={24}
-              height={24}
+              width={AVATAR_SIZE_PX.xs}
+              height={AVATAR_SIZE_PX.xs}
               className="absolute -bottom-1 -right-1 z-10 size-6 select-none rounded-full object-cover"
             />
           )}
@@ -154,10 +157,10 @@ export function UserSummary({
         <div className="relative h-24 w-24 shrink-0 overflow-visible">
           {avatarUrl ? (
             <Image
-              src={getProxiedImageUrl(avatarUrl) ?? avatarUrl}
+              src={avatarSrc}
               alt={name}
-              width={96}
-              height={96}
+              width={AVATAR_SIZE_PX.profile}
+              height={AVATAR_SIZE_PX.profile}
               className="rounded-full object-cover"
             />
           ) : (
@@ -171,10 +174,10 @@ export function UserSummary({
             <div className="absolute -bottom-1 -right-1 flex size-10 select-none items-center justify-center overflow-hidden rounded-full bg-ods-bg ring-2 ring-ods-border">
               {mspPreview.logoUrl ? (
                 <Image
-                  src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
+                  src={mspLogoSrc}
                   alt={mspPreview.name || 'MSP Logo'}
-                  width={40}
-                  height={40}
+                  width={AVATAR_SIZE_PX.md}
+                  height={AVATAR_SIZE_PX.md}
                   className="object-cover"
                 />
               ) : (

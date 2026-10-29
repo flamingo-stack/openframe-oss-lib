@@ -1,27 +1,31 @@
-use crate::clients::tool_agent_file_client::ToolAgentFileClient;
+use crate::config::update_config::ALLOW_DOWNGRADE;
 use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 use crate::models::{Installation, InstalledAsset, ToolRecordState};
 use crate::platform::{
     binary_writer, clear_aside_binary, detect_actual_installation, needs_migration, run_migration,
-    run_update, DirectoryManager, ToolUpdaterDeps,
+    run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
+use crate::services::tool_ops::{ToolOpGuard, ToolOps};
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
 use crate::services::InstalledToolsService;
 use crate::services::ToolCommandParamsResolver;
 use crate::services::ToolKillService;
+use crate::utils::version_comparator::compare_versions;
 use anyhow::{Context, Result};
+use std::cmp::Ordering;
 use tracing::{error, info, warn};
 
 #[derive(Clone)]
 pub struct ToolAgentUpdateService {
     github_download_service: GithubDownloadService,
-    tool_agent_file_client: ToolAgentFileClient,
     installed_tools_service: InstalledToolsService,
     tool_kill_service: ToolKillService,
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
     directory_manager: DirectoryManager,
     config_service: AgentConfigurationService,
     installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -32,10 +36,10 @@ impl ToolAgentUpdateService {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         github_download_service: GithubDownloadService,
-        tool_agent_file_client: ToolAgentFileClient,
         installed_tools_service: InstalledToolsService,
         tool_kill_service: ToolKillService,
         tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
         directory_manager: DirectoryManager,
         config_service: AgentConfigurationService,
         installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -49,10 +53,10 @@ impl ToolAgentUpdateService {
 
         Self {
             github_download_service,
-            tool_agent_file_client,
             installed_tools_service,
             tool_kill_service,
             tool_run_manager,
+            tool_ops,
             directory_manager,
             config_service,
             installed_agent_publisher,
@@ -68,6 +72,31 @@ impl ToolAgentUpdateService {
             "Processing tool agent update for tool: {} to version: {}",
             tool_agent_id, new_version
         );
+
+        let tool_lock = match self.tool_ops.try_lock(tool_agent_id) {
+            Ok(lock) => lock,
+            Err(_) => {
+                info!(
+                    "Tool {} busy with another operation, deferring update",
+                    tool_agent_id
+                );
+                anyhow::bail!(
+                    "tool {} busy, deferring update for redelivery",
+                    tool_agent_id
+                );
+            }
+        };
+        self.process_update_locked(message, tool_lock).await
+    }
+
+    // a ToolLock is marked busy only once there is something to update; a ToolOpGuard already is
+    pub async fn process_update_locked(
+        &self,
+        message: ToolAgentUpdateMessage,
+        tool: impl Into<ToolOpGuard>,
+    ) -> Result<()> {
+        let tool_agent_id = &message.tool_agent_id;
+        let new_version = &message.version;
 
         // Check if tool is installed
         let mut installed_tool = match self
@@ -119,7 +148,28 @@ impl ToolAgentUpdateService {
             }
         }
 
-        let needs_tool_update = needs_repair || installed_tool.version != *new_version;
+        let version_order = compare_versions(&installed_tool.version, new_version);
+        let tool_downgrade =
+            !ALLOW_DOWNGRADE && !needs_repair && version_order == Some(Ordering::Less);
+        if tool_downgrade {
+            warn!(
+                "Tool {} refusing downgrade to {} — installed {} is newer, skipping stale update message",
+                tool_agent_id, new_version, installed_tool.version
+            );
+        }
+        let version_changed = match version_order {
+            Some(order) => order != Ordering::Equal,
+            None => {
+                if installed_tool.version != *new_version {
+                    warn!(
+                        "Tool {} versions {:?} -> {:?} are not semver, applying without downgrade check",
+                        tool_agent_id, installed_tool.version, new_version
+                    );
+                }
+                installed_tool.version != *new_version
+            }
+        };
+        let needs_tool_update = needs_repair || (!tool_downgrade && version_changed);
         let assets_to_update: Vec<_> = message
             .assets
             .as_ref()
@@ -137,8 +187,22 @@ impl ToolAgentUpdateService {
                         {
                             return false;
                         }
-                        let existing = installed_tool.assets.iter().find(|ia| ia.id == a.asset_id);
-                        existing.map(|e| e.version.as_str()) != Some(new_version)
+                        let Some(existing) =
+                            installed_tool.assets.iter().find(|ia| ia.id == a.asset_id)
+                        else {
+                            return true;
+                        };
+                        match compare_versions(&existing.version, new_version) {
+                            Some(Ordering::Less) if !ALLOW_DOWNGRADE => {
+                                warn!(
+                                    "Asset {} refusing downgrade to {} — installed {} is newer",
+                                    a.asset_id, new_version, existing.version
+                                );
+                                false
+                            }
+                            Some(order) => order != Ordering::Equal,
+                            None => existing.version != new_version,
+                        }
                     })
                     .collect()
             })
@@ -152,8 +216,7 @@ impl ToolAgentUpdateService {
             return Ok(());
         }
 
-        // Mark as updating once for all updates
-        self.tool_run_manager.mark_updating(tool_agent_id).await;
+        let _op: ToolOpGuard = tool.into();
 
         // A Standard->GuiApp migration self-relaunches, so only relaunch here if it was already a GUI app.
         let was_gui_before_update =
@@ -167,9 +230,6 @@ impl ToolAgentUpdateService {
                 &assets_to_update,
             )
             .await;
-
-        // Clear updating flag - for Standard tools the run manager relaunches them via this flag.
-        self.tool_run_manager.clear_updating(tool_agent_id).await;
 
         if result.is_ok() && needs_repair {
             if let Err(e) = self
@@ -210,24 +270,65 @@ impl ToolAgentUpdateService {
             );
             self.do_tool_update(new_version, message, installed_tool)
                 .await?;
-        } else if !assets_to_update.is_empty() {
-            // Only assets to update - stop tool once before all asset updates
+        }
+
+        let mut stopped_for_assets = false;
+        if !needs_tool_update && !assets_to_update.is_empty() {
+            // Only assets to update - stop tool once before all asset updates.
             info!(tool_id = %tool_agent_id, "Stopping tool for asset updates");
+            stopped_for_assets = true;
             self.tool_kill_service
-                .stop_tool(tool_agent_id)
+                .stop_installed_tool(installed_tool, false)
                 .await
                 .with_context(|| {
                     format!("Failed to stop tool {} for asset updates", tool_agent_id)
                 })?;
         }
 
-        // 2. Asset updates (tool already stopped by tool_update or above)
+        // 2. Asset updates (tool already stopped by tool_update or above).
+        let mut asset_result = Ok(());
         for asset in assets_to_update {
-            self.do_asset_update(tool_agent_id, asset, installed_tool)
-                .await?;
+            asset_result = self
+                .do_asset_update(tool_agent_id, asset, installed_tool)
+                .await;
+            if asset_result.is_err() {
+                break;
+            }
         }
 
-        Ok(())
+        if stopped_for_assets {
+            match &installed_tool.installation {
+                Installation::Service { service_name, .. } => {
+                    self.restart_service_after_assets(tool_agent_id, service_name)
+                        .await;
+                }
+                #[cfg(target_os = "macos")]
+                Installation::GuiApp { .. } => {
+                    if let Err(e) = self
+                        .tool_run_manager
+                        .run_new_tool(installed_tool.clone())
+                        .await
+                    {
+                        warn!(tool_id = %tool_agent_id, "Failed to relaunch GuiApp after asset updates: {:#}", e);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        asset_result
+    }
+
+    async fn restart_service_after_assets(&self, tool_agent_id: &str, service_name: &str) {
+        info!(tool_id = %tool_agent_id, service = %service_name, "Restarting service tool after asset updates");
+
+        if let Err(e) = system_service::start_service(service_name).await {
+            error!(
+                tool_id = %tool_agent_id, service = %service_name,
+                "Service tool could not be restarted after asset updates - it will stay down until a reinstall or reboot: {:#}",
+                e
+            );
+        }
     }
 
     async fn do_tool_update(
@@ -238,18 +339,14 @@ impl ToolAgentUpdateService {
     ) -> Result<()> {
         let tool_agent_id = &installed_tool.tool_agent_id;
 
-        let download_config = if !message.download_configurations.is_empty() {
-            self.github_download_service
-                .find_config_for_current_os(&message.download_configurations)
-                .with_context(|| format!("No download config for current OS: {}", tool_agent_id))?
-        } else {
-            return self.do_legacy_update(new_version, installed_tool).await;
-        };
+        let download_config = self
+            .github_download_service
+            .find_config_for_current_os(&message.download_configurations)
+            .with_context(|| format!("No download config for current OS: {}", tool_agent_id))?;
 
         let deps = ToolUpdaterDeps {
             github_download_service: self.github_download_service.clone(),
             tool_kill_service: self.tool_kill_service.clone(),
-            tool_run_manager: self.tool_run_manager.clone(),
             directory_manager: self.directory_manager.clone(),
             command_params_resolver: self.command_params_resolver.clone(),
         };
@@ -323,78 +420,6 @@ impl ToolAgentUpdateService {
         Ok(())
     }
 
-    async fn do_legacy_update(
-        &self,
-        new_version: &str,
-        installed_tool: &mut crate::models::installed_tool::InstalledTool,
-    ) -> Result<()> {
-        #[cfg(target_family = "unix")]
-        use std::os::unix::fs::PermissionsExt;
-        use tokio::fs::{self, File};
-        use tokio::io::AsyncWriteExt;
-
-        let tool_agent_id = &installed_tool.tool_agent_id;
-
-        if !matches!(installed_tool.installation, Installation::Standard { .. }) {
-            anyhow::bail!(
-                "Legacy update (without download_configurations) only supports Standard installation type. \
-                Tool {} has {:?}",
-                tool_agent_id,
-                installed_tool.installation
-            );
-        }
-
-        let agent_file_path = self.directory_manager.get_agent_path(tool_agent_id);
-        let backup_file_path = agent_file_path.with_extension("backup");
-
-        info!(tool_id = %tool_agent_id, "Using legacy update method (Artifactory)");
-
-        self.tool_kill_service
-            .stop_tool(tool_agent_id)
-            .await
-            .with_context(|| format!("Failed to stop tool: {}", tool_agent_id))?;
-
-        if agent_file_path.exists() {
-            fs::copy(&agent_file_path, &backup_file_path)
-                .await
-                .with_context(|| "Failed to backup")?;
-        }
-
-        let new_agent_bytes = self
-            .tool_agent_file_client
-            .get_tool_agent_file(tool_agent_id.to_string())
-            .await
-            .with_context(|| "Failed to download from Artifactory")?;
-
-        File::create(&agent_file_path)
-            .await?
-            .write_all(&new_agent_bytes)
-            .await?;
-
-        #[cfg(target_family = "unix")]
-        {
-            let mut perms = fs::metadata(&agent_file_path).await?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&agent_file_path, perms).await?;
-        }
-
-        installed_tool.version = new_version.to_string();
-        self.installed_tools_service
-            .save(installed_tool.clone())
-            .await?;
-
-        if backup_file_path.exists() {
-            let _ = fs::remove_file(&backup_file_path).await;
-        }
-
-        info!(tool_id = %tool_agent_id, version = %new_version, "Legacy update completed");
-
-        self.publish_installed_agent_message(tool_agent_id, new_version)
-            .await;
-
-        Ok(())
-    }
-
     async fn do_asset_update(
         &self,
         tool_agent_id: &str,
@@ -449,7 +474,12 @@ impl ToolAgentUpdateService {
                 .get_asset_path(tool_agent_id, asset_filename, is_executable);
 
         if is_executable {
-            binary_writer::write_executable(&bytes, &asset_path)
+            #[cfg(target_os = "macos")]
+            self.tool_kill_service
+                .stop_asset(asset_id, tool_agent_id)
+                .await
+                .with_context(|| format!("Failed to stop asset {} before replace", asset_id))?;
+            binary_writer::replace_executable(&bytes, &asset_path)
                 .await
                 .with_context(|| format!("Failed to write executable asset: {}", asset_id))?;
         } else {
@@ -524,7 +554,7 @@ impl ToolAgentUpdateService {
                 .process(tool_agent_id, installed_tool.run_command_args.clone())
                 .unwrap_or_else(|_| installed_tool.run_command_args.clone());
             // For openframe-chat, add --background flag to start in tray
-            if tool_agent_id == "openframe-chat" {
+            if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                 launch_args.push("--background".to_string());
             }
             let command_path = self
@@ -564,7 +594,7 @@ impl ToolAgentUpdateService {
                 .process(tool_agent_id, installed_tool.run_command_args.clone())
                 .unwrap_or_else(|_| installed_tool.run_command_args.clone());
             // For openframe-chat, add --background flag to start in tray
-            if tool_agent_id == "openframe-chat" {
+            if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                 launch_args.push("--background".to_string());
             }
             let command_path = self
@@ -575,15 +605,10 @@ impl ToolAgentUpdateService {
                 )
                 .to_string_lossy()
                 .to_string();
-            match crate::services::tool_run_manager::launch_process_in_user_session(
-                &command_path,
-                &launch_args,
-            ) {
-                Ok((pid, process_handle)) => {
+            match crate::platform::user_session::launch_in_user_session(&command_path, &launch_args)
+            {
+                Ok(pid) => {
                     info!(tool_id = %tool_agent_id, pid, "Relaunched updated GuiApp in user session (fire-and-forget)");
-                    unsafe {
-                        let _ = windows::Win32::Foundation::CloseHandle(process_handle);
-                    }
                 }
                 Err(e) => {
                     warn!(tool_id = %tool_agent_id, error = %e,

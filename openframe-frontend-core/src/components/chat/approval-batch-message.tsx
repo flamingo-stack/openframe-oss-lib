@@ -3,11 +3,14 @@
 import { forwardRef, useState } from 'react';
 import type { HTMLAttributes } from 'react';
 import { cn } from '../../utils/cn';
-import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon, XmarkIcon } from '../icons-v2-generated';
+import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon } from '../icons-v2-generated';
+import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import type { ToolType } from '../platform';
 import { ToolIcon } from '../tool-icon';
 import { Button } from '../ui/button';
-import { Tag } from '../ui/tag';
+import { useLoadingScope } from '../ui/loading-scope';
+import { StatusLine } from '../ui/status-line';
+import { CHAT_BLOCK_CLASS, CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
@@ -21,7 +24,9 @@ import type {
 import { COMMAND_BODY_ARG_KEYS, getCommandText } from './utils/tool-call-helpers';
 
 export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: ApprovalBatchSegment['data'];
+  /** The batch. `null` is a batch still being read (a list's loading row): the block draws its own loading form, as
+   *  it does in a loading scope. */
+  data: ApprovalBatchSegment['data'] | null;
   status?: ApprovalBatchSegment['status'];
   onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>;
   onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>;
@@ -80,16 +85,15 @@ export interface ApprovalStatusTagProps {
  */
 export function ApprovalStatusTag({ status, resolvedByName, inlineResolver = false }: ApprovalStatusTagProps) {
   const suffix = inlineResolver && resolvedByName ? ` by ${resolvedByName}` : '';
-  if (status === 'approved') {
-    return <Tag label={`Approved${suffix}`} variant="success" icon={<CheckCircleIcon className="h-4 w-4" />} />;
-  }
-  if (status === 'cancelled') {
-    return <Tag label={`Canceled${suffix}`} variant="grey" icon={<XmarkIcon className="h-4 w-4" />} />;
-  }
-  if (status === 'rejected') {
-    return <Tag label={`Rejected${suffix}`} variant="error" icon={<XmarkCircleIcon className="h-4 w-4" />} />;
-  }
+  if (status === 'approved') return <StatusLine tone="success" label={`Approved${suffix}`} />;
+  if (status === 'cancelled') return <StatusLine tone="muted" label={`Canceled${suffix}`} />;
+  if (status === 'rejected') return <StatusLine tone="error" label={`Rejected${suffix}`} />;
   return null;
+}
+
+/** What a pending approval says while it waits: the one place the wording lives. */
+export function ApprovalWaitingLine() {
+  return <StatusLine tone="waiting" label="Waiting for you" />;
 }
 
 function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
@@ -144,12 +148,10 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
 
   return (
     <div className="flex w-full flex-col items-start border-b border-ods-border bg-ods-card last:border-b-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full cursor-pointer items-start gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-sf)] text-left"
-      >
-        <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+      <Button variant="row" type="button" onClick={onToggle} aria-expanded={expanded}>
+        {/* The tool mark is the grey `currentColor` cut, so the wrapper sets the colour it takes; without it
+            the icon inherits the message text's primary (white). Same treatment as ToolBadge. */}
+        <div className="flex h-5 w-5 shrink-0 items-center justify-center text-ods-text-secondary">
           <ToolIcon toolType={toolType} size={16} />
         </div>
         <div
@@ -170,7 +172,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
         <div className="flex h-5 w-5 shrink-0 items-center justify-center">
           <ExpandChevron expanded={expanded} />
         </div>
-      </button>
+      </Button>
 
       <div className="w-full" style={containerStyle}>
         <div ref={innerRef}>
@@ -193,6 +195,96 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
   );
 }
 
+/**
+ * The block while its batch is read. Admin: the frame, ONE command row (a typical batch holds one; its command a
+ * two-line clamp, so two bars), and the footer with one explanation line, the waiting line and the Approve / Reject
+ * buttons (real and inert: static copy). Client (the Fae card): one title line, the waiting line and the buttons.
+ */
+const ApprovalBatchLoading = forwardRef<
+  HTMLDivElement,
+  HTMLAttributes<HTMLDivElement> & { showFooterActions: boolean; variant: ApprovalBlockVariant }
+>(({ className, showFooterActions, variant, ...props }, ref) =>
+  variant === 'client' ? (
+    <div ref={ref} aria-hidden className={cn('mb-[var(--spacing-system-xsf)]', CHAT_BLOCK_CLASS, className)} {...props}>
+      <p className="w-full text-h4">
+        <TextLineSkeleton type="inherit" as="span" className="inline-block w-3/4 align-middle" />
+      </p>
+      {showFooterActions && <ApprovalWaitingLine />}
+      {showFooterActions && (
+        <div className="flex w-full items-center gap-[var(--spacing-system-xsf)]">
+          <Button
+            size="small-legacy"
+            variant="accent"
+            tabIndex={-1}
+            className="h-8 px-[var(--spacing-system-xsf)] text-h5"
+          >
+            Approve
+          </Button>
+          <Button
+            size="small-legacy"
+            variant="outline"
+            tabIndex={-1}
+            className="h-8 px-[var(--spacing-system-xsf)] text-h5"
+          >
+            Reject
+          </Button>
+        </div>
+      )}
+    </div>
+  ) : (
+    <div
+      ref={ref}
+      aria-hidden
+      className={cn('mb-[var(--spacing-system-xsf)] flex flex-col overflow-hidden', CHAT_BLOCK_FRAME_CLASS, className)}
+      {...props}
+    >
+      <div className="flex w-full flex-col items-start bg-ods-card">
+        <Button variant="row" type="button" tabIndex={-1}>
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+            <MediaSkeleton.Icon size="sm" />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col text-h6">
+            <TextLineSkeleton type="inherit" className="w-full" />
+            <TextLineSkeleton type="inherit" className="w-2/3" />
+          </div>
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+            <ExpandChevron expanded={false} />
+          </div>
+        </Button>
+      </div>
+      <div className="flex flex-col items-start justify-center gap-[var(--spacing-system-xsf)] border-t border-ods-border p-[var(--spacing-system-sf)]">
+        <ul className="w-full list-disc pl-5 text-ods-text-primary text-h6">
+          <li>
+            <TextLineSkeleton type="inherit" as="span" className="inline-block w-3/4 align-middle" />
+          </li>
+        </ul>
+        {showFooterActions && <ApprovalWaitingLine />}
+        {showFooterActions && (
+          <div className="flex items-center gap-[var(--spacing-system-xsf)]">
+            <Button
+              size="small-legacy"
+              variant="accent"
+              tabIndex={-1}
+              className="h-8 px-[var(--spacing-system-xsf)] text-h5"
+            >
+              Approve
+            </Button>
+            <Button
+              size="small-legacy"
+              variant="outline"
+              tabIndex={-1}
+              className="h-8 px-[var(--spacing-system-xsf)] text-h5"
+            >
+              Reject
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  ),
+);
+ApprovalBatchLoading.displayName = 'ApprovalBatchLoading';
+
 const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProps>(
   (
     {
@@ -214,6 +306,20 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const isClient = variant === 'client';
+    // ONE switch: in a loading scope, or with no batch yet, the block is its own loading form (the null check sits in
+    // the condition itself, so `data` is narrowed below it).
+    const inLoadingScope = useLoadingScope();
+    if (inLoadingScope || data === null) {
+      return (
+        <ApprovalBatchLoading
+          ref={ref}
+          className={className}
+          variant={variant}
+          showFooterActions={showFooterActions}
+          {...props}
+        />
+      );
+    }
 
     const explanations = data.toolCalls.map(c => c.toolExplanation?.trim()).filter((s): s is string => !!s);
 
@@ -275,14 +381,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
         .map(c => c.toolExplanation?.trim() || c.toolTitle?.trim())
         .filter((s): s is string => !!s);
       return (
-        <div
-          ref={ref}
-          className={cn(
-            'mb-[var(--spacing-system-xsf)] flex flex-col gap-[var(--spacing-system-mf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
-            className,
-          )}
-          {...props}
-        >
+        <div ref={ref} className={cn('mb-[var(--spacing-system-xsf)]', CHAT_BLOCK_CLASS, className)} {...props}>
           {titles.length > 0 ? (
             titles.map((title, i) => (
               <p key={i} className="w-full whitespace-pre-line break-words text-ods-text-primary text-h4">
@@ -292,9 +391,10 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
           ) : (
             <p className="w-full text-ods-text-primary text-h4">Approval required</p>
           )}
+          {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
           {showFooterActions &&
             (status === 'pending' ? (
-              <div className="flex w-full items-center gap-[var(--spacing-system-mf)]">{actionButtons}</div>
+              <div className="flex w-full items-center gap-[var(--spacing-system-xsf)]">{actionButtons}</div>
             ) : (
               <div className="flex w-full">
                 <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver />
@@ -310,8 +410,8 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       <div
         ref={ref}
         className={cn(
-          'mb-[var(--spacing-system-xsf)] flex flex-col',
-          'overflow-hidden rounded-md border border-ods-border bg-ods-card',
+          'mb-[var(--spacing-system-xsf)] flex flex-col overflow-hidden',
+          CHAT_BLOCK_FRAME_CLASS,
           className,
         )}
         {...props}
@@ -336,7 +436,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
         </div>
 
         {showFooterBlock && (
-          <div className="flex flex-col items-start justify-center gap-[var(--spacing-system-xsf)] border-t border-ods-border bg-ods-card p-[var(--spacing-system-sf)]">
+          <div className="flex flex-col items-start justify-center gap-[var(--spacing-system-xsf)] border-t border-ods-border p-[var(--spacing-system-sf)]">
             {explanations.length > 0 && (
               <ul className="w-full list-disc pl-5 text-ods-text-primary text-h6">
                 {explanations.map((expl, i) => (
@@ -345,6 +445,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               </ul>
             )}
 
+            {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
             {showFooterActions &&
               (status === 'pending' ? (
                 <div className="flex items-center gap-[var(--spacing-system-xsf)]">{actionButtons}</div>

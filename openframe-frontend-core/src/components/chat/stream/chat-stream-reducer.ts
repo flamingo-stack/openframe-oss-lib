@@ -50,7 +50,6 @@
  * approval segments.
  */
 
-import { escapeThinkingTags } from '../../../chat-protocol/decode';
 import { errorDetailsMessage } from '../../../chat-protocol/events';
 import {
   CHAT_OWNER_ADMIN,
@@ -60,6 +59,8 @@ import {
   type ParticipantEvent,
   type UsageEvent,
 } from '../../../chat-protocol/events';
+import { escapeThinkingTags } from '../../../chat-protocol/leading-frames';
+import type { ChatProgress } from '../../../chat-protocol/progress';
 import { mergeSourceMetadata, type SourceMetadata } from '../../../chat-protocol/source-metadata';
 import type {
   ApprovalBatchSegment,
@@ -71,6 +72,7 @@ import type {
   ToolExecutionSegment,
   ExecutingToolState,
 } from '../types';
+import type { ScrollAnchor } from '../types/message.types';
 import type { PendingApproval } from '../types/processing.types';
 import type {
   DialogTokenUsage,
@@ -84,7 +86,7 @@ import {
   createMessageSegmentAccumulator,
   type AccumulatorCallbacks,
 } from '../utils/message-segment-accumulator';
-import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor';
+import { parseScrollAnchor } from '../utils/scroll-anchor';
 import { getCommandText } from '../utils/tool-call-helpers';
 import {
   CONTENT_DEDUP_WINDOW,
@@ -154,6 +156,9 @@ export interface ChatTurnMetaState {
 export interface ChatReducerState {
   messages: UnifiedChatMessage[];
   streamingPhase: StreamingPhase;
+  /** What the pending turn is doing, while it is still thinking and the server
+   *  has said (`chat-protocol/progress`). Null once text streams or the turn ends. */
+  streamingProgress: ChatProgress | null;
   turnMeta: ChatTurnMetaState;
   dialogTokenUsage?: DialogTokenUsage | null;
   liveModel?: {
@@ -529,6 +534,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   // ── Mutable internals ──────────────────────────────────────────────────
   let messages: UnifiedChatMessage[] = [];
   let streamingPhase: StreamingPhase = 'idle';
+  let streamingProgress: ChatProgress | null = null;
   let dialogTokenUsage: DialogTokenUsage | null = null;
   let liveModel: ChatReducerState['liveModel'] = null;
   let approvalStatuses: Record<string, ChatApprovalStatus> = {
@@ -688,6 +694,8 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       stateCache = {
         messages,
         streamingPhase,
+        // A stage describes the wait before the first token only.
+        streamingProgress: streamingPhase === 'thinking' ? streamingProgress : null,
         turnMeta: { meta: metaMap, sources: sourcesMap, sendCount },
         dialogTokenUsage,
         liveModel,
@@ -1581,6 +1589,10 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     const sendIdx = sendCount - 1;
     switch (event.type) {
       case 'status':
+        if (event.progress) {
+          streamingProgress = event.progress;
+          invalidate();
+        }
         setPhaseInternal('thinking');
         break;
       case 'thinking-delta':
@@ -1901,6 +1913,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         { id: nextId('assistant'), role: 'assistant', content: '', segments: [] },
       ];
       streamingPhase = 'thinking';
+      streamingProgress = null;
       invalidate();
     },
     clearThread() {
@@ -1948,6 +1961,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       sendCount += 1;
       sseCurrentText = '';
       streamingPhase = 'thinking';
+      streamingProgress = null;
       invalidate();
     },
     endSseTurn() {

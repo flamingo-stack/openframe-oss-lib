@@ -38,20 +38,20 @@ export const PLATFORM_DOMAINS: readonly PlatformDomainEntry[] = [
   { key: 'product-hub', defaultUrl: 'https://product-hub.flamingo.so', envVar: 'NEXT_PUBLIC_PRODUCT_HUB_URL' },
   { key: 'revenue-hub', defaultUrl: 'https://revenue-hub.flamingo.so', envVar: 'NEXT_PUBLIC_REVENUE_HUB_URL' },
   { key: 'people-hub', defaultUrl: 'https://people-hub.flamingo.so', envVar: 'NEXT_PUBLIC_PEOPLE_HUB_URL' },
+  { key: 'coding-hub', defaultUrl: 'https://coding-hub.flamingo.so', envVar: 'NEXT_PUBLIC_CODING_HUB_URL' },
   { key: 'openmsp', defaultUrl: 'https://www.openmsp.ai', envVar: 'NEXT_PUBLIC_OPENMSP_URL' },
-  // ORDERING INVARIANT (first-wins, load-bearing): `flamingo` MUST precede `flamingo-teaser` + `universal`.
-  // All three resolve to www.flamingo.run; the reverse index is first-wins → flamingo claims the shared host,
-  // teaser keeps only its unique flamingo.cx aliases, universal contributes no unique host.
+  // ORDERING INVARIANT (first-wins, load-bearing): `flamingo` MUST precede `universal`.
+  // Both resolve to www.flamingo.run; the reverse index is first-wins → flamingo claims the shared host,
+  // universal contributes no unique host. `flamingo.cx` is the company's older domain: it maps to flamingo.
   // ⚠️ DO NOT REORDER — enforced by the module-load self-check at the bottom of this file.
-  { key: 'flamingo', defaultUrl: 'https://www.flamingo.run', envVar: 'NEXT_PUBLIC_FLAMINGO_URL' },
-  { key: 'tmcg', defaultUrl: 'https://www.tmcg.miami', envVar: 'NEXT_PUBLIC_TMCG_URL' },
-  { key: 'mlg', defaultUrl: 'https://www.mlg.soccer', envVar: 'NEXT_PUBLIC_MLG_URL' },
   {
-    key: 'flamingo-teaser',
+    key: 'flamingo',
     defaultUrl: 'https://www.flamingo.run',
     envVar: 'NEXT_PUBLIC_FLAMINGO_URL',
     aliasHostnames: ['flamingo.cx', 'www.flamingo.cx'],
   },
+  { key: 'tmcg', defaultUrl: 'https://www.tmcg.miami', envVar: 'NEXT_PUBLIC_TMCG_URL' },
+  { key: 'mlg', defaultUrl: 'https://www.mlg.soccer', envVar: 'NEXT_PUBLIC_MLG_URL' },
   {
     key: 'openframe',
     defaultUrl: 'https://openframe.ai',
@@ -87,6 +87,7 @@ const ENV_OVERRIDES = {
   NEXT_PUBLIC_PRODUCT_HUB_URL: process.env.NEXT_PUBLIC_PRODUCT_HUB_URL,
   NEXT_PUBLIC_REVENUE_HUB_URL: process.env.NEXT_PUBLIC_REVENUE_HUB_URL,
   NEXT_PUBLIC_PEOPLE_HUB_URL: process.env.NEXT_PUBLIC_PEOPLE_HUB_URL,
+  NEXT_PUBLIC_CODING_HUB_URL: process.env.NEXT_PUBLIC_CODING_HUB_URL,
   NEXT_PUBLIC_OPENMSP_URL: process.env.NEXT_PUBLIC_OPENMSP_URL,
   NEXT_PUBLIC_FLAMINGO_URL: process.env.NEXT_PUBLIC_FLAMINGO_URL,
   NEXT_PUBLIC_TMCG_URL: process.env.NEXT_PUBLIC_TMCG_URL,
@@ -390,16 +391,15 @@ export function matchCookieDomain(hostname: string, baseDomains: string[]): stri
 // host: the latter false-positives when NEXT_PUBLIC_FLAMINGO_URL is overridden to a non-default host
 // (flamingo's resolved host changes, so `www.flamingo.run` no longer reverse-maps to it though the
 // ordering is fine). The alias checks below ARE env-immune (aliasHostnames are unique per key). The
-// authoritative guard is the reverse-map vitest. ⚠️ keep `flamingo` before `flamingo-teaser`/`universal`.
+// authoritative guard is the reverse-map vitest. ⚠️ keep `flamingo` before `universal`.
 const _orderIdx = (k: PlatformDomainKey) => PLATFORM_DOMAINS.findIndex(e => e.key === k);
 if (
-  _orderIdx('flamingo') > _orderIdx('flamingo-teaser') ||
   _orderIdx('flamingo') > _orderIdx('universal') ||
-  getPlatformByHostname('flamingo.cx') !== 'flamingo-teaser' ||
+  getPlatformByHostname('flamingo.cx') !== 'flamingo' ||
   getPlatformByHostname('hub.openframe.ai') !== 'openframe'
 ) {
   console.error(
     '[platform-domains] ⚠️ PLATFORM_DOMAINS ordering invariant violated — `flamingo` must precede ' +
-      '`flamingo-teaser`/`universal`, and the openframe/teaser aliases must be intact. Do not reorder the table.',
+      '`universal`, and the openframe and flamingo.cx aliases must be intact. Do not reorder the table.',
   );
 }

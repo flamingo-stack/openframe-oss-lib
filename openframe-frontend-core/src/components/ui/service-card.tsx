@@ -6,10 +6,16 @@ import { useMemo, useState } from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { cn } from '../../utils/cn';
-import { EyeIcon, OpenFrameLogo } from '../icons';
 import { Copy01Icon } from '../icons-v2-generated/documents';
+import { EyeClassicIcon } from '../icons-v2-generated/interface/eye-classic-icon';
+import { EyeOffClassicIcon } from '../icons-v2-generated/interface/eye-off-classic-icon';
+import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { FloatingTooltip } from './floating-tooltip';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
+import { Tag } from './tag';
 import { TruncateText } from './truncate-text';
 
 export type ServiceCardRowAction = {
@@ -38,7 +44,28 @@ export interface ServiceCardProps {
   icon?: React.ReactNode;
   tag?: ServiceCardTag;
   rows: ServiceCardRow[];
+  /**
+   * The values are still being read: the frame, icon, title, subtitle, tag and each row's label are drawn for real
+   * (an empty title is a bar), and each row's value is a bar in the row's own value box, without its actions. A
+   * loading scope does the same.
+   */
+  loading?: boolean;
   className?: string;
+  /** `data-*` markers (`data-loading-item` on a read list's card), on the card's root in both forms. */
+  [key: `data-${string}`]: unknown;
+}
+
+/** A row's label column and its value box, read by the row and its skeleton (the same box). */
+const SERVICE_CARD_ROW_CLASS = 'flex min-w-0 items-center gap-3';
+const SERVICE_CARD_ROW_LABEL_CLASS = 'w-20 shrink-0 text-ods-text-primary text-h6 content-md:w-24';
+const SERVICE_CARD_VALUE_BOX_CLASS =
+  'flex h-12 min-w-0 flex-1 items-center justify-between rounded-md border border-ods-border bg-ods-bg px-3 content-md:px-4';
+/** The value box's actions (reveal, copy, open), loaded and loading. */
+const SERVICE_CARD_ACTIONS_CLASS = 'flex flex-shrink-0 items-center gap-2 pl-3';
+
+/** A row's actions: copy by default, open with a link, reveal for a secret, then what the row states. */
+function rowActions(row: ServiceCardRow): ServiceCardRowAction {
+  return { copy: true, open: !!row.href, reveal: !!row.isSecret, ...row.actions };
 }
 
 function MaskedValue({ value, isRevealed }: { value: string; isRevealed: boolean }) {
@@ -46,17 +73,28 @@ function MaskedValue({ value, isRevealed }: { value: string; isRevealed: boolean
   return <span>{'•'.repeat(Math.min(value.length, 12))}</span>;
 }
 
-export function ServiceCard({ title, subtitle, icon, tag, rows, className }: ServiceCardProps) {
+export function ServiceCard({
+  title,
+  subtitle,
+  icon,
+  tag,
+  rows,
+  loading: loadingProp,
+  className,
+  ...props
+}: ServiceCardProps) {
+  // ONE switch: in a page's loading state (or while the host reads the values) every value is a bar.
+  const loading = useLoadingScope() || !!loadingProp;
   const resolvedIcon = icon ?? (
-    <OpenFrameLogo
+    <OpenframeLogoIcon
+      secondaryColor="var(--color-accent-primary)"
       className="h-10 w-10"
-      lowerPathColor={'var(--color-accent-primary)'}
-      upperPathColor={'var(--color-text-primary)'}
+      color={'var(--color-text-primary)'}
     />
   );
 
   return (
-    <div className={cn('rounded-lg border border-ods-border bg-ods-card p-6', className)}>
+    <div className={cn('rounded-lg border border-ods-border bg-ods-card p-6', className)} {...loadingItemProps(props)}>
       {/* Header */}
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
@@ -64,39 +102,47 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
             {resolvedIcon}
           </div>
           <div className="min-w-0">
-            <TruncateText variant="h3">{title}</TruncateText>
-            {subtitle && (
-              <TruncateText variant="h6" tone="secondary">
-                {subtitle}
-              </TruncateText>
+            {loading && !title ? (
+              <TextLineSkeleton type="h3" className="w-40 max-w-full" />
+            ) : (
+              <TruncateText variant="h3">{title}</TruncateText>
+            )}
+            {loading && subtitle === '' ? (
+              <TextLineSkeleton type="h6" className="w-56 max-w-full" />
+            ) : (
+              subtitle && (
+                <TruncateText variant="h6" tone="secondary">
+                  {subtitle}
+                </TruncateText>
+              )
             )}
           </div>
         </div>
-        {tag && (
-          <div className="self-start whitespace-nowrap rounded-full border border-ods-border bg-ods-bg px-3 py-1 font-semibold text-ods-text-primary text-h6">
-            {tag.label}
-          </div>
-        )}
+        {/* The tag is read with the values: the lib `Tag`, which draws its own skeleton while loading. */}
+        {tag && <Tag label={tag.label} variant="outline" className="shrink-0 self-start" loading={loading} />}
       </div>
 
       {/* Rows */}
       <div className="space-y-3">
         {rows.map((row, idx) => (
-          <ServiceCardRowItem key={idx} row={row} />
+          <ServiceCardRowItem key={idx} row={row} loading={loading} />
         ))}
       </div>
     </div>
   );
 }
 
-function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
+/**
+ * One row, loaded and loading. The label column is drawn when the row has a label (`''` is a label still being read:
+ * a bar in the column); the value is a bar in the value box (in the row's own face) while it is read; the actions are
+ * the row's own, drawn for real, disabled while the value is read.
+ */
+function ServiceCardRowItem({ row, loading: loadingProp }: { row: ServiceCardRow; loading: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
   const [revealed, setRevealed] = useState(false);
   const { copy, copied } = useCopyToClipboard();
   const { ref: valueRef, isTruncated: valueTruncated } = useIsTruncated<HTMLDivElement>(row.value);
-  const actions = useMemo<ServiceCardRowAction>(
-    () => ({ copy: true, open: !!row.href, reveal: !!row.isSecret, ...row.actions }),
-    [row],
-  );
+  const actions = useMemo<ServiceCardRowAction>(() => rowActions(row), [row]);
 
   const displayValue = row.isSecret ? (
     <MaskedValue value={row.value} isRevealed={revealed} />
@@ -111,59 +157,78 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
     window.open(row.href, '_blank', 'noopener,noreferrer');
   };
 
+  // A label column only where the loaded row has one; while loading, a label not here yet is a bar in it.
+  const labelColumn = loading ? row.label !== undefined : !!row.label;
+
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      {row.label && <div className="w-20 shrink-0 text-ods-text-primary text-h6 md:w-24">{row.label}</div>}
-      <div
-        className={cn(
-          'flex h-12 min-w-0 flex-1 items-center justify-between rounded-md border border-ods-border bg-ods-bg px-3 md:px-4',
-          row.monospace ? 'font-mono' : '',
+    <div className={SERVICE_CARD_ROW_CLASS}>
+      {labelColumn && (
+        <div className={SERVICE_CARD_ROW_LABEL_CLASS}>
+          {row.label || <TextLineSkeleton type="inherit" className="w-full" />}
+        </div>
+      )}
+      <div className={cn(SERVICE_CARD_VALUE_BOX_CLASS, row.monospace ? 'font-mono' : '')}>
+        {loading ? (
+          <TextLineSkeleton type="inherit" className="w-40 max-w-full" />
+        ) : (
+          // No tooltip while a secret is masked — the old native `title` leaked the raw value on hover.
+          <FloatingTooltip
+            content={row.value}
+            side="top"
+            disabled={!valueTruncated || (row.isSecret && !revealed)}
+            triggerClassName="min-w-0"
+            className="max-w-xs [overflow-wrap:anywhere]"
+          >
+            <div ref={valueRef} className="truncate text-ods-text-primary">
+              {displayValue}
+            </div>
+          </FloatingTooltip>
         )}
-      >
-        {/* No tooltip while a secret is masked — the old native `title` leaked the raw value on hover. */}
-        <FloatingTooltip
-          content={row.value}
-          side="top"
-          disabled={!valueTruncated || (row.isSecret && !revealed)}
-          triggerClassName="min-w-0"
-          className="max-w-xs [overflow-wrap:anywhere]"
-        >
-          <div ref={valueRef} className="truncate text-ods-text-primary">
-            {displayValue}
-          </div>
-        </FloatingTooltip>
-        <div className="flex flex-shrink-0 items-center gap-2 pl-3">
+        <div className={SERVICE_CARD_ACTIONS_CLASS}>
           {actions.reveal && (
-            <button
+            <Button
+              variant="bare"
+              size="icon-sm"
+              type="button"
+              disabled={loading}
+              tabIndex={loading ? -1 : undefined}
               onClick={() => setRevealed(v => !v)}
-              className="rounded p-2 text-ods-text-secondary hover:bg-ods-card"
               aria-label={revealed ? 'Hide' : 'Reveal'}
             >
-              <EyeIcon className="h-5 w-5" off={revealed} />
-            </button>
+              {revealed ? (
+                <EyeOffClassicIcon className="text-ods-text-secondary" />
+              ) : (
+                <EyeClassicIcon className="text-ods-text-secondary" />
+              )}
+            </Button>
           )}
 
           {actions.copy && (
-            <button
+            <Button
+              variant="bare"
+              size="icon-sm"
+              type="button"
+              disabled={loading}
+              tabIndex={loading ? -1 : undefined}
               onClick={handleCopy}
-              className={cn(
-                'rounded p-2 transition-colors hover:bg-ods-card',
-                copied ? 'text-ods-success' : 'text-ods-text-secondary',
-              )}
-              aria-label={`Copy ${row.label ?? 'value'}`}
+              aria-label={`Copy ${row.label || 'value'}`}
             >
-              {copied ? <CheckIcon size={20} /> : <Copy01Icon size={20} />}
-            </button>
+              {copied ? <CheckIcon className="text-ods-success" /> : <Copy01Icon className="text-ods-text-secondary" />}
+            </Button>
           )}
 
           {actions.open && row.href && (
-            <button
+            <Button
+              variant="bare"
+              size="icon-sm"
+              type="button"
+              disabled={loading}
+              tabIndex={loading ? -1 : undefined}
               onClick={openInNewTab}
-              className="rounded p-2 text-ods-text-secondary hover:bg-ods-card"
-              aria-label={`Open ${row.label ?? 'link'}`}
+              aria-label={`Open ${row.label || 'link'}`}
             >
-              <ExternalLink className="h-5 w-5" />
-            </button>
+              <ExternalLink className="text-ods-text-secondary" />
+            </Button>
           )}
         </div>
       </div>

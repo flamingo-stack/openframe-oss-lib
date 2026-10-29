@@ -161,6 +161,36 @@ export const CustomAddLabel: Story = {
 };
 
 /**
+ * Environment variables with secrets (design 1:13395). A stored secret shows a
+ * mask and a read-only key; one added through "Add Secret" starts empty.
+ */
+export const WithSecrets: Story = {
+  args: {
+    arguments: [],
+    titleLabel: 'Environment Vars',
+  },
+  render: function WithSecretsStory() {
+    const [args, setArgs] = useState<ScriptArgument[]>([
+      { id: '1', key: 'node_env', value: 'production' },
+      { id: '2', key: 'DB_PASSWORD', value: '', secret: true, hasStoredValue: true },
+      { id: '3', key: 'DEPLOY_TOKEN', value: '', secret: true, hasStoredValue: true },
+    ]);
+
+    return (
+      <ScriptArguments
+        arguments={args}
+        onArgumentsChange={setArgs}
+        keyPlaceholder="Key"
+        valuePlaceholder="Enter Value"
+        addButtonLabel="Add Variable"
+        addSecretButtonLabel="Add Secret"
+        titleLabel="Environment Vars"
+      />
+    );
+  },
+};
+
+/**
  * Interactive example with state management.
  */
 export const Interactive: Story = {
@@ -178,7 +208,7 @@ export const Interactive: Story = {
     return (
       <div className="flex flex-col gap-4">
         <ScriptArguments arguments={args} onArgumentsChange={setArgs} titleLabel="Script Arguments" />
-        <div className="rounded-[6px] border border-[#3a3a3a] bg-[#1a1a1a] p-4">
+        <div className="rounded-[6px] border border-ods-border bg-ods-card p-4">
           <p className="mb-2 text-sm text-ods-text-secondary">Current State:</p>
           <pre className="overflow-auto text-xs text-ods-text-primary">{JSON.stringify(args, null, 2)}</pre>
         </div>

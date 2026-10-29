@@ -44,6 +44,20 @@ public class RunResult {
         return null;
     }
 
+    /**
+     * The model id recorded on the last ASSISTANT message, or {@code null}. Any message counts, an ERROR
+     * included: a model that rejects the request still answered on that model.
+     */
+    public String answeringModel() {
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Message m = messages.get(i);
+            if (isAssistant(m)) {
+                return m.getOwner().getModel();
+            }
+        }
+        return null;
+    }
+
     public List<MessageData> executedTools() {
         return allData(MessageDataType.EXECUTED_TOOL);
     }
@@ -112,7 +126,8 @@ public class RunResult {
         StringBuilder sb = new StringBuilder("RunResult conversation dump:\n");
         for (Message m : messages) {
             String owner = m.getOwner() == null ? "?" : String.valueOf(m.getOwner().getType());
-            sb.append("  [").append(owner).append(" @ ").append(m.getCreatedAt()).append("]\n");
+            String model = m.getOwner() == null || m.getOwner().getModel() == null ? "" : " model=" + m.getOwner().getModel();
+            sb.append("  [").append(owner).append(model).append(" @ ").append(m.getCreatedAt()).append("]\n");
             if (m.getMessageData() != null) {
                 for (MessageData d : m.getMessageData()) {
                     sb.append("      ").append(d.getType()).append(": ");

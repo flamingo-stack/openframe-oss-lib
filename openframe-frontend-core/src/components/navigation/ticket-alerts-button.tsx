@@ -2,8 +2,8 @@
 
 /**
  * TicketAlertsButton — the unified header affordance for support-ticket
- * unread indication. Mounted by BOTH header shells (hub `Header` via
- * `HeaderConfig.tickets`, console `AppHeader` via `showTicketAlerts`).
+ * unread indication. Mounted by BOTH header shells (the `SiteHeader` through its
+ * `sideActions` slot, console `AppHeader` via `showTicketAlerts`).
  *
  * ATTENTION-ONLY element, deliberately unlike the always-on header cells:
  *   - renders NOTHING unless there are unread support replies (and a
@@ -29,9 +29,9 @@
  */
 
 import { cn } from '../../utils/cn';
+import { buildTicketOpenHref } from '../../utils/dev-sections/dev-section-param-keys';
 import { LifeBuoyIcon } from '../icons-v2-generated/interface/life-buoy-icon';
 import { useOptionalTicketLive } from '../tickets/ticket-live-provider';
-import { buildTicketOpenHref } from '../tickets/types';
 import { HeaderButton } from './header-button';
 import { UnreadCountBadge } from './unread-dot';
 

@@ -81,6 +81,21 @@ export const APPROVAL_BLOCK_VARIANT = {
 
 export type ApprovalBlockVariant = (typeof APPROVAL_BLOCK_VARIANT)[keyof typeof APPROVAL_BLOCK_VARIANT];
 
+/**
+ * Visual generation of a chat thread. `v2` is the fae chat v2 design: author
+ * names without the trailing colon, a 24px assistant avatar, 16px between
+ * messages, and in-thread info/error blocks on the page surface. `classic`
+ * (default) is everything that predates it. The Fae client opts in first;
+ * Mingo and the admin views stay classic until their own redesign lands, then
+ * `classic` goes away.
+ */
+export const CHAT_APPEARANCE = {
+  CLASSIC: 'classic',
+  V2: 'v2',
+} as const;
+
+export type ChatAppearance = (typeof CHAT_APPEARANCE)[keyof typeof CHAT_APPEARANCE];
+
 // ========== Connection Status Definitions ==========
 
 export const CONNECTION_STATUS = {

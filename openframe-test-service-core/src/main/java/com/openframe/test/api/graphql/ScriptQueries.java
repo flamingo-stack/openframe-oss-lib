@@ -136,7 +136,8 @@ public class ScriptQueries {
             }
             """;
 
-    private static final String EXECUTION_NODE = "id executionId scriptId scriptName scheduleId source status dispatchedAt statusChangedAt";
+    private static final String EXECUTION_NODE = "id executionId scriptId scriptName scheduleId source status dispatchedAt statusChangedAt"
+            + " privilegeLevel finishedAt exitCode timedOut stdout stderr error machine { machineId hostname }";
 
     public static final String SCRIPT_EXECUTIONS = """
             query ScriptExecutions($scriptId: ID!, $first: Int) {
@@ -151,6 +152,12 @@ public class ScriptQueries {
     public static final String RUN_SCRIPT = """
             mutation RunScript($input: RunScriptInput!) {
                 runScript(input: $input) { executionId }
+            }
+            """;
+
+    public static final String BATCH_RUN_SCRIPT = """
+            mutation BatchRunScript($input: BatchRunScriptInput!) {
+                batchRunScript(input: $input) { executionId }
             }
             """;
 

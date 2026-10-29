@@ -7,9 +7,12 @@ use crate::service::FULL_SERVICE_NAME;
 use crate::services::github_download_service::GithubDownloadService;
 use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
+use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
+use crate::utils::fs::JsonFile;
+use crate::utils::version_comparator;
 use anyhow::{anyhow, Context, Result};
 use semver::Version;
 use std::path::{Path, PathBuf};
@@ -19,8 +22,14 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+#[derive(Debug, PartialEq)]
+pub enum UpdateLaunch {
+    Launched,
+    Skipped,
+}
+
 /// Marks an update as in progress until dropped
-struct UpdateGuard(Arc<AtomicBool>);
+pub struct UpdateGuard(Arc<AtomicBool>);
 
 impl UpdateGuard {
     fn acquire(flag: &Arc<AtomicBool>) -> Option<Self> {
@@ -44,6 +53,7 @@ pub struct OpenFrameClientUpdateService {
     update_state_service: UpdateStateService,
     last_known_good_service: LastKnownGoodService,
     tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
     update_handler_service: UpdateHandlerService,
     /// Set from the update request until the updater is done with this process
     update_in_progress: Arc<AtomicBool>,
@@ -56,6 +66,7 @@ impl OpenFrameClientUpdateService {
         update_state_service: UpdateStateService,
         last_known_good_service: LastKnownGoodService,
         tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
         update_handler_service: UpdateHandlerService,
     ) -> Self {
         Self {
@@ -64,23 +75,24 @@ impl OpenFrameClientUpdateService {
             update_state_service,
             last_known_good_service,
             tool_run_manager,
+            tool_ops,
             update_handler_service,
             update_in_progress: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    pub async fn process_update(&self, message: OpenFrameClientUpdateMessage) -> Result<()> {
+    pub async fn process_update(
+        &self,
+        message: OpenFrameClientUpdateMessage,
+    ) -> Result<UpdateLaunch> {
+        let guard = self.reserve(&message)?;
+        self.apply(message, guard).await
+    }
+
+    /// Takes the update slot and parks new tool operations, unless another update or a tool holds them
+    pub fn reserve(&self, message: &OpenFrameClientUpdateMessage) -> Result<UpdateGuard> {
         let requested_version = message.version.trim();
         info!("Received update request for version: {}", requested_version);
-
-        self.tool_run_manager.mark_client_update_pending().await;
-
-        if self.tool_run_manager.any_tool_op_in_progress().await {
-            warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
-            return Err(anyhow!(
-                "Tool operation in progress, deferring client update"
-            ));
-        }
 
         // 1. Held until the updater is done with this process, so a redelivery cannot overlap a live script
         let Some(guard) = UpdateGuard::acquire(&self.update_in_progress) else {
@@ -92,15 +104,23 @@ impl OpenFrameClientUpdateService {
         };
         info!("Acquired update lock for version: {}", requested_version);
 
-        self.process_update_internal(message, guard).await
+        self.tool_run_manager.mark_client_update_pending();
+
+        if self.tool_ops.any_busy() {
+            warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
+            return Err(anyhow!(
+                "Tool operation in progress, deferring client update"
+            ));
+        }
+        Ok(guard)
     }
 
-    /// Internal update processing with version validation and safety checks
-    async fn process_update_internal(
+    /// Update processing with version validation and safety checks, under a reserved update slot
+    pub async fn apply(
         &self,
         message: OpenFrameClientUpdateMessage,
         guard: UpdateGuard,
-    ) -> Result<()> {
+    ) -> Result<UpdateLaunch> {
         let requested_version = message.version.trim();
 
         // 2. Validate version format
@@ -118,8 +138,8 @@ impl OpenFrameClientUpdateService {
                 "Already running version {}, ignoring update request",
                 canonical_version
             );
-            self.tool_run_manager.clear_client_update_pending().await;
-            return Ok(());
+            self.tool_run_manager.clear_client_update_pending();
+            return Ok(UpdateLaunch::Skipped);
         }
 
         if !ALLOW_DOWNGRADE {
@@ -135,13 +155,16 @@ impl OpenFrameClientUpdateService {
             };
             if let Some(anchor) = anchor {
                 match Self::parse_version(&anchor) {
-                    Ok(anchor_semver) if requested_semver < anchor_semver => {
+                    Ok(anchor_semver)
+                        if version_comparator::precedence(&requested_semver, &anchor_semver)
+                            == std::cmp::Ordering::Less =>
+                    {
                         warn!(
                             "refusing downgrade to {} — anchored at {}",
                             requested_version, anchor
                         );
-                        self.tool_run_manager.clear_client_update_pending().await;
-                        return Ok(());
+                        self.tool_run_manager.clear_client_update_pending();
+                        return Ok(UpdateLaunch::Skipped);
                     }
                     Ok(_) => {}
                     Err(e) => warn!(
@@ -210,7 +233,7 @@ impl OpenFrameClientUpdateService {
             info!("Update failed, NATS will retry");
         }
 
-        update_result
+        update_result.map(|()| UpdateLaunch::Launched)
     }
 
     /// Execute the actual update process
@@ -254,7 +277,7 @@ impl OpenFrameClientUpdateService {
             binary_bytes.len()
         );
 
-        self.tool_run_manager.mark_client_update_pending().await;
+        self.tool_run_manager.mark_client_update_pending();
 
         // 3. Extract binary
         update_state.set_phase(UpdatePhase::Extracting);
@@ -302,7 +325,7 @@ impl OpenFrameClientUpdateService {
             rollback_only: false,
         };
 
-        if self.tool_run_manager.any_tool_op_in_progress().await {
+        if self.tool_ops.any_busy() {
             warn!("Tool operation started during client download, deferring client update (will redeliver)");
             if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
                 warn!(
@@ -391,15 +414,16 @@ impl OpenFrameClientUpdateService {
             }
         }
 
-        let mut state = match self.update_state_service.load().await {
-            Ok(Some(state)) => state,
-            Ok(None) => {
+        let mut state = match self.update_state_service.read_state().await {
+            Ok(JsonFile::Parsed(state)) => state,
+            Ok(JsonFile::Missing) => {
                 warn!(
                     "Updater for {} exited early and the update state is gone (client uninstalled?), nothing to finish",
                     target_version
                 );
                 return;
             }
+            Ok(JsonFile::Corrupt) => UpdateState::new(target_version.to_string()),
             Err(e) => {
                 warn!(
                     "Updater for {} exited early and the update state is unreadable: {:#}",
@@ -425,7 +449,7 @@ impl OpenFrameClientUpdateService {
             );
         }
 
-        self.tool_run_manager.clear_client_update_pending().await;
+        self.tool_run_manager.clear_client_update_pending();
         if let Err(e) = self.tool_run_manager.resume_after_update_failure().await {
             warn!(
                 "Failed to resume tool supervision after the aborted update to {}: {:#}",
@@ -452,10 +476,8 @@ impl OpenFrameClientUpdateService {
     /// Parse version string into semver Version
     /// Supports formats like: "1.2.3", "v1.2.3", "1.2.3-beta", "1.2.3+build"
     fn parse_version(version: &str) -> Result<Version> {
-        // Remove 'v' prefix if present
-        let version = version.trim().trim_start_matches('v');
-
-        Version::parse(version).with_context(|| format!("Failed to parse version: {}", version))
+        version_comparator::parse_version(version)
+            .with_context(|| format!("Failed to parse version: {}", version))
     }
 
     /// Validate version format (basic semver check)

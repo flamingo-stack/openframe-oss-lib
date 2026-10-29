@@ -2,9 +2,13 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
+import { useLoadingScope } from '../ui/loading-scope';
 import { PageActions, type PageActionButton } from '../ui/page-actions';
 import { BackButton } from './back-button';
+import { accentSentenceMarks } from './page-heading';
+import { PageTitle } from './page-picture';
 
 // Legacy interface for backward compatibility (layout version)
 interface LegacyPageContainerProps {
@@ -134,8 +138,9 @@ function isAdvancedProps(props: PageContainerProps): props is AdvancedPageContai
  * </PageContainer>
  */
 export function PageContainer(props: PageContainerProps) {
+  const inScope = useLoadingScope();
   if (isAdvancedProps(props)) {
-    return renderAdvancedPageContainer(props);
+    return renderAdvancedPageContainer(props, inScope);
   } else {
     return renderLegacyPageContainer(props);
   }
@@ -173,24 +178,54 @@ function renderLegacyPageContainer({
   );
 }
 
+/** The header's title and subtitle lines, read by the header and by their skeletons. */
+const PAGE_CONTAINER_TITLE_CLASS = 'text-ods-text-primary text-h2';
+const PAGE_CONTAINER_SUBTITLE_CLASS = 'text-ods-text-secondary text-h6';
+
+/** A page title that is read, while it is: one bar of the title's line, at its type step. */
+function PageContainerTitleSkeleton({ className }: { className?: string }) {
+  return <TextLineSkeleton type="h2" className={cn('w-64 max-w-full', className)} />;
+}
+
+/** A page subtitle that is read, while it is: one bar of the subtitle's line. */
+function PageContainerSubtitleSkeleton({ className }: { className?: string }) {
+  return <TextLineSkeleton type="h6" className={cn('w-80 max-w-full', className)} />;
+}
+
 // Advanced implementation (from UI component)
-function renderAdvancedPageContainer({
-  children,
-  variant = 'content',
-  title,
-  subtitle,
-  backButton,
-  headerActions,
-  headerContent,
-  actions,
-  actionsVariant,
-  menuActions,
-  padding = 'none',
-  background = 'transparent',
-  className,
-  contentClassName,
-  showHeader = true,
-}: AdvancedPageContainerProps) {
+function renderAdvancedPageContainer(
+  {
+    children,
+    variant = 'content',
+    title,
+    subtitle,
+    backButton,
+    headerActions,
+    headerContent,
+    actions,
+    actionsVariant,
+    menuActions,
+    padding = 'none',
+    background = 'transparent',
+    className,
+    contentClassName,
+    showHeader = true,
+  }: AdvancedPageContainerProps,
+  inScope = false,
+) {
+  // A title or subtitle that is READ arrives as '' in a page's loading state (an absent one is undefined): it is
+  // drawn as a bar of its line, so the header keeps its rows. A given one is the page's own words, drawn as is.
+  const titleNode = title ? (
+    <PageTitle className={PAGE_CONTAINER_TITLE_CLASS}>{accentSentenceMarks(title)}</PageTitle>
+  ) : inScope && title === '' ? (
+    <PageContainerTitleSkeleton />
+  ) : null;
+  const subtitleNode = subtitle ? (
+    <div className={PAGE_CONTAINER_SUBTITLE_CLASS}>{subtitle}</div>
+  ) : inScope && subtitle === '' ? (
+    <PageContainerSubtitleSkeleton />
+  ) : null;
+
   // Determine PageActions variant based on page variant
   const getActionsVariant = () => {
     if (actionsVariant) return actionsVariant;
@@ -231,18 +266,22 @@ function renderAdvancedPageContainer({
 
     if (variant === 'detail') {
       return (
-        <div className="flex items-end justify-between gap-4 md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex items-end justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-end content-lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             {/* Back Button */}
             {backButton && (
-              <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden md:inline-flex" />
+              <BackButton
+                onClick={backButton.onClick}
+                label={backButton.label}
+                className="hidden content-md:inline-flex"
+              />
             )}
 
             {/* Title */}
-            {title && <h1 className="text-ods-text-primary text-h2">{title}</h1>}
+            {titleNode}
 
             {/* Subtitle */}
-            {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
+            {subtitleNode}
           </div>
 
           {/* Header Actions */}
@@ -258,15 +297,19 @@ function renderAdvancedPageContainer({
 
     if (variant === 'list') {
       return (
-        <div className="flex items-center justify-between gap-4 md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-center content-lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* Back Button */}
             {backButton && (
-              <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden md:inline-flex" />
+              <BackButton
+                onClick={backButton.onClick}
+                label={backButton.label}
+                className="hidden content-md:inline-flex"
+              />
             )}
 
-            {title && <h1 className="text-ods-text-primary text-h2">{title}</h1>}
-            {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
+            {titleNode}
+            {subtitleNode}
           </div>
 
           {/* Header Actions */}
@@ -282,14 +325,18 @@ function renderAdvancedPageContainer({
 
     if (variant === 'form') {
       return (
-        <div className="flex items-end justify-between gap-4 md:flex-col md:items-start md:justify-start lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex items-end justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-end content-lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             {/* Back Button */}
             {backButton && (
-              <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden md:inline-flex" />
+              <BackButton
+                onClick={backButton.onClick}
+                label={backButton.label}
+                className="hidden content-md:inline-flex"
+              />
             )}
 
-            {title && <h1 className="text-ods-text-primary text-h2">{title}</h1>}
+            {titleNode}
           </div>
 
           {/* Header Actions */}
@@ -305,11 +352,11 @@ function renderAdvancedPageContainer({
 
     // Default content header
     return (
-      <div className="flex items-center justify-between gap-4 md:flex-col md:items-start md:justify-start lg:flex-row lg:items-center lg:justify-between">
-        {(title || subtitle) && (
+      <div className="flex items-center justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-center content-lg:justify-between">
+        {(titleNode || subtitleNode) && (
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            {title && <h1 className="text-ods-text-primary text-h2">{title}</h1>}
-            {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
+            {titleNode}
+            {subtitleNode}
           </div>
         )}
 
@@ -328,28 +375,28 @@ function renderAdvancedPageContainer({
 
     switch (variant) {
       case 'list':
-        return cn(baseClasses, 'gap-4 md:gap-6', className);
+        return cn(baseClasses, 'gap-4 content-md:gap-6', className);
       case 'detail':
-        return cn(baseClasses, 'gap-4 md:gap-6', className);
+        return cn(baseClasses, 'gap-4 content-md:gap-6', className);
       case 'form':
-        return cn(baseClasses, 'gap-6 md:gap-10', className);
+        return cn(baseClasses, 'gap-6 content-md:gap-10', className);
       case 'content':
       default:
-        return cn(baseClasses, 'gap-4 md:gap-6', className);
+        return cn(baseClasses, 'gap-4 content-md:gap-6', className);
     }
   };
 
   const getContentClasses = () => {
     // Add bottom padding on mobile when using primary-buttons variant (fixed bottom bar)
-    const mobilePadding = needsBottomPadding ? 'pb-28 md:pb-0' : '';
+    const mobilePadding = needsBottomPadding ? 'pb-28 content-md:pb-0' : '';
 
     switch (variant) {
       case 'detail':
         return cn('flex-1 overflow-auto', mobilePadding, contentClassName);
       case 'list':
-        return cn('flex flex-col gap-4 md:gap-6', mobilePadding, contentClassName);
+        return cn('flex flex-col gap-4 content-md:gap-6', mobilePadding, contentClassName);
       case 'form':
-        return cn('flex flex-col gap-4 md:gap-10', mobilePadding, contentClassName);
+        return cn('flex flex-col gap-4 content-md:gap-10', mobilePadding, contentClassName);
       case 'content':
       default:
         return cn('flex-1', mobilePadding, contentClassName);
@@ -384,9 +431,6 @@ export const FormPageContainer = (props: Omit<AdvancedPageContainerProps, 'varia
 export const ContentPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => (
   <PageContainer {...props} variant="content" />
 );
-
-// Re-export PageActionButton type for convenience
-export type { PageActionButton } from '../ui/page-actions';
 
 /** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
 export default PageContainer;

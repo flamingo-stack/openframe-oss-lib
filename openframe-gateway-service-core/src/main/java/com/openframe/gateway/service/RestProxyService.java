@@ -37,6 +37,8 @@ public class RestProxyService {
 
     private static final AttributeKey<URI> TARGET_URI_KEY = AttributeKey.valueOf("target_uri");
 
+    private static final String GENERIC_ERROR_MESSAGE = "An error occurred while processing the proxy request";
+
     private static final Set<String> FORWARDED_RESPONSE_HEADERS = Set.of(
             "content-type",
             "content-disposition",
@@ -211,10 +213,10 @@ public class RestProxyService {
                     .onErrorResume(this::buildErrorResponse)
                     .doOnSuccess(response -> log.debug("Successfully proxied request to {}", tool.getName()))
                     .doOnError(error -> log.error("Failed to proxy request to {}: {}", tool.getName(),
-                            error.getMessage()));
+                            error.getMessage(), error));
         } catch (Exception e) {
-            log.error("Failed to proxy request to {}: {}", tool.getName(), e.getMessage());
-            return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()));
+            log.error("Failed to proxy request to {}: {}", tool.getName(), e.getMessage(), e);
+            return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(GENERIC_ERROR_MESSAGE));
         }
         return monoResponseEntity;
     }
@@ -262,7 +264,8 @@ public class RestProxyService {
     }
 
     private Mono<ResponseEntity<String>> buildErrorResponse(Throwable e) {
-        return Mono.just(ResponseEntity.status(500).body(e.getMessage()));
+        log.error("Error while proxying request: {}", e.getMessage(), e);
+        return Mono.just(ResponseEntity.status(500).body(GENERIC_ERROR_MESSAGE));
     }
 
     private static class ToolNotFoundException extends RuntimeException {

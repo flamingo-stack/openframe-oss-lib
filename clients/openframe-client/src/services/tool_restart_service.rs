@@ -1,6 +1,7 @@
 use crate::config::service_stop::TOOL_RESTART_TIMEOUT_SECS;
 use crate::models::{Installation, InstalledTool};
 use crate::platform::system_service;
+use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::InstalledToolsService;
 use crate::services::ToolKillService;
@@ -16,32 +17,12 @@ pub enum RestartOutcome {
     Busy,
 }
 
-/// Clears the updating flag on drop (surviving cancellation and panic), releasing the tool lock only after the flag clears.
-struct UpdatingGuard {
-    tool_run_manager: ToolRunManager,
-    tool_agent_id: String,
-    lock_guard: Option<tokio::sync::OwnedMutexGuard<()>>,
-}
-
-impl Drop for UpdatingGuard {
-    fn drop(&mut self) {
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            let manager = self.tool_run_manager.clone();
-            let tool_agent_id = self.tool_agent_id.clone();
-            let lock_guard = self.lock_guard.take();
-            handle.spawn(async move {
-                manager.clear_updating(&tool_agent_id).await;
-                drop(lock_guard);
-            });
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct ToolRestartService {
     installed_tools_service: InstalledToolsService,
     tool_kill_service: ToolKillService,
     tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
 }
 
 impl ToolRestartService {
@@ -49,26 +30,21 @@ impl ToolRestartService {
         installed_tools_service: InstalledToolsService,
         tool_kill_service: ToolKillService,
         tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
     ) -> Self {
         Self {
             installed_tools_service,
             tool_kill_service,
             tool_run_manager,
+            tool_ops,
         }
     }
 
     /// Restart under the tool lock with the updating flag held; the flag is cleared exactly once on return, panic, or cancellation, and the lock is held until then.
     pub async fn restart_guarded(&self, tool_agent_id: &str) -> Result<RestartOutcome> {
-        let tool_lock = self.tool_run_manager.tool_lock(tool_agent_id).await;
-        let lock_guard = match tool_lock.try_lock_owned() {
-            Ok(guard) => guard,
+        let _op = match self.tool_ops.try_lock(tool_agent_id) {
+            Ok(lock) => lock.mark_busy(),
             Err(_) => return Ok(RestartOutcome::Busy),
-        };
-        self.tool_run_manager.mark_updating(tool_agent_id).await;
-        let _updating = UpdatingGuard {
-            tool_run_manager: self.tool_run_manager.clone(),
-            tool_agent_id: tool_agent_id.to_string(),
-            lock_guard: Some(lock_guard),
         };
         // Hard cap so a wedged OS call can't hold the flag/lock forever and freeze callers (e.g. mesh self-heal).
         let outcome = tokio::time::timeout(
@@ -154,3 +130,7 @@ impl ToolRestartService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tool_restart_service_tests.rs"]
+mod tests;

@@ -1,0 +1,138 @@
+/**
+ * Vendor classifications: whatever `vendor_classification.classification` holds on the
+ * server. The database owns the vocabulary (its CHECK constraint is the list), the catalog
+ * builds its filters from the rows that exist, and nothing here limits which values are valid.
+ *
+ * This module only ENRICHES the values we want to present specially: a curated label, a
+ * tooltip description and a group. A value with no entry still works everywhere, labelled
+ * by title case. To present a new value better, add an entry here; to make it exist, add it
+ * to the database.
+ *
+ * Groups:
+ *   - `license`: how the software is licensed.
+ *   - `lifecycle`: where the product is in its life (a tag and a filter; a card's one tag stays the license).
+ *   - `openframe`: drawn with the OpenFrame mark and ONE word (`word`).
+ */
+export type VendorClassificationValue = string;
+
+export type VendorClassificationGroup = 'license' | 'lifecycle' | 'openframe';
+
+export interface VendorClassificationCopy {
+  /** The label on a tag, a filter and a plain-text surface. */
+  label: string;
+  /** What the classification means, for a tooltip. */
+  description: string;
+  group: VendorClassificationGroup;
+  /** OpenFrame group only: the one word drawn beside the OpenFrame mark. */
+  word?: string;
+  /** The icon drawn beside the label, by name (resolved by the shared icon resolver), and its tone. */
+  icon?: VendorClassificationIconConfig;
+}
+
+/**
+ * A classification's icon, as data: `name` is any name the shared resolver knows (an alias such
+ * as `openframe-logo`, an icon of the design set by its kebab name, or a lucide name). `tone`:
+ * `accent` (the brand colour), `neutral` (secondary text on a tile) or `warning`.
+ */
+export interface VendorClassificationIconConfig {
+  name: string;
+  tone: 'accent' | 'neutral' | 'warning';
+}
+
+/** In display order: a filter list shows OpenFrame first, then license, then lifecycle. */
+export const VENDOR_CLASSIFICATION_COPY: Readonly<Record<string, VendorClassificationCopy>> = {
+  openframe_selected: {
+    label: 'OpenFrame Selected',
+    word: 'Selected',
+    description:
+      'OpenFrame is a unified platform that integrates multiple open-source IT and security tools into a single dashboard for MSPs. This filter shows vendors selected by our team for their excellence, community support, and MSP-specific value.',
+    group: 'openframe',
+    icon: { name: 'openframe-logo', tone: 'accent' },
+  },
+  openframe_connect: {
+    label: 'OpenFrame Connect',
+    word: 'Connect',
+    description:
+      'Services OpenFrame connects to and manages for every client, such as Microsoft 365 and Google Workspace, beside devices and tickets.',
+    group: 'openframe',
+    icon: { name: 'openframe-logo', tone: 'accent' },
+  },
+  openframe_shipped: {
+    label: 'OpenFrame Shipped',
+    word: 'Shipped',
+    description: 'Tools and OpenFrame products that are in the released OpenFrame product today, not on the roadmap.',
+    group: 'openframe',
+    icon: { name: 'openframe-logo', tone: 'accent' },
+  },
+  open_source: {
+    label: 'Open Source',
+    description: 'Released under an OSI-approved open-source license.',
+    group: 'license',
+    icon: { name: 'code', tone: 'accent' },
+  },
+  source_available: {
+    label: 'Source-available',
+    description:
+      'The source code is public, but the license restricts how it may be used (for example SSPL, BSL, the Elastic License, or limits on company size or on offering it as a service).',
+    group: 'license',
+    icon: { name: 'file-code', tone: 'neutral' },
+  },
+  commercial: {
+    label: 'Commercial',
+    description: 'Proprietary software sold by the vendor.',
+    group: 'license',
+    icon: { name: 'dollar', tone: 'neutral' },
+  },
+  end_of_life: {
+    label: 'End of life',
+    description: 'The vendor has discontinued or retired the product. No new releases.',
+    group: 'lifecycle',
+    icon: { name: 'alert-triangle', tone: 'warning' },
+  },
+  end_of_support: {
+    label: 'End of support',
+    description: 'The vendor no longer provides support or security fixes, though the product can still be obtained.',
+    group: 'lifecycle',
+    icon: { name: 'clock', tone: 'warning' },
+  },
+  unmaintained: {
+    label: 'Unmaintained',
+    description: 'No release for years and no official end-of-life notice.',
+    group: 'lifecycle',
+    icon: { name: 'pause-circle', tone: 'warning' },
+  },
+};
+
+/** The enrichment of a classification, or undefined for a value we do not present specially. */
+export function vendorClassificationCopy(value: string | null | undefined): VendorClassificationCopy | undefined {
+  if (!value || !Object.prototype.hasOwnProperty.call(VENDOR_CLASSIFICATION_COPY, value)) return undefined;
+  return VENDOR_CLASSIFICATION_COPY[value];
+}
+
+/** The group of a classification, or undefined for a value with no enrichment. */
+export function vendorClassificationGroup(value: string | null | undefined): VendorClassificationGroup | undefined {
+  return vendorClassificationCopy(value)?.group;
+}
+
+/** A classification drawn with the OpenFrame mark (it has a `word`). */
+export function isOpenFrameClassification(value: string | null | undefined): boolean {
+  return vendorClassificationGroup(value) === 'openframe';
+}
+
+const DISPLAY_ORDER = Object.keys(VENDOR_CLASSIFICATION_COPY);
+
+/**
+ * Sort order for a list of classifications (a filter list): the enriched values in their
+ * display order (OpenFrame Selected, Connect, Shipped, then license, then lifecycle), then
+ * every other value the server holds, alphabetically.
+ */
+export function compareVendorClassifications(a: string, b: string): number {
+  const ia = DISPLAY_ORDER.indexOf(a);
+  const ib = DISPLAY_ORDER.indexOf(b);
+  if (ia !== -1 || ib !== -1) {
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  }
+  return a.localeCompare(b);
+}

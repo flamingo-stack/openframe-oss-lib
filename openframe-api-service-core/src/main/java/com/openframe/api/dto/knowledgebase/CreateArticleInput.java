@@ -33,4 +33,7 @@ public class CreateArticleInput {
     private List<String> assignedTicketIds;
     @Size(max = 50)
     private List<String> assignedKnowledgeArticleIds;
+
+    @Size(max = 50)
+    private List<String> attachmentTempIds;
 }

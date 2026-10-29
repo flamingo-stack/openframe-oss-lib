@@ -1,6 +1,6 @@
 package com.openframe.client.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.client.service.ToolConnectionService;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
@@ -21,6 +21,8 @@ public class ToolConnectionListener extends AbstractJetStreamPushListener {
     private final ToolConnectionService toolConnectionService;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
 
+    // Manual constructor is required because the superclass AbstractJetStreamPushListener
+    // requires an explicit super(natsConnection) call, which @RequiredArgsConstructor cannot express.
     public ToolConnectionListener(
             Connection natsConnection,
             ObjectMapper objectMapper,

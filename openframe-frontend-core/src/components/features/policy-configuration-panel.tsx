@@ -11,26 +11,38 @@ import type {
 } from '../../types/permissions';
 import { cn } from '../../utils/cn';
 import { useCollapsible } from '../chat/hooks/use-collapsible';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { ToolIcon } from '../tool-icon';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
+import { APPROVAL_LEVEL_META, APPROVAL_LEVELS } from './approval-level';
 
-const approvalLevelLabels: Record<ApprovalLevel, string> = {
-  ALLOW: 'Allow',
-  ASK_USER: 'Ask User',
-  ASK_TECHNICIAN: 'Ask Technician',
-  DENY: 'Restrict',
-};
-
-const approvalLevelOptions = (Object.keys(approvalLevelLabels) as ApprovalLevel[]).map(value => ({
-  value,
-  label: approvalLevelLabels[value],
-}));
+const approvalLevelOptions = APPROVAL_LEVELS.map(value => ({ value, label: APPROVAL_LEVEL_META[value].label }));
 
 const POLICY_LEVEL_WIDTH = 'w-[180px]';
 const CATEGORY_LEVEL_WIDTH = 'w-[256px]';
 
-const getApprovalLevelLabel = (level: ApprovalLevel): string => approvalLevelLabels[level] ?? level;
+/** How many collapsed category rows the panel draws while loading when the host passes no categories. */
+export const POLICY_CONFIGURATION_PANEL_SKELETON_CATEGORIES = 4;
+
+/** A category's header row, read by the row and its skeleton (the same box). */
+const CATEGORY_HEADER_CLASS =
+  'flex items-center gap-[var(--spacing-system-m)] border-t border-ods-border bg-ods-card py-[var(--spacing-system-s)] pl-[var(--spacing-system-m)] pr-[var(--spacing-system-xsf)] first:border-t-0';
+/** The square tile a category's (and a policy's) icon sits in. */
+const ICON_TILE_SIZE_CLASS = 'h-8 w-8 shrink-0 rounded-md';
+const ICON_TILE_CLASS = cn(ICON_TILE_SIZE_CLASS, 'flex items-center justify-center border border-ods-border bg-ods-bg');
+/** The category's name and count column. */
+const CATEGORY_TEXT_CLASS = 'flex min-w-0 flex-1 flex-col';
+/** The category's empty "Global Permission" column at `md+` outside edit mode. */
+const CATEGORY_LEVEL_COLUMN_CLASS = cn(
+  'hidden shrink-0 px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] content-md:block',
+  CATEGORY_LEVEL_WIDTH,
+);
+/** The expand / collapse control's chevron. */
+const CHEVRON_CLASS = 'h-6 w-6 text-ods-text-primary transition-transform duration-300';
+
+const getApprovalLevelLabel = (level: ApprovalLevel): string => APPROVAL_LEVEL_META[level]?.label ?? level;
 
 const ApprovalLevelDropdown: FC<{
   value: ApprovalLevel | undefined;
@@ -39,11 +51,13 @@ const ApprovalLevelDropdown: FC<{
   allowClear?: boolean;
   triggerClassName?: string;
   contentClassName?: string;
-}> = ({ value, onChange, allowClear = false, triggerClassName, contentClassName }) => (
+  disabled?: boolean;
+}> = ({ value, onChange, allowClear = false, triggerClassName, contentClassName, disabled }) => (
   <DropdownMenu>
-    <DropdownMenuTrigger asChild>
+    <DropdownMenuTrigger asChild disabled={disabled}>
       <Button
         variant="outline"
+        disabled={disabled}
         rightIcon={<ChevronDown className="h-6 w-6 text-ods-text-secondary" />}
         className={cn(
           'flex h-auto items-center justify-between gap-[var(--spacing-system-xsf)] rounded-md border border-ods-border bg-ods-card !px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xsf)] transition-colors !text-h6 hover:bg-ods-bg-hover',
@@ -80,9 +94,9 @@ const PolicyRow: FC<{
   };
 
   return (
-    <div className="flex items-start gap-[var(--spacing-system-m)] border-b border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] last:border-b-0 md:items-center">
+    <div className="flex items-start gap-[var(--spacing-system-m)] border-b border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] last:border-b-0 content-md:items-center">
       {/* Tool Icon */}
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-ods-border bg-ods-bg">
+      <div className={ICON_TILE_CLASS}>
         <ToolIcon toolType={policy.toolName} size={16} />
       </div>
 
@@ -93,7 +107,7 @@ const PolicyRow: FC<{
         </p>
         <p className="break-all text-ods-text-secondary text-h6">{policy.commandPattern}</p>
         {editMode ? (
-          <div className="mt-[var(--spacing-system-xsf)] md:hidden">
+          <div className="mt-[var(--spacing-system-xsf)] content-md:hidden">
             <ApprovalLevelDropdown
               value={policy.approvalLevel}
               onChange={handleChange}
@@ -102,12 +116,14 @@ const PolicyRow: FC<{
             />
           </div>
         ) : policy.approvalLevel ? (
-          <span className="text-ods-text-primary text-h4 md:hidden">{getApprovalLevelLabel(policy.approvalLevel)}</span>
+          <span className="text-ods-text-primary text-h4 content-md:hidden">
+            {getApprovalLevelLabel(policy.approvalLevel)}
+          </span>
         ) : null}
       </div>
 
       {/* Approval Level column (desktop only) */}
-      <div className="hidden shrink-0 md:block">
+      <div className="hidden shrink-0 content-md:block">
         {editMode ? (
           <ApprovalLevelDropdown
             value={policy.approvalLevel}
@@ -127,6 +143,15 @@ const PolicyRow: FC<{
   );
 };
 
+/** A category before its policies are read: the host's name and icon when it passes them, else nothing yet. */
+const LOADING_CATEGORY: PermissionCategory = { id: '', name: '', policies: [] };
+
+/**
+ * One category, loaded and loading. While its policies are read (`loading`) the header is the same row, collapsed and
+ * inert: the icon static (the host's, else the default shield), the name the host passes drawn for real (a bar when
+ * there is none), the configuration count a bar, and the edit-mode dropdowns with their static "Set Global
+ * Permission" label, disabled.
+ */
 const CategorySection: FC<{
   category: PermissionCategory;
   editMode: boolean;
@@ -136,7 +161,23 @@ const CategorySection: FC<{
   onToggle: (categoryId: string) => void;
   onBulkLevelChange: (categoryId: string, level: ApprovalLevel | undefined) => void;
   onPolicyPermissionChange: (categoryId: string, policyId: string, level: ApprovalLevel) => void;
-}> = ({ category, editMode, isExpanded, bulkLevel, onToggle, onBulkLevelChange, onPolicyPermissionChange }) => {
+  loading?: boolean;
+  /** List markers (`data-loading-item`), set by the panel on each category header. */
+  [key: `data-${string}`]: unknown;
+}> = ({
+  category,
+  editMode,
+  isExpanded: isExpandedProp,
+  bulkLevel,
+  onToggle,
+  onBulkLevelChange,
+  onPolicyPermissionChange,
+  loading: loadingGiven = false,
+  ...props
+}) => {
+  // ONE switch: a page's loading scope, or the panel's read.
+  const loading = useLoadingScope() || loadingGiven;
+  const isExpanded = isExpandedProp && !loading;
   const { innerRef, containerStyle } = useCollapsible({ expanded: isExpanded, durationMs: 300 });
   const handleBulkChange = (level: ApprovalLevel | undefined) => onBulkLevelChange(category.id, level);
 
@@ -144,28 +185,38 @@ const CategorySection: FC<{
     <>
       {/* Category Header */}
       <div
-        className="flex cursor-pointer items-center gap-[var(--spacing-system-m)] border-t border-ods-border bg-ods-card py-[var(--spacing-system-s)] pl-[var(--spacing-system-m)] pr-[var(--spacing-system-xsf)] transition-colors first:border-t-0 hover:bg-ods-bg-hover"
-        onClick={() => onToggle(category.id)}
+        {...loadingItemProps(props)}
+        className={cn(CATEGORY_HEADER_CLASS, !loading && 'cursor-pointer transition-colors hover:bg-ods-bg-hover')}
+        onClick={loading ? undefined : () => onToggle(category.id)}
       >
-        {/* Category Icon */}
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-ods-border bg-ods-bg">
+        {/* Category Icon (static: the host's, else the default shield) */}
+        <div className={ICON_TILE_CLASS}>
           <div className="text-ods-text-secondary">{category.icon ?? <Shield className="h-4 w-4" />}</div>
         </div>
 
         {/* Category Info — on mobile the bulk dropdown stacks below the count */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <p className="truncate text-ods-text-primary text-h4" title={category.name}>
-            {category.name}
-          </p>
-          <p className="text-ods-text-secondary text-h6">{category.policies.length} Configurations</p>
+        <div className={CATEGORY_TEXT_CLASS}>
+          {category.name ? (
+            <p className="truncate text-ods-text-primary text-h4" title={category.name}>
+              {category.name}
+            </p>
+          ) : (
+            <TextLineSkeleton type="h4" className="w-40 max-w-full" />
+          )}
+          {loading ? (
+            <TextLineSkeleton type="h6" className="w-24" />
+          ) : (
+            <p className="text-ods-text-secondary text-h6">{category.policies.length} Configurations</p>
+          )}
           {editMode && (
-            <div className="mt-[var(--spacing-system-xsf)] md:hidden" onClick={e => e.stopPropagation()}>
+            <div className="mt-[var(--spacing-system-xsf)] content-md:hidden" onClick={e => e.stopPropagation()}>
               <ApprovalLevelDropdown
                 value={bulkLevel}
                 onChange={handleBulkChange}
                 allowClear
                 triggerClassName="w-full"
                 contentClassName={CATEGORY_LEVEL_WIDTH}
+                disabled={loading}
               />
             </div>
           )}
@@ -173,46 +224,36 @@ const CategorySection: FC<{
 
         {/* Global Permission column (desktop only) */}
         {editMode ? (
-          <div className="hidden shrink-0 md:block" onClick={e => e.stopPropagation()}>
+          <div className="hidden shrink-0 content-md:block" onClick={e => e.stopPropagation()}>
             <ApprovalLevelDropdown
               value={bulkLevel}
               onChange={handleBulkChange}
               allowClear
               triggerClassName={CATEGORY_LEVEL_WIDTH}
               contentClassName={CATEGORY_LEVEL_WIDTH}
+              disabled={loading}
             />
           </div>
         ) : (
-          <div
-            className={cn(
-              'hidden shrink-0 px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] md:block',
-              CATEGORY_LEVEL_WIDTH,
-            )}
-          />
+          <div className={CATEGORY_LEVEL_COLUMN_CLASS} />
         )}
 
         {/* Expand/Collapse Button */}
         <Button
           type="button"
           variant="transparent"
+          disabled={loading}
           onClick={e => {
             e.stopPropagation();
             onToggle(category.id);
           }}
-          leftIcon={
-            <ChevronDown
-              className={cn(
-                'h-6 w-6 text-ods-text-primary transition-transform duration-300',
-                isExpanded && 'rotate-180',
-              )}
-            />
-          }
+          leftIcon={<ChevronDown className={cn(CHEVRON_CLASS, isExpanded && 'rotate-180')} />}
           className="h-auto w-auto shrink-0 rounded-md"
           aria-label={isExpanded ? 'Collapse' : 'Expand'}
         />
       </div>
 
-      {/* Policies List */}
+      {/* Policies List: collapsed while the policies are read (`isExpanded` is false), so it takes no height. */}
       <div
         style={{
           ...containerStyle,
@@ -225,7 +266,8 @@ const CategorySection: FC<{
       >
         <div ref={innerRef} className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
           <div className="overflow-hidden rounded-md border border-ods-border">
-            {category.policies.map(policy => (
+            {/* No rows while the policies are read: nothing read is drawn, even collapsed. */}
+            {(loading ? [] : category.policies).map(policy => (
               <PolicyRow
                 key={policy.id}
                 policy={policy}
@@ -255,13 +297,20 @@ const CategorySection: FC<{
 /** One shared empty map, so a reset that changes nothing changes no identity. */
 const NO_BULK_LEVELS: Record<string, ApprovalLevel | undefined> = {};
 
+/** The panel's frame, loaded and loading. */
+const PANEL_CLASS = 'overflow-hidden rounded-md border border-ods-border bg-ods-card';
+
 export const PolicyConfigurationPanel: FC<PolicyConfigurationPanelProps> = ({
   categories,
   editMode,
   onPolicyPermissionChange,
   onCategoryPermissionChange,
+  loading: loadingProp,
+  skeletonCount = POLICY_CONFIGURATION_PANEL_SKELETON_CATEGORIES,
   className,
 }) => {
+  // ONE switch: in a page's loading state (or while the host reads the policies) every category is its skeleton.
+  const loading = useLoadingScope() || !!loadingProp;
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
   const [bulkLevels, setBulkLevels] = useState<Record<string, ApprovalLevel | undefined>>(NO_BULK_LEVELS);
 
@@ -292,11 +341,16 @@ export const PolicyConfigurationPanel: FC<PolicyConfigurationPanelProps> = ({
     }
   };
 
+  // While loading: the host's categories as they are, else a typical count of categories not read yet.
+  const shown: PermissionCategory[] =
+    loading && categories.length === 0 ? Array.from({ length: skeletonCount }, () => LOADING_CATEGORY) : categories;
+
   return (
-    <div className={cn('overflow-hidden rounded-md border border-ods-border bg-ods-card', className)}>
-      {categories.map(category => (
+    <div className={cn(PANEL_CLASS, className)}>
+      {shown.map((category, index) => (
         <CategorySection
-          key={category.id}
+          key={category.id || index}
+          data-loading-item
           category={category}
           editMode={editMode}
           isExpanded={expandedIds.has(category.id)}
@@ -304,6 +358,7 @@ export const PolicyConfigurationPanel: FC<PolicyConfigurationPanelProps> = ({
           onToggle={handleToggle}
           onBulkLevelChange={handleBulkLevelChange}
           onPolicyPermissionChange={onPolicyPermissionChange}
+          loading={loading}
         />
       ))}
     </div>

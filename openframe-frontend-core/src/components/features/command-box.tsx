@@ -1,10 +1,13 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
-import { Button } from '../ui/button';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button, buttonVariants } from '../ui/button';
 import { FadePreview } from '../ui/fade-preview';
+import { useLoadingScope } from '../ui/loading-scope';
 
 export interface CommandBoxAction {
   /** Button label */
@@ -50,6 +53,9 @@ export interface CommandBoxProps {
   onCopy?: () => void;
   /** Accessible label for the corner copy button */
   copyAriaLabel?: string;
+  /** The command is still being read: the box draws its skeleton, as tall as the command, its action labels real. A
+   *  loading scope does the same. */
+  loading?: boolean;
 }
 
 /**
@@ -95,6 +101,18 @@ const lineClampClasses: Record<number, string> = {
   6: 'line-clamp-6',
 };
 
+/** The box's layout, read by the box and by its skeleton, so the skeleton is the box's size. */
+const COMMAND_BOX_CLASS = 'flex flex-col gap-2';
+const COMMAND_BOX_TITLE_CLASS = 'text-ods-text-primary text-h4';
+const COMMAND_BOX_FRAME_CLASS = 'rounded-[6px] border border-ods-border bg-ods-bg p-4';
+const COMMAND_BOX_COPY_ROW_CLASS = 'flex items-start gap-4';
+const COMMAND_BOX_COPY_BUTTON_LAYOUT = 'shrink-0';
+const COMMAND_BOX_ACTIONS_CLASS = 'mt-4 flex flex-col gap-3 content-md:flex-row content-md:justify-end';
+const COMMAND_BOX_ACTION_CLASS = 'w-full content-md:w-auto';
+/** The fixed-height command area: N rows of the `text-code` line height token. Read by the box and its skeleton. */
+const fixedCommandHeight = (visibleLines: number) => `calc(${visibleLines} * var(--font-line-space-h6-caption))`;
+/** The fixed-height area's toggle wording, read by the box and by its skeleton. */
+const COMMAND_TOGGLE_LABELS = { more: 'Show all', less: 'Show less' };
 export function CommandBox({
   command,
   title,
@@ -106,8 +124,27 @@ export function CommandBox({
   visibleLines,
   onCopy,
   copyAriaLabel = 'Copy command',
+  loading,
 }: CommandBoxProps) {
   const fixedHeight = visibleLines !== undefined && visibleLines > 0;
+  // While the page is read the command is not known: the box is drawn as its skeleton, as tall as the command.
+  if (useLoadingScope() || loading) {
+    return (
+      <CommandBoxSkeleton
+        title={title}
+        lines={!fixedHeight && maxLines > 0 ? maxLines : undefined}
+        visibleLines={fixedHeight ? visibleLines : undefined}
+        primaryActionLabel={primaryAction?.label}
+        primaryActionIcon={primaryAction?.icon}
+        primaryActionVariant={primaryAction?.variant}
+        secondaryActionLabel={secondaryAction?.label}
+        secondaryActionIcon={secondaryAction?.icon}
+        secondaryActionVariant={secondaryAction?.variant}
+        showCopy={Boolean(onCopy)}
+        className={className}
+      />
+    );
+  }
   // Get static line-clamp class or undefined for unlimited
   const lineClampClass = !fixedHeight && maxLines > 0 ? lineClampClasses[maxLines] : undefined;
 
@@ -132,11 +169,7 @@ export function CommandBox({
           and collapsing on each one would fold an expanded box under the
           typist, the exact jump this mode exists to prevent. Nothing goes stale
           without it: the expanded height is re-measured on every commit. */}
-      <FadePreview
-        fixedHeight
-        collapsedHeight={`calc(${visibleLines} * var(--font-line-space-h6-caption))`}
-        labels={{ more: 'Show all', less: 'Show less' }}
-      >
+      <FadePreview fixedHeight collapsedHeight={fixedCommandHeight(visibleLines)} labels={COMMAND_TOGGLE_LABELS}>
         {text}
       </FadePreview>
     </div>
@@ -145,26 +178,28 @@ export function CommandBox({
   );
 
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
-      {title && <div className="text-ods-text-primary text-h4">{title}</div>}
-      <div className="rounded-[6px] border border-ods-border bg-ods-bg p-4">
+    <div className={cn(COMMAND_BOX_CLASS, className)}>
+      {title && <div className={COMMAND_BOX_TITLE_CLASS}>{title}</div>}
+      <div className={COMMAND_BOX_FRAME_CLASS}>
         {onCopy ? (
-          <div className="flex items-start gap-4">
+          <div className={COMMAND_BOX_COPY_ROW_CLASS}>
             {commandText}
-            <button
+            <Button
+              variant="bare"
+              size="icon-sm"
               type="button"
               onClick={onCopy}
               aria-label={copyAriaLabel}
-              className="shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
+              className={COMMAND_BOX_COPY_BUTTON_LAYOUT}
             >
-              <Copy02Icon className="h-5 w-5" />
-            </button>
+              <Copy02Icon />
+            </Button>
           </div>
         ) : (
           commandText
         )}
         {(primaryAction || secondaryAction) && (
-          <div className="mt-4 flex flex-col gap-3 md:flex-row md:justify-end">
+          <div className={COMMAND_BOX_ACTIONS_CLASS}>
             {secondaryAction && (
               <Button
                 variant={secondaryAction.variant || 'outline'}
@@ -172,7 +207,7 @@ export function CommandBox({
                 onClick={secondaryAction.onClick}
                 disabled={secondaryAction.disabled}
                 loading={secondaryAction.loading}
-                className="w-full md:w-auto"
+                className={COMMAND_BOX_ACTION_CLASS}
               >
                 {secondaryAction.label}
               </Button>
@@ -184,9 +219,109 @@ export function CommandBox({
                 onClick={primaryAction.onClick}
                 disabled={primaryAction.disabled}
                 loading={primaryAction.loading}
-                className="w-full md:w-auto"
+                className={COMMAND_BOX_ACTION_CLASS}
               >
                 {primaryAction.label}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The command box while its command is read: the same box, its title and action buttons for real (their labels are
+ * the box's own words), and the command as a bar `lines` lines tall at the command's type step.
+ */
+function CommandBoxSkeleton({
+  title,
+  lines = 2,
+  visibleLines,
+  primaryActionLabel,
+  primaryActionIcon,
+  primaryActionVariant,
+  secondaryActionLabel,
+  secondaryActionIcon,
+  secondaryActionVariant,
+  showCopy = false,
+  className,
+}: {
+  title?: string;
+  lines?: number;
+  /** The box's fixed-height mode (`CommandBox` `visibleLines`): that many rows tall, plus the toggle row. */
+  visibleLines?: number;
+  primaryActionLabel?: string;
+  primaryActionIcon?: React.ReactNode;
+  primaryActionVariant?: CommandBoxAction['variant'];
+  secondaryActionLabel?: string;
+  secondaryActionIcon?: React.ReactNode;
+  secondaryActionVariant?: CommandBoxAction['variant'];
+  /** Draw the corner copy glyph (the box has `onCopy`). */
+  showCopy?: boolean;
+  className?: string;
+}) {
+  const commandLines =
+    visibleLines !== undefined && visibleLines > 0 ? (
+      <div className={cn(showCopy && 'min-w-0 flex-1')}>
+        {/* `text-code`'s line height is the token the loaded area's height is N rows of (`fixedCommandHeight`). */}
+        <TextLineSkeleton type="code" lines={visibleLines} />
+        {/* FadePreview's toggle row, which fixed mode always reserves: the real control, unseen. */}
+        <Button
+          type="button"
+          variant="link"
+          size="compact"
+          noPaddingX
+          tabIndex={-1}
+          rightIcon={<ChevronDown />}
+          className="invisible mt-[var(--spacing-system-mf)]"
+        >
+          {COMMAND_TOGGLE_LABELS.more}
+        </Button>
+      </div>
+    ) : (
+      <TextLineSkeleton type="code" lines={Math.max(lines, 1)} className={cn(showCopy && 'min-w-0 flex-1')} />
+    );
+  return (
+    <div className={cn(COMMAND_BOX_CLASS, className)} aria-hidden inert>
+      {title && <div className={COMMAND_BOX_TITLE_CLASS}>{title}</div>}
+      <div className={COMMAND_BOX_FRAME_CLASS}>
+        {showCopy ? (
+          <div className={COMMAND_BOX_COPY_ROW_CLASS}>
+            {commandLines}
+            <span
+              className={cn(
+                buttonVariants({ variant: 'transparent', size: 'icon-sm' }),
+                COMMAND_BOX_COPY_BUTTON_LAYOUT,
+              )}
+            >
+              <Copy02Icon />
+            </span>
+          </div>
+        ) : (
+          commandLines
+        )}
+        {(primaryActionLabel || secondaryActionLabel) && (
+          <div className={COMMAND_BOX_ACTIONS_CLASS}>
+            {secondaryActionLabel && (
+              <Button
+                variant={secondaryActionVariant || 'outline'}
+                leftIcon={secondaryActionIcon}
+                className={COMMAND_BOX_ACTION_CLASS}
+                tabIndex={-1}
+              >
+                {secondaryActionLabel}
+              </Button>
+            )}
+            {primaryActionLabel && (
+              <Button
+                variant={primaryActionVariant || 'accent'}
+                leftIcon={primaryActionIcon}
+                className={COMMAND_BOX_ACTION_CLASS}
+                tabIndex={-1}
+              >
+                {primaryActionLabel}
               </Button>
             )}
           </div>

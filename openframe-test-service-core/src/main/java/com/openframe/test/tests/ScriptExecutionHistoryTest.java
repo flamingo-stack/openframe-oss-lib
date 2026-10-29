@@ -49,8 +49,12 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 // @Tag("post-mingo") because dispatching needs an enrolled ONLINE machine, and one only exists after
 // the device and assistant phases have run. Tagged at class level so the class stays inside a single
 // phase — splitting one across two phases is what made ExtApi: Archive customer fail on its second run.
+// @Tag("needs-device") marks the same dependency for runs that are not the pipeline: the dev suite
+// runs the `saas` tag against a long-lived tenant with no agent installed, where every case here
+// aborts on its assumption. The `tenant` env excludes this tag; the pipeline phases do not.
 @Tag("saas")
 @Tag("post-mingo")
+@Tag("needs-device")
 @DisplayName("Script execution history")
 public class ScriptExecutionHistoryTest extends BaseTest {
 
@@ -168,21 +172,21 @@ public class ScriptExecutionHistoryTest extends BaseTest {
         if (ownSchedule != null) {
             try {
                 ScriptScheduleApi.deleteSchedule(ownSchedule.getId());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 log.warn("Failed to delete schedule {} — it is left in the tenant: {}", ownSchedule.getId(), e.getMessage());
             }
         }
         if (ownDispatched != null) {
             try {
                 ScriptApi.deleteScript(ownDispatched.getId());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 log.warn("Failed to delete script {} — it is left in the tenant: {}", ownDispatched.getId(), e.getMessage());
             }
         }
         if (ownScript != null) {
             try {
                 ScriptApi.deleteScript(ownScript.getId());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 log.warn("Failed to delete script {} — it is left in the tenant: {}", ownScript.getId(), e.getMessage());
             }
         }

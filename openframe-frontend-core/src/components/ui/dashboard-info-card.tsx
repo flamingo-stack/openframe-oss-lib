@@ -1,9 +1,13 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { CircularProgress, type CircularProgressOverflow, type CircularProgressVariant } from './circular-progress';
 import { FloatingTooltip } from './floating-tooltip';
+import { useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 
 /**
@@ -74,11 +78,49 @@ export interface DashboardInfoCardProps {
   href?: string;
   /** Tooltip content shown on a question-mark icon next to the value */
   tooltip?: ReactNode;
-  /** Override the value text className (default: `text-h3 md:text-h2` per Figma) */
+  /** Override the value text className (default: `text-h3 content-md:text-h2` per Figma) */
   valueClassName?: string;
   /** Secondary text rendered beside the value (e.g. an entry/item count). */
   subValue?: ReactNode;
+  /**
+   * One line UNDER the value (what the number counts). A card with a caption
+   * grows to fit it instead of holding the fixed stat-tile height.
+   */
+  caption?: ReactNode;
+  /**
+   * The figure is still being fetched: the SAME card, so the loaded card replaces it in
+   * place. `title` / `titleSlot` / `titleTag` / `icon` are drawn as they are (they are known
+   * before the data; with neither title a bar holds the title line), the value and caption are
+   * bars of their own line heights, the progress ring is held when `showProgress` is set, and
+   * the percentage when `loadingShowsPercentage` is set, the sub-value when `loadingShowsSubValue` is set.
+   */
+  loading?: boolean;
+  /**
+   * While `loading`: hold the percentage's box (plain "(NN%)" text, or a `Tag` when
+   * `percentageDisplay` / `progressVariant` would draw one), because the loaded card will show
+   * a percentage. Default: `showProgress` or a percentage drawn as a tag (`percentageDisplay="tag"`, or a
+   * `warning`/`error` `progressVariant`), the cards that show one.
+   */
+  loadingShowsPercentage?: boolean;
+  /**
+   * While `loading`: hold the `subValue`'s box (one `text-h6` line beside the value) for a card
+   * whose loaded state will carry one. Default `false`.
+   */
+  loadingShowsSubValue?: boolean;
+  /**
+   * While `loading`: the title is read too, so its line is a bar even when a `title` is passed (an empty `title`
+   * already draws the bar). `titleSlot` and `titleTag` are left as given. Default `false`.
+   */
+  titleLoading?: boolean;
+  /**
+   * While `loading`: the icon is read too (it depends on the figure), so the icon slot is a skeleton of the slot's
+   * own box, whether or not an `icon` is passed. Default `false`.
+   */
+  iconLoading?: boolean;
 }
+
+/** The icon slot's box (Figma "icon" variant): 32px on mobile, 56px from `md` up. Read by the slot and its skeleton. */
+const DASHBOARD_INFO_CARD_ICON_BOX_CLASS = 'size-8 shrink-0 rounded-sm content-md:size-14';
 
 export function DashboardInfoCard({
   title,
@@ -97,17 +139,41 @@ export function DashboardInfoCard({
   tooltip,
   valueClassName,
   subValue,
+  caption,
+  loading: loadingProp = false,
+  loadingShowsPercentage: loadingShowsPercentageProp,
+  loadingShowsSubValue = false,
+  titleLoading = false,
+  iconLoading = false,
 }: DashboardInfoCardProps) {
+  // In a page's loading state the figure is read: the card is its skeleton (`loading`).
+  const inScope = useLoadingScope();
+  const loading = loadingProp || inScope;
+  // A caption still being read is empty while loading: its two lines are kept whenever one is passed.
+  const hasCaption = loading ? caption != null : Boolean(caption);
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : value;
 
+  const percentageAsTag =
+    percentageDisplay === 'tag' ||
+    (percentageDisplay === 'auto' && (progressVariant === 'warning' || progressVariant === 'error'));
+  // A card that draws a progress ring or a percentage tag shows a percentage once loaded: its box is held by default.
+  const loadingShowsPercentage = loadingShowsPercentageProp ?? (showProgress || percentageAsTag);
+
   const renderPercentage = () => {
+    if (loading) {
+      if (!loadingShowsPercentage) return null;
+      // The box the loaded percentage takes: a `Tag` (h-8) or one `text-h4` line.
+      return percentageAsTag ? (
+        <Tag loading label="" className="w-12" />
+      ) : (
+        <p className="text-h4">
+          <TextLineSkeleton type="inherit" as="span" className="w-12" />
+        </p>
+      );
+    }
     if (percentage === undefined) return null;
 
-    const asTag =
-      percentageDisplay === 'tag' ||
-      (percentageDisplay === 'auto' && (progressVariant === 'warning' || progressVariant === 'error'));
-
-    if (asTag) {
+    if (percentageAsTag) {
       const tagVariant =
         progressVariant === 'warning' || progressVariant === 'error'
           ? progressVariant
@@ -121,13 +187,13 @@ export function DashboardInfoCard({
   };
 
   const renderProgress = () => {
-    if (!showProgress || percentage === undefined) return null;
+    if (!showProgress || (percentage === undefined && !loading)) return null;
 
     // Keep the ring proportionally weighted (10px stroke at the 56px default).
     const strokeFor = (size: number) => Math.max(2, Math.round((size * 10) / 56));
 
     const common = {
-      percentage,
+      percentage: percentage ?? 0,
       variant: progressVariant,
       overflow: progressOverflow,
       showLabel: false,
@@ -145,17 +211,38 @@ export function DashboardInfoCard({
     const { base, md, lg } = size;
 
     const rings: Array<{ key: string; size: number; className: string }> = [
-      { key: 'base', size: base, className: md !== undefined ? 'md:hidden' : lg !== undefined ? 'lg:hidden' : '' },
+      {
+        key: 'base',
+        size: base,
+        className: md !== undefined ? 'content-md:hidden' : lg !== undefined ? 'content-lg:hidden' : '',
+      },
     ];
     if (md !== undefined) {
       rings.push({
         key: 'md',
         size: md,
-        className: lg !== undefined ? 'hidden md:block lg:hidden' : 'hidden md:block',
+        className: lg !== undefined ? 'hidden content-md:block content-lg:hidden' : 'hidden content-md:block',
       });
     }
     if (lg !== undefined) {
-      rings.push({ key: 'lg', size: lg, className: 'hidden lg:block' });
+      rings.push({ key: 'lg', size: lg, className: 'hidden content-lg:block' });
+    }
+
+    if (loading) {
+      // The ring's own box at each breakpoint, as a circle.
+      return (
+        <>
+          {rings.map(ring => (
+            <UnifiedSkeleton
+              key={ring.key}
+              variant="circular"
+              width={ring.size}
+              height={ring.size}
+              className={cn('shrink-0', ring.className)}
+            />
+          ))}
+        </>
+      );
     }
 
     return (
@@ -177,24 +264,51 @@ export function DashboardInfoCard({
     <>
       {/* Icon slot (Figma "icon" variant): 32px box / 16px content on mobile,
           56px box / 24px content from `md` up. */}
-      {icon && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary md:size-14">
-          <span className="flex size-4 items-center justify-center md:size-6 [&>*]:size-full">{icon}</span>
-        </div>
+      {loading && iconLoading ? (
+        <UnifiedSkeleton className={DASHBOARD_INFO_CARD_ICON_BOX_CLASS} />
+      ) : (
+        icon && (
+          <div
+            className={cn(
+              DASHBOARD_INFO_CARD_ICON_BOX_CLASS,
+              'flex items-center justify-center border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary',
+            )}
+          >
+            <span className="flex size-4 items-center justify-center content-md:size-6 [&>*]:size-full">{icon}</span>
+          </div>
+        )
       )}
 
       {/* Content section */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Title row: caption and/or tag (Figma "status" variant) */}
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
-          {titleSlot ?? (title !== undefined && <p className="truncate text-ods-text-secondary text-h5">{title}</p>)}
+          {titleSlot ??
+            // A title still being read (empty while loading) is a bar of its line, like no title.
+            (title !== undefined && !(loading && (!title || titleLoading)) ? (
+              <p className="truncate text-ods-text-secondary text-h5">{title}</p>
+            ) : (
+              loading && (
+                <p className="text-h5">
+                  <TextLineSkeleton type="inherit" as="span" className="w-20" />
+                </p>
+              )
+            ))}
           {titleTag}
         </div>
 
         {/* Value and percentage */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
-          <p className={cn('truncate text-ods-text-primary text-h3 md:text-h2', valueClassName)}>{formattedValue}</p>
-          {subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
+          <p className={cn('truncate text-ods-text-primary text-h3 content-md:text-h2', valueClassName)}>
+            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-24" /> : formattedValue}
+          </p>
+          {loading
+            ? loadingShowsSubValue && (
+                <p className="text-h6">
+                  <TextLineSkeleton type="inherit" as="span" className="w-16" />
+                </p>
+              )
+            : subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
           {renderPercentage()}
           {tooltip && (
             <FloatingTooltip content={tooltip} side="top">
@@ -204,6 +318,13 @@ export function DashboardInfoCard({
             </FloatingTooltip>
           )}
         </div>
+
+        {/* Two lines kept for the caption, loading or loaded, so a narrow tile is one height. */}
+        {hasCaption && (
+          <p className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">
+            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-32" /> : caption}
+          </p>
+        )}
       </div>
 
       {/* Progress indicator */}
@@ -216,14 +337,20 @@ export function DashboardInfoCard({
   // min-h) — with a 32px titleTag the natural content height slightly exceeds
   // the spec, and Figma's frame is fixed; items-center absorbs the difference.
   const baseClassName =
-    'bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-xsf)] md:p-[var(--spacing-system-m)] h-16 md:h-[104px] flex gap-[var(--spacing-system-s)] md:gap-[var(--spacing-system-m)] items-center transition-all';
+    'bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-xsf)] content-md:p-[var(--spacing-system-m)] h-16 content-md:h-[104px] flex gap-[var(--spacing-system-s)] content-md:gap-[var(--spacing-system-m)] items-center transition-all';
 
-  if (href) {
+  // A caption is a third line: the fixed stat-tile height would clip it.
+  const captionClassName = hasCaption ? 'h-auto content-md:h-auto' : undefined;
+
+  // While loading the card is not yet a link: a skeleton is never focusable.
+  if (href && !loading) {
     return (
       <Link
         href={href}
+        aria-busy={loading || undefined}
         className={cn(
           baseClassName,
+          captionClassName,
           'group cursor-pointer',
           'hover:border-ods-border-hover hover:bg-ods-card-hover',
           className,
@@ -234,5 +361,11 @@ export function DashboardInfoCard({
     );
   }
 
-  return <div className={cn(baseClassName, className)}>{cardContent}</div>;
+  // Loading, the card is busy: one card announces nothing of its own (a grid of them would say it once per
+  // card); the region it sits in does.
+  return (
+    <div aria-busy={loading || undefined} className={cn(baseClassName, captionClassName, className)}>
+      {cardContent}
+    </div>
+  );
 }

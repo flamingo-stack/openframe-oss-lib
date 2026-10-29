@@ -1,5 +1,6 @@
 package com.openframe.api.dto.rmm.software;
 
+import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
@@ -23,6 +24,7 @@ public class SoftwareScheduleResponse {
     private SoftwareAction action;
     private List<SoftwareSchedulePackage> packages;
     private ScheduleDeviceSelectionMode selectionMode;
+    private ScheduleDeviceCriteria deviceCriteria;
     private ScheduleScriptTrigger trigger;
     private ScheduleTimeReference timeReference;
     private ScheduleOfflineBehavior offlineBehavior;

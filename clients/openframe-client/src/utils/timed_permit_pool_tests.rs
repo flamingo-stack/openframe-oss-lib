@@ -88,3 +88,28 @@ async fn call_over_capacity_fails_fast_while_slots_are_busy() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn a_parked_call_and_a_busy_pool_are_distinguishable() {
+    let pool = TimedPermitPool::new(1);
+    let parked = pool
+        .call("op", Duration::from_millis(50), || {
+            thread::sleep(Duration::from_millis(400))
+        })
+        .await
+        .unwrap_err();
+    // The call reached the pool and its thread is still parked; another would park one more.
+    assert!(!parked.is_busy(), "got: {parked}");
+
+    let busy = pool
+        .call("op", Duration::from_millis(50), || ())
+        .await
+        .unwrap_err();
+    // No call was issued, so a retry costs the pool nothing.
+    assert!(busy.is_busy(), "got: {busy}");
+
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    pool.call("op", Duration::from_secs(5), || ())
+        .await
+        .unwrap();
+}

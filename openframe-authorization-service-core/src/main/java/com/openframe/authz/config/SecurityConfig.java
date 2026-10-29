@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.annotation.ObjectPostProcessor;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -31,7 +31,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -40,6 +40,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 
 /**
  * Security configuration for all non-Authorization-Server requests: the login page, form login,
@@ -67,7 +69,7 @@ public class SecurityConfig {
                 // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
                 // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
                 // cannot reach: it can't set application/json, and fetch preflights against disabled CORS.
-                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(new AntPathRequestMatcher("/login", "POST")))
+                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/login")))
                 .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -80,10 +82,12 @@ public class SecurityConfig {
                                 "/login",
                                 "/favicon.ico",
                                 "/tenant/**",
+                                "/mobile/version-policy",
                                 "/management/**",
                                 "/.well-known/**",
                                 "/error",
-                                "/sso/providers/**"
+                                "/sso/providers/**",
+                                "/graphql"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -113,8 +117,7 @@ public class SecurityConfig {
     @Bean
     public AuthenticationFailureHandler oauth2LoginFailureHandler(AuthErrorResponder authErrorResponder) {
         return (HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) ->
-                authErrorResponder.send(response, request, "oauth2-login", exception,
-                        "SSO login failed. Please try again.");
+                authErrorResponder.send(response, request, "oauth2-login", exception, SSO_LOGIN_FAILED);
     }
 
     /** One entry per distinct SSO config (its cache key), NOT per login — bounded by active configs. */

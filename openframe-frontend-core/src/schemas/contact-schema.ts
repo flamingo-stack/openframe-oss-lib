@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 // Dropdown option constants — re-exported by `<ContactForm>` consumers
 // that want to surface their own custom Select widgets keyed on the

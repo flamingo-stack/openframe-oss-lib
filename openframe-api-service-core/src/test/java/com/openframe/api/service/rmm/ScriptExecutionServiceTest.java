@@ -51,13 +51,16 @@ class ScriptExecutionServiceTest {
     private ScriptExecutionRepository scriptExecutionRepository;
     @Mock
     private TenantIdProvider tenantIdProvider;
+    @Mock
+    private TestRunPolicy testRunPolicy;
 
     private ScriptExecutionService service;
 
     @BeforeEach
     void setUp() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        service = new ScriptExecutionService(scriptExecutionRepository, tenantIdProvider, new ScriptExecutionMapper());
+        service = new ScriptExecutionService(scriptExecutionRepository, tenantIdProvider, new ScriptExecutionMapper(),
+                testRunPolicy);
         lenient().when(scriptExecutionRepository.saveRunning(any(RunningExecutionRows.class)))
                 .thenAnswer(inv -> rowsFrom(inv.getArgument(0)));
     }
@@ -70,8 +73,57 @@ class ScriptExecutionServiceTest {
                         .timeoutSeconds(r.getTimeoutSeconds()).initiatedBy(r.getInitiatedBy()).source(r.getSource())
                         .packageManager(r.getPackageManager()).packageName(r.getPackageName())
                         .softwareAction(r.getSoftwareAction()).status(ExecutionStatus.RUNNING)
+                        .testRun(r.isTestRun())
                         .build())
                 .toList();
+    }
+
+    @Test
+    @DisplayName("create: a test run is recorded as such")
+    void create_marksATestRun() {
+        when(testRunPolicy.isTestRun()).thenReturn(true);
+
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS,
+                INITIATED_BY, ExecutionSource.MANUAL);
+
+        assertThat(savedRows().isTestRun()).isTrue();
+    }
+
+    @Test
+    @DisplayName("create: a regular run is not a test run")
+    void create_regularRunIsNotATestRun() {
+        service.create(EXECUTION_ID, SCRIPT_ID, MACHINE_ID, PrivilegeLevel.ADMIN, TIMEOUT_SECONDS,
+                INITIATED_BY, ExecutionSource.MANUAL);
+
+        assertThat(savedRows().isTestRun()).isFalse();
+    }
+
+    @Test
+    @DisplayName("createBatch: an ad-hoc batch of a test run is recorded as such")
+    void createBatch_marksAnAdHocTestRun() {
+        when(testRunPolicy.isTestRun()).thenReturn(true);
+
+        service.createBatch(EXECUTION_ID, SCRIPT_ID, null, List.of(MACHINE_ID), PrivilegeLevel.ADMIN,
+                TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.MANUAL);
+
+        assertThat(savedRows().isTestRun()).isTrue();
+    }
+
+    @Test
+    @DisplayName("createBatch: a schedule run stays visible even in test mode — its parent schedule row is never hidden")
+    void createBatch_scheduleRunIsNeverATestRun() {
+        lenient().when(testRunPolicy.isTestRun()).thenReturn(true);
+
+        service.createBatch(EXECUTION_ID, SCRIPT_ID, "schedule-1", List.of(MACHINE_ID), PrivilegeLevel.ADMIN,
+                TIMEOUT_SECONDS, INITIATED_BY, ExecutionSource.SCHEDULED);
+
+        assertThat(savedRows().isTestRun()).isFalse();
+    }
+
+    private RunningExecutionRows savedRows() {
+        ArgumentCaptor<RunningExecutionRows> captor = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(scriptExecutionRepository).saveRunning(captor.capture());
+        return captor.getValue();
     }
 
     @Test

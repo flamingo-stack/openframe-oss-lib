@@ -65,7 +65,7 @@ const NoData = React.forwardRef<HTMLDivElement, NoDataProps>(function NoDataImpl
         leftIcon={buttonIcon}
         onClick={onButtonClick}
         {...buttonProps}
-        className={cn('w-full md:w-auto', buttonProps?.className)}
+        className={cn('w-full content-md:w-auto', buttonProps?.className)}
       >
         {buttonLabel}
       </Button>

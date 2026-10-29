@@ -3,6 +3,7 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { useIsInActionsMenuHeader } from './actions-menu-header-context';
+import { Button } from './button';
 import { Label } from './label';
 
 export interface TabSelectorItem {
@@ -78,7 +79,7 @@ export function TabSelector({
           'flex gap-[var(--spacing-system-xxs)] bg-ods-bg p-[var(--spacing-system-xxs)]',
           flush
             ? 'h-10 w-full'
-            : cn('h-11 rounded-md border border-ods-border md:h-12', scrollable ? 'overflow-x-auto' : 'w-full'),
+            : cn('h-11 rounded-md border border-ods-border content-md:h-12', scrollable ? 'overflow-x-auto' : 'w-full'),
         )}
       >
         {items.map(item => {
@@ -86,37 +87,28 @@ export function TabSelector({
           const isDisabled = disabled || item.disabled;
 
           return (
-            <button
+            <Button
+              // A segment of the control: the selected one is filled (the accent in `primary`, the raised surface in
+              // `secondary`), from its `data-state` and `data-tone`.
+              variant="segment"
               key={item.id}
               type="button"
               disabled={isDisabled}
               onClick={() => onValueChange(item.id)}
               aria-label={!item.label ? item.ariaLabel : undefined}
-              className={cn(
-                // Bold on BOTH states (text-h3 = DM Sans bold) — a medium↔bold
-                // flip between the active and inactive tabs read as inconsistent
-                // weight (and nudged label widths on every switch).
-                'flex items-center justify-center gap-[var(--spacing-system-xs)] whitespace-nowrap rounded-xs p-[var(--spacing-system-xsf)] transition-colors duration-200 text-h4',
-                // scrollable: intrinsic widths must sum past the container or
-                // nothing ever overflows (flex-1's basis-0 defeats the scroll).
-                scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1',
-                isDisabled
-                  ? isActive
-                    ? 'cursor-not-allowed bg-ods-bg-surface text-ods-text-secondary'
-                    : 'cursor-not-allowed bg-transparent text-ods-text-secondary'
-                  : isActive
-                    ? variant === 'primary'
-                      ? 'cursor-default bg-ods-accent text-ods-text-on-accent'
-                      : 'cursor-default bg-ods-bg-surface text-ods-text-primary'
-                    : 'cursor-pointer bg-transparent text-ods-text-primary hover:bg-ods-bg-hover',
-              )}
+              aria-pressed={isActive}
+              data-state={isActive ? 'active' : undefined}
+              data-tone={variant === 'primary' ? 'accent' : undefined}
+              // scrollable: intrinsic widths must sum past the container or nothing ever overflows (flex-1's basis-0
+              // defeats the scroll).
+              className={cn('h-full', scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1')}
             >
               {item.icon && (
-                <span className="flex size-4 shrink-0 items-center justify-center md:size-6">{item.icon}</span>
+                <span className="flex size-4 shrink-0 items-center justify-center content-md:size-6">{item.icon}</span>
               )}
               {item.label}
               {item.badge && item.badge}
-            </button>
+            </Button>
           );
         })}
       </div>

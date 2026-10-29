@@ -122,18 +122,19 @@ export function TagsSelector({
             >
               {tag.name}
               {!disabled && (
-                <button
+                <Button
+                  variant="bare"
+                  size="icon-inline"
                   type="button"
                   onClick={e => {
                     e.preventDefault();
                     e.stopPropagation();
                     handleTagRemove(tag.id);
                   }}
-                  className="inline-flex h-4 w-4 items-center justify-center rounded-full text-ods-text-secondary transition-colors hover:bg-ods-accent/20 hover:text-ods-text-primary"
                   aria-label={`Remove ${tag.name}`}
                 >
-                  <X className="h-3 w-3" />
-                </button>
+                  <X />
+                </Button>
               )}
             </span>
           ))}

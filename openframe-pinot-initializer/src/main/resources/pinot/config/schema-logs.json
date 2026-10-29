@@ -8,6 +8,8 @@
     { "name": "deviceId",           "dataType": "STRING", "singleValueField": true },
     { "name": "hostname",           "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
     { "name": "nickname",           "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
+    { "name": "executionSource",    "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
+    { "name": "scriptCreationSource", "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
     { "name": "organizationId",     "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
     { "name": "organizationName",   "dataType": "STRING", "singleValueField": true, "defaultNullValue": "" },
     { "name": "ingestDay",          "dataType": "STRING", "singleValueField": true },

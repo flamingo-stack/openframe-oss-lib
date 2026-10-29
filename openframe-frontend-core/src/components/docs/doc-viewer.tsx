@@ -7,11 +7,12 @@ import type { DocContent, DocNode, DocRenderHandlers, DocSourceId } from '../../
 import { findDocNodeByPath } from '../../utils/doc-tree-nav';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
-import { CategorySidebarSkeleton } from '../loading/page-layout-skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MultiLevelNavigation, MobileNavigationDropdown } from '../navigation/multi-level-navigation';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { PersistentSidebar, PersistentMobileDropdown } from '../persistent-filter-controls';
 import { DocSearchBar, useDocSearch } from '../shared/doc-search';
+import { DataSyncLine } from '../ui/data-attribution';
 import { useDocNavigation } from './doc-navigation-context';
 import { useDocsResolveLink } from './use-docs-resolve-link';
 import { useDocumentTree } from './use-document-tree';
@@ -118,6 +119,11 @@ export interface DocViewerProps {
   /** Whether to render the doc-search bar (bound to chat). */
   showAIChat?: boolean;
 
+  /** This source's documents are mirrored from another system and carry a `sync` (the knowledge base, from GitHub):
+   *  the page then states it in the first row under its title, holding the row with a skeleton while a document
+   *  loads. Default false: a source nothing syncs (the data room) never draws the row. */
+  synced?: boolean;
+
   /** Folder-index filename (default `'README.md'`). */
   folderIndexFile?: string;
 
@@ -132,6 +138,10 @@ export interface DocViewerProps {
 export function DocViewer(props: DocViewerProps) {
   return <DocViewerContent {...props} />;
 }
+
+/** The "On this page" column's heading: static copy, drawn for real loaded and loading. */
+const ON_THIS_PAGE_LABEL = 'ON THIS PAGE';
+const ON_THIS_PAGE_HEADING_CLASS = 'mb-4 font-semibold text-ods-text-secondary text-h5';
 
 function DocViewerContent({
   sourceId,
@@ -152,6 +162,7 @@ function DocViewerContent({
   baseRoute,
   emptyStateText,
   showAIChat = false,
+  synced = false,
   folderIndexFile,
   backButton,
 }: DocViewerProps) {
@@ -270,6 +281,11 @@ function DocViewerContent({
     <div style={{ ...bgStyle, ...containerBgStyle }}>
       <PageLayout title={title} subtitle={subtitle} titleSize="h1" titleWrap backButton={backCfg ?? undefined}>
         <div className="flex w-full flex-col gap-10">
+          {/* Where the document is mirrored from: the first row under the title, as on every synced page. */}
+          {/* Loading until the document is here: the structure read comes first, so the server's HTML holds the line too. */}
+          {synced && (
+            <DataSyncLine sync={content?.sync} loading={!content && (isLoadingContent || isLoadingStructure)} />
+          )}
           {showAIChat && (
             <DocSearchBar
               placeholder={`Search ${sidebarLabel?.toLowerCase() || 'documents'}...`}
@@ -292,43 +308,39 @@ function DocViewerContent({
           )}
 
           {!error && (
-            <div className="flex flex-1 flex-col items-start gap-6 lg:flex-row lg:gap-10">
-              <div className="w-full lg:w-[320px] lg:shrink-0">
-                <div className="lg:sticky lg:top-20">
-                  {isLoadingStructure ? (
-                    <CategorySidebarSkeleton />
-                  ) : (
-                    <>
-                      <PersistentMobileDropdown isLoading={false}>
-                        <MobileNavigationDropdown
+            <div className="flex flex-1 flex-col items-start gap-6 content-lg:flex-row content-lg:gap-10">
+              <div className="w-full content-lg:w-[320px] content-lg:shrink-0">
+                <div className="content-lg:sticky content-lg:top-20">
+                  {/* While the tree is read, the dropdown and the sidebar are their own skeletons (`isLoading`), each at
+                      its breakpoint, so the loading state is the loaded tree's frame. */}
+                  <PersistentMobileDropdown isLoading={false}>
+                    <MobileNavigationDropdown
+                      nodes={structure}
+                      selectedPath={selectedPath}
+                      expandedNodes={expandedNodes}
+                      onNodeClick={selectNode}
+                      onToggleExpand={toggleNode}
+                      isLoading={isLoadingStructure}
+                      folderIndexFile={folderIndexFile}
+                    />
+                  </PersistentMobileDropdown>
+
+                  <PersistentSidebar isLoading={false}>
+                    <div className="hidden content-lg:block">
+                      <div className="space-y-4">
+                        <h3 className="font-semibold text-ods-text-secondary text-h5">{sidebarLabel}</h3>
+                        <MultiLevelNavigation
                           nodes={structure}
                           selectedPath={selectedPath}
                           expandedNodes={expandedNodes}
                           onNodeClick={selectNode}
                           onToggleExpand={toggleNode}
-                          isLoading={false}
+                          isLoading={isLoadingStructure}
                           folderIndexFile={folderIndexFile}
                         />
-                      </PersistentMobileDropdown>
-
-                      <PersistentSidebar isLoading={false}>
-                        <div className="hidden lg:block">
-                          <div className="space-y-4">
-                            <h3 className="font-semibold text-ods-text-secondary text-h5">{sidebarLabel}</h3>
-                            <MultiLevelNavigation
-                              nodes={structure}
-                              selectedPath={selectedPath}
-                              expandedNodes={expandedNodes}
-                              onNodeClick={selectNode}
-                              onToggleExpand={toggleNode}
-                              isLoading={false}
-                              folderIndexFile={folderIndexFile}
-                            />
-                          </div>
-                        </div>
-                      </PersistentSidebar>
-                    </>
-                  )}
+                      </div>
+                    </div>
+                  </PersistentSidebar>
                 </div>
               </div>
 
@@ -343,7 +355,7 @@ function DocViewerContent({
                     // shouldn't be on file pages" bug.
                     isMarkdownContent &&
                     ((showStickyNav && stickyNavSections.length > 0) || isLoadingContent || isLoadingStructure)
-                      ? 'lg:grid-cols-[1fr_280px]'
+                      ? 'content-lg:grid-cols-[1fr_280px]'
                       : ''
                   } gap-8`}
                 >
@@ -366,9 +378,9 @@ function DocViewerContent({
                   </div>
 
                   {isMarkdownContent && (isLoadingContent || isLoadingStructure) && (
-                    <div className="hidden lg:block">
+                    <div className="hidden content-lg:block">
                       <div className="sticky top-24">
-                        <div className="mb-5 h-[14px] w-28 animate-pulse rounded bg-ods-border" />
+                        <h3 className={ON_THIS_PAGE_HEADING_CLASS}>{ON_THIS_PAGE_LABEL}</h3>
                         <div className="space-y-0">
                           {[130, 170, 190, 220, 110, 200, 80, 100, 120, 140, 90].map((w, i) => (
                             <div
@@ -377,7 +389,7 @@ function DocViewerContent({
                                 i === 0 ? 'border-ods-accent' : 'border-transparent'
                               }`}
                             >
-                              <div className="h-[13px] animate-pulse rounded bg-ods-border" style={{ width: w }} />
+                              <UnifiedSkeleton className="h-[13px] rounded" width={w} />
                             </div>
                           ))}
                         </div>
@@ -386,9 +398,9 @@ function DocViewerContent({
                   )}
 
                   {showStickyNav && content && stickyNavSections.length > 0 && !isLoadingContent && (
-                    <div className="hidden lg:block">
+                    <div className="hidden content-lg:block">
                       <div className="sticky top-24">
-                        <h3 className="mb-4 font-semibold text-ods-text-secondary text-h5">ON THIS PAGE</h3>
+                        <h3 className={ON_THIS_PAGE_HEADING_CLASS}>{ON_THIS_PAGE_LABEL}</h3>
                         <StickySectionNav
                           sections={stickyNavSections}
                           activeSection={activeSection}

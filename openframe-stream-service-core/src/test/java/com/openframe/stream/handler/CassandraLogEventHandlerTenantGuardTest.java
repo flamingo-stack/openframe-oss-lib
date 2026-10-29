@@ -1,0 +1,73 @@
+package com.openframe.stream.handler;
+
+import tools.jackson.databind.json.JsonMapper;
+import com.openframe.data.cassandra.model.CassandraLogEvent;
+import com.openframe.data.cassandra.model.enums.UnifiedEventType;
+import com.openframe.data.cassandra.repository.CassandraLogEventRepository;
+import com.openframe.data.model.enums.IntegratedToolType;
+import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.config.ToolEventProperties;
+import com.openframe.stream.mapping.LogEventMapper;
+import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
+import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+
+/**
+ * The Cassandra event-log handler must apply the same tenant guard as the Kafka/Pinot handler:
+ * an event whose tenant could not be resolved (shared cluster — e.g. a Fleet CDC row without a
+ * stamped team_id, or a MeshCentral event with an unknown domain) is DROPPED, never written with
+ * a NULL tenant_id into the tenant-keyed unified_logs primary key.
+ */
+class CassandraLogEventHandlerTenantGuardTest {
+
+    private CassandraLogEventRepository repository;
+    private CassandraLogEventHandler handler;
+
+    @BeforeEach
+    void setUp() {
+        repository = mock(CassandraLogEventRepository.class);
+        handler = new CassandraLogEventHandler(
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
+                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
+    }
+
+    private static DeserializedDebeziumMessage message(String tenantId) {
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        payload.setOperation("c");
+        DeserializedDebeziumMessage message = DeserializedDebeziumMessage.builder()
+                .payload(payload)
+                .tenantId(tenantId)
+                .toolEventId("evt-1")
+                .ingestDay("2026-07-24")
+                .integratedToolType(IntegratedToolType.FLEET)
+                .unifiedEventType(UnifiedEventType.UNKNOWN)
+                .eventTimestamp(1L)
+                .build();
+        return message;
+    }
+
+    @Test
+    @DisplayName("no resolved tenant -> event dropped, nothing written to Cassandra")
+    void dropsEventWithoutTenant() {
+        handler.handle(message(null), new IntegratedToolEnrichedData());
+        handler.handle(message(""), new IntegratedToolEnrichedData());
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    @DisplayName("resolved tenant -> event written")
+    void writesEventWithTenant() {
+        IntegratedToolEnrichedData enriched = new IntegratedToolEnrichedData();
+        enriched.setTenantId("tenant-a");
+        handler.handle(message("tenant-a"), enriched);
+        verify(repository).save(any(CassandraLogEvent.class));
+    }
+}

@@ -33,6 +33,7 @@ public class IntegrationController {
             value = "{toolId}/**",
             method = {
                     RequestMethod.GET,
+                    RequestMethod.HEAD,
                     RequestMethod.POST,
                     RequestMethod.PUT,
                     RequestMethod.PATCH,

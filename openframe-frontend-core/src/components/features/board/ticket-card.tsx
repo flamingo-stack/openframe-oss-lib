@@ -7,6 +7,7 @@ import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/elemen
 import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
 import {
   memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -21,6 +22,7 @@ import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime, formatTicketFullTimestamp } from '../../../utils/date-utils';
 import { holdMoveDragEffect } from '../../../utils/drag-effect';
 import { getReadableTextColor } from '../../../utils/ods-color-utils';
+import { AgentMark } from '../../agent-mark';
 import {
   ClockIcon,
   DotsLoaderIcon,
@@ -29,7 +31,10 @@ import {
   MessagesIcon,
   UserCheckIcon,
 } from '../../icons-v2-generated';
+import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { Button } from '../../ui/button';
 import { DeletedUserAvatar } from '../../ui/deleted-user-avatar';
+import { loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { Tag } from '../../ui/tag';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip';
@@ -69,6 +74,9 @@ const ACTIVITY_DEFAULT_LABEL: Record<BoardTicketActivityKind, string> = {
 const TICKET_CARD_SHELL =
   'relative flex flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] select-none text-left';
 
+/** The number and time line (`3891 • 5 min ago`), loaded and loading. */
+const TICKET_CARD_META_CLASS = 'truncate text-ods-text-secondary text-h6';
+
 // =============================================================================
 // Presentational body — the ONE ticket-card design, no drag/link/board context.
 // Reused by the draggable `TicketCard` AND the static `TicketCardView`.
@@ -82,18 +90,34 @@ export interface TicketCardBodyProps {
    *  `TicketCard` adapts its own `(ticketId, requestId)` signature onto these). */
   onApprove?: (requestId?: string) => void | Promise<void>;
   onReject?: (requestId?: string) => void | Promise<void>;
+  /** Where the card opens. The body sits above the card's own link with pointer
+   *  events off, but the number/time line has to take them back for its tooltip -
+   *  so with an `href` that line is a link of its own, and a click on it opens the
+   *  ticket like a click anywhere else on the card. That link is out of the tab
+   *  order, so pass `href` only from a card that already renders its own focusable
+   *  link to the same place, as `TicketCard` does. */
+  href?: string;
+  onLinkClick?: (e: MouseEvent) => void;
 }
 
 /** The card's inner content: title + device/org, priority + assignees, tags,
  *  timestamp, "New Message", and the approval row. Pure — driven only by props. */
-export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprove, onReject }: TicketCardBodyProps) {
+export function TicketCardBody({
+  ticket,
+  columnColor,
+  renderAssignSlot,
+  onApprove,
+  onReject,
+  href,
+  onLinkClick,
+}: TicketCardBodyProps) {
   const showNewMessage = !!ticket.hasNewMessage && !!columnColor;
   const newMessageTextColor = columnColor ? getReadableTextColor(columnColor) : undefined;
 
   const showDeviceRow = !!(ticket.deviceHostnames?.length || ticket.organizationName);
   const deviceText = [ticket.deviceHostnames?.join(', '), ticket.organizationName].filter(Boolean).join(', ');
 
-  const hasRightSection = !!(ticket.priority || ticket.assignees?.length || renderAssignSlot);
+  const hasRightSection = !!(ticket.priority || ticket.agent || ticket.assignees?.length || renderAssignSlot);
   const rightSection = hasRightSection ? (
     <div className="pointer-events-auto flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
       {ticket.priority && (
@@ -101,6 +125,15 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
           className={cn('size-4', PRIORITY_COLOR_CLASS[ticket.priority])}
           aria-label={`Priority: ${ticket.priority}`}
         />
+      )}
+      {ticket.agent && (
+        <span
+          role="img"
+          aria-label={`Owned by ${ticket.agent === 'fae' ? 'Fae' : 'Mingo'}`}
+          className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-ods-border bg-ods-bg"
+        >
+          <AgentMark agent={ticket.agent} className={ticket.agent === 'fae' ? 'size-full' : 'size-5'} />
+        </span>
       )}
       {renderAssignSlot ? (
         renderAssignSlot(ticket)
@@ -143,6 +176,21 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
   // may be empty - the hub hero card and tickets without one send '' - so either
   // half stands on its own and the line disappears with both missing.
   const metaLabel = [ticket.ticketNumber || null, timestampLabel].filter(Boolean).join(' \u2022 ');
+  // Out of the tab order: the card's own link is the one stop for the ticket.
+  const meta = href ? (
+    <Link
+      href={href}
+      draggable={false}
+      prefetch={false}
+      tabIndex={-1}
+      onClick={onLinkClick}
+      className={cn('pointer-events-auto block', TICKET_CARD_META_CLASS)}
+    >
+      {metaLabel}
+    </Link>
+  ) : (
+    <p className={cn(tooltipLabel && 'pointer-events-auto', TICKET_CARD_META_CLASS)}>{metaLabel}</p>
+  );
 
   return (
     <>
@@ -165,14 +213,12 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
         (tooltipLabel ? (
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <p className="pointer-events-auto truncate text-ods-text-secondary text-h6">{metaLabel}</p>
-              </TooltipTrigger>
+              <TooltipTrigger asChild>{meta}</TooltipTrigger>
               <TooltipContent>{tooltipLabel}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         ) : (
-          <p className="truncate text-ods-text-secondary text-h6">{metaLabel}</p>
+          meta
         ))}
       {ticket.escalatedByUser && (
         <div className="flex items-center gap-[var(--spacing-system-xxs)] text-ods-open-yellow text-h6">
@@ -215,7 +261,9 @@ export function TicketCardBody({ ticket, columnColor, renderAssignSlot, onApprov
 // drag-and-drop / board context (for embeds, marketing heroes, previews).
 // =============================================================================
 
-export interface TicketCardViewProps extends TicketCardBodyProps {
+/** No `href`: the static card has no card-wide link for keyboard users, so the
+ *  number/time line must not become a pointer-only one. */
+export interface TicketCardViewProps extends Omit<TicketCardBodyProps, 'href' | 'onLinkClick'> {
   className?: string;
   /** Merged over the shell's own — the board uses it to fade the copy it leaves
    *  behind and to place the one that follows the pointer. */
@@ -247,7 +295,9 @@ export function TicketCardView({ className, style, ...bodyProps }: TicketCardVie
 // =============================================================================
 
 export interface TicketCardProps {
-  ticket: BoardTicket;
+  /** The ticket. `null` is a card still being read (a lane's loading form): the card draws its own skeleton, as it
+   *  does in a loading scope. */
+  ticket: BoardTicket | null;
   columnId: string;
   columnColor?: string;
   href?: string;
@@ -261,6 +311,8 @@ export interface TicketCardProps {
   renderAssignSlot?: (ticket: BoardTicket) => ReactNode;
   onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>;
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>;
+  /** `data-*` markers (`data-loading-item` on a lane's cards), on the card's root in both forms. */
+  [key: `data-${string}`]: unknown;
 }
 
 /** Memoized: a drag moves one card, but it re-renders the column lists around
@@ -268,7 +320,7 @@ export interface TicketCardProps {
  *  must pass stable `renderAssignSlot` / `onApprove` / `onReject` (useCallback)
  *  for this to bite — an inline arrow re-renders every card on every keystroke
  *  anywhere in the page. */
-export const TicketCard = memo(function TicketCardImpl({
+const TicketCardImpl = memo(function TicketCardDraggable({
   ticket,
   columnId,
   columnColor,
@@ -279,7 +331,8 @@ export const TicketCard = memo(function TicketCardImpl({
   renderAssignSlot,
   onApprove,
   onReject,
-}: TicketCardProps) {
+  ...props
+}: TicketCardProps & { ticket: BoardTicket }) {
   const ref = useRef<HTMLDivElement>(null);
   // Read at drag start rather than captured: the registration below is keyed on
   // the ticket's id, so capturing the object would hand a renamed or re-tagged
@@ -412,9 +465,13 @@ export const TicketCard = memo(function TicketCardImpl({
   const style: CSSProperties = {};
   if (showNewMessage) style.borderColor = columnColor;
 
-  const handleClick = (e: MouseEvent) => {
-    if (isDragging) e.preventDefault();
-  };
+  // Stable between drags: it is handed into the memoized body below.
+  const handleClick = useCallback(
+    (e: MouseEvent) => {
+      if (isDragging) e.preventDefault();
+    },
+    [isDragging],
+  );
 
   // Held as one memoized element, not re-created per render. A card being
   // dragged over re-renders on every edge flip — it owns the hover state that
@@ -430,9 +487,11 @@ export const TicketCard = memo(function TicketCardImpl({
         renderAssignSlot={renderAssignSlot}
         onApprove={onApprove ? requestId => onApprove(ticket.id, requestId) : undefined}
         onReject={onReject ? requestId => onReject(ticket.id, requestId) : undefined}
+        href={href}
+        onLinkClick={handleClick}
       />
     ),
-    [ticket, columnColor, renderAssignSlot, onApprove, onReject],
+    [ticket, columnColor, renderAssignSlot, onApprove, onReject, href, handleClick],
   );
 
   // No transition on the margins below, and that is not a style choice: room is
@@ -449,6 +508,7 @@ export const TicketCard = memo(function TicketCardImpl({
     // Read by the lane's scroll anchor to keep the list still when tickets are
     // inserted above the viewport — see `use-lane-scroll-anchor.ts`.
     [TICKET_ID_ATTRIBUTE]: ticket.id,
+    ...loadingItemProps(props),
   };
 
   const innerWrapperClass = 'relative z-10 flex flex-col gap-[var(--spacing-system-sf)]';
@@ -519,17 +579,28 @@ export const TicketCard = memo(function TicketCardImpl({
   return (
     <div {...outerProps}>
       {insertionLine}
-      <button
+      <Button
+        variant="card"
         type="button"
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         aria-label={ticket.title}
         aria-keyshortcuts={keyShortcuts}
-        className="absolute inset-0 z-0 cursor-pointer rounded-md focus-visible:outline-none"
+        className="absolute inset-0 z-0"
       />
       <div className={cn('pointer-events-none', innerWrapperClass)}>{body}</div>
     </div>
   );
+});
+
+/**
+ * The board card, loaded and loading. ONE switch: in a loading scope, or with no ticket yet (`ticket={null}`), it is
+ * its own {@link TicketCardSkeleton}; otherwise the draggable card. The lane never picks the skeleton.
+ */
+export const TicketCard = memo(function TicketCardSwitch({ ticket, ...props }: TicketCardProps) {
+  const loading = useLoadingScope() || ticket === null;
+  if (loading) return <TicketCardSkeleton {...loadingItemProps(props)} />;
+  return <TicketCardImpl ticket={ticket} {...props} />;
 });
 
 function TicketTagRow({ tags }: { tags: string[] }) {
@@ -542,6 +613,37 @@ function TicketTagRow({ tags }: { tags: string[] }) {
         <Tag key={tag} variant="outline" label={tag} />
       ))}
       {hidden > 0 && <Tag variant="outline" label={`+${hidden}`} />}
+    </div>
+  );
+}
+
+/**
+ * A board card while it is read: the card's own shell, its title and device lines as bars of their own type steps,
+ * the priority and assignee marks, the number and time line and the activity line ("No activity for 2 days"), in the
+ * body's order. A typical card has no tags (none of 70 measured tickets had one) and does have an activity line (every
+ * one did). The board card draws it itself (`ticket={null}` or a loading scope).
+ */
+function TicketCardSkeleton({ className, ...props }: { className?: string; [key: `data-${string}`]: unknown }) {
+  return (
+    <div aria-hidden className={cn(TICKET_CARD_SHELL, className)} {...loadingItemProps(props)}>
+      <div className="flex items-start gap-[var(--spacing-system-sf)]">
+        <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-zero)]">
+          <TextLineSkeleton type="h3" className="w-3/4" />
+          <div className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)] text-h6">
+            <UnifiedSkeleton className="size-4 shrink-0 rounded-sm" />
+            <TextLineSkeleton type="inherit" className="w-1/2" />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
+          <UnifiedSkeleton className="size-4 rounded-sm" />
+          <UnifiedSkeleton className="size-8 rounded-full" />
+        </div>
+      </div>
+      <TextLineSkeleton type="h6" className={cn(TICKET_CARD_META_CLASS, 'w-1/3')} />
+      <div className="flex items-center gap-[var(--spacing-system-xxs)] text-h6">
+        <UnifiedSkeleton className="size-4 shrink-0 rounded-sm" />
+        <TextLineSkeleton type="inherit" className="w-1/2" />
+      </div>
     </div>
   );
 }

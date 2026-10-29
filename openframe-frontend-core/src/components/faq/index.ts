@@ -9,5 +9,15 @@
 //
 // (Server-safe subpath is wired in tsup.config.ts under the server/universal
 // block and exposed via "./components/faq/json-ld" in package.json#exports.)
-export { FaqSection, type FaqSectionProps } from './faq-section';
+export {
+  FaqSection,
+  FAQ_SECTION_SKELETON_QUESTIONS,
+  PAGE_FAQ_SECTION_ID,
+  pageFaqProps,
+  type FaqSectionProps,
+  type FaqSkeletonGroup,
+  type FaqSkeletonShape,
+  type PageFaqSlot,
+} from './faq-section';
 export { FaqDocumentPage, type FaqDocumentPageProps } from './faq-document-page';
+export { FaqAskCard, type FaqAskOptions } from './faq-ask-card';

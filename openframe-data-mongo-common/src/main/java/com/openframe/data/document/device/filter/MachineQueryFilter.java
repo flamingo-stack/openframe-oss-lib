@@ -1,5 +1,6 @@
 package com.openframe.data.document.device.filter;
 
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,4 +21,23 @@ public class MachineQueryFilter {
     private List<OsType> osTypes;
     private List<String> organizationIds;
     private Collection<String> restrictToMachineIds;
+    private Collection<PackageManagerType> manageableByPackageManagers;
+    private String pattern;
+    private List<String> hostnames;
+    private List<String> nicknames;
+    private List<String> tagKeys;
+    private List<String> tagValues;
+
+    public MachineQueryFilter(List<String> statuses, List<String> excludeStatuses, List<String> deviceTypes,
+                              List<OsType> osTypes, List<String> organizationIds,
+                              Collection<String> restrictToMachineIds,
+                              Collection<PackageManagerType> manageableByPackageManagers) {
+        this.statuses = statuses;
+        this.excludeStatuses = excludeStatuses;
+        this.deviceTypes = deviceTypes;
+        this.osTypes = osTypes;
+        this.organizationIds = organizationIds;
+        this.restrictToMachineIds = restrictToMachineIds;
+        this.manageableByPackageManagers = manageableByPackageManagers;
+    }
 }

@@ -49,6 +49,9 @@ public class User implements TenantScoped {
     private LocalDateTime createdAt;
     @LastModifiedDate
     private LocalDateTime updatedAt;
+    @Builder.Default
+    private Long version = 0L;
+
     public void setEmail(String email) {
         this.email = email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }

@@ -1,5 +1,7 @@
 package com.openframe.api.util;
 
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.ForbiddenException;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import lombok.experimental.UtilityClass;
@@ -12,7 +14,7 @@ public class AuthPrincipalUtils {
 
     public static void validateAdminAccess(AuthPrincipal principal) {
         if (principal.getActorType() != ActorType.ADMIN) {
-            throw new IllegalStateException("Operation requires ADMIN access");
+            throw new ForbiddenException(ErrorCode.FORBIDDEN, "Operation requires ADMIN access");
         }
     }
 

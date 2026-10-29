@@ -1,11 +1,15 @@
 package com.openframe.sdk.fleetmdm.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Setter
-@Getter
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CreateUserRequest {
 
     private String name;
@@ -19,3 +23,4 @@ public class CreateUserRequest {
     private boolean apiOnly;
 
 }
+

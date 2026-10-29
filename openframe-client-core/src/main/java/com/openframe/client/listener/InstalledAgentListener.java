@@ -1,6 +1,6 @@
 package com.openframe.client.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
