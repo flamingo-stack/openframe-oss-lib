@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
@@ -39,6 +40,17 @@ public class PackageUpdateDispatchService {
     public void dispatchAdminUpdateNow(RunningExecutionRows execution, BrewPackageType brewPackageType) {
         dispatch(execution, brewPackageType, PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT,
                 DEFAULT_FORCE_COUNTDOWN_SECONDS, null);
+    }
+
+    // Bundles and schedules saved before Update Settings existed carry none and keep the old behaviour.
+    public void dispatchAdminUpdate(RunningExecutionRows execution, BrewPackageType brewPackageType,
+                                    PackageUpdateSettings settings) {
+        if (settings == null) {
+            dispatchAdminUpdateNow(execution, brewPackageType);
+            return;
+        }
+        dispatch(execution, brewPackageType, PackageUpdateSource.ADMIN, settings.getMode(),
+                settings.getCountdownSeconds(), settings.getDeadlineSeconds());
     }
 
     // Every dispatch is its own request, so a shared execution id never collides on the request index.

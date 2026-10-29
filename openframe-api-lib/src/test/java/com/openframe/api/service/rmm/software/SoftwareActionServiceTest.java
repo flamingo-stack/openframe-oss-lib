@@ -1,15 +1,18 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.script.ScriptFilterOption;
+import com.openframe.api.dto.rmm.software.SoftwareActionFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareActionFilters;
 import com.openframe.api.dto.rmm.software.SoftwareActionResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.mapper.ScriptFilterOptionMapper;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareActionSummary;
 import com.openframe.data.repository.rmm.SoftwareActionAggregationRepository;
@@ -20,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
@@ -30,6 +34,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,9 +64,11 @@ class SoftwareActionServiceTest {
         when(scheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(eq(TENANT), eq(ScriptStatus.ACTIVE), any()))
                 .thenReturn(List.of());
         when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(1L);
+        SoftwareActionSummary autoUpdate = summary("exec-1", PackageManagerType.BREW, "slack",
+                SoftwareAction.UPDATE, SoftwareActionStatus.FAILED, 7, 4);
+        autoUpdate.setKind(SoftwareActionKind.AUTO_UPDATE);
         when(aggregationRepository.findPage(eq(TENANT), any(), any(), eq("dispatchedAt"), eq(Sort.Direction.DESC), eq(0), eq(25)))
-                .thenReturn(List.of(summary("exec-1", PackageManagerType.BREW, "slack",
-                        SoftwareAction.UPDATE, SoftwareActionStatus.FAILED, 7, 4)));
+                .thenReturn(List.of(autoUpdate));
 
         PageResult<SoftwareActionResponse> result = service.list(null, null, null, 0, 25);
 
@@ -69,6 +76,7 @@ class SoftwareActionServiceTest {
         SoftwareActionResponse row = result.items().get(0);
         assertThat(row.getSoftware()).isEqualTo("slack");
         assertThat(row.getAction()).isEqualTo(SoftwareAction.UPDATE);
+        assertThat(row.getKind()).isEqualTo(SoftwareActionKind.AUTO_UPDATE);
         assertThat(row.getEngine()).isEqualTo(PackageManagerType.BREW);
         assertThat(row.getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
         assertThat(row.getTotalMachineCount()).isEqualTo(7);
@@ -96,6 +104,7 @@ class SoftwareActionServiceTest {
         assertThat(result.filteredCount()).isEqualTo(1);
         SoftwareActionResponse row = result.items().get(0);
         assertThat(row.getStatus()).isEqualTo(SoftwareActionStatus.SCHEDULED);
+        assertThat(row.getKind()).isEqualTo(SoftwareActionKind.INSTALL);
         assertThat(row.getSoftware()).isEqualTo("crowdstrike");
         assertThat(row.getTotalMachineCount()).isEqualTo(7);
         assertThat(row.getRespondedMachineCount()).isZero();
@@ -109,6 +118,8 @@ class SoftwareActionServiceTest {
                 .thenReturn(new java.util.LinkedHashMap<>(java.util.Map.of("COMPLETED", 3, "FAILED", 1)));
         when(aggregationRepository.facet(eq(TENANT), any(), any(), eq("action")))
                 .thenReturn(new java.util.LinkedHashMap<>(java.util.Map.of("UPDATE", 4)));
+        when(aggregationRepository.facet(eq(TENANT), any(), any(), eq("kind")))
+                .thenReturn(new java.util.LinkedHashMap<>(java.util.Map.of("UPDATE", 3, "AUTO_UPDATE", 1)));
         when(aggregationRepository.facet(eq(TENANT), any(), any(), eq("packageManager")))
                 .thenReturn(new java.util.LinkedHashMap<>(java.util.Map.of("BREW", 4)));
         when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(4L);
@@ -130,9 +141,37 @@ class SoftwareActionServiceTest {
         assertThat(count(filters.getStatuses(), "SCHEDULED")).isEqualTo(1); // only from the schedule
         assertThat(count(filters.getActions(), "UPDATE")).isEqualTo(4);
         assertThat(count(filters.getActions(), "INSTALL")).isEqualTo(1);    // from the schedule
+        assertThat(count(filters.getKinds(), "UPDATE")).isEqualTo(3);
+        assertThat(count(filters.getKinds(), "AUTO_UPDATE")).isEqualTo(1);
+        assertThat(count(filters.getKinds(), "INSTALL")).isEqualTo(1);      // from the schedule
         assertThat(count(filters.getEngines(), "BREW")).isEqualTo(4);
         assertThat(count(filters.getEngines(), "WINGET")).isEqualTo(1);     // from the schedule
         assertThat(filters.getFilteredCount()).isEqualTo(5);               // 4 executed + 1 scheduled
+    }
+
+    @Test
+    @DisplayName("list: a kinds filter keeps out the schedules of another kind and reaches the aggregation")
+    void list_kindsFilter_excludesOtherScheduledKinds() {
+        SoftwareSchedule install = SoftwareSchedule.builder()
+                .id("s1").tenantId(TENANT).action(SoftwareAction.INSTALL)
+                .nextRunAt(Instant.now().plusSeconds(3600))
+                .packages(List.of(SoftwareSchedulePackage.builder()
+                        .packageManager(PackageManagerType.BREW).packageName("crowdstrike").build()))
+                .build();
+        when(scheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(eq(TENANT), eq(ScriptStatus.ACTIVE), any()))
+                .thenReturn(List.of(install));
+        when(aggregationRepository.getDefaultSortField()).thenReturn("dispatchedAt");
+        when(aggregationRepository.count(eq(TENANT), any(), any())).thenReturn(0L);
+        when(aggregationRepository.findPage(eq(TENANT), any(), any(), any(), any(), eq(0), eq(25))).thenReturn(List.of());
+        SoftwareActionFilterInput filter = new SoftwareActionFilterInput();
+        filter.setKinds(List.of(SoftwareActionKind.UPDATE));
+
+        PageResult<SoftwareActionResponse> result = service.list(filter, null, null, 0, 25);
+
+        assertThat(result.items()).isEmpty();
+        ArgumentCaptor<SoftwareActionQueryFilter> query = ArgumentCaptor.forClass(SoftwareActionQueryFilter.class);
+        verify(aggregationRepository).count(eq(TENANT), query.capture(), any());
+        assertThat(query.getValue().getKinds()).containsExactly(SoftwareActionKind.UPDATE);
     }
 
     private static int count(List<ScriptFilterOption> options, String value) {

@@ -43,11 +43,13 @@ public class PackageUpdateExecutionRecorder {
         Instant now = Instant.now();
         switch (event.getState()) {
             case WAITING -> {
-                if (row.getStatus() == ExecutionStatus.RUNNING) {
+                if (row.getStatus() == ExecutionStatus.RUNNING && Boolean.TRUE.equals(row.getWaiting())) {
                     return;
                 }
-                // a retried request waits again: the previous attempt's outcome no longer applies
-                update(row, ExecutionStatus.RUNNING, null, null, null, null);
+                if (row.getStatus() != ExecutionStatus.RUNNING) {
+                    update(row, ExecutionStatus.RUNNING, null, null, null, null);
+                }
+                row.setWaiting(true);
             }
             case DONE -> update(row, ExecutionStatus.SUCCESS, now, null, summary(event), null);
             case FAILED -> {
@@ -62,6 +64,7 @@ public class PackageUpdateExecutionRecorder {
     private static void update(ScriptExecution row, ExecutionStatus status, Instant finishedAt, Integer exitCode,
                                String stdout, String error) {
         row.setStatus(status);
+        row.setWaiting(null);
         row.setFinishedAt(finishedAt);
         row.setExitCode(exitCode);
         row.setStdout(stdout);
