@@ -109,4 +109,19 @@ class OAuthBffControllerRefreshTest {
         assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).containsExactly(AUTH_COOKIE);
         verify(cookieService).addAuthCookies(any(HttpHeaders.class), eq("at"), eq("rt"));
     }
+
+    @Test
+    void reproducesBug_CU17tkuw61qkg_refresh_serviceFailsWithUnclassifiedError_502WithoutTouchingCookies() {
+        // setup
+        when(oauthBffService.refreshTokensPublic(eq("tenant-1"), eq("stale"), any()))
+                .thenReturn(Mono.error(new IllegalStateException("token_refresh_failed")));
+
+        // execution
+        ResponseEntity<Void> response = controller.refresh("tenant-1", "stale", request).block();
+
+        // verifications
+        assertThat(response.getStatusCode().value()).isEqualTo(502);
+        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).isNullOrEmpty();
+        verify(cookieService, never()).addClearAuthCookies(any(HttpHeaders.class));
+    }
 }

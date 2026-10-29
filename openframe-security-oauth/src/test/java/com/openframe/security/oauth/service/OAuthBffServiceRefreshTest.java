@@ -130,4 +130,18 @@ class OAuthBffServiceRefreshTest {
                 })
                 .verifyComplete();
     }
+
+    @Test
+    void reproducesBug_CU17tkuw61qkg_refreshTokens_bare401WithoutOAuthErrorCode_invalidRefreshTokenException() {
+        // setup
+        OAuthBffService service = serviceRespondingWith(HttpStatus.UNAUTHORIZED, "");
+
+        // execution
+        Mono<TokenResponse> refresh = service.refreshTokensPublic("tenant-1", "stale-token", request);
+
+        // verifications
+        StepVerifier.create(refresh)
+                .expectError(InvalidRefreshTokenException.class)
+                .verify();
+    }
 }
