@@ -12,9 +12,7 @@
  */
 
 import type React from 'react';
-import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
-import { BrowserWindowIcon } from '../icons-v2-generated/coding/browser-window-icon';
 import { Tag } from '../ui/tag';
 
 /**
@@ -49,31 +47,7 @@ export function InlineChip({
       label={label}
       loading={loading}
       className={cn(INLINE_CHIP_CLASS, className)}
+      data-testid="inline-chip"
     />
-  );
-}
-
-/**
- * A link that stays in this app (the runtime's `computeIsNewTab` keeps it in this window), drawn as an inline box. `anchor` is the host's link element (its
- * `NavLinkAnchor`, so the click follows the host's routing rule), else the lib's boxed `Link`.
- */
-export function InlineAppLinkChip({
-  href,
-  children,
-  anchor: Anchor,
-}: {
-  href: string;
-  children: React.ReactNode;
-  anchor?: React.ComponentType<{ href: string; className?: string; children?: React.ReactNode }>;
-}): React.ReactElement {
-  const chip = <InlineChip icon={<BrowserWindowIcon />} label={children} className="hover:bg-ods-bg-hover" />;
-  return Anchor ? (
-    <Anchor href={href} className="no-underline">
-      {chip}
-    </Anchor>
-  ) : (
-    <Link href={href} className="no-underline">
-      {chip}
-    </Link>
   );
 }

@@ -63,7 +63,7 @@ export type ProductReleaseCardSize = 'lg' | 'sm';
 
 /**
  * Minimal structural `<Link>` prop bundle the consumer composes (typically
- * via the hub's `useNavLink` hook — single source of truth for click
+ * via `useNavLinkViaRuntime` — single source of truth for click
  * routing). Kept structural here so the OSS lib has zero hub coupling;
  * the consumer's `NavLinkProps` is type-compatible by shape.
  *
@@ -97,7 +97,7 @@ export interface LoadedProductReleaseCardProps {
    */
   onClick?: () => void;
   /**
-   * `<Link>` prop bundle from the consumer's `useNavLink` (or equivalent).
+   * `<Link>` prop bundle from the consumer's `useNavLinkViaRuntime` (or equivalent).
    * When provided, the card's outer element renders as a real anchor so
    * routing (cross-origin → new tab, same-origin → soft RSC nav,
    * modifier-click → browser default) is owned by the hook — the card
@@ -433,7 +433,7 @@ function LoadedProductReleaseCard({
   // cannot reuse `InteractiveCard` (a `<div>`).
   //
   // - When `anchorProps` is set, render as a real `<Link>` so the consumer's
-  //   click hook (`useNavLink`) owns routing identically to every other
+  //   click hook (`useNavLinkViaRuntime`) owns routing identically to every other
   //   entity card — cross-origin → new tab, same-origin → soft RSC nav.
   // - Else fall back to legacy `<span role="button">` behavior driven by
   //   `onClick` (kept for the public `/releases` page caller).
@@ -528,7 +528,7 @@ function LoadedProductReleaseCard({
         </span>
       </>
     );
-    // Anchor variant — consumer's `useNavLink` (or equivalent) owns the
+    // Anchor variant — consumer's `useNavLinkViaRuntime` (or equivalent) owns the
     // click decision; the card just spreads the prop bundle and renders
     // a real `<Link>` so cmd/ctrl-click new-tab + middle-click work without
     // any extra JS. This is the SAME pattern BlogCard / CaseStudyCard /

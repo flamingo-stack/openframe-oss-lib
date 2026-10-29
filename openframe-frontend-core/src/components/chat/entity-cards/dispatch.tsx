@@ -5,9 +5,9 @@
  *
  * Lib-portable refactor of the hub's `components/shared/entity-card-dispatch.tsx`.
  * Drops the hub-only imports:
- *   - `useNavLink`              → click routing flows through `<NavLinkAnchorViaRuntime>`
+ *   - `useNavLinkViaRuntime`              → click routing flows through `<NavLinkAnchorViaRuntime>`
  *                                 (reads `useRequiredChatRuntime` internally) or
- *                                 the chat-runtime's `handleChatNavClick` helper.
+ *                                 the chat-runtime's `executeNavigation` helper.
  *   - `currentPlatform`         → runtime.source supplies the identifier.
  *   - `buildContentURL`         → URLs arrive pre-composed by the server's
  *                                 RAG mapper (`ref.url`); the card just renders.
@@ -33,7 +33,6 @@ import type React from 'react';
 import type { ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
-import { useRouter } from '../../../embed-shims/next-navigation';
 import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
 import {
@@ -100,10 +99,10 @@ import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
 import type { BaseProgramItem, ProgramConfig } from '../types/entities/program-types';
 import { getStatusColorScheme } from '../utils/agent-status-message';
 import { resolveCardDestination } from '../utils/card-destination';
-import { resolveHrefForRuntime } from '../utils/chat-nav-resolution';
 import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
-import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
+import { buildAnchorProps, navLinkTarget } from '../utils/nav-anchor-props';
+import { isRelativeHref } from '../utils/new-tab-rel';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
@@ -251,7 +250,7 @@ export interface ChatCardRenderOptions {
   /** Pre-computed new-tab decision for the inner anchor's `target`
    *  attribute. Required — always computed by `ChatCardLoader` via the
    *  same rule source chips use, so the rendered `<a target>` matches
-   *  whatever `ChatCardNavWrap` + `handleChatNavClick` decide at click
+   *  whatever `ChatCardNavWrap` + `executeNavigation` decide at click
    *  time. */
   isNewTab: boolean;
   /** Host-provided "Ask Mingo"/"Display" affordance for this card, resolved
@@ -264,9 +263,9 @@ export interface ChatCardRenderOptions {
 // =============================================================================
 // Per-type "no-fetch" wrapper components (ChatRef carries everything).
 // Each wrapper receives `isNewTab` as a prop — `ChatCardLoader` computes
-// it ONCE via `computeIsNewTab` against the resolved `chatRef.url` and
-// threads it through `renderOpts`. Wrappers must NOT call
-// `computeIsNewTab` themselves; the parent's decision is the single
+// it ONCE via `navLinkTarget` against the resolved `chatRef.url` and
+// threads it through `renderOpts`. Wrappers must NOT decide
+// themselves; the parent's decision is the single
 // source of truth for the rendered `<a target>` AND `ChatCardNavWrap`'s
 // close-on-nav gate.
 // =============================================================================
@@ -333,7 +332,7 @@ function GitHubChatCard({
       description={description}
       icon={githubKindIcon(kind)}
       status={status}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
       menuGroups={cardMenuGroups(chatRef.url, discuss)}
       menuAriaLabel="Activity actions"
     />
@@ -539,7 +538,7 @@ function HubspotTicketChatCard({
       description={chatRef.preview ?? undefined}
       icon={<TagIcon size={24} />}
       status={statusText ? { label: statusText, variant: hubspotStatusToVariant(status) } : undefined}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
       menuGroups={cardMenuGroups(chatRef.url, discuss, {
         label: 'Open Ticket Details',
         icon: <TagIcon size={20} />,
@@ -572,7 +571,7 @@ function FaqChatCard({
       description={chatRef.preview ?? undefined}
       icon={<QuestionCircleIcon size={24} />}
       status={{ label: statusLabel, variant: 'grey' }}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
       menuGroups={cardMenuGroups(chatRef.url, discuss)}
       menuAriaLabel="FAQ actions"
     />
@@ -599,7 +598,7 @@ function SlackChatCard({
       title={title}
       description={chatRef.preview ?? undefined}
       icon={<SlackLogoGreyIcon size={24} />}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
       menuGroups={cardMenuGroups(chatRef.url, discuss)}
       menuAriaLabel="Message actions"
     />
@@ -627,7 +626,7 @@ function GlyphChatCard({
       title={chatRef.title}
       description={chatRef.preview ?? undefined}
       icon={icon}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
       menuGroups={cardMenuGroups(chatRef.url, discuss)}
       menuAriaLabel="Card actions"
     />
@@ -672,7 +671,7 @@ function TrustCenterChatCard({
       description={summary || TRUST_CENTER_TAGLINE}
       icon={<ShieldCheckIcon size={24} />}
       status={lead ? { label: lead.label, variant: TRUST_STATUS_TAG_VARIANT[lead.color] } : undefined}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
       menuGroups={cardMenuGroups(chatRef.url, discuss, {
         label: 'View trust center',
         icon: <ShieldCheckIcon size={20} />,
@@ -703,7 +702,7 @@ function DataRoomDocChatCard({
       description={chatRef.preview ?? undefined}
       icon={<FileContentIcon size={24} />}
       status={{ label: badgeText, variant: 'grey' }}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
       menuGroups={cardMenuGroups(chatRef.url, discuss)}
       menuAriaLabel="Document actions"
     />
@@ -727,7 +726,7 @@ function GenericFinancialChatCard({
       title={chatRef.title}
       description={subtitle}
       icon={icon}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
       menuGroups={cardMenuGroups(chatRef.url, discuss)}
       menuAriaLabel="Document actions"
     />
@@ -920,7 +919,7 @@ function EntityMingoCard({
       imageAlt={typeof title === 'string' ? title : undefined}
       icon={fallbackIcon}
       status={status}
-      anchorProps={buildAnchorProps(chatRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
       menuGroups={cardMenuGroups(chatRef.url, discuss, openDetails, externalLink)}
       menuAriaLabel={menuAriaLabel}
     />
@@ -1081,7 +1080,7 @@ function DesignDocChatCard({
           ? { label: readiness.label, variant: readiness.scheme === 'success' ? 'success' : 'grey' }
           : { label: 'Design doc', variant: 'grey' }
       }
-      anchorProps={buildAnchorProps(displayRef.url, isNewTab)}
+      anchorProps={buildAnchorProps(displayRef.url, isNewTab, displayRef.targetPlatform)}
       menuGroups={cardMenuGroups(displayRef.url, discuss)}
       menuAriaLabel="Design doc actions"
     />
@@ -1324,7 +1323,7 @@ interface ChatCardRegistryEntry {
    *  for ChatRef-shaped items). Result is validated via `safeHref`
    *  before being attached to the resolved ref — so the wrapper sees a
    *  non-null `href`, the pre-computed `isNewTab` reflects the actual
-   *  destination, and the click goes through `handleChatNavClick` (no
+   *  destination, and the click goes through `executeNavigation` (no
    *  silent bypass of embed-mode / close-on-nav). Takes precedence over
    *  the `composeContentUrl` fallback below — but NOT over an explicit
    *  host `override` for the type (see `pickFetchedCardHref`). */
@@ -1905,20 +1904,20 @@ export function chatCardLabel(docType: string): string | undefined {
 // card body provides its own `<a href={absolute}>` (per the
 // pure-presentation contract) — this wrapper intercepts the primary
 // click via `onClickCapture` BEFORE the browser's default navigation
-// fires, and routes through `handleChatNavClick` to apply runtime nav
+// fires, and routes through `executeNavigation` to apply runtime nav
 // rules (embed-mode `window.open` / cross-platform new-tab / host
 // `runtime.navigation.navigate`). Modifier / non-primary clicks pass
-// through (`handleChatNavClick` returns early so the browser opens
+// through (`executeNavigation` returns early so the browser opens
 // the inner anchor's href naturally).
 //
-// Same click model as source chips — chips use `<a onClick={handleChatNavClick}>`
-// directly; cards use `<span onClickCapture={→handleChatNavClick}>` outside
-// the card's own anchor. Both ultimately call `handleChatNavClick` with
+// Same click model as source chips — chips use `<a onClick={executeNavigation}>`
+// directly; cards use `<span onClickCapture={→executeNavigation}>` outside
+// the card's own anchor. Both ultimately call `executeNavigation` with
 // the same `{href, targetPlatform}` resolved at `ChatCardLoader` via
 // `resolveSourceRowCTA`. The unification:
 //   - Same URL composition (`resolveSourceRowCTA`)
-//   - Same embed-mode prefix (`resolveHrefForRuntime`)
-//   - Same click router (`handleChatNavClick`)
+//   - Same navigation decision (`navLinkTarget`)
+//   - Same click router (`executeNavigation`)
 //   - Same conditional close (`ChatPanelContext.closeChat` on same-tab only)
 // =============================================================================
 
@@ -1930,7 +1929,7 @@ export function chatCardLabel(docType: string): string | undefined {
  * new-tab decision applied (via `opts.isNewTab` from ChatCardLoader).
  *
  * Job:
- *   - PRIMARY clicks → preventDefault + route through `handleChatNavClick`
+ *   - PRIMARY clicks → preventDefault + route through `executeNavigation`
  *   - Modifier-clicks → pass through to the browser's native handling
  *   - Same-tab nav → close the chat panel (so the panel doesn't linger
  *     over the now-current-page content). New-tab nav leaves it open.
@@ -1945,13 +1944,14 @@ function ChatCardNavWrap({
   path,
   targetPlatform,
   isNewTab,
+  hostRoute,
   children,
 }: {
   href: string | null;
   /** In-app doc-tree path for `markdown` / `data_room_doc` refs. The
    *  runtime's `navigate({path})` opportunistically swaps the active
    *  documentation section without a full page nav; null for everything
-   *  else. Threaded straight through to `handleChatNavClick` so chips
+   *  else. Threaded straight through to `executeNavigation` so chips
    *  and inline cards apply the same routing rule. */
   path: string | null;
   targetPlatform: string | null;
@@ -1959,10 +1959,12 @@ function ChatCardNavWrap({
    *  same value the card's `<a target>` already renders with.
    *  Consumed here ONLY to decide whether to close the panel. */
   isNewTab: boolean;
+  /** `href` is the host's own relative route (see `navLinkTarget`), handed to the executor so the click decides as
+   *  the render did. */
+  hostRoute: boolean;
   children: ReactNode;
 }) {
   const runtime = useRequiredChatRuntime();
-  const router = useRouter();
   const panel = useChatPanel();
   const onClickCapture = (e: React.MouseEvent<HTMLElement>) => {
     if (!href) return;
@@ -1987,7 +1989,7 @@ function ChatCardNavWrap({
     if (targetEl?.closest?.('button')) return;
     if (!targetEl?.closest?.('a')) return;
 
-    const handled = executeNavigation({ event: e, runtime, href, path, targetPlatform, fallbackNavigate: router.push });
+    const handled = executeNavigation({ event: e, runtime, href, path, targetPlatform, hostRoute });
     if (!handled) return;
     // Modifier-clicks fall through (handled=false) without stopPropagation
     // so ancestor telemetry handlers still see the bubble.
@@ -2055,7 +2057,7 @@ function CardWithDisclosure({
  *   - Re-attach the resolved values onto the ref so EVERY downstream
  *     card — whether it renders an inner `<a>` from `href` prop
  *     (BlogCard, ProgramCard, …) or pulls `anchorProps` from
- *     `computeIsNewTab` — sees the SAME canonical URL the
+ *     `navLinkTarget` — sees the SAME canonical URL the
  *     chip would render.
  *
  * Eliminates the entire "chip works, inline card doesn't" class of bug.
@@ -2092,7 +2094,7 @@ export function ChatCardLoader({
     entry: fetchEntry,
     ctx: sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
     composeContentUrl: runtime.composeContentUrl,
-    resolveHref: href => resolveHrefForRuntime(href, runtime),
+    resolveHref: href => navLinkTarget(runtime, href).href,
   });
   const hrefResolvedChatRef: ChatRef = {
     ...chatRef,
@@ -2117,8 +2119,15 @@ export function ChatCardLoader({
   // Pre-compute new-tab decision ONCE here (the same rule chips use).
   // Render branches that pass `target` / `rel` to their card pull this
   // via `renderOpts.isNewTab` so the inner `<a>` agrees with the
-  // runtime nav decision in `ChatCardNavWrap` + `handleChatNavClick`.
-  const isNewTab = computeIsNewTab(runtime, finalChatRef.url, finalChatRef.targetPlatform ?? null);
+  // runtime nav decision in `ChatCardNavWrap` + `executeNavigation`.
+  // A url the host composed (`composed`, `hostOverride`) as a relative route of its own is the host's page.
+  const hostRoute =
+    (destination.source === 'composed' || destination.source === 'hostOverride') &&
+    !!finalChatRef.url &&
+    isRelativeHref(finalChatRef.url);
+  const isNewTab = finalChatRef.url
+    ? navLinkTarget(runtime, finalChatRef.url, finalChatRef.targetPlatform, { hostRoute }).isNewTab
+    : false;
 
   // Resolve the "Ask Mingo"/"Display" affordance ONCE — same precedence as the
   // legacy `ChatCardWithDiscuss` (displayAction + onDisplay → "Display",
@@ -2153,6 +2162,7 @@ export function ChatCardLoader({
       path={path}
       targetPlatform={finalChatRef.targetPlatform ?? null}
       isNewTab={isNewTab}
+      hostRoute={hostRoute}
     >
       {children}
     </ChatCardNavWrap>

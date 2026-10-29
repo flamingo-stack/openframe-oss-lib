@@ -182,7 +182,7 @@ export interface GitHubActivityCardProps {
   item: GitHubActivityItem;
   variant?: 'row' | 'compact';
   className?: string;
-  /** Pre-composed `<Link>` prop bundle (typically from a `useNavLink` hook in
+  /** Pre-composed `<Link>` prop bundle (typically from a `useNavLinkViaRuntime` hook in
    *  the consumer). When provided, the outer renders as a real `<Link>`. */
   anchorProps?: GitHubActivityCardAnchorProps;
 }

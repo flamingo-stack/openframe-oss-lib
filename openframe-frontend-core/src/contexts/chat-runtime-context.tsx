@@ -23,11 +23,14 @@
  * access codes). Each runtime stays an independent React context so
  * embedders can opt into either feature without forcing the other.
  *
+ * Without a provider, the lib's links follow its default rule: a link to another origin opens a new tab, any other
+ * stays in this tab (`navLinkTarget`).
+ *
  * IMPORTANT for embedders: memoize the value passed to
  * `<ChatRuntimeContext.Provider value={...}>` (e.g. via React.useMemo).
  * Every change to its reference identity invalidates downstream
  * `useMemo` consumers (the chat input's slash-commands binding,
- * useNavLink's embed-resolution memo, useDocChat's streamFn factory).
+ * useDocChat's streamFn factory).
  * The hub's `<HubRuntimeProvider>` already memoizes correctly with
  * stable deps. Embedded apps that build the value inline on each render
  * will pay an avoidable re-render cost across the entire chat tree.
@@ -208,18 +211,18 @@ export interface ChatRuntime {
      *  Safari/Firefox block popups opened outside a direct user gesture.
      *  Default: window.open(href, '_blank', 'noopener,noreferrer'). */
     openExternal?: (href: string) => void;
-    /** Optional in-app navigation callback (host-mode only).
-     *  Returns `true` if the host handled the click in-app
-     *  (router.push + docNav.navigate); returns `false`, `undefined`,
-     *  or `void` → lib falls back to window.location.assign(href).
-     *  Hub wires this via HubRuntimeProvider's HubNavigationWiring;
-     *  embedders not in Next.js leave it undefined. */
+    /** The host's in-app navigation (host mode): every same-tab link the lib
+     *  executes goes through it. Returns `true` when the host navigated in the app
+     *  (its router, a docNav swap); `false`, `undefined` or `void` for a target it
+     *  does not take (another origin), which the browser then opens
+     *  (`window.location.assign`). Every host wires it: the hub
+     *  (HubRuntimeProvider), the OpenFrame app (OpenframeChatRuntimeProvider) and
+     *  the embedding example (its react-router). */
     navigate?: (input: { href: string; path?: string | null; targetPlatform?: string | null }) => boolean | void;
-    /** Optional new-tab decision callback. Returns true → lib opens in
-     *  new tab; false → same tab via `navigate`. Hub wires the existing
-     *  `decideNewTab` logic from use-nav-link.tsx (re-imports the pure
-     *  helper from lib). Embedders may omit; lib defaults to:
-     *  same-origin/same-platform → same tab, else new tab. */
+    /** Optional new-tab rule of the host's own, for a host whose links need one: returns true → a new tab, false →
+     *  same tab via `navigate`. Omitted, the lib's rule decides (a named platform other than `source`, or another
+     *  origin → new tab). The OpenFrame app wires it to ignore `targetPlatform` (its knowledge base tags every row
+     *  with its own platform); the hub omits it. */
     decideNewTab?: (args: { href: string; targetPlatform?: string | null }) => boolean;
   };
   /** Optional content-URL composer. Returns the platform-aware href +

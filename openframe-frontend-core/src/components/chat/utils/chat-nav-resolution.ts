@@ -14,14 +14,9 @@
  */
 
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
+import { newTabFeatures } from './new-tab-rel';
 
-/** Arguments accepted by `window.open` for a new tab — keep `noopener`
- *  + `noreferrer` to prevent the opened page from accessing
- *  window.opener (reverse-tabnabbing class). */
-export const NEW_TAB_FEATURES = 'noopener,noreferrer';
-
-/** Modifier-click predicate — matches the existing useNavLink branch
- *  (cmd/ctrl/shift/alt OR non-primary mouse button). */
+/** Modifier-click predicate: cmd/ctrl/shift/alt or a non-primary mouse button. */
 export function isModifierClick(e: {
   button?: number;
   metaKey?: boolean;
@@ -137,7 +132,7 @@ export function resolveExternalNavigation(args: {
     if (args.runtime.navigation.openExternal) {
       args.runtime.navigation.openExternal(abs);
     } else {
-      window.open(abs, '_blank', NEW_TAB_FEATURES);
+      window.open(abs, '_blank', newTabFeatures(abs, args.targetPlatform));
     }
   };
 

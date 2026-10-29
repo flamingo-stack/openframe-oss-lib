@@ -23,7 +23,7 @@ export interface HoverDropdownItem {
   /**
    * In-app doc-tree path for `markdown` / `data_room_doc` refs. Threaded
    * through to the caller's `renderAnchor` so chat consumers can wire it
-   * into `handleChatNavClick` and trigger an in-page doc-tree swap
+   * into `executeNavigation` and trigger an in-page doc-tree swap
    * (parity with source chips and inline cards).
    */
   path?: string | null;
@@ -47,7 +47,7 @@ export interface HoverDropdownItem {
 export interface HoverDropdownRenderAnchorArgs {
   href: string;
   targetPlatform?: string | null;
-  /** In-app doc-tree path — chat consumers forward to `handleChatNavClick`
+  /** In-app doc-tree path — chat consumers forward to `executeNavigation`
    *  for doc-tree swap parity with chips + inline cards. */
   path?: string | null;
   alwaysNewTab?: boolean;

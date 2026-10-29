@@ -21,7 +21,7 @@ const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release'])
 // currentPlatform(); client-side link decisions fall back to an origin comparison; and
 // the chat-history localStorage namespace falls back to a lib constant. So pointing
 // HUB_ORIGIN at any platform's hub just works — no platform knob anywhere on the client.
-export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
+export function buildChatRuntime(navigate: ChatRuntime['navigation']['navigate']): Omit<ChatRuntime, 'source'> {
   return {
     endpoints: {
       chatStreamUrl: EP.chatStream,
@@ -72,10 +72,11 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       ticketReadUrl: EP.ticketRead,
     },
     navigation: {
-      // 'host' = this app owns routing. react-router is registered into the lib's
-      // embed-shims (embed-router-bridge), so the lib soft-navigates through that
-      // router directly — no `navigate` callback or app-side bridge needed.
+      // 'host' = this app owns routing: every same-tab link the lib opens goes
+      // through `navigate` (react-router, see app-providers.tsx), as in the hub and
+      // the OpenFrame app.
       mode: 'host',
+      navigate,
     },
     // OG-placeholder fallback: NO wiring needed. The lib owns the default URL
     // construction now and derives the route's base from `imageProxyUrlPrefix`
