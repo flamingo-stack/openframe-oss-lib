@@ -7,7 +7,7 @@
  * Reads the active `ChatRuntime` and routes clicks through
  * `handleChatNavClick`. Same single-source rules as source chips and
  * inline cards:
- *   - new-tab decision via `computeIsNewTab` (embed-mode short-circuit
+ *   - new-tab decision via `navLinkTarget` (embed-mode short-circuit
  *     + `runtime.navigation.decideNewTab` + lib fallback)
  *   - `target` / `rel` via `newTabAnchorAttrs`
  *   - same-tab click → close the chat panel (via `ChatPanelContext`);
@@ -29,9 +29,8 @@ import type { AnchorHTMLAttributes, ReactNode, MouseEvent } from 'react';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useChatPanel } from './chat-panel-context';
-import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { executeNavigation } from './utils/execute-navigation';
-import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
+import { type NavLinkTarget, navLinkTarget, newTabAnchorAttrs } from './utils/nav-anchor-props';
 
 export interface NavLinkAnchorViaRuntimeProps extends Omit<
   AnchorHTMLAttributes<HTMLAnchorElement>,
@@ -64,22 +63,9 @@ export interface NavLinkViaRuntimeProps {
   onClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
-/** Where a chat link goes: its href as the runtime resolves it, and whether it opens in a new tab. */
-export interface NavLinkTarget {
-  href: string;
-  isNewTab: boolean;
-}
-
-/**
- * THE navigation decision for a chat link: the href resolved for this runtime (`resolveHrefForRuntime`) and the
- * new-tab rule on that href (`computeIsNewTab`). {@link useNavLinkViaRuntime} routes by it, and anything that draws a
- * link differently by where it goes (a link that stays in the app drawn as the inline box) reads it here, never
- * deciding again.
- */
+/** The navigation decision ({@link navLinkTarget}) for a link rendered inside the chat runtime. */
 export function useNavLinkTarget(href: string, targetPlatform?: string | null): NavLinkTarget {
-  const runtime = useRequiredChatRuntime();
-  const resolvedHref = resolveHrefForRuntime(href, runtime);
-  return { href: resolvedHref, isNewTab: computeIsNewTab(runtime, resolvedHref, targetPlatform ?? null) };
+  return navLinkTarget(useRequiredChatRuntime(), href, targetPlatform);
 }
 
 /**

@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import type { ChatRuntime } from '../../../../contexts/chat-runtime-context';
 import { makeComposeContentUrl } from '../../../../utils/content-href';
 import type { SearchResult } from '../../../ui/search-input';
 import { resolveSearchResultAction } from '../resolve-search-result-action';
 
 const HUB = 'https://www.flamingo.run';
+
+/** A chat runtime in `mode`, for the `openframe` source, with no host override of the new-tab rule. */
+const runtimeIn = (mode: 'host' | 'embed'): ChatRuntime =>
+  ({ navigation: { mode, defaultContentOrigin: HUB }, source: 'openframe' }) as unknown as ChatRuntime;
 
 /** A RAG row for a guide the hub owns, shaped like `mapDocSearchResults` emits. */
 const guideRow: SearchResult = {
@@ -35,26 +40,28 @@ const helpCenterCompose = makeComposeContentUrl({
 });
 
 describe('resolveSearchResultAction — composeContentUrl seam', () => {
-  it('no seam wired → the RAG externalUrl verbatim (legacy behavior)', () => {
-    expect(resolveSearchResultAction(guideRow, 'openframe')).toEqual({
+  it("no runtime → the RAG externalUrl verbatim, same tab (the decision's no-runtime rule)", () => {
+    expect(resolveSearchResultAction(guideRow, 'openframe', null)).toEqual({
       kind: 'navigate-same-tab',
       href: `${HUB}/onboarding-guides/deploy-first-device`,
     });
   });
 
   it('hosted type → the host in-app route, slug recovered from externalUrl', () => {
-    expect(resolveSearchResultAction(guideRow, 'openframe', 'host', helpCenterCompose)).toEqual({
+    expect(resolveSearchResultAction(guideRow, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-same-tab',
       href: '/help-center/onboarding-guides/deploy-first-device',
+      hostRoute: true,
     });
   });
 
   it('relative composed href stays same-tab even in embed mode', () => {
     // `decideNewTab` forces new-tab under embed; an in-app path must not be
     // handed to window.open — the short-circuit runs before that decision.
-    expect(resolveSearchResultAction(guideRow, 'openframe', 'embed', helpCenterCompose)).toEqual({
+    expect(resolveSearchResultAction(guideRow, 'openframe', runtimeIn('embed'), helpCenterCompose)).toEqual({
       kind: 'navigate-same-tab',
       href: '/help-center/onboarding-guides/deploy-first-device',
+      hostRoute: true,
     });
   });
 
@@ -69,9 +76,10 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
         id: 'abc123',
       },
     };
-    expect(resolveSearchResultAction(row, 'openframe', 'host', helpCenterCompose)).toEqual({
+    expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-same-tab',
       href: '/help-center/bug-fixes?search=abc123',
+      hostRoute: true,
     });
   });
 
@@ -87,7 +95,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
         targetPlatform: 'flamingo',
       },
     };
-    expect(resolveSearchResultAction(row, 'openframe', 'host', helpCenterCompose)).toEqual({
+    expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-new-tab',
       href: `${HUB}/blog/hello`,
     });
@@ -99,7 +107,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
       title: 'Untyped',
       metadata: { externalUrl: `${HUB}/somewhere`, targetPlatform: 'openframe' },
     };
-    expect(resolveSearchResultAction(row, 'openframe', 'host', helpCenterCompose)).toEqual({
+    expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-same-tab',
       href: `${HUB}/somewhere`,
     });
@@ -114,7 +122,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
           metadata: { documentType: 'cap_table', sourceRepo: 'financial-cap-table', id: 'row-9' },
         },
         'company-hub',
-        'host',
+        runtimeIn('host'),
         helpCenterCompose,
       ),
     ).toEqual({
@@ -129,12 +137,14 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
       resolveSearchResultAction(
         { id: 'doc', title: 'Doc', path: 'repo/architecture/api.md' },
         'openframe',
-        'host',
+        runtimeIn('host'),
         helpCenterCompose,
       ),
     ).toEqual({ kind: 'route', path: 'repo/architecture/api.md' });
 
-    expect(resolveSearchResultAction({ id: 'empty', title: 'Empty' }, 'openframe', 'host', helpCenterCompose)).toEqual({
+    expect(
+      resolveSearchResultAction({ id: 'empty', title: 'Empty' }, 'openframe', runtimeIn('host'), helpCenterCompose),
+    ).toEqual({
       kind: 'noop',
     });
   });

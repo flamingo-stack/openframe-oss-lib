@@ -4,7 +4,7 @@
  * THE single navigation-EXECUTION primitive for the whole lib.
  *
  * Link BUILDING is unified by `composeContentUrl`; the new-tab DECISION is
- * unified by `computeIsNewTab`/`decideNewTab`. This is the third leg: ONE place
+ * `navLinkTarget` (nav-anchor-props). This is the third leg: ONE place
  * that EXECUTES a navigation — encoding new-tab-vs-same-tab + internal-vs-external
  * + embed-vs-host + the runtime-then-router-then-window fallback chain. Every
  * surface routes through it:
@@ -17,7 +17,7 @@
  *   1. empty href → no-op (click form preventDefaults + reports handled)
  *   2. (click form) modifier / non-primary button → NOT handled — let the
  *      browser do its native thing (`<a>` opens a new tab, etc.)
- *   3. `computeIsNewTab` true → `runtime.navigation.openExternal(href)` else
+ *   3. `navLinkTarget(...).isNewTab` true → `runtime.navigation.openExternal(href)` else
  *      `window.open(href, '_blank', noopener,noreferrer)`
  *   4. else (same-tab) → `runtime.navigation.navigate({href,path,targetPlatform})`;
  *      if the host didn't handle it → `fallbackNavigate(stripped)` else
@@ -31,7 +31,7 @@
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
 import { NEW_TAB_FEATURES, stripSameOriginToPath } from './chat-nav-resolution';
-import { computeIsNewTab, isSameOriginAbsoluteHref } from './nav-anchor-props';
+import { isSameOriginAbsoluteHref, navLinkTarget } from './nav-anchor-props';
 
 /** Absolute `http(s)` URL pointing at an origin that is not ours. */
 function isForeignOriginHref(href: string): boolean {
@@ -59,13 +59,19 @@ export interface ExecuteNavigationClickArgs {
    *  `navigation.navigate` — pass `useRouter().push`. Without it, falls back to a
    *  full-page `window.location.assign`. */
   fallbackNavigate?: (path: string) => void;
+  /** The host's `composeContentUrl` returned `href` as its own relative route (see `navLinkTarget`). */
+  hostRoute?: boolean;
 }
 
 export interface ExecuteNavigationImperativeArgs {
   runtime: ChatRuntime | null | undefined;
   href: string;
+  /** Doc-tree path, for a host that swaps a mounted doc viewer in place (`runtime.navigation.navigate`). */
+  path?: string | null;
   targetPlatform?: string | null;
   fallbackNavigate?: (path: string) => void;
+  /** The host's `composeContentUrl` returned `href` as its own relative route (see `navLinkTarget`). */
+  hostRoute?: boolean;
 }
 
 /** Core: make the new-tab decision (when a runtime is present) and execute. */
@@ -75,9 +81,10 @@ function runNavigation(
   path: string | null | undefined,
   targetPlatform: string | null | undefined,
   fallbackNavigate?: (path: string) => void,
+  hostRoute?: boolean,
 ): void {
-  // No runtime → no embed/new-tab decision possible; plain same-tab fallback.
-  const isNewTab = runtime ? computeIsNewTab(runtime, href, targetPlatform ?? null) : false;
+  // THE navigation decision (no runtime → same tab).
+  const { isNewTab } = navLinkTarget(runtime, href, targetPlatform, { hostRoute });
   if (isNewTab) {
     if (runtime?.navigation.openExternal) runtime.navigation.openExternal(href);
     else window.open(href, '_blank', NEW_TAB_FEATURES);
@@ -121,6 +128,7 @@ export function executeNavigation({
   path,
   targetPlatform,
   fallbackNavigate,
+  hostRoute,
 }: ExecuteNavigationClickArgs): boolean {
   if (!href) {
     event.preventDefault();
@@ -133,7 +141,7 @@ export function executeNavigation({
   if (event.button !== undefined && event.button !== 0) return false;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
   event.preventDefault();
-  runNavigation(runtime, href, path, targetPlatform, fallbackNavigate);
+  runNavigation(runtime, href, path, targetPlatform, fallbackNavigate, hostRoute);
   return true;
 }
 
@@ -144,10 +152,12 @@ export function executeNavigation({
 export function executeNavigationImperative({
   runtime,
   href,
+  path,
   targetPlatform,
   fallbackNavigate,
+  hostRoute,
 }: ExecuteNavigationImperativeArgs): void {
-  runNavigation(runtime, href, undefined, targetPlatform, fallbackNavigate);
+  runNavigation(runtime, href, path, targetPlatform, fallbackNavigate, hostRoute);
 }
 
 /**

@@ -100,10 +100,9 @@ import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
 import type { BaseProgramItem, ProgramConfig } from '../types/entities/program-types';
 import { getStatusColorScheme } from '../utils/agent-status-message';
 import { resolveCardDestination } from '../utils/card-destination';
-import { resolveHrefForRuntime } from '../utils/chat-nav-resolution';
 import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
-import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
+import { buildAnchorProps, isRelativeHref, navLinkTarget } from '../utils/nav-anchor-props';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
@@ -264,9 +263,9 @@ export interface ChatCardRenderOptions {
 // =============================================================================
 // Per-type "no-fetch" wrapper components (ChatRef carries everything).
 // Each wrapper receives `isNewTab` as a prop — `ChatCardLoader` computes
-// it ONCE via `computeIsNewTab` against the resolved `chatRef.url` and
-// threads it through `renderOpts`. Wrappers must NOT call
-// `computeIsNewTab` themselves; the parent's decision is the single
+// it ONCE via `navLinkTarget` against the resolved `chatRef.url` and
+// threads it through `renderOpts`. Wrappers must NOT decide
+// themselves; the parent's decision is the single
 // source of truth for the rendered `<a target>` AND `ChatCardNavWrap`'s
 // close-on-nav gate.
 // =============================================================================
@@ -1917,8 +1916,8 @@ export function chatCardLabel(docType: string): string | undefined {
 // the same `{href, targetPlatform}` resolved at `ChatCardLoader` via
 // `resolveSourceRowCTA`. The unification:
 //   - Same URL composition (`resolveSourceRowCTA`)
-//   - Same embed-mode prefix (`resolveHrefForRuntime`)
-//   - Same click router (`handleChatNavClick`)
+//   - Same navigation decision (`navLinkTarget`)
+//   - Same click router (`executeNavigation`)
 //   - Same conditional close (`ChatPanelContext.closeChat` on same-tab only)
 // =============================================================================
 
@@ -1945,6 +1944,7 @@ function ChatCardNavWrap({
   path,
   targetPlatform,
   isNewTab,
+  hostRoute,
   children,
 }: {
   href: string | null;
@@ -1959,6 +1959,9 @@ function ChatCardNavWrap({
    *  same value the card's `<a target>` already renders with.
    *  Consumed here ONLY to decide whether to close the panel. */
   isNewTab: boolean;
+  /** `href` is the host's own relative route (see `navLinkTarget`), handed to the executor so the click decides as
+   *  the render did. */
+  hostRoute: boolean;
   children: ReactNode;
 }) {
   const runtime = useRequiredChatRuntime();
@@ -1987,7 +1990,15 @@ function ChatCardNavWrap({
     if (targetEl?.closest?.('button')) return;
     if (!targetEl?.closest?.('a')) return;
 
-    const handled = executeNavigation({ event: e, runtime, href, path, targetPlatform, fallbackNavigate: router.push });
+    const handled = executeNavigation({
+      event: e,
+      runtime,
+      href,
+      path,
+      targetPlatform,
+      fallbackNavigate: router.push,
+      hostRoute,
+    });
     if (!handled) return;
     // Modifier-clicks fall through (handled=false) without stopPropagation
     // so ancestor telemetry handlers still see the bubble.
@@ -2055,7 +2066,7 @@ function CardWithDisclosure({
  *   - Re-attach the resolved values onto the ref so EVERY downstream
  *     card — whether it renders an inner `<a>` from `href` prop
  *     (BlogCard, ProgramCard, …) or pulls `anchorProps` from
- *     `computeIsNewTab` — sees the SAME canonical URL the
+ *     `navLinkTarget` — sees the SAME canonical URL the
  *     chip would render.
  *
  * Eliminates the entire "chip works, inline card doesn't" class of bug.
@@ -2092,7 +2103,7 @@ export function ChatCardLoader({
     entry: fetchEntry,
     ctx: sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
     composeContentUrl: runtime.composeContentUrl,
-    resolveHref: href => resolveHrefForRuntime(href, runtime),
+    resolveHref: href => navLinkTarget(runtime, href).href,
   });
   const hrefResolvedChatRef: ChatRef = {
     ...chatRef,
@@ -2118,7 +2129,14 @@ export function ChatCardLoader({
   // Render branches that pass `target` / `rel` to their card pull this
   // via `renderOpts.isNewTab` so the inner `<a>` agrees with the
   // runtime nav decision in `ChatCardNavWrap` + `handleChatNavClick`.
-  const isNewTab = computeIsNewTab(runtime, finalChatRef.url, finalChatRef.targetPlatform ?? null);
+  // A url the host composed (`composed`, `hostOverride`) as a relative route of its own is the host's page.
+  const hostRoute =
+    (destination.source === 'composed' || destination.source === 'hostOverride') &&
+    !!finalChatRef.url &&
+    isRelativeHref(finalChatRef.url);
+  const isNewTab = finalChatRef.url
+    ? navLinkTarget(runtime, finalChatRef.url, finalChatRef.targetPlatform, { hostRoute }).isNewTab
+    : false;
 
   // Resolve the "Ask Mingo"/"Display" affordance ONCE — same precedence as the
   // legacy `ChatCardWithDiscuss` (displayAction + onDisplay → "Display",
@@ -2153,6 +2171,7 @@ export function ChatCardLoader({
       path={path}
       targetPlatform={finalChatRef.targetPlatform ?? null}
       isNewTab={isNewTab}
+      hostRoute={hostRoute}
     >
       {children}
     </ChatCardNavWrap>

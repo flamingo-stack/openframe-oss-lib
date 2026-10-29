@@ -4,8 +4,8 @@
  *
  * Resolution order:
  *  1. `externalUrl` present → resolve the href through the host's
- *     `composeContentUrl` seam (when wired), then use `decideNewTab` to
- *     choose same-tab vs new-tab against the resolved `targetPlatform`.
+ *     `composeContentUrl` seam (when wired), then THE navigation decision
+ *     (`navLinkTarget`, the one every chat link uses) chooses same-tab vs new-tab.
  *  2. Row has `id` + `sourceRepo` + `documentType` → synth an Ask-AI
  *     action (entity drill-in via primary key, no URL).
  *  3. Row has only `path` → legacy navigation fallback.
@@ -15,21 +15,15 @@
  * Pure — no React, no telemetry.
  */
 
+import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import type { ChatRef } from '../../chat/chat-ref.types';
-import { decideNewTab } from '../../chat/utils/decide-new-tab';
+import { isRelativeHref, navLinkTarget } from '../../chat/utils/nav-anchor-props';
 import type { SearchResult } from '../../ui/search-input';
 
-/** True for `https://…` and protocol-relative `//…`. A composed href that is
- *  NOT absolute is an in-app route the host claimed via `hostedTypes` /
- *  `overrides`. */
-function isAbsoluteHref(href: string): boolean {
-  return /^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(href);
-}
-
 export type SearchResultAction =
-  | { kind: 'navigate-same-tab'; href: string }
-  | { kind: 'navigate-new-tab'; href: string }
+  | { kind: 'navigate-same-tab'; href: string; hostRoute?: boolean }
+  | { kind: 'navigate-new-tab'; href: string; hostRoute?: boolean }
   | { kind: 'ask-ai'; detail: { source: string; ref: ChatRef } }
   | { kind: 'route'; path: string }
   | { kind: 'noop' };
@@ -37,7 +31,8 @@ export type SearchResultAction =
 export function resolveSearchResultAction(
   result: SearchResult,
   source: string,
-  runtimeMode?: 'host' | 'embed',
+  /** The chat runtime the search runs in; null outside one (same tab, the decision's no-runtime rule). */
+  runtime: ChatRuntime | null | undefined,
   /** The host's unified content-href seam (`runtime.composeContentUrl`).
    *  When wired, an entity row's RAG `externalUrl` is re-resolved through it,
    *  so a type the host serves in-app (`hostedTypes`) or deep-links itself
@@ -65,26 +60,19 @@ export function resolveSearchResultAction(
             targetPlatform: targetPlatform ?? null,
           })
         : null;
-    const href = composed?.href || externalUrl;
-    // A RELATIVE composed href means the host claimed this row as in-app.
-    // Short-circuit BEFORE `decideNewTab`: in embed mode that helper forces
-    // new-tab unconditionally, which would fire `window.open()` on a path
-    // that only resolves inside this app.
-    if (composed && !isAbsoluteHref(href)) {
-      return { kind: 'navigate-same-tab', href };
-    }
-    // Same pure helper `useNavLink` and `useUnifiedNav` call — single
-    // decision rule across cards, chips, and autocomplete rows. Thread
-    // the caller's `source` as `currentSource` so the platform-vs-
-    // platform comparison matches the hub's pre-migration behavior.
-    const isNewTab = decideNewTab({
-      href,
-      targetPlatform: composed ? composed.targetPlatform : targetPlatform,
-      surface: 'useUnifiedNav',
-      runtimeMode,
-      currentSource: source,
-    });
-    return isNewTab ? { kind: 'navigate-new-tab', href } : { kind: 'navigate-same-tab', href };
+    // THE navigation decision. A RELATIVE composed href is a route the host claimed as in-app (`hostRoute`): it stays
+    // in this window in every mode, never handed to `window.open`.
+    const hostRoute = !!composed?.href && isRelativeHref(composed.href);
+    const target = navLinkTarget(
+      runtime,
+      composed?.href || externalUrl,
+      composed ? composed.targetPlatform : targetPlatform,
+      {
+        hostRoute,
+      },
+    );
+    const kind = target.isNewTab ? 'navigate-new-tab' : 'navigate-same-tab';
+    return hostRoute ? { kind, href: target.href, hostRoute } : { kind, href: target.href };
   }
   if (rowId && sourceRepo && documentType) {
     return {

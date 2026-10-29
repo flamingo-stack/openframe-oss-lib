@@ -72,7 +72,13 @@ export {
   type ExecuteNavigationImperativeArgs,
   type NavClickEvent,
 } from './execute-navigation';
-export { computeIsNewTab, newTabAnchorAttrs, buildAnchorProps } from './nav-anchor-props';
+export {
+  computeIsNewTab,
+  navLinkTarget,
+  type NavLinkTarget,
+  newTabAnchorAttrs,
+  buildAnchorProps,
+} from './nav-anchor-props';
 export { isCrossOriginUrl } from './is-cross-origin-url';
 export { decideNewTab, type DecideNewTabInput, type NavSurface, type RuntimeMode } from './decide-new-tab';
 

@@ -42,8 +42,6 @@ import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { chatProgressLabel } from '../../chat-protocol/progress';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
-import Link from '../../embed-shims/next-link';
-import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
 import { formatCitationIndices } from '../../utils/source-grouping';
@@ -115,14 +113,11 @@ import type {
 } from './types/unified-chat-state.types';
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
-import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
 import { FALLBACK_TOP_RETRIEVED, splitCitedSources } from './utils/cited-sources';
-import { executeNavigation } from './utils/execute-navigation';
 import { flattenAssistantContent } from './utils/flatten-assistant-content';
 import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
-import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
 
@@ -740,17 +735,14 @@ function SourceChip({
   src,
   baseRoute,
   chipBasePlatform,
-  onClose,
   onDiscuss,
 }: {
   src: ChatSource;
   baseRoute: string;
   chipBasePlatform?: string;
-  onClose: () => void;
   onDiscuss?: (ref: ChatRef) => void;
 }) {
   const runtime = useRequiredChatRuntime();
-  const router = useRouter();
   // Single CTA resolver — same icon, same href chain, same ChatRef
   // synthesis the inline card and search-result paths use.
   const cta = resolveSourceRowCTA(
@@ -768,11 +760,6 @@ function SourceChip({
   const Icon = cta.icon;
   const icon = <Icon className="h-3.5 w-3.5" />;
   const chipClass = chatChipClass({ tone: 'secondary' });
-
-  // Single source for the new-tab decision — same `computeIsNewTab` the
-  // inline cards consume via `ChatCardLoader`.
-  const decideTab = (href: string | null, targetPlatform: string | null) =>
-    computeIsNewTab(runtime, href, targetPlatform);
 
   // Grouped source — hover/click reveals a dropdown with Open + Ask per row.
   if (src.items && src.items.length > 0) {
@@ -861,57 +848,20 @@ function SourceChip({
     </span>
   );
 
-  // Click handler that routes through chat-runtime AND closes the chat
-  // panel ONLY on same-tab navigation. New-tab clicks leave the chat
-  // open so the user keeps their context while reading the new tab.
-  // Modifier-clicks pass through to the browser's native behavior.
-  // Single close model: matches `ChatCardNavWrap` for inline cards.
-  const buildClickHandler =
-    (href: string, path: string | null | undefined, targetPlatform: string | null, isNewTab: boolean) =>
-    (e: React.MouseEvent<HTMLAnchorElement>) => {
-      const handled = executeNavigation({
-        event: e,
-        runtime,
-        href,
-        path,
-        targetPlatform,
-        fallbackNavigate: router.push,
-      });
-      if (handled && !isNewTab && onClose) onClose();
-    };
-
-  // Entity chip with a resolved external URL. `resolveHrefForRuntime`
-  // applies embed-mode origin prefix so modifier-click / hover-preview
-  // / right-click "copy link" all land on the hub origin.
-  if (cta.href && !!src.externalUrl) {
-    const resolvedHref = resolveHrefForRuntime(cta.href, runtime);
-    const isNewTab = decideTab(resolvedHref, cta.targetPlatform ?? null);
-    return wrapChip(
-      <Link
-        href={resolvedHref}
-        {...newTabAnchorAttrs(isNewTab)}
-        onClick={buildClickHandler(resolvedHref, null, cta.targetPlatform ?? null, isNewTab)}
-        className={chipClass}
-      >
-        {chipBody(src.name)}
-      </Link>,
-    );
-  }
-
-  // In-app navigable doc (markdown / data-room PDF).
+  // A chip that opens something is THE chat link (`NavLinkAnchorViaRuntime`): the one navigation decision, the one
+  // click executor, and the panel closing on a same-tab navigation, exactly as markdown links and cards.
   if (cta.href) {
-    const resolvedHref = resolveHrefForRuntime(cta.href, runtime);
-    const isNewTab = decideTab(resolvedHref, cta.targetPlatform ?? null);
+    const isEntity = !!src.externalUrl;
     return wrapChip(
-      <Link
-        href={resolvedHref}
-        {...newTabAnchorAttrs(isNewTab)}
-        onClick={buildClickHandler(resolvedHref, src.path, cta.targetPlatform ?? null, isNewTab)}
+      <NavLinkAnchorViaRuntime
+        href={cta.href}
+        path={isEntity ? null : src.path}
+        targetPlatform={cta.targetPlatform ?? null}
         className={chipClass}
-        title={displayName}
+        title={isEntity ? undefined : displayName}
       >
-        {chipBody(displayName)}
-      </Link>,
+        {chipBody(isEntity ? src.name : displayName)}
+      </NavLinkAnchorViaRuntime>,
     );
   }
 
@@ -932,7 +882,6 @@ function SourceChips({
   uncited,
   baseRoute,
   chipBasePlatform,
-  onClose,
   onDiscuss,
   loading,
 }: {
@@ -940,7 +889,6 @@ function SourceChips({
   uncited: ChatSource[];
   baseRoute: string;
   chipBasePlatform?: string;
-  onClose: () => void;
   onDiscuss?: (ref: ChatRef) => void;
   /** The answer is still being written: the strip's frame, heading and a row of chips in their loading form, so
    *  the strip does not appear under the answer when it finishes. */
@@ -978,7 +926,6 @@ function SourceChips({
               src={src}
               baseRoute={baseRoute}
               chipBasePlatform={chipBasePlatform}
-              onClose={onClose}
               onDiscuss={onDiscuss}
             />
           ))}
@@ -1000,7 +947,6 @@ function SourceChips({
             src={src}
             baseRoute={baseRoute}
             chipBasePlatform={chipBasePlatform}
-            onClose={onClose}
             onDiscuss={onDiscuss}
           />
         ))}
@@ -1011,7 +957,6 @@ function SourceChips({
               src={src}
               baseRoute={baseRoute}
               chipBasePlatform={chipBasePlatform}
-              onClose={onClose}
               onDiscuss={onDiscuss}
             />
           ))}
@@ -2124,7 +2069,6 @@ function EmbeddableChatInner({
               uncited={[]}
               baseRoute={resolvedBaseRoute}
               chipBasePlatform={chipBasePlatform}
-              onClose={handleNavigationClose}
             />
           </div>
         );
@@ -2138,13 +2082,12 @@ function EmbeddableChatInner({
             uncited={uncited}
             baseRoute={resolvedBaseRoute}
             chipBasePlatform={chipBasePlatform}
-            onClose={handleNavigationClose}
             onDiscuss={askAbout}
           />
         </div>
       );
     },
-    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, askAbout],
+    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, askAbout],
   );
 
   // Host node for in-panel Radix portals (see the body wrapper below).

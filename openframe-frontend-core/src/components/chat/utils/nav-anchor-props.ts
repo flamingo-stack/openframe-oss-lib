@@ -28,6 +28,7 @@
  */
 
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
+import { resolveHrefForRuntime } from './chat-nav-resolution';
 import { decideNewTab as libDecideNewTab } from './decide-new-tab';
 
 /** An ABSOLUTE `http(s)` URL on the current page's origin. Relative hrefs return
@@ -60,6 +61,39 @@ export function computeIsNewTab(
       currentSource: runtime.source ?? '',
     })
   );
+}
+
+/** True for a path with no scheme and no host (`/help-center/x`, `x`); false for `https://…` and `//…`. */
+export function isRelativeHref(href: string): boolean {
+  return !/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(href);
+}
+
+/** Where a chat link goes: its href as the runtime resolves it, and whether it opens in a new tab. */
+export interface NavLinkTarget {
+  href: string;
+  isNewTab: boolean;
+}
+
+/**
+ * THE navigation decision for every link the lib renders or follows: the href resolved for the runtime
+ * (`resolveHrefForRuntime`) and the new-tab rule on that resolved href (`computeIsNewTab`). Anchors
+ * (`useNavLinkTarget` / `useNavLinkViaRuntime`), cards, chips, search results and the click executor
+ * (`executeNavigation`) all read it; nothing else calls `computeIsNewTab` or `decideNewTab` (a test fails if it does).
+ * Without a runtime there is no embed or host rule to apply: the href as given, same tab (the executor's rule).
+ *
+ * `hostRoute`: the host's `composeContentUrl` returned this href as a RELATIVE route of its own (a type it serves
+ * in-app). It is the host's page, not the hub's, so it is never resolved against the hub's origin and never handed to
+ * a new tab, in any mode (in embed mode a relative href is otherwise taken as hub-relative).
+ */
+export function navLinkTarget(
+  runtime: ChatRuntime | null | undefined,
+  href: string,
+  targetPlatform?: string | null,
+  { hostRoute = false }: { hostRoute?: boolean } = {},
+): NavLinkTarget {
+  if (!runtime || (hostRoute && isRelativeHref(href))) return { href, isNewTab: false };
+  const resolved = resolveHrefForRuntime(href, runtime);
+  return { href: resolved, isNewTab: computeIsNewTab(runtime, resolved, targetPlatform ?? null) };
 }
 
 /**

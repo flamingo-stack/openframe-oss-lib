@@ -25,7 +25,7 @@
 
 import { useMemo } from 'react';
 import { useChatRuntime } from '../../../contexts/chat-runtime-context';
-import { computeIsNewTab } from '../utils/nav-anchor-props';
+import { navLinkTarget } from '../utils/nav-anchor-props';
 
 export interface UseEntityCardLinkArgs {
   href: string;
@@ -53,14 +53,9 @@ export function useEntityCardLink({ href, targetPlatform, target, rel }: UseEnti
       const safeRel = rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined);
       return { target, rel: safeRel };
     }
-    // Use the UNIFIED new-tab decision so the rendered anchor's target/rel ALWAYS
-    // agrees with the click handler (executeNavigation also calls computeIsNewTab) —
-    // including the embed-mode short-circuit + the origin/platform fallback.
-    // Previously this used `decideNewTab ?? false`, which diverged from the click
-    // when decideNewTab was unwired (embed mode rendered a same-tab anchor that
-    // clicked into a new tab). Hub behavior is unchanged: it wires decideNewTab,
-    // which computeIsNewTab consumes identically.
-    const newTab = runtime ? computeIsNewTab(runtime, href, targetPlatform ?? null) : false;
+    // THE navigation decision (`navLinkTarget`), the one the click handler executes by, so the rendered anchor's
+    // target/rel always agrees with the click.
+    const newTab = navLinkTarget(runtime, href, targetPlatform).isNewTab;
     return newTab
       ? { target: '_blank' as const, rel: 'noopener noreferrer' as const }
       : { target: undefined, rel: undefined };
