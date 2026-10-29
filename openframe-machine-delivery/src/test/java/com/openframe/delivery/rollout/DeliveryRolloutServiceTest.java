@@ -9,6 +9,9 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.delivery.MachineDeliveryRolloutRepository;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.service.machine.AgentVersionService;
+import com.openframe.delivery.agent.AgentVersionFloor;
+import com.openframe.delivery.agent.AgentVersionFloorResolver;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
@@ -34,6 +37,7 @@ import org.springframework.data.domain.Limit;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,9 +46,11 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,6 +64,8 @@ class DeliveryRolloutServiceTest {
 
     @Mock private MachineDeliveryRolloutRepository repository;
     @Mock private MachineRepository machineRepository;
+    @Mock private AgentVersionService agentVersions;
+    @Mock private AgentVersionFloorResolver floors;
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliverySink sink;
     @Mock private DeliverySpec<DeliverySeed, DeliveryPayload> spec;
@@ -72,7 +80,7 @@ class DeliveryRolloutServiceTest {
     void setUp() {
         DeliveryProperties properties = DeliveryTestPolicies.properties();
         properties.getSweep().setBatchSize(BATCH_SIZE);
-        service = new DeliveryRolloutService(repository, machineRepository, registry, properties, new DeliveryPayloadJson(new JsonMapper()), sink, metrics);
+        service = new DeliveryRolloutService(repository, machineRepository, agentVersions, floors, registry, properties, new DeliveryPayloadJson(new JsonMapper()), sink, metrics);
         TestPayload payload = new TestPayload();
         payload.setValue("1.5.11");
         payload.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UPDATE, TARGET_ID, "d-rollout"));
@@ -89,7 +97,8 @@ class DeliveryRolloutServiceTest {
         when(repository.findByStatus(DeliveryRolloutStatus.RUNNING)).thenReturn(List.of(rollout));
         doReturn(spec).when(registry).require(DeliveryType.CLIENT_UPDATE);
         doReturn(DELIVERABLE).when(spec).getDeliverableStatuses();
-        doReturn(TestPayload.class).when(spec).getPayloadClass();
+        lenient().doReturn(TestPayload.class).when(spec).getPayloadClass();
+        lenient().when(floors.of(DeliveryType.CLIENT_UPDATE)).thenReturn(AgentVersionFloor.EVERY_VERSION);
     }
 
     @Test
@@ -181,6 +190,55 @@ class DeliveryRolloutServiceTest {
         verify(metrics).recordRolloutMachineSkipped(DeliveryType.CLIENT_UPDATE);
         verify(metrics, never()).recordRolloutBatchFailed(any());
         verify(repository).advance(ROLLOUT_ID, SEQUENCE, "id-m-2", 2);
+    }
+
+    @Test
+    void advance_floorSet_machinesBelowItWalkedPastCursorStillMovesOverThem() {
+        // setup
+        when(floors.of(DeliveryType.CLIENT_UPDATE)).thenReturn(AgentVersionFloor.from("1.6.0"));
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(machine("m-1"), machine("m-2")));
+        when(agentVersions.findAll(List.of("m-1", "m-2"))).thenReturn(Map.of("m-1", "1.5.9", "m-2", "1.6.0"));
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(sink).accept(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getMachineId()).isEqualTo("m-2");
+        verify(repository).advance(ROLLOUT_ID, SEQUENCE, "id-m-2", 1);
+        verify(metrics).recordRolloutMachines(DeliveryType.CLIENT_UPDATE, 1);
+        verify(metrics).recordRolloutBelowFloor(DeliveryType.CLIENT_UPDATE, 1);
+        verify(metrics, never()).recordRolloutMachineSkipped(any());
+    }
+
+    @Test
+    void advance_floorClosed_nobodyDispatchedTheRolloutStillFinishes() {
+        // setup
+        when(floors.of(DeliveryType.CLIENT_UPDATE)).thenReturn(AgentVersionFloor.CLOSED);
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(machine("m-9")));
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(sink, never()).accept(any());
+        verify(repository).finish(ROLLOUT_ID, SEQUENCE, 0);
+    }
+
+    @Test
+    void advance_noFloor_versionsNeverLookedUp() {
+        // setup
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(machine("m-1")));
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(sink).accept(any());
+        verifyNoInteractions(agentVersions);
     }
 
     private static Machine machine(String machineId) {
