@@ -21,7 +21,7 @@
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>
-        <revision>7.0.39</revision>
+        <revision>7.0.42</revision>
         <java.version>25</java.version>
         <lombok.version>1.18.48</lombok.version>
         <mapstruct.version>1.6.3</mapstruct.version>

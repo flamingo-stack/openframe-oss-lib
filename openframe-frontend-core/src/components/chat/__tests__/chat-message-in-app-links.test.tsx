@@ -99,6 +99,17 @@ describe('ChatMessageEnhanced — in-app screen links', () => {
     expect(windowOpen).not.toHaveBeenCalled();
   });
 
+  it("draws a link that stays in the app as the inline box, by the runtime's own new-tab rule", () => {
+    renderAnswer(ANSWER);
+    // The box is the anchor around the lib's InlineChip (`InlineAppLinkChip`), routed by the same host anchor.
+    for (const anchor of screen.getAllByRole('link')) expect(anchor).toHaveClass('no-underline');
+  });
+
+  it('keeps a link the runtime sends to a new tab a plain link, not a box', () => {
+    renderAnswer(ANSWER.replace(/\]\(\//g, `](${ORIGIN}/`));
+    expect(screen.getByRole('link', { name: 'Devices → Add Device' })).not.toHaveClass('no-underline');
+  });
+
   it('opens the same link written absolute in a new tab, even on the page origin', () => {
     renderAnswer(ANSWER.replace(/\]\(\//g, `](${ORIGIN}/`));
     const anchor = screen.getByRole('link', { name: 'Devices → Add Device' });

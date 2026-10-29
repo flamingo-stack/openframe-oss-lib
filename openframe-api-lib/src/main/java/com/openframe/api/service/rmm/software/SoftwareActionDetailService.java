@@ -3,24 +3,29 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceResponse;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -28,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -41,8 +47,10 @@ public class SoftwareActionDetailService {
     private final SoftwareBundleOnlineDispatchRepository bundleOnlineDispatchRepository;
     private final SoftwareScheduleOnlineDispatchRepository scheduleOnlineDispatchRepository;
     private final SoftwareScheduleMachineAssignedRepository scheduleMachineAssignedRepository;
+    private final PackageUpdateDeviceStateRepository packageUpdateDeviceStateRepository;
     private final MachineRepository machineRepository;
     private final OrganizationRepository organizationRepository;
+    private final TagAssignmentRepository tagAssignmentRepository;
     private final TenantIdProvider tenantIdProvider;
 
     public List<SoftwareActionDeviceResponse> devices(String executionId, String bundleId, String scheduleId,
@@ -63,18 +71,36 @@ public class SoftwareActionDetailService {
 
         // 3. Overlay execution leaves — the real outcome wins over any pending state.
         if (hasText(executionId)) {
-            for (ScriptExecution leaf : scriptExecutionRepository.findByTenantIdAndExecutionId(tenantId, executionId)) {
+            List<ScriptExecution> leaves = scriptExecutionRepository.findByTenantIdAndExecutionId(tenantId, executionId);
+            for (ScriptExecution leaf : leaves) {
                 byMachine.put(leaf.getMachineId(), fromLeaf(leaf));
             }
+            overlayWaiting(tenantId, leaves, byMachine);
         }
 
         enrichWithCustomer(tenantId, byMachine);
+        Set<String> tagged = taggedMachines(byMachine.keySet(), filter);
 
         return byMachine.values().stream()
                 .filter(row -> matchesStatus(row, filter))
                 .filter(row -> matchesCustomer(row, filter))
+                .filter(row -> tagged == null || tagged.contains(row.getMachineId()))
                 .filter(row -> matchesSearch(row, search))
                 .toList();
+    }
+
+    // null = no tag filter; a device matches when it carries any of the tags
+    private Set<String> taggedMachines(Set<String> machineIds, SoftwareActionDeviceFilterInput filter) {
+        if (filter == null || filter.getDeviceTagIds() == null || filter.getDeviceTagIds().isEmpty()) {
+            return null;
+        }
+        if (machineIds.isEmpty()) {
+            return Set.of();
+        }
+        return tagAssignmentRepository.findByEntityIdInAndTagIdInAndEntityType(
+                        new ArrayList<>(machineIds), filter.getDeviceTagIds(), TagEntityType.DEVICE).stream()
+                .map(TagAssignment::getEntityId)
+                .collect(Collectors.toSet());
     }
 
     private void addPending(Map<String, SoftwareActionDeviceResponse> byMachine, String tenantId,
@@ -95,6 +121,28 @@ public class SoftwareActionDetailService {
                             "Device did not reconnect within the retry window"));
                 }
             });
+        }
+    }
+
+    // 4. A running package update reads WAITING from its device state, so rows recorded before the leaf carried
+    // the waiting flag show it too.
+    private void overlayWaiting(String tenantId, List<ScriptExecution> leaves,
+                                Map<String, SoftwareActionDeviceResponse> byMachine) {
+        Map<String, String> requestByMachine = new HashMap<>();
+        for (ScriptExecution leaf : leaves) {
+            if (hasText(leaf.getPackageUpdateRequestId()) && isRunning(leaf.getStatus())) {
+                requestByMachine.put(leaf.getMachineId(), leaf.getPackageUpdateRequestId());
+            }
+        }
+        if (requestByMachine.isEmpty()) {
+            return;
+        }
+        for (PackageUpdateDeviceState state : packageUpdateDeviceStateRepository
+                .findByTenantIdAndRequestIdIn(tenantId, new HashSet<>(requestByMachine.values()))) {
+            if (state.getStatus() == SoftwareActionStatus.WAITING
+                    && state.getRequestId().equals(requestByMachine.get(state.getMachineId()))) {
+                byMachine.get(state.getMachineId()).setStatus(SoftwareActionStatus.WAITING);
+            }
         }
     }
 
@@ -125,6 +173,8 @@ public class SoftwareActionDetailService {
                 row.setHostname(m.getHostname());
                 row.setOrganizationId(m.getOrganizationId());
                 row.setOrganizationName(organizationNames.get(m.getOrganizationId()));
+                row.setDeviceStatus(m.getStatus());
+                row.setLastSeen(m.getLastSeen());
             }
         });
     }
@@ -176,6 +226,10 @@ public class SoftwareActionDetailService {
                 .status(status)
                 .error(error)
                 .build();
+    }
+
+    private static boolean isRunning(ExecutionStatus status) {
+        return status == null || status == ExecutionStatus.QUEUED || status == ExecutionStatus.RUNNING;
     }
 
     private static SoftwareActionStatus deviceStatus(ExecutionStatus status) {

@@ -21,6 +21,8 @@ import java.util.List;
 @Slf4j
 public class NatsStreamConfigurationInitializer implements ApplicationRunner {
 
+    private static final long LATEST_MESSAGE_ONLY = 1;
+
     // TODO: use json file
     // TODO: revise stream configuration
     private static final List<StreamConfiguration> CONFIGURATIONS = List.of(
@@ -31,12 +33,13 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
-            // client update stream
+            // client update stream: only the latest release matters, so an offline agent gets one message, not the backlog
             StreamConfiguration.builder()
                     .name("CLIENT_UPDATE")
                     .subjects(List.of("machine.*.client-update"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
+                    .maxMessagesPerSubject(LATEST_MESSAGE_ONLY)
                     .build(),
             // client uninstall stream (the message itself is the command, empty payload)
             StreamConfiguration.builder()

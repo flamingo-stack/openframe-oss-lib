@@ -25,4 +25,10 @@ public class SubmitSoftwareBundleInput {
 
     @Valid
     private SoftwareBundleScheduleInput schedule;
+
+    @Valid
+    private PackageUpdateSettingsInput updateSettings;
+
+    @Valid
+    private SoftwareAutoUpdateInput autoUpdate;
 }
