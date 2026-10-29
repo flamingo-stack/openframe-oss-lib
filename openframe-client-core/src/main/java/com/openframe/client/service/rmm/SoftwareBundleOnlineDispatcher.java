@@ -97,7 +97,7 @@ public class SoftwareBundleOnlineDispatcher {
                 .softwareBundleId(bundle.getId())
                 .build();
         if (viaOrder) {
-            packageUpdateDispatchService.dispatchAdminUpdateNow(rows, pkg.getBrewPackageType());
+            packageUpdateDispatchService.dispatchAdminUpdate(rows, pkg.getBrewPackageType(), bundle.getUpdateSettings());
             return;
         }
 

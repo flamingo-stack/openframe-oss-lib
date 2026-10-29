@@ -72,27 +72,15 @@ class EngineDeliveryRouteTest {
     }
 
     @Test
-    void canReachEveryMachine_rolledOutTypeOnAndFloorOpen_yes() {
+    void canReachEveryMachine_rolledOutTypeOn_yesWhateverTheFloorTheWalkAppliesIt() {
         // setup
         properties.getEnabled().put(DeliveryType.CLIENT_UPDATE, true);
         doReturn(spec).when(specs).require(DeliveryType.CLIENT_UPDATE);
         when(spec.canDeliverToEveryMachine()).thenReturn(true);
-        when(floors.of(DeliveryType.CLIENT_UPDATE)).thenReturn(AgentVersionFloor.from("1.6.0"));
 
         // execution + verifications
         assertThat(route.canReachEveryMachine(DeliveryType.CLIENT_UPDATE)).isTrue();
-    }
-
-    @Test
-    void canReachEveryMachine_floorClosed_no() {
-        // setup
-        properties.getEnabled().put(DeliveryType.CLIENT_UPDATE, true);
-        doReturn(spec).when(specs).require(DeliveryType.CLIENT_UPDATE);
-        when(spec.canDeliverToEveryMachine()).thenReturn(true);
-        when(floors.of(DeliveryType.CLIENT_UPDATE)).thenReturn(AgentVersionFloor.CLOSED);
-
-        // execution + verifications
-        assertThat(route.canReachEveryMachine(DeliveryType.CLIENT_UPDATE)).isFalse();
+        verifyNoInteractions(floors);
     }
 
     @Test

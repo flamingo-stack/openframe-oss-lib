@@ -15,13 +15,6 @@ class AgentVersionFloorTest {
     }
 
     @Test
-    void closed_admitsNobody() {
-        // execution + verifications
-        assertThat(AgentVersionFloor.CLOSED.admits("9.9.9")).isFalse();
-        assertThat(AgentVersionFloor.CLOSED.isForEveryVersion()).isFalse();
-    }
-
-    @Test
     void withMinVersion_thatVersionAndUpOnlyUnknownStaysBelow() {
         // setup
         AgentVersionFloor floor = AgentVersionFloor.from("1.6.0");
