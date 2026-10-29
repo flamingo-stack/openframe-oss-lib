@@ -3,7 +3,6 @@ package com.openframe.delivery.dispatch;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
-import com.openframe.data.repository.delivery.MachineDeliveryPayloadRepository;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.config.DeliveryProperties;
@@ -25,8 +24,12 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DeliveryRecorder {
 
+    // Mongo reaps expired documents once a minute per collection: a body that expired with its last row could go a
+    // minute before the row, in front of a sweep pass. Held longer, the body is always there while any row is
+    static final long BODY_OUTLIVES_ROW_SECONDS = 600;
+
     private final MachineDeliveryRepository repository;
-    private final MachineDeliveryPayloadRepository payloads;
+    private final DeliveryPayloadStore payloads;
     private final MachineDeliverySequenceRepository sequences;
     private final DeliveryProperties properties;
     private final DeliveryPayloadJson payloadJson;
@@ -84,7 +87,8 @@ public class DeliveryRecorder {
         Instant dueAt = online ? runAt.plusSeconds(ackThresholdSeconds) : runAt;
         Instant expiresAt = runAt.plusSeconds(ttlSeconds);
         DeliveryPayloadBody body = payloadJson.body(payload);
-        String payloadId = payloads.hold(type, body.hash(), body.json(), expiresAt);
+        Instant bodyExpiresAt = expiresAt.plusSeconds(BODY_OUTLIVES_ROW_SECONDS);
+        String payloadId = payloads.hold(type, body, bodyExpiresAt);
         return MachineDelivery.builder()
                 .id(id)
                 .type(type)

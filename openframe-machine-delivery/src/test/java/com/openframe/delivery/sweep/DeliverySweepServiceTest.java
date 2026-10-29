@@ -8,12 +8,12 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.DeviceStatus;
-import com.openframe.data.repository.delivery.MachineDeliveryPayloadRepository;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.data.repository.delivery.RerunPublication;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.PolicyOverride;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
+import com.openframe.delivery.dispatch.DeliveryPayloadStore;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryTestPolicies;
@@ -81,7 +81,7 @@ class DeliverySweepServiceTest {
     private static final int NO_ATTEMPTS = 0;
 
     @Mock private MachineDeliveryRepository repository;
-    @Mock private MachineDeliveryPayloadRepository payloads;
+    @Mock private DeliveryPayloadStore payloads;
     @Mock private MachineOnlineStatus machineOnlineStatus;
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliveryCloser closer;
@@ -180,7 +180,7 @@ class DeliverySweepServiceTest {
         delivery.setPayloadId(PAYLOAD_ID);
         delivery.setDispatchId(OLD_DISPATCH_ID);
         delivery.setSequence(SEQUENCE);
-        when(payloads.findJsonOnPrimary(PAYLOAD_ID)).thenReturn(Optional.of(PAYLOAD_JSON));
+        when(payloads.find(PAYLOAD_ID)).thenReturn(Optional.of(PAYLOAD_JSON));
         stubDue(delivery);
         stubMachineOnline();
         stubSpec();
@@ -204,7 +204,7 @@ class DeliverySweepServiceTest {
         // setup
         delivery.setPayloadJson(null);
         delivery.setPayloadId(PAYLOAD_ID);
-        when(payloads.findJsonOnPrimary(PAYLOAD_ID)).thenReturn(Optional.empty());
+        when(payloads.find(PAYLOAD_ID)).thenReturn(Optional.empty());
         stubDue(delivery);
         stubMachineOnline();
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);

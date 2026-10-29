@@ -6,7 +6,6 @@ import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.DeviceStatus;
-import com.openframe.data.repository.delivery.MachineDeliveryPayloadRepository;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.data.repository.delivery.RerunPublication;
 import com.openframe.delivery.config.DeliveryProperties;
@@ -14,6 +13,7 @@ import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.config.DeliveryProperties.Sweep;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
+import com.openframe.delivery.dispatch.DeliveryPayloadStore;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
@@ -41,7 +41,7 @@ import static java.util.stream.Collectors.toSet;
 public class DeliverySweepService {
 
     private final MachineDeliveryRepository repository;
-    private final MachineDeliveryPayloadRepository payloads;
+    private final DeliveryPayloadStore payloads;
     private final MachineOnlineStatus machineOnlineStatus;
     private final DeliverySpecRegistry registry;
     private final DeliveryProperties properties;
@@ -215,7 +215,7 @@ public class DeliverySweepService {
         if (payloadId == null) {
             return delivery.getPayloadJson();
         }
-        return payloads.findJsonOnPrimary(payloadId)
+        return payloads.find(payloadId)
                 .orElseThrow(() -> new IllegalStateException("Delivery payload body is gone: " + payloadId));
     }
 

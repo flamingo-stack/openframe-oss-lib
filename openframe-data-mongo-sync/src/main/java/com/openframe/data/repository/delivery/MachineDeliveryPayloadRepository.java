@@ -1,14 +1,18 @@
 package com.openframe.data.repository.delivery;
 
-import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.MachineDeliveryPayload;
+import com.openframe.data.repository.TenantAwareRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.ReadPreference;
+import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
 import java.util.Optional;
 
-public interface MachineDeliveryPayloadRepository {
+@Repository
+@TenantAwareRepository
+public interface MachineDeliveryPayloadRepository extends MongoRepository<MachineDeliveryPayload, String> {
 
-    // the id of the tenant's document holding this body: written on first use, kept at least until expiresAt
-    String hold(DeliveryType type, String hash, String payloadJson, Instant expiresAt);
-
-    Optional<String> findJsonOnPrimary(String id);
+    // primary on purpose: the sweep reads a body milliseconds after another pod wrote it
+    @ReadPreference("primary")
+    Optional<MachineDeliveryPayload> findHeldById(String id);
 }

@@ -5,7 +5,6 @@ import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
-import com.openframe.data.repository.delivery.MachineDeliveryPayloadRepository;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.config.DeliveryTestPolicies;
@@ -48,12 +47,12 @@ class DeliveryRecorderTest {
     private static final String BODY_JSON = "{\"value\":\"issued\"}";
 
     @Mock private MachineDeliveryRepository repository;
-    @Mock private MachineDeliveryPayloadRepository payloads;
+    @Mock private DeliveryPayloadStore payloads;
     @Mock private MachineDeliverySequenceRepository sequences;
     @Mock private MachineOnlineStatus onlineStatus;
 
     @Captor private ArgumentCaptor<MachineDelivery> deliveryCaptor;
-    @Captor private ArgumentCaptor<String> bodyCaptor;
+    @Captor private ArgumentCaptor<DeliveryPayloadBody> bodyCaptor;
     @Captor private ArgumentCaptor<Instant> expiresAtCaptor;
 
     private DeliveryRecorder recorder;
@@ -73,7 +72,7 @@ class DeliveryRecorderTest {
                 .payload(payload)
                 .build();
         recorder = new DeliveryRecorder(repository, payloads, sequences, DeliveryTestPolicies.properties(), new DeliveryPayloadJson(new JsonMapper()), onlineStatus);
-        lenient().when(payloads.hold(any(), any(), any(), any())).thenReturn(PAYLOAD_ID);
+        lenient().when(payloads.hold(any(), any(), any())).thenReturn(PAYLOAD_ID);
     }
 
     @Test
@@ -146,10 +145,11 @@ class DeliveryRecorderTest {
         recorder.record(request);
 
         // verifications
-        verify(payloads).hold(eq(DeliveryType.CLIENT_UNINSTALL), any(), bodyCaptor.capture(), expiresAtCaptor.capture());
-        assertThat(bodyCaptor.getValue()).isEqualTo(BODY_JSON);
+        verify(payloads).hold(eq(DeliveryType.CLIENT_UNINSTALL), bodyCaptor.capture(), expiresAtCaptor.capture());
+        assertThat(bodyCaptor.getValue().json()).isEqualTo(BODY_JSON);
         verify(repository).upsertPending(deliveryCaptor.capture());
-        assertThat(expiresAtCaptor.getValue()).isEqualTo(deliveryCaptor.getValue().getExpiresAt());
+        Instant rowExpiresAt = deliveryCaptor.getValue().getExpiresAt();
+        assertThat(expiresAtCaptor.getValue()).isEqualTo(rowExpiresAt.plusSeconds(DeliveryRecorder.BODY_OUTLIVES_ROW_SECONDS));
     }
 
     @Test
