@@ -14,6 +14,7 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
@@ -141,6 +142,7 @@ class SoftwareBundleServiceTest {
             assertThat(r.getMachineIds()).containsExactlyInAnyOrder("m1", "m2"); // both macOS -> both compatible with brew
             assertThat(r.getId()).isEqualTo(r.getExecutionId());
             assertThat(r.getVersion()).isEqualTo("1.2.3"); // catalog version recorded on the action
+            assertThat(r.getKind()).isEqualTo(SoftwareActionKind.INSTALL);
         });
     }
 

@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareActionSummary;
@@ -143,6 +144,41 @@ class SoftwareActionAggregationRepositoryImplIT extends BaseMongoIntegrationTest
                 .dispatchedAt(Instant.now()).build());
 
         assertThat(repository.findByExecutionId(TENANT, "exec-v").orElseThrow().getVersion()).isEqualTo("4.36.140");
+    }
+
+    @Test
+    @DisplayName("kind: stored on the row, or its action's name on a row written before the kind existed; filter and facet use it")
+    void kindFallsBackToActionAndFilters() {
+        kindRow("exec-old-install", SoftwareAction.INSTALL, null);
+        kindRow("exec-old-update", SoftwareAction.UPDATE, null);
+        kindRow("exec-update", SoftwareAction.UPDATE, SoftwareActionKind.UPDATE);
+        kindRow("exec-auto", SoftwareAction.UPDATE, SoftwareActionKind.AUTO_UPDATE);
+
+        Map<String, SoftwareActionSummary> byExec = allRows();
+        assertThat(byExec.get("exec-old-install").getKind()).isEqualTo(SoftwareActionKind.INSTALL);
+        assertThat(byExec.get("exec-old-update").getKind()).isEqualTo(SoftwareActionKind.UPDATE);
+        assertThat(byExec.get("exec-auto").getKind()).isEqualTo(SoftwareActionKind.AUTO_UPDATE);
+
+        SoftwareActionQueryFilter updates = SoftwareActionQueryFilter.builder()
+                .kinds(List.of(SoftwareActionKind.UPDATE)).build();
+        assertThat(repository.findPage(TENANT, updates, null, "dispatchedAt", Sort.Direction.DESC, 0, 50))
+                .extracting(SoftwareActionSummary::getExecutionId)
+                .containsExactlyInAnyOrder("exec-old-update", "exec-update");
+
+        SoftwareActionQueryFilter autoUpdates = SoftwareActionQueryFilter.builder()
+                .kinds(List.of(SoftwareActionKind.AUTO_UPDATE)).build();
+        assertThat(repository.count(TENANT, autoUpdates, null)).isEqualTo(1);
+
+        assertThat(repository.facet(TENANT, null, null, "kind"))
+                .containsEntry("INSTALL", 1).containsEntry("UPDATE", 2).containsEntry("AUTO_UPDATE", 1);
+    }
+
+    private void kindRow(String executionId, SoftwareAction action, SoftwareActionKind kind) {
+        mongoTemplate.save(SoftwareActionResult.builder()
+                .id(executionId).tenantId(TENANT).executionId(executionId)
+                .action(action).kind(kind).packageManager(PackageManagerType.BREW).packageName("slack")
+                .status(SoftwareActionStatus.IN_PROGRESS).totalMachineCount(1)
+                .dispatchedAt(Instant.now()).build());
     }
 
     private Map<String, SoftwareActionSummary> allRows() {

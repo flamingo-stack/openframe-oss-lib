@@ -4,6 +4,7 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareActionSummary;
@@ -123,6 +124,12 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
             if (filter.getActions() != null && !filter.getActions().isEmpty()) {
                 match.append("action", new Document("$in", names(filter.getActions())));
             }
+            if (filter.getKinds() != null && !filter.getKinds().isEmpty()) {
+                List<String> kinds = names(filter.getKinds());
+                match.append("$or", List.of(
+                        new Document("kind", new Document("$in", kinds)),
+                        new Document("kind", null).append("action", new Document("$in", kinds))));
+            }
             if (filter.getEngines() != null && !filter.getEngines().isEmpty()) {
                 match.append("packageManager", new Document("$in", names(filter.getEngines())));
             }
@@ -193,6 +200,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .append("packageName", 1)
                 .append("version", 1)
                 .append("action", 1)
+                .append("kind", new Document("$ifNull", Arrays.asList("$kind", "$action")))
                 .append("initiatedBy", 1)
                 .append("bundleId", 1)
                 .append("scheduleId", 1)
@@ -235,6 +243,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .packageName(doc.getString("packageName"))
                 .version(doc.getString("version"))
                 .action(enumOrNull(doc.getString("action"), SoftwareAction.class))
+                .kind(enumOrNull(doc.getString("kind"), SoftwareActionKind.class))
                 .status(enumOrNull(doc.getString("status"), SoftwareActionStatus.class))
                 .totalMachineCount(intValue(doc.get("totalMachineCount")))
                 .respondedMachineCount(intValue(doc.get("respondedMachineCount")))
