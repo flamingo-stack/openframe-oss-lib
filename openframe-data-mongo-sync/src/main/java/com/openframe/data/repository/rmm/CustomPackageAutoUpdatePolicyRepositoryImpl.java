@@ -29,6 +29,18 @@ public class CustomPackageAutoUpdatePolicyRepositoryImpl implements CustomPackag
         bulk.execute();
     }
 
+    @Override
+    public long disableBySoftwareId(String tenantId, String softwareId, String actor) {
+        Query enabled = Query.query(Criteria.where("tenantId").is(tenantId)
+                .and("softwareId").is(softwareId)
+                .and("enabled").is(true));
+        Update disable = new Update()
+                .set("enabled", false)
+                .set("updatedBy", actor)
+                .set("updatedAt", Instant.now());
+        return mongoTemplate.updateMulti(enabled, disable, PackageAutoUpdatePolicy.class).getModifiedCount();
+    }
+
     private static Query key(PackageAutoUpdatePolicy template, String machineId) {
         return Query.query(Criteria.where("tenantId").is(template.getTenantId())
                 .and("machineId").is(machineId)

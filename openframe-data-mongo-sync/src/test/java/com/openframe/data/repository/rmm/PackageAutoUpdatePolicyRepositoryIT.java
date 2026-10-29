@@ -92,6 +92,26 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
                 .containsExactlyInAnyOrder("slack", "google-chrome");
     }
 
+    @Test
+    @DisplayName("disableBySoftwareId: turns off only that Software's enabled policies, rows stay")
+    void disableBySoftwareId_turnsOffItsPolicies() {
+        repository.enable(template("google-chrome", "title-7", WAIT, "admin@x"), List.of("m1", "m2"));
+        repository.enable(template("slack", "title-9", WAIT, "admin@x"), List.of("m1"));
+
+        long turnedOff = repository.disableBySoftwareId(TENANT, "title-7", "other@x");
+
+        assertThat(turnedOff).isEqualTo(2);
+        assertThat(repository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("title-7")))
+                .hasSize(2)
+                .allSatisfy(p -> {
+                    assertThat(p.isEnabled()).isFalse();
+                    assertThat(p.getUpdatedBy()).isEqualTo("other@x");
+                });
+        assertThat(repository.findByTenantIdAndMachineIdAndSoftwareIdIn(TENANT, "m1", List.of("title-9")))
+                .singleElement().satisfies(p -> assertThat(p.isEnabled()).isTrue());
+        assertThat(repository.disableBySoftwareId(TENANT, "title-7", "other@x")).isZero();   // idempotent
+    }
+
     private Map<String, PackageAutoUpdatePolicy> byMachine() {
         return repository.findAll().stream()
                 .collect(Collectors.toMap(PackageAutoUpdatePolicy::getMachineId, Function.identity()));
