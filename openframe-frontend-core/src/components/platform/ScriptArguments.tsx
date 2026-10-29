@@ -75,6 +75,8 @@ export interface ScriptArgumentsProps {
   className?: string;
   /** Label for the title input */
   titleLabel: string;
+  /** The title's scale, as `FieldWrapper`'s: 'large' (`text-h4`) beside fields titled at the body scale */
+  labelVariant?: 'default' | 'large';
 }
 
 /**
@@ -101,6 +103,7 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
   disabled = false,
   className,
   titleLabel,
+  labelVariant = 'default',
 }) => {
   const handleKeyChange = (id: string, newKey: string) => {
     if (!onArgumentsChange) return;
@@ -145,7 +148,11 @@ export const ScriptArguments: React.FC<ScriptArgumentsProps> = ({
           <div key={arg.id} className="flex w-full items-end gap-2">
             {/* Key input - with label only on first row */}
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              {isFirstRow(index) && <Label spacing="tight">{titleLabel}</Label>}
+              {isFirstRow(index) && (
+                <Label variant={labelVariant} spacing="tight">
+                  {titleLabel}
+                </Label>
+              )}
               <Input
                 value={arg.key}
                 onChange={e => handleKeyChange(arg.id, e.target.value)}
