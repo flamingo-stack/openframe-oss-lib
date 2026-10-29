@@ -30,11 +30,13 @@
     },
     "./style-sources": {
       "types": "./dist/build/style-sources.d.ts",
+      "import": "./dist/build/style-sources.cjs",
       "require": "./dist/build/style-sources.cjs",
       "default": "./dist/build/style-sources.cjs"
     },
     "./next-styles": {
       "types": "./dist/build/next-styles.d.ts",
+      "import": "./dist/build/next-styles.cjs",
       "require": "./dist/build/next-styles.cjs",
       "default": "./dist/build/next-styles.cjs"
     },
