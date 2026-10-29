@@ -18,9 +18,10 @@ export interface HeaderButtonProps extends React.ButtonHTMLAttributes<HTMLButton
    * - `cell` (default): a full-height cell of a top bar, as wide as the bar's
    *   `--top-nav-cell` (56px standalone).
    * - `compact`: for the grouped navigation sidebar's foot (`footerSlot`). In the
-   *   56px rail it is a row's cell — the rail's width, 44px tall, the rows' hover —
-   *   so the foot's icons sit like the tree's; from 140px of sidebar width, a 32px
-   *   rounded icon button beside the account row. Pass a 20px icon.
+   *   56px rail it is a row's cell — the rail's width, 44px tall, the rows' hover,
+   *   its glyph 8px in — so the foot's icons sit on the tree's icon line; from
+   *   140px of sidebar width, a 32px rounded icon button beside the account row.
+   *   Pass a 20px icon.
    */
   size?: 'cell' | 'compact';
   /** Additional class names */
@@ -43,9 +44,11 @@ export function HeaderButton({
       className={cn(
         compact
           ? cn(
-              // A row's cell of the sidebar rail, a 32px rounded icon button from 140px; its 20px glyph kept.
-              // `min-h-0` drops the bar cell's full-height floor, so the rail's height never stretches it.
-              'h-11 min-h-0 w-full rounded-md px-0 @[140px]/of-nav-sidebar:size-8 [&_svg]:h-5 [&_svg]:w-5',
+              // A row's cell of the sidebar rail, its glyph on the rows' icon line (8px in), a 32px rounded
+              // icon button from 140px; its 20px glyph kept. `min-h-0` drops the bar cell's full-height
+              // floor, so the rail's height never stretches it.
+              'h-11 min-h-0 w-full justify-start rounded-md pl-[var(--spacing-system-xsf)] pr-0 [&_svg]:h-5 [&_svg]:w-5',
+              '@[140px]/of-nav-sidebar:size-8 @[140px]/of-nav-sidebar:justify-center @[140px]/of-nav-sidebar:px-0',
               'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent',
             )
           : // Square cell width follows the TopNavigation size (56px small /

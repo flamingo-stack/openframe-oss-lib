@@ -279,7 +279,8 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
             {/* The rail's container, declared at the drawer's width, so the
                 grouped rows — which read it — lay out expanded. */}
             <div className="flex min-h-0 flex-1 flex-col @container/of-nav-sidebar">
-              <div className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-mf)] overflow-y-auto overflow-x-hidden overscroll-contain px-[var(--spacing-system-xsf)] py-[var(--spacing-system-mf)]">
+              {/* One inset all round the rows (8px), as in the sidebar. */}
+              <div className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-mf)] overflow-y-auto overflow-x-hidden overscroll-contain p-[var(--spacing-system-xsf)]">
                 {userCard}
 
                 {/* The top slot, the tree and the section as one block, spaced as in

@@ -48,6 +48,14 @@ describe('MobileBurgerMenu grouped', () => {
     expect(within(dialog).getByText('account row')).toBeInTheDocument();
   });
 
+  it('insets the rows by one padding all round, as the sidebar does', () => {
+    render(
+      <MobileBurgerMenu isOpen onClose={vi.fn()} config={{ variant: 'grouped', items, currentPath: '/devices' }} />,
+    );
+    expect(document.body.innerHTML).toMatch(/class="[^"]*overscroll-contain p-\[var\(--spacing-system-xsf\)\]"/);
+    expect(document.body.innerHTML).not.toContain('overscroll-contain px-');
+  });
+
   it('holds the section slot only while open, and through the closing slide', () => {
     vi.useFakeTimers();
     try {

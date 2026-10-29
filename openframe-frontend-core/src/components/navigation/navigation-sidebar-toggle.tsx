@@ -37,7 +37,7 @@ export function NavigationSidebarToggle({
           // rows' icon line in both widths — so the rail's cells are all one kind.
           // Otherwise the sidebar's row height (its entries are `h-14` too).
           compact
-            ? 'h-11 gap-0 overflow-hidden pl-2.5 pr-0 transition-[padding,background-color] duration-300 [transition-timing-function:cubic-bezier(0.2,0,0,1)] @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)] motion-reduce:transition-none'
+            ? 'h-11 gap-0 overflow-hidden pl-[var(--spacing-system-xsf)] pr-0 transition-[padding,background-color] duration-300 [transition-timing-function:cubic-bezier(0.2,0,0,1)] @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)] motion-reduce:transition-none'
             : 'h-14',
         )}
         title={minimized ? 'Hide Menu' : undefined}

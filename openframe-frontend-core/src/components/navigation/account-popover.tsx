@@ -153,12 +153,12 @@ export function AccountPopover({
           aria-label={collapsed ? `Account: ${name}` : undefined}
           title={collapsed ? name : undefined}
           // The shape follows the sidebar's width (the `of-nav-sidebar`
-          // container), as its rows do: the avatar holds its place — centred in
-          // the rail, 8px in once expanded — and the name fades as the width
+          // container), as its rows do: the avatar holds its place — 8px in at
+          // both widths, on the rows' icon line — and the name fades as the width
           // crosses 140px. `collapsed` flips on the click, mid-way through that.
           className={cn(
             'group/account flex h-11 w-full min-w-0 items-center gap-[var(--spacing-system-xsf)] overflow-hidden rounded-md text-left',
-            'pl-1.5 pr-0 @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)]',
+            'pl-[var(--spacing-system-xsf)] pr-0 @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]',
             'transition-[padding,background-color] duration-200 hover:bg-ods-bg-hover data-[state=open]:bg-ods-bg-hover motion-reduce:transition-none',
             disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',
             className,

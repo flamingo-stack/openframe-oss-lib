@@ -570,7 +570,9 @@ export function NavigationSidebar({
         <div
           className={cn(
             'flex flex-1 flex-col justify-between overflow-y-auto',
-            grouped ? 'px-[var(--spacing-system-xsf)] py-[var(--spacing-system-mf)]' : 'py-4',
+            // Grouped: one inset all round the rows (8px), so the first row sits as far under the
+            // header's border as the rows sit from the sidebar's sides.
+            grouped ? 'p-[var(--spacing-system-xsf)]' : 'py-4',
           )}
         >
           {/* The top slot, the primary nav and the section are ONE

@@ -66,6 +66,12 @@ export function useOpenNavigationGroup(activeGroupId: string | null) {
  */
 const ACTIVE_PILL = 'bg-ods-accent-secondary text-ods-accent';
 
+/**
+ * An open group's parent row, flush inside its card: the card's 6px less its 1px border,
+ * so the hover and the focus ring run parallel to the border instead of a rounder curve.
+ */
+const CARD_INNER_RADIUS = 'rounded-[calc(var(--radius)-3px)] after:rounded-[calc(var(--radius)-3px)]';
+
 /** The motion curve of the grouped sidebar: quick off the mark, a long soft landing. */
 const EASE = '[transition-timing-function:cubic-bezier(0.2,0,0,1)]';
 
@@ -87,14 +93,15 @@ const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-inset f
 
 /**
  * The 44px row geometry shared by a top-level entry, a group's parent and an
- * action row. The icon keeps its place while the rail widens or narrows: 10px
- * in (centred in the rail's 40px cell), 8px once expanded — a 2px glide. A row
- * that re-centred its icon (`justify-center` in the rail) moved it ~50px in the
- * frame the width crossed 140px, mid-toggle.
+ * action row. The icon never moves while the rail widens or narrows: 8px in at
+ * both widths (2px left of the centre of the rail's 40px cell); only the right
+ * inset comes and goes. A row that re-centred its icon (`justify-center` in the
+ * rail) moved it ~50px in the frame the width crossed 140px, mid-toggle, and one
+ * that centred it with a wider inset nudged every icon sideways on each toggle.
  */
 const ROW_CLASSES = cn(
   'relative isolate flex h-11 w-full items-center overflow-hidden rounded-md text-left',
-  'pl-2.5 pr-0 @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)]',
+  'pl-[var(--spacing-system-xsf)] pr-0 @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]',
   'transition-[padding] duration-300 motion-reduce:transition-none',
   EASE,
   FOCUS_RING,
@@ -242,12 +249,8 @@ function GroupedChildRow({
   const name = accessibleName(item);
   const lit = isActive && !disabled;
   const className = cn(
+    // The icon column flush, under the parent's icon at both widths.
     'group/nav-child relative flex h-11 w-full items-stretch gap-[var(--spacing-system-xxs)] rounded-md text-left',
-    // The icon column under the parent's icon: 2px in while the card is the
-    // rail's (centred in its 24px), flush once expanded — as the parent glides.
-    'pl-0.5 @[140px]/of-nav-sidebar:pl-0',
-    'transition-[padding] duration-300 motion-reduce:transition-none',
-    EASE,
     FOCUS_RING,
     disabled && 'cursor-not-allowed opacity-50',
   );
@@ -357,6 +360,7 @@ function GroupedGroup({
           // not one of its children is the current page.
           !disabled && (isOpen ? 'text-ods-accent' : 'text-ods-text-primary'),
           !disabled && 'hover:after:opacity-100',
+          isOpen && CARD_INNER_RADIUS,
           disabled && 'cursor-not-allowed text-ods-text-secondary opacity-50',
         )}
       >
@@ -535,7 +539,7 @@ export function NavigationSidebarActionRow({
 export function NavigationSidebarGroupedSkeleton() {
   return (
     <div
-      className="flex h-11 w-full items-center overflow-hidden pl-2.5 @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)]"
+      className="flex h-11 w-full items-center overflow-hidden pl-[var(--spacing-system-xsf)] @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]"
       aria-hidden="true"
     >
       <UnifiedSkeleton className="size-5 shrink-0 rounded" />
