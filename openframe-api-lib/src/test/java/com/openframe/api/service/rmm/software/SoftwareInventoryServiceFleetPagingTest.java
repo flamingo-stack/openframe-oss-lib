@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
@@ -36,6 +37,7 @@ import java.util.Map;
 
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.title;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -58,13 +60,14 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
+    @Mock private SoftwareAutoUpdateService autoUpdateService;
 
     private SoftwareInventoryService service;
 
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader);
+                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }
@@ -91,6 +94,14 @@ class SoftwareInventoryServiceFleetPagingTest {
         assertThat(result.hasNext()).isTrue();
         assertThat(result.hasPrevious()).isTrue();
         verifyNoInteractions(deviceCountEnricher);
+        verify(autoUpdateService).applyToSoftware(result.items());   // AUTO-UPDATE for the page only
+    }
+
+    @Test
+    void turnOffAutoUpdate_unknownSoftware_notFound() {
+        // execution / verifications
+        assertThatThrownBy(() -> service.turnOffAutoUpdate("not-a-title", "admin@x"))
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test

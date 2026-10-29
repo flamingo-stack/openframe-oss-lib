@@ -3,6 +3,7 @@
 import React from 'react';
 import { cn } from '../../../utils/cn';
 import { Button } from './button';
+import { buttonIconSlotClass } from './button-styles';
 
 // Two independent interactive halves, each the lib's `Button` (a `<button>`, or a link with `href`) attached to the
 // other (`attach="start"` / `"end"`): one surface with a seam. For a single-target variant (decorative trailing icon),
@@ -148,9 +149,9 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
         type={type}
         ariaLabel={ariaLabel}
       >
-        {leftIcon && <span className="inline-flex items-center">{leftIcon}</span>}
+        {leftIcon && <span className={buttonIconSlotClass(variant, disabled || mainDisabled)}>{leftIcon}</span>}
         <span>{children}</span>
-        {rightIcon && <span className="inline-flex items-center">{rightIcon}</span>}
+        {rightIcon && <span className={buttonIconSlotClass(variant, disabled || mainDisabled)}>{rightIcon}</span>}
       </Half>
       <Half
         variant={variant}

@@ -135,6 +135,8 @@ type SoftwareBundlePackage {
     packageName: String!
     brewPackageType: BrewPackageType
     version: String
+    "The Software (Fleet title) this package updates; null when it was picked from the package search."
+    softwareId: ID
 }
 
 enum SoftwareBundleStatus {

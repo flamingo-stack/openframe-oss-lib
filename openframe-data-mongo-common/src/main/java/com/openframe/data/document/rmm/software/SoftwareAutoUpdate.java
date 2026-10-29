@@ -14,4 +14,9 @@ public class SoftwareAutoUpdate {
     private boolean enabled;
 
     private PackageUpdateSettings settings;
+
+    // no settings of its own = "Same settings for auto-update"
+    public PackageUpdateSettings settingsOr(PackageUpdateSettings updateSettings) {
+        return settings != null ? settings : updateSettings;
+    }
 }
