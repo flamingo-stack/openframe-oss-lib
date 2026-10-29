@@ -12,6 +12,12 @@ export interface MingoQuickActionWallProps {
   onQuickActionHoverEnd?: () => void;
   /** A built-in agent (`'fae'`/`'mingo'`) caps the wall at 2 rows. Default `'mingo'`. */
   agentSlug?: string;
+  /**
+   * The actions are still being read: the wall draws its chips' loading form at its full
+   * row count, so a host that holds its layout around the wall (a composer under it, a
+   * greeting centred above) does not move when the actions land.
+   */
+  loading?: boolean;
   className?: string;
 }
 
@@ -28,9 +34,10 @@ export function MingoQuickActionWall({
   onQuickActionHover,
   onQuickActionHoverEnd,
   agentSlug = 'mingo',
+  loading = false,
   className,
 }: MingoQuickActionWallProps) {
-  if (quickActions.length === 0) return null;
+  if (quickActions.length === 0 && !loading) return null;
   return (
     <QuickActionWall
       chips={quickActions.map(action => ({
@@ -43,6 +50,7 @@ export function MingoQuickActionWall({
         onHoverEnd: () => onQuickActionHoverEnd?.(),
       }))}
       agentSlug={agentSlug}
+      loading={loading}
       rows={4}
       pauseOnHover
       dragScroll

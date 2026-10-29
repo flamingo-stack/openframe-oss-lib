@@ -33,6 +33,13 @@ describe('MingoQuickActionWall', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("holds the wall's place while the actions are read: its chips' loading form, no chip to press", () => {
+    const { container } = render(<MingoQuickActionWall quickActions={[]} loading />);
+    expect(container.innerHTML).toContain('data-loading-item');
+    expect(container.innerHTML).toContain('max-h-44');
+    expect(screen.queryAllByRole('button', { name: 'Patching' })).toHaveLength(0);
+  });
+
   it('is the wall the welcome draws', () => {
     const { container: welcome } = render(<MingoWelcome quickActions={ACTIONS} hasExistingChats={false} />);
     const { container: wall } = render(<MingoQuickActionWall quickActions={ACTIONS} />);
