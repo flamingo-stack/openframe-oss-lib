@@ -30,6 +30,7 @@ import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
+import { InlineAppLinkChip, isInAppPath } from './inline-app-link-chip';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
@@ -463,6 +464,15 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // flamingo hero-demo with mock content), fall back to a plain
           // `<a href>`. No cross-origin sniffing here — the OSS-lib does
           // not own routing decisions; the host does.
+          // A link to a screen of the app (`/devices/new`) is drawn as an inline box, the skin of the host's entity
+          // mentions, still routed through the host's `NavLinkAnchor` (`inline-app-link-chip.tsx`).
+          if (typeof href === 'string' && isInAppPath(href)) {
+            return (
+              <InlineAppLinkChip href={href} anchor={NavLinkAnchor}>
+                {children}
+              </InlineAppLinkChip>
+            );
+          }
           if (typeof href === 'string' && NavLinkAnchor && !href.startsWith('#')) {
             return (
               <NavLinkAnchor href={href} className={linkClassName} {...rest}>
