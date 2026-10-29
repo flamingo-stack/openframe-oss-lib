@@ -50,6 +50,18 @@ pub const ALLOW_DOWNGRADE: bool = false;
 pub const UPDATER_TRANSCRIPTS_KEPT: usize = 5;
 /// Minimum age before a temp update leftover is swept (a live updater's files are younger).
 pub const TEMP_LEFTOVER_MIN_AGE_SECS: u64 = 3600;
+/// How long a downloaded client binary gets to print its version before the update goes ahead unchecked.
+pub const STAGED_VERSION_CHECK_TIMEOUT_SECS: u64 = 30;
+
+// Saved client update (legacy broadcast path): retried until it applies
+/// Wait after each attempt at a saved client update; the last one repeats.
+pub const SAVED_UPDATE_RETRY_DELAYS_SECS: [u64; 4] = [15 * 60, 60 * 60, 4 * 60 * 60, 12 * 60 * 60];
+/// A saved client update that still fails this long after it arrived is dropped.
+pub const SAVED_UPDATE_MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
+/// How often the saved client update is checked, and busy tools with it.
+pub const SAVED_UPDATE_CHECK_INTERVAL_SECS: u64 = 120;
+/// How long a saved client update may park new tool operations while waiting for busy ones.
+pub const SAVED_UPDATE_BUSY_HOLD_SECS: u64 = 20 * 60;
 
 // NATS message settings
 pub const CONSUMER_ACK_WAIT_SECS: u64 = 120;

@@ -211,6 +211,7 @@ impl CommandHandler for ClientUpdateHandler {
         command: Self::Command,
         guard: UpdateGuard,
     ) -> Outcome {
+        self.service.drop_saved_update().await;
         match self.service.apply(command, guard).await {
             Ok(UpdateLaunch::Launched) => Outcome::Restarting,
             Ok(UpdateLaunch::Skipped) => Outcome::Done,
