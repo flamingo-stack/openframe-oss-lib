@@ -134,6 +134,22 @@ class DeliveryPropertiesTest {
     }
 
     @Test
+    void resolve_typeOverridesMinAgentVersion_overrideWinsAndTheDefaultIsEveryAgent() {
+        // setup
+        PolicyOverride uninstall = new PolicyOverride();
+        uninstall.setMinAgentVersion("1.5.100");
+        properties.setTypes(Map.of(DeliveryType.CLIENT_UNINSTALL, uninstall));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+        Policy other = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(resolved.getMinAgentVersion()).isEqualTo("1.5.100");
+        assertThat(other.getMinAgentVersion()).isEmpty();
+    }
+
+    @Test
     void fastTypes_noTypeAskingForTheFastPass_empty() {
         // setup
         properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));

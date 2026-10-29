@@ -57,10 +57,10 @@ public class NotificationEmitter {
         Audience audience = spec.audience(typed);
         String title = spec.composeTitle(typed);
         String description = spec.composeDescription(typed);
-        NotificationSeverity severity = spec.getSeverity();
+        NotificationSeverity severity = spec.severity(typed);
         NotificationType specType = spec.getType();
         String applePushCategory = spec.getApplePushCategory().orElse(null);
-        NotificationCategory category = spec.getCategory();
+        NotificationCategory category = spec.category(typed);
         NotificationSettingGroup settingsGroup = spec.getSettingsGroup().orElse(null);
         NotificationEntityRef entity = spec.entity(typed).orElse(null);
         return NotificationCommand.builder()

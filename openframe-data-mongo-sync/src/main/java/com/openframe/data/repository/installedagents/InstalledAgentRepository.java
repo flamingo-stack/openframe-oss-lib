@@ -4,6 +4,7 @@ import com.openframe.data.document.installedagents.InstalledAgent;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,5 +16,7 @@ public interface InstalledAgentRepository extends MongoRepository<InstalledAgent
     List<InstalledAgent> findByMachineIdIn(List<String> machineIds);
 
     Optional<InstalledAgent> findByMachineIdAndAgentType(String machineId, String agentType);
+
+    List<InstalledAgent> findByMachineIdInAndAgentType(Collection<String> machineIds, String agentType);
 
 }

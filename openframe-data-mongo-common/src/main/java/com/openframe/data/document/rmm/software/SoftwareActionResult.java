@@ -26,6 +26,7 @@ public class SoftwareActionResult implements TenantScoped {
     private String executionId;
 
     private SoftwareAction action;
+    private SoftwareActionKind kind;
     private PackageManagerType packageManager;
     private String packageName;
     private String version;
