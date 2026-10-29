@@ -1,3 +1,5 @@
+import { type CardReference, extractCardReferences } from '../../../chat-protocol/card-marker';
+import { canonicalContentRefType } from '../../../utils/list-url';
 import { groupSourcesByTable } from '../../../utils/source-grouping';
 import type { ChatSource } from '../types/message.types';
 
@@ -53,6 +55,14 @@ function withoutCode(content: string): string {
 export function splitCitedSources(sources: ChatSource[] | undefined, content: string): CitedSources {
   if (!sources || sources.length === 0) return { cited: [], uncited: [] };
 
+  // An answer with cards cites what its cards show. The reader sees the cards and not the `[N]` numbers (the
+  // renderer hides those beside cards, `remarkStripCitations`), and the numbers a model writes can name another
+  // record than the card beside them: guide cards cited as `[1]`, a docs page (CU-17tkuw61kfy). So the strip is
+  // built from the cards, and its count is the cards'.
+  // An answer whose cards show no retrieved record (a card from an earlier turn) falls back to its numbers.
+  const byCards = splitByCards(sources, extractCardReferences(withoutCode(content)));
+  if (byCards.cited.length > 0) return byCards;
+
   const firstMentionAt = new Map<number, number>();
   for (const match of withoutCode(content).matchAll(CITATION)) {
     const index = Number.parseInt(match[1], 10);
@@ -63,5 +73,46 @@ export function splitCitedSources(sources: ChatSource[] | undefined, content: st
     .filter(source => firstMentionAt.has(source.index))
     .sort((a, b) => (firstMentionAt.get(a.index) ?? 0) - (firstMentionAt.get(b.index) ?? 0));
   const uncited = sources.filter(source => !firstMentionAt.has(source.index));
+  return { cited: groupSourcesByTable(cited), uncited: groupSourcesByTable(uncited) };
+}
+
+/** One record of a source, as a flat source: a flat source itself, or one row of a grouped source (keeping its own
+ *  citation number when it has one, else the group's). */
+function recordsOf(source: ChatSource): ChatSource[] {
+  if (!source.items || source.items.length === 0) return [source];
+  return source.items.map(item => ({
+    index: item.index ?? source.index,
+    id: item.id,
+    name: item.name,
+    path: item.path ?? '',
+    documentType: item.documentType,
+    ...(item.externalUrl ? { externalUrl: item.externalUrl } : {}),
+    targetPlatform: item.targetPlatform ?? null,
+    ...(source.sourceRepo ? { sourceRepo: source.sourceRepo } : {}),
+  }));
+}
+
+/** The card key of a record, in the canonical vocabulary the card markers use. A document is keyed by its id, or
+ *  by its path when it carries no id (doc rows are keyed by path). */
+function recordKey(record: ChatSource): string | null {
+  const id = record.id || record.path;
+  return record.documentType && id ? `${canonicalContentRefType(record.documentType)}:${id}` : null;
+}
+
+/** Cited = the records the answer's cards show, in card order; uncited = every other record. Both halves are then
+ *  grouped by table, so a table's chip counts exactly its carded records. */
+function splitByCards(sources: ChatSource[], cards: CardReference[]): CitedSources {
+  const records = sources.flatMap(recordsOf);
+  const byKey = new Map<string, ChatSource>();
+  for (const record of records) {
+    const key = recordKey(record);
+    if (key && !byKey.has(key)) byKey.set(key, record);
+  }
+  const cited: ChatSource[] = [];
+  for (const card of cards) {
+    const record = byKey.get(`${canonicalContentRefType(card.type)}:${card.id}`);
+    if (record && !cited.includes(record)) cited.push(record);
+  }
+  const uncited = records.filter(record => !cited.includes(record));
   return { cited: groupSourcesByTable(cited), uncited: groupSourcesByTable(uncited) };
 }
