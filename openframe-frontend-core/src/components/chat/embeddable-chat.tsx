@@ -707,16 +707,17 @@ function dispatchSlashCommandAction(
  *  2. Ask: small `MessageSquare` icon-button on the right → fires
  *     `onDiscuss(ref)` to drill into THIS row via `entityIdFilter`.
  */
-/** How many chips the strip's loading form draws: the count real answers' strips showed (measured). */
+/** How many chips the strip's loading form draws: the count real answers' strips showed (measured). On a phone,
+ *  where a strip holds one chip a row, it draws one. */
 const SOURCE_CHIP_SKELETON_COUNT = 2;
 
 /**
  * A source chip's loading form, built like the chip (`wrapChip` around `chipBody`): the chip's frame, its icon,
  * its title as a bar one text line tall (so the chip is the loaded chip's height), and the Ask slot beside it.
  */
-function SourceChipSkeleton() {
+function SourceChipSkeleton({ className }: { className?: string }) {
   return (
-    <span aria-hidden className="pointer-events-none inline-flex items-center">
+    <span aria-hidden className={cn('pointer-events-none inline-flex shrink-0 items-center', className)}>
       <span className={chatChipClass({ tone: 'secondary' })}>
         <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3.5 w-3.5 rounded-sm')} />
         <span className={cn(SKELETON_SURFACE_CLASS, 'w-28 rounded-sm')}>{'\u00a0'}</span>
@@ -944,9 +945,11 @@ function SourceChips({
         <span className="uppercase text-ods-text-muted text-h6">
           <TextHold>Sources</TextHold>
         </span>
-        <div className="flex flex-wrap gap-1.5">
+        {/* One row at every width: a chip that does not fit is cut, never wrapped (a strip's chips fit one row in
+            the answers measured, and a wrapped skeleton shrinks when the answer ends). */}
+        <div className="flex flex-nowrap gap-1.5 overflow-hidden">
           {Array.from({ length: SOURCE_CHIP_SKELETON_COUNT }, (_, i) => (
-            <SourceChipSkeleton key={i} />
+            <SourceChipSkeleton key={i} className={i > 0 ? 'max-md:hidden' : undefined} />
           ))}
         </div>
       </div>
