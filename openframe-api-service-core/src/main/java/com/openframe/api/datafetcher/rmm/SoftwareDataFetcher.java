@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
@@ -16,9 +17,13 @@ import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.rmm.software.SoftwareInventoryService;
+import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 
 @DgsComponent
@@ -102,5 +107,15 @@ public class SoftwareDataFetcher {
     public SoftwareOnDeviceFilters softwareDeviceFilters(@InputArgument String softwareId,
                                                          @InputArgument Object filter, @InputArgument String search) {
         return softwareInventoryService.getSoftwareDeviceFilters(softwareId, search);
+    }
+
+    @DgsMutation
+    public SoftwareResponse turnOffSoftwareAutoUpdate(@InputArgument String softwareId) {
+        return softwareInventoryService.turnOffAutoUpdate(softwareId, getCurrentUserId());
+    }
+
+    private String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 }

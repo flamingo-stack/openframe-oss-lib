@@ -515,6 +515,9 @@ input SoftwarePackageInput {
     "Brew-only sub-type (CASK/FORMULA). Required for brew (enforced server-side), ignored by managers that do not distinguish."
     brewPackageType: BrewPackageType
     version: String
+    """The Software (Fleet title) this package updates, when the update starts from a software page. Links an
+    auto-update this package turns on to that Software's autoUpdate and turnOffSoftwareAutoUpdate."""
+    softwareId: ID
 }
 
 """The dispatch outcome for one package: its shared executionId across the targeted devices."""

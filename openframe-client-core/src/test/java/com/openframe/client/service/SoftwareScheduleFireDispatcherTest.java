@@ -19,6 +19,7 @@ import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdate;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
@@ -29,6 +30,7 @@ import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
+import com.openframe.data.service.rmm.software.PackageAutoUpdatePolicyService;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
@@ -71,9 +73,11 @@ class SoftwareScheduleFireDispatcherTest {
     private final PackageUpdateEligibilityService packageUpdateEligibility = mock(PackageUpdateEligibilityService.class);
     private final PackageUpdateDispatchService packageUpdateDispatchService = mock(PackageUpdateDispatchService.class);
 
+    private final PackageAutoUpdatePolicyService autoUpdatePolicyService = mock(PackageAutoUpdatePolicyService.class);
+
     private final SoftwareScheduleFireDispatcher dispatcher = new SoftwareScheduleFireDispatcher(
             scriptRepository, registry, scriptExecutionRepository, softwareNatsPublisher, retryStore, platformResolver,
-            packageUpdateEligibility, packageUpdateDispatchService);
+            packageUpdateEligibility, packageUpdateDispatchService, autoUpdatePolicyService);
 
     @Test
     @DisplayName("fires a brew install to its macOS targets: QUEUED rows, one software-pipe message per machine, each armed for SOFTWARE-channel retry")
@@ -151,13 +155,16 @@ class SoftwareScheduleFireDispatcherTest {
                 .thenReturn(Set.of("m-1"));
         PackageUpdateSettings settings = PackageUpdateSettings.builder()
                 .mode(PackageUpdateMode.FORCE).countdownSeconds(120).build();
+        SoftwareAutoUpdate autoUpdate = SoftwareAutoUpdate.builder().enabled(true).build();
 
         SoftwareSchedule schedule = SoftwareSchedule.builder()
                 .id("ss-1").tenantId(TENANT).createdBy("user-1").action(SoftwareAction.UPDATE)
                 .packages(List.of(SoftwareSchedulePackage.builder()
                         .packageManager(PackageManagerType.BREW).packageName("slack").brewPackageType(BrewPackageType.CASK)
+                        .softwareId("title-7")
                         .build()))
                 .updateSettings(settings)
+                .autoUpdate(autoUpdate)
                 .build();
 
         dispatcher.dispatch(schedule, List.of("m-1", "m-2"), Instant.now());
@@ -165,6 +172,11 @@ class SoftwareScheduleFireDispatcherTest {
         String executionId = SoftwareExecutionId.forSchedule("ss-1", PackageManagerType.BREW, "slack");
         ArgumentCaptor<RunningExecutionRows> order = ArgumentCaptor.forClass(RunningExecutionRows.class);
         verify(packageUpdateDispatchService).dispatchAdminUpdate(order.capture(), eq(BrewPackageType.CASK), eq(settings));
+        // auto-update only where the order goes: the script path cannot run it
+        ArgumentCaptor<RunningExecutionRows> autoUpdateRows = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(autoUpdatePolicyService).turnOn(autoUpdateRows.capture(), eq(BrewPackageType.CASK), eq("title-7"),
+                eq(autoUpdate), eq(settings));
+        assertThat(autoUpdateRows.getValue().getMachineIds()).containsExactly("m-1");
         assertThat(order.getValue().getExecutionId()).isEqualTo(executionId);
         assertThat(order.getValue().getMachineIds()).containsExactly("m-1");
         assertThat(order.getValue().getScriptId()).isEqualTo("brew-update-id");
