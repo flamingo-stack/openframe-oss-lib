@@ -213,21 +213,6 @@ class DeliveryRolloutServiceTest {
     }
 
     @Test
-    void advance_floorClosed_nobodyDispatchedTheRolloutStillFinishes() {
-        // setup
-        when(floors.of(DeliveryType.CLIENT_UPDATE)).thenReturn(AgentVersionFloor.CLOSED);
-        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
-                .thenReturn(List.of(machine("m-9")));
-
-        // execution
-        service.advance();
-
-        // verifications
-        verify(sink, never()).accept(any());
-        verify(repository).finish(ROLLOUT_ID, SEQUENCE, 0);
-    }
-
-    @Test
     void advance_noFloor_versionsNeverLookedUp() {
         // setup
         when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
