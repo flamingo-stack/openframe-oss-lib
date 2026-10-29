@@ -2,6 +2,7 @@
 
 import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
@@ -30,6 +31,7 @@ import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
+import { InlineAppLinkChip } from './inline-app-link-chip';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
@@ -41,6 +43,7 @@ import { TicketEventMessage } from './ticket-event-message';
 import { ToolExecutionDisplay } from './tool-execution-display';
 import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
+import { computeIsNewTab } from './utils/nav-anchor-props';
 
 /** Inline `@marker:id` mention token in the message body (sibling of the
  *  `[card://]` grammar) — used to filter out items rendered inline from the
@@ -406,6 +409,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const renderingPlanRef = useRef(renderingPlan);
     renderingPlanRef.current = renderingPlan;
 
+    // The runtime decides whether a link stays in this app (`computeIsNewTab`); null outside a chat runtime, where
+    // every link stays a plain link.
+    const chatRuntime = useChatRuntime();
     const cardComponentOverrides = useMemo(() => {
       if (!hasMarkerSupport && !hasMentionSupport) return undefined;
       return {
@@ -463,6 +469,23 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // flamingo hero-demo with mock content), fall back to a plain
           // `<a href>`. No cross-origin sniffing here — the OSS-lib does
           // not own routing decisions; the host does.
+          // A link that stays in this app is drawn as an inline box, the skin of the host's entity mentions, still
+          // routed through the host's `NavLinkAnchor`. Whether it stays is the runtime's ONE new-tab rule
+          // (`computeIsNewTab`, the decision the chat's cards and source chips make): a link it keeps in this window
+          // is a place in the app; one it sends to a new tab (another site, a hub page from an embedded chat, a
+          // `mailto:`) stays a plain link.
+          if (
+            typeof href === 'string' &&
+            !href.startsWith('#') &&
+            chatRuntime &&
+            !computeIsNewTab(chatRuntime, href, null)
+          ) {
+            return (
+              <InlineAppLinkChip href={href} anchor={NavLinkAnchor}>
+                {children}
+              </InlineAppLinkChip>
+            );
+          }
           if (typeof href === 'string' && NavLinkAnchor && !href.startsWith('#')) {
             return (
               <NavLinkAnchor href={href} className={linkClassName} {...rest}>
@@ -481,7 +504,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       // streaming turn (booleans + host-stable fn/component identities, both
       // enforced by this file's `memo` comparator). The rendering plan is
       // read through a ref above precisely so it does NOT appear here.
-    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor]);
+    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor, chatRuntime]);
 
     /**
      * Body of a markdown-bearing segment (`text` / `guide`).

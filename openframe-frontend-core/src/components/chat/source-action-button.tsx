@@ -20,7 +20,10 @@
 
 import { MessageSquare, FileText } from 'lucide-react';
 import type React from 'react';
+import { cn } from '../../utils/cn';
 import { Button } from '../ui/button';
+import { TextHold } from '../ui/layout-hold';
+import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 import type { ChatRef } from './chat-ref.types';
 
 export type SourceActionDensity = 'inline' | 'card' | 'list-row';
@@ -41,7 +44,13 @@ export interface SourceActionButtonProps {
    *  the icon only — the label is used for aria-label / title even when
    *  it doesn't render visibly. */
   label?: string;
+  /** Draw the action's loading form: the same box, its icon and label as skeleton bars. */
+  loading?: boolean;
 }
+
+/** A chat card's footer action (Ask, Display, Watch video): one look for every action in that row. */
+export const CARD_FOOTER_ACTION_CLASS =
+  '!h-auto !p-0 text-h6 font-normal text-ods-text-secondary opacity-60 hover:bg-transparent hover:opacity-100 hover:text-ods-text-primary';
 
 // Per-density styling lives in one map so the three call sites share the
 // SAME hover/opacity/transition rules. Adding a fourth density means
@@ -66,8 +75,7 @@ const DENSITY_STYLES: Record<
     size: 'small',
     showLabel: true,
     iconSize: '!h-3 !w-3',
-    className:
-      '!h-auto !p-0 text-h6 font-normal text-ods-text-secondary opacity-60 hover:bg-transparent hover:opacity-100 hover:text-ods-text-primary',
+    className: CARD_FOOTER_ACTION_CLASS,
   },
   'list-row': {
     size: 'small',
@@ -78,14 +86,57 @@ const DENSITY_STYLES: Record<
   },
 };
 
+/**
+ * A footer action's loading form: the real button, inert and unread, with its icon and label drawn as skeleton
+ * bars, so the box is exactly the loaded action's (same paddings, same line height, same label width).
+ */
+export function FooterActionSkeleton({
+  label,
+  className,
+  showLabel = true,
+  size = 'small',
+}: {
+  label: string;
+  className: string;
+  showLabel?: boolean;
+  size?: 'small' | 'icon';
+}): React.ReactElement {
+  const icon = <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3 w-3 rounded-sm')} />;
+  return (
+    <span aria-hidden inert className="contents">
+      <Button
+        variant="transparent"
+        size={size}
+        tabIndex={-1}
+        leftIcon={showLabel ? icon : undefined}
+        className={cn(className, 'pointer-events-none')}
+      >
+        {showLabel ? <TextHold>{label}</TextHold> : icon}
+      </Button>
+    </span>
+  );
+}
+
 export function SourceActionButton({
   chatRef,
   onDiscuss,
   density = 'inline',
   className,
   label = 'Ask',
+  loading,
 }: SourceActionButtonProps): React.ReactElement | null {
   if (!chatRef || !onDiscuss) return null;
+  if (loading) {
+    const s = DENSITY_STYLES[density];
+    return (
+      <FooterActionSkeleton
+        label={label}
+        size={s.size}
+        showLabel={s.showLabel}
+        className={`${s.className}${className ? ` ${className}` : ''}`}
+      />
+    );
+  }
 
   // Label-driven icon. "Display" reads as a verbatim-content action so a
   // FileText icon reinforces "show me the body" semantics; the default
