@@ -44,11 +44,12 @@ export function HeaderMingoButton({
       aria-label={showClose ? 'Close Mingo AI' : 'Mingo AI'}
       aria-pressed={isActive}
       className={cn(
-        // Fixed 140px cell from md, so the header's right-hand cluster has a
-        // known width and a loading placeholder can reserve it exactly
-        // (`AppHeaderProps.loadingActionCells` → `'wide'`). Content-width below
-        // md, and in `iconOnly` mode, where the control is a square affordance.
-        !iconOnly && 'md:w-[140px]',
+        // `iconOnly` (below md): a square cell, the bar's `--top-nav-cell` like every
+        // other one (`HeaderButton`), so its divider lines up with what sits under the
+        // bar. Otherwise the fixed 140px cell from md, so the header's right-hand
+        // cluster has a known width and a loading placeholder can reserve it exactly
+        // (`AppHeaderProps.loadingActionCells` → `'wide'`).
+        iconOnly ? 'w-[var(--top-nav-cell,3.5rem)]' : 'md:w-[140px]',
         className,
       )}
       {...props}

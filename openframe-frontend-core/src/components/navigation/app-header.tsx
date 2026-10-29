@@ -439,7 +439,7 @@ function HeaderCellSkeleton({ className }: { className?: string }) {
 /**
  * Wide cell placeholder — mirrors `HeaderMingoButton` at both widths, which are
  * two different shapes: the live button gets `iconOnly={!isMdUp}`, so below md it
- * drops its wordmark and collapses to the same 48px square as any other cell, and
+ * drops its wordmark and collapses to the same square as any other cell, and
  * from md it is the fixed 140px labelled cell. Reserving 140px-worth of icon,
  * label, gap and padding on a phone would make the placeholder cluster ~70px
  * wider than the header it hands off to.
