@@ -43,7 +43,13 @@ export type { AiPromptCardData, AiPromptCardProps } from './ai-prompt-card';
 export { BlockCard, type BlockCardProps } from './block-card';
 export { ChatTicketItem, type ChatTicketItemData, type ChatTicketItemProps } from './chat-ticket-item';
 export { ChatVideoEntityCard, type ChatVideoEntityCardProps } from './chat-video-entity-card';
-export { ChatCollapsibleVideo, HIDE_VIDEO_LABEL, useChatVideoToggle, WATCH_VIDEO_LABEL } from './chat-video-toggle';
+export {
+  CHAT_CARD_DISCLOSURES,
+  ChatCardDisclosureButton,
+  ChatCardDisclosureRow,
+  type ChatCardDisclosureVariant,
+  useChatCardDisclosure,
+} from './chat-card-disclosure';
 export {
   ProductReleaseCard,
   type ProductReleaseCardProps,

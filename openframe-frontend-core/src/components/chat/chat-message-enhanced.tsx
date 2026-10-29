@@ -1,6 +1,7 @@
 'use client';
 
 import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
+import { isAppScreenLink } from '../../chat-protocol/app-screen-link';
 import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
@@ -30,7 +31,7 @@ import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
-import { InlineAppLinkChip, isInAppPath } from './inline-app-link-chip';
+import { InlineAppLinkChip } from './inline-app-link-chip';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
@@ -464,9 +465,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // flamingo hero-demo with mock content), fall back to a plain
           // `<a href>`. No cross-origin sniffing here — the OSS-lib does
           // not own routing decisions; the host does.
-          // A link to a screen of the app (`/devices/new`) is drawn as an inline box, the skin of the host's entity
-          // mentions, still routed through the host's `NavLinkAnchor` (`inline-app-link-chip.tsx`).
-          if (typeof href === 'string' && isInAppPath(href)) {
+          // A link the answer MARKED as a screen of the app (`[label](/path "app-screen")`, `isAppScreenLink`) is
+          // drawn as an inline box, the skin of the host's entity mentions, still routed through the host's
+          // `NavLinkAnchor`. Nothing is inferred from the path: an unmarked link stays a plain link.
+          if (typeof href === 'string' && isAppScreenLink(href, rest.title)) {
             return (
               <InlineAppLinkChip href={href} anchor={NavLinkAnchor}>
                 {children}

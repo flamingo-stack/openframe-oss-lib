@@ -707,6 +707,9 @@ function dispatchSlashCommandAction(
  *  2. Ask: small `MessageSquare` icon-button on the right → fires
  *     `onDiscuss(ref)` to drill into THIS row via `entityIdFilter`.
  */
+/** A no-break space: one line of the chip's text, so a bar that holds it is exactly one text line tall. */
+const ONE_TEXT_LINE = '\u00a0';
+
 /** How many chips the strip's loading form draws: the count real answers' strips showed (measured). On a phone,
  *  where a strip holds one chip a row, it draws one. */
 const SOURCE_CHIP_SKELETON_COUNT = 2;
@@ -720,7 +723,7 @@ function SourceChipSkeleton({ className }: { className?: string }) {
     <span aria-hidden className={cn('pointer-events-none inline-flex shrink-0 items-center', className)}>
       <span className={chatChipClass({ tone: 'secondary' })}>
         <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3.5 w-3.5 rounded-sm')} />
-        <span className={cn(SKELETON_SURFACE_CLASS, 'w-28 rounded-sm')}>{'\u00a0'}</span>
+        <span className={cn(SKELETON_SURFACE_CLASS, 'w-28 rounded-sm')}>{ONE_TEXT_LINE}</span>
       </span>
       <span className={cn(SKELETON_SURFACE_CLASS, '-mr-1 ml-1 inline-block h-5 w-5 rounded-sm')} />
     </span>

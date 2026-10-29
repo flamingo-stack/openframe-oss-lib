@@ -5,7 +5,10 @@ import { setEmbedAuthAdapter } from '../../../../utils/embed-authed-fetch';
 import { ExternalMediaNotice } from '../../../ui/markdown/external-media-notice';
 import type { ChatRef } from '../../chat-ref.types';
 import type { BlockCardProps } from '../block-card';
-import { ChatCollapsibleVideo, HIDE_VIDEO_LABEL, WATCH_VIDEO_LABEL } from '../chat-video-toggle';
+import { CHAT_CARD_DISCLOSURES, ChatCardDisclosureRow } from '../chat-card-disclosure';
+
+const WATCH_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.video.label;
+const HIDE_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.video.openLabel;
 import { renderChatInlineEntityCard } from '../dispatch';
 
 /** `[card://video:mp4-<base64url(url)>]`: the id the hub mints for an embedded video, and one a reply can mint too. */
@@ -39,20 +42,20 @@ describe('video marker — a player from outside the app is not drawn', () => {
   it('mounts a video from the app itself (the gateway a native shell sanctions)', () => {
     setEmbedAuthAdapter({ allowedOrigins: ['https://gateway.example'] });
     const block = blockOf(mp4Ref('https://gateway.example/media/v.mp4'));
-    expect(isValidElement(block) && block.type).toBe(ChatCollapsibleVideo);
+    expect(isValidElement(block) && block.type).toBe(ChatCardDisclosureRow);
   });
 
   it('plays Mux and YouTube markers: their ids only ever reach those fixed hosts', () => {
     for (const id of ['mux-a1B2c3D4e5F6g7H8i9', 'dQw4w9WgXcQ']) {
       const block = blockOf({ type: 'video', id } as ChatRef);
-      expect(isValidElement(block) && block.type, id).toBe(ChatCollapsibleVideo);
+      expect(isValidElement(block) && block.type, id).toBe(ChatCardDisclosureRow);
     }
   });
 
   it('does not draw a player for a plain-http mp4 at all', () => {
     const card = renderChatInlineEntityCard(mp4Ref('http://attacker.example/v.mp4'));
     const { children } = isValidElement(card) ? (card.props as { children?: ReactNode }) : {};
-    expect(isValidElement(children) && children.type === ChatCollapsibleVideo).toBe(false);
+    expect(isValidElement(children) && children.type === ChatCardDisclosureRow).toBe(false);
     expect(isValidElement(children) && children.type === ExternalMediaNotice).toBe(false);
   });
 });
@@ -77,6 +80,9 @@ describe('video marker — collapsed until the reader opens it', () => {
 
     fireEvent.click(close);
     expect(screen.getByRole('button', { name: `${WATCH_VIDEO_LABEL}: Onboarding walkthrough` })).toBeTruthy();
+    // The player stays mounted while the panel closes, so it is not cut mid-animation; it unmounts at the end.
+    expect(container.innerHTML).not.toBe(before);
+    fireEvent.transitionEnd(screen.getByTestId('chat-card-disclosure-panel'));
     expect(container.innerHTML).toBe(before);
   });
 });

@@ -109,7 +109,7 @@ import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-
 import { BlockCard } from './block-card';
 import { BlogCard } from './blog-card';
 import { CaseStudyCard } from './case-study-card';
-import { ChatCollapsibleVideo, ChatVideoToggleButton, useChatVideoToggle } from './chat-video-toggle';
+import { ChatCardDisclosureButton, ChatCardDisclosureRow, useChatCardDisclosure } from './chat-card-disclosure';
 import { CustomerInterviewCard } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
 import { designDocMetaLine } from './design-doc-card';
@@ -2034,14 +2034,14 @@ interface ChatCardLoaderProps {
  * opened; with no video on this record, the action's slot is kept unseen.
  */
 function CardWithVideo({ video, card }: { video: ChatRef | null; card: (action: ReactNode) => ReactNode }) {
-  const { action, player } = useChatVideoToggle(video, { reserve: true });
+  const { action, panel } = useChatCardDisclosure('video', video, { reserve: true });
   return (
     // Same 12px rhythm as the message renderer's block-sibling wrapper
     // (`my-3` in chat-message-enhanced) so card→player spacing matches
     // the spacing between any two hoisted blocks.
     <div className="grid min-w-0 grid-cols-1 gap-3">
       {card(action)}
-      {player}
+      {panel}
     </div>
   );
 }
@@ -2194,7 +2194,11 @@ export function ChatCardLoader({
     return finish(entry.render(undefined, finalChatRef, renderOpts));
   }
   if (isLoading) {
-    return finish(fetchEntry.skeleton?.() ?? null, entry.video ? <ChatVideoToggleButton loading /> : undefined, true);
+    return finish(
+      fetchEntry.skeleton?.() ?? null,
+      entry.video ? <ChatCardDisclosureButton variant="video" loading /> : undefined,
+      true,
+    );
   }
   if (!item) {
     // FAIL LOUD (explicit product decision 2026-08-13): a card that
@@ -2227,7 +2231,7 @@ export function ChatCardLoader({
       ? { ...finalChatRef, metadata: { ...(finalChatRef.metadata ?? {}), ...videoMeta } }
       : null;
     // Collapsed: the card's footer row carries "Watch video", and the player
-    // opens below the card only when asked (`chat-video-toggle.tsx`).
+    // opens below the card only when asked (`chat-card-disclosure.tsx`).
     return (
       <CardWithVideo video={videoRef} card={action => finish(entry.render(item, finalChatRef, renderOpts), action)} />
     );
@@ -2302,7 +2306,7 @@ export function renderChatInlineEntityCard(
           {externalUrl && !isAppOriginUrl(externalUrl) ? (
             <ExternalMediaNotice url={externalUrl} kind="video" label={displayRef.title} />
           ) : (
-            <ChatCollapsibleVideo chatRef={displayRef} />
+            <ChatCardDisclosureRow variant="video" chatRef={displayRef} />
           )}
         </BlockCard>
       );

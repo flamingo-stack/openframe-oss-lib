@@ -53,13 +53,9 @@ export function InlineChip({
   );
 }
 
-/** True for a link to a screen of the app the chat runs in: a root-relative path (`/devices/new`), never `//host`. */
-export function isInAppPath(href: string | undefined): boolean {
-  return typeof href === 'string' && href.startsWith('/') && !href.startsWith('//');
-}
-
 /**
- * A link the answer makes to a screen of the app, drawn as an inline box. `anchor` is the host's link element (its
+ * A link the answer marked as a screen of the app (`isAppScreenLink`, `chat-protocol/app-screen-link.ts`), drawn as an
+ * inline box. `anchor` is the host's link element (its
  * `NavLinkAnchor`, so the click follows the host's routing rule), else the lib's boxed `Link`.
  */
 export function InlineAppLinkChip({
