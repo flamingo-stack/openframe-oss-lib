@@ -13,6 +13,8 @@ import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundleOnlineDispatch;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
@@ -20,6 +22,7 @@ import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +37,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -52,6 +56,7 @@ class SoftwareActionDetailServiceTest {
     @Mock private PackageUpdateDeviceStateRepository packageUpdateDeviceStateRepository;
     @Mock private MachineRepository machineRepository;
     @Mock private OrganizationRepository organizationRepository;
+    @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private TenantIdProvider tenantIdProvider;
 
     private SoftwareActionDetailService service;
@@ -60,7 +65,7 @@ class SoftwareActionDetailServiceTest {
     void setUp() {
         service = new SoftwareActionDetailService(scriptExecutionRepository, bundleOnlineDispatchRepository,
                 scheduleOnlineDispatchRepository, scheduleMachineAssignedRepository, packageUpdateDeviceStateRepository,
-                machineRepository, organizationRepository, tenantIdProvider);
+                machineRepository, organizationRepository, tagAssignmentRepository, tenantIdProvider);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
         // Enrichment always runs; default to no machine metadata unless a test provides it.
         lenient().when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of());
@@ -134,6 +139,44 @@ class SoftwareActionDetailServiceTest {
 
         List<SoftwareActionDeviceResponse> search = service.devices(EXEC, null, null, null, "BETA-HOST");
         assertThat(search).extracting(SoftwareActionDeviceResponse::getMachineId).containsExactly("beta");
+    }
+
+    @Test
+    @DisplayName("device tags: only the action's devices that carry any of the tags")
+    void deviceTagFilter() {
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of(
+                leaf("alpha", ExecutionStatus.SUCCESS),
+                leaf("beta", ExecutionStatus.SUCCESS),
+                leaf("gamma", ExecutionStatus.FAILED)));
+        when(tagAssignmentRepository.findByEntityIdInAndTagIdInAndEntityType(
+                argThat(ids -> ids.containsAll(List.of("alpha", "beta", "gamma"))),
+                eq(List.of("tag-vip", "tag-lab")), eq(TagEntityType.DEVICE)))
+                .thenReturn(List.of(tagged("alpha", "tag-vip"), tagged("gamma", "tag-lab"), tagged("gamma", "tag-vip")));
+        SoftwareActionDeviceFilterInput filter = new SoftwareActionDeviceFilterInput();
+        filter.setDeviceTagIds(List.of("tag-vip", "tag-lab"));
+
+        List<SoftwareActionDeviceResponse> rows = service.devices(EXEC, null, null, filter, null);
+
+        assertThat(rows).extracting(SoftwareActionDeviceResponse::getMachineId).containsExactlyInAnyOrder("alpha", "gamma");
+    }
+
+    @Test
+    @DisplayName("device tags: no tag filter, no tag lookup")
+    void noDeviceTagFilter_noLookup() {
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of(
+                leaf("alpha", ExecutionStatus.SUCCESS)));
+
+        assertThat(service.devices(EXEC, null, null, new SoftwareActionDeviceFilterInput(), null)).hasSize(1);
+
+        verifyNoInteractions(tagAssignmentRepository);
+    }
+
+    private static TagAssignment tagged(String machineId, String tagId) {
+        TagAssignment assignment = new TagAssignment();
+        assignment.setEntityId(machineId);
+        assignment.setTagId(tagId);
+        assignment.setEntityType(TagEntityType.DEVICE);
+        return assignment;
     }
 
     @Test
