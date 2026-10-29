@@ -8,17 +8,15 @@
  * that EXECUTES a navigation — new tab or same tab, in the app through the host's
  * `runtime.navigation.navigate`, or by the browser when the host does not take it.
  * Every surface routes through it:
- *   - chat cards / chips / markdown links → `executeNavigation` (click form),
- *     via the thin `handleChatNavClick` wrapper.
+ *   - chat cards / chips / markdown links → `executeNavigation` (click form).
  *   - buttons / page rows / form redirects → `executeNavigationImperative` directly.
  *
- * Decision tree (the SAME one `handleChatNavClick` used — copied verbatim so
- * behavior is byte-identical; the hub's chat-click behavior MUST NOT change):
+ * Decision tree:
  *   1. empty href → no-op (click form preventDefaults + reports handled)
  *   2. (click form) modifier / non-primary button → NOT handled — let the
  *      browser do its native thing (`<a>` opens a new tab, etc.)
- *   3. `navLinkTarget(...).isNewTab` true → `runtime.navigation.openExternal(href)` else
- *      `window.open(href, '_blank', noopener,noreferrer)`
+ *   3. `navLinkTarget(...).isNewTab` true → `executeNewTabNavigation` (the host's `openExternal`, else
+ *      `window.open` with the one referrer rule, `newTabFeatures`)
  *   4. else (same-tab) → `runtime.navigation.navigate({href,path,targetPlatform})`,
  *      the host's in-app navigation (every host wires it); a target the host does
  *      not take (another origin) is a browser navigation, `window.location.assign`.
@@ -170,23 +168,4 @@ export function executeNavigationImperative({
   openIn,
 }: ExecuteNavigationImperativeArgs): void {
   runNavigation(runtime, href, path, targetPlatform, hostRoute, openIn);
-}
-
-/**
- * @deprecated Call {@link executeNavigation} directly. Kept only so external
- * embedders' imports keep resolving; no lib code path goes through it.
- */
-export function handleChatNavClick(
-  event: NavClickEvent,
-  runtime: ChatRuntime | null | undefined,
-  { href, path, targetPlatform }: ChatNavClickInput,
-): boolean {
-  return executeNavigation({ event, runtime, href, path, targetPlatform });
-}
-
-/** @deprecated Argument shape of the deprecated {@link handleChatNavClick}. */
-export interface ChatNavClickInput {
-  href: string;
-  path?: string | null;
-  targetPlatform?: string | null;
 }

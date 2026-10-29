@@ -88,7 +88,7 @@ import {
 
 /** Render-prop component injection for the navigation decision — keeps hook
  *  calls legal (hooks live INSIDE the injected component; `CardForType`
- *  itself calls zero hooks). The hub injects a `useNavLink`-backed provider;
+ *  itself calls zero hooks). The hub injects a `useNavLinkViaRuntime`-backed provider;
  *  the default reads THE navigation decision (`navLinkTarget`). MUST be defined at module
  *  scope by hosts — an inline arrow would remount every card each render. */
 export interface CardLinkProviderProps {
@@ -601,7 +601,7 @@ export interface RelatedContentSectionProps {
   /** Hub injects its registry-driven entity-list-api builder; default = the
    *  lib's `buildListUrl(type, ids, apiBaseUrl)`. */
   buildListUrl?: (type: string, ids: string[]) => string | null;
-  /** Hub injects a `useNavLink`-backed render-prop provider; default = pure
+  /** Hub injects a `useNavLinkViaRuntime`-backed render-prop provider; default = pure
    *  anchor via `decideNewTab`. MUST be a module-scope component. */
   LinkProvider?: CardLinkProvider;
   /** Renderer pair for the admin-only `marketing_campaign` type. Absent →

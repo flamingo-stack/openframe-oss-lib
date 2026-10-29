@@ -60,10 +60,9 @@ export {
   resolveExternalNavigation,
   type ExternalNavResolution,
 } from './chat-nav-resolution';
-export { handleChatNavClick, type ChatNavClickInput } from './execute-navigation';
 // The unified navigation-execution primitive — single source of truth for
 // new-tab/same-tab + internal/external + embed/host, through the host's
-// `runtime.navigation.navigate`. Every surface routes through it (handleChatNavClick is now a wrapper).
+// `runtime.navigation.navigate`. Every surface routes through it.
 export {
   executeNavigation,
   executeNavigationImperative,
@@ -82,7 +81,7 @@ export {
 } from './nav-anchor-props';
 export { isCrossOriginUrl } from './is-cross-origin-url';
 export { isRelativeHref, newTabFeatures, newTabRel, type NewTabRel } from './new-tab-rel';
-export { decideNewTab, type DecideNewTabInput, type NavSurface, type RuntimeMode } from './decide-new-tab';
+export { decideNewTab, type DecideNewTabInput, type RuntimeMode } from './decide-new-tab';
 
 // Embed-surface auth moved to `utils/` (embed-proxy-auth-storage /
 // embed-authed-fetch) — import the Embed* names from

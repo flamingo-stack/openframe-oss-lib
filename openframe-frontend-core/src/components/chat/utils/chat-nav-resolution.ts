@@ -16,8 +16,7 @@
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { newTabFeatures } from './new-tab-rel';
 
-/** Modifier-click predicate — matches the existing useNavLink branch
- *  (cmd/ctrl/shift/alt OR non-primary mouse button). */
+/** Modifier-click predicate: cmd/ctrl/shift/alt or a non-primary mouse button. */
 export function isModifierClick(e: {
   button?: number;
   metaKey?: boolean;

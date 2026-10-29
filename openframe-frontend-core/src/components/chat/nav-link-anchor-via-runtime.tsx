@@ -5,10 +5,10 @@
  * source-chip drill-ins, inline references).
  *
  * Reads the active `ChatRuntime` and routes clicks through
- * `handleChatNavClick`. Same single-source rules as source chips and
+ * `executeNavigation`. Same single-source rules as source chips and
  * inline cards:
- *   - new-tab decision via `navLinkTarget` (embed-mode short-circuit
- *     + `runtime.navigation.decideNewTab` + lib fallback)
+ *   - new-tab decision via `navLinkTarget` (the embed rule, then the host's
+ *     `runtime.navigation.decideNewTab` when it wires one, else the lib's rule)
  *   - `target` / `rel` via `newTabAnchorAttrs`
  *   - same-tab click → close the chat panel (via `ChatPanelContext`);
  *     new-tab click → leave panel open while the new tab loads
@@ -40,6 +40,8 @@ export interface NavLinkAnchorViaRuntimeProps extends Omit<
   href: string;
   path?: string | null;
   targetPlatform?: string | null;
+  /** The caller's explicit tab (an "open in new tab" control); absent = the rule decides. */
+  openIn?: NavOpenIn;
   className?: string;
   /** Optional — matches `NavLinkAnchorComponent`'s contract so the
    *  markdown-anchor slot can render an empty anchor (rare but legal). */
@@ -145,12 +147,13 @@ export function NavLinkAnchorViaRuntime({
   href,
   path,
   targetPlatform,
+  openIn,
   className,
   children,
   onClick,
   ...anchorAttrs
 }: NavLinkAnchorViaRuntimeProps) {
-  const linkProps = useNavLinkViaRuntime({ href, path, targetPlatform, onClick });
+  const linkProps = useNavLinkViaRuntime({ href, path, targetPlatform, openIn, onClick });
   return (
     <a {...linkProps} {...anchorAttrs} className={className}>
       {children}

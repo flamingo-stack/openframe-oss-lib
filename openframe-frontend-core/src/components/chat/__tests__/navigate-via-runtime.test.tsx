@@ -1,8 +1,8 @@
-import { renderHook } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
-import { useNavigateViaRuntime, useNavLinkViaRuntime } from '../nav-link-anchor-via-runtime';
+import { NavLinkAnchorViaRuntime, useNavigateViaRuntime, useNavLinkViaRuntime } from '../nav-link-anchor-via-runtime';
 
 function runtimeWith(navigation: Partial<ChatRuntime['navigation']>): ChatRuntime {
   return {
@@ -77,5 +77,28 @@ describe('useNavLinkViaRuntime', () => {
     });
 
     expect(result.current).toMatchObject({ href: '/admin/preview/x', target: '_blank' });
+  });
+});
+
+describe('NavLinkAnchorViaRuntime', () => {
+  it('opens an in-app path in a new tab when asked, through the host, keeping the Referer', () => {
+    const navigate = vi.fn();
+    const openExternal = vi.fn();
+    const Wrapper = wrapperFor(runtimeWith({ navigate, openExternal }));
+    render(
+      <Wrapper>
+        <NavLinkAnchorViaRuntime href="/devices/x" openIn="new-tab" aria-label="Open in new tab">
+          open
+        </NavLinkAnchorViaRuntime>
+      </Wrapper>,
+    );
+    const link = screen.getByRole('link', { name: 'Open in new tab' });
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener');
+
+    fireEvent.click(link);
+
+    expect(openExternal).toHaveBeenCalledWith('/devices/x');
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

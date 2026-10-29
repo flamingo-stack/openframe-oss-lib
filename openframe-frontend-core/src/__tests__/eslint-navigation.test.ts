@@ -25,10 +25,6 @@ new RuleTester().run('no-navigation-fallback', navigationPlugin.rules['no-naviga
       errors: [{ messageId: 'option' }, { messageId: 'beside' }],
     },
     {
-      code: 'function onClick(e) { handleChatNavClick(e, runtime, { href }, router.push); }',
-      errors: [{ messageId: 'option' }],
-    },
-    {
       // A second path after the executor.
       code: 'function onClick(e) { if (!executeNavigation({ event: e, runtime, href })) router.push(href); }',
       errors: [{ messageId: 'beside' }],

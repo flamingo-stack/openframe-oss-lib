@@ -12,7 +12,6 @@ const EXECUTORS = new Set([
   'executeNavigation',
   'executeNavigationImperative',
   'executeNewTabNavigation',
-  'handleChatNavClick',
   'useNavLinkViaRuntime',
   'useNavigateViaRuntime',
 ]);
@@ -127,13 +126,6 @@ const noNavigationFallback = {
                 context.report({ node: prop, messageId: 'option', data: { key, executor: name } });
               }
             }
-          }
-          if (name === 'handleChatNavClick' && node.arguments.length > 3) {
-            context.report({
-              node: node.arguments[3],
-              messageId: 'option',
-              data: { key: 'the fourth argument', executor: name },
-            });
           }
           return;
         }

@@ -5,7 +5,7 @@
  * After the navigation unification (ChatCardLoader pre-resolves
  * `chatRef.url` via `resolveSourceRowCTA` + `resolveHrefForRuntime`,
  * and `ChatCardNavWrap` handles every primary click via `onClickCapture`
- * → `handleChatNavClick`), the per-card wrapper only needs
+ * → `executeNavigation`), the per-card wrapper only needs
  * `{href, target, rel}` on its inner `<a>` so modifier-click /
  * hover-preview / copy-link work natively.
  *
@@ -78,7 +78,8 @@ export interface NavLinkTarget {
  * (`resolveHrefForRuntime`) and the new-tab rule on that resolved href (`computeIsNewTab`). Anchors
  * (`useNavLinkTarget` / `useNavLinkViaRuntime`), cards, chips, search results and the click executor
  * (`executeNavigation`) all read it; nothing else calls `computeIsNewTab` or `decideNewTab` (a test fails if it does).
- * Without a runtime there is no embed or host rule to apply: the href as given, same tab (the executor's rule).
+ * Without a runtime there is no embed or host rule to apply: the href as given, decided by the lib's default rule
+ * (the caller's `openIn`, else another origin opens a new tab).
  *
  * `hostRoute`: the host's `composeContentUrl` returned this href as a RELATIVE route of its own (a type it serves
  * in-app). It is the host's page, not the hub's, so it is never resolved against the hub's origin and never handed to
@@ -93,8 +94,8 @@ export function navLinkTarget(
   targetPlatform?: string | null,
   { hostRoute = false, openIn }: { hostRoute?: boolean; openIn?: NavOpenIn } = {},
 ): NavLinkTarget {
-  if (!runtime) return { href, isNewTab: openIn === 'new-tab' };
-  if (hostRoute && isRelativeHref(href)) return { href, isNewTab: false };
+  if (!runtime) return { href, isNewTab: libDecideNewTab({ href, openIn, currentSource: '' }) };
+  if (hostRoute && isRelativeHref(href)) return { href, isNewTab: openIn === 'new-tab' };
   const resolved = resolveHrefForRuntime(href, runtime);
   const isNewTab =
     runtime.navigation.mode !== 'embed' && openIn
@@ -135,6 +136,7 @@ export function newTabAnchorAttrs(
 export function buildAnchorProps(
   href: string | null | undefined,
   isNewTab: boolean,
+  targetPlatform?: string | null,
 ): { href: string; target?: '_blank'; rel?: NewTabRel } | undefined {
-  return href ? { href, ...newTabAnchorAttrs(isNewTab, href) } : undefined;
+  return href ? { href, ...newTabAnchorAttrs(isNewTab, href, targetPlatform) } : undefined;
 }

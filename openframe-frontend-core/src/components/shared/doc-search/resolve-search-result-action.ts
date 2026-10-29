@@ -23,8 +23,8 @@ import { isRelativeHref } from '../../chat/utils/new-tab-rel';
 import type { SearchResult } from '../../ui/search-input';
 
 export type SearchResultAction =
-  | { kind: 'navigate-same-tab'; href: string; hostRoute?: boolean }
-  | { kind: 'navigate-new-tab'; href: string; hostRoute?: boolean }
+  | { kind: 'navigate-same-tab'; href: string; targetPlatform: string | null; hostRoute?: boolean }
+  | { kind: 'navigate-new-tab'; href: string; targetPlatform: string | null; hostRoute?: boolean }
   | { kind: 'ask-ai'; detail: { source: string; ref: ChatRef } }
   | { kind: 'route'; path: string }
   | { kind: 'noop' };
@@ -64,16 +64,13 @@ export function resolveSearchResultAction(
     // THE navigation decision. A RELATIVE composed href is a route the host claimed as in-app (`hostRoute`): it stays
     // in this window in every mode, never handed to `window.open`.
     const hostRoute = !!composed?.href && isRelativeHref(composed.href);
-    const target = navLinkTarget(
-      runtime,
-      composed?.href || externalUrl,
-      composed ? composed.targetPlatform : targetPlatform,
-      {
-        hostRoute,
-      },
-    );
+    const actionPlatform = composed ? composed.targetPlatform : (targetPlatform ?? null);
+    const target = navLinkTarget(runtime, composed?.href || externalUrl, actionPlatform, { hostRoute });
     const kind = target.isNewTab ? 'navigate-new-tab' : 'navigate-same-tab';
-    return hostRoute ? { kind, href: target.href, hostRoute } : { kind, href: target.href };
+    // The executor decides again from these same inputs, so the click lands where this action says.
+    return hostRoute
+      ? { kind, href: target.href, targetPlatform: actionPlatform, hostRoute }
+      : { kind, href: target.href, targetPlatform: actionPlatform };
   }
   if (rowId && sourceRepo && documentType) {
     return {

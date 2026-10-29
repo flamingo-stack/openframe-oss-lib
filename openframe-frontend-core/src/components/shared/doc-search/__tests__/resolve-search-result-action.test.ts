@@ -40,10 +40,11 @@ const helpCenterCompose = makeComposeContentUrl({
 });
 
 describe('resolveSearchResultAction — composeContentUrl seam', () => {
-  it("no runtime → the RAG externalUrl verbatim, same tab (the decision's no-runtime rule)", () => {
+  it("no runtime → the RAG externalUrl verbatim, the lib's default rule (another origin → new tab)", () => {
     expect(resolveSearchResultAction(guideRow, 'openframe', null)).toEqual({
-      kind: 'navigate-same-tab',
+      kind: 'navigate-new-tab',
       href: `${HUB}/onboarding-guides/deploy-first-device`,
+      targetPlatform: 'openframe',
     });
   });
 
@@ -51,6 +52,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     expect(resolveSearchResultAction(guideRow, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-same-tab',
       href: '/help-center/onboarding-guides/deploy-first-device',
+      targetPlatform: null,
       hostRoute: true,
     });
   });
@@ -61,6 +63,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     expect(resolveSearchResultAction(guideRow, 'openframe', runtimeIn('embed'), helpCenterCompose)).toEqual({
       kind: 'navigate-same-tab',
       href: '/help-center/onboarding-guides/deploy-first-device',
+      targetPlatform: null,
       hostRoute: true,
     });
   });
@@ -79,6 +82,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-same-tab',
       href: '/help-center/bug-fixes?search=abc123',
+      targetPlatform: null,
       hostRoute: true,
     });
   });
@@ -98,6 +102,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-new-tab',
       href: `${HUB}/blog/hello`,
+      targetPlatform: 'flamingo',
     });
   });
 
@@ -110,6 +115,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-same-tab',
       href: `${HUB}/somewhere`,
+      targetPlatform: 'openframe',
     });
   });
 

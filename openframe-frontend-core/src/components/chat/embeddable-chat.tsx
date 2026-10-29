@@ -3,7 +3,7 @@
 /**
  * EmbeddableChat — lib-portable port of the hub's `<GlobalAskAI>` component.
  *
- * Drops every hub-only import (auth-provider, useNavLink, currentPlatform,
+ * Drops every hub-only import (auth-provider, useNavLinkViaRuntime, currentPlatform,
  * tableIdForDocumentType, rag-table-config, etc.) and routes ALL navigation
  * + identity decisions through `useRequiredChatRuntime()`. Host wires the
  * runtime once at root (HubRuntimeProvider in the hub, custom provider in
@@ -13,8 +13,8 @@
  *   - `useAuth()` → `useRequiredChatRuntime().user` (greeting + identity only;
  *     the requireAuth render gate is dropped — hub's wrapper handles it).
  *   - `currentPlatform()` → `useRequiredChatRuntime().source`.
- *   - `useNavLink`/`NavLinkAnchor` → chip-anchor rewrite via
- *     `handleChatNavClick` + lib's `NavLinkAnchorViaRuntime`.
+ *   - `useNavLinkViaRuntime`/`NavLinkAnchor` → chip-anchor rewrite via
+ *     `executeNavigation` + lib's `NavLinkAnchorViaRuntime`.
  *   - `useDocChat(source)` → `useSseChatAdapter()` (reads source from runtime).
  *   - `tableIdForDocumentType` import deleted (dead per audit).
  *   - `renderChatInlineEntityCard` imported from lib's entity-cards barrel.

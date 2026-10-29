@@ -27,7 +27,7 @@
  * `<ChatRuntimeContext.Provider value={...}>` (e.g. via React.useMemo).
  * Every change to its reference identity invalidates downstream
  * `useMemo` consumers (the chat input's slash-commands binding,
- * useNavLink's embed-resolution memo, useDocChat's streamFn factory).
+ * useDocChat's streamFn factory).
  * The hub's `<HubRuntimeProvider>` already memoizes correctly with
  * stable deps. Embedded apps that build the value inline on each render
  * will pay an avoidable re-render cost across the entire chat tree.
@@ -216,11 +216,10 @@ export interface ChatRuntime {
      *  (HubRuntimeProvider), the OpenFrame app (OpenframeChatRuntimeProvider) and
      *  the embedding example (its react-router). */
     navigate?: (input: { href: string; path?: string | null; targetPlatform?: string | null }) => boolean | void;
-    /** Optional new-tab decision callback. Returns true → lib opens in
-     *  new tab; false → same tab via `navigate`. Hub wires the existing
-     *  `decideNewTab` logic from use-nav-link.tsx (re-imports the pure
-     *  helper from lib). Embedders may omit; lib defaults to:
-     *  same-origin/same-platform → same tab, else new tab. */
+    /** Optional new-tab rule of the host's own, for a host whose links need one: returns true → a new tab, false →
+     *  same tab via `navigate`. Omitted, the lib's rule decides (a named platform other than `source`, or another
+     *  origin → new tab). The OpenFrame app wires it to ignore `targetPlatform` (its knowledge base tags every row
+     *  with its own platform); the hub omits it. */
     decideNewTab?: (args: { href: string; targetPlatform?: string | null }) => boolean;
   };
   /** Optional content-URL composer. Returns the platform-aware href +

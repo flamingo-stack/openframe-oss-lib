@@ -270,7 +270,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
           // anchor, so the browser will not do it natively. Opened the one way a new tab is opened.
           if (wantsNewTab) {
             setKeepOpen(true);
-            executeNewTabNavigation({ runtime, href: action.href, targetPlatform: null });
+            executeNewTabNavigation({ runtime, href: action.href, targetPlatform: action.targetPlatform });
             return;
           }
           // A new-tab result keeps the dropdown open, so the user can pick another without searching again.
@@ -279,12 +279,12 @@ export function useDocSearch(config: UseDocSearchConfig) {
           const path =
             baseRoute && action.href.startsWith(`${baseRoute}/`) ? action.href.slice(baseRoute.length + 1) : null;
           if (action.kind === 'navigate-same-tab' && path && onInPageSwap?.(path)) return;
-          // THE click executor: the one navigation decision, then the host's `navigate` / `openExternal`.
+          // THE click executor, given the inputs the action was decided from, so it decides the same way.
           executeNavigationImperative({
             runtime,
             href: action.href,
             path,
-            targetPlatform: (result.metadata?.targetPlatform as string | null | undefined) ?? null,
+            targetPlatform: action.targetPlatform,
             hostRoute: action.hostRoute,
           });
           return;

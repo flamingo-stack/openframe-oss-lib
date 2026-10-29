@@ -3,9 +3,11 @@
 import { ExternalLink } from 'lucide-react';
 import type React from 'react';
 import { useMemo, useState } from 'react';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { cn } from '../../utils/cn';
+import { executeNewTabNavigation } from '../chat/utils/execute-navigation';
 import { Copy01Icon } from '../icons-v2-generated/documents';
 import { EyeClassicIcon } from '../icons-v2-generated/interface/eye-classic-icon';
 import { EyeOffClassicIcon } from '../icons-v2-generated/interface/eye-off-classic-icon';
@@ -143,6 +145,7 @@ function ServiceCardRowItem({ row, loading: loadingProp }: { row: ServiceCardRow
   const { copy, copied } = useCopyToClipboard();
   const { ref: valueRef, isTruncated: valueTruncated } = useIsTruncated<HTMLDivElement>(row.value);
   const actions = useMemo<ServiceCardRowAction>(() => rowActions(row), [row]);
+  const runtime = useChatRuntime();
 
   const displayValue = row.isSecret ? (
     <MaskedValue value={row.value} isRevealed={revealed} />
@@ -154,7 +157,7 @@ function ServiceCardRowItem({ row, loading: loadingProp }: { row: ServiceCardRow
 
   const openInNewTab = () => {
     if (!row.href) return;
-    window.open(row.href, '_blank', 'noopener,noreferrer');
+    executeNewTabNavigation({ runtime, href: row.href });
   };
 
   // A label column only where the loaded row has one; while loading, a label not here yet is a bar in it.
