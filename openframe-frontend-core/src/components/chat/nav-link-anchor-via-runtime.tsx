@@ -64,6 +64,24 @@ export interface NavLinkViaRuntimeProps {
   onClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
+/** Where a chat link goes: its href as the runtime resolves it, and whether it opens in a new tab. */
+export interface NavLinkTarget {
+  href: string;
+  isNewTab: boolean;
+}
+
+/**
+ * THE navigation decision for a chat link: the href resolved for this runtime (`resolveHrefForRuntime`) and the
+ * new-tab rule on that href (`computeIsNewTab`). {@link useNavLinkViaRuntime} routes by it, and anything that draws a
+ * link differently by where it goes (a link that stays in the app drawn as the inline box) reads it here, never
+ * deciding again.
+ */
+export function useNavLinkTarget(href: string, targetPlatform?: string | null): NavLinkTarget {
+  const runtime = useRequiredChatRuntime();
+  const resolvedHref = resolveHrefForRuntime(href, runtime);
+  return { href: resolvedHref, isNewTab: computeIsNewTab(runtime, resolvedHref, targetPlatform ?? null) };
+}
+
 /**
  * The anchor props of {@link NavLinkAnchorViaRuntime}, for an element that is
  * not a bare `<a>` (a `Button`'s `linkProps`). ONE decision and ONE click
@@ -82,8 +100,7 @@ export function useNavLinkViaRuntime({
   const runtime = useRequiredChatRuntime();
   const router = useRouter();
   const panel = useChatPanel();
-  const resolvedHref = resolveHrefForRuntime(href, runtime);
-  const isNewTab = computeIsNewTab(runtime, resolvedHref, targetPlatform ?? null);
+  const { href: resolvedHref, isNewTab } = useNavLinkTarget(href, targetPlatform);
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
     onClickProp?.(e);
