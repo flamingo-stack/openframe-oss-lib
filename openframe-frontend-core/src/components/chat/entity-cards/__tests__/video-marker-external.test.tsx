@@ -7,8 +7,8 @@ import type { ChatRef } from '../../chat-ref.types';
 import type { BlockCardProps } from '../block-card';
 import { CHAT_CARD_DISCLOSURES, ChatCardDisclosureRow } from '../chat-card-disclosure';
 
-const WATCH_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.video.label;
-const HIDE_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.video.openLabel;
+const WATCH_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.VIDEO.label;
+const HIDE_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.VIDEO.openLabel;
 import { renderChatInlineEntityCard } from '../dispatch';
 
 /** `[card://video:mp4-<base64url(url)>]`: the id the hub mints for an embedded video, and one a reply can mint too. */

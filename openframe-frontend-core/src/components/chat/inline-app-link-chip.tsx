@@ -54,8 +54,7 @@ export function InlineChip({
 }
 
 /**
- * A link the answer marked as a screen of the app (`isAppScreenLink`, `chat-protocol/app-screen-link.ts`), drawn as an
- * inline box. `anchor` is the host's link element (its
+ * A link that stays in this app (the runtime's `computeIsNewTab` keeps it in this window), drawn as an inline box. `anchor` is the host's link element (its
  * `NavLinkAnchor`, so the click follows the host's routing rule), else the lib's boxed `Link`.
  */
 export function InlineAppLinkChip({

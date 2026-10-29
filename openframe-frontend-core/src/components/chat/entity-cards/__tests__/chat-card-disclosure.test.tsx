@@ -4,18 +4,18 @@ import type { ChatRef } from '../../chat-ref.types';
 import { SourceActionButton } from '../../source-action-button';
 import { CHAT_CARD_DISCLOSURES, ChatCardDisclosureButton, useChatCardDisclosure } from '../chat-card-disclosure';
 
-const WATCH_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.video.label;
+const WATCH_VIDEO_LABEL = CHAT_CARD_DISCLOSURES.VIDEO.label;
 
 const ref = { type: 'webinar', id: 'w1', title: 'A webinar' } as ChatRef;
 
 function Footer({ video, reserve }: { video: ChatRef | null; reserve?: boolean }) {
-  const { action } = useChatCardDisclosure('video', video, { reserve });
+  const { action } = useChatCardDisclosure('VIDEO', video, { reserve });
   return <div data-testid="row">{action}</div>;
 }
 
 describe('the card footer keeps its actions in place while loading', () => {
   it('draws "Watch video" in its loading form: the label held as a skeleton bar, not a reachable button', () => {
-    render(<ChatCardDisclosureButton variant="video" loading />);
+    render(<ChatCardDisclosureButton kind="VIDEO" loading />);
     expect(screen.getByText(WATCH_VIDEO_LABEL)).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByRole('button')).toBeNull();
   });

@@ -109,7 +109,15 @@ import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-
 import { BlockCard } from './block-card';
 import { BlogCard } from './blog-card';
 import { CaseStudyCard } from './case-study-card';
-import { ChatCardDisclosureButton, ChatCardDisclosureRow, useChatCardDisclosure } from './chat-card-disclosure';
+import {
+  CHAT_CARD_DISCLOSURE,
+  CHAT_CARD_DISCLOSURES,
+  ChatCardDisclosureButton,
+  type ChatCardDisclosureKind,
+  ChatCardDisclosureRow,
+  chatCardDisclosureOf,
+  useChatCardDisclosure,
+} from './chat-card-disclosure';
 import { CustomerInterviewCard } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
 import { designDocMetaLine } from './design-doc-card';
@@ -463,40 +471,6 @@ function decodeVideoMarkerId(id: string): { videoUrl?: string; youtubeUrl?: stri
   }
   if (/^[A-Za-z0-9_-]{11}$/.test(id)) return { youtubeUrl: id };
   return null;
-}
-
-/** Read hero-video metadata off a FETCHED item — the API-driven
- *  replacement for the retired refs-frame `metadata.videoUrl` check. Two item
- *  shapes: ChatRef-shaped items (per-object hydration routes) carry the
- *  SSOT `metadata` keys directly; content rows (public list APIs) carry
- *  the canonical columns (`custom_video_url` for recordings,
- *  `main_video_url` elsewhere — see the hub configs' videoUrlColumns).
- *  Returns null when the item carries no video (compact card only). */
-function itemVideoMetadata(item: ChatCardItem | undefined): Record<string, string> | null {
-  const pick = (...vals: unknown[]): string | undefined => {
-    for (const v of vals) if (typeof v === 'string' && v.length > 0) return v;
-    return undefined;
-  };
-  const m: Record<string, unknown> = item?.metadata ?? {};
-  const out: Record<string, string> = {};
-  const videoUrl = pick(m.videoUrl, item?.custom_video_url, item?.main_video_url);
-  // `testimonial_video_url` is the case-study mapper's youtube column.
-  const youtubeUrl = pick(m.youtubeUrl, item?.youtube_url, item?.testimonial_video_url);
-  const highlightVideoUrl = pick(m.highlightVideoUrl, item?.highlight_video_url);
-  // `featured_image` is the customer-interview mapper's poster column.
-  const videoPoster = pick(
-    m.videoPoster,
-    item?.main_video_thumbnail,
-    item?.highlight_video_thumbnail,
-    item?.featured_image,
-  );
-  const highlightVideoPoster = pick(m.highlightVideoPoster, item?.highlight_video_thumbnail);
-  if (videoUrl) out.videoUrl = videoUrl;
-  if (youtubeUrl) out.youtubeUrl = youtubeUrl;
-  if (highlightVideoUrl) out.highlightVideoUrl = highlightVideoUrl;
-  if (videoPoster) out.videoPoster = videoPoster;
-  if (highlightVideoPoster) out.highlightVideoPoster = highlightVideoPoster;
-  return out.videoUrl || out.youtubeUrl || out.highlightVideoUrl ? out : null;
 }
 
 /** LOUD hydration-failure card — a card that fails to load renders a
@@ -1336,9 +1310,10 @@ interface ChatCardRegistryEntry {
   contentRefType?: string;
   /** Required whenever `contentRefType` is set. */
   skeleton?: () => React.ReactNode;
-  /** This type's records can carry a video (`itemVideoMetadata`): the card's footer row keeps a "Watch video"
-   *  slot loading and loaded, with or without a video, so the row never changes height. */
-  video?: boolean;
+  /** The kind of content this type's records can open below the card (`CHAT_CARD_DISCLOSURE.VIDEO`): the card's
+   *  footer row keeps that action's slot loading and loaded, with or without the content on a record, so the row
+   *  never changes height. */
+  disclosure?: ChatCardDisclosureKind;
   /** `item` is the fetched row (`undefined` only on the ref-only render
    *  path — `deleted_data` / `video`). */
   render: (item: ChatCardItem | undefined, chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode;
@@ -1603,11 +1578,21 @@ interface ProgramCardConfig {
   configKey: ProgramConfigKey;
   contentRefType: string;
   /** Episodes and webinars have recordings; events do not. */
-  video?: boolean;
+  disclosure?: ChatCardDisclosureKind;
 }
 const PROGRAM_CARD_CONFIGS: Record<string, ProgramCardConfig> = {
-  podcast: { label: 'Podcast episode', configKey: 'podcast', contentRefType: 'podcast', video: true },
-  webinar: { label: 'Webinar', configKey: 'webinar', contentRefType: 'webinar', video: true },
+  podcast: {
+    label: 'Podcast episode',
+    configKey: 'podcast',
+    contentRefType: 'podcast',
+    disclosure: CHAT_CARD_DISCLOSURE.VIDEO,
+  },
+  webinar: {
+    label: 'Webinar',
+    configKey: 'webinar',
+    contentRefType: 'webinar',
+    disclosure: CHAT_CARD_DISCLOSURE.VIDEO,
+  },
   event: { label: 'Event', configKey: 'event', contentRefType: 'event' },
 };
 function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
@@ -1615,7 +1600,7 @@ function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
-    video: cfg.video,
+    disclosure: cfg.disclosure,
     skeleton: () => <ProgramCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <ProgramChatCard
@@ -1786,7 +1771,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   case_study: {
-    video: true,
+    disclosure: CHAT_CARD_DISCLOSURE.VIDEO,
     label: 'Case study',
     contentRefType: 'case_study',
     bareInline: true,
@@ -1813,7 +1798,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   customer_interview: {
-    video: true,
+    disclosure: CHAT_CARD_DISCLOSURE.VIDEO,
     label: 'Customer interview',
     contentRefType: 'customer_interview',
     bareInline: true,
@@ -1829,7 +1814,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   product_release: {
-    video: true,
+    disclosure: CHAT_CARD_DISCLOSURE.VIDEO,
     label: 'Product release',
     contentRefType: 'product_release',
     bareInline: true,
@@ -1855,7 +1840,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   },
   ...programRegistryEntries(),
   investor_update: {
-    video: true,
+    disclosure: CHAT_CARD_DISCLOSURE.VIDEO,
     label: 'Investor update',
     contentRefType: 'investor_update',
     bareInline: true,
@@ -1871,7 +1856,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   onboarding_guide: {
-    video: true,
+    disclosure: CHAT_CARD_DISCLOSURE.VIDEO,
     label: 'Onboarding guide',
     contentRefType: 'onboarding_guide',
     bareInline: true,
@@ -2030,11 +2015,19 @@ interface ChatCardLoaderProps {
 }
 
 /**
- * A fetched card of a type that can carry a video: "Watch video" in the card's footer row, the player below once
- * opened; with no video on this record, the action's slot is kept unseen.
+ * A fetched card with something to open below it: the kind's action in the card's footer row ("Watch video"), the
+ * content below once opened; with no content on this record, the action's slot is kept unseen.
  */
-function CardWithVideo({ video, card }: { video: ChatRef | null; card: (action: ReactNode) => ReactNode }) {
-  const { action, panel } = useChatCardDisclosure('video', video, { reserve: true });
+function CardWithDisclosure({
+  kind,
+  content,
+  card,
+}: {
+  kind: ChatCardDisclosureKind;
+  content: ChatRef | null;
+  card: (action: ReactNode) => ReactNode;
+}) {
+  const { action, panel } = useChatCardDisclosure(kind, content, { reserve: true });
   return (
     // Same 12px rhythm as the message renderer's block-sibling wrapper
     // (`my-3` in chat-message-enhanced) so card→player spacing matches
@@ -2196,7 +2189,7 @@ export function ChatCardLoader({
   if (isLoading) {
     return finish(
       fetchEntry.skeleton?.() ?? null,
-      entry.video ? <ChatCardDisclosureButton variant="video" loading /> : undefined,
+      entry.disclosure ? <ChatCardDisclosureButton kind={entry.disclosure} loading /> : undefined,
       true,
     );
   }
@@ -2225,15 +2218,18 @@ export function ChatCardLoader({
   // async) it renders nothing (the missing-videos regression,
   // 2026-08-13). The loader's output already lives in a hoisted
   // block-level sibling (`b-<key>`), so block content is legal here.
-  const videoMeta = itemVideoMetadata(item);
-  if (videoMeta || entry.video) {
-    const videoRef: ChatRef | null = videoMeta
-      ? { ...finalChatRef, metadata: { ...(finalChatRef.metadata ?? {}), ...videoMeta } }
-      : null;
-    // Collapsed: the card's footer row carries "Watch video", and the player
-    // opens below the card only when asked (`chat-card-disclosure.tsx`).
+  // The kind the type declares (its slot is reserved even when this record has no content), else the first kind
+  // whose content the record carries. Collapsed: the footer row carries the action, and the content opens below the
+  // card only when asked (`chat-card-disclosure.tsx`).
+  const kind = entry.disclosure ?? chatCardDisclosureOf(item, finalChatRef)?.kind;
+  if (kind) {
+    const content = CHAT_CARD_DISCLOSURES[kind].fromItem(item, finalChatRef);
     return (
-      <CardWithVideo video={videoRef} card={action => finish(entry.render(item, finalChatRef, renderOpts), action)} />
+      <CardWithDisclosure
+        kind={kind}
+        content={content}
+        card={action => finish(entry.render(item, finalChatRef, renderOpts), action)}
+      />
     );
   }
   return finish(entry.render(item, finalChatRef, renderOpts));
@@ -2282,7 +2278,7 @@ export function renderChatInlineEntityCard(
   // transport with zero refs/fetch. Undecodable ids (legacy sha1 hashes,
   // hallucinations) fall through to the loader → plain-text degrade.
   // Hero videos on FETCHED entity types (webinars, releases, …) are
-  // handled post-fetch inside ChatCardLoader (`itemVideoMetadata`) — the
+  // handled post-fetch inside ChatCardLoader (`chatCardDisclosureOf`) — the
   // marker's ref plays no part in either path.
   if (chatRef.type === 'video') {
     const decoded = decodeVideoMarkerId(chatRef.id);
@@ -2306,7 +2302,7 @@ export function renderChatInlineEntityCard(
           {externalUrl && !isAppOriginUrl(externalUrl) ? (
             <ExternalMediaNotice url={externalUrl} kind="video" label={displayRef.title} />
           ) : (
-            <ChatCardDisclosureRow variant="video" chatRef={displayRef} />
+            <ChatCardDisclosureRow kind={CHAT_CARD_DISCLOSURE.VIDEO} chatRef={displayRef} />
           )}
         </BlockCard>
       );

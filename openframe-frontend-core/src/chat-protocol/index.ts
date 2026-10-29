@@ -28,7 +28,4 @@ export { isRecord, unwrapEnvelope } from './wire-narrow';
 // The `[card://<type>:<id>]` grammar — the renderer's and the server's one
 // definition, so a reference the hub emits is one the client expands.
 export * from './card-marker';
-// The link an answer makes to a screen of the app (`[label](/path "app-screen")`): what the hub tells the model to
-// write and what the chat draws as an inline box.
-export * from './app-screen-link';
 export { escapeThinkingTags } from './leading-frames';
