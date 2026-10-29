@@ -251,13 +251,15 @@ class SoftwareBundleServiceTest {
     }
 
     @Test
-    @DisplayName("submit SCHEDULED UPDATE: the settings travel to the schedule it creates")
+    @DisplayName("submit SCHEDULED UPDATE: the settings and each package's Software travel to the schedule it creates")
     void submit_scheduledUpdate_settingsForwardedToTheSchedule() {
         SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
         when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
         when(machinePlatformResolver.osTypesByMachineId(any())).thenReturn(java.util.Map.of("m1", OsType.MAC_OS));
         when(softwareScheduleService.create(any(), eq(USER))).thenReturn(SoftwareScheduleResponse.builder().id("s1").build());
-        SubmitSoftwareBundleInput input = submitInput(brewPkg("slack"));
+        SoftwarePackageInput slack = brewPkg("slack");
+        slack.setSoftwareId("title-7");
+        SubmitSoftwareBundleInput input = submitInput(slack);
         input.setAction(SoftwareAction.UPDATE);
         SoftwareBundleScheduleInput schedule = new SoftwareBundleScheduleInput();
         schedule.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
@@ -274,6 +276,8 @@ class SoftwareBundleServiceTest {
         verify(softwareScheduleService).create(created.capture(), eq(USER));
         assertThat(created.getValue().getUpdateSettings()).isSameAs(settings);
         assertThat(created.getValue().getAutoUpdate()).isSameAs(autoUpdate);
+        assertThat(created.getValue().getPackages()).singleElement()
+                .satisfies(p -> assertThat(p.getSoftwareId()).isEqualTo("title-7"));
     }
 
     private static PackageUpdateSettingsInput settingsInput(PackageUpdateMode mode, Long deadlineSeconds, int countdownSeconds) {

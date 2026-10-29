@@ -2,6 +2,7 @@ use crate::config::update_config::ALLOW_DOWNGRADE;
 use crate::models::openframe_client_info::ClientUpdateStatus;
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
 use crate::models::update_state::{UpdatePhase, UpdateState};
+use crate::platform::directories::get_update_staging_directory;
 use crate::platform::updater_launcher::{self, LaunchedUpdater, UpdaterParams};
 use crate::service::FULL_SERVICE_NAME;
 use crate::services::github_download_service::GithubDownloadService;
@@ -458,11 +459,14 @@ impl OpenFrameClientUpdateService {
         }
     }
 
-    /// Writes the extracted binary to a temp file for the updater script. The UUID name means
+    /// Writes the extracted binary to the staging dir for the updater script. The UUID name means
     /// nothing can read it before we return, so no atomic-rename or fsync ceremony is needed.
     async fn stage_binary(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
-        let temp_dir = std::env::temp_dir();
-        let binary_path = temp_dir.join(format!(
+        let staging_dir = get_update_staging_directory();
+        tokio::fs::create_dir_all(&staging_dir)
+            .await
+            .context("Failed to create update staging directory")?;
+        let binary_path = staging_dir.join(format!(
             "openframe-update-{}-{}",
             Uuid::new_v4(),
             binary_name

@@ -12,6 +12,7 @@ import com.openframe.data.document.rmm.script.ScriptType;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdate;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
@@ -20,6 +21,7 @@ import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
+import com.openframe.data.service.rmm.software.PackageAutoUpdatePolicyService;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
@@ -55,9 +57,11 @@ class SoftwareBundleOnlineDispatcherTest {
     private final PackageUpdateEligibilityService packageUpdateEligibility = mock(PackageUpdateEligibilityService.class);
     private final PackageUpdateDispatchService packageUpdateDispatchService = mock(PackageUpdateDispatchService.class);
 
+    private final PackageAutoUpdatePolicyService autoUpdatePolicyService = mock(PackageAutoUpdatePolicyService.class);
+
     private final SoftwareBundleOnlineDispatcher dispatcher = new SoftwareBundleOnlineDispatcher(
             scriptRepository, registry, scriptExecutionRepository, softwareNatsPublisher, retryStore,
-            packageManagerAvailability, packageUpdateEligibility, packageUpdateDispatchService);
+            packageManagerAvailability, packageUpdateEligibility, packageUpdateDispatchService, autoUpdatePolicyService);
 
     private final Machine mac = machine("m-1", OsType.MAC_OS);
 
@@ -91,6 +95,26 @@ class SoftwareBundleOnlineDispatcherTest {
     }
 
     @Test
+    @DisplayName("update on a feature-enabled device: the bundle's auto-update is turned on for that device and package")
+    void update_eligibleDevice_turnsAutoUpdateOn() {
+        when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__brew-update", ScriptType.SOFTWARE))
+                .thenReturn(Optional.of(script("brew-update-id")));
+        when(packageUpdateEligibility.isEligible(SoftwareAction.UPDATE, mac)).thenReturn(true);
+        SoftwareAutoUpdate autoUpdate = SoftwareAutoUpdate.builder().enabled(true).build();
+        SoftwareBundle bundle = bundle(SoftwareAction.UPDATE);
+        bundle.getPackages().get(0).setSoftwareId("title-7");
+        bundle.setAutoUpdate(autoUpdate);
+
+        dispatcher.dispatch(bundle, mac);
+
+        ArgumentCaptor<RunningExecutionRows> rows = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(autoUpdatePolicyService).turnOn(rows.capture(), eq(BrewPackageType.CASK), eq("title-7"),
+                eq(autoUpdate), eq(bundle.getUpdateSettings()));
+        assertThat(rows.getValue().getMachineIds()).containsExactly("m-1");
+        assertThat(rows.getValue().getPackageName()).isEqualTo("slack");
+    }
+
+    @Test
     @DisplayName("update on a device without the feature: the script, as before")
     void update_notEligible_runsScript() {
         when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__brew-update", ScriptType.SOFTWARE))
@@ -104,6 +128,7 @@ class SoftwareBundleOnlineDispatcherTest {
         assertThat(rows.getValue().getMachineIds()).containsExactly("m-1");
         verify(softwareNatsPublisher).publishSoftware(eq("m-1"), any());
         verify(packageUpdateDispatchService, never()).dispatchAdminUpdate(any(), any(), any());
+        verifyNoInteractions(autoUpdatePolicyService);
     }
 
     @Test
