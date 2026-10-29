@@ -51,6 +51,9 @@ export interface MingoHistoryRailProps {
   isLoadingMore?: boolean;
   /** Fetch the next page. */
   onLoadMore?: () => void;
+  /** How the next page loads: as the list's end scrolls into view (`'scroll'`, the default),
+   *  or on a "Show more" under it (`'button'`, a page at a time). */
+  loadMore?: 'scroll' | 'button';
   /** True while the FIRST page of dialogs is still loading. The list draws its
    *  own loading state so the rail doesn't flash the empty state before the list arrives. */
   isLoadingHistory?: boolean;
@@ -95,6 +98,7 @@ export function MingoHistoryRail({
   onScopeChange,
   searchQuery,
   hasMore = false,
+  loadMore = 'scroll',
   isLoadingMore = false,
   onLoadMore,
   isLoadingHistory = false,
@@ -168,6 +172,7 @@ export function MingoHistoryRail({
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
           onLoadMore={onLoadMore}
+          loadMore={loadMore}
         />
       ) : (
         // Figma 113:60939 — no-chats empty state.

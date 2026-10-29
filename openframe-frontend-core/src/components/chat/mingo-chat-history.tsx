@@ -66,8 +66,11 @@ export interface MingoChatHistoryProps {
   hasMore?: boolean;
   /** True while the next page is loading. */
   isLoadingMore?: boolean;
-  /** Fetch the next page — fired when the bottom sentinel scrolls into view. */
+  /** Fetch the next page — fired when the bottom sentinel scrolls into view, or on "Show more" (`loadMore`). */
   onLoadMore?: () => void;
+  /** How the next page loads: as the list's end scrolls into view (`'scroll'`, the default), or on a
+   *  "Show more" under it (`'button'`, a page at a time; it spins while the page loads). */
+  loadMore?: 'scroll' | 'button';
   /** The first page is still loading: the list draws its own loading state (one page of rows). Inside a
    *  `LoadingScope` it does so whatever this says. */
   loading?: boolean;
@@ -359,6 +362,7 @@ export function MingoChatHistory({
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
+  loadMore = 'scroll',
   loading = false,
   pageSize = CHAT_HISTORY_PAGE_SIZE,
   className,
@@ -373,9 +377,10 @@ export function MingoChatHistory({
   const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>();
 
   // Infinite scroll — load the next page when the sentinel enters the
-  // scroll viewport.
+  // scroll viewport. Not with "Show more": the list then grows on a click only.
+  const onScroll = loadMore === 'scroll';
   const sentinelRef = useLoadMoreSentinel({
-    hasMore,
+    hasMore: hasMore && onScroll,
     isLoadingMore,
     onLoadMore,
     itemCount: dialogs.length,
@@ -424,7 +429,20 @@ export function MingoChatHistory({
               </div>
             ))
           )}
-          {hasMore ? <div ref={sentinelRef} className="h-px shrink-0" /> : null}
+          {hasMore && onScroll ? <div ref={sentinelRef} className="h-px shrink-0" /> : null}
+          {hasMore && !onScroll && onLoadMore ? (
+            <Button
+              variant="link"
+              size="compact"
+              type="button"
+              data-tone="neutral"
+              loading={isLoadingMore}
+              onClick={onLoadMore}
+              className="self-start px-[var(--spacing-system-xs)]"
+            >
+              Show more
+            </Button>
+          ) : null}
         </div>
 
         {/* Scroll-fade — only while content is hidden in that direction. */}
