@@ -3,6 +3,7 @@ package com.openframe.delivery.dispatch;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
+import com.openframe.data.repository.delivery.MachineDeliveryPayloadRepository;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.delivery.config.DeliveryProperties;
@@ -25,6 +26,7 @@ import java.util.Optional;
 public class DeliveryRecorder {
 
     private final MachineDeliveryRepository repository;
+    private final MachineDeliveryPayloadRepository payloads;
     private final MachineDeliverySequenceRepository sequences;
     private final DeliveryProperties properties;
     private final DeliveryPayloadJson payloadJson;
@@ -76,11 +78,13 @@ public class DeliveryRecorder {
         DeliveryPayload payload = request.getPayload();
         DeliveryRef delivery = payload.getDelivery();
         String dispatchId = delivery.getDispatchId();
-        String json = payloadJson.write(payload);
         Policy policy = properties.resolve(type);
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
         long ttlSeconds = policy.getTtlSeconds();
         Instant dueAt = online ? runAt.plusSeconds(ackThresholdSeconds) : runAt;
+        Instant expiresAt = runAt.plusSeconds(ttlSeconds);
+        DeliveryPayloadBody body = payloadJson.body(payload);
+        String payloadId = payloads.hold(type, body.hash(), body.json(), expiresAt);
         return MachineDelivery.builder()
                 .id(id)
                 .type(type)
@@ -91,10 +95,10 @@ public class DeliveryRecorder {
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
                 .errors(0)
-                .payloadJson(json)
+                .payloadId(payloadId)
                 .dispatchedAt(runAt)
                 .dueAt(dueAt)
-                .expiresAt(runAt.plusSeconds(ttlSeconds))
+                .expiresAt(expiresAt)
                 .build();
     }
 }
