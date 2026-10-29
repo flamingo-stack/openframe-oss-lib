@@ -1,9 +1,7 @@
 use super::{AppIdentity, MainImages, Undetermined, RESOLVE_TIMEOUT_SECS};
 use crate::executor::{execute_script, Privilege, ScriptParams};
-use crate::models::{BrewKind, PackageRef};
 use crate::services::package_manager::brew;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 const INFO: &str = r#"HOMEBREW_NO_AUTO_UPDATE=1 "$BREW" info --json=v2 --cask "$@"
@@ -41,48 +39,24 @@ struct Info {
 #[derive(Debug, Deserialize)]
 struct Cask {
     token: String,
+    #[serde(default)]
+    full_token: String,
+    #[serde(default)]
+    old_tokens: Vec<String>,
     installed: Option<String>,
     #[serde(default)]
     artifacts: Vec<serde_json::Map<String, serde_json::Value>>,
 }
 
-/// An entry for every cask in `packages`; one `brew info` run for all of them.
-pub(super) async fn resolve(
-    packages: &[PackageRef],
-) -> HashMap<PackageRef, Result<AppIdentity, Undetermined>> {
-    let names: Vec<String> = packages
+/// Where brew installed the cask's app.
+pub(super) async fn resolve(name: &str) -> Result<AppIdentity, Undetermined> {
+    let info = run(&[name.to_string()]).await?;
+    info.casks
         .iter()
-        .filter_map(|package| match package {
-            PackageRef::Brew {
-                kind: BrewKind::Cask,
-                name,
-            } => Some(name.clone()),
-            _ => None,
+        .find(|cask| is_named(cask, name))
+        .map_or(Err(Undetermined::NotInstalled), |cask| {
+            identity(cask, Path::new(APPLICATIONS))
         })
-        .collect();
-    if names.is_empty() {
-        return HashMap::new();
-    }
-
-    let info = run(&names).await;
-    names
-        .into_iter()
-        .map(|name| {
-            let identity = info.as_ref().map_err(Clone::clone).and_then(|info| {
-                info.casks
-                    .iter()
-                    .find(|cask| cask.token == name)
-                    .map_or(Err(Undetermined::NotInstalled), |cask| {
-                        identity(cask, Path::new(APPLICATIONS))
-                    })
-            });
-            let package = PackageRef::Brew {
-                kind: BrewKind::Cask,
-                name,
-            };
-            (package, identity)
-        })
-        .collect()
 }
 
 async fn run(names: &[String]) -> Result<Info, Undetermined> {
@@ -105,6 +79,12 @@ async fn run(names: &[String]) -> Result<Info, Undetermined> {
     let start = result.stdout.find('{').unwrap_or(0);
     serde_json::from_str(&result.stdout[start..])
         .map_err(|e| Undetermined::Resolver(format!("unparseable output: {e}")))
+}
+
+/// brew answers an old token or a tap-qualified name with the cask's current token.
+fn is_named(cask: &Cask, name: &str) -> bool {
+    let short = name.rsplit('/').next().unwrap_or(name);
+    cask.full_token == name || cask.token == short || cask.old_tokens.iter().any(|old| old == short)
 }
 
 /// The cask's app bundle and main images; NoApp for file-only casks, pkg and script casks unknown.

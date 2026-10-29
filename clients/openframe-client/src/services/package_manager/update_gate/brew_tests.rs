@@ -39,6 +39,27 @@ fn located(identity: Result<AppIdentity, Undetermined>) -> Result<Option<PathBuf
 }
 
 #[test]
+fn a_cask_is_found_by_its_old_token_or_its_tap_qualified_name() {
+    let info: Info = serde_json::from_str(
+        r#"{"casks": [{"token": "docker-desktop", "full_token": "docker-desktop", "old_tokens": ["docker"], "installed": "4.52.0,210994"},
+                      {"token": "fork", "full_token": "acme/apps/fork", "installed": "2.59.2"}]}"#,
+    )
+    .unwrap();
+    let cases = [
+        ("docker-desktop", Some("docker-desktop")),
+        ("docker", Some("docker-desktop")),
+        ("homebrew/cask/docker", Some("docker-desktop")),
+        ("acme/apps/fork", Some("fork")),
+        ("docker-desktop-beta", None),
+    ];
+
+    for (name, expected) in cases {
+        let found = info.casks.iter().find(|cask| is_named(cask, name));
+        assert_eq!(found.map(|cask| cask.token.as_str()), expected, "{name}");
+    }
+}
+
+#[test]
 fn the_artifacts_decide_where_the_app_is_or_that_there_is_none() {
     let info: Info = serde_json::from_str(CAPTURED).unwrap();
     let applications = Path::new("/Apps");
@@ -85,6 +106,8 @@ fn main_images_are_the_files_directly_in_contents_macos() {
     }
     let cask = |target: &Path| Cask {
         token: "klogg".to_string(),
+        full_token: "klogg".to_string(),
+        old_tokens: Vec::new(),
         installed: Some("22.06.0.1289".to_string()),
         artifacts: vec![serde_json::from_value(serde_json::json!({
             "app": ["klogg.app"],

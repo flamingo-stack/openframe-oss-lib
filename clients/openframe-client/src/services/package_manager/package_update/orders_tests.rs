@@ -161,7 +161,7 @@ fn an_order_whose_install_runs_is_not_superseded() {
     store
         .submit(MACHINE, 1, 100, wait("req-1", "Vendor.App"), 0)
         .unwrap();
-    store.set_installing(Some("req-1"));
+    assert!(store.start_installing("req-1"));
 
     let submitted = store
         .submit(MACHINE, 1, 200, wait("req-2", "Vendor.App"), 0)
@@ -183,6 +183,28 @@ fn an_order_whose_install_runs_is_not_superseded() {
     assert!(
         matches!(third, Submitted::Superseded(ref old) if old.request_id == "req-2"),
         "finishing clears the install mark: {third:?}"
+    );
+}
+
+#[test]
+fn a_superseded_order_cannot_start_its_install() {
+    let (store, _dir) = store();
+    store
+        .submit(MACHINE, 1, 100, wait("req-1", "Vendor.App"), 0)
+        .unwrap();
+    store
+        .submit(MACHINE, 1, 200, wait("req-2", "Vendor.App"), 0)
+        .unwrap();
+
+    assert!(!store.start_installing("req-1"));
+    assert!(store.start_installing("req-2"));
+    let third = store
+        .submit(MACHINE, 1, 300, wait("req-3", "Vendor.App"), 0)
+        .unwrap();
+    assert_eq!(
+        third,
+        Submitted::Accepted,
+        "the request that started stays pending"
     );
 }
 

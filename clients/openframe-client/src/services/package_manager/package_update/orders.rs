@@ -201,9 +201,22 @@ impl OrderStore {
             .cloned()
     }
 
-    /// Marks the request whose install is running, so a newer request for its package waits for it.
-    pub fn set_installing(&self, request_id: Option<&str>) {
-        self.state().installing = request_id.map(str::to_string);
+    /// Marks the request whose install starts now, so a newer request for its package waits for it;
+    /// false when the request is no longer pending because a newer one replaced it.
+    pub fn start_installing(&self, request_id: &str) -> bool {
+        let mut state = self.state();
+        let pending = state
+            .pending
+            .iter()
+            .any(|order| order.request_id == request_id);
+        if pending {
+            state.installing = Some(request_id.to_string());
+        }
+        pending
+    }
+
+    pub fn stop_installing(&self) {
+        self.state().installing = None;
     }
 
     /// Drops a finished request and remembers its sequence, so a late re-send is stale.

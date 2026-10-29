@@ -27,7 +27,16 @@ fn a_built_event_carries_the_order_and_a_fresh_id() {
         relaunched: false,
     });
 
-    let event = build("m-1", &order(), Some("1.0"), Some("2.0"), done);
+    let order = order();
+    let event = build(
+        "m-1",
+        &order.request_id,
+        &order.source,
+        &order.package,
+        Some("1.0"),
+        Some("2.0"),
+        done,
+    );
 
     assert_eq!(event.request_id, "req-1");
     assert_eq!(event.machine_id, "m-1");
@@ -62,4 +71,20 @@ async fn a_superseded_report_is_a_failed_event_with_the_reason() {
         events[0].failed.as_ref().map(|f| f.reason),
         Some(FailReason::Superseded)
     );
+}
+
+#[test]
+fn outbox_keys_sort_in_the_order_events_happened() {
+    let keys = [
+        outbox_key(999_999_999, "ffffffff-0000-4000-8000-000000000000"),
+        outbox_key(1_000_000_000, "00000000-0000-4000-8000-000000000000"),
+        outbox_key(
+            1_761_600_000_000_000_001,
+            "88888888-0000-4000-8000-000000000000",
+        ),
+    ];
+
+    let mut sorted = keys.clone();
+    sorted.sort();
+    assert_eq!(sorted, keys);
 }

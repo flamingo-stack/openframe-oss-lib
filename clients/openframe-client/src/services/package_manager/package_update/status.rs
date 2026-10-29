@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use tokio::sync::Notify;
@@ -8,8 +9,8 @@ use tracing::{error, info, warn};
 use super::orders::Order;
 use crate::config::update_config::FLUSH_PUBLISH_TIMEOUT_SECS;
 use crate::models::{
-    package_update_status_subject, Done, FailReason, Failed, PackageUpdateStatusMessage,
-    UpdateStatus, Waiting,
+    package_update_status_subject, Done, FailReason, Failed, PackageRef, PackageUpdateMessage,
+    PackageUpdateStatusMessage, UpdateSource, UpdateStatus, Waiting,
 };
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::result_store::ResultStore;
@@ -90,7 +91,11 @@ impl StatusReporter {
                     }
                 };
                 if store.enabled() {
-                    let key = format!("package-update-status:{}", event.event_id);
+                    let at = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|elapsed| elapsed.as_nanos())
+                        .unwrap_or_default();
+                    let key = outbox_key(at, &event.event_id);
                     match store.enqueue(key, subject, bytes).await {
                         Ok(()) => flush.notify_one(),
                         Err(e) => error!(
@@ -128,25 +133,60 @@ impl StatusReporter {
             exit_code: None,
             message: Some("replaced by a newer request for the same package".to_string()),
         };
-        self.report(build(machine_id, order, None, None, Report::Failed(failed)))
-            .await;
+        self.report(build(
+            machine_id,
+            &order.request_id,
+            &order.source,
+            &order.package,
+            None,
+            None,
+            Report::Failed(failed),
+        ))
+        .await;
+    }
+
+    /// An order refused before it was taken in, so the backend still learns how it ended.
+    pub async fn report_rejected(
+        &self,
+        machine_id: &str,
+        message: &PackageUpdateMessage,
+        reason: FailReason,
+        detail: String,
+    ) {
+        let failed = Failed {
+            reason,
+            exit_code: None,
+            message: Some(detail),
+        };
+        self.report(build(
+            machine_id,
+            &message.request_id,
+            &message.source,
+            &message.package,
+            None,
+            None,
+            Report::Failed(failed),
+        ))
+        .await;
     }
 }
 
 pub(super) fn build(
     machine_id: &str,
-    order: &Order,
+    request_id: &str,
+    source: &UpdateSource,
+    package: &PackageRef,
     installed_version: Option<&str>,
     available_version: Option<&str>,
     report: Report,
 ) -> PackageUpdateStatusMessage {
     let mut event = PackageUpdateStatusMessage {
         event_id: uuid::Uuid::new_v4().to_string(),
-        request_id: order.request_id.clone(),
+        request_id: request_id.to_string(),
         machine_id: machine_id.to_string(),
         at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-        source: order.source.clone(),
-        package: order.package.clone(),
+        source: source.clone(),
+        package: package.clone(),
         installed_version: installed_version.map(str::to_string),
         available_version: available_version.map(str::to_string),
         state: UpdateStatus::Waiting,
@@ -166,6 +206,11 @@ pub(super) fn build(
         }
     }
     event
+}
+
+/// Time first: the outbox sends in key order, so the events of a request leave in the order they happened.
+fn outbox_key(unix_nanos: u128, event_id: &str) -> String {
+    format!("package-update-status:{unix_nanos:020}:{event_id}")
 }
 
 pub(super) fn rfc3339(unix_secs: u64) -> String {

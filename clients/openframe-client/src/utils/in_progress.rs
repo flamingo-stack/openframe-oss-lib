@@ -6,7 +6,7 @@ pub struct InProgress(Arc<AtomicUsize>);
 
 impl InProgress {
     pub fn begin(&self) -> InProgressGuard {
-        self.0.fetch_add(1, Ordering::AcqRel);
+        self.0.fetch_add(1, Ordering::SeqCst);
         InProgressGuard(self.0.clone())
     }
 
@@ -20,7 +20,7 @@ pub struct InProgressView(Arc<AtomicUsize>);
 
 impl InProgressView {
     pub fn is_active(&self) -> bool {
-        self.0.load(Ordering::Acquire) > 0
+        self.0.load(Ordering::SeqCst) > 0
     }
 }
 
@@ -30,7 +30,7 @@ pub struct InProgressGuard(Arc<AtomicUsize>);
 
 impl Drop for InProgressGuard {
     fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::AcqRel);
+        self.0.fetch_sub(1, Ordering::SeqCst);
     }
 }
 

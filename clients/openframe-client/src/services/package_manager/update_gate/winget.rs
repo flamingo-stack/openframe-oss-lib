@@ -1,9 +1,7 @@
 use super::decide::is_under;
 use super::{AppIdentity, MainImages, Undetermined, RESOLVE_TIMEOUT_SECS};
 use crate::executor::{execute_script, Privilege, ScriptParams};
-use crate::models::PackageRef;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Emits raw facts only; every choice is made in Rust. Runs as the console user.
@@ -117,36 +115,16 @@ struct AppxApplication {
     app_list_entry: Option<String>,
 }
 
-/// An entry for every `Winget` package in `packages`; one script run for all of them.
-pub(super) async fn resolve(
-    packages: &[PackageRef],
-) -> HashMap<PackageRef, Result<AppIdentity, Undetermined>> {
-    let ids: Vec<String> = packages
+/// Where the package's app is installed and what it runs as.
+pub(super) async fn resolve(id: &str) -> Result<AppIdentity, Undetermined> {
+    let output = run(&[id.to_string()]).await?;
+    output
+        .packages
         .iter()
-        .filter_map(|package| match package {
-            PackageRef::Winget { id } => Some(id.clone()),
-            _ => None,
+        .find(|package| package.id == id)
+        .map_or(Err(Undetermined::NotInstalled), |package| {
+            identity(package, &output.shortcuts)
         })
-        .collect();
-    if ids.is_empty() {
-        return HashMap::new();
-    }
-
-    let output = run(&ids).await;
-    ids.into_iter()
-        .map(|id| {
-            let identity = output.as_ref().map_err(Clone::clone).and_then(|output| {
-                output
-                    .packages
-                    .iter()
-                    .find(|package| package.id == id)
-                    .map_or(Err(Undetermined::NotInstalled), |package| {
-                        identity(package, &output.shortcuts)
-                    })
-            });
-            (PackageRef::Winget { id }, identity)
-        })
-        .collect()
 }
 
 async fn run(ids: &[String]) -> Result<Output, Undetermined> {

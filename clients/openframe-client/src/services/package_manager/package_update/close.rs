@@ -47,9 +47,17 @@ pub(super) async fn close(holders: &[u32]) -> Vec<u32> {
 
 async fn still_running(pids: &[u32]) -> Vec<u32> {
     let pids = pids.to_vec();
-    tokio::task::spawn_blocking(move || process_snapshot::alive(&pids))
-        .await
-        .unwrap_or_default()
+    let checked = pids.clone();
+    match tokio::task::spawn_blocking(move || process_snapshot::alive(&checked)).await {
+        Ok(alive) => alive,
+        Err(e) => {
+            warn!(
+                ?pids,
+                "Could not check the closed apps, taking them as running: {:#}", e
+            );
+            pids
+        }
+    }
 }
 
 #[cfg(test)]

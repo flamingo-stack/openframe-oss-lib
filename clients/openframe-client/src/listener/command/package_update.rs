@@ -3,7 +3,9 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use super::{Begin, CommandHandler, Outcome};
-use crate::models::{DeliveryRef, PackageUpdateMessage, UpdateMode, PACKAGE_UPDATE_KIND};
+use crate::models::{
+    DeliveryRef, FailReason, PackageUpdateMessage, UpdateMode, PACKAGE_UPDATE_KIND,
+};
 use crate::services::package_manager::package_update::{OrderStore, StatusReporter, Submitted};
 use crate::services::package_manager::{is_supported, ManagerId};
 use crate::services::result_store::now_secs;
@@ -12,7 +14,8 @@ const DEFAULT_COUNTDOWN_SECS: u64 = 300;
 const MIN_COUNTDOWN_SECS: u64 = 60;
 const MAX_COUNTDOWN_SECS: u64 = 1800;
 
-/// Takes update orders in: DONE once the order is on disk, the outcome follows on the status stream.
+/// Takes update orders in: DONE once the order is on disk or an unsupported one is refused with a
+/// FAILED status; the outcome follows on the status stream.
 #[derive(Clone)]
 pub struct PackageUpdateHandler {
     orders: Arc<OrderStore>,
@@ -51,7 +54,15 @@ impl CommandHandler for PackageUpdateHandler {
         };
         let manager = ManagerId::of(&command.package);
         if !is_supported(manager) {
-            return Outcome::Failed(format!("{manager:?} is not supported on this device"));
+            self.status
+                .report_rejected(
+                    machine_id,
+                    &command,
+                    FailReason::NotSupported,
+                    format!("{manager:?} is not supported on this device"),
+                )
+                .await;
+            return Outcome::Done;
         }
         let countdown = countdown_for(&command);
         match self

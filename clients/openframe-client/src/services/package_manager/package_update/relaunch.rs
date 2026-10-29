@@ -1,8 +1,9 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use tracing::{info, warn};
+use tracing::warn;
 
+use crate::platform::app_close;
 use crate::services::package_manager::update_gate::{AppIdentity, Holder};
 
 const SEARCH_DEPTH: usize = 3;
@@ -16,7 +17,7 @@ pub(super) async fn relaunch(closed: &[Holder], identity: Option<&AppIdentity>) 
     let mut relaunched = false;
     for image in images {
         match locate(image, identity) {
-            Some(target) => relaunched |= launch(&target).await,
+            Some(target) => relaunched |= app_close::reopen(&target).await,
             None => {
                 warn!(image = %image.display(), "The closed app is gone after the upgrade, not relaunching it")
             }
@@ -62,58 +63,6 @@ fn find_named(dir: &Path, name: &OsStr, depth: usize) -> Option<PathBuf> {
         level = next;
     }
     None
-}
-
-#[cfg(target_os = "macos")]
-async fn launch(image: &Path) -> bool {
-    use crate::platform::user_session::{get_console_user, launch_as_user};
-
-    let Some(user) = get_console_user() else {
-        warn!(image = %image.display(), "No console user to relaunch the app for");
-        return false;
-    };
-    let bundle = image
-        .ancestors()
-        .find(|path| path.extension().is_some_and(|ext| ext == "app"));
-    let (executable, args) = match bundle {
-        Some(bundle) => (
-            "/usr/bin/open".to_string(),
-            vec![bundle.to_string_lossy().into_owned()],
-        ),
-        None => (image.to_string_lossy().into_owned(), Vec::new()),
-    };
-    match launch_as_user(&executable, &args, &user).await {
-        Ok(_child) => {
-            info!(image = %image.display(), "Relaunched the app after its forced upgrade");
-            true
-        }
-        Err(e) => {
-            warn!(image = %image.display(), "Could not relaunch the app: {:#}", e);
-            false
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-async fn launch(image: &Path) -> bool {
-    use crate::platform::user_session::launch_in_user_session;
-
-    match launch_in_user_session(&image.to_string_lossy(), &[]) {
-        Ok(pid) => {
-            info!(image = %image.display(), pid, "Relaunched the app after its forced upgrade");
-            true
-        }
-        Err(e) => {
-            warn!(image = %image.display(), "Could not relaunch the app: {:#}", e);
-            false
-        }
-    }
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-async fn launch(image: &Path) -> bool {
-    warn!(image = %image.display(), "Relaunching apps is not supported here");
-    false
 }
 
 #[cfg(test)]

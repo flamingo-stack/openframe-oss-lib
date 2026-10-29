@@ -1,20 +1,11 @@
 use super::*;
-use crate::models::{
-    FailReason, PackageRef, PackageUpdateMessage, SourceKind, UpdateMode, UpdateSource,
-    UpdateStatus,
-};
 use crate::platform::DirectoryManager;
 use crate::services::tool_run_manager::ClientUpdatePendingFlag;
 use crate::utils::latch::Latch;
-use run::Verdict;
 use tempfile::TempDir;
-
-const MACHINE: &str = "machine-1";
 
 struct Fixture {
     worker: Arc<Worker>,
-    orders: Arc<OrderStore>,
-    events: Arc<std::sync::Mutex<Vec<crate::models::PackageUpdateStatusMessage>>>,
     agent_restart: Latch,
     _dir: TempDir,
 }
@@ -29,10 +20,10 @@ impl Fixture {
         );
         let config = AgentConfigurationService::new(directories).unwrap();
         let orders = Arc::new(OrderStore::load(dir.path().join("package_updates.json")));
-        let (status, events) = StatusReporter::in_memory();
+        let (status, _events) = StatusReporter::in_memory();
         let agent_restart = Latch::default();
         let worker = Arc::new(Worker {
-            orders: orders.clone(),
+            orders,
             status,
             config,
             signals: RestartSignals {
@@ -43,60 +34,10 @@ impl Fixture {
         });
         Fixture {
             worker,
-            orders,
-            events,
             agent_restart,
             _dir: dir,
         }
     }
-
-    fn submit(&self, request_id: &str, package: PackageRef) -> Order {
-        self.orders
-            .submit(
-                MACHINE,
-                1,
-                unix_now(),
-                PackageUpdateMessage {
-                    request_id: request_id.to_string(),
-                    source: UpdateSource {
-                        kind: SourceKind::Auto,
-                        origin: None,
-                    },
-                    package,
-                    mode: UpdateMode::Wait,
-                    countdown_seconds: None,
-                },
-                0,
-            )
-            .unwrap();
-        self.orders.get(request_id).unwrap()
-    }
-}
-
-#[tokio::test]
-async fn an_order_for_an_unsupported_manager_fails_as_not_supported() {
-    let f = Fixture::new();
-    let order = f.submit(
-        "req-1",
-        PackageRef::Choco {
-            id: "git".to_string(),
-        },
-    );
-    let mut progress = Progress::default();
-
-    let verdict = f
-        .worker
-        .look(MACHINE, &order, &mut progress, unix_now())
-        .await;
-
-    assert!(matches!(verdict, Verdict::Finished));
-    let events = f.events.lock().unwrap();
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0].state, UpdateStatus::Failed);
-    assert_eq!(
-        events[0].failed.as_ref().map(|failed| failed.reason),
-        Some(FailReason::NotSupported)
-    );
 }
 
 #[tokio::test]

@@ -38,31 +38,23 @@ const IMAGE: &str = "held.exe";
 #[cfg(not(target_os = "windows"))]
 const IMAGE: &str = "held";
 
-fn winget(id: &str) -> PackageRef {
-    PackageRef::Winget { id: id.to_string() }
-}
-
-fn prepared_for(package: &PackageRef, install_dir: &Path) -> Prepared {
+fn prepared_for(install_dir: &Path) -> Prepared {
     Prepared {
-        identities: HashMap::from([(
-            package.clone(),
-            Ok(AppIdentity::App {
-                install_dir: install_dir.to_path_buf(),
-                main_images: MainImages::Derived(vec![IMAGE.to_string()]),
-            }),
-        )]),
+        identity: Ok(AppIdentity::App {
+            install_dir: install_dir.to_path_buf(),
+            main_images: MainImages::Derived(vec![IMAGE.to_string()]),
+        }),
     }
 }
 
 #[tokio::test]
 async fn check_now_answers_from_a_fresh_snapshot() {
     let dir = tempfile::tempdir().unwrap();
-    let package = winget("Vendor.App");
-    let prepared = prepared_for(&package, dir.path());
-    assert_eq!(prepared.check_now(&package).await, GateDecision::Clear);
+    let prepared = prepared_for(dir.path());
+    assert_eq!(prepared.check_now().await, GateDecision::Clear);
 
     let running = RunningFrom::start(dir.path());
-    match prepared.check_now(&package).await {
+    match prepared.check_now().await {
         GateDecision::Blocked(BlockReason::Running { holders }) => {
             assert_eq!(holders.len(), 1);
             assert_eq!(holders[0].pid, running.0.id());
@@ -71,16 +63,5 @@ async fn check_now_answers_from_a_fresh_snapshot() {
     }
 
     drop(running);
-    assert_eq!(prepared.check_now(&package).await, GateDecision::Clear);
-}
-
-#[tokio::test]
-async fn a_package_that_was_not_prepared_is_held() {
-    let dir = tempfile::tempdir().unwrap();
-    let prepared = prepared_for(&winget("Vendor.App"), dir.path());
-
-    assert!(matches!(
-        prepared.check_now(&winget("Other.App")).await,
-        GateDecision::Blocked(BlockReason::Undetermined(Undetermined::Resolver(_)))
-    ));
+    assert_eq!(prepared.check_now().await, GateDecision::Clear);
 }

@@ -1,22 +1,21 @@
 use serde::Deserialize;
 
 use super::{
-    last_line, OutdatedPackage, QueryError, UpgradeOutcome, OUTDATED_TIMEOUT_SECS,
+    last_line, Probe, ProbeState, QueryError, UpgradeOutcome, PROBE_TIMEOUT_SECS,
     UPGRADE_TIMEOUT_SECS,
 };
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::PackageRef;
 
-/// Updatable rows with versions; sourceless or inexact-version rows are skipped, exit 3 means no WinGet module.
-const OUTDATED_SCRIPT: &str = r#"$ErrorActionPreference = 'Stop'
+/// The installed rows of one id with their source and update flag; exit 3 means no WinGet module.
+const PROBE_SCRIPT: &str = r#"$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 if (-not (Get-Module -ListAvailable -Name Microsoft.WinGet.Client)) { exit 3 }
 Import-Module Microsoft.WinGet.Client
 
 $rows = @(
-    Get-WinGetPackage |
-        Where-Object { $_.Source -and $_.IsUpdateAvailable -and $_.InstalledVersion -notmatch '^[<>]' } |
-        ForEach-Object { [pscustomobject]@{ id = $_.Id; installed = $_.InstalledVersion; available = @($_.AvailableVersions)[0] } }
+    Get-WinGetPackage -Id $args[0] -MatchOption EqualsCaseInsensitive |
+        ForEach-Object { [pscustomobject]@{ installed = $_.InstalledVersion; available = @($_.AvailableVersions)[0]; source = $_.Source; update = [bool]$_.IsUpdateAvailable } }
 )
 ConvertTo-Json -InputObject $rows -Compress
 "#;
@@ -45,24 +44,32 @@ const MODULE_MISSING: i32 = 3;
 
 #[derive(Deserialize)]
 struct Row {
-    id: String,
     #[serde(default)]
     installed: Option<String>,
     #[serde(default)]
     available: Option<String>,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    update: bool,
 }
 
-pub(super) async fn outdated() -> Result<Vec<OutdatedPackage>, QueryError> {
+pub(super) async fn probe(package: &PackageRef) -> Result<Probe, QueryError> {
+    let PackageRef::Winget { id } = package else {
+        return Err(QueryError::Unavailable(format!(
+            "not a winget package: {package:?}"
+        )));
+    };
     let result = execute_script(ScriptParams {
-        code: OUTDATED_SCRIPT,
+        code: PROBE_SCRIPT,
         shell: "powershell",
-        args: &[],
-        timeout_secs: OUTDATED_TIMEOUT_SECS,
+        args: std::slice::from_ref(id),
+        timeout_secs: PROBE_TIMEOUT_SECS,
         privilege: Privilege::User,
         env_vars: &[],
     })
     .await;
-    read_outdated(&result)
+    read_probe(&result)
 }
 
 pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
@@ -85,7 +92,8 @@ pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
     interpret(&result)
 }
 
-fn read_outdated(result: &ExecResult) -> Result<Vec<OutdatedPackage>, QueryError> {
+/// Several rows (scopes, architectures) count as outdated when any row winget can upgrade has an update.
+fn read_probe(result: &ExecResult) -> Result<Probe, QueryError> {
     match result.retcode {
         0 => {}
         MODULE_MISSING => {
@@ -95,21 +103,56 @@ fn read_outdated(result: &ExecResult) -> Result<Vec<OutdatedPackage>, QueryError
         }
         code => {
             return Err(QueryError::Failed(format!(
-                "outdated query exited {code}: {}",
+                "package query exited {code}: {}",
                 result.stderr.trim()
             )))
         }
     }
     let rows: Vec<Row> = serde_json::from_str(result.stdout.trim())
-        .map_err(|e| QueryError::Failed(format!("unparseable outdated query output: {e}")))?;
-    Ok(rows
-        .into_iter()
-        .map(|row| OutdatedPackage {
-            package: PackageRef::Winget { id: row.id },
-            installed_version: row.installed.filter(|v| !v.is_empty()),
-            available_version: row.available.filter(|v| !v.is_empty()),
-        })
-        .collect())
+        .map_err(|e| QueryError::Failed(format!("unparseable package query output: {e}")))?;
+    let upgradable = |row: &&Row| {
+        row.source
+            .as_deref()
+            .is_some_and(|source| !source.is_empty())
+            && !row
+                .installed
+                .as_deref()
+                .unwrap_or_default()
+                .starts_with(['<', '>'])
+    };
+    let Some(row) = rows
+        .iter()
+        .filter(upgradable)
+        .find(|row| row.update)
+        .or_else(|| rows.iter().find(upgradable))
+        .or_else(|| rows.first())
+    else {
+        return Ok(Probe {
+            state: ProbeState::NotInstalled,
+            installed_version: None,
+            available_version: None,
+        });
+    };
+    let state = if !upgradable(&row) {
+        if row
+            .source
+            .as_deref()
+            .is_some_and(|source| !source.is_empty())
+        {
+            ProbeState::NotUpgradable("its installed version is unknown to winget".to_string())
+        } else {
+            ProbeState::NotUpgradable("not installed from a winget source".to_string())
+        }
+    } else if row.update {
+        ProbeState::Outdated
+    } else {
+        ProbeState::UpToDate
+    };
+    Ok(Probe {
+        state,
+        installed_version: row.installed.clone().filter(|v| !v.is_empty()),
+        available_version: row.available.clone().filter(|v| !v.is_empty()),
+    })
 }
 
 fn interpret(result: &ExecResult) -> UpgradeOutcome {

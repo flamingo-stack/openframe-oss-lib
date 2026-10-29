@@ -6,7 +6,6 @@ mod winget;
 
 use crate::models::{BrewKind, PackageRef};
 use crate::platform::process_snapshot::{self, RunningProcess};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use decide::decide;
@@ -67,47 +66,29 @@ pub enum Undetermined {
     Snapshot(String),
 }
 
-/// Identities resolved once, the slow part; each verdict is taken later against a fresh snapshot.
+/// The identity resolved once, the slow part; each verdict is taken later against a fresh snapshot.
 pub struct Prepared {
-    identities: HashMap<PackageRef, Result<AppIdentity, Undetermined>>,
+    identity: Result<AppIdentity, Undetermined>,
 }
 
 impl Prepared {
-    pub async fn check_now(&self, package: &PackageRef) -> GateDecision {
-        self.decide(package, &snapshot().await)
+    pub async fn check_now(&self) -> GateDecision {
+        match (&self.identity, &snapshot().await) {
+            (Ok(identity), Ok(processes)) => decide(identity, processes),
+            (Err(reason), _) | (_, Err(reason)) => {
+                GateDecision::Blocked(BlockReason::Undetermined(reason.clone()))
+            }
+        }
     }
 
-    pub fn identity(&self, package: &PackageRef) -> Option<&AppIdentity> {
-        self.identities
-            .get(package)
-            .and_then(|identity| identity.as_ref().ok())
-    }
-
-    fn decide(
-        &self,
-        package: &PackageRef,
-        processes: &Result<Vec<RunningProcess>, Undetermined>,
-    ) -> GateDecision {
-        let identity = self.identities.get(package).cloned().unwrap_or_else(|| {
-            Err(Undetermined::Resolver(
-                "package was not prepared".to_string(),
-            ))
-        });
-        identity
-            .and_then(|identity| {
-                processes
-                    .as_ref()
-                    .map(|processes| decide(&identity, processes))
-                    .map_err(Clone::clone)
-            })
-            .unwrap_or_else(|reason| GateDecision::Blocked(BlockReason::Undetermined(reason)))
+    pub fn identity(&self) -> Option<&AppIdentity> {
+        self.identity.as_ref().ok()
     }
 }
 
-pub async fn prepare(packages: &[PackageRef]) -> Prepared {
-    let identities = resolve(packages).await;
+pub async fn prepare(package: &PackageRef) -> Prepared {
     Prepared {
-        identities: packages.iter().cloned().zip(identities).collect(),
+        identity: resolve(package).await,
     }
 }
 
@@ -117,30 +98,21 @@ async fn snapshot() -> Result<Vec<RunningProcess>, Undetermined> {
         .map_err(|e| Undetermined::Snapshot(e.to_string()))
 }
 
-/// One identity per package, in input order.
-async fn resolve(packages: &[PackageRef]) -> Vec<Result<AppIdentity, Undetermined>> {
-    #[cfg(target_os = "windows")]
-    let winget = winget::resolve(packages).await;
-    #[cfg(target_os = "macos")]
-    let casks = brew::resolve(packages).await;
-
-    packages
-        .iter()
-        .map(|package| match package {
-            PackageRef::Brew {
-                kind: BrewKind::Formula,
-                ..
-            } => Ok(AppIdentity::NoApp),
-            #[cfg(target_os = "windows")]
-            PackageRef::Winget { .. } => winget[package].clone(),
-            #[cfg(target_os = "macos")]
-            PackageRef::Brew {
-                kind: BrewKind::Cask,
-                ..
-            } => casks[package].clone(),
-            _ => Err(Undetermined::ManagerUnsupported),
-        })
-        .collect()
+async fn resolve(package: &PackageRef) -> Result<AppIdentity, Undetermined> {
+    match package {
+        PackageRef::Brew {
+            kind: BrewKind::Formula,
+            ..
+        } => Ok(AppIdentity::NoApp),
+        #[cfg(target_os = "windows")]
+        PackageRef::Winget { id } => winget::resolve(id).await,
+        #[cfg(target_os = "macos")]
+        PackageRef::Brew {
+            kind: BrewKind::Cask,
+            name,
+        } => brew::resolve(name).await,
+        _ => Err(Undetermined::ManagerUnsupported),
+    }
 }
 
 #[cfg(test)]

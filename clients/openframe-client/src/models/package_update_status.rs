@@ -55,6 +55,7 @@ pub struct Waiting {
 pub enum WaitReason {
     AppRunning,
     ManagerBusy,
+    NoUserSession,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +107,8 @@ pub enum FailReason {
     Timeout,
     NotSupported,
     Superseded,
+    NotInstalled,
+    NotUpgradable,
 }
 
 #[cfg(test)]

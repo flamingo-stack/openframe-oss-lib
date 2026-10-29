@@ -6,11 +6,11 @@ pub struct Latch(Arc<AtomicBool>);
 
 impl Latch {
     pub fn set(&self) {
-        self.0.store(true, Ordering::Release);
+        self.0.store(true, Ordering::SeqCst);
     }
 
     pub fn is_set(&self) -> bool {
-        self.0.load(Ordering::Acquire)
+        self.0.load(Ordering::SeqCst)
     }
 
     pub fn view(&self) -> LatchView {
@@ -23,7 +23,7 @@ pub struct LatchView(Arc<AtomicBool>);
 
 impl LatchView {
     pub fn is_set(&self) -> bool {
-        self.0.load(Ordering::Acquire)
+        self.0.load(Ordering::SeqCst)
     }
 }
 

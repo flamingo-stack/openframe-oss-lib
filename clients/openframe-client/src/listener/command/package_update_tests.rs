@@ -87,6 +87,20 @@ async fn an_order_is_stored_and_done_at_once() {
     assert!(f.events.lock().unwrap().is_empty(), "nothing to report yet");
 }
 
+/// The one event a refused order leaves: FAILED with `reason`, for `request_id`.
+fn assert_refused(f: &Fixture, outcome: Outcome, request_id: &str, reason: FailReason) {
+    assert_eq!(outcome, Outcome::Done, "the refusal itself is the outcome");
+    assert!(f.orders.pending(MACHINE).is_empty());
+    let events = f.events.lock().unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].request_id, request_id);
+    assert_eq!(events[0].state, UpdateStatus::Failed);
+    assert_eq!(
+        events[0].failed.as_ref().map(|failed| failed.reason),
+        Some(reason)
+    );
+}
+
 #[tokio::test]
 async fn an_order_without_a_sequence_fails() {
     let f = fixture();
@@ -106,7 +120,7 @@ async fn an_order_without_a_sequence_fails() {
 }
 
 #[tokio::test]
-async fn an_unsupported_manager_is_refused_and_dropped() {
+async fn an_unsupported_manager_is_refused_on_the_status_stream() {
     let f = fixture();
     let command: PackageUpdateMessage = serde_json::from_value(json!({
         "requestId": "req-1",
@@ -121,8 +135,7 @@ async fn an_unsupported_manager_is_refused_and_dropped() {
         .run(MACHINE, &delivery(Some(1)), command, ())
         .await;
 
-    assert!(matches!(outcome, Outcome::Failed(_)));
-    assert!(f.orders.pending(MACHINE).is_empty());
+    assert_refused(&f, outcome, "req-1", FailReason::NotSupported);
 }
 
 #[tokio::test]
