@@ -122,6 +122,8 @@ type SoftwareSchedulePackage {
     packageName: String!
     """Brew-only sub-type (CASK/FORMULA); null for managers that do not distinguish."""
     brewPackageType: BrewPackageType
+    "The Software (Fleet title) this package updates; null when it was picked from the package search."
+    softwareId: ID
 }
 
 input SoftwareSchedulePackageInput {
@@ -129,6 +131,8 @@ input SoftwareSchedulePackageInput {
     packageName: String!
     "Brew-only sub-type (CASK/FORMULA). Required for brew (enforced server-side), ignored by other managers."
     brewPackageType: BrewPackageType
+    "The Software (Fleet title) this package updates, as on SoftwarePackageInput."
+    softwareId: ID
 }
 
 input CreateSoftwareScheduleInput {
