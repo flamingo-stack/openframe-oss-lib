@@ -41,15 +41,6 @@ public class CustomPackageAutoUpdatePolicyRepositoryImpl implements CustomPackag
         return mongoTemplate.updateMulti(enabled, disable, PackageAutoUpdatePolicy.class).getModifiedCount();
     }
 
-    @Override
-    public void markOrdered(Collection<String> policyIds, String version) {
-        if (policyIds.isEmpty()) {
-            return;
-        }
-        mongoTemplate.updateMulti(Query.query(Criteria.where("_id").in(policyIds)),
-                new Update().set("lastVersion", version), PackageAutoUpdatePolicy.class);
-    }
-
     private static Query key(PackageAutoUpdatePolicy template, String machineId) {
         return Query.query(Criteria.where("tenantId").is(template.getTenantId())
                 .and("machineId").is(machineId)

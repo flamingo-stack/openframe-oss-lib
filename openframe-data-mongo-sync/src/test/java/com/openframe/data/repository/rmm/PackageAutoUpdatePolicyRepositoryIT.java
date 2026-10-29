@@ -125,6 +125,7 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(enabled).extracting(PackageAutoUpdatePolicy::getPackageName).containsOnly("google-chrome");
         assertThat(enabled).extracting(PackageAutoUpdatePolicy::getLastVersion).containsOnly("151.0.7922.98");
 
+        assertThat(repository.markOrdered(List.of(), "152.0.7977.65")).isZero();   // nothing to mark, nothing touched
         repository.markOrdered(List.of(byMachine("google-chrome").get("m1").getId()), "152.0.7977.65");
 
         Map<String, PackageAutoUpdatePolicy> chromeByMachine = byMachine("google-chrome");
