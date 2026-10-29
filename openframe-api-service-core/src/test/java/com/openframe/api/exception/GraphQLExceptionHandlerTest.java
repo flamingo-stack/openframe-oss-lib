@@ -23,6 +23,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationDeniedException;
@@ -206,6 +207,8 @@ class GraphQLExceptionHandlerTest {
                         "LOKI_QUERY_REJECTED", 400),
                 arguments(new LokiQueryException("loki down"),
                         "Logs are temporarily unavailable. Please try again later.", "LOKI_QUERY_ERROR", 503),
+                arguments(new OptimisticLockingFailureException("stale version"),
+                        "This item was changed by someone else. Reload it and try again.", "CONFLICT", 409),
                 arguments(new DataAccessResourceFailureException("mongo down"),
                         "Database operation failed. Please try again later.", "DATABASE_ERROR", 503),
                 arguments(new RuntimeException("boom"), UNEXPECTED, "INTERNAL_ERROR", 500),
