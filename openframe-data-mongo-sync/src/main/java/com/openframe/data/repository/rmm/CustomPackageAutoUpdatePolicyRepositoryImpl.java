@@ -53,6 +53,7 @@ public class CustomPackageAutoUpdatePolicyRepositoryImpl implements CustomPackag
                 .set("enabled", true)
                 .set("brewPackageType", template.getBrewPackageType())
                 .set("settings", template.getSettings())
+                .set("lastVersion", template.getLastVersion())
                 .set("updatedBy", template.getUpdatedBy())
                 .set("updatedAt", now)
                 .setOnInsert("createdBy", template.getUpdatedBy())

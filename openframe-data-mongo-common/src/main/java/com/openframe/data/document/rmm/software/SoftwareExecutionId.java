@@ -18,6 +18,11 @@ public final class SoftwareExecutionId {
         return derive("swschedule", scheduleId, packageManager, packageName);
     }
 
+    // one auto-update job per package and version, so devices that reach it later join the same row
+    public static String forAutoUpdate(String tenantId, PackageManagerType packageManager, String packageName, String version) {
+        return derive("swauto", tenantId + '@' + version, packageManager, packageName);
+    }
+
     private static String derive(String kind, String id, PackageManagerType packageManager, String packageName) {
         String seed = kind + ':' + id + ':' + packageManager + ':' + packageName;
         return UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).toString();
