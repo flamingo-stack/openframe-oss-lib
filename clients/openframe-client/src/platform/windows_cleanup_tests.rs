@@ -19,7 +19,7 @@ fn script_removes_binary_install_dirs_and_itself() {
     let script = staging_dir.join("cleanup.ps1");
     fs::write(
         &script,
-        generate_binary_cleanup_script(&binary, exited.id(), Some(&bin_dir), Some(&staging_dir)),
+        generate_binary_cleanup_script(&binary, exited.id(), Some(&bin_dir), &staging_dir),
     )
     .unwrap();
 

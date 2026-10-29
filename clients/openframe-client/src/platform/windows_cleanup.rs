@@ -17,15 +17,13 @@ pub fn generate_binary_cleanup_script(
     install_path: &Path,
     current_pid: u32,
     bin_dir: Option<&PathBuf>,
-    staging_dir: Option<&PathBuf>,
+    staging_dir: &Path,
 ) -> String {
     let install_path_str = install_path.to_string_lossy().replace('\'', "''");
     let bin_dir_str = bin_dir
         .map(|p| p.to_string_lossy().replace('\'', "''"))
         .unwrap_or_default();
-    let staging_dir_str = staging_dir
-        .map(|p| p.to_string_lossy().replace('\'', "''"))
-        .unwrap_or_default();
+    let staging_dir_str = staging_dir.to_string_lossy().replace('\'', "''");
 
     format!(
         r#"
@@ -172,7 +170,7 @@ pub fn execute_binary_cleanup_script(install_path: &Path, bin_dir: Option<&PathB
 
     // Generate script content
     let script_content =
-        generate_binary_cleanup_script(install_path, current_pid, bin_dir, Some(&staging_dir));
+        generate_binary_cleanup_script(install_path, current_pid, bin_dir, &staging_dir);
 
     // Write script to file
     let mut file =
