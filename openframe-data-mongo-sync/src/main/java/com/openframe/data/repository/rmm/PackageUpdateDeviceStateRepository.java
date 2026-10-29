@@ -4,6 +4,7 @@ import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +14,8 @@ public interface PackageUpdateDeviceStateRepository extends MongoRepository<Pack
     Optional<PackageUpdateDeviceState> findByTenantIdAndRequestIdAndMachineId(String tenantId, String requestId, String machineId);
 
     List<PackageUpdateDeviceState> findByTenantIdAndRequestId(String tenantId, String requestId);
+
+    List<PackageUpdateDeviceState> findByTenantIdAndRequestIdIn(String tenantId, Collection<String> requestIds);
 
     long deleteByTenantIdAndRequestId(String tenantId, String requestId);
 }

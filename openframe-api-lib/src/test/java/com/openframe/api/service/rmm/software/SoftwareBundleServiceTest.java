@@ -1,12 +1,18 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
+import com.openframe.api.dto.rmm.software.PackageUpdateSettingsInput;
+import com.openframe.api.dto.rmm.software.SoftwareAutoUpdateInput;
 import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
+import com.openframe.api.dto.rmm.software.SoftwareBundleScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
+import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
@@ -199,6 +205,81 @@ class SoftwareBundleServiceTest {
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("brewPackageType");
         verify(bundleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("submit UPDATE without settings: the screen's defaults are stored and returned, auto-update off")
+    void submit_update_defaultSettingsStoredAndReturned() {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(machinePlatformResolver.osTypesByMachineId(any())).thenReturn(java.util.Map.of("m1", OsType.MAC_OS));
+        when(onlineDispatchRepository.findByTenantIdAndMachineIdAndBundleId(eq(TENANT), anyString(), eq(BUNDLE_ID)))
+                .thenReturn(Optional.empty());
+        SubmitSoftwareBundleInput input = submitInput(brewPkg("slack"));
+        input.setAction(SoftwareAction.UPDATE);
+
+        SoftwareBundleResponse res = service.submit(input, USER);
+
+        ArgumentCaptor<SoftwareBundle> saved = ArgumentCaptor.forClass(SoftwareBundle.class);
+        verify(bundleRepository).save(saved.capture());
+        assertThat(saved.getValue().getUpdateSettings()).satisfies(s -> {
+            assertThat(s.getMode()).isEqualTo(PackageUpdateMode.WAIT);
+            assertThat(s.getDeadlineSeconds()).isEqualTo(604_800L);
+            assertThat(s.getCountdownSeconds()).isEqualTo(300);
+        });
+        assertThat(saved.getValue().getAutoUpdate().isEnabled()).isFalse();
+        assertThat(res.getUpdateSettings()).isEqualTo(saved.getValue().getUpdateSettings());
+        assertThat(res.getAutoUpdate()).isEqualTo(saved.getValue().getAutoUpdate());
+    }
+
+    @Test
+    @DisplayName("submit INSTALL with update settings: rejected before anything is saved or dispatched")
+    void submit_installWithUpdateSettings_rejectedNothingSaved() {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(machinePlatformResolver.osTypesByMachineId(any())).thenReturn(java.util.Map.of("m1", OsType.MAC_OS));
+        SubmitSoftwareBundleInput input = submitInput(brewPkg("slack"));
+        input.setUpdateSettings(settingsInput(PackageUpdateMode.FORCE, null, 60));
+
+        assertThatThrownBy(() -> service.submit(input, USER))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("updateSettings");
+        verify(bundleRepository, never()).save(any());
+        verifyNoInteractions(onlineDispatchRepository, softwareActionResultRepository, softwareScheduleService);
+    }
+
+    @Test
+    @DisplayName("submit SCHEDULED UPDATE: the settings travel to the schedule it creates")
+    void submit_scheduledUpdate_settingsForwardedToTheSchedule() {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(machinePlatformResolver.osTypesByMachineId(any())).thenReturn(java.util.Map.of("m1", OsType.MAC_OS));
+        when(softwareScheduleService.create(any(), eq(USER))).thenReturn(SoftwareScheduleResponse.builder().id("s1").build());
+        SubmitSoftwareBundleInput input = submitInput(brewPkg("slack"));
+        input.setAction(SoftwareAction.UPDATE);
+        SoftwareBundleScheduleInput schedule = new SoftwareBundleScheduleInput();
+        schedule.setStartAt(Instant.parse("2026-09-15T02:00:00Z"));
+        input.setSchedule(schedule);
+        PackageUpdateSettingsInput settings = settingsInput(PackageUpdateMode.WAIT, 86_400L, 120);
+        SoftwareAutoUpdateInput autoUpdate = new SoftwareAutoUpdateInput();
+        autoUpdate.setEnabled(true);
+        input.setUpdateSettings(settings);
+        input.setAutoUpdate(autoUpdate);
+
+        service.submit(input, USER);
+
+        ArgumentCaptor<CreateSoftwareScheduleInput> created = ArgumentCaptor.forClass(CreateSoftwareScheduleInput.class);
+        verify(softwareScheduleService).create(created.capture(), eq(USER));
+        assertThat(created.getValue().getUpdateSettings()).isSameAs(settings);
+        assertThat(created.getValue().getAutoUpdate()).isSameAs(autoUpdate);
+    }
+
+    private static PackageUpdateSettingsInput settingsInput(PackageUpdateMode mode, Long deadlineSeconds, int countdownSeconds) {
+        PackageUpdateSettingsInput input = new PackageUpdateSettingsInput();
+        input.setMode(mode);
+        input.setDeadlineSeconds(deadlineSeconds);
+        input.setCountdownSeconds(countdownSeconds);
+        return input;
     }
 
     private static SubmitSoftwareBundleInput submitInput(SoftwarePackageInput... packages) {
