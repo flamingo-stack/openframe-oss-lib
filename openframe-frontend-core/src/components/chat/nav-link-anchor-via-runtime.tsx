@@ -27,7 +27,6 @@
 
 import type { AnchorHTMLAttributes, ReactNode, MouseEvent } from 'react';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
-import { useRouter } from '../../embed-shims/next-navigation';
 import { useChatPanel } from './chat-panel-context';
 import { executeNavigation } from './utils/execute-navigation';
 import { type NavLinkTarget, navLinkTarget, newTabAnchorAttrs } from './utils/nav-anchor-props';
@@ -84,21 +83,13 @@ export function useNavLinkViaRuntime({
   onClick: onClickProp,
 }: NavLinkViaRuntimeInput): NavLinkViaRuntimeProps {
   const runtime = useRequiredChatRuntime();
-  const router = useRouter();
   const panel = useChatPanel();
   const { href: resolvedHref, isNewTab } = useNavLinkTarget(href, targetPlatform);
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
     onClickProp?.(e);
     if (e.defaultPrevented) return;
-    const handled = executeNavigation({
-      event: e,
-      runtime,
-      href: resolvedHref,
-      path,
-      targetPlatform,
-      fallbackNavigate: router.push,
-    });
+    const handled = executeNavigation({ event: e, runtime, href: resolvedHref, path, targetPlatform });
     if (handled && !isNewTab && panel?.closeChat) panel.closeChat();
   };
   const attrs = newTabAnchorAttrs(isNewTab);

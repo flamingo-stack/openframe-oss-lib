@@ -63,8 +63,8 @@ export {
 } from './chat-nav-resolution';
 export { handleChatNavClick, type ChatNavClickInput } from './execute-navigation';
 // The unified navigation-execution primitive — single source of truth for
-// new-tab/same-tab + internal/external + embed/host + the runtime→router→window
-// fallback. Every surface routes through it (handleChatNavClick is now a wrapper).
+// new-tab/same-tab + internal/external + embed/host, through the host's
+// `runtime.navigation.navigate`. Every surface routes through it (handleChatNavClick is now a wrapper).
 export {
   executeNavigation,
   executeNavigationImperative,

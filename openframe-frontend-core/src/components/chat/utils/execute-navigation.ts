@@ -5,9 +5,9 @@
  *
  * Link BUILDING is unified by `composeContentUrl`; the new-tab DECISION is
  * `navLinkTarget` (nav-anchor-props). This is the third leg: ONE place
- * that EXECUTES a navigation — encoding new-tab-vs-same-tab + internal-vs-external
- * + embed-vs-host + the runtime-then-router-then-window fallback chain. Every
- * surface routes through it:
+ * that EXECUTES a navigation — new tab or same tab, in the app through the host's
+ * `runtime.navigation.navigate`, or by the browser when the host does not take it.
+ * Every surface routes through it:
  *   - chat cards / chips / markdown links → `executeNavigation` (click form),
  *     via the thin `handleChatNavClick` wrapper.
  *   - buttons / page rows / form redirects → `executeNavigationImperative` directly.
@@ -19,13 +19,12 @@
  *      browser do its native thing (`<a>` opens a new tab, etc.)
  *   3. `navLinkTarget(...).isNewTab` true → `runtime.navigation.openExternal(href)` else
  *      `window.open(href, '_blank', noopener,noreferrer)`
- *   4. else (same-tab) → `runtime.navigation.navigate({href,path,targetPlatform})`;
- *      if the host didn't handle it → `fallbackNavigate(stripped)` else
- *      `window.location.assign(stripped)`
+ *   4. else (same-tab) → `runtime.navigation.navigate({href,path,targetPlatform})`,
+ *      the host's in-app navigation (every host wires it); a target the host does
+ *      not take (another origin) is a browser navigation, `window.location.assign`.
  *
- * `runtime` is nullable: surfaces with no `ChatRuntimeContext` mounted (e.g. the
- * announcement bar) pass `null` and get the plain same-tab fallback — there's no
- * new-tab/embed decision to make without a runtime.
+ * `runtime` is nullable: a surface with no `ChatRuntimeContext` mounted has no
+ * host navigation, so its links are browser navigations.
  */
 
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
@@ -55,10 +54,6 @@ export interface ExecuteNavigationClickArgs {
   href: string;
   path?: string | null;
   targetPlatform?: string | null;
-  /** Host router fallback for same-origin soft-nav when the runtime doesn't wire
-   *  `navigation.navigate` — pass `useRouter().push`. Without it, falls back to a
-   *  full-page `window.location.assign`. */
-  fallbackNavigate?: (path: string) => void;
   /** The host's `composeContentUrl` returned `href` as its own relative route (see `navLinkTarget`). */
   hostRoute?: boolean;
 }
@@ -69,7 +64,6 @@ export interface ExecuteNavigationImperativeArgs {
   /** Doc-tree path, for a host that swaps a mounted doc viewer in place (`runtime.navigation.navigate`). */
   path?: string | null;
   targetPlatform?: string | null;
-  fallbackNavigate?: (path: string) => void;
   /** The host's `composeContentUrl` returned `href` as its own relative route (see `navLinkTarget`). */
   hostRoute?: boolean;
 }
@@ -80,7 +74,6 @@ function runNavigation(
   href: string,
   path: string | null | undefined,
   targetPlatform: string | null | undefined,
-  fallbackNavigate?: (path: string) => void,
   hostRoute?: boolean,
 ): void {
   // THE navigation decision (no runtime → same tab).
@@ -104,16 +97,12 @@ function runNavigation(
   // neither opens nor scrolls. `navigateSamePageHash` does the pushState AND
   // dispatches the synthetic `hashchange` (+ anchoring-proof scroll). It returns
   // false for cross-page targets (different pathname/search) — those fall through
-  // to the host nav / router below, which mount the new route where the hash is
+  // to the host's navigation below, which mounts the new route where the hash is
   // read fresh on first render.
   if (target.includes('#') && navigateSamePageHash(target, { headerOffset: STICKY_HEADER_OFFSET_PX })) {
     return;
   }
-  const handled = runtime?.navigation.navigate?.({ href, path, targetPlatform }) ?? false;
-  if (!handled) {
-    if (fallbackNavigate) fallbackNavigate(target);
-    else window.location.assign(target);
-  }
+  if (!runtime?.navigation.navigate?.({ href, path, targetPlatform })) window.location.assign(target);
 }
 
 /**
@@ -127,7 +116,6 @@ export function executeNavigation({
   href,
   path,
   targetPlatform,
-  fallbackNavigate,
   hostRoute,
 }: ExecuteNavigationClickArgs): boolean {
   if (!href) {
@@ -141,7 +129,7 @@ export function executeNavigation({
   if (event.button !== undefined && event.button !== 0) return false;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
   event.preventDefault();
-  runNavigation(runtime, href, path, targetPlatform, fallbackNavigate, hostRoute);
+  runNavigation(runtime, href, path, targetPlatform, hostRoute);
   return true;
 }
 
@@ -154,10 +142,9 @@ export function executeNavigationImperative({
   href,
   path,
   targetPlatform,
-  fallbackNavigate,
   hostRoute,
 }: ExecuteNavigationImperativeArgs): void {
-  runNavigation(runtime, href, path, targetPlatform, fallbackNavigate, hostRoute);
+  runNavigation(runtime, href, path, targetPlatform, hostRoute);
 }
 
 /**
@@ -168,9 +155,8 @@ export function handleChatNavClick(
   event: NavClickEvent,
   runtime: ChatRuntime | null | undefined,
   { href, path, targetPlatform }: ChatNavClickInput,
-  fallbackNavigate?: (path: string) => void,
 ): boolean {
-  return executeNavigation({ event, runtime, href, path, targetPlatform, fallbackNavigate });
+  return executeNavigation({ event, runtime, href, path, targetPlatform });
 }
 
 /** @deprecated Argument shape of the deprecated {@link handleChatNavClick}. */

@@ -27,12 +27,16 @@
 
 import type React from 'react';
 import { type ReactNode, useState } from 'react';
+import { cn } from '../../../utils/cn';
 import { PlayIcon } from '../../icons-v2-generated/media-playback/play-icon';
 import { Button } from '../../ui/button';
+import { TextHold } from '../../ui/layout-hold';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { SKELETON_SURFACE_CLASS } from '../../ui/skeleton-surface';
 import type { ChatRef } from '../chat-ref.types';
 import { ExpandChevron } from '../expand-chevron';
 import { useCollapsible } from '../hooks/use-collapsible';
-import { CARD_FOOTER_ACTION_CLASS, FooterActionSkeleton } from '../source-action-button';
+import { CARD_FOOTER_ACTION_CLASS } from '../source-action-button';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
 
 /** The kinds of content a chat card can open below itself. */
@@ -142,7 +146,25 @@ export function ChatCardDisclosureButton({
   loading?: boolean;
 }): React.ReactElement {
   const spec = CHAT_CARD_DISCLOSURES[kind];
-  if (loading) return <FooterActionSkeleton label={spec.label} className={CARD_FOOTER_ACTION_CLASS} />;
+  // Its loading form is the same button, inert: its icons as skeleton marks and its closed label held, so the
+  // action keeps its size when the card resolves.
+  if (useLoadingScope() || loading) {
+    const mark = <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3 w-3 rounded-sm')} />;
+    return (
+      <span aria-hidden inert className="contents">
+        <Button
+          variant="transparent"
+          size="small"
+          tabIndex={-1}
+          leftIcon={mark}
+          rightIcon={mark}
+          className={cn(CARD_FOOTER_ACTION_CLASS, 'pointer-events-none')}
+        >
+          <TextHold>{spec.label}</TextHold>
+        </Button>
+      </span>
+    );
+  }
   const label = open ? spec.openLabel : spec.label;
   const Icon = spec.icon;
   return (

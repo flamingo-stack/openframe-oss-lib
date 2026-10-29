@@ -63,7 +63,7 @@ import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
 import { TextHold } from '../ui/layout-hold';
-import { LoadingItems } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps } from '../ui/loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container';
 import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -711,17 +711,17 @@ function dispatchSlashCommandAction(
 /** A no-break space: one line of the chip's text, so a bar that holds it is exactly one text line tall. */
 const ONE_TEXT_LINE = '\u00a0';
 
-/** How many chips the strip's loading form draws: the count real answers' strips showed (measured). On a phone,
- *  where a strip holds one chip a row, it draws one. */
-const SOURCE_CHIP_SKELETON_COUNT = 2;
+/** How many chips the strip's loading form draws, at every width: one, the row a phone shows a strip's first chip in
+ *  (a strip has no page size, so its loading form draws a typical count, and the strip is one row either way). */
+const SOURCE_CHIP_SKELETON_COUNT = 1;
 
 /**
  * A source chip's loading form, built like the chip (`wrapChip` around `chipBody`): the chip's frame, its icon,
  * its title as a bar one text line tall (so the chip is the loaded chip's height), and the Ask slot beside it.
  */
-function SourceChipSkeleton({ className }: { className?: string }) {
+function SourceChipSkeleton(props: { 'data-loading-item'?: boolean }) {
   return (
-    <span aria-hidden className={cn('pointer-events-none inline-flex shrink-0 items-center', className)}>
+    <span aria-hidden className="pointer-events-none inline-flex shrink-0 items-center" {...loadingItemProps(props)}>
       <span className={chatChipClass({ tone: 'secondary' })}>
         <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3.5 w-3.5 rounded-sm')} />
         <span className={cn(SKELETON_SURFACE_CLASS, 'w-28 rounded-sm')}>{ONE_TEXT_LINE}</span>
@@ -731,17 +731,16 @@ function SourceChipSkeleton({ className }: { className?: string }) {
   );
 }
 
-function SourceChip({
-  src,
-  baseRoute,
-  chipBasePlatform,
-  onDiscuss,
-}: {
+function SourceChip(props: {
   src: ChatSource;
   baseRoute: string;
   chipBasePlatform?: string;
   onDiscuss?: (ref: ChatRef) => void;
+  /** The strip's list-item marker, carried by the chip's frame like its loading form's. */
+  'data-loading-item'?: boolean;
 }) {
+  const { src, baseRoute, chipBasePlatform, onDiscuss } = props;
+  const marks = loadingItemProps(props);
   const runtime = useRequiredChatRuntime();
   // Single CTA resolver — same icon, same href chain, same ChatRef
   // synthesis the inline card and search-result paths use.
@@ -807,26 +806,28 @@ function SourceChip({
     const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
 
     return (
-      <HoverDropdown
-        items={dropdownItems}
-        renderAnchor={({ href, targetPlatform, path, className, children }) => (
-          <NavLinkAnchorViaRuntime
-            href={href}
-            targetPlatform={targetPlatform ?? null}
-            path={path}
-            className={className}
-          >
-            {children}
-          </NavLinkAnchorViaRuntime>
-        )}
-      >
-        <span className={`${chipClass} cursor-pointer`}>
-          {icon}
-          <span className="max-w-[160px] truncate">
-            [{groupIndices}] {src.name}
+      <span className="inline-flex" {...marks}>
+        <HoverDropdown
+          items={dropdownItems}
+          renderAnchor={({ href, targetPlatform, path, className, children }) => (
+            <NavLinkAnchorViaRuntime
+              href={href}
+              targetPlatform={targetPlatform ?? null}
+              path={path}
+              className={className}
+            >
+              {children}
+            </NavLinkAnchorViaRuntime>
+          )}
+        >
+          <span className={`${chipClass} cursor-pointer`}>
+            {icon}
+            <span className="max-w-[160px] truncate">
+              [{groupIndices}] {src.name}
+            </span>
           </span>
-        </span>
-      </HoverDropdown>
+        </HoverDropdown>
+      </span>
     );
   }
 
@@ -842,7 +843,7 @@ function SourceChip({
     </>
   );
   const wrapChip = (clickable: React.ReactNode) => (
-    <span className="inline-flex items-center">
+    <span className="inline-flex items-center" {...marks}>
       {clickable}
       <SourceActionButton chatRef={cta.chatRef} onDiscuss={onDiscuss} density="inline" className="-mr-1 ml-1" />
     </span>
@@ -905,9 +906,9 @@ function SourceChips({
         {/* One row at every width: a chip that does not fit is cut, never wrapped (a strip's chips fit one row in
             the answers measured, and a wrapped skeleton shrinks when the answer ends). */}
         <div className="flex flex-nowrap gap-1.5 overflow-hidden">
-          {Array.from({ length: SOURCE_CHIP_SKELETON_COUNT }, (_, i) => (
-            <SourceChipSkeleton key={i} className={i > 0 ? 'max-md:hidden' : undefined} />
-          ))}
+          <LoadingItems count={SOURCE_CHIP_SKELETON_COUNT}>
+            {() => <SourceChipSkeleton data-loading-item />}
+          </LoadingItems>
         </div>
       </div>
     );
@@ -922,6 +923,7 @@ function SourceChips({
         <div className="flex flex-wrap gap-1.5">
           {fallback.map(src => (
             <SourceChip
+              data-loading-item
               key={src.index}
               src={src}
               baseRoute={baseRoute}
@@ -943,6 +945,7 @@ function SourceChips({
       <div className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}>
         {cited.map(src => (
           <SourceChip
+            data-loading-item
             key={src.index}
             src={src}
             baseRoute={baseRoute}
@@ -953,6 +956,7 @@ function SourceChips({
         {expanded &&
           uncited.map(src => (
             <SourceChip
+              data-loading-item
               key={src.index}
               src={src}
               baseRoute={baseRoute}

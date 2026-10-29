@@ -23,6 +23,7 @@ import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/button';
 import { TextHold } from '../ui/layout-hold';
+import { useLoadingScope } from '../ui/loading-scope';
 import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 import type { ChatRef } from './chat-ref.types';
 
@@ -125,8 +126,9 @@ export function SourceActionButton({
   label = 'Ask',
   loading,
 }: SourceActionButtonProps): React.ReactElement | null {
+  const isLoading = useLoadingScope() || loading;
   if (!chatRef || !onDiscuss) return null;
-  if (loading) {
+  if (isLoading) {
     const s = DENSITY_STYLES[density];
     return (
       <FooterActionSkeleton

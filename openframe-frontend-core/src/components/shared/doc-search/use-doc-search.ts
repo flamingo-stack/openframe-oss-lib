@@ -24,7 +24,7 @@
  *     equivalent runtime-context yet; bring it back when there is one.
  *
  * Everything else (debounce, `useChatRuntime` for embed-mode short-
- * circuit, embed-shim router, the action-resolver + result-mapper) is
+ * circuit, the action-resolver + result-mapper) is
  * now lib-resident.
  *
  * ## Result hrefs go through the content-href seam
@@ -40,7 +40,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useChatRuntime } from '../../../contexts/chat-runtime-context';
-import { useRouter } from '../../../embed-shims';
 import { useDebounce } from '../../../hooks/ui/use-debounce';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import { contentFetch } from '../../../utils/embed-content-fetch';
@@ -150,7 +149,6 @@ export function useDocSearch(config: UseDocSearchConfig) {
   const { source, baseRoute, onNavigate, tableIds, onInPageSwap, searchEndpoint, composeContentUrl } = config;
   const tableIdsKey = tableIds && tableIds.length > 0 ? tableIds.join(',') : '';
 
-  const router = useRouter();
   // Optional chat-runtime read — when present and mode='embed' the
   // search-result row click short-circuits to a new-tab open against
   // the absolutized URL. Null/host preserves today's behavior.
@@ -290,7 +288,6 @@ export function useDocSearch(config: UseDocSearchConfig) {
             href: action.href,
             path,
             targetPlatform: (result.metadata?.targetPlatform as string | null | undefined) ?? null,
-            fallbackNavigate: router.push,
             hostRoute: action.hostRoute,
           });
           return;
@@ -314,7 +311,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
           return;
       }
     },
-    [onNavigate, source, baseRoute, router, onInPageSwap, runtime, resolvedComposeContentUrl],
+    [onNavigate, source, baseRoute, onInPageSwap, runtime, resolvedComposeContentUrl],
   );
 
   // Reset keepOpen when query changes. Adjusted while rendering, not from an

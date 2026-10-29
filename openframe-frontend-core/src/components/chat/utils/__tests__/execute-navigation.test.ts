@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatRuntime } from '../../../../contexts/chat-runtime-context';
 import { stripSameOriginToPath } from '../chat-nav-resolution';
 import { decideNewTab } from '../decide-new-tab';
@@ -74,35 +74,43 @@ describe('decideNewTab', () => {
 });
 
 describe('executeNavigation', () => {
+  // The browser's own navigation, for a target no host navigation takes. jsdom's `location` cannot be spied on in
+  // place, so it is swapped for one that reads the same and records `assign`.
+  let assign: ReturnType<typeof vi.fn>;
+  let realLocation: Location;
+  beforeEach(() => {
+    realLocation = window.location;
+    assign = vi.fn();
+    const { href, origin, pathname, search, hash } = realLocation;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { href, origin, pathname, search, hash, assign },
+    });
+  });
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { configurable: true, value: realLocation });
+  });
+
   it('hands a same-tab click to the host navigate callback', () => {
     const navigate = vi.fn().mockReturnValue(true);
-    const fallbackNavigate = vi.fn();
     const event = primaryClick();
 
-    const handled = executeNavigation({
-      event,
-      runtime: runtimeWith({ navigate }),
-      href: '/help-center/guides',
-      fallbackNavigate,
-    });
+    const handled = executeNavigation({ event, runtime: runtimeWith({ navigate }), href: '/help-center/guides' });
 
     expect(handled).toBe(true);
     expect(event.preventDefault).toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ href: '/help-center/guides' }));
-    expect(fallbackNavigate).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
-  it('falls back to the host router when navigate declines', () => {
-    const fallbackNavigate = vi.fn();
-
+  it('lets the browser open a target the host does not take', () => {
     executeNavigation({
       event: primaryClick(),
       runtime: runtimeWith({ navigate: () => false }),
       href: '/help-center/guides',
-      fallbackNavigate,
     });
 
-    expect(fallbackNavigate).toHaveBeenCalledWith('/help-center/guides');
+    expect(assign).toHaveBeenCalledWith('/help-center/guides');
   });
 
   it('opens an absolute SAME-origin href in a new tab', () => {
@@ -111,61 +119,50 @@ describe('executeNavigation', () => {
     // Pinned because hosts keep rediscovering it by absolutizing an in-app href
     // and getting a redundant new tab.
     const openExternal = vi.fn();
-    const fallbackNavigate = vi.fn();
 
     executeNavigation({
       event: primaryClick(),
       runtime: runtimeWith({ openExternal }),
       href: `${ORIGIN}/help-center/guides`,
-      fallbackNavigate,
     });
 
     expect(openExternal).toHaveBeenCalledWith(`${ORIGIN}/help-center/guides`);
-    expect(fallbackNavigate).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('still strips an absolute SAME-origin href down to a path', () => {
-    // The hub's soft-RSC-nav case: one app, several origins, absolute in-app
-    // href routed same-tab. It must stay a soft nav, not a full page load.
-    const fallbackNavigate = vi.fn();
-
+    // The hub's case: one app, several origins, absolute in-app href routed same-tab.
     executeNavigation({
       event: primaryClick(),
       runtime: runtimeWith({ navigate: () => false, decideNewTab: () => false }),
       href: `${ORIGIN}/releases/v1?x=1#top`,
-      fallbackNavigate,
     });
 
-    expect(fallbackNavigate).toHaveBeenCalledWith('/releases/v1?x=1#top');
+    expect(assign).toHaveBeenCalledWith('/releases/v1?x=1#top');
   });
 
-  it('passes a cross-origin href to the router WHOLE', () => {
+  it('opens a cross-origin href WHOLE', () => {
     // Regression: it used to arrive origin-stripped and 404 locally.
-    const fallbackNavigate = vi.fn();
-
     executeNavigation({
       event: primaryClick(),
       runtime: runtimeWith({ navigate: () => false, decideNewTab: () => false }),
       href: 'https://www.flamingo.run/webinars/x',
-      fallbackNavigate,
     });
 
-    expect(fallbackNavigate).toHaveBeenCalledWith('https://www.flamingo.run/webinars/x');
+    expect(assign).toHaveBeenCalledWith('https://www.flamingo.run/webinars/x');
   });
 
   it('routes a new-tab decision through openExternal', () => {
     const openExternal = vi.fn();
-    const fallbackNavigate = vi.fn();
 
     executeNavigation({
       event: primaryClick(),
       runtime: runtimeWith({ openExternal, decideNewTab: () => true }),
       href: 'https://www.flamingo.run/blog/x',
-      fallbackNavigate,
     });
 
     expect(openExternal).toHaveBeenCalledWith('https://www.flamingo.run/blog/x');
-    expect(fallbackNavigate).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('leaves modifier clicks to the browser', () => {
@@ -180,11 +177,12 @@ describe('executeNavigation', () => {
   });
 
   it('reports an empty href as handled without navigating anywhere', () => {
-    const fallbackNavigate = vi.fn();
+    const navigate = vi.fn();
     const event = primaryClick();
 
-    expect(executeNavigation({ event, runtime: runtimeWith(), href: '', fallbackNavigate })).toBe(true);
+    expect(executeNavigation({ event, runtime: runtimeWith({ navigate }), href: '' })).toBe(true);
     expect(event.preventDefault).toHaveBeenCalled();
-    expect(fallbackNavigate).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(assign).not.toHaveBeenCalled();
   });
 });

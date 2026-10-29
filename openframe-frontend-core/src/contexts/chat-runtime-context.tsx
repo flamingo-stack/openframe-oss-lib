@@ -208,12 +208,13 @@ export interface ChatRuntime {
      *  Safari/Firefox block popups opened outside a direct user gesture.
      *  Default: window.open(href, '_blank', 'noopener,noreferrer'). */
     openExternal?: (href: string) => void;
-    /** Optional in-app navigation callback (host-mode only).
-     *  Returns `true` if the host handled the click in-app
-     *  (router.push + docNav.navigate); returns `false`, `undefined`,
-     *  or `void` → lib falls back to window.location.assign(href).
-     *  Hub wires this via HubRuntimeProvider's HubNavigationWiring;
-     *  embedders not in Next.js leave it undefined. */
+    /** The host's in-app navigation (host mode): every same-tab link the lib
+     *  executes goes through it. Returns `true` when the host navigated in the app
+     *  (its router, a docNav swap); `false`, `undefined` or `void` for a target it
+     *  does not take (another origin), which the browser then opens
+     *  (`window.location.assign`). Every host wires it: the hub
+     *  (HubRuntimeProvider), the OpenFrame app (OpenframeChatRuntimeProvider) and
+     *  the embedding example (its react-router). */
     navigate?: (input: { href: string; path?: string | null; targetPlatform?: string | null }) => boolean | void;
     /** Optional new-tab decision callback. Returns true → lib opens in
      *  new tab; false → same tab via `navigate`. Hub wires the existing
