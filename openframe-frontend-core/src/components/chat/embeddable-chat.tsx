@@ -64,8 +64,10 @@ import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
+import { TextHold } from '../ui/layout-hold';
 import { LoadingItems } from '../ui/loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container';
+import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatAppearanceContext } from './chat-appearance-context';
 import { ChatArchivePage } from './chat-archive-page';
@@ -705,6 +707,25 @@ function dispatchSlashCommandAction(
  *  2. Ask: small `MessageSquare` icon-button on the right → fires
  *     `onDiscuss(ref)` to drill into THIS row via `entityIdFilter`.
  */
+/** How many chips the strip's loading form draws: the count real answers' strips showed (measured). */
+const SOURCE_CHIP_SKELETON_COUNT = 2;
+
+/**
+ * A source chip's loading form, built like the chip (`wrapChip` around `chipBody`): the chip's frame, its icon,
+ * its title as a bar one text line tall (so the chip is the loaded chip's height), and the Ask slot beside it.
+ */
+function SourceChipSkeleton() {
+  return (
+    <span aria-hidden className="pointer-events-none inline-flex items-center">
+      <span className={chatChipClass({ tone: 'secondary' })}>
+        <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3.5 w-3.5 rounded-sm')} />
+        <span className={cn(SKELETON_SURFACE_CLASS, 'w-28 rounded-sm')}>{'\u00a0'}</span>
+      </span>
+      <span className={cn(SKELETON_SURFACE_CLASS, '-mr-1 ml-1 inline-block h-5 w-5 rounded-sm')} />
+    </span>
+  );
+}
+
 function SourceChip({
   src,
   baseRoute,
@@ -903,6 +924,7 @@ function SourceChips({
   chipBasePlatform,
   onClose,
   onDiscuss,
+  loading,
 }: {
   cited: ChatSource[];
   uncited: ChatSource[];
@@ -910,8 +932,26 @@ function SourceChips({
   chipBasePlatform?: string;
   onClose: () => void;
   onDiscuss?: (ref: ChatRef) => void;
+  /** The answer is still being written: the strip's frame, heading and a row of chips in their loading form, so
+   *  the strip does not appear under the answer when it finishes. */
+  loading?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+
+  if (loading) {
+    return (
+      <div aria-hidden className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
+        <span className="uppercase text-ods-text-muted text-h6">
+          <TextHold>Sources</TextHold>
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {Array.from({ length: SOURCE_CHIP_SKELETON_COUNT }, (_, i) => (
+            <SourceChipSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (cited.length === 0) {
     const fallback = uncited.slice(0, FALLBACK_TOP_RETRIEVED);
@@ -2062,7 +2102,21 @@ function EmbeddableChatInner({
       // the THREAD, so testing it alone pulls the strips off every earlier
       // answer too — a reader scrolled up watches finished citations blink out
       // for the duration of an unrelated turn.
-      if (chatLoading && index === messages.length - 1) return null;
+      // Its strip is drawn in its loading form meanwhile, so the strip is already there when the answer ends.
+      if (chatLoading && index === messages.length - 1) {
+        return (
+          <div className="pb-2">
+            <SourceChips
+              loading
+              cited={[]}
+              uncited={[]}
+              baseRoute={resolvedBaseRoute}
+              chipBasePlatform={chipBasePlatform}
+              onClose={handleNavigationClose}
+            />
+          </div>
+        );
+      }
       const { cited, uncited } = splitCitedSources(message.sources, flattenAssistantContent(message.content));
       if (cited.length === 0 && uncited.length === 0) return null;
       return (

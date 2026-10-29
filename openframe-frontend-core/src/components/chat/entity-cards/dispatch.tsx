@@ -109,7 +109,7 @@ import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-
 import { BlockCard } from './block-card';
 import { BlogCard } from './blog-card';
 import { CaseStudyCard } from './case-study-card';
-import { ChatCollapsibleVideo, useChatVideoToggle } from './chat-video-toggle';
+import { ChatCollapsibleVideo, ChatVideoToggleButton, useChatVideoToggle } from './chat-video-toggle';
 import { CustomerInterviewCard } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
 import { designDocMetaLine } from './design-doc-card';
@@ -781,6 +781,7 @@ function ChatCardWithDiscuss({
   onDisplay,
   displayAction,
   footerAction,
+  loading,
   children,
 }: {
   chatRef: ChatRef;
@@ -789,6 +790,8 @@ function ChatCardWithDiscuss({
   displayAction?: boolean;
   /** A further action in the footer row, beside Ask (the card's "Watch video"). */
   footerAction?: React.ReactNode;
+  /** The card is still loading: the footer row is drawn too, its actions in their loading form. */
+  loading?: boolean;
   children: React.ReactNode;
 }) {
   const { Icon: SourceIcon, label: sourceLabel } = resolveSourceIcon({
@@ -808,6 +811,7 @@ function ChatCardWithDiscuss({
             onDiscuss={useDisplay ? onDisplay : onDiscuss}
             label={useDisplay ? 'Display' : undefined}
             density="card"
+            loading={loading}
           />
           {footerAction}
         </span>
@@ -1332,6 +1336,9 @@ interface ChatCardRegistryEntry {
   contentRefType?: string;
   /** Required whenever `contentRefType` is set. */
   skeleton?: () => React.ReactNode;
+  /** This type's records can carry a video (`itemVideoMetadata`): the card's footer row keeps a "Watch video"
+   *  slot loading and loaded, with or without a video, so the row never changes height. */
+  video?: boolean;
   /** `item` is the fetched row (`undefined` only on the ref-only render
    *  path — `deleted_data` / `video`). */
   render: (item: ChatCardItem | undefined, chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode;
@@ -1595,10 +1602,12 @@ interface ProgramCardConfig {
   label: string;
   configKey: ProgramConfigKey;
   contentRefType: string;
+  /** Episodes and webinars have recordings; events do not. */
+  video?: boolean;
 }
 const PROGRAM_CARD_CONFIGS: Record<string, ProgramCardConfig> = {
-  podcast: { label: 'Podcast episode', configKey: 'podcast', contentRefType: 'podcast' },
-  webinar: { label: 'Webinar', configKey: 'webinar', contentRefType: 'webinar' },
+  podcast: { label: 'Podcast episode', configKey: 'podcast', contentRefType: 'podcast', video: true },
+  webinar: { label: 'Webinar', configKey: 'webinar', contentRefType: 'webinar', video: true },
   event: { label: 'Event', configKey: 'event', contentRefType: 'event' },
 };
 function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
@@ -1606,6 +1615,7 @@ function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
+    video: cfg.video,
     skeleton: () => <ProgramCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <ProgramChatCard
@@ -1776,6 +1786,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   case_study: {
+    video: true,
     label: 'Case study',
     contentRefType: 'case_study',
     bareInline: true,
@@ -1802,6 +1813,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   customer_interview: {
+    video: true,
     label: 'Customer interview',
     contentRefType: 'customer_interview',
     bareInline: true,
@@ -1817,6 +1829,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   product_release: {
+    video: true,
     label: 'Product release',
     contentRefType: 'product_release',
     bareInline: true,
@@ -1842,6 +1855,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   },
   ...programRegistryEntries(),
   investor_update: {
+    video: true,
     label: 'Investor update',
     contentRefType: 'investor_update',
     bareInline: true,
@@ -1857,6 +1871,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     ),
   },
   onboarding_guide: {
+    video: true,
     label: 'Onboarding guide',
     contentRefType: 'onboarding_guide',
     bareInline: true,
@@ -2014,9 +2029,12 @@ interface ChatCardLoaderProps {
   extras?: ChatCardDispatchExtras;
 }
 
-/** A fetched card whose record carries a video: "Watch video" in the card's footer row, the player below once opened. */
-function CardWithVideo({ video, card }: { video: ChatRef; card: (action: ReactNode) => ReactNode }) {
-  const { action, player } = useChatVideoToggle(video);
+/**
+ * A fetched card of a type that can carry a video: "Watch video" in the card's footer row, the player below once
+ * opened; with no video on this record, the action's slot is kept unseen.
+ */
+function CardWithVideo({ video, card }: { video: ChatRef | null; card: (action: ReactNode) => ReactNode }) {
+  const { action, player } = useChatVideoToggle(video, { reserve: true });
   return (
     // Same 12px rhythm as the message renderer's block-sibling wrapper
     // (`my-3` in chat-message-enhanced) so card→player spacing matches
@@ -2150,10 +2168,12 @@ export function ChatCardLoader({
   // wrapper; everything else gets the ChatCardWithDiscuss chrome. Kept
   // here (not per-branch) so the two paths can never drift on the
   // discuss-menu wiring.
-  const finish = (node: React.ReactNode, footerAction?: React.ReactNode) =>
+  // `loading` draws the same chrome around the card's skeleton (the footer row and its actions in their loading
+  // form), so the card does not grow by a row when it loads.
+  const finish = (node: React.ReactNode, footerAction?: React.ReactNode, loading?: boolean) =>
     entry.bareInline ? (
       <>
-        {navWrap(node)}
+        {loading ? node : navWrap(node)}
         {footerAction ? <span className="mt-1 flex items-center pl-0.5">{footerAction}</span> : null}
       </>
     ) : (
@@ -2163,8 +2183,9 @@ export function ChatCardLoader({
         onDisplay={onDisplay}
         displayAction={entry.displayAction}
         footerAction={footerAction}
+        loading={loading}
       >
-        {navWrap(node)}
+        {loading ? node : navWrap(node)}
       </ChatCardWithDiscuss>
     );
   if (!fetchEntry) {
@@ -2172,7 +2193,9 @@ export function ChatCardLoader({
     // to fetch): render straight from the marker's descriptor.
     return finish(entry.render(undefined, finalChatRef, renderOpts));
   }
-  if (isLoading) return <>{fetchEntry.skeleton?.() ?? null}</>;
+  if (isLoading) {
+    return finish(fetchEntry.skeleton?.() ?? null, entry.video ? <ChatVideoToggleButton loading /> : undefined, true);
+  }
   if (!item) {
     // FAIL LOUD (explicit product decision 2026-08-13): a card that
     // cannot hydrate renders a VISIBLE error card — silent removal made
@@ -2199,11 +2222,10 @@ export function ChatCardLoader({
   // 2026-08-13). The loader's output already lives in a hoisted
   // block-level sibling (`b-<key>`), so block content is legal here.
   const videoMeta = itemVideoMetadata(item);
-  if (videoMeta) {
-    const videoRef: ChatRef = {
-      ...finalChatRef,
-      metadata: { ...(finalChatRef.metadata ?? {}), ...videoMeta },
-    };
+  if (videoMeta || entry.video) {
+    const videoRef: ChatRef | null = videoMeta
+      ? { ...finalChatRef, metadata: { ...(finalChatRef.metadata ?? {}), ...videoMeta } }
+      : null;
     // Collapsed: the card's footer row carries "Watch video", and the player
     // opens below the card only when asked (`chat-video-toggle.tsx`).
     return (
