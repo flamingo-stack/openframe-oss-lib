@@ -3,11 +3,16 @@ package com.openframe.security.oauth.controller;
 import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
+import com.openframe.security.oauth.exception.RefreshUpstreamException;
+import com.openframe.security.oauth.exception.RefreshUpstreamReason;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +22,11 @@ import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 
+import java.util.stream.Stream;
+
+import static com.openframe.security.oauth.exception.RefreshUpstreamReason.CLIENT_REJECTED;
+import static com.openframe.security.oauth.exception.RefreshUpstreamReason.UPSTREAM_ERROR;
+import static com.openframe.security.oauth.exception.RefreshUpstreamReason.UPSTREAM_UNAVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -123,5 +133,42 @@ class OAuthBffControllerRefreshTest {
         assertThat(response.getStatusCode().value()).isEqualTo(502);
         assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).isNullOrEmpty();
         verify(cookieService, never()).addClearAuthCookies(any(HttpHeaders.class));
+    }
+
+    @ParameterizedTest
+    @MethodSource("upstreamReasons")
+    void refresh_serviceFailsUpstream_statusFromReasonWithoutTouchingCookies(RefreshUpstreamReason reason, int expectedStatus) {
+        // setup
+        when(oauthBffService.refreshTokensPublic(eq("tenant-1"), eq("token"), any()))
+                .thenReturn(Mono.error(new RefreshUpstreamException(reason)));
+
+        // execution
+        ResponseEntity<Void> response = controller.refresh("tenant-1", "token", request).block();
+
+        // verifications
+        assertThat(response.getStatusCode().value()).isEqualTo(expectedStatus);
+        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE)).isNullOrEmpty();
+        verify(cookieService, never()).addClearAuthCookies(any(HttpHeaders.class));
+    }
+
+    @Test
+    void refresh_lookupFailsUpstream_statusFromReason() {
+        // setup
+        when(oauthBffService.refreshTokensByLookup(eq("token"), any()))
+                .thenReturn(Mono.error(new RefreshUpstreamException(UPSTREAM_UNAVAILABLE)));
+
+        // execution
+        ResponseEntity<Void> response = controller.refresh(null, "token", request).block();
+
+        // verifications
+        assertThat(response.getStatusCode().value()).isEqualTo(503);
+    }
+
+    private static Stream<Arguments> upstreamReasons() {
+        return Stream.of(
+                Arguments.of(CLIENT_REJECTED, 502),
+                Arguments.of(UPSTREAM_ERROR, 502),
+                Arguments.of(UPSTREAM_UNAVAILABLE, 503)
+        );
     }
 }
