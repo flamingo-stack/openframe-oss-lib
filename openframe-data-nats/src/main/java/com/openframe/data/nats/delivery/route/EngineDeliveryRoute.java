@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 import java.util.Set;
 
 // the delivery engine: every type with a spec, for the environments that switched the type on and the agents the
-// tenant's floor admits
+// type's floor admits; a rollout is handed over whole, its walk leaves out the machines below the floor
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty("spring.cloud.stream.enabled")
@@ -49,11 +49,7 @@ public class EngineDeliveryRoute implements DeliveryRoute {
 
     @Override
     public boolean canReachEveryMachine(DeliveryType type) {
-        if (!properties.isEnabled(type) || !isRolledOut(type)) {
-            return false;
-        }
-        AgentVersionFloor floor = floors.of(type);
-        return floor.open();
+        return properties.isEnabled(type) && isRolledOut(type);
     }
 
     @Override
