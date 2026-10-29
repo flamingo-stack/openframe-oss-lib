@@ -160,7 +160,7 @@ impl CrossPlatformServiceManager {
             .config
             .working_directory
             .clone()
-            .unwrap_or_else(|| self.get_app_support_dir());
+            .unwrap_or_else(crate::platform::directories::get_app_support_directory);
 
         debug!(
             "Setting service working directory to: {}",
@@ -556,25 +556,6 @@ impl CrossPlatformServiceManager {
 
     fn remove_platform_specific_files(&self) {
         // Nothing to do here - service-manager will handle cleanup
-    }
-
-    fn get_app_support_dir(&self) -> PathBuf {
-        #[cfg(target_os = "macos")]
-        {
-            PathBuf::from("/Library/Application Support/OpenFrame")
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            let programdata =
-                std::env::var("PROGRAMDATA").unwrap_or_else(|_| "C:\\ProgramData".to_string());
-            PathBuf::from(programdata).join("OpenFrame")
-        }
-
-        #[cfg(all(unix, not(target_os = "macos")))]
-        {
-            PathBuf::from("/var/lib/openframe")
-        }
     }
 
     fn get_service_username(&self) -> Option<String> {

@@ -675,10 +675,7 @@ impl Service {
 
         #[cfg(target_os = "windows")]
         {
-            let program_files =
-                std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
-            PathBuf::from(program_files)
-                .join("OpenFrame")
+            crate::platform::directories::get_install_directory()
                 .join("bin")
                 .join("openframe-client.exe")
         }
