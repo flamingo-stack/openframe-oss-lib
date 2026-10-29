@@ -180,9 +180,9 @@ function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {
         onClick={action.onClick}
         disabled={action.disabled}
         mainDisabled={action.mainDisabled}
-        leftIcon={action.icon}
+        leftIcon={actionGlyph(action.icon)}
         fullWidth={opts.fullWidth}
-        iconAction={action.iconAction}
+        iconAction={{ ...action.iconAction, icon: actionGlyph(action.iconAction.icon) }}
       >
         {action.label}
       </SplitButton>
@@ -199,7 +199,7 @@ function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {
             variant="outline"
             disabled={action.disabled}
             loading={action.loading}
-            leftIcon={action.icon}
+            leftIcon={actionGlyph(action.icon)}
             splitIcon={<Chevron02DownIcon className="h-4 w-4" />}
             className={opts.fullWidth ? 'flex-1' : undefined}
           >
@@ -213,10 +213,12 @@ function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {
   // Icon-only button (no label, or explicitly icon-only on desktop).
   const isIconOnly = opts.iconOnly || !action.label || action.iconOnlyOnDesktop;
   if (isIconOnly) {
-    const iconNode = action.iconOnlyOnDesktop ? (
-      <span className="inline-flex [&_svg]:!text-ods-text-primary">{action.icon}</span>
-    ) : (
-      action.icon
+    const iconNode = actionGlyph(
+      action.iconOnlyOnDesktop ? (
+        <span className="inline-flex [&_svg]:!text-ods-text-primary">{action.icon}</span>
+      ) : (
+        action.icon
+      ),
     );
     return (
       <Button
@@ -244,7 +246,7 @@ function renderRawActionButton(action: PageActionButton, opts: RenderOptions = {
       onClick={action.onClick}
       disabled={action.disabled}
       loading={action.loading}
-      leftIcon={action.icon}
+      leftIcon={actionGlyph(action.icon)}
       className={opts.fullWidth ? 'flex-1' : undefined}
     >
       {action.label}
@@ -274,6 +276,18 @@ export interface PageActionsProps {
 }
 
 const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]';
+
+/**
+ * An action's glyph: 16px, 24px from the content area's md, whatever size the caller drew it at
+ * (`<Icon className="h-6 w-6" />`, `size={24}`) and over `Button`'s flat 20px. `&&` doubles the
+ * class (specificity 0,2,1) to win over `Button`'s own `[&_svg]` rule (0,1,1) without leaning on
+ * stylesheet order. The "…" menu sizes its rows' glyphs on the same steps (`ActionsMenu`).
+ */
+const ACTION_GLYPH_CLASSES = 'inline-flex [&&_svg]:h-4 [&&_svg]:w-4 content-md:[&&_svg]:h-6 content-md:[&&_svg]:w-6';
+
+function actionGlyph(icon: React.ReactNode): React.ReactNode {
+  return icon ? <span className={ACTION_GLYPH_CLASSES}>{icon}</span> : icon;
+}
 
 /**
  * While the page reads the record that decides which actions exist (`loading`), the actions the caller passed are
@@ -536,9 +550,9 @@ function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageA
         covered && 'invisible',
         // `lf` (24px at every breakpoint), NOT `l` — this bar is `md:hidden`, so the
         // only value it ever uses is the MOBILE one, and `l` is 16px there. The
-        // fixed variant is what keeps the 24px the bar has always had.
-        'flex items-start p-[var(--spacing-system-lf)]',
-        ACTIONS_GAP,
+        // fixed variant is what keeps the 24px the bar has always had. The gap
+        // between its buttons IS `l`, the design's 16px there (not the header's `xs`).
+        'flex items-start gap-[var(--spacing-system-l)] p-[var(--spacing-system-lf)]',
       )}
     >
       {actions.map((action, idx) => (

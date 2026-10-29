@@ -86,6 +86,11 @@ interface MenuItemProps {
   onItemClick?: (item: ActionsMenuItem) => void;
 }
 
+// A row's glyphs, the leading one and the trailing action's: 16px, 24px from md (the menu
+// follows the window), whatever size the caller drew them at. The slot alone sized the box,
+// so an `h-6 w-6` glyph squeezed to 16x24 below md and a `size={24}` one overflowed it.
+const ROW_GLYPH_CLASSES = '[&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6';
+
 const ROW_CLASSES =
   'flex flex-1 min-w-0 items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] cursor-pointer transition-colors bg-ods-bg outline-none';
 const WRAPPER_CLASSES = 'relative flex items-stretch border-b border-ods-border last:border-b-0';
@@ -119,7 +124,7 @@ const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ acti
         openInNewTab={action.openInNewTab}
         aria-label={action['aria-label']}
         disabled={action.disabled}
-        className={cn(action.openInNewTab && 'max-md:hidden')}
+        className={cn(ROW_GLYPH_CLASSES, action.openInNewTab && 'max-md:hidden')}
         onClick={handleClick}
       >
         {action.icon}
@@ -198,6 +203,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
         <div
           className={cn(
             'flex h-4 w-4 flex-shrink-0 items-center justify-center md:h-6 md:w-6',
+            ROW_GLYPH_CLASSES,
             item.danger && 'text-ods-error',
             item.disabled && 'opacity-50',
           )}
