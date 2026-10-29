@@ -6,17 +6,16 @@ import type { BoardColumnDef } from '../components/features/board/types';
 // The board picks its kind from this query: `true` the drag board, `false` the touch board.
 function answerMediaQueries(matches: boolean) {
   const original = window.matchMedia;
-  window.matchMedia = (query: string): MediaQueryList =>
-    ({
-      matches,
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
+  window.matchMedia = (query: string): MediaQueryList => ({
+    matches,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  });
   return () => {
     window.matchMedia = original;
   };
