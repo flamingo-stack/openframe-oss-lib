@@ -148,6 +148,17 @@ class ClientVersionMetricsFilterTest {
     }
 
     @Test
+    void filter_chatClient_countedAsChat(CapturedOutput output) {
+        // execution
+        runAs("agent_1", request("chat/1.5.107 bundle/1.5.107"));
+
+        // verifications
+        assertThat(requests("chat", "1.5.107", "1.5.107")).isEqualTo(1.0);
+        assertThat(output.getOut())
+                .contains("Client seen: tenantId=tenant-a sub=agent_1 kind=chat shell=1.5.107 bundle=1.5.107");
+    }
+
+    @Test
     void filter_malformedHeader_countedAsUnknown() {
         // execution
         runAs(SUB, request("garbage"));
