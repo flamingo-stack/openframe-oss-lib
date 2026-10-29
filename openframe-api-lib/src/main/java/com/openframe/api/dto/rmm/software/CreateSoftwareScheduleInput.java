@@ -39,4 +39,10 @@ public class CreateSoftwareScheduleInput {
     private Long repeat;
 
     private List<String> machineIds;
+
+    @Valid
+    private PackageUpdateSettingsInput updateSettings;
+
+    @Valid
+    private SoftwareAutoUpdateInput autoUpdate;
 }

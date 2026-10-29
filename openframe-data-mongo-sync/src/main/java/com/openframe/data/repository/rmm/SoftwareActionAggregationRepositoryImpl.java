@@ -141,6 +141,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                         new Document("$ne", Arrays.asList("$softwareAction", null)))))),
                 new Document("$group", new Document("_id", null)
                         .append("responded", new Document("$addToSet", cond(inArr("$status", TERMINAL), "$machineId", null)))
+                        .append("waiting", new Document("$addToSet", cond(isWaiting(), "$machineId", null)))
                         .append("hasInProgress", new Document("$max", cond(inArr("$status", IN_PROGRESS), 1, 0)))
                         .append("failed", new Document("$max",
                                 cond(new Document("$eq", Arrays.asList("$status", ExecutionStatus.FAILED.name())), 1, 0)))
@@ -156,17 +157,33 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
         stages.add(ctx -> new Document("$addFields",
                 new Document("_exec", new Document("$arrayElemAt", Arrays.asList("$exec", 0)))));
         Object hasLeaves = new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.execCount", 0)), 0));
-        Object responded = new Document("$size", new Document("$setDifference", List.of(
-                new Document("$ifNull", Arrays.asList("$_exec.responded", Collections.emptyList())),
-                Collections.singletonList(null))));
-        Object liveStatus = cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.hasInProgress", 0)), 0)),
-                SoftwareActionStatus.IN_PROGRESS.name(),
-                cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.failed", 0)), 0)),
-                        SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.COMPLETED.name()));
+        Object responded = machineCount("$_exec.responded");
+        Object waiting = machineCount("$_exec.waiting");
+        // same precedence as the package-update roll-up: any waiting device makes the whole action WAITING
+        Object liveStatus = cond(new Document("$gt", Arrays.asList(waiting, 0)),
+                SoftwareActionStatus.WAITING.name(),
+                cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.hasInProgress", 0)), 0)),
+                        SoftwareActionStatus.IN_PROGRESS.name(),
+                        cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.failed", 0)), 0)),
+                                SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.COMPLETED.name())));
         stages.add(ctx -> new Document("$addFields", new Document()
                 .append("respondedMachineCount", cond(hasLeaves, responded, 0))
+                .append("waitingMachineCount", cond(hasLeaves, waiting, 0))
                 .append("status", cond(hasLeaves, liveStatus, "$status"))));
         return stages;
+    }
+
+    private static Document isWaiting() {
+        return new Document("$and", List.of(
+                new Document("$eq", Arrays.asList("$status", ExecutionStatus.RUNNING.name())),
+                new Document("$eq", Arrays.asList("$waiting", true))));
+    }
+
+    // distinct machine ids collected by the lookup, without the null the $cond adds for non-matching leaves
+    private static Document machineCount(String field) {
+        return new Document("$size", new Document("$setDifference", List.of(
+                new Document("$ifNull", Arrays.asList(field, Collections.emptyList())),
+                Collections.singletonList(null))));
     }
 
     private static Document projectDoc() {
@@ -174,6 +191,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .append("executionId", 1)
                 .append("packageManager", 1)
                 .append("packageName", 1)
+                .append("version", 1)
                 .append("action", 1)
                 .append("initiatedBy", 1)
                 .append("bundleId", 1)
@@ -181,6 +199,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .append("dispatchedAt", 1)
                 .append("totalMachineCount", 1)
                 .append("respondedMachineCount", 1)
+                .append("waitingMachineCount", 1)
                 .append("status", 1);
     }
 
@@ -214,10 +233,12 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .executionId(doc.getString("executionId"))
                 .packageManager(enumOrNull(doc.getString("packageManager"), PackageManagerType.class))
                 .packageName(doc.getString("packageName"))
+                .version(doc.getString("version"))
                 .action(enumOrNull(doc.getString("action"), SoftwareAction.class))
                 .status(enumOrNull(doc.getString("status"), SoftwareActionStatus.class))
                 .totalMachineCount(intValue(doc.get("totalMachineCount")))
                 .respondedMachineCount(intValue(doc.get("respondedMachineCount")))
+                .waitingMachineCount(intValue(doc.get("waitingMachineCount")))
                 .dispatchedAt(instantOrNull(doc.get("dispatchedAt")))
                 .initiatedBy(doc.getString("initiatedBy"))
                 .bundleId(doc.getString("bundleId"))

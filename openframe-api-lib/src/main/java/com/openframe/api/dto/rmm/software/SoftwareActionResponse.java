@@ -16,12 +16,14 @@ public class SoftwareActionResponse {
     private String executionId;
 
     private String software;
+    private String version;
     private SoftwareAction action;
     private PackageManagerType engine;
     private SoftwareActionStatus status;
 
     private int totalMachineCount;
     private int respondedMachineCount;
+    private int waitingMachineCount;
 
     private Instant scheduledAt;
     private Instant dispatchedAt;

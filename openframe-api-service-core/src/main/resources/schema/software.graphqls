@@ -10,7 +10,7 @@ extend type Query {
 
     """Paginated list of software titles installed across the tenant's fleet.
     One row = one software title (aggregated across devices).
-    Sortable fields: name, devicesCount, cveCount, highestSeverity (default: Fleet order by name).
+    Sortable fields: name, devicesCount, cveCount, highestSeverity, adoptionCount (default: Fleet order by name).
     An unknown sort field is rejected as a client error (BAD_REQUEST), not a server error."""
     softwares(
         filter: SoftwareFilterInput,
@@ -23,8 +23,9 @@ extend type Query {
     ): SoftwareConnection!
 
     """Devices that have a given software title installed, with each device's own
-    installed version and per-device software status (OUTDATED / SCHEDULED_UPDATE / …).
-    Powers the Software → Devices tab."""
+    installed version and per-device software status (OUTDATED / SCHEDULED_UPDATE / …),
+    who installed it, its adoption and auto-update. Powers the Software → Devices tab.
+    Sortable fields: softwareVersion."""
     softwareDevices(
         softwareId: ID!,
         filter: SoftwareOnDeviceFilterInput,
@@ -159,6 +160,19 @@ type Software {
     """False when the vulnerability scanner could not find a matching CPE entry
     — shown as "no CPE match" instead of a severity badge."""
     cpeMatched: Boolean
+
+    """Kind of software — the Type field on the detail page (e.g. "Application")."""
+    type: SoftwareType
+
+    """AUTO-UPDATE column and the detail page's "Turn Off Auto-Update" button (shown while ON).
+    Filterable with the same values (SoftwareFilterInput.autoUpdateStatuses). Null = unknown."""
+    autoUpdate: SoftwareAutoUpdateStatus
+
+    """Devices that have this title installed manually (installedBy UNMANAGED) and can be adopted — the
+    ADOPTION column and the "N devices have … installed manually" banner with Adopt. Null or 0 = "–", no banner;
+    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with).
+    Sortable as adoptionCount."""
+    adoptionCount: Int
 }
 
 type SoftwareVulnerabilitySummary {
@@ -172,6 +186,29 @@ type SoftwareOnDevice {
     device: Machine!
     softwareVersion: String
     status: SoftwareOnDeviceStatus
+
+    """INSTALLED BY column: the package manager that installed it here (WINGET / CHOCOLATEY / BREW), or
+    UNMANAGED for "Manually". Null = unknown."""
+    installedBy: SoftwareSource
+
+    """Set while an adoption of this device runs or after it failed — the ADOPTING / ADOPTION FAILED chip that
+    replaces installedBy. ADOPTING on an offline device shows "Starts when online" (from device.status).
+    Null = no adoption."""
+    adoption: SoftwareAdoption
+
+    """AUTO-UPDATE column for this device. Filterable with the same values
+    (SoftwareOnDeviceFilterInput.autoUpdateStatuses). Null = unknown."""
+    autoUpdate: SoftwareAutoUpdateStatus
+}
+
+"""An adoption of one device: the manually installed copy is reinstalled with a package manager, so it can be
+updated."""
+type SoftwareAdoption {
+    status: SoftwareAdoptionStatus!
+    "The package manager the copy is reinstalled with."
+    packageManager: PackageManagerType
+    "Why the adoption failed. FAILED only."
+    error: String
 }
 
 # ────────── Vulnerability (CVE row) ──────────
@@ -205,6 +242,36 @@ enum SoftwareCveSeverity {
     MEDIUM
     LOW
     NONE
+}
+
+"""Kind of software, from the inventory source."""
+enum SoftwareType {
+    "Desktop applications (Windows programs, macOS apps)."
+    APPLICATION
+    "Browser extensions and add-ons."
+    BROWSER_EXTENSION
+    "OS and package-manager packages (deb, rpm, Homebrew, Chocolatey, …)."
+    PACKAGE
+    OTHER
+}
+
+"""Whether software can be and is kept updated automatically — the AUTO-UPDATE column and its filter."""
+enum SoftwareAutoUpdateStatus {
+    "An auto-update policy keeps it updated (the ON tag)."
+    ON
+    "A package manager installed it, but no auto-update policy covers it (the OFF tag)."
+    OFF
+    "No package manager has a package for this app, so it can't be auto-updated or adopted (\"No package found\")."
+    NO_PACKAGE
+    "Installed by hand: it needs adoption first (\"–\")."
+    NEEDS_ADOPTION
+}
+
+enum SoftwareAdoptionStatus {
+    "Reinstall with a package manager is queued or running; on an offline device it starts when it comes online."
+    ADOPTING
+    "The reinstall failed; the manually installed copy is left as it was."
+    FAILED
 }
 
 """Per-device software state: static (UP_TO_DATE / OUTDATED) or in a lifecycle
@@ -258,10 +325,20 @@ type SoftwareFilters {
     sources: [SoftwareFilterOption!]!
     versionStatuses: [SoftwareFilterOption!]!
     severities: [SoftwareFilterOption!]!
+    "AUTO-UPDATE dropdown: ON / OFF / NO_PACKAGE / NEEDS_ADOPTION."
+    autoUpdateStatuses: [SoftwareFilterOption!]!
 }
 
 type SoftwareOnDeviceFilters {
     statuses: [SoftwareFilterOption!]!
+    "INSTALLED BY dropdown: WINGET / CHOCOLATEY / BREW / UNMANAGED (Manually)."
+    installedBy: [SoftwareFilterOption!]!
+    "AUTO-UPDATE dropdown: ON / OFF / NO_PACKAGE / NEEDS_ADOPTION."
+    autoUpdateStatuses: [SoftwareFilterOption!]!
+    "CUSTOMER dropdown of the Adopt device picker: value = organizationId, label = its name."
+    organizations: [SoftwareFilterOption!]!
+    "STATUS dropdown of the Adopt device picker: the device statuses."
+    deviceStatuses: [SoftwareFilterOption!]!
 }
 
 type SoftwareFilterOption {
@@ -277,11 +354,18 @@ input SoftwareFilterInput {
     versionStatuses: [SoftwareVersionStatus!]
     minSeverity: SoftwareCveSeverity
     deviceTagIds: [ID!]
+    autoUpdateStatuses: [SoftwareAutoUpdateStatus!]
 }
 
 input SoftwareOnDeviceFilterInput {
     statuses: [SoftwareOnDeviceStatus!]
     deviceTagIds: [ID!]
+    "The CUSTOMER filter of the Adopt device picker."
+    organizationIds: [ID!]
+    "The STATUS filter of the Adopt device picker (the device's own status, e.g. ACTIVE = Managed)."
+    deviceStatuses: [DeviceStatus!]
+    installedBy: [SoftwareSource!]
+    autoUpdateStatuses: [SoftwareAutoUpdateStatus!]
 }
 
 input SoftwareVulnerabilityFilterInput {
@@ -379,6 +463,41 @@ extend type Mutation {
     """Update one or more catalog packages on the given devices, immediately. Each package is
     dispatched as its own RMM execution; returns one result (with its executionId) per package."""
     updateSoftware(input: SoftwareManagementInput!): [SoftwareDispatchResult!]!
+
+    """Adopt a software title on devices that have it installed manually: reinstall it with a package manager,
+    so it can be updated. Runs now; an offline device starts when it comes online. The device picker lists
+    softwareDevices(softwareId, filter: {installedBy: [UNMANAGED]}). Returns one result per package manager used
+    (each its own execution, shown as an ADOPT row in Software Actions)."""
+    adoptSoftware(input: AdoptSoftwareInput!): [SoftwareDispatchResult!]!
+
+    """Turn off auto-update for a software title on every device ("Turn Off Auto-Update"). Running updates
+    finish; no new version is installed automatically. Turned on again through Update Software (autoUpdate).
+    Idempotent: a title that has no auto-update is returned as it is. Unknown softwareId → NOT_FOUND."""
+    turnOffSoftwareAutoUpdate(softwareId: ID!): Software!
+}
+
+# ────────── Adopt ──────────
+
+input AdoptSoftwareInput {
+    "The software title (Software.id) to adopt."
+    softwareId: ID!
+    """Selected devices (Machine global ids), 1..100. Devices that do not have the title installed manually are
+    skipped. Null = every device matching filter + search ("Add All Devices")."""
+    machineIds: [ID!]
+    """With machineIds null: the devices to adopt, as the picker's softwareDevices(softwareId, filter, search) lists
+    them. Always narrowed to installedBy UNMANAGED. Ignored when machineIds is set."""
+    filter: SoftwareOnDeviceFilterInput
+    search: String
+    "Package Manager for Windows. macOS devices always adopt with Brew."
+    windowsPackageManager: SoftwareAdoptionWindowsManager! = MATCH_CUSTOMER
+}
+
+"""Which package manager adopts the title on Windows devices."""
+enum SoftwareAdoptionWindowsManager {
+    "The manager each customer already uses for this app; Winget if none."
+    MATCH_CUSTOMER
+    WINGET
+    CHOCOLATEY
 }
 
 """A set of catalog packages to install/update on a set of devices."""
@@ -403,4 +522,44 @@ type SoftwareDispatchResult {
     packageManager: PackageManagerType!
     packageName: String!
     executionId: String!
+}
+
+# ────────── Update settings (Update Software → "Update Settings" / "Auto-update") ──────────
+
+"""What an update does on a device where the app is running."""
+enum PackageUpdateMode {
+    "Wait & notify: the user gets Update now or Ask later; once they close the app, it updates."
+    WAIT
+    "Force install: the user gets a short countdown, then the app closes and updates."
+    FORCE
+}
+
+"""How an update behaves on a device where the app is running. UPDATE only."""
+type PackageUpdateSettings {
+    mode: PackageUpdateMode!
+    "WAIT only: seconds after the first try before the countdown starts. Null = no deadline, the update waits."
+    deadlineSeconds: Long
+    "Seconds of countdown before the app is closed: after the deadline (WAIT) or right away (FORCE)."
+    countdownSeconds: Int!
+}
+
+input PackageUpdateSettingsInput {
+    mode: PackageUpdateMode!
+    "WAIT only, up to 2592000 (30 days); ignored for FORCE. Null = no deadline (\"Countdown after the deadline\" off)."
+    deadlineSeconds: Long
+    "Up to 3600 (1 hour)."
+    countdownSeconds: Int!
+}
+
+"""Keep it auto-updated: after this update, every new version is installed on the same devices. UPDATE only."""
+type SoftwareAutoUpdate {
+    enabled: Boolean!
+    "The settings the auto-updates run with. Null = the update's own (\"Same settings for auto-update\")."
+    settings: PackageUpdateSettings
+}
+
+input SoftwareAutoUpdateInput {
+    enabled: Boolean!
+    "Null = the update's own settings (\"Same settings for auto-update\"). Ignored while enabled is false."
+    settings: PackageUpdateSettingsInput
 }

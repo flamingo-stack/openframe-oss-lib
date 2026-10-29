@@ -57,6 +57,10 @@ type SoftwareSchedule implements Node {
     action: SoftwareAction!
     """The packages this schedule installs/updates."""
     packages: [SoftwareSchedulePackage!]!
+    """How the update behaves on a device. Null for INSTALL."""
+    updateSettings: PackageUpdateSettings
+    """Keep it auto-updated. Null for INSTALL."""
+    autoUpdate: SoftwareAutoUpdate
     """How this schedule targets devices: SPECIFIC (an explicit machine set) or CRITERIA (a live rule;
     devices registered later that match are included automatically). Never null — legacy schedules read as SPECIFIC."""
     selectionMode: ScheduleDeviceSelectionMode!
@@ -145,6 +149,10 @@ input CreateSoftwareScheduleInput {
     repeat: Long
     "SPECIFIC target device ids (Machine global ids)."
     machineIds: [ID!]
+    "UPDATE only, rejected for INSTALL. Null: wait & notify, a countdown 7 days after the first try, 5 minutes long."
+    updateSettings: PackageUpdateSettingsInput
+    "UPDATE only, rejected for INSTALL. Null: no auto-update."
+    autoUpdate: SoftwareAutoUpdateInput
 }
 
 """Full-replacement (PUT) payload for an existing software schedule."""
@@ -161,4 +169,8 @@ input UpdateSoftwareScheduleInput {
     repeat: Long
     "Full replacement of the assigned device set (Machine global ids). Null leaves the assignment untouched."
     machineIds: [ID!]
+    "UPDATE only, rejected for INSTALL. Full replacement: null resets to the defaults (wait & notify, 7 days, 5 minutes)."
+    updateSettings: PackageUpdateSettingsInput
+    "UPDATE only, rejected for INSTALL. Full replacement: null turns auto-update off."
+    autoUpdate: SoftwareAutoUpdateInput
 }
