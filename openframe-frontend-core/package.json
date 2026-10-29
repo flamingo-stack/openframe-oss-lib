@@ -9,6 +9,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "next-styles": "./dist/build/next-styles.cjs"
+  },
   "files": [
     "dist",
     "src",

@@ -66,41 +66,15 @@ const ROUTE_FILE =
  * bring the full stylesheet with it must keep its classes in the one the page loads.
  */
 const LAZY_STYLED = ['dist/components/chat/embeddable-chat.js'];
-const NOT_SCANNED = [
-  '.css',
-  '.scss',
-  '.sass',
-  '.less',
-  '.svg',
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.avif',
-  '.ico',
-  '.bmp',
-  '.woff',
-  '.woff2',
-  '.ttf',
-  '.otf',
-  '.eot',
-  '.mp3',
-  '.mp4',
-  '.webm',
-  '.wav',
-  '.pdf',
-  '.md',
-  '.mdx',
-  '.txt',
-  '.html',
-  '.wasm',
-  '.node',
-  '.graphql',
-  '.gql',
-  '.yml',
-  '.yaml',
-];
+/** What the walk reads: code (and JSON, which code imports). Every other import (a stylesheet, an image, a
+ * font) holds no class name and is loaded as an empty module, so nothing has to name its extension. */
+const CODE = /\.(?:[cm]?[jt]sx?|json)$/;
+const codeOnly = {
+  name: 'code-only',
+  setup(builder) {
+    builder.onLoad({ filter: /.*/ }, args => (CODE.test(args.path) ? undefined : { contents: '', loader: 'empty' }));
+  },
+};
 
 /** Route files under `dir`, skipping private folders (`_x`), API routes and the excluded directories. */
 function routeFiles(appRoot, dir, exclude, out) {
@@ -163,7 +137,7 @@ async function loadRouteFilter(build, root, tsconfigRaw, routes) {
     jsx: 'automatic',
     logLevel: 'silent',
     tsconfigRaw,
-    loader: Object.fromEntries(NOT_SCANNED.map(ext => [ext, 'empty'])),
+    plugins: [codeOnly],
   });
   try {
     const filter = require(outfile)[routes.export];
@@ -257,8 +231,7 @@ async function walk({ root, appDir, exclude, routes, alias, firstPaint }) {
     treeShaking: true,
     logLevel: 'silent',
     tsconfigRaw,
-    loader: Object.fromEntries(NOT_SCANNED.map(ext => [ext, 'empty'])),
-    plugins: [graph],
+    plugins: [graph, codeOnly],
   });
 
   // A module is scanned when the tree-shaken bundle keeps any of it, as the app's own bundle does.

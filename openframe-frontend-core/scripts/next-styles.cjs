@@ -1,11 +1,15 @@
+#!/usr/bin/env node
 /**
  * How a Next.js app that uses this library ships its stylesheet: inside the page, and measured.
  *
  *   const { withInlineStyles } = require('<package>/next-styles')
  *   export default withInlineStyles(nextConfig)                       // next.config
  *
- *   node node_modules/<package>/dist/build/next-styles.cjs budget \
- *     --input src/app/globals.css --config tailwind.config.ts --budget 31500   // the build gate
+ *   next-styles budget --budget 31500                                  // the build gate (package.json script)
+ *
+ * `budget` finds the app's stylesheet (`src/app/globals.css`, else `app/globals.css`) and Tailwind config
+ * (`tailwind.config.{ts,js,cjs,mjs}`) itself and is named after the app's package; `--input`, `--config`
+ * and `--name` say otherwise.
  *
  * WHY. A page cannot paint before its stylesheet arrives, and a stylesheet in a file of its own is
  * requested only once the HTML names it: one more round trip after the HTML, whatever the file weighs.
@@ -28,7 +32,7 @@
  * page's sheet is mostly its layout's. Inlining removes the wait; a smaller sheet only makes it cheap.
  */
 const { execFile } = require('node:child_process');
-const { mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
+const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { dirname, isAbsolute, join, resolve } = require('node:path');
 const { promisify } = require('node:util');
@@ -120,20 +124,26 @@ function parseArgs(argv) {
   return args;
 }
 
-/** `budget --input <css> --config <tailwind config> --budget <brotli bytes> [--name <label>] [--env K=V]` */
+/** The first of `candidates` (relative to `root`) that exists. */
+const firstExisting = (root, candidates) => candidates.find(file => existsSync(resolve(root, file)));
+
+/** `budget --budget <brotli bytes> [--input <css>] [--config <tailwind config>] [--name <label>] [--env K=V]` */
 async function budgetCommand(argv) {
+  const root = process.cwd();
   const args = parseArgs(argv);
   const budget = Number(args.budget);
-  if (!args.input || !args.config || !Number.isInteger(budget) || budget <= 0) {
-    throw new Error('usage: next-styles budget --input <css> --config <tailwind config> --budget <brotli bytes>');
+  const input = args.input ?? firstExisting(root, ['src/app/globals.css', 'app/globals.css']);
+  const config =
+    args.config ??
+    firstExisting(
+      root,
+      ['ts', 'js', 'cjs', 'mjs'].map(ext => `tailwind.config.${ext}`),
+    );
+  if (!input || !config || !Number.isInteger(budget) || budget <= 0) {
+    throw new Error('usage: next-styles budget --budget <brotli bytes> [--input <css>] [--config <tailwind config>]');
   }
-  const name = args.name ?? args.input;
-  const { raw, brotli } = await measureStylesheet({
-    root: process.cwd(),
-    input: args.input,
-    config: args.config,
-    env: args.env,
-  });
+  const name = args.name ?? (existsSync(join(root, 'package.json')) ? require(join(root, 'package.json')).name : input);
+  const { raw, brotli } = await measureStylesheet({ root, input, config, env: args.env });
   console.log(`[css-budget] ${name}: ${kb(raw)} raw, ${kb(brotli)} brotli (budget ${kb(budget)})`);
   if (brotli > budget) {
     console.error(

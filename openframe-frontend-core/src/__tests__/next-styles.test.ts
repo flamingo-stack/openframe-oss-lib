@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -77,5 +78,13 @@ describe('next-styles: the stylesheet as the build builds it', () => {
     expect(css).not.toContain('.p-8{');
     expect(raw).toBe(Buffer.byteLength(css));
     expect(brotli).toBeGreaterThan(0);
+  });
+
+  it('budget finds the stylesheet and the config itself, and fails past the budget', () => {
+    const script = join(__dirname, '..', '..', 'scripts', 'next-styles.cjs');
+    const run = (budget: number) =>
+      execFileSync(process.execPath, [script, 'budget', '--budget', String(budget)], { cwd: root, encoding: 'utf8' });
+    expect(run(100_000)).toContain('[css-budget] src/app/globals.css:');
+    expect(() => run(1)).toThrow();
   });
 });
