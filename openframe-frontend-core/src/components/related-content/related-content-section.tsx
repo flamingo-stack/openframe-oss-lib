@@ -108,7 +108,7 @@ function DefaultLinkPropsProvider({
   const runtime = useChatRuntime();
   if (!href) return children(null);
   const target = navLinkTarget(runtime, href, targetPlatform);
-  return children({ href: target.href, ...newTabAnchorAttrs(target.isNewTab) });
+  return children({ href: target.href, ...newTabAnchorAttrs(target.isNewTab, target.href, targetPlatform) });
 }
 
 /** Default href resolution: trust the ref's stored url/targetPlatform as the

@@ -14,11 +14,7 @@
  */
 
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
-
-/** Arguments accepted by `window.open` for a new tab — keep `noopener`
- *  + `noreferrer` to prevent the opened page from accessing
- *  window.opener (reverse-tabnabbing class). */
-export const NEW_TAB_FEATURES = 'noopener,noreferrer';
+import { newTabFeatures } from './new-tab-rel';
 
 /** Modifier-click predicate — matches the existing useNavLink branch
  *  (cmd/ctrl/shift/alt OR non-primary mouse button). */
@@ -137,7 +133,7 @@ export function resolveExternalNavigation(args: {
     if (args.runtime.navigation.openExternal) {
       args.runtime.navigation.openExternal(abs);
     } else {
-      window.open(abs, '_blank', NEW_TAB_FEATURES);
+      window.open(abs, '_blank', newTabFeatures(abs, args.targetPlatform));
     }
   };
 

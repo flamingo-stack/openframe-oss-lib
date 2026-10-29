@@ -55,7 +55,6 @@ export { getCommandText } from './tool-call-helpers';
 export { CHIP_ACTION_BUTTON_CLASS } from './chip-action-class';
 export { chatChipClass, type ChipClassOptions } from './chip-styles';
 export {
-  NEW_TAB_FEATURES,
   isModifierClick,
   stripSameOriginToPath,
   resolveExternalNavigation,
@@ -77,10 +76,12 @@ export {
   computeIsNewTab,
   navLinkTarget,
   type NavLinkTarget,
+  type NavOpenIn,
   newTabAnchorAttrs,
   buildAnchorProps,
 } from './nav-anchor-props';
 export { isCrossOriginUrl } from './is-cross-origin-url';
+export { isRelativeHref, newTabFeatures, newTabRel, type NewTabRel } from './new-tab-rel';
 export { decideNewTab, type DecideNewTabInput, type NavSurface, type RuntimeMode } from './decide-new-tab';
 
 // Embed-surface auth moved to `utils/` (embed-proxy-auth-storage /

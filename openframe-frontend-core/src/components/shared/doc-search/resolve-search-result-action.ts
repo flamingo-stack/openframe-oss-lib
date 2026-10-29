@@ -18,7 +18,8 @@
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import type { ChatRef } from '../../chat/chat-ref.types';
-import { isRelativeHref, navLinkTarget } from '../../chat/utils/nav-anchor-props';
+import { navLinkTarget } from '../../chat/utils/nav-anchor-props';
+import { isRelativeHref } from '../../chat/utils/new-tab-rel';
 import type { SearchResult } from '../../ui/search-input';
 
 export type SearchResultAction =

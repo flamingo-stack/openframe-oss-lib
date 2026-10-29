@@ -165,6 +165,48 @@ describe('executeNavigation', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  it('opens a new tab when the caller asks for one, whatever the rule', () => {
+    const openExternal = vi.fn();
+    const navigate = vi.fn();
+
+    executeNavigation({
+      event: primaryClick(),
+      runtime: runtimeWith({ openExternal, navigate }),
+      href: '/admin/blog/preview/x',
+      openIn: 'new-tab',
+    });
+
+    expect(openExternal).toHaveBeenCalledWith('/admin/blog/preview/x');
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the tab when the caller asks for it, even for another platform', () => {
+    const navigate = vi.fn().mockReturnValue(true);
+
+    executeNavigation({
+      event: primaryClick(),
+      runtime: runtimeWith({ navigate }),
+      href: '/x',
+      targetPlatform: 'openmsp',
+      openIn: 'same-tab',
+    });
+
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ href: '/x' }));
+  });
+
+  it('lets the embed rule win over a same-tab request', () => {
+    const openExternal = vi.fn();
+
+    executeNavigation({
+      event: primaryClick(),
+      runtime: runtimeWith({ mode: 'embed', openExternal }),
+      href: 'https://www.flamingo.run/blog/x',
+      openIn: 'same-tab',
+    });
+
+    expect(openExternal).toHaveBeenCalledWith('https://www.flamingo.run/blog/x');
+  });
+
   it('leaves modifier clicks to the browser', () => {
     const navigate = vi.fn();
     const event = { preventDefault: vi.fn(), button: 0, metaKey: true };

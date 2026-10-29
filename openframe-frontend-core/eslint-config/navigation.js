@@ -14,6 +14,7 @@ const EXECUTORS = new Set([
   'executeNewTabNavigation',
   'handleChatNavClick',
   'useNavLinkViaRuntime',
+  'useNavigateViaRuntime',
 ]);
 
 /** `router.push(...)`, `router.replace(...)`: a router call on anything named like a router. */

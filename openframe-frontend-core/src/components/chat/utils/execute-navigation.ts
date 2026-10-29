@@ -29,8 +29,9 @@
 
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
-import { NEW_TAB_FEATURES, resolveExternalNavigation, stripSameOriginToPath } from './chat-nav-resolution';
-import { isSameOriginAbsoluteHref, navLinkTarget } from './nav-anchor-props';
+import { resolveExternalNavigation, stripSameOriginToPath } from './chat-nav-resolution';
+import { isSameOriginAbsoluteHref, type NavOpenIn, navLinkTarget } from './nav-anchor-props';
+import { newTabFeatures } from './new-tab-rel';
 
 /** Absolute `http(s)` URL pointing at an origin that is not ours. */
 function isForeignOriginHref(href: string): boolean {
@@ -56,6 +57,8 @@ export interface ExecuteNavigationClickArgs {
   targetPlatform?: string | null;
   /** The host's `composeContentUrl` returned `href` as its own relative route (see `navLinkTarget`). */
   hostRoute?: boolean;
+  /** The caller's explicit tab (see `navLinkTarget`). */
+  openIn?: NavOpenIn;
 }
 
 export interface ExecuteNavigationImperativeArgs {
@@ -66,6 +69,8 @@ export interface ExecuteNavigationImperativeArgs {
   targetPlatform?: string | null;
   /** The host's `composeContentUrl` returned `href` as its own relative route (see `navLinkTarget`). */
   hostRoute?: boolean;
+  /** The caller's explicit tab (see `navLinkTarget`). */
+  openIn?: NavOpenIn;
 }
 
 /**
@@ -83,7 +88,7 @@ export function executeNewTabNavigation({
   targetPlatform?: string | null;
 }): void {
   if (runtime) resolveExternalNavigation({ href, targetPlatform, runtime }).open();
-  else window.open(href, '_blank', NEW_TAB_FEATURES);
+  else window.open(href, '_blank', newTabFeatures(href, targetPlatform));
 }
 
 /** Core: make the new-tab decision (when a runtime is present) and execute. */
@@ -93,9 +98,10 @@ function runNavigation(
   path: string | null | undefined,
   targetPlatform: string | null | undefined,
   hostRoute?: boolean,
+  openIn?: NavOpenIn,
 ): void {
   // THE navigation decision (no runtime → same tab).
-  const { isNewTab } = navLinkTarget(runtime, href, targetPlatform, { hostRoute });
+  const { isNewTab } = navLinkTarget(runtime, href, targetPlatform, { hostRoute, openIn });
   if (isNewTab) {
     executeNewTabNavigation({ runtime, href, targetPlatform });
     return;
@@ -134,6 +140,7 @@ export function executeNavigation({
   path,
   targetPlatform,
   hostRoute,
+  openIn,
 }: ExecuteNavigationClickArgs): boolean {
   if (!href) {
     event.preventDefault();
@@ -146,7 +153,7 @@ export function executeNavigation({
   if (event.button !== undefined && event.button !== 0) return false;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
   event.preventDefault();
-  runNavigation(runtime, href, path, targetPlatform, hostRoute);
+  runNavigation(runtime, href, path, targetPlatform, hostRoute, openIn);
   return true;
 }
 
@@ -160,8 +167,9 @@ export function executeNavigationImperative({
   path,
   targetPlatform,
   hostRoute,
+  openIn,
 }: ExecuteNavigationImperativeArgs): void {
-  runNavigation(runtime, href, path, targetPlatform, hostRoute);
+  runNavigation(runtime, href, path, targetPlatform, hostRoute, openIn);
 }
 
 /**

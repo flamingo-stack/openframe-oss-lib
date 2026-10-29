@@ -30,6 +30,7 @@
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { resolveHrefForRuntime } from './chat-nav-resolution';
 import { decideNewTab as libDecideNewTab } from './decide-new-tab';
+import { isRelativeHref, newTabRel, type NewTabRel } from './new-tab-rel';
 
 /** An ABSOLUTE `http(s)` URL on the current page's origin. Relative hrefs return
  *  false (in embed mode they're hub-relative, not in-app), as do cross-origin
@@ -63,10 +64,8 @@ export function computeIsNewTab(
   );
 }
 
-/** True for a path with no scheme and no host (`/help-center/x`, `x`); false for `https://…` and `//…`. */
-export function isRelativeHref(href: string): boolean {
-  return !/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(href);
-}
+/** A caller's explicit tab for a link (an admin preview always opens a new tab); absent = the rule decides. */
+export type NavOpenIn = 'new-tab' | 'same-tab';
 
 /** Where a chat link goes: its href as the runtime resolves it, and whether it opens in a new tab. */
 export interface NavLinkTarget {
@@ -84,16 +83,24 @@ export interface NavLinkTarget {
  * `hostRoute`: the host's `composeContentUrl` returned this href as a RELATIVE route of its own (a type it serves
  * in-app). It is the host's page, not the hub's, so it is never resolved against the hub's origin and never handed to
  * a new tab, in any mode (in embed mode a relative href is otherwise taken as hub-relative).
+ *
+ * `openIn`: the caller names the tab itself (an admin preview always opens a new one). The embed rule still comes
+ * first: an embedded guest never navigates its host page to the hub.
  */
 export function navLinkTarget(
   runtime: ChatRuntime | null | undefined,
   href: string,
   targetPlatform?: string | null,
-  { hostRoute = false }: { hostRoute?: boolean } = {},
+  { hostRoute = false, openIn }: { hostRoute?: boolean; openIn?: NavOpenIn } = {},
 ): NavLinkTarget {
-  if (!runtime || (hostRoute && isRelativeHref(href))) return { href, isNewTab: false };
+  if (!runtime) return { href, isNewTab: openIn === 'new-tab' };
+  if (hostRoute && isRelativeHref(href)) return { href, isNewTab: false };
   const resolved = resolveHrefForRuntime(href, runtime);
-  return { href: resolved, isNewTab: computeIsNewTab(runtime, resolved, targetPlatform ?? null) };
+  const isNewTab =
+    runtime.navigation.mode !== 'embed' && openIn
+      ? openIn === 'new-tab'
+      : computeIsNewTab(runtime, resolved, targetPlatform ?? null);
+  return { href: resolved, isNewTab };
 }
 
 /**
@@ -101,15 +108,18 @@ export function navLinkTarget(
  * on the new-tab decision. Spread directly into JSX:
  *   <a href={href} {...newTabAnchorAttrs(isNewTab)} />
  *
- * Single helper so chat anchors stay consistent — new-tab links always
- * pair `_blank` with `noopener noreferrer` (defense against window.opener
- * tab-nabbing) and same-tab links don't render either attribute.
+ * Single helper so anchors stay consistent: a new-tab link pairs `_blank` with the one referrer rule
+ * (`newTabRel`: `noopener` always, `noreferrer` for a third party) and a same-tab link renders neither.
  */
-export function newTabAnchorAttrs(isNewTab: boolean): {
+export function newTabAnchorAttrs(
+  isNewTab: boolean,
+  href?: string | null,
+  targetPlatform?: string | null,
+): {
   target?: '_blank';
-  rel?: 'noopener' | 'noopener noreferrer';
+  rel?: NewTabRel;
 } {
-  return isNewTab ? { target: '_blank' as const, rel: 'noopener noreferrer' as const } : {};
+  return isNewTab ? { target: '_blank' as const, rel: newTabRel(href, targetPlatform) } : {};
 }
 
 /**
@@ -125,6 +135,6 @@ export function newTabAnchorAttrs(isNewTab: boolean): {
 export function buildAnchorProps(
   href: string | null | undefined,
   isNewTab: boolean,
-): { href: string; target?: '_blank'; rel?: 'noopener' | 'noopener noreferrer' } | undefined {
-  return href ? { href, ...newTabAnchorAttrs(isNewTab) } : undefined;
+): { href: string; target?: '_blank'; rel?: NewTabRel } | undefined {
+  return href ? { href, ...newTabAnchorAttrs(isNewTab, href) } : undefined;
 }

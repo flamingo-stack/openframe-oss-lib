@@ -70,6 +70,8 @@ export {
   type NavLinkAnchorViaRuntimeProps,
   type NavLinkViaRuntimeInput,
   type NavLinkViaRuntimeProps,
+  type NavigateViaRuntimeInput,
+  useNavigateViaRuntime,
   useNavLinkViaRuntime,
 } from './nav-link-anchor-via-runtime';
 export { SourceActionButton, type SourceActionButtonProps, type SourceActionDensity } from './source-action-button';
