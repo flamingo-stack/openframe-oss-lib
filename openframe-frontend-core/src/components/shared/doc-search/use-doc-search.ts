@@ -44,8 +44,7 @@ import { useDebounce } from '../../../hooks/ui/use-debounce';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import { ASK_AI_OPEN_WITH_REF_EVENT } from '../../chat/utils/ask-ai-events';
-import { resolveExternalNavigation, NEW_TAB_FEATURES } from '../../chat/utils/chat-nav-resolution';
-import { executeNavigationImperative } from '../../chat/utils/execute-navigation';
+import { executeNavigationImperative, executeNewTabNavigation } from '../../chat/utils/execute-navigation';
 import type { SearchResult } from '../../ui/search-input';
 import { mapDocSearchResults } from './map-doc-search-results';
 import { resolveSearchResultAction } from './resolve-search-result-action';
@@ -268,12 +267,10 @@ export function useDocSearch(config: UseDocSearchConfig) {
         case 'navigate-same-tab':
         case 'navigate-new-tab': {
           // A modifier / non-primary click asks for a new tab, whatever the decision: the row is a `<div>`, not an
-          // anchor, so the browser will not do it natively. Opened the one way a new tab is opened
-          // (`resolveExternalNavigation`: the host's `openExternal`, else `window.open`).
+          // anchor, so the browser will not do it natively. Opened the one way a new tab is opened.
           if (wantsNewTab) {
             setKeepOpen(true);
-            if (runtime) resolveExternalNavigation({ href: action.href, targetPlatform: null, runtime }).open();
-            else window.open(action.href, '_blank', NEW_TAB_FEATURES);
+            executeNewTabNavigation({ runtime, href: action.href, targetPlatform: null });
             return;
           }
           // A new-tab result keeps the dropdown open, so the user can pick another without searching again.

@@ -68,6 +68,7 @@ export { handleChatNavClick, type ChatNavClickInput } from './execute-navigation
 export {
   executeNavigation,
   executeNavigationImperative,
+  executeNewTabNavigation,
   type ExecuteNavigationClickArgs,
   type ExecuteNavigationImperativeArgs,
   type NavClickEvent,

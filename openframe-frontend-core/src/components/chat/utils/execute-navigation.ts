@@ -29,7 +29,7 @@
 
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
-import { NEW_TAB_FEATURES, stripSameOriginToPath } from './chat-nav-resolution';
+import { NEW_TAB_FEATURES, resolveExternalNavigation, stripSameOriginToPath } from './chat-nav-resolution';
 import { isSameOriginAbsoluteHref, navLinkTarget } from './nav-anchor-props';
 
 /** Absolute `http(s)` URL pointing at an origin that is not ours. */
@@ -68,6 +68,24 @@ export interface ExecuteNavigationImperativeArgs {
   hostRoute?: boolean;
 }
 
+/**
+ * Open `href` in a new tab: the host's `openExternal` (through `resolveExternalNavigation`, which absolutizes it in
+ * embed mode), else the browser. THE one way the lib opens a tab, for the decision below and for a click that asks
+ * for a new tab itself (a modifier click on a row that is not an anchor).
+ */
+export function executeNewTabNavigation({
+  runtime,
+  href,
+  targetPlatform,
+}: {
+  runtime: ChatRuntime | null | undefined;
+  href: string;
+  targetPlatform?: string | null;
+}): void {
+  if (runtime) resolveExternalNavigation({ href, targetPlatform, runtime }).open();
+  else window.open(href, '_blank', NEW_TAB_FEATURES);
+}
+
 /** Core: make the new-tab decision (when a runtime is present) and execute. */
 function runNavigation(
   runtime: ChatRuntime | null | undefined,
@@ -79,8 +97,7 @@ function runNavigation(
   // THE navigation decision (no runtime → same tab).
   const { isNewTab } = navLinkTarget(runtime, href, targetPlatform, { hostRoute });
   if (isNewTab) {
-    if (runtime?.navigation.openExternal) runtime.navigation.openExternal(href);
-    else window.open(href, '_blank', NEW_TAB_FEATURES);
+    executeNewTabNavigation({ runtime, href, targetPlatform });
     return;
   }
   // A FOREIGN href that the host's `decideNewTab` routed same-tab must reach the
