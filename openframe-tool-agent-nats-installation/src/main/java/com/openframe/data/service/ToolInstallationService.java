@@ -2,11 +2,8 @@ package com.openframe.data.service;
 
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
-import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ToolInstallationDeliverySeed;
-import com.openframe.data.nats.publisher.ToolInstallationNatsPublisher;
-import com.openframe.delivery.config.DeliveryProperties;
-import com.openframe.delivery.dispatch.DeliveryDispatcher;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,9 +21,7 @@ public class ToolInstallationService {
 
     private final IntegratedToolService integratedToolService;
     private final ToolCommandParamsResolver toolCommandParamsResolver;
-    private final ToolInstallationNatsPublisher toolInstallationNatsPublisher;
-    private final DeliveryProperties deliveryProperties;
-    private final DeliveryDispatcher deliveryDispatcher;
+    private final DeliveryRouter deliveryRouter;
 
     public void process(String machineId, IntegratedToolAgent toolAgent) {
         process(machineId, toolAgent, false);
@@ -47,8 +42,11 @@ public class ToolInstallationService {
             List<String> runCommandArgs = toolAgent.getRunCommandArgs();
             toolAgent.setRunCommandArgs(toolCommandParamsResolver.process(toolId, runCommandArgs));
 
-            publish(machineId, toolAgent, tool, reinstall);
-            log.info("Published {} agent installation message for machine {}", toolId, machineId);
+            ToolInstallationDeliverySeed seed = new ToolInstallationDeliverySeed(machineId, toolAgent, tool, reinstall);
+            boolean carried = deliveryRouter.dispatch(seed);
+            if (carried) {
+                log.info("Published {} agent installation message for machine {}", toolId, machineId);
+            }
         } catch (Exception e) {
             // TODO: add fallback mechanism
             log.error("Failed to publish {} agent installation message for machine {}", toolId, machineId, e);
@@ -68,15 +66,5 @@ public class ToolInstallationService {
             return integratedToolService.getToolByKey(toolId)
                     .orElseThrow(() -> new IllegalStateException("No tool found:" + toolId));
         }
-    }
-
-
-    private void publish(String machineId, IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
-        if (deliveryProperties.isEnabled(DeliveryType.TOOL_INSTALLATION)) {
-            ToolInstallationDeliverySeed seed = new ToolInstallationDeliverySeed(machineId, toolAgent, tool, reinstall);
-            deliveryDispatcher.dispatch(seed);
-            return;
-        }
-        toolInstallationNatsPublisher.publish(machineId, toolAgent, tool, reinstall);
     }
 }

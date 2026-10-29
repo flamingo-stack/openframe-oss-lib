@@ -66,6 +66,8 @@ public class SoftwareScheduleService {
                 .description(input.getDescription())
                 .action(input.getAction())
                 .packages(packages)
+                .updateSettings(PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings()))
+                .autoUpdate(PackageUpdateSettingsMapper.autoUpdate(input.getAction(), input.getAutoUpdate()))
                 .trigger(ScheduleScriptTrigger.DATE_TIME)
                 .timeReference(timeReference)
                 .offlineBehavior(input.getOfflineBehavior())
@@ -100,6 +102,8 @@ public class SoftwareScheduleService {
         entity.setDescription(input.getDescription());
         entity.setAction(input.getAction());
         entity.setPackages(packages);
+        entity.setUpdateSettings(PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings()));
+        entity.setAutoUpdate(PackageUpdateSettingsMapper.autoUpdate(input.getAction(), input.getAutoUpdate()));
         entity.setTimeReference(timeReference);
         entity.setOfflineBehavior(input.getOfflineBehavior());
         entity.setReconnectWindowSeconds(input.getReconnectWindowSeconds());
@@ -286,6 +290,7 @@ public class SoftwareScheduleService {
         return SoftwareScheduleResponse.builder()
                 .id(s.getId()).name(s.getName()).description(s.getDescription())
                 .action(s.getAction()).packages(s.getPackages())
+                .updateSettings(s.getUpdateSettings()).autoUpdate(s.getAutoUpdate())
                 .selectionMode(s.getSelectionMode()).deviceCriteria(s.getDeviceCriteria())
                 .trigger(s.getTrigger()).timeReference(s.getTimeReference())
                 .offlineBehavior(s.getOfflineBehavior()).reconnectWindowSeconds(s.getReconnectWindowSeconds())

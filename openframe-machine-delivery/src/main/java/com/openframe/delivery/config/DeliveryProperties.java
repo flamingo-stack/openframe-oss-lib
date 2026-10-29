@@ -128,6 +128,10 @@ public class DeliveryProperties {
         @Positive
         private long rerunAfterSeconds;
 
+        // empty = every agent; else the first client version (dotted numbers) the engine delivers the type to, an
+        // older or unknown one takes the legacy subject the router keeps for the type
+        private String minAgentVersion = "";
+
         public boolean hasRunsLeft(int reruns) {
             return reruns + 1 < maxRuns;
         }
@@ -167,6 +171,7 @@ public class DeliveryProperties {
         private Boolean fastSweep;
         private Integer maxRuns;
         private Long rerunAfterSeconds;
+        private String minAgentVersion;
 
         Policy mergeOver(Policy base) {
             Policy merged = new Policy();
@@ -180,6 +185,7 @@ public class DeliveryProperties {
             merged.setFastSweep(requireNonNullElse(fastSweep, base.isFastSweep()));
             merged.setMaxRuns(requireNonNullElse(maxRuns, base.getMaxRuns()));
             merged.setRerunAfterSeconds(requireNonNullElse(rerunAfterSeconds, base.getRerunAfterSeconds()));
+            merged.setMinAgentVersion(requireNonNullElse(minAgentVersion, base.getMinAgentVersion()));
             return merged;
         }
     }
