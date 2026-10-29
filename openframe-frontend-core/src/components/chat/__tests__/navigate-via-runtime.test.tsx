@@ -65,10 +65,8 @@ describe('useNavigateViaRuntime', () => {
 });
 
 describe('useNavLinkViaRuntime', () => {
-  it('returns no link without an href', () => {
-    const { result } = renderHook(() => useNavLinkViaRuntime({ href: null }), {
-      wrapper: wrapperFor(runtimeWith({})),
-    });
+  it.each([null, undefined, ''])('returns no link without a destination (%j)', href => {
+    const { result } = renderHook(() => useNavLinkViaRuntime({ href }), { wrapper: wrapperFor(runtimeWith({})) });
 
     expect(result.current).toBeNull();
   });

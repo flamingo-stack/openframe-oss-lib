@@ -16,6 +16,8 @@ describe('newTabRel', () => {
   it('drops it for a third party', () => {
     expect(newTabRel('https://businessof.tech/2025/10/31/some-post/')).toBe('noopener noreferrer');
     expect(newTabRel('//evil.example/x')).toBe('noopener noreferrer');
+    expect(newTabRel('mailto:hi@flamingo.run')).toBe('noopener noreferrer');
+    expect(newTabRel('#section')).toBe('noopener noreferrer');
   });
 
   it('writes the same rule as window.open features', () => {

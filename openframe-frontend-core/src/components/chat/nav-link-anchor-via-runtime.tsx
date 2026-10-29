@@ -48,9 +48,9 @@ export interface NavLinkAnchorViaRuntimeProps extends Omit<
   onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
-export interface NavLinkViaRuntimeInput<Href extends string | null | undefined = string> {
-  /** The destination; with none (null / undefined) the hook returns null and the caller draws no link. */
-  href: Href;
+export interface NavLinkViaRuntimeInput {
+  /** The destination; with none (null, undefined or empty) the hook returns null and the caller draws no link. */
+  href: string | null | undefined;
   path?: string | null;
   /** The platform that owns `href`, by name. */
   targetPlatform?: string | null;
@@ -80,21 +80,17 @@ export function useNavLinkTarget(href: string, targetPlatform?: string | null, o
  * A new-tab link to one of our own sites keeps the Referer (`newTabRel`: the
  * cross-domain analytics attribute the visit by it); any other gets `noreferrer`.
  */
-export function useNavLinkViaRuntime(input: NavLinkViaRuntimeInput): NavLinkViaRuntimeProps;
-export function useNavLinkViaRuntime(
-  input: NavLinkViaRuntimeInput<string | null | undefined>,
-): NavLinkViaRuntimeProps | null;
 export function useNavLinkViaRuntime({
   href,
   path,
   targetPlatform,
   openIn,
   onClick: onClickProp,
-}: NavLinkViaRuntimeInput<string | null | undefined>): NavLinkViaRuntimeProps | null {
+}: NavLinkViaRuntimeInput): NavLinkViaRuntimeProps | null {
   const runtime = useRequiredChatRuntime();
   const panel = useChatPanel();
   const { href: resolvedHref, isNewTab } = useNavLinkTarget(href ?? '', targetPlatform, openIn);
-  if (href == null) return null;
+  if (!href) return null;
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
     onClickProp?.(e);

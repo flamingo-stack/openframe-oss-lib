@@ -16,9 +16,11 @@ export function isRelativeHref(href: string): boolean {
   return !/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(href);
 }
 
+/** A path on this site (`/x`), or an absolute URL on a platform's own host (or a local one). Not a bare anchor
+ *  (`#x`), a `mailto:` or any other scheme, and not a protocol-relative `//host`. */
 function isOwnSiteHref(href: string | null | undefined): boolean {
   if (!href) return false;
-  if (isRelativeHref(href)) return true;
+  if (href.startsWith('/') && !href.startsWith('//')) return true;
   try {
     const url = new URL(href);
     return isLocalUrl(url.href) || getPlatformByHostname(url.hostname) !== null;
