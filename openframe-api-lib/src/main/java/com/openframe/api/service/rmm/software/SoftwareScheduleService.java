@@ -282,6 +282,7 @@ public class SoftwareScheduleService {
                         .packageManager(p.getPackageManager())
                         .packageName(p.getPackageName())
                         .brewPackageType(p.getBrewPackageType())
+                        .softwareId(p.getSoftwareId())
                         .build())
                 .toList();
     }

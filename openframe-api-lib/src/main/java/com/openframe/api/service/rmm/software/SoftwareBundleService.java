@@ -308,6 +308,7 @@ public class SoftwareBundleService {
                     i.setPackageManager(p.getPackageManager());
                     i.setPackageName(p.getPackageName());
                     i.setBrewPackageType(p.getBrewPackageType());
+                    i.setSoftwareId(p.getSoftwareId());
                     return i;
                 })
                 .toList();
@@ -359,6 +360,7 @@ public class SoftwareBundleService {
                         .packageName(p.getPackageName())
                         .brewPackageType(p.getBrewPackageType())
                         .version(p.getVersion())
+                        .softwareId(p.getSoftwareId())
                         .build())
                 .toList();
     }
