@@ -30,7 +30,7 @@
 const { execFile } = require('node:child_process');
 const { mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
-const { basename, dirname, isAbsolute, join, resolve } = require('node:path');
+const { dirname, isAbsolute, join, resolve } = require('node:path');
 const { promisify } = require('node:util');
 const { brotliCompressSync, constants } = require('node:zlib');
 
@@ -74,12 +74,13 @@ async function measureStylesheet({ root, input, config, env = {} }) {
   if (!isAbsolute(root)) throw new Error('measureStylesheet: root must be an absolute path');
   const file = resolve(root, input);
   const dir = mkdtempSync(join(tmpdir(), 'next-styles-'));
-  // The resolved copy sits BESIDE the input, so what it names relative to its own folder still resolves:
-  // an `@config '../tailwind.full.config.ts'` (Tailwind refuses an absolute one) and a relative `url()`.
-  const source = join(dirname(file), `.${basename(file)}.${process.pid}-${basename(dir)}.measure.css`);
   try {
+    // The copy lives in the temp folder, never beside the input (a file watcher or linter there would see
+    // it). A stylesheet's own `@config` is relative to ITS folder and Tailwind refuses an absolute one, so
+    // it is dropped: `config` is what the sheet is built with, as the app's build states it.
+    const source = join(dir, 'input.css');
     const output = join(dir, 'output.css');
-    writeFileSync(source, resolveImports(file, root));
+    writeFileSync(source, resolveImports(file, root).replace(/^\s*@config\s+(['"])[^'"]+\1\s*;\s*$/gm, ''));
     // The app's own Tailwind, the one its build runs; this package's where the app has none of its own.
     const cli = require.resolve('tailwindcss/lib/cli.js', { paths: [root, __dirname] });
     await promisify(execFile)(
@@ -97,7 +98,6 @@ async function measureStylesheet({ root, input, config, env = {} }) {
     }).length;
     return { css, raw: Buffer.byteLength(css), brotli };
   } finally {
-    rmSync(source, { force: true });
     rmSync(dir, { recursive: true, force: true });
   }
 }

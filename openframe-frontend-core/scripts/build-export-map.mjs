@@ -23,6 +23,7 @@
  */
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -145,6 +146,13 @@ function main() {
   copyFileSync(join(ROOT, 'scripts', 'style-sources.d.ts'), join(OUT_DIR, 'style-sources.d.ts'));
   copyFileSync(join(ROOT, 'scripts', 'next-styles.cjs'), join(OUT_DIR, 'next-styles.cjs'));
   copyFileSync(join(ROOT, 'scripts', 'next-styles.d.ts'), join(OUT_DIR, 'next-styles.d.ts'));
+  // style-sources leaves these built files out of the first-paint stylesheet by path: a build that moves
+  // one would silently put its classes back on every page, so a missing one fails the build instead.
+  const missing = createRequire(import.meta.url)(join(ROOT, 'scripts', 'style-sources.cjs')).LAZY_STYLED.filter(
+    file => !existsSync(join(ROOT, file)),
+  );
+  if (missing.length > 0)
+    throw new Error(`build-export-map: LAZY_STYLED names files the build did not write: ${missing.join(', ')}`);
   console.log(`Export map: ${names} names over ${Object.keys(entries).length} entries`);
 }
 

@@ -286,4 +286,4 @@ if (require.main === module) {
   );
 }
 
-module.exports = { appStyleSources, routePaths, servedRouteFiles };
+module.exports = { appStyleSources, routePaths, servedRouteFiles, LAZY_STYLED };
