@@ -140,4 +140,4 @@ export {
   ASK_AI_TRIGGER_ATTRIBUTE,
 } from './utils/ask-ai-events';
 export * from './proxy-credentials-panel';
-export { INLINE_CHIP_CLASS, InlineAppLinkChip, isInAppPath } from './inline-app-link-chip';
+export { InlineAppLinkChip, InlineChip, isInAppPath } from './inline-app-link-chip';

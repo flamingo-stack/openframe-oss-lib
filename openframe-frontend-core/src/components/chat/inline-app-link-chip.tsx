@@ -6,9 +6,9 @@
  * the app (`[Devices → Add Device](/devices/new)`) both use it, so a link to a place in the app reads as one at a
  * glance (CU-17tkuw61kfy: drawn as a plain link, it was the colour of the text around it).
  *
- * The skin is the lib's `Tag` badge, rendered as a `<span>` (the chip sits inside markdown's `<p>`, where a `<div>` is
- * invalid), with the tweaks below. `INLINE_CHIP_CLASS` is exported so a host chip (the frontend's `MentionTag`) draws
- * the same box instead of a copy of it.
+ * ONE component draws the box, `InlineChip`: the lib's `Tag` badge, rendered as a `<span>` (the chip sits inside
+ * markdown's `<p>`, where a `<div>` is invalid), with the inline skin below. A host's chip (the frontend's
+ * `MentionTag`, both its segments) draws `InlineChip` too, and adds only its own behaviour (link, new-tab segment).
  */
 
 import type React from 'react';
@@ -23,8 +23,35 @@ import { Tag } from '../ui/tag';
  * - `hover:border-ods-border`: no accent border on hover (the badge's default);
  * - `[&_svg]:size-4` and `[&_svg]:text-ods-text-secondary`: a 16px muted lead icon, the label in the primary colour.
  */
-export const INLINE_CHIP_CLASS =
+const INLINE_CHIP_CLASS =
   'max-w-[16rem] align-middle [&_svg]:size-4 [&_svg]:text-ods-text-secondary hover:border-ods-border';
+
+/**
+ * The inline box: an icon and a label in a chat sentence. `className` adds to the skin (a segment's square corner, a
+ * hover fill); `loading` draws `Tag`'s own skeleton in the same box.
+ */
+export function InlineChip({
+  icon,
+  label,
+  className,
+  loading,
+}: {
+  icon?: React.ReactNode;
+  label: React.ReactNode;
+  className?: string;
+  loading?: boolean;
+}): React.ReactElement {
+  return (
+    <Tag
+      as="span"
+      variant="badge"
+      icon={icon}
+      label={label}
+      loading={loading}
+      className={cn(INLINE_CHIP_CLASS, className)}
+    />
+  );
+}
 
 /** True for a link to a screen of the app the chat runs in: a root-relative path (`/devices/new`), never `//host`. */
 export function isInAppPath(href: string | undefined): boolean {
@@ -44,15 +71,7 @@ export function InlineAppLinkChip({
   children: React.ReactNode;
   anchor?: React.ComponentType<{ href: string; className?: string; children?: React.ReactNode }>;
 }): React.ReactElement {
-  const chip = (
-    <Tag
-      as="span"
-      variant="badge"
-      icon={<BrowserWindowIcon />}
-      label={children}
-      className={cn(INLINE_CHIP_CLASS, 'hover:bg-ods-bg-hover')}
-    />
-  );
+  const chip = <InlineChip icon={<BrowserWindowIcon />} label={children} className="hover:bg-ods-bg-hover" />;
   return Anchor ? (
     <Anchor href={href} className="no-underline">
       {chip}
