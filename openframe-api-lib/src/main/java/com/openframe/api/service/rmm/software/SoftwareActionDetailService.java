@@ -9,6 +9,8 @@ import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
@@ -16,12 +18,14 @@ import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.SoftwareBundleOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleOnlineDispatchRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -29,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -45,6 +50,7 @@ public class SoftwareActionDetailService {
     private final PackageUpdateDeviceStateRepository packageUpdateDeviceStateRepository;
     private final MachineRepository machineRepository;
     private final OrganizationRepository organizationRepository;
+    private final TagAssignmentRepository tagAssignmentRepository;
     private final TenantIdProvider tenantIdProvider;
 
     public List<SoftwareActionDeviceResponse> devices(String executionId, String bundleId, String scheduleId,
@@ -73,12 +79,28 @@ public class SoftwareActionDetailService {
         }
 
         enrichWithCustomer(tenantId, byMachine);
+        Set<String> tagged = taggedMachines(byMachine.keySet(), filter);
 
         return byMachine.values().stream()
                 .filter(row -> matchesStatus(row, filter))
                 .filter(row -> matchesCustomer(row, filter))
+                .filter(row -> tagged == null || tagged.contains(row.getMachineId()))
                 .filter(row -> matchesSearch(row, search))
                 .toList();
+    }
+
+    // null = no tag filter; a device matches when it carries any of the tags
+    private Set<String> taggedMachines(Set<String> machineIds, SoftwareActionDeviceFilterInput filter) {
+        if (filter == null || filter.getDeviceTagIds() == null || filter.getDeviceTagIds().isEmpty()) {
+            return null;
+        }
+        if (machineIds.isEmpty()) {
+            return Set.of();
+        }
+        return tagAssignmentRepository.findByEntityIdInAndTagIdInAndEntityType(
+                        new ArrayList<>(machineIds), filter.getDeviceTagIds(), TagEntityType.DEVICE).stream()
+                .map(TagAssignment::getEntityId)
+                .collect(Collectors.toSet());
     }
 
     private void addPending(Map<String, SoftwareActionDeviceResponse> byMachine, String tenantId,

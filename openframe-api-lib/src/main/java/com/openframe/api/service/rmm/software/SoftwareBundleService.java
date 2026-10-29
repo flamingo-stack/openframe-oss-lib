@@ -185,6 +185,7 @@ public class SoftwareBundleService {
                     .tenantId(bundle.getTenantId())
                     .executionId(executionId)
                     .action(bundle.getAction())
+                    .kind(bundle.getAction().kind())
                     .packageManager(pkg.getPackageManager())
                     .packageName(pkg.getPackageName())
                     .version(pkg.getVersion())

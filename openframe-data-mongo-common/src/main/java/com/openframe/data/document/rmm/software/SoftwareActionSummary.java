@@ -15,6 +15,7 @@ public class SoftwareActionSummary {
     private String packageName;
     private String version;
     private SoftwareAction action;
+    private SoftwareActionKind kind;
     private SoftwareActionStatus status;
     private int totalMachineCount;
     private int respondedMachineCount;
