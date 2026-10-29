@@ -18,13 +18,18 @@ import org.springframework.stereotype.Service;
 public class PackageAutoUpdatePolicyService {
 
     private final PackageAutoUpdatePolicyRepository repository;
+    private final PackageCatalogVersions catalogVersions;
 
     // A run with Auto-update off leaves an earlier policy as it is: only Turn Off Auto-Update turns one off.
+    // The run itself brings the package to the catalog's latest, so the trigger starts from the next release.
     public void turnOn(RunningExecutionRows execution, BrewPackageType brewPackageType, String softwareId,
                        SoftwareAutoUpdate autoUpdate, PackageUpdateSettings updateSettings) {
         if (autoUpdate == null || !autoUpdate.isEnabled()) {
             return;
         }
+        String catalogVersion = catalogVersions
+                .latest(execution.getPackageManager(), execution.getPackageName(), brewPackageType)
+                .orElse(null);
         repository.enable(PackageAutoUpdatePolicy.builder()
                 .tenantId(execution.getTenantId())
                 .packageManager(execution.getPackageManager())
@@ -32,6 +37,7 @@ public class PackageAutoUpdatePolicyService {
                 .brewPackageType(brewPackageType)
                 .softwareId(softwareId)
                 .settings(autoUpdate.settingsOr(updateSettings))
+                .lastVersion(catalogVersion)
                 .updatedBy(execution.getInitiatedBy())
                 .build(), execution.getMachineIds());
         log.info("Auto-update turned on package={}/{} machines={} softwareId={}",

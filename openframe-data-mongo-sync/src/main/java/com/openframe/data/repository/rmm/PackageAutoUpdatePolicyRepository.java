@@ -10,6 +10,8 @@ import java.util.List;
 @Repository
 public interface PackageAutoUpdatePolicyRepository extends MongoRepository<PackageAutoUpdatePolicy, String>, CustomPackageAutoUpdatePolicyRepository {
 
+    List<PackageAutoUpdatePolicy> findByTenantIdAndEnabledTrue(String tenantId);
+
     List<PackageAutoUpdatePolicy> findByTenantIdAndSoftwareIdIn(String tenantId, Collection<String> softwareIds);
 
     List<PackageAutoUpdatePolicy> findByTenantIdAndMachineIdAndSoftwareIdIn(String tenantId, String machineId,

@@ -112,6 +112,32 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(repository.disableBySoftwareId(TENANT, "title-7", "other@x")).isZero();   // idempotent
     }
 
+    @Test
+    @DisplayName("lastVersion: set by enable as the starting point, moved by markOrdered; the trigger reads enabled rows only")
+    void lastVersion_startsAtEnable_movesWithOrders() {
+        PackageAutoUpdatePolicy chrome = template("google-chrome", null, WAIT, "admin@x");
+        chrome.setLastVersion("151.0.7922.98");
+        repository.enable(chrome, List.of("m1", "m2"));
+        repository.enable(template("slack", "title-9", WAIT, "admin@x"), List.of("m1"));
+        repository.disableBySoftwareId(TENANT, "title-9", "admin@x");
+
+        List<PackageAutoUpdatePolicy> enabled = repository.findByTenantIdAndEnabledTrue(TENANT);
+        assertThat(enabled).extracting(PackageAutoUpdatePolicy::getPackageName).containsOnly("google-chrome");
+        assertThat(enabled).extracting(PackageAutoUpdatePolicy::getLastVersion).containsOnly("151.0.7922.98");
+
+        repository.markOrdered(List.of(byMachine("google-chrome").get("m1").getId()), "152.0.7977.65");
+
+        Map<String, PackageAutoUpdatePolicy> chromeByMachine = byMachine("google-chrome");
+        assertThat(chromeByMachine.get("m1").getLastVersion()).isEqualTo("152.0.7977.65");
+        assertThat(chromeByMachine.get("m2").getLastVersion()).isEqualTo("151.0.7922.98");
+    }
+
+    private Map<String, PackageAutoUpdatePolicy> byMachine(String packageName) {
+        return repository.findAll().stream()
+                .filter(p -> packageName.equals(p.getPackageName()))
+                .collect(Collectors.toMap(PackageAutoUpdatePolicy::getMachineId, Function.identity()));
+    }
+
     private Map<String, PackageAutoUpdatePolicy> byMachine() {
         return repository.findAll().stream()
                 .collect(Collectors.toMap(PackageAutoUpdatePolicy::getMachineId, Function.identity()));

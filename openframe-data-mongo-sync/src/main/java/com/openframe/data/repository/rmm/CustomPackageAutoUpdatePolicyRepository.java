@@ -11,4 +11,6 @@ public interface CustomPackageAutoUpdatePolicyRepository {
 
     // Turns off every enabled policy linked to the Software; returns how many it turned off.
     long disableBySoftwareId(String tenantId, String softwareId, String actor);
+
+    void markOrdered(Collection<String> policyIds, String version);
 }
