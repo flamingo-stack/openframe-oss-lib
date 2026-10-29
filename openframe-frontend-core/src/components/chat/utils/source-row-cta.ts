@@ -169,6 +169,25 @@ function shouldFallbackToPathNav(row: SourceRowInput): boolean {
  * no logging. Call from any surface (chip, card, search result) with the
  * same row shape and get the same answer back.
  */
+/**
+ * A doc's viewer address: `<basePath>/<path>`, on `platform`'s origin. A doc on the platform the chat runs on (or one
+ * with no platform: the host's own viewer) gets a RELATIVE address, so it opens on the site the reader is on (a
+ * preview, a staging deployment, another of the platform's domains), exactly like every other link to that platform's
+ * pages. Only a doc on ANOTHER platform is absolute, at that platform's address.
+ */
+function docViewerHref(
+  path: string,
+  platform: string | null,
+  basePath: string,
+  currentPlatform: string | null | undefined,
+): string | null {
+  const local = 'https://_internal_.local';
+  const sameSite = !platform || platform === currentPlatform;
+  const origin = sameSite ? local : getPlatformUrl(platform);
+  const absolute = new URL(path, `${origin}${basePath}/`).toString();
+  return safeHref(sameSite ? absolute.slice(local.length) : absolute) ?? null;
+}
+
 export function resolveSourceRowCTA(row: SourceRowInput, ctx: SourceRowContext = {}): SourceRowCTA {
   // Derive sourceRepo from documentType when the caller didn't supply
   // it. Inline cards know `ref.type` (documentType) but not `sourceRepo`;
@@ -205,17 +224,13 @@ export function resolveSourceRowCTA(row: SourceRowInput, ctx: SourceRowContext =
         // slash-stripping regex `/^\/+|\/+$/g` tripped CodeQL's js/polynomial-redos (high)
         // since `\/+$` backtracks on inputs with many '/'. split/filter/join is linear.
         const seg = docTarget.basePath.split('/').filter(Boolean).join('/');
-        const base = `${getPlatformUrl(docTarget.platform)}${seg ? `/${seg}` : ''}/`;
-        href = safeHref(new URL(safePath, base).toString()) ?? null;
+        href = docViewerHref(safePath, docTarget.platform, seg ? `/${seg}` : '', ctx.currentPlatform);
         targetPlatform = docTarget.platform;
       } else if (ctx.chipBasePlatform) {
-        const base = `${getPlatformUrl(ctx.chipBasePlatform)}/knowledge-base/`;
-        href = safeHref(new URL(safePath, base).toString()) ?? null;
+        href = docViewerHref(safePath, ctx.chipBasePlatform, '/knowledge-base', ctx.currentPlatform);
         targetPlatform = ctx.chipBasePlatform;
       } else if (ctx.baseRoute) {
-        const synthetic = `https://_internal_.local${ctx.baseRoute.startsWith('/') ? ctx.baseRoute : '/' + ctx.baseRoute}/`;
-        const absolute = new URL(safePath, synthetic).toString();
-        href = safeHref(absolute.replace('https://_internal_.local', '')) ?? null;
+        href = docViewerHref(safePath, null, ctx.baseRoute.startsWith('/') ? ctx.baseRoute : `/${ctx.baseRoute}`, null);
         targetPlatform = ctx.currentPlatform ?? null;
       }
     }

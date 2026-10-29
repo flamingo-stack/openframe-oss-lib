@@ -59,6 +59,28 @@ describe('resolveSourceRowCTA — doc-chip platform routing', () => {
     expect(md.targetPlatform).toBe('flamingo');
   });
 
+  // CU-17tkuw61kfy: a doc card on the openframe preview opened production hub.openframe.ai. A doc on the platform the
+  // chat runs on is a page of the site the reader is on, so its address is relative, like every other link to it.
+  it('a doc on the platform the chat runs on gets a relative address, so it stays on this site', () => {
+    const md = resolveSourceRowCTA(markdownRow, { docPlatformTargets, currentPlatform: 'flamingo' });
+    expect(md.href).toBe('/knowledge-base/getting-started/install');
+    expect(md.targetPlatform).toBe('flamingo');
+  });
+
+  it("a doc on another platform keeps that platform's address, while the same chat links its own docs relative", () => {
+    const md = resolveSourceRowCTA(markdownRow, { docPlatformTargets, currentPlatform: 'flamingo' });
+    const dr = resolveSourceRowCTA(dataRoomRow, { docPlatformTargets, currentPlatform: 'flamingo' });
+    expect(md.href).toBe('/knowledge-base/getting-started/install');
+    expect(dr.href).toBe(expectHref('company-hub', 'data-room', 'financials/cap-table.pdf'));
+  });
+
+  it('the legacy chipBasePlatform follows the same rule: relative on its own platform', () => {
+    const own = resolveSourceRowCTA(markdownRow, { chipBasePlatform: 'flamingo', currentPlatform: 'flamingo' });
+    const other = resolveSourceRowCTA(markdownRow, { chipBasePlatform: 'flamingo', currentPlatform: 'openframe' });
+    expect(own.href).toBe('/knowledge-base/getting-started/install');
+    expect(other.href).toBe(expectHref('flamingo', 'knowledge-base', 'getting-started/install'));
+  });
+
   it('falls back to an in-app relative path from baseRoute (host serves the viewer)', () => {
     const md = resolveSourceRowCTA(markdownRow, { baseRoute: '/data-room', currentPlatform: 'openmsp' });
     expect(md.href).toBe('/data-room/getting-started/install');
