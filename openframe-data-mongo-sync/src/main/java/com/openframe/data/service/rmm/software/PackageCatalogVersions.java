@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
-import java.util.Optional;
+import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
@@ -16,13 +16,21 @@ public class PackageCatalogVersions {
 
     private final PackageCatalogRepository catalogRepository;
 
-    // Latest released version; empty for a package the catalog does not carry (Chocolatey is not in it).
+    // false for a package the catalog does not carry (Chocolatey is not in it)
+    public boolean hasLatest(PackageManagerType manager, String packageId, BrewPackageType brewType) {
+        return versions(manager, packageId, brewType).findAny().isPresent();
+    }
+
+    public String latest(PackageManagerType manager, String packageId, BrewPackageType brewType) {
+        return versions(manager, packageId, brewType).findFirst()
+                .orElseThrow(() -> new IllegalStateException("No catalog version of " + manager + "/" + packageId));
+    }
+
     // A brew formula and cask can share a token, so the brew type picks between them.
-    public Optional<String> latest(PackageManagerType manager, String packageId, BrewPackageType brewType) {
+    private Stream<String> versions(PackageManagerType manager, String packageId, BrewPackageType brewType) {
         return catalogRepository.findByManagerAndPackageIdIgnoreCase(manager, packageId).stream()
                 .filter(entry -> manager != PackageManagerType.BREW || brewType == null || brewType == entry.getBrewType())
                 .map(PackageCatalogEntry::getVersion)
-                .filter(Objects::nonNull)
-                .findFirst();
+                .filter(Objects::nonNull);
     }
 }

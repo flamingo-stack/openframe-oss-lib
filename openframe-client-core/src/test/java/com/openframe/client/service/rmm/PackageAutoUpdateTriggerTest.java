@@ -70,8 +70,8 @@ class PackageAutoUpdateTriggerTest {
     @BeforeEach
     void setUp() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
-        when(catalogVersions.latest(PackageManagerType.BREW, "google-chrome", BrewPackageType.CASK))
-                .thenReturn(Optional.of(LATEST));
+        when(catalogVersions.hasLatest(PackageManagerType.BREW, "google-chrome", BrewPackageType.CASK)).thenReturn(true);
+        when(catalogVersions.latest(PackageManagerType.BREW, "google-chrome", BrewPackageType.CASK)).thenReturn(LATEST);
         when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__brew-update", ScriptType.SOFTWARE))
                 .thenReturn(Optional.of(Script.builder().id("brew-update-id").privilegeLevel(PrivilegeLevel.USER)
                         .defaultTimeoutSeconds(1800).build()));
@@ -85,7 +85,7 @@ class PackageAutoUpdateTriggerTest {
                 chrome("p1", "m1", "151.0.7922.98", WAIT),
                 chrome("p2", "m2", "151.0.7922.98", WAIT),
                 chrome("p3", "m3", LATEST, WAIT)));
-        when(eligibility.eligibleMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of("m1", "m2"));
+        when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of("m1", "m2"));
 
         trigger.run();
 
@@ -128,7 +128,7 @@ class PackageAutoUpdateTriggerTest {
         when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(PackageAutoUpdatePolicy.builder()
                 .id("p1").tenantId(TENANT).machineId("m1").packageManager(PackageManagerType.CHOCO)
                 .packageName("googlechrome").enabled(true).build()));
-        when(catalogVersions.latest(PackageManagerType.CHOCO, "googlechrome", null)).thenReturn(Optional.empty());
+        when(catalogVersions.hasLatest(PackageManagerType.CHOCO, "googlechrome", null)).thenReturn(false);
 
         trigger.run();
 
@@ -136,10 +136,31 @@ class PackageAutoUpdateTriggerTest {
     }
 
     @Test
-    @DisplayName("a device whose agent cannot take the order is neither ordered nor marked")
+    @DisplayName("an update script missing for the tenant fails that package only: no job, no order, the next package still runs")
+    void updateScriptNotSeeded_failsThatPackageOnly() {
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(
+                PackageAutoUpdatePolicy.builder().id("p0").tenantId(TENANT).machineId("m0")
+                        .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome").enabled(true).build(),
+                chrome("p1", "m1", "151", WAIT)));
+        when(catalogVersions.hasLatest(PackageManagerType.WINGET, "Google.Chrome", null)).thenReturn(true);
+        when(catalogVersions.latest(PackageManagerType.WINGET, "Google.Chrome", null)).thenReturn("142.0.7444.60");
+        when(scriptRepository.findByTenantIdAndNameAndType(TENANT, "__software__winget-update", ScriptType.SOFTWARE))
+                .thenReturn(Optional.empty());
+        when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection()))
+                .thenReturn(Set.of("m0", "m1"));
+
+        trigger.run();
+
+        verify(policyRepository, never()).markOrdered(List.of("p0"), "142.0.7444.60");
+        verify(dispatchService).dispatchAutoUpdate(any(), eq(BrewPackageType.CASK), eq(WAIT));
+        verify(policyRepository).markOrdered(List.of("p1"), LATEST);
+    }
+
+    @Test
+    @DisplayName("a device whose agent cannot take the order, or that is no longer connected, is neither ordered nor marked")
     void ineligibleDevice_leftForLater() {
         when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(chrome("p1", "m1", "151", WAIT)));
-        when(eligibility.eligibleMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of());
+        when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of());
 
         trigger.run();
 
@@ -157,7 +178,7 @@ class PackageAutoUpdateTriggerTest {
         when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(
                 chrome("p2", "m2", "151", WAIT),
                 chrome("p3", "m3", null, FORCE)));
-        when(eligibility.eligibleMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of("m2", "m3"));
+        when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of("m2", "m3"));
 
         trigger.run();
 

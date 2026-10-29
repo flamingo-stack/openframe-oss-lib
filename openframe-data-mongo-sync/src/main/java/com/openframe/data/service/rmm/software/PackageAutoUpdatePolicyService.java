@@ -27,19 +27,19 @@ public class PackageAutoUpdatePolicyService {
         if (autoUpdate == null || !autoUpdate.isEnabled()) {
             return;
         }
-        String catalogVersion = catalogVersions
-                .latest(execution.getPackageManager(), execution.getPackageName(), brewPackageType)
-                .orElse(null);
-        repository.enable(PackageAutoUpdatePolicy.builder()
+        PackageAutoUpdatePolicy.PackageAutoUpdatePolicyBuilder policy = PackageAutoUpdatePolicy.builder()
                 .tenantId(execution.getTenantId())
                 .packageManager(execution.getPackageManager())
                 .packageName(execution.getPackageName())
                 .brewPackageType(brewPackageType)
                 .softwareId(softwareId)
                 .settings(autoUpdate.settingsOr(updateSettings))
-                .lastVersion(catalogVersion)
-                .updatedBy(execution.getInitiatedBy())
-                .build(), execution.getMachineIds());
+                .updatedBy(execution.getInitiatedBy());
+        if (catalogVersions.hasLatest(execution.getPackageManager(), execution.getPackageName(), brewPackageType)) {
+            policy.lastVersion(catalogVersions.latest(execution.getPackageManager(), execution.getPackageName(),
+                    brewPackageType));
+        }
+        repository.enable(policy.build(), execution.getMachineIds());
         log.info("Auto-update turned on package={}/{} machines={} softwareId={}",
                 execution.getPackageManager(), execution.getPackageName(), execution.getMachineIds().size(), softwareId);
     }

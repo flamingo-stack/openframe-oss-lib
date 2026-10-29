@@ -16,7 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,7 +36,8 @@ class PackageAutoUpdatePolicyServiceTest {
 
     @Test
     void autoUpdateOn_enablesThePackageOnTheRunsDevices() {
-        when(catalogVersions.latest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn(Optional.of("4.47.69"));
+        when(catalogVersions.hasLatest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn(true);
+        when(catalogVersions.latest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn("4.47.69");
 
         service.turnOn(rows("m1", "m2"), BrewPackageType.CASK, "title-7",
                 SoftwareAutoUpdate.builder().enabled(true).build(), UPDATE_SETTINGS);
@@ -65,6 +65,7 @@ class PackageAutoUpdatePolicyServiceTest {
         ArgumentCaptor<PackageAutoUpdatePolicy> template = ArgumentCaptor.forClass(PackageAutoUpdatePolicy.class);
         verify(repository).enable(template.capture(), eq(List.of("m1")));
         assertThat(template.getValue().getSettings()).isEqualTo(own);
+        assertThat(template.getValue().getLastVersion()).isNull();      // the catalog has no version: the trigger catches up
     }
 
     @Test

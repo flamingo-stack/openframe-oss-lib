@@ -33,7 +33,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static java.util.stream.Collectors.groupingBy;
@@ -63,8 +62,10 @@ public class PackageAutoUpdateTrigger {
                 .collect(groupingBy(PackageKey::of, LinkedHashMap::new, toList()));
         byPackage.forEach((pkg, policies) -> {
             try {
-                catalogVersions.latest(pkg.manager(), pkg.name(), pkg.brewType())
-                        .ifPresent(version -> orderOutdated(tenantId, pkg, version, policies));
+                if (catalogVersions.hasLatest(pkg.manager(), pkg.name(), pkg.brewType())) {
+                    orderOutdated(tenantId, pkg, catalogVersions.latest(pkg.manager(), pkg.name(), pkg.brewType()),
+                            policies);
+                }
             } catch (Exception e) {
                 log.error("Auto-update of {}/{} failed", pkg.manager(), pkg.name(), e);
             }
@@ -79,28 +80,24 @@ public class PackageAutoUpdateTrigger {
             return;
         }
         // a device whose agent cannot take the order yet stays outdated and is ordered once it can
-        Set<String> eligible = packageUpdateEligibility.eligibleMachines(SoftwareAction.UPDATE, machineIds(outdated));
+        Set<String> eligible = packageUpdateEligibility.eligibleConnectedMachines(SoftwareAction.UPDATE,
+                machineIds(outdated));
         List<PackageAutoUpdatePolicy> due = outdated.stream()
                 .filter(policy -> eligible.contains(policy.getMachineId()))
                 .toList();
         if (due.isEmpty()) {
             return;
         }
-        Optional<Script> script = updateScript(tenantId, pkg.manager());
-        if (script.isEmpty()) {
-            log.warn("Update script for {} not seeded for tenant {}: auto-update of {} skipped",
-                    pkg.manager(), tenantId, pkg.name());
-            return;
-        }
+        Script script = updateScript(tenantId, pkg.manager());
 
         String executionId = SoftwareExecutionId.forAutoUpdate(tenantId, pkg.manager(), pkg.name(), version);
         recordJob(tenantId, executionId, pkg, version, machineIds(due));
         RunningExecutionRows rows = RunningExecutionRows.builder()
                 .tenantId(tenantId)
                 .executionId(executionId)
-                .scriptId(script.get().getId())
-                .privilegeLevel(script.get().getPrivilegeLevel())
-                .timeoutSeconds(script.get().getDefaultTimeoutSeconds())
+                .scriptId(script.getId())
+                .privilegeLevel(script.getPrivilegeLevel())
+                .timeoutSeconds(script.getDefaultTimeoutSeconds())
                 .source(ExecutionSource.PACKAGE_AUTO_UPDATE)
                 .packageManager(pkg.manager())
                 .packageName(pkg.name())
@@ -115,9 +112,11 @@ public class PackageAutoUpdateTrigger {
                 pkg.manager(), pkg.name(), version, due.size(), executionId);
     }
 
-    private Optional<Script> updateScript(String tenantId, PackageManagerType manager) {
+    // every tenant is seeded with the update scripts, so a missing one is a broken tenant, not a skip
+    private Script updateScript(String tenantId, PackageManagerType manager) {
         String name = packageManagerRegistry.handlerFor(manager).scriptCode(SoftwareAction.UPDATE).canonicalName();
-        return scriptRepository.findByTenantIdAndNameAndType(tenantId, name, ScriptType.SOFTWARE);
+        return scriptRepository.findByTenantIdAndNameAndType(tenantId, name, ScriptType.SOFTWARE)
+                .orElseThrow(() -> new IllegalStateException("Update script " + name + " is not seeded for tenant " + tenantId));
     }
 
     private void recordJob(String tenantId, String executionId, PackageKey pkg, String version, List<String> machineIds) {
