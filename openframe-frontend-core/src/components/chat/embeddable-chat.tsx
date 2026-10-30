@@ -303,9 +303,6 @@ export interface EmbeddableChatProps {
    */
   activeAgentSlug?: string;
 
-  /** Optional agent switcher callback (host renders the agent picker UI). */
-  onAgentChange?: (slug: string) => void;
-
   /**
    * Per-component override for the agent display-config route. Highest
    * precedence (over `runtime.endpoints.aiAgentConfigUrl` and the built-in
@@ -615,8 +612,7 @@ function useRailPresence(open: boolean): { mounted: boolean; active: boolean } {
  * and the body's list column). The OUTER box transitions its width 0 ⇄ 320 +
  * opacity (so the neighbouring chat block slides smoothly); the INNER keeps a
  * fixed `w-80` so the rail content never squishes mid-animation — it's just
- * clipped by the shrinking outer (`overflow-hidden`). One easing both ways;
- * the collapse runs a touch longer than the open for a soft close.
+ * clipped by the shrinking outer (`overflow-hidden`).
  */
 function RailSlot({
   active,
@@ -639,7 +635,7 @@ function RailSlot({
         // Border on the OUTER so the rail/chat divider tracks the animating
         // boundary (and fades out with the panel) instead of vanishing early.
         'shrink-0 overflow-hidden border-r border-ods-border transition-[width,opacity] ease-out',
-        active ? cn('duration-[240ms] opacity-100', width) : 'duration-[300ms] w-0 opacity-0',
+        active ? cn('opacity-100', width) : 'w-0 opacity-0',
         className,
       )}
     >
@@ -1017,7 +1013,6 @@ function EmbeddableChatInner({
   activeMode: controlledActiveMode,
   onActiveModeChange,
   activeAgentSlug,
-  onAgentChange: _onAgentChange,
   aiAgentConfigUrl: aiAgentConfigUrlProp,
   defaultActiveMode,
   shell = 'drawer',
