@@ -27,8 +27,8 @@ import { defaultDocumentTypeForTableId, getSourceLabel } from './source-icons';
 
 /**
  * Doc-table documentTypes: whole documents with their own viewer (markdown =
- * product docs, data_room_doc = data room). They carry an in-app `path`, an
- * embedder keys `docPlatformTargets` by them, and a server never folds them
+ * product docs, data_room_doc = data room). They carry an in-app `path` (handed
+ * to the host's composer as the slug), and a server never folds them
  * into one citation (`groupsByTable`); the strip still draws them as one chip
  * per table. The hub's per-source contract test pins this list to its
  * doc-table configs.

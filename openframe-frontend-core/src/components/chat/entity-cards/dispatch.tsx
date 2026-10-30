@@ -241,8 +241,6 @@ export interface ChatCardDispatchExtras {
 
 /** Per-card render options threaded through from the chat shell. */
 export interface ChatCardRenderOptions {
-  baseRoute?: string;
-  chipBasePlatform?: string;
   /** Host-supplied builders for cards whose derived props live in hub
    *  land (programs + product_release). When omitted, these card types
    *  render `null` and the shell falls back to title text. */
@@ -2011,8 +2009,6 @@ interface ChatCardLoaderProps {
   chatRef: ChatRef;
   onDiscuss?: (ref: ChatRef) => void;
   onDisplay?: (ref: ChatRef) => void;
-  baseRoute?: string;
-  chipBasePlatform?: string;
   extras?: ChatCardDispatchExtras;
 }
 
@@ -2049,9 +2045,8 @@ function CardWithDisclosure({
  * SINGLE URL-RESOLUTION POINT — same code path source chips already
  * had. Before render dispatch:
  *   - Pass the ref through `resolveSourceRowCTA` to compute the
- *     canonical `{href, targetPlatform}` (externalUrl → in-app path
- *     fallback → null, with embedder `baseRoute` / `chipBasePlatform`
- *     awareness).
+ *     canonical `{href, targetPlatform}` through the host's composer
+ *     (`composeContentUrl`), the one address rule.
  *   - Pre-resolve href against `runtime.navigation.defaultContentOrigin`
  *     in embed mode (so modifier-click + copy-link land on the hub).
  *   - Re-attach the resolved values onto the ref so EVERY downstream
@@ -2062,14 +2057,7 @@ function CardWithDisclosure({
  *
  * Eliminates the entire "chip works, inline card doesn't" class of bug.
  */
-export function ChatCardLoader({
-  chatRef,
-  onDiscuss,
-  onDisplay,
-  baseRoute,
-  chipBasePlatform,
-  extras,
-}: ChatCardLoaderProps) {
+export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCardLoaderProps) {
   const runtime = useRequiredChatRuntime();
   const entry = CHAT_CARD_REGISTRY[chatRef.type];
   // Hook order MUST be stable across renders — call the data hook
@@ -2092,7 +2080,7 @@ export function ChatCardLoader({
     chatRef,
     item: fetchEntry ? item : undefined,
     entry: fetchEntry,
-    ctx: sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
+    ctx: sourceRowCtxFromRuntime(runtime),
     composeContentUrl: runtime.composeContentUrl,
     resolveHref: href => navLinkTarget(runtime, href).href,
   });
@@ -2143,8 +2131,6 @@ export function ChatCardLoader({
     : undefined;
 
   const renderOpts: ChatCardRenderOptions = {
-    baseRoute,
-    chipBasePlatform,
     extras,
     isNewTab,
     discuss,
@@ -2265,23 +2251,12 @@ export function renderChatInlineEntityCard(
   options: {
     onDiscuss?: (ref: ChatRef) => void;
     onDisplay?: (ref: ChatRef) => void;
-    baseRoute?: string;
-    chipBasePlatform?: string;
     extras?: ChatCardDispatchExtras;
   } = {},
 ): React.ReactNode {
-  const { onDiscuss, onDisplay, baseRoute, chipBasePlatform, extras } = options;
+  const { onDiscuss, onDisplay, extras } = options;
 
-  const loader = (
-    <ChatCardLoader
-      chatRef={chatRef}
-      onDiscuss={onDiscuss}
-      onDisplay={onDisplay}
-      baseRoute={baseRoute}
-      chipBasePlatform={chipBasePlatform}
-      extras={extras}
-    />
-  );
+  const loader = <ChatCardLoader chatRef={chatRef} onDiscuss={onDiscuss} onDisplay={onDisplay} extras={extras} />;
 
   // Embedded videos are SELF-DESCRIBING: the marker id alone recovers the
   // playable URL (`decodeVideoMarkerId`), so the player renders on ANY

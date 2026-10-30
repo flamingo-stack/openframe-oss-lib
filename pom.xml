@@ -21,7 +21,7 @@
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>
-        <revision>7.0.42</revision>
+        <revision>7.0.48</revision>
         <java.version>25</java.version>
         <lombok.version>1.18.48</lombok.version>
         <mapstruct.version>1.6.3</mapstruct.version>
@@ -42,7 +42,6 @@
         <jackson-2-bom.version>2.21.7</jackson-2-bom.version>
         <tomcat.version>11.0.26</tomcat.version>
         <freemarker.version>2.3.35</freemarker.version>
-        <plexus-utils.version>3.6.2</plexus-utils.version>
         <bcprov-lts8on.version>2.73.13</bcprov-lts8on.version>
         <libthrift.version>0.25.0</libthrift.version>
         <async-http-client.version>3.0.14</async-http-client.version>
@@ -267,12 +266,6 @@
                 <version>${revision}</version>
             </dependency>
             <!-- External dependency versions used by modules -->
-            <!-- Pulled in by mongock-runner-core via maven-artifact; not managed by Spring Boot -->
-            <dependency>
-                <groupId>org.codehaus.plexus</groupId>
-                <artifactId>plexus-utils</artifactId>
-                <version>${plexus-utils.version}</version>
-            </dependency>
             <!-- Pulled in by jnats (nats-spring-cloud-stream-binder) -->
             <dependency>
                 <groupId>org.bouncycastle</groupId>

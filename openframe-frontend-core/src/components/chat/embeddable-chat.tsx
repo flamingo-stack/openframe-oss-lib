@@ -40,7 +40,6 @@ import { usePreventScroll } from '@react-aria/overlays';
 import { isIOS } from '@react-aria/utils';
 import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { chatProgressLabel } from '../../chat-protocol/progress';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
@@ -114,7 +113,7 @@ import type {
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { chatChipClass } from './utils/chip-styles';
-import { FALLBACK_TOP_RETRIEVED, splitCitedSources } from './utils/cited-sources';
+import { FALLBACK_TOP_RETRIEVED, groupedRowLabels, splitCitedSources } from './utils/cited-sources';
 import { flattenAssistantContent } from './utils/flatten-assistant-content';
 import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
@@ -164,14 +163,6 @@ const drawerDefaultWidthWithoutRail = (viewportWidth: number) => drawerDefaultWi
 // =============================================================================
 
 export interface EmbeddableChatProps {
-  /** Base route for in-app doc chip nav (e.g. `/knowledge-base`). When
-   *  omitted, defaults are derived from `runtime.source`. */
-  baseRoute?: string;
-  /** When the embedder doesn't host a `[...path]` route to render markdown
-   *  chips against, set this to a platform that does. Chips with
-   *  `externalUrl: null` resolve to `getPlatformUrl(chipBasePlatform) +
-   *  '/knowledge-base/' + path` and open in a new tab. */
-  chipBasePlatform?: string;
   /** How many source chips the strip under an answer draws while the answer is written (default 1). `0` draws no
    *  strip until the answer ends: for a host whose answers rarely cite sources, where a strip that appears and then
    *  goes away would move the thread. */
@@ -311,9 +302,6 @@ export interface EmbeddableChatProps {
    * So agent mode works with ZERO wiring, yet every route stays overridable.
    */
   activeAgentSlug?: string;
-
-  /** Optional agent switcher callback (host renders the agent picker UI). */
-  onAgentChange?: (slug: string) => void;
 
   /**
    * Per-component override for the agent display-config route. Highest
@@ -624,8 +612,7 @@ function useRailPresence(open: boolean): { mounted: boolean; active: boolean } {
  * and the body's list column). The OUTER box transitions its width 0 ⇄ 320 +
  * opacity (so the neighbouring chat block slides smoothly); the INNER keeps a
  * fixed `w-80` so the rail content never squishes mid-animation — it's just
- * clipped by the shrinking outer (`overflow-hidden`). One easing both ways;
- * the collapse runs a touch longer than the open for a soft close.
+ * clipped by the shrinking outer (`overflow-hidden`).
  */
 function RailSlot({
   active,
@@ -648,7 +635,7 @@ function RailSlot({
         // Border on the OUTER so the rail/chat divider tracks the animating
         // boundary (and fades out with the panel) instead of vanishing early.
         'shrink-0 overflow-hidden border-r border-ods-border transition-[width,opacity] ease-out',
-        active ? cn('duration-[240ms] opacity-100', width) : 'duration-[300ms] w-0 opacity-0',
+        active ? cn('opacity-100', width) : 'w-0 opacity-0',
         className,
       )}
     >
@@ -738,13 +725,11 @@ function SourceChipSkeleton(props: { 'data-loading-item'?: boolean }) {
 
 function SourceChip(props: {
   src: ChatSource;
-  baseRoute: string;
-  chipBasePlatform?: string;
   onDiscuss?: (ref: ChatRef) => void;
   /** The strip's list-item marker, carried by the chip's frame like its loading form's. */
   'data-loading-item'?: boolean;
 }) {
-  const { src, baseRoute, chipBasePlatform, onDiscuss } = props;
+  const { src, onDiscuss } = props;
   const marks = loadingItemProps(props);
   const runtime = useRequiredChatRuntime();
   // Single CTA resolver — same icon, same href chain, same ChatRef
@@ -759,7 +744,7 @@ function SourceChip(props: {
       targetPlatform: src.targetPlatform ?? null,
       path: src.path,
     },
-    sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
+    sourceRowCtxFromRuntime(runtime),
   );
   const Icon = cta.icon;
   const icon = <Icon className="h-3.5 w-3.5" />;
@@ -767,7 +752,11 @@ function SourceChip(props: {
 
   // Grouped source — hover/click reveals a dropdown with Open + Ask per row.
   if (src.items && src.items.length > 0) {
-    const dropdownItems: HoverDropdownItem[] = src.items.map(item => {
+    // A server-grouped chip answers to one number; a client-built one answers
+    // to every number its rows were cited by.
+    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
+    const rowLabels = groupedRowLabels(src.items);
+    const dropdownItems: HoverDropdownItem[] = src.items.map((item, i) => {
       const itemCta = resolveSourceRowCTA(
         {
           sourceRepo: src.sourceRepo,
@@ -778,7 +767,7 @@ function SourceChip(props: {
           targetPlatform: item.targetPlatform ?? null,
           path: item.path,
         },
-        sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
+        sourceRowCtxFromRuntime(runtime),
       );
       const ItemIcon = itemCta.icon;
       // Read out of the CTA before the `onClick` closure below is built: a
@@ -787,9 +776,7 @@ function SourceChip(props: {
       // value is what keeps the handler assertion-free.
       const itemChatRef = itemCta.chatRef;
       return {
-        // A client-built group keeps each row's own citation number, so the
-        // `[3]` in the answer is findable inside the dropdown.
-        label: item.index === undefined ? item.name : `[${item.index}] ${item.name}`,
+        label: rowLabels[i],
         icon: <ItemIcon className="h-3.5 w-3.5" />,
         href: itemCta.href ?? undefined,
         targetPlatform: itemCta.targetPlatform,
@@ -805,9 +792,6 @@ function SourceChip(props: {
       };
     });
 
-    // A server-grouped chip answers to one number; a client-built one answers
-    // to every number its rows were cited by.
-    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
     const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
 
     return (
@@ -886,16 +870,12 @@ function SourceChip(props: {
 function SourceChips({
   cited,
   uncited,
-  baseRoute,
-  chipBasePlatform,
   onDiscuss,
   loading,
   skeletonCount,
 }: {
   cited: ChatSource[];
   uncited: ChatSource[];
-  baseRoute: string;
-  chipBasePlatform?: string;
   onDiscuss?: (ref: ChatRef) => void;
   /** The answer is still being written: the strip's frame, heading and a row of chips in their loading form, so
    *  the strip does not appear under the answer when it finishes. */
@@ -928,14 +908,7 @@ function SourceChips({
         <span className="uppercase text-ods-text-muted text-h6">Top retrieved sources</span>
         <div className="flex flex-wrap gap-1.5">
           {fallback.map(src => (
-            <SourceChip
-              data-loading-item
-              key={src.index}
-              src={src}
-              baseRoute={baseRoute}
-              chipBasePlatform={chipBasePlatform}
-              onDiscuss={onDiscuss}
-            />
+            <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
           ))}
         </div>
       </div>
@@ -950,26 +923,10 @@ function SourceChips({
       <span className="uppercase text-ods-text-muted text-h6">Sources</span>
       <div className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}>
         {cited.map(src => (
-          <SourceChip
-            data-loading-item
-            key={src.index}
-            src={src}
-            baseRoute={baseRoute}
-            chipBasePlatform={chipBasePlatform}
-            onDiscuss={onDiscuss}
-          />
+          <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
         ))}
         {expanded &&
-          uncited.map(src => (
-            <SourceChip
-              data-loading-item
-              key={src.index}
-              src={src}
-              baseRoute={baseRoute}
-              chipBasePlatform={chipBasePlatform}
-              onDiscuss={onDiscuss}
-            />
-          ))}
+          uncited.map(src => <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />)}
         {hasOverflow && (
           <Button
             variant="link"
@@ -1037,8 +994,6 @@ export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableC
 EmbeddableChat.displayName = 'EmbeddableChat';
 
 function EmbeddableChatInner({
-  baseRoute,
-  chipBasePlatform,
   sourceSkeletonCount = SOURCE_CHIP_SKELETON_COUNT,
   enabledRagTableIds = null,
   emptyStateGreeting = null,
@@ -1058,7 +1013,6 @@ function EmbeddableChatInner({
   activeMode: controlledActiveMode,
   onActiveModeChange,
   activeAgentSlug,
-  onAgentChange: _onAgentChange,
   aiAgentConfigUrl: aiAgentConfigUrlProp,
   defaultActiveMode,
   shell = 'drawer',
@@ -1323,7 +1277,6 @@ function EmbeddableChatInner({
   const {
     messages: rawMessages,
     isLoading: chatLoading,
-    streamingProgress,
     sendMessage: sendMessageRaw,
     discussRef,
     stopMessage,
@@ -1618,15 +1571,6 @@ function EmbeddableChatInner({
   // forwards it verbatim to the message list and calls it from the `mention://`
   // override; the host returns a self-fetching chip.
 
-  // Resolve base route. Hub default mapping: flamingo → /knowledge-base,
-  // anything else → /data-room. Embedders override per platform. An embedder that
-  // doesn't host an in-app doc viewer should NOT pass an empty baseRoute (that just
-  // falls back to the platform default here) — instead it sets a truthy baseRoute +
-  // `chipBasePlatform` so doc chips with no externalUrl resolve cross-platform to that
-  // platform's public knowledge hub (`getPlatformUrl(chipBasePlatform)/knowledge-base/…`),
-  // exactly like the hub's openframe config (baseRoute:'/', chipBasePlatform:'openframe').
-  const resolvedBaseRoute = baseRoute || (source === 'flamingo' ? '/knowledge-base' : '/data-room');
-
   const handleClose = useCallback(() => setIsOpen(false), [setIsOpen]);
   // What the header close controls call; absent on a panel that cannot close.
   const closeControl = closable ? handleClose : undefined;
@@ -1670,11 +1614,9 @@ function EmbeddableChatInner({
       renderChatInlineEntityCard(reference, {
         onDiscuss: askAbout,
         onDisplay: displayRef,
-        baseRoute: resolvedBaseRoute,
-        chipBasePlatform,
         extras,
       }),
-    [askAbout, displayRef, resolvedBaseRoute, chipBasePlatform, extras],
+    [askAbout, displayRef, extras],
   );
 
   // Stable assistant-icon element. `<ChatMessageList>` forwards this prop to
@@ -2075,14 +2017,7 @@ function EmbeddableChatInner({
         if (sourceSkeletonCount <= 0) return null;
         return (
           <div className="pb-2">
-            <SourceChips
-              loading
-              skeletonCount={sourceSkeletonCount}
-              cited={[]}
-              uncited={[]}
-              baseRoute={resolvedBaseRoute}
-              chipBasePlatform={chipBasePlatform}
-            />
+            <SourceChips loading skeletonCount={sourceSkeletonCount} cited={[]} uncited={[]} />
           </div>
         );
       }
@@ -2090,18 +2025,11 @@ function EmbeddableChatInner({
       if (cited.length === 0 && uncited.length === 0) return null;
       return (
         <div className="pb-2">
-          <SourceChips
-            cited={cited}
-            uncited={uncited}
-            baseRoute={resolvedBaseRoute}
-            chipBasePlatform={chipBasePlatform}
-            onDiscuss={askAbout}
-            skeletonCount={sourceSkeletonCount}
-          />
+          <SourceChips cited={cited} uncited={uncited} onDiscuss={askAbout} skeletonCount={sourceSkeletonCount} />
         </div>
       );
     },
-    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, askAbout, sourceSkeletonCount],
+    [chatLoading, messages.length, askAbout, sourceSkeletonCount],
   );
 
   // Host node for in-panel Radix portals (see the body wrapper below).
@@ -2982,9 +2910,6 @@ function EmbeddableChatInner({
                                   // faces, 16px between messages (shared with fae v2).
                                   appearance={appearance}
                                   isTyping={chatLoading}
-                                  // The stage the turn reports while the user waits
-                                  // ("Searching 28 sources"); the generic phrase otherwise.
-                                  typingMessage={streamingProgress ? chatProgressLabel(streamingProgress) : undefined}
                                   // Sticky footer for approvals the host lifted out of the
                                   // thread — see the prop's docblock.
                                   pendingApprovals={pendingApprovals}

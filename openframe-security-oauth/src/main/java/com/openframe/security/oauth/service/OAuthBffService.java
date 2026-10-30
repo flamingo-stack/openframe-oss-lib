@@ -10,6 +10,7 @@ import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredException;
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
+import com.openframe.security.oauth.exception.RefreshUpstreamException;
 import com.openframe.security.oauth.headers.ForwardedHeadersContributor;
 import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -39,6 +41,9 @@ import java.util.regex.Pattern;
 
 import static com.openframe.core.constants.HttpHeaders.ACCEPT;
 import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
+import static com.openframe.security.oauth.exception.RefreshUpstreamReason.CLIENT_REJECTED;
+import static com.openframe.security.oauth.exception.RefreshUpstreamReason.UPSTREAM_ERROR;
+import static com.openframe.security.oauth.exception.RefreshUpstreamReason.UPSTREAM_UNAVAILABLE;
 import static com.openframe.security.pkce.PKCEUtils.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.time.Instant.now;
@@ -59,7 +64,7 @@ public class OAuthBffService {
 
     private static final String USER_ID_CLAIM = "userId";
 
-    private static final String INVALID_GRANT = "invalid_grant";
+    private static final String INVALID_CLIENT = "invalid_client";
     private static final Pattern OAUTH_ERROR_CODE = Pattern.compile("[a-z0-9_]{1,40}");
     private static final ObjectMapper ERROR_BODY_MAPPER = new JsonMapper();
 
@@ -400,29 +405,37 @@ public class OAuthBffService {
                 .header(ACCEPT, "application/json")
                 .body(BodyInserters.fromFormData(form))
                 .retrieve()
-                .onStatus(s -> s.is4xxClientError(), resp ->
+                .onStatus(HttpStatusCode::is4xxClientError, resp ->
                         resp.bodyToMono(String.class).defaultIfEmpty("")
                                 .flatMap(body -> {
-                                    String oauthError = extractOAuthErrorCode(body);
-                                    if (INVALID_GRANT.equals(oauthError)) {
-                                        log.warn("Auth server rejected refresh for tenant {} ({}): error={}",
-                                                tenantId, resp.statusCode(), oauthError);
-                                        return Mono.error(new InvalidRefreshTokenException());
-                                    }
-                                    log.error("Auth server refused refresh for tenant {} ({}): error={}",
-                                            tenantId, resp.statusCode(), oauthError);
-                                    return Mono.error(new IllegalStateException("token_refresh_failed"));
+                                    RuntimeException refusal = classifyRefusedRefresh(tenantId, resp.statusCode(), body);
+                                    return Mono.error(refusal);
                                 })
                 )
-                .onStatus(s -> s.is5xxServerError(), resp ->
-                        resp.bodyToMono(String.class).defaultIfEmpty("")
-                                .flatMap(body -> {
-                                    log.error("Auth server error during refresh for tenant {} ({})",
-                                            tenantId, resp.statusCode());
-                                    return Mono.error(new IllegalStateException("token_refresh_failed"));
-                                })
-                )
-                .bodyToMono(TokenResponse.class);
+                .onStatus(HttpStatusCode::is5xxServerError, resp -> {
+                    log.error("Auth server error during refresh for tenant {} ({})", tenantId, resp.statusCode());
+                    Mono<Throwable> failure = Mono.error(new RefreshUpstreamException(UPSTREAM_ERROR));
+                    return resp.releaseBody().then(failure);
+                })
+                .bodyToMono(TokenResponse.class)
+                .onErrorMap(WebClientRequestException.class, e -> upstreamUnavailable(tenantId, e));
+    }
+
+    private RuntimeException classifyRefusedRefresh(String tenantId, HttpStatusCode status, String body) {
+        String oauthError = extractOAuthErrorCode(body);
+        if (INVALID_CLIENT.equals(oauthError)) {
+            log.error("Auth server rejected the gateway client credentials on refresh for tenant {} ({}): error={}",
+                    tenantId, status, oauthError);
+            return new RefreshUpstreamException(CLIENT_REJECTED);
+        }
+        String loggedError = oauthError == null ? "none" : oauthError;
+        log.warn("Auth server refused refresh for tenant {} ({}): error={}", tenantId, status, loggedError);
+        return new InvalidRefreshTokenException();
+    }
+
+    private RefreshUpstreamException upstreamUnavailable(String tenantId, WebClientRequestException cause) {
+        log.error("Auth server unreachable during refresh for tenant {}: {}", tenantId, cause.getMessage());
+        return new RefreshUpstreamException(UPSTREAM_UNAVAILABLE, cause);
     }
 
     private String extractOAuthErrorCode(String body) {

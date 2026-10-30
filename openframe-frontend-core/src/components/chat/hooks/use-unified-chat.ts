@@ -214,7 +214,6 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       messages: activeState.messages,
       isLoading: activeState.isLoading,
       streamingPhase: activeState.streamingPhase,
-      streamingProgress: activeState.streamingProgress ?? null,
       sendMessage,
       stopMessage,
       clearMessages,
