@@ -55,10 +55,12 @@ public class DeliveryCloser {
         delivery.setFinishedAt(now);
         delivery.setExpiresAt(expiresAt);
 
+        String targetId = delivery.getTargetId();
+        String machineId = delivery.getMachineId();
         metrics.recordFailed(type, failure);
         log.warn("Delivery FAILED: type={} targetId={} machineId={} attempts={} reason={}",
-                type, delivery.getTargetId(), delivery.getMachineId(), delivery.getAttempts(), failure);
-        eventPublisher.publishEvent(new DeliveryFailedEvent(type, delivery.getTargetId(), delivery.getMachineId(), failure));
+                type, targetId, machineId, delivery.getAttempts(), failure);
+        eventPublisher.publishEvent(new DeliveryFailedEvent(type, targetId, machineId, failure));
     }
 
     public void failReported(DeliveryType type, String targetId, String machineId, String dispatchId, String error, Instant now) {
