@@ -15,11 +15,6 @@ export {
 // New unified loading components
 export { ContentLoadingContainer, useContentLoading } from '../content-loading-container';
 
-// Note: OpenmspHeartbeatLoader is a client-only component and should be
-// imported directly from "./openmsp-heartbeat" in client components. Do NOT
-// export it here, otherwise server components that import this index will
-// break due to client-only code.
-
 export { LoadingRegion, type LoadingRegionProps } from './loading-region';
 export { LoadingStatus } from '../ui/loading-scope';
 export { LoadingFallback, LoadingSuspense } from './loading-fallback';

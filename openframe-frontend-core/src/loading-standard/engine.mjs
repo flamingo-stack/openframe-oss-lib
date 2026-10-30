@@ -281,8 +281,7 @@ export const CONFIGS = {
       },
       {
         why: "the loaders themselves (declared, never a screen state in the lib), the Button's own action progress, and the chat registry's card loader (a card read by id, drawn by the card's own skeleton)",
-        files:
-          /(?:^|\/)components\/(?:ui\/(?:[\w-]+-)?loader|loading\/openmsp-heartbeat|ui\/button\/button|chat\/entity-cards\/dispatch)\.tsx$/,
+        files: /(?:^|\/)components\/(?:ui\/(?:[\w-]+-)?loader|ui\/button\/button|chat\/entity-cards\/dispatch)\.tsx$/,
         rules: ['LOADER_COMPONENT', 'SPINNER', 'OWN_PULSE'],
       },
     ],
