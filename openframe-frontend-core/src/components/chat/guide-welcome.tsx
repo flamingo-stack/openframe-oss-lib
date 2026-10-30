@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useMemo } from 'react';
+import { usePageTopicStamp } from '../../contexts/page-topics-context';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
@@ -60,7 +61,8 @@ export interface GuideWelcomeProps {
   quickActionsLoading?: boolean;
   /** Print the page's topic (`PageTopicLabel`, the label the FAQ block prints
    *  under its heading) above the chips, so whoever edits quick actions sees
-   *  which topic's chips the page asked for. Default off. */
+   *  which topic's chips the page asked for. Default: the host's choice
+   *  (`PageTopicsProvider showTopic`), else off. */
   showTopic?: boolean;
   /** Fired when a quick-action chip is activated (click). */
   onQuickAction?: (action: GuideQuickAction) => void;
@@ -107,7 +109,7 @@ export function GuideWelcome({
   subtitleLoading = false,
   quickActions = [],
   quickActionsLoading = false,
-  showTopic = false,
+  showTopic: showTopicProp,
   onQuickAction,
   onQuickActionHover,
   onQuickActionHoverEnd,
@@ -115,6 +117,9 @@ export function GuideWelcome({
   children,
   className,
 }: GuideWelcomeProps) {
+  // The host's choice (`PageTopicsProvider showTopic`) unless this surface states its own.
+  const topicStamp = usePageTopicStamp();
+  const showTopic = showTopicProp ?? topicStamp;
   // Scroll-fade affordances: a 48px gradient at the top/bottom edge of the
   // scroll region, shown only while content is actually hidden in that
   // direction. (Same behaviour as MingoWelcome.)

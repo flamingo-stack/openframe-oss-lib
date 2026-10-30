@@ -14,6 +14,8 @@ interface PageTopicsValue {
   topics: PageTopics;
   /** The address to read, where the router's answer is not the page's. */
   pathname?: string;
+  /** Whether surfaces print the page's topic stamp (`PageTopicLabel`) by default. */
+  showTopic: boolean;
 }
 
 const PageTopicsContext = createContext<PageTopicsValue | null>(null);
@@ -27,11 +29,21 @@ export interface PageTopicsProviderProps {
    * a topic.
    */
   pathname?: string;
+  /**
+   * Print the page's topic stamp (`PageTopicLabel`) on every surface that can
+   * show it (the FAQ block, the chat's quick actions), for whoever edits FAQs
+   * and quick actions. ONE host decision, made where the map is given; a
+   * surface's own `showTopic` prop still overrides it. Absent: the enclosing
+   * provider's choice, else off.
+   */
+  showTopic?: boolean;
   children: ReactNode;
 }
 
-export function PageTopicsProvider({ topics, pathname, children }: PageTopicsProviderProps) {
-  const value = useMemo(() => ({ topics, pathname }), [topics, pathname]);
+export function PageTopicsProvider({ topics, pathname, showTopic, children }: PageTopicsProviderProps) {
+  const inherited = useContext(PageTopicsContext)?.showTopic ?? false;
+  const stamp = showTopic ?? inherited;
+  const value = useMemo(() => ({ topics, pathname, showTopic: stamp }), [topics, pathname, stamp]);
   return <PageTopicsContext.Provider value={value}>{children}</PageTopicsContext.Provider>;
 }
 
@@ -41,4 +53,9 @@ export function usePageTopic(): string | undefined {
   const routerPathname = usePathname();
   if (!value) return undefined;
   return pageTopicFor(value.pathname ?? routerPathname ?? '/', value.topics) || undefined;
+}
+
+/** Whether the host asked surfaces to print the page's topic stamp (`PageTopicsProvider showTopic`). */
+export function usePageTopicStamp(): boolean {
+  return useContext(PageTopicsContext)?.showTopic ?? false;
 }

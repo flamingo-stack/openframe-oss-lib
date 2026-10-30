@@ -3,7 +3,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
-import { usePageTopic } from '../../contexts/page-topics-context';
+import { usePageTopic, usePageTopicStamp } from '../../contexts/page-topics-context';
 import Link from '../../embed-shims/next-link';
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
@@ -53,7 +53,7 @@ export interface FaqSectionProps {
   /**
    * Print the page's topic (`usePageTopic`) in small muted text under the heading
    * (`pricing`), so whoever edits the FAQs can see which topic a page asks
-   * for. Default off. The section always carries it as `data-faq-topic` too.
+   * for. Default: the host's choice (`PageTopicsProvider showTopic`), else off. The section always carries it as `data-faq-topic` too.
    */
   showTopic?: boolean;
   /** Maps to /api/faqs `?count=` (the 5-tier fill target). Absent → param
@@ -563,7 +563,7 @@ export function FaqSection({
   jsonLd,
   className,
   id,
-  showTopic = false,
+  showTopic: showTopicProp,
   minResults,
   apiBaseUrl = '',
   aside: asideProp,
@@ -571,6 +571,9 @@ export function FaqSection({
   skeletonShape,
   skeletonNav = false,
 }: FaqSectionProps) {
+  // The host's choice (`PageTopicsProvider showTopic`) unless this surface states its own.
+  const topicStamp = usePageTopicStamp();
+  const showTopic = showTopicProp ?? topicStamp;
   const assistant = useAssistantRuntime();
   const inScope = useLoadingScope();
   // THE page's topic, from its address: the questions and the ask card are the ones written for it.
@@ -669,13 +672,16 @@ const DEFAULT_SKELETON_SHAPE: FaqSkeletonShape = [{}];
 function FaqSectionSkeleton({
   heading,
   topic,
-  showTopic = false,
+  showTopic: showTopicProp,
   aside,
   shape = DEFAULT_SKELETON_SHAPE,
   navRow = false,
   className,
   id,
 }: FaqSectionSkeletonProps) {
+  // The host's choice (`PageTopicsProvider showTopic`) unless this surface states its own.
+  const topicStamp = usePageTopicStamp();
+  const showTopic = showTopicProp ?? topicStamp;
   const headingNode = faqHeadingNode(heading, showTopic, topic);
   const CategoryHeading = heading === null ? 'h2' : 'h3';
   const groups = shape.length > 0 ? shape : DEFAULT_SKELETON_SHAPE;
