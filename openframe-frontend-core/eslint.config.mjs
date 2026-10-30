@@ -217,6 +217,8 @@ export default defineConfig([
       'src/__tests__/data-table-loading-items.test.tsx',
       // The same marker on the chat's conversation rows (loaded and loading), counted per list.
       'src/components/chat/__tests__/chat-history-loading.test.tsx',
+      // The same marker on the source strip's skeleton chips under an answer being written, counted per host setting.
+      'src/components/chat/__tests__/embeddable-chat-source-skeleton.test.tsx',
       // Static controls drawn real and inert while loading: the `inert` ancestor and the skeleton surfaces are
       // role-less and aria-hidden, so `screen` cannot see what is under test.
       'src/components/ui/__tests__/static-controls-loading.test.tsx',
@@ -225,6 +227,10 @@ export default defineConfig([
       // (an accent-tinted icon must not stay dark on the menu's dark row). No
       // `screen` query reaches it, so the test walks up from the icon.
       'src/components/ui/__tests__/page-actions-menu-icon.test.tsx',
+      // The same kind of wrapper on a Button: the role-less <span> that holds a labelled button's icon and sets the
+      // tone a `currentColor` glyph inherits (secondary on outline). Its class IS the contract, so the test walks up
+      // from the icon.
+      'src/components/ui/__tests__/button-icon-tone.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',

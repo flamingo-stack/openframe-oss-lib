@@ -25,6 +25,7 @@ import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Map;
 
@@ -79,6 +80,29 @@ class DeliveryDispatchListenerWiringTest {
             DeliveryDispatchMessage message = (DeliveryDispatchMessage) read;
             assertThat(message.getMachineId()).isEqualTo("mach-42");
             assertThat(message.getPayload().get("delivery").get("type").asString()).isEqualTo("CLIENT_FEATURE_FLAGS");
+            assertThat(message.getDueAt()).isNull();
+        });
+    }
+
+    @Test
+    void context_sharedConsumerFactory_scheduledHandOffKeepsItsMoment() {
+        runner.run(context -> {
+            ConcurrentKafkaListenerContainerFactory<?, ?> factory =
+                    context.getBean(DeliveryDispatchListenerConfiguration.CONTAINER_FACTORY, ConcurrentKafkaListenerContainerFactory.class);
+            ConsumerFactory<?, ?> consumerFactory = factory.getConsumerFactory();
+            @SuppressWarnings("unchecked")
+            Deserializer<Object> values = (Deserializer<Object>) consumerFactory.getValueDeserializer();
+            values.configure(consumerFactory.getConfigurationProperties(), false);
+            Instant dueAt = Instant.parse("2026-11-01T10:00:00.123Z");
+            DeliveryDispatchMessage scheduled = handOff();
+            scheduled.setDueAt(dueAt);
+
+            Headers headers = new RecordHeaders();
+            byte[] record = KafkaJsonSerdes.valueSerializer().serialize(TOPIC, headers, scheduled);
+            Object read = values.deserialize(TOPIC, headers, record);
+
+            assertThat(read).isInstanceOf(DeliveryDispatchMessage.class);
+            assertThat(((DeliveryDispatchMessage) read).getDueAt()).isEqualTo(dueAt);
         });
     }
 

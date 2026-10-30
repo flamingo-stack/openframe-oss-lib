@@ -4,13 +4,10 @@ import com.openframe.api.dto.force.request.ForceClientUninstallRequest;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponseItem;
-import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.nats.delivery.ClientUninstallDeliverySeed;
-import com.openframe.data.nats.publisher.ClientUninstallNatsPublisher;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.delivery.config.DeliveryProperties;
-import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,14 +24,11 @@ import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 @Slf4j
 public class ForceClientUninstallService {
 
-    private final ClientUninstallNatsPublisher clientUninstallNatsPublisher;
     private final MachineRepository machineRepository;
-    private final DeliveryProperties deliveryProperties;
-    private final DeliveryDispatcher deliveryDispatcher;
+    private final DeliveryRouter deliveryRouter;
 
     public ForceClientUninstallResponse process(ForceClientUninstallRequest request) {
         List<String> machineIds = request.getMachineIds();
-
         validateMachineIds(machineIds);
 
         log.info("Process force client uninstall request for machines {}", machineIds);
@@ -45,7 +39,6 @@ public class ForceClientUninstallService {
 
         ForceClientUninstallResponse response = new ForceClientUninstallResponse();
         response.setItems(responseItems);
-
         return response;
     }
 
@@ -56,21 +49,16 @@ public class ForceClientUninstallService {
                 log.warn("Skipping client uninstall for unknown machine {}", machineId);
                 return buildResponseItem(machineId, ForceAgentStatus.FAILED);
             }
-
             Machine machine = foundMachine.get();
             if (machine.getStatus() == DELETED) {
                 log.warn("Skipping client uninstall for already deleted machine {}", machineId);
                 return buildResponseItem(machineId, ForceAgentStatus.FAILED);
             }
-
-            if (deliveryProperties.isEnabled(DeliveryType.CLIENT_UNINSTALL)) {
-                deliveryDispatcher.dispatch(new ClientUninstallDeliverySeed(machineId));
-            } else {
-                clientUninstallNatsPublisher.publish(machineId);
+            boolean carried = deliveryRouter.dispatch(new ClientUninstallDeliverySeed(machineId));
+            if (!carried) {
+                return buildResponseItem(machineId, ForceAgentStatus.FAILED);
             }
-
             markPendingDeletion(machine);
-
             return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
         } catch (Exception e) {
             log.error("Failed to publish client uninstall command for machine {}", machineId, e);
@@ -97,8 +85,6 @@ public class ForceClientUninstallService {
         ForceClientUninstallResponseItem responseItem = new ForceClientUninstallResponseItem();
         responseItem.setMachineId(machineId);
         responseItem.setStatus(status);
-
         return responseItem;
     }
-
 }

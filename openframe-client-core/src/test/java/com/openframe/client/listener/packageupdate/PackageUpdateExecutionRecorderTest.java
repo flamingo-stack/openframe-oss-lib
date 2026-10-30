@@ -76,7 +76,21 @@ class PackageUpdateExecutionRecorderTest {
         recorder.record(request, "m1", event(State.WAITING));
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(row.getWaiting()).isTrue();
         assertThat(row.getStatusChangedAt()).isNotNull();
+        verify(scriptExecutionRepository).save(row);
+    }
+
+    @Test
+    void waiting_onARunningRowWithoutTheFlag_marksItWaiting() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        row.setStdout("kept");
+
+        recorder.record(request, "m1", event(State.WAITING));
+
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(row.getWaiting()).isTrue();
+        assertThat(row.getStdout()).isEqualTo("kept");
         verify(scriptExecutionRepository).save(row);
     }
 
@@ -95,8 +109,8 @@ class PackageUpdateExecutionRecorderTest {
     }
 
     @Test
-    void waiting_againWhileRunning_writesNothing() {
-        rowFound(ExecutionStatus.RUNNING);
+    void waiting_againWhileWaiting_writesNothing() {
+        rowFound(ExecutionStatus.RUNNING).setWaiting(true);
 
         recorder.record(request, "m1", event(State.WAITING));
 
@@ -106,10 +120,12 @@ class PackageUpdateExecutionRecorderTest {
     @Test
     void done_upgraded_succeedsWithSummary() {
         ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        row.setWaiting(true);
 
         recorder.record(request, "m1", done(Done.Result.UPGRADED, "4.36.140", true));
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        assertThat(row.getWaiting()).isNull();
         assertThat(row.getFinishedAt()).isNotNull();
         assertThat(row.getStdout()).isEqualTo("Updated (4.36.140), reboot required.");
         assertThat(row.getError()).isNull();
@@ -129,10 +145,12 @@ class PackageUpdateExecutionRecorderTest {
     @Test
     void failed_failsWithReasonMessageAndExitCode() {
         ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        row.setWaiting(true);
 
         recorder.record(request, "m1", failed(Failed.Reason.MANAGER_ERROR, "winget exited 1", 1L));
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(row.getWaiting()).isNull();
         assertThat(row.getFinishedAt()).isNotNull();
         assertThat(row.getError()).isEqualTo("MANAGER_ERROR: winget exited 1");
         assertThat(row.getExitCode()).isEqualTo(1);

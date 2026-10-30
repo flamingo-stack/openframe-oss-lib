@@ -16,6 +16,7 @@ import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
+import com.openframe.data.service.rmm.software.PackageAutoUpdatePolicyService;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
@@ -44,6 +45,7 @@ public class SoftwareScheduleFireDispatcher {
     private final MachinePlatformResolver machinePlatformResolver;
     private final PackageUpdateEligibilityService packageUpdateEligibility;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
+    private final PackageAutoUpdatePolicyService autoUpdatePolicyService;
 
     public void dispatch(SoftwareSchedule schedule, List<String> machineIds, Instant now) {
         if (schedule.getPackages() == null || schedule.getPackages().isEmpty()
@@ -99,8 +101,11 @@ public class SoftwareScheduleFireDispatcher {
                 .build();
 
         if (!orderTargets.isEmpty()) {
-            packageUpdateDispatchService.dispatchAdminUpdateNow(rows.toBuilder().machineIds(orderTargets).build(),
-                    pkg.getBrewPackageType());
+            RunningExecutionRows orderRows = rows.toBuilder().machineIds(orderTargets).build();
+            autoUpdatePolicyService.turnOn(orderRows, pkg.getBrewPackageType(), pkg.getSoftwareId(),
+                    schedule.getAutoUpdate(), schedule.getUpdateSettings());
+            packageUpdateDispatchService.dispatchAdminUpdate(orderRows, pkg.getBrewPackageType(),
+                    schedule.getUpdateSettings());
         }
         if (scriptTargets.isEmpty()) {
             return;
