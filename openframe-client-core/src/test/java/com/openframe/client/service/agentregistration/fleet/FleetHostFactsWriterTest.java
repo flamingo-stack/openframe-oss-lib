@@ -5,6 +5,7 @@ import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.sdk.fleetmdm.model.Host;
+import org.bson.Document;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -12,7 +13,9 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.query.Criteria;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +39,9 @@ class FleetHostFactsWriterTest {
     @Captor
     private ArgumentCaptor<MachineUpdate> updateCaptor;
 
+    @Captor
+    private ArgumentCaptor<Criteria> guardCaptor;
+
     @InjectMocks
     private FleetHostFactsWriter writer;
 
@@ -49,7 +55,7 @@ class FleetHostFactsWriterTest {
         writer.fill(machine, host);
 
         // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), updateCaptor.capture());
+        verify(machineWriter).update(eq(MACHINE_ID), any(Criteria.class), updateCaptor.capture());
         MachineUpdate update = updateCaptor.getValue();
         assertThat(update.paths()).containsExactly("serialNumber", "model", "manufacturer", "osUuid", "computerName");
         Machine written = new Machine();
@@ -74,7 +80,7 @@ class FleetHostFactsWriterTest {
         writer.fill(machine, host);
 
         // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), updateCaptor.capture());
+        verify(machineWriter).update(eq(MACHINE_ID), any(Criteria.class), updateCaptor.capture());
         assertThat(updateCaptor.getValue().paths()).containsExactly("model", "computerName");
     }
 
@@ -89,10 +95,33 @@ class FleetHostFactsWriterTest {
         writer.fill(machine, host);
 
         // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), updateCaptor.capture());
+        verify(machineWriter).update(eq(MACHINE_ID), any(Criteria.class), updateCaptor.capture());
         Machine written = new Machine();
         updateCaptor.getValue().applyTo(written);
         assertThat(written.getSerialNumber()).isEqualTo("C02XG2JHJG5H");
+    }
+
+    @Test
+    void fill_blankFields_writeGuardedOnEachStillBeingBlank() {
+        // setup
+        Machine machine = machine();
+        machine.setSerialNumber("FROM-AGENT");
+        machine.setManufacturer("Apple Inc.");
+        machine.setOsUuid("FROM-AGENT-UUID");
+        machine.setComputerName("Jane's MacBook Pro");
+        Host host = fleetHost();
+
+        // execution
+        writer.fill(machine, host);
+
+        // verifications
+        verify(machineWriter).update(eq(MACHINE_ID), guardCaptor.capture(), any(MachineUpdate.class));
+        Document stillBlank = new Document("$or", List.of(
+                new Document("model", new Document("$exists", false)),
+                new Document("model", null),
+                new Document("model", "")));
+        assertThat(guardCaptor.getValue().getCriteriaObject())
+                .isEqualTo(new Document("$and", List.of(stillBlank)));
     }
 
     @Test
@@ -119,7 +148,7 @@ class FleetHostFactsWriterTest {
         writer.fill(MACHINE_ID, host);
 
         // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), any(MachineUpdate.class));
+        verify(machineWriter).update(eq(MACHINE_ID), any(Criteria.class), any(MachineUpdate.class));
     }
 
     @Test

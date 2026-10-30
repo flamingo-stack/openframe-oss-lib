@@ -8,9 +8,11 @@ import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.sdk.fleetmdm.model.Host;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.Set;
 
 import static com.openframe.data.service.machine.MachineFields.COMPUTER_NAME;
 import static com.openframe.data.service.machine.MachineFields.MANUFACTURER;
@@ -52,7 +54,19 @@ public class FleetHostFactsWriter {
             return;
         }
         log.info("Filling hardware facts from Fleet: machineId={}, fields={}", machineId, update.paths());
-        machineWriter.update(machineId, update);
+        machineWriter.update(machineId, stillBlank(update.paths()), update);
+    }
+
+    // A value the agent reports between the read and the write wins: the write only lands while every field it
+    // sets is still blank
+    private static Criteria stillBlank(Set<String> paths) {
+        Criteria[] blankFields = paths.stream()
+                .map(path -> new Criteria().orOperator(
+                        Criteria.where(path).exists(false),
+                        Criteria.where(path).is(null),
+                        Criteria.where(path).is("")))
+                .toArray(Criteria[]::new);
+        return new Criteria().andOperator(blankFields);
     }
 
     private static void setWhereBlank(MachineUpdate update, MachineField<String> field, String stored, String fleetValue) {

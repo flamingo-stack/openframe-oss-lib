@@ -88,6 +88,25 @@ class FleetHostFactsBackfillServiceTest {
     }
 
     @Test
+    void backfill_hostIdTooLongForALong_skippedAndTheWalkMovesOn() {
+        // setup
+        Machine overflowing = machine("m-1", null);
+        Machine next = machine("m-2", null);
+        Host host = new Host();
+        pageAfter(BEFORE_FIRST, List.of(connection("c-1", "m-1", "1234567890123456789012345"), connection("c-2", "m-2", "12")));
+        when(machineRepository.findByMachineIdIn(List.of("m-1", "m-2"))).thenReturn(List.of(overflowing, next));
+        when(fleetMdmClients.client()).thenReturn(fleetClient);
+        when(fleetClient.getHostById(12L)).thenReturn(host);
+
+        // execution
+        service.backfill();
+
+        // verifications
+        verify(fleetHostFactsWriter).fill(next, host);
+        verify(fleetClient, times(1)).getHostById(anyLong());
+    }
+
+    @Test
     void backfill_deletedMachine_skipped() {
         // setup
         Machine deleted = machine("m-1", null);

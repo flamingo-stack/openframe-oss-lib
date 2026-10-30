@@ -78,8 +78,8 @@ public class FleetHostFactsBackfillService {
             for (ToolConnection connection : page) {
                 cursor = connection.getId();
                 Machine machine = machines.get(connection.getMachineId());
-                if (isMissingFacts(machine, connection)) {
-                    long hostId = Long.parseLong(connection.getAgentToolId());
+                Long hostId = isMissingFacts(machine) ? fleetHostId(connection) : null;
+                if (hostId != null) {
                     hosts.add(new PendingHost(machine, hostId));
                 }
                 if (hosts.size() == MACHINES_PER_RUN) {
@@ -102,13 +102,26 @@ public class FleetHostFactsBackfillService {
                 .collect(toMap(Machine::getMachineId, Function.identity(), (first, duplicate) -> first));
     }
 
-    // A numeric agentToolId is the Fleet host id the transformer confirmed; a UUID there means Fleet never
-    // confirmed the host, so there is nothing to read yet
-    private static boolean isMissingFacts(Machine machine, ToolConnection connection) {
+    private static boolean isMissingFacts(Machine machine) {
         return machine != null
                 && !RETIRED_STATUSES.contains(machine.getStatus())
-                && isBlank(machine.getSerialNumber())
-                && isNumeric(connection.getAgentToolId());
+                && isBlank(machine.getSerialNumber());
+    }
+
+    // A numeric agentToolId is the Fleet host id the transformer confirmed; a UUID there means Fleet never
+    // confirmed the host, so there is nothing to read yet. A digit string too long for a host id is skipped the same
+    // way, so it cannot stall the walk.
+    private static Long fleetHostId(ToolConnection connection) {
+        String agentToolId = connection.getAgentToolId();
+        if (!isNumeric(agentToolId)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(agentToolId);
+        } catch (NumberFormatException e) {
+            log.warn("Fleet host id out of range, skipped: connectionId={}, agentToolId={}", connection.getId(), agentToolId);
+            return null;
+        }
     }
 
     private boolean fill(FleetMdmClient client, PendingHost pending) {
