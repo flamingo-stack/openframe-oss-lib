@@ -43,6 +43,11 @@ pub(crate) fn is_login_user(user: &str) -> bool {
     !user.is_empty() && user != "root" && !user.starts_with('_')
 }
 
+/// The console user; a Mac has one GUI session, so the process's session tells nothing more.
+pub(crate) fn session_user(_session: Option<u32>) -> Option<String> {
+    get_console_user().map(|user| user.username)
+}
+
 pub async fn launch_as_user(
     executable: &str,
     args: &[String],

@@ -178,10 +178,7 @@ fn interpret(result: &ExecResult) -> UpgradeOutcome {
         REBOOT_REQUIRED_FOR_INSTALL => {
             UpgradeOutcome::Busy("a reboot is required before installing".to_string())
         }
-        COULD_NOT_LAUNCH
-            if result.stderr.contains("no linked token")
-                || result.stderr.contains("not a local administrator") =>
-        {
+        COULD_NOT_LAUNCH if crate::executor::cannot_elevate(&result.stderr) => {
             UpgradeOutcome::Failed {
                 exit_code: i64::from(code),
                 message: format!(

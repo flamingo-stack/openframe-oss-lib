@@ -379,17 +379,24 @@ unsafe fn token_information<T: Default>(
     Ok(value)
 }
 
+const NO_LINKED_TOKEN: &str = "no linked token for the interactive user";
+const NOT_ADMINISTRATOR: &str =
+    "linked token is not elevated; interactive user is not a local administrator";
+
+/// The elevated run failed because the console user is no administrator; a retry cannot change that.
+pub(crate) fn cannot_elevate(stderr: &str) -> bool {
+    stderr.contains(NO_LINKED_TOKEN) || stderr.contains(NOT_ADMINISTRATOR)
+}
+
 fn linked_elevated_token(token: HANDLE) -> Result<HANDLE> {
     let linked: TOKEN_LINKED_TOKEN = unsafe { token_information(token, TokenLinkedToken) }
-        .map_err(|e| anyhow!("no linked token for the interactive user: {e}"))?;
+        .map_err(|e| anyhow!("{NO_LINKED_TOKEN}: {e}"))?;
 
     match is_elevated(linked.LinkedToken) {
         Ok(true) => Ok(linked.LinkedToken),
         Ok(false) => {
             close(linked.LinkedToken);
-            Err(anyhow!(
-                "linked token is not elevated; interactive user is not a local administrator"
-            ))
+            Err(anyhow!(NOT_ADMINISTRATOR))
         }
         Err(e) => {
             close(linked.LinkedToken);

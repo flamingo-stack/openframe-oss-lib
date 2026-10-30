@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use tracing::{info, warn};
@@ -10,6 +11,7 @@ use crate::executor::console_user_present;
 use crate::models::{
     Done, DoneResult, FailReason, Failed, HolderInfo, UpdateMode, WaitPhase, WaitReason, Waiting,
 };
+use crate::platform::user_session::session_user;
 use crate::services::package_manager::update_gate::{
     self, BlockReason, GateDecision, Holder, Prepared, Undetermined,
 };
@@ -34,8 +36,8 @@ pub(super) struct Progress {
     probe: Option<Probe>,
     prepared: Option<Arc<Prepared>>,
     countdown: Option<u64>,
-    /// The apps a forced close stopped; relaunched once the order ends.
-    closed: Vec<Holder>,
+    /// The apps a forced close stopped, with the user each ran as; relaunched once the order ends.
+    closed: Vec<(Holder, Option<String>)>,
     busy_since: Option<u64>,
     unseen_since: Option<u64>,
     held: Hold,
@@ -323,6 +325,10 @@ impl Worker {
         p.closed = holders
             .into_iter()
             .filter(|holder| !survivors.contains(&holder.pid))
+            .map(|holder| {
+                let user = session_user(holder.session);
+                (holder, user)
+            })
             .collect();
         if !survivors.is_empty() {
             return self
@@ -552,12 +558,18 @@ impl Worker {
             return;
         }
         p.last_report = Some(key);
+        let mut users = HashMap::new();
         let waiting = Waiting {
             reason,
             phase,
             holders: holders
                 .iter()
-                .map(|holder| holder_info(holder, holder_user(holder)))
+                .map(|holder| {
+                    let user = users
+                        .entry(holder.session)
+                        .or_insert_with(|| session_user(holder.session));
+                    holder_info(holder, user.clone())
+                })
                 .collect(),
             closes_at: closes_at.map(status::rfc3339),
         };
@@ -657,23 +669,6 @@ fn holder_info(holder: &Holder, user: Option<String>) -> HolderInfo {
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| holder.image.to_string_lossy().into_owned());
     HolderInfo { app, user }
-}
-
-#[cfg(target_os = "macos")]
-fn holder_user(_holder: &Holder) -> Option<String> {
-    crate::platform::user_session::get_console_user().map(|user| user.username)
-}
-
-#[cfg(target_os = "windows")]
-fn holder_user(holder: &Holder) -> Option<String> {
-    holder
-        .session
-        .and_then(crate::platform::user_session::session_user_name)
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn holder_user(_holder: &Holder) -> Option<String> {
-    None
 }
 
 #[cfg(test)]

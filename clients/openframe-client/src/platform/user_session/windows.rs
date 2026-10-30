@@ -15,24 +15,29 @@ use windows::{
 pub(crate) fn launch_in_user_session(command_path: &str, args: &[String]) -> Result<u32> {
     let session_id = get_active_user_session().context("No active user session found")?;
     let (pid, process_handle) =
-        launch_process_in_target_session(command_path, args, session_id, false, None)?;
+        launch_process_in_target_session(command_path, args, session_id, None)?;
     unsafe {
         let _ = CloseHandle(process_handle);
     }
     Ok(pid)
 }
 
-/// Starts an app as the session's user would: their environment, the app's folder as working directory.
-pub(crate) fn launch_app_in_session(image: &Path, session_id: Option<u32>) -> Result<u32> {
-    let session_id = match session_id {
-        Some(session_id) => session_id,
-        None => get_active_user_session().context("No active user session found")?,
-    };
+/// Starts an app as its user would: their environment, the app's folder as working directory.
+/// It goes to the session it ran in while `user` still owns it, else to the active session if that is `user`'s.
+pub(crate) fn launch_app_in_session(
+    image: &Path,
+    session_id: Option<u32>,
+    user: Option<&str>,
+) -> Result<u32> {
+    let owned = |id: &u32| user.is_none_or(|user| session_user_name(*id).as_deref() == Some(user));
+    let session_id = session_id
+        .filter(owned)
+        .or_else(|| get_active_user_session().filter(owned))
+        .context("No session of the app's user")?;
     let (pid, process_handle) = launch_process_in_target_session(
         &image.to_string_lossy(),
         &[],
         session_id,
-        true,
         image.parent(),
     )?;
     unsafe {
@@ -41,8 +46,13 @@ pub(crate) fn launch_app_in_session(image: &Path, session_id: Option<u32>) -> Re
     Ok(pid)
 }
 
+/// The user logged on to the session a process ran in.
+pub(crate) fn session_user(session: Option<u32>) -> Option<String> {
+    session.and_then(session_user_name)
+}
+
 /// The user logged on to a session; `None` for session 0 or when it cannot be read.
-pub(crate) fn session_user_name(session_id: u32) -> Option<String> {
+fn session_user_name(session_id: u32) -> Option<String> {
     unsafe {
         let mut buffer = PWSTR::null();
         let mut bytes = 0u32;
@@ -179,8 +189,7 @@ fn launch_process_in_target_session(
     command_path: &str,
     args: &[String],
     session_id: u32,
-    user_environment: bool,
-    working_dir: Option<&Path>,
+    app_dir: Option<&Path>,
 ) -> Result<(u32, HANDLE)> {
     unsafe {
         info!("Step 1: Querying user token for session {}", session_id);
@@ -252,7 +261,7 @@ fn launch_process_in_target_session(
         let mut cmdline_wide = to_wide(&cmdline);
 
         let mut env_block: *mut core::ffi::c_void = std::ptr::null_mut();
-        let environment = if user_environment {
+        let environment = if app_dir.is_some() {
             match CreateEnvironmentBlock(&mut env_block, primary_token, false) {
                 Ok(()) => Some(env_block as *const core::ffi::c_void),
                 Err(e) => {
@@ -271,17 +280,17 @@ fn launch_process_in_target_session(
         } else {
             CREATE_NEW_PROCESS_GROUP
         };
-        let working_dir = working_dir.map(|dir| to_wide(&dir.to_string_lossy()));
+        let working_dir = app_dir.map(|dir| to_wide(&dir.to_string_lossy()));
         let working_dir = working_dir
             .as_ref()
             .map_or(PCWSTR::null(), |dir| PCWSTR(dir.as_ptr()));
 
         info!("Step 5: Calling CreateProcessAsUserW");
         info!("  lpApplicationName: NULL (using command line parsing)");
-        info!("  Creation flags: CREATE_NEW_PROCESS_GROUP");
+        info!("  Creation flags: {:?}", flags);
 
         // Try with lpApplicationName = NULL and full command line
-        let result = CreateProcessAsUserW(
+        let result = match CreateProcessAsUserW(
             primary_token,
             PCWSTR::null(), // lpApplicationName = NULL
             PWSTR(cmdline_wide.as_mut_ptr()),
@@ -293,56 +302,56 @@ fn launch_process_in_target_session(
             working_dir,
             &si,
             &mut pi,
-        );
-
-        if let Err(e) = result {
-            // Fallback: try without desktop specification
-            error!(
-                "✗ CreateProcessAsUserW failed with desktop specification: {:?}",
-                e
-            );
-            warn!("Attempting fallback: retrying without desktop specification");
-
-            info!("Step 6: Fallback attempt - removing desktop specification");
-            si.lpDesktop = PWSTR::null();
-            info!("  Desktop: NULL (removed)");
-            let mut cmdline_wide_retry = to_wide(&cmdline);
-
-            let result_retry = CreateProcessAsUserW(
-                primary_token,
-                PCWSTR::null(),
-                PWSTR(cmdline_wide_retry.as_mut_ptr()),
-                None,
-                None,
-                false,
-                flags,
-                environment,
-                working_dir,
-                &si,
-                &mut pi,
-            );
-
-            let _ = CloseHandle(primary_token);
-            if !env_block.is_null() {
-                let _ = DestroyEnvironmentBlock(env_block);
+        ) {
+            Ok(()) => {
+                info!("CreateProcessAsUserW succeeded on first attempt");
+                Ok(())
             }
-
-            if let Err(e2) = result_retry {
+            Err(e) => {
+                // Fallback: try without desktop specification
                 error!(
-                    "✗ CreateProcessAsUserW failed again without desktop specification: {:?}",
-                    e2
+                    "✗ CreateProcessAsUserW failed with desktop specification: {:?}",
+                    e
                 );
-                error!("Both attempts to launch process failed");
-                anyhow::bail!("Failed to launch process in user session: {:?}", e2);
-            }
+                warn!("Attempting fallback: retrying without desktop specification");
 
-            info!("Fallback successful - process launched without desktop specification");
-        } else {
-            info!("CreateProcessAsUserW succeeded on first attempt");
-            let _ = CloseHandle(primary_token);
-            if !env_block.is_null() {
-                let _ = DestroyEnvironmentBlock(env_block);
+                info!("Step 6: Fallback attempt - removing desktop specification");
+                si.lpDesktop = PWSTR::null();
+                info!("  Desktop: NULL (removed)");
+                let mut cmdline_wide_retry = to_wide(&cmdline);
+
+                let retry = CreateProcessAsUserW(
+                    primary_token,
+                    PCWSTR::null(),
+                    PWSTR(cmdline_wide_retry.as_mut_ptr()),
+                    None,
+                    None,
+                    false,
+                    flags,
+                    environment,
+                    working_dir,
+                    &si,
+                    &mut pi,
+                );
+                if retry.is_ok() {
+                    info!("Fallback successful - process launched without desktop specification");
+                }
+                retry
             }
+        };
+
+        let _ = CloseHandle(primary_token);
+        if !env_block.is_null() {
+            let _ = DestroyEnvironmentBlock(env_block);
+        }
+
+        if let Err(e2) = result {
+            error!(
+                "✗ CreateProcessAsUserW failed again without desktop specification: {:?}",
+                e2
+            );
+            error!("Both attempts to launch process failed");
+            anyhow::bail!("Failed to launch process in user session: {:?}", e2);
         }
 
         let pid = pi.dwProcessId;
