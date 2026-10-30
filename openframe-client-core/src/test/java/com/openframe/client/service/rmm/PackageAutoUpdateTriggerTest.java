@@ -15,6 +15,7 @@ import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
+import com.openframe.data.nats.packageupdate.PackageAutoUpdateRetryWithdrawal;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -70,7 +71,7 @@ class PackageAutoUpdateTriggerTest {
     private final PackageAutoUpdateTrigger trigger = new PackageAutoUpdateTrigger(policyRepository, catalogVersions,
             eligibility,
             new PackageManagerRegistry(List.of(new BrewPackageManagerHandler(), new WingetPackageManagerHandler())),
-            scriptRepository, actionResultRepository, dispatchService, deliveryTracker, tenantIdProvider);
+            scriptRepository, actionResultRepository, dispatchService, new PackageAutoUpdateRetryWithdrawal(deliveryTracker), tenantIdProvider);
 
     @BeforeEach
     void setUp() {

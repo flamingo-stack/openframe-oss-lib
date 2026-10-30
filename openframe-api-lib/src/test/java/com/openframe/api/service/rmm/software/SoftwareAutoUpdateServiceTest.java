@@ -2,13 +2,12 @@ package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
-import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.PackageAutoUpdatePolicy;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.nats.packageupdate.PackageAutoUpdateRetryWithdrawal;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.service.TenantIdProvider;
-import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +25,6 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -38,7 +36,7 @@ class SoftwareAutoUpdateServiceTest {
 
     @Mock private PackageAutoUpdatePolicyRepository policyRepository;
     @Mock private TenantIdProvider tenantIdProvider;
-    @Mock private DeliveryTracker deliveryTracker;
+    @Mock private PackageAutoUpdateRetryWithdrawal retryWithdrawal;
 
     @InjectMocks private SoftwareAutoUpdateService service;
 
@@ -103,17 +101,16 @@ class SoftwareAutoUpdateServiceTest {
 
     @Test
     void turnOff_withdrawsRetriesStillWaiting_afterThePoliciesAreOff() {
-        PackageAutoUpdatePolicy waiting = policy("m1", "chrome", false);
-        waiting.setRetryRequestId("req-1");
-        when(policyRepository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("chrome")))
-                .thenReturn(List.of(waiting, policy("m2", "chrome", false)));
+        PackageAutoUpdatePolicy m1 = policy("m1", "chrome", false);
+        PackageAutoUpdatePolicy m2 = policy("m2", "chrome", false);
+        when(policyRepository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("chrome"))).thenReturn(List.of(m1, m2));
 
         service.turnOff("chrome", "admin@x");
 
-        InOrder order = inOrder(policyRepository, deliveryTracker);
+        InOrder order = inOrder(policyRepository, retryWithdrawal);
         order.verify(policyRepository).disableBySoftwareId(TENANT, "chrome", "admin@x");
-        order.verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1"), eq("m1"), any());
-        verify(deliveryTracker, times(1)).cancel(any(), any(), any(), any());
+        order.verify(retryWithdrawal).withdraw(eq(m1), any());
+        order.verify(retryWithdrawal).withdraw(eq(m2), any());
     }
 
     private static PackageAutoUpdatePolicy policy(String machineId, String softwareId, boolean enabled) {

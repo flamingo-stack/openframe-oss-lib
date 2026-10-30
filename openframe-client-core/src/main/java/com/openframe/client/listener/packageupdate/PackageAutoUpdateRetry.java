@@ -6,6 +6,7 @@ import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
+import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Failed;
 import com.openframe.data.nats.packageupdate.PackageUpdateWire;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
@@ -47,18 +48,22 @@ public class PackageAutoUpdateRetry {
             return;
         }
         String machineId = state.getMachineId();
+        currentPolicy(request, machineId).ifPresentOrElse(
+                policy -> schedule(state, request, policy),
+                () -> log.info("[package-update] no retry, the policy is off or a newer version is ordered requestId={} machineId={}",
+                        request.getRequestId(), machineId));
+    }
+
+    private void schedule(PackageUpdateDeviceState state, PackageUpdateRequest request, PackageAutoUpdatePolicy policy) {
+        String machineId = state.getMachineId();
         String requestId = request.getRequestId();
-        Optional<PackageAutoUpdatePolicy> policy = currentPolicy(request, machineId);
-        if (policy.isEmpty()) {
-            log.info("[package-update] no retry, the policy is off or a newer version is ordered requestId={} machineId={}", requestId, machineId);
-            return;
-        }
         // written first: a retry the policy does not name could not be withdrawn
-        policyRepository.markRetryScheduled(policy.get().getId(), requestId);
+        policyRepository.markRetryScheduled(policy.getId(), requestId);
         Instant dueAt = Instant.now().plusSeconds(backoffSeconds);
-        deliveryDispatcher.schedule(PackageUpdateWire.seed(machineId, requestId, request.getSource(),
+        PackageUpdateDeliverySeed seed = PackageUpdateWire.seed(machineId, requestId, request.getSource(),
                 request.getPackageManager(), request.getPackageName(), request.getBrewPackageType(), request.getMode(),
-                request.getForceCountdownSeconds()), dueAt);
+                request.getForceCountdownSeconds());
+        deliveryDispatcher.schedule(seed, dueAt);
         int retries = state.getRetries() + 1;
         state.setRetries(retries);
         // this attempt arms its own deadline
