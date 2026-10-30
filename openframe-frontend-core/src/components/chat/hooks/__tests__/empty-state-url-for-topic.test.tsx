@@ -2,7 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../../utils/embed-authed-fetch', () => ({ embedAuthedFetch: vi.fn() }));
 import { PageTopicsProvider } from '../../../../contexts/page-topics-context';
+import { embedAuthedFetch } from '../../../../utils/embed-authed-fetch';
 import { emptyStateUrlForTopic, useEmptyStateConfig } from '../use-empty-state-config';
 
 describe('emptyStateUrlForTopic', () => {
@@ -29,8 +32,10 @@ describe('emptyStateUrlForTopic', () => {
 
 describe("useEmptyStateConfig: the page's topic", () => {
   it('reads the empty state for the topic of the page on screen', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ quickActions: [] }) });
-    vi.stubGlobal('fetch', fetchMock);
+    vi.mocked(embedAuthedFetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ quickActions: [] }),
+    } as unknown as Response);
     const client = new QueryClient();
     renderHook(() => useEmptyStateConfig('/api/docs/empty-state'), {
       wrapper: ({ children }: { children: ReactNode }) => (
@@ -39,8 +44,7 @@ describe("useEmptyStateConfig: the page's topic", () => {
         </QueryClientProvider>
       ),
     });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('topic')).toBe('pricing');
-    vi.unstubAllGlobals();
+    await waitFor(() => expect(embedAuthedFetch).toHaveBeenCalledTimes(1));
+    expect(new URL(String(vi.mocked(embedAuthedFetch).mock.calls[0][0])).searchParams.get('topic')).toBe('pricing');
   });
 });
