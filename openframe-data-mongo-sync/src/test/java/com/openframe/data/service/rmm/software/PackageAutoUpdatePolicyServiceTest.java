@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PackageAutoUpdatePolicyServiceTest {
@@ -29,11 +30,15 @@ class PackageAutoUpdatePolicyServiceTest {
             .mode(PackageUpdateMode.WAIT).deadlineSeconds(604_800L).countdownSeconds(300).build();
 
     @Mock private PackageAutoUpdatePolicyRepository repository;
+    @Mock private PackageCatalogVersions catalogVersions;
 
     @InjectMocks private PackageAutoUpdatePolicyService service;
 
     @Test
     void autoUpdateOn_enablesThePackageOnTheRunsDevices() {
+        when(catalogVersions.hasLatest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn(true);
+        when(catalogVersions.latest(PackageManagerType.BREW, "slack", BrewPackageType.CASK)).thenReturn("4.47.69");
+
         service.turnOn(rows("m1", "m2"), BrewPackageType.CASK, "title-7",
                 SoftwareAutoUpdate.builder().enabled(true).build(), UPDATE_SETTINGS);
 
@@ -47,6 +52,7 @@ class PackageAutoUpdatePolicyServiceTest {
         assertThat(policy.getSoftwareId()).isEqualTo("title-7");
         assertThat(policy.getUpdatedBy()).isEqualTo("admin@x");
         assertThat(policy.getSettings()).isEqualTo(UPDATE_SETTINGS);   // "Same settings for auto-update"
+        assertThat(policy.getLastVersion()).isEqualTo("4.47.69");      // the run brings it there: next release triggers
     }
 
     @Test
@@ -59,6 +65,7 @@ class PackageAutoUpdatePolicyServiceTest {
         ArgumentCaptor<PackageAutoUpdatePolicy> template = ArgumentCaptor.forClass(PackageAutoUpdatePolicy.class);
         verify(repository).enable(template.capture(), eq(List.of("m1")));
         assertThat(template.getValue().getSettings()).isEqualTo(own);
+        assertThat(template.getValue().getLastVersion()).isNull();      // the catalog has no version: the trigger catches up
     }
 
     @Test

@@ -2,7 +2,9 @@
 
 import type React from 'react';
 import { type MouseEvent, type ReactNode, useMemo } from 'react';
+import { useChatRuntime } from '../../../contexts/chat-runtime-context';
 import { formatDate, formatTime } from '../../../utils/format-date';
+import { executeNewTabNavigation } from '../../chat/utils/execute-navigation';
 import { ArrowRightUpIcon } from '../../icons-v2-generated';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import {
@@ -72,12 +74,13 @@ export function getDeviceActionsColumn<T extends DeviceRow = DeviceRow>(
 /** Opens the device's page in a new tab. A button, because the row is itself a link and a link cannot hold a link. */
 function OpenDeviceButton({ device }: { device: DeviceRow }) {
   const { getDeviceHref } = useDevicesViewConfig();
+  const runtime = useChatRuntime();
   // The button is static chrome: drawn real while the row is read, and inert.
   const loading = useLoadingScope();
   const href = loading ? undefined : getDeviceHref?.(device);
   const open = (event: MouseEvent) => {
     event.preventDefault();
-    if (href) window.open(href, '_blank', 'noopener,noreferrer');
+    if (href) executeNewTabNavigation({ runtime, href });
   };
   return (
     <div data-no-row-click className="pointer-events-auto flex items-center justify-end">

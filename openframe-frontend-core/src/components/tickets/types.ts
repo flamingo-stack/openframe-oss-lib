@@ -114,7 +114,7 @@ export interface TicketClickupSummary {
    *  chat-inline delivery card uses. Carries `?search=<id>` so the
    *  delivery list filters to that single task on landing. */
   delivery_href: string;
-  /** Target platform name for the host's `useNavLink` to decide
+  /** Target platform name for the host's `useNavLinkViaRuntime` to decide
    *  same-tab vs new-tab on cross-platform links. */
   delivery_target_platform: string;
   /** Release version label set by the delivery team, e.g. "0.9" / "1.0".
