@@ -6,6 +6,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 import { boxedPrimitivesPlugin } from './boxed-primitives.js';
+import { deadClassesPlugin } from './dead-classes.js';
 import { ignores } from './ignores.js';
 import { imageSizesPlugin } from './image-sizes.js';
 import { layoutVariantsPlugin } from './layout-variants.js';
@@ -20,6 +21,7 @@ export const flamingoPlugin = {
   rules: {
     ...webviewPerformancePlugin.rules,
     ...layoutVariantsPlugin.rules,
+    ...deadClassesPlugin.rules,
     ...navigationPlugin.rules,
     ...imageSizesPlugin.rules,
     ...boxedPrimitivesPlugin.rules,
@@ -333,6 +335,16 @@ export const base = [
     ignores: ['**/*.{test,spec}.{js,mjs,jsx,ts,mts,tsx}', '**/__tests__/**'],
     plugins: { flamingo: flamingoPlugin },
     rules: { 'flamingo/no-mixed-layout-variants': 'error' },
+  },
+
+  // A class that styles nothing (no Tailwind utility, no stylesheet) — see ./dead-classes.js. An app that
+  // defines classes in its own CSS passes its stylesheets as `css` in a later block.
+  {
+    name: 'flamingo/base/dead-classes',
+    files: ['**/*.{js,mjs,jsx,ts,mts,tsx}'],
+    ignores: ['**/*.{test,spec}.{js,mjs,jsx,ts,mts,tsx}', '**/__tests__/**', '**/*.stories.{js,jsx,ts,tsx,mdx}'],
+    plugins: { flamingo: flamingoPlugin },
+    rules: { 'flamingo/no-dead-class': 'error' },
   },
 
   // A link is followed through the lib's navigation executor only — see ./navigation.js.

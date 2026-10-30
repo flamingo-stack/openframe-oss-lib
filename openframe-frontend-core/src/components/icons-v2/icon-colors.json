@@ -214,6 +214,10 @@
     "secondaryColor": "var(--ods-accent)",
     "tertiaryColor": "var(--color-text-primary)"
   },
+  "logos/mingo-logo": {
+    "color": "var(--color-text-primary)",
+    "secondaryColor": "var(--ods-flamingo-cyan-base)"
+  },
   "logos/openframe-logo": {
     "color": "var(--color-text-primary)",
     "secondaryColor": "var(--color-accent-primary)"

@@ -22,6 +22,7 @@ use crate::services::{
     ToolCommandParamsResolver, ToolKillService, ToolOps, ToolRunManager, UpdateCleanupService,
     UpdateHandlerService, UpdateStateService,
 };
+use crate::utils::in_progress::InProgress;
 
 const READY_BOUND: Duration = Duration::from_secs(10);
 
@@ -160,6 +161,7 @@ pub(crate) fn client_update_fixture(dir: &TempDir) -> ClientUpdateFixture {
         last_known_good,
         tool_run_manager.clone(),
         tool_ops.clone(),
+        InProgress::default().view(),
         update_handler,
     );
 

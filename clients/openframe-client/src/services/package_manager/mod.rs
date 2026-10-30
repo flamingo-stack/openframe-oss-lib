@@ -1,24 +1,16 @@
-#[cfg(target_os = "macos")]
-mod brew;
-#[cfg(target_os = "windows")]
-mod choco;
+pub(crate) mod brew;
+pub mod package_update;
 pub mod report_publisher;
 pub mod report_run_manager;
 mod state;
 mod support;
-#[cfg(target_os = "windows")]
-mod winget;
+pub mod update_gate;
 
-use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
+pub use support::is_supported;
+
+use crate::models::PackageRef;
 use serde::Serialize;
 use std::path::Path;
-use tokio::time::{interval, Duration};
-use tracing::info;
-
-const UPDATES_ENABLED: bool = false;
-const UPDATE_INTERVAL: Duration = Duration::from_secs(3600);
-const UPDATE_TIMEOUT_SECS: u32 = 600;
-const SETUP_FAILURE_RETCODE: i32 = 85;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -36,24 +28,20 @@ pub enum Presence {
 }
 
 impl ManagerId {
-    pub const ALL: &'static [ManagerId] = &[ManagerId::Brew, ManagerId::Choco, ManagerId::Winget];
-
-    fn updater(self) -> Option<Box<dyn ManagerUpdater>> {
-        match self {
-            #[cfg(target_os = "macos")]
-            ManagerId::Brew => Some(Box::new(brew::Brew)),
-            #[cfg(target_os = "windows")]
-            ManagerId::Winget => Some(Box::new(winget::Winget)),
-            _ => None,
+    pub fn of(package: &PackageRef) -> Self {
+        match package {
+            PackageRef::Winget { .. } => ManagerId::Winget,
+            PackageRef::Brew { .. } => ManagerId::Brew,
+            PackageRef::Choco { .. } => ManagerId::Choco,
         }
     }
+
+    pub const ALL: &'static [ManagerId] = &[ManagerId::Brew, ManagerId::Choco, ManagerId::Winget];
 
     pub async fn presence(self) -> Presence {
         match self {
             ManagerId::Brew => {
-                if Path::new("/opt/homebrew/bin/brew").exists()
-                    || Path::new("/usr/local/bin/brew").exists()
-                {
+                if brew::PATHS.iter().any(|path| Path::new(path).exists()) {
                     Presence::Present
                 } else {
                     Presence::Absent
@@ -105,6 +93,10 @@ pub const PRESENCE_PROBE_TIMEOUT_SECS: u32 = 60;
 
 #[cfg(target_os = "windows")]
 async fn winget_presence() -> Presence {
+    use crate::executor::{execute_script, Privilege, ScriptParams};
+
+    const SETUP_FAILURE_RETCODE: i32 = 85;
+
     let result = execute_script(ScriptParams {
         code: WINGET_PRESENCE_SCRIPT,
         shell: "powershell",
@@ -129,136 +121,4 @@ async fn winget_presence() -> Presence {
 #[cfg(not(target_os = "windows"))]
 async fn winget_presence() -> Presence {
     Presence::Unknown
-}
-
-#[derive(Debug)]
-pub enum UpdateOutcome {
-    Updated {
-        from: Option<String>,
-        to: Option<String>,
-    },
-    AlreadyLatest {
-        version: Option<String>,
-    },
-    NotPresent,
-    Deferred,
-    Failed {
-        detail: String,
-    },
-}
-
-pub trait ManagerUpdater: Send + Sync {
-    fn id(&self) -> ManagerId;
-    fn privilege(&self) -> Privilege;
-    fn shell(&self) -> &'static str;
-    fn update_script(&self) -> String;
-    fn interpret_result(&self, result: &ExecResult) -> UpdateOutcome;
-}
-
-#[cfg(target_os = "windows")]
-mod markers {
-    pub const NOT_PRESENT: &str = "__NOT_PRESENT__";
-    pub const LATEST: &str = "__LATEST__|";
-    pub const FROM: &str = "__FROM__|";
-    pub const TO: &str = "__TO__|";
-}
-
-#[cfg(target_os = "windows")]
-fn marker_value(stdout: &str, prefix: &str) -> Option<String> {
-    stdout.lines().find_map(|line| {
-        line.trim()
-            .strip_prefix(prefix)
-            .map(|v| v.trim().to_string())
-    })
-}
-
-#[cfg(target_os = "windows")]
-fn interpret_markers(result: &ExecResult) -> UpdateOutcome {
-    if result.stdout.contains(markers::NOT_PRESENT) {
-        return UpdateOutcome::NotPresent;
-    }
-    if let Some(version) = marker_value(&result.stdout, markers::LATEST) {
-        return UpdateOutcome::AlreadyLatest {
-            version: Some(version),
-        };
-    }
-    if result.retcode != 0 {
-        return UpdateOutcome::Failed {
-            detail: result.stderr.clone(),
-        };
-    }
-    UpdateOutcome::Updated {
-        from: marker_value(&result.stdout, markers::FROM),
-        to: marker_value(&result.stdout, markers::TO),
-    }
-}
-
-fn managers() -> Vec<Box<dyn ManagerUpdater>> {
-    ManagerId::ALL
-        .iter()
-        .filter_map(|id| id.updater())
-        .collect()
-}
-
-pub struct PackageManagerUpdateRunManager;
-
-impl PackageManagerUpdateRunManager {
-    pub fn new() -> Self {
-        Self
-    }
-
-    pub fn start(&self) {
-        if !UPDATES_ENABLED {
-            info!("Package manager self-update is disabled");
-            return;
-        }
-
-        info!("Starting package manager update run manager");
-
-        tokio::spawn(async move {
-            let mut ticker = interval(UPDATE_INTERVAL);
-
-            loop {
-                ticker.tick().await;
-
-                for manager in managers() {
-                    if manager.id().presence().await == Presence::Absent {
-                        continue;
-                    }
-
-                    let code = manager.update_script();
-                    let params = ScriptParams {
-                        code: &code,
-                        shell: manager.shell(),
-                        args: &[],
-                        timeout_secs: UPDATE_TIMEOUT_SECS,
-                        privilege: manager.privilege(),
-                        env_vars: &[],
-                    };
-
-                    let result = execute_script(params).await;
-
-                    let outcome = if result.retcode == SETUP_FAILURE_RETCODE
-                        && manager.privilege() != Privilege::Agent
-                    {
-                        UpdateOutcome::Deferred
-                    } else {
-                        manager.interpret_result(&result)
-                    };
-
-                    info!(
-                        manager = ?manager.id(),
-                        outcome = ?outcome,
-                        "Package manager update check completed"
-                    );
-                }
-            }
-        });
-    }
-}
-
-impl Default for PackageManagerUpdateRunManager {
-    fn default() -> Self {
-        Self::new()
-    }
 }

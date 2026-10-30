@@ -1,6 +1,7 @@
 mod core_nats;
 mod delivery;
 mod handlers;
+mod package_update;
 mod restart;
 
 use std::future::Future;
@@ -25,6 +26,7 @@ pub use handlers::{
     ClientUninstallHandler, ClientUpdateHandler, FeatureFlagsHandler, ToolInstallationHandler,
     ToolUpdateHandler,
 };
+pub use package_update::PackageUpdateHandler;
 pub use restart::RestartGate;
 
 pub trait CommandHandler: Clone + Send + Sync + 'static {

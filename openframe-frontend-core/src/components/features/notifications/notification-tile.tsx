@@ -90,10 +90,13 @@ interface NotificationTileOptions {
 /**
  * The notification and what dismisses it, or `loading` while the host reads it: the tile then draws its own loading
  * form, as it does in a loading scope (an approval tile, one given `actions`, draws its button row too).
+ *
+ * `onComplete` is the ✓ "Mark notification complete" control once the tile is no longer live. Omit it for a tile with
+ * no notification behind it (an approval card built from a chat or a ticket): no ✓ is drawn.
  */
 export type NotificationTileProps = NotificationTileOptions &
   (
-    | { notification: Notification; onComplete: (id: string) => void; loading?: boolean }
+    | { notification: Notification; onComplete?: (id: string) => void; loading?: boolean }
     | {
         loading: true;
         notification?: undefined;
@@ -105,7 +108,7 @@ export type NotificationTileProps = NotificationTileOptions &
 
 type LoadedNotificationTileProps = NotificationTileOptions & {
   notification: Notification;
-  onComplete: (id: string) => void;
+  onComplete?: (id: string) => void;
 };
 
 /** A notification as a tile; ONE switch: in a loading scope (or `loading`) its own loading form. */
@@ -236,7 +239,8 @@ function LoadedNotificationTile({
             </time>
           ) : null}
 
-          {!lockscreen && (
+          {/* Nothing to dismiss and nothing to complete: no slot at all. */}
+          {!lockscreen && (isLive || onComplete) && (
             <>
               {/* Live X and settled check swap in the same 16px slot; the inactive
               one is removed from the a11y tree and disabled, not just faded. */}
@@ -248,12 +252,16 @@ function LoadedNotificationTile({
                     icon: <XmarkIcon size={16} />,
                     onClick: () => onSettle?.(id),
                   },
-                  {
-                    active: !isLive,
-                    label: 'Mark notification complete',
-                    icon: <CheckCircleIcon size={16} />,
-                    onClick: () => onComplete(id),
-                  },
+                  ...(onComplete
+                    ? [
+                        {
+                          active: !isLive,
+                          label: 'Mark notification complete',
+                          icon: <CheckCircleIcon size={16} />,
+                          onClick: () => onComplete(id),
+                        },
+                      ]
+                    : []),
                 ].map(({ active, label, icon: actionIcon, onClick }) => (
                   <Button
                     variant="bare"

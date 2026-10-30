@@ -16,4 +16,9 @@ public class DeliveryId {
     public String rollout(String tenantId, DeliveryType type, String targetId) {
         return tenantId + SEPARATOR + type.name() + SEPARATOR + targetId;
     }
+
+    // a body is unique by its content, within the tenant and type that sent it
+    public String payload(String tenantId, DeliveryType type, String hash) {
+        return tenantId + SEPARATOR + type.name() + SEPARATOR + hash;
+    }
 }

@@ -33,3 +33,15 @@ fn app_bundle_path_is_the_dot_app_ancestor() {
     );
     assert_eq!(extract_app_bundle_path("/usr/local/bin/agent"), None);
 }
+
+#[test]
+fn only_a_login_account_counts_as_the_console_user() {
+    for (user, expected) in [
+        ("jane", true),
+        ("", false),
+        ("root", false),
+        ("_mbsetupuser", false),
+    ] {
+        assert_eq!(is_login_user(user), expected, "{user:?}");
+    }
+}

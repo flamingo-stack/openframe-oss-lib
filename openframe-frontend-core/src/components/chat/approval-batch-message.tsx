@@ -148,7 +148,8 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
 
   return (
     <div className="flex w-full flex-col items-start border-b border-ods-border bg-ods-card last:border-b-0">
-      <Button variant="row" type="button" onClick={onToggle} aria-expanded={expanded}>
+      {/* Square, as the tool card's header: the frame clips the corners and the rows meet flat. */}
+      <Button variant="row" type="button" onClick={onToggle} aria-expanded={expanded} className="rounded-none">
         {/* The tool mark is the grey `currentColor` cut, so the wrapper sets the colour it takes; without it
             the icon inherits the message text's primary (white). Same treatment as ToolBadge. */}
         <div className="flex h-5 w-5 shrink-0 items-center justify-center text-ods-text-secondary">
@@ -239,7 +240,7 @@ const ApprovalBatchLoading = forwardRef<
       {...props}
     >
       <div className="flex w-full flex-col items-start bg-ods-card">
-        <Button variant="row" type="button" tabIndex={-1}>
+        <Button variant="row" type="button" tabIndex={-1} className="rounded-none">
           <div className="flex h-5 w-5 shrink-0 items-center justify-center">
             <MediaSkeleton.Icon size="sm" />
           </div>

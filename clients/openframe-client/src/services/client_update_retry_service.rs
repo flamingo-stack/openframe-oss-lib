@@ -251,12 +251,12 @@ impl ClientUpdateRetryService {
             since.elapsed() < Duration::from_secs(CLIENT_UPDATE_BUSY_PARK_SECS)
         });
         // past the hold, reserve() would park new tool operations again, so the update just waits for idle tools
-        if !park_tools && self.update_service.tools_busy() {
+        if !park_tools && self.update_service.is_busy() {
             if !clock.hold_ended {
                 clock.hold_ended = true;
                 self.tool_run_manager.clear_client_update_pending();
                 info!(
-                    "Tools still busy after {} minutes, the client update now waits for them without parking tool operations",
+                    "Still busy after {} minutes, the client update now waits without parking tool operations",
                     CLIENT_UPDATE_BUSY_PARK_SECS / 60
                 );
             }
@@ -264,7 +264,7 @@ impl ClientUpdateRetryService {
         }
         let Ok(guard) = self.update_service.reserve(&pending.message) else {
             // a busy tool starts the hold, another update in progress does not
-            if self.update_service.tools_busy() {
+            if self.update_service.is_busy() {
                 clock.busy_since.get_or_insert_with(Instant::now);
                 // past the hold, a tool that started right after the check above must not stay parked behind it
                 if !park_tools && !self.update_service.update_in_progress() {

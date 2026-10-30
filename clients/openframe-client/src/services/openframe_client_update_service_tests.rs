@@ -58,7 +58,7 @@ async fn a_second_update_is_refused_while_one_holds_the_slot() {
     let _running = fixture.service.reserve(&message("9.9.8")).unwrap();
 
     assert!(fixture.service.reserve(&message("9.9.9")).is_err());
-    assert!(!fixture.service.tools_busy());
+    assert!(!fixture.service.is_busy());
 }
 
 #[cfg(unix)]

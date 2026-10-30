@@ -250,8 +250,8 @@ export const FaeBareHeader: Story = {
 /**
  * Model row in its loading state — `ModelDisplay` with `loading` draws its own
  * skeleton below the composer until the model metadata resolves: the left part
- * (provider icon + model name), and the "tokens used" tail once the context
- * window is known.
+ * (provider icon + model name), and the "context budget" tail once the budget
+ * is known.
  */
 export const FaeModelLoading: Story = {
   render: () => <FaeChatShell modelLoading />,

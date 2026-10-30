@@ -1177,6 +1177,7 @@ export const ICON_LOADERS: Readonly<Record<string, () => Promise<IconModule>>> =
   MilkBottleIcon: () => import('./food-and-drinks/milk-bottle-icon').then(module => ({ default: module.MilkBottleIcon })),
   MilkCartonIcon: () => import('./food-and-drinks/milk-carton-icon').then(module => ({ default: module.MilkCartonIcon })),
   MingoIcon: () => import('./communication/mingo-icon').then(module => ({ default: module.MingoIcon })),
+  MingoLogoIcon: () => import('./logos/mingo-logo-icon').then(module => ({ default: module.MingoLogoIcon })),
   MingoMonochromeIcon: () => import('./communication/mingo-monochrome-icon').then(module => ({ default: module.MingoMonochromeIcon })),
   MinusAltIcon: () => import('./signs-and-symbols/minus-alt-icon').then(module => ({ default: module.MinusAltIcon })),
   MinusCircleIcon: () => import('./signs-and-symbols/minus-circle-icon').then(module => ({ default: module.MinusCircleIcon })),

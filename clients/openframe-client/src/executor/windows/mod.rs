@@ -2,7 +2,7 @@ pub(crate) mod job;
 mod process;
 mod run_as_user;
 
-pub(crate) use run_as_user::console_user_present;
+pub(crate) use run_as_user::{cannot_elevate, console_user_present};
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;

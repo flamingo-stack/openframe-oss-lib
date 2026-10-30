@@ -378,6 +378,7 @@
     "./eslint-config": "./eslint-config/index.js",
     "./eslint-config/base": "./eslint-config/base.js",
     "./eslint-config/image-sizes": "./eslint-config/image-sizes.js",
+    "./eslint-config/dead-classes": "./eslint-config/dead-classes.js",
     "./eslint-config/next": "./eslint-config/next.js",
     "./eslint-config/react": "./eslint-config/react.js",
     "./eslint-config/relay": "./eslint-config/relay.js",
