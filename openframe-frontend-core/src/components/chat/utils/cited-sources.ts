@@ -1,4 +1,5 @@
 import { type CardReference, extractCardReferences } from '../../../chat-protocol/card-marker';
+import { citedSourceNumbers } from '../../../chat-protocol/citation-chip';
 import { canonicalContentRefType } from '../../../utils/list-url';
 import { groupSourcesByTable } from '../../../utils/source-grouping';
 import type { ChatSource } from '../types/message.types';
@@ -13,9 +14,6 @@ export interface CitedSources {
   /** Everything retrieved but not referenced, in the order supplied. */
   uncited: ChatSource[];
 }
-
-/** `[1]`, `[12]` — a citation marker in the answer body. */
-const CITATION = /\[(\d+)\]/g;
 
 /** Fenced blocks and inline code spans. */
 const CODE = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g;
@@ -63,11 +61,7 @@ export function splitCitedSources(sources: ChatSource[] | undefined, content: st
   const byCards = splitByCards(sources, extractCardReferences(withoutCode(content)));
   if (byCards.cited.length > 0) return byCards;
 
-  const firstMentionAt = new Map<number, number>();
-  for (const match of withoutCode(content).matchAll(CITATION)) {
-    const index = Number.parseInt(match[1], 10);
-    if (!firstMentionAt.has(index)) firstMentionAt.set(index, firstMentionAt.size);
-  }
+  const firstMentionAt = new Map(citedSourceNumbers(withoutCode(content)).map((index, order) => [index, order]));
 
   const cited = sources
     .filter(source => firstMentionAt.has(source.index))
