@@ -214,7 +214,10 @@ export function GuideWelcome({
           Chips stay directly hoverable — hover/focus previews the action's full
           prompt in the composer, click sends it — and `pauseOnHover` freezes
           the hovered row so a moving chip never dodges a click. */}
-      {showTopic && <PageTopicLabel className="shrink-0 px-[var(--spacing-system-l)]" />}
+      {/* Right-aligned and pulled against the chips, so it reads as a stamp on the wall, not a row of its own. */}
+      {showTopic && (
+        <PageTopicLabel className="-mb-[var(--spacing-system-xs)] shrink-0 px-[var(--spacing-system-l)] text-right" />
+      )}
       {(quickActions.length > 0 || chipsAreLoading) && (
         <QuickActionWall
           chips={chipItems}
