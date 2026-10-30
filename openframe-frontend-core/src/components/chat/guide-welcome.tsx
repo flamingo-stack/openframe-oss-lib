@@ -53,6 +53,10 @@ export interface GuideWelcomeProps {
    *  is directly hoverable — hover/focus previews the action's full `prompt` in
    *  the composer; click sends it. */
   quickActions?: ReadonlyArray<GuideQuickAction>;
+  /** The host is still reading the chips (e.g. the quick actions of the page's
+   *  topic): with none to show yet the wall draws its own loading form. A
+   *  loading scope draws it too. */
+  quickActionsLoading?: boolean;
   /** Fired when a quick-action chip is activated (click). */
   onQuickAction?: (action: GuideQuickAction) => void;
   /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
@@ -97,6 +101,7 @@ export function GuideWelcome({
   subtitle,
   subtitleLoading = false,
   quickActions = [],
+  quickActionsLoading = false,
   onQuickAction,
   onQuickActionHover,
   onQuickActionHoverEnd,
@@ -109,7 +114,10 @@ export function GuideWelcome({
   // direction. (Same behaviour as MingoWelcome.)
   const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>();
   // ONE switch for the greeting (read data): a loading scope, or the host still fetching it with none to show yet.
-  const subtitleIsLoading = useLoadingScope() || (subtitleLoading && !subtitle);
+  const inLoadingScope = useLoadingScope();
+  const subtitleIsLoading = inLoadingScope || (subtitleLoading && !subtitle);
+  // The same switch for the chips (read data): the wall draws its loading form while there are none to show yet.
+  const chipsAreLoading = inLoadingScope || (quickActionsLoading && quickActions.length === 0);
 
   // Map to the shared {@link QuickActionChip} shape consumed by the unified
   // `QuickActionWall` — the SAME chip wall the website hero + deck render, so
@@ -200,9 +208,10 @@ export function GuideWelcome({
           Chips stay directly hoverable — hover/focus previews the action's full
           prompt in the composer, click sends it — and `pauseOnHover` freezes
           the hovered row so a moving chip never dodges a click. */}
-      {quickActions.length > 0 && (
+      {(quickActions.length > 0 || chipsAreLoading) && (
         <QuickActionWall
           chips={chipItems}
+          loading={chipsAreLoading}
           agentSlug={agentSlug}
           rows={4}
           pauseOnHover

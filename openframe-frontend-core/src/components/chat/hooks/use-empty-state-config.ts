@@ -123,10 +123,22 @@ export async function fetchEmptyStateConfig(
 }
 
 /**
+ * The empty-state URL for the page the chat is on: the host's endpoint with the
+ * page's `topic` (a FAQ topic: `pricing`, `home`), which the host uses to place
+ * the quick actions (that topic's first, then the ones written for no topic,
+ * never another topic's). No topic: the endpoint as given.
+ */
+export function emptyStateUrlForTopic(emptyStateUrl: string, topic?: string | null): string {
+  if (!topic) return emptyStateUrl;
+  return `${emptyStateUrl}${emptyStateUrl.includes('?') ? '&' : '?'}${new URLSearchParams({ topic }).toString()}`;
+}
+
+/**
  * Shared empty-state config (single fetch per chat surface), via react-query
- * so every consumer dedupes to ONE request. Keyed on `emptyStateUrl` ALONE —
- * the request sends no `source` param (resolved server-side), so the URL
- * fully determines the response.
+ * so every consumer dedupes to ONE request. Keyed on the URL ALONE (the
+ * endpoint plus the page's `topic`, `emptyStateUrlForTopic`) — the request
+ * sends no `source` param (resolved server-side), so the URL fully determines
+ * the response: each topic is read once per session.
  *
  * `staleTime`/`gcTime: Infinity` → static per session (toggling modes or
  * remounting the drawer reads from cache, never refetches).
@@ -137,12 +149,13 @@ export async function fetchEmptyStateConfig(
  */
 export function useEmptyStateConfig(
   emptyStateUrl: string | undefined,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; topic?: string | null },
 ): { config: EmptyStateConfig; loading: boolean; loaded: boolean } {
   const enabled = (options?.enabled ?? true) && !!emptyStateUrl;
+  const url = emptyStateUrl ? emptyStateUrlForTopic(emptyStateUrl, options?.topic) : undefined;
   const query = useQuery({
-    queryKey: ['chat-empty-state', emptyStateUrl],
-    queryFn: ({ signal }) => fetchEmptyStateConfig(signal, emptyStateUrl as string),
+    queryKey: ['chat-empty-state', url],
+    queryFn: ({ signal }) => fetchEmptyStateConfig(signal, url as string),
     enabled,
     staleTime: Infinity,
     gcTime: Infinity,

@@ -313,6 +313,15 @@ export interface EmbeddableChatProps {
    */
   activeAgentSlug?: string;
 
+  /**
+   * The topic of the page the chat is open on (a FAQ topic the host knows:
+   * `pricing`, `careers`, `home`). Sent as `topic` with the empty-state read
+   * (the platform's `emptyStateUrl` and an agent's config alike), so the host
+   * offers that topic's quick actions first, then the ones written for no
+   * topic, never another topic's. Absent: the ones written for no topic.
+   */
+  topic?: string;
+
   /** Optional agent switcher callback (host renders the agent picker UI). */
   onAgentChange?: (slug: string) => void;
 
@@ -1102,6 +1111,7 @@ function EmbeddableChatInner({
   activeMode: controlledActiveMode,
   onActiveModeChange,
   activeAgentSlug,
+  topic,
   onAgentChange: _onAgentChange,
   aiAgentConfigUrl: aiAgentConfigUrlProp,
   defaultActiveMode,
@@ -1332,6 +1342,7 @@ function EmbeddableChatInner({
   // the agent config so greeting/suggested prompts are ready.
   const { config: emptyStateConfig, loading: emptyStateLoading } = useEmptyStateConfig(emptyStateUrl, {
     enabled: activeMode === 'guide' || !!activeAgentSlug,
+    topic,
   });
   // Resolution: fetched (when `emptyStateUrl` set) → explicit prop → default.
   // `greeting` is null-unambiguous so `??` chains cleanly; the arrays use
@@ -3125,6 +3136,9 @@ function EmbeddableChatInner({
                                 // While the admin greeting is still being fetched, render a
                                 // subtitle skeleton instead of flashing empty → text.
                                 subtitleLoading={emptyStateLoading}
+                                // The page's topic is read with the empty state: the chip wall
+                                // draws its loading form until that topic's chips land.
+                                quickActionsLoading={!!emptyStateUrl && emptyStateLoading}
                                 {...guideWelcome}
                                 // Agent identity (name → title, icon → empty-state glyph)
                                 // wins over the host `guideWelcome` spread + built-in
