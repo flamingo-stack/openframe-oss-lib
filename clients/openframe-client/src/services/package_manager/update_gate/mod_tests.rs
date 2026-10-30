@@ -38,30 +38,28 @@ const IMAGE: &str = "held.exe";
 #[cfg(not(target_os = "windows"))]
 const IMAGE: &str = "held";
 
-fn prepared_for(install_dir: &Path) -> Prepared {
-    Prepared {
-        identity: Ok(AppIdentity::App {
-            install_dir: install_dir.to_path_buf(),
-            main_images: MainImages::Derived(vec![IMAGE.to_string()]),
-        }),
-    }
+fn identity_for(install_dir: &Path) -> Result<AppIdentity, Undetermined> {
+    Ok(AppIdentity::App {
+        install_dir: install_dir.to_path_buf(),
+        main_images: MainImages::Derived(vec![IMAGE.to_string()]),
+    })
 }
 
 #[tokio::test]
-async fn check_now_answers_from_a_fresh_snapshot() {
+async fn check_answers_from_a_fresh_snapshot() {
     let dir = tempfile::tempdir().unwrap();
-    let prepared = prepared_for(dir.path());
-    assert_eq!(prepared.check_now().await, GateDecision::Clear);
+    let identity = identity_for(dir.path());
+    assert_eq!(check(&identity, &snapshot().await), GateDecision::Clear);
 
     let running = RunningFrom::start(dir.path());
-    match prepared.check_now().await {
+    match check(&identity, &snapshot().await) {
         GateDecision::Blocked(BlockReason::Running { holders }) => {
             assert_eq!(holders.len(), 1);
             assert_eq!(holders[0].pid, running.0.id());
         }
-        other => panic!("expected the app started after prepare to block, got {other:?}"),
+        other => panic!("expected the app started after resolve to block, got {other:?}"),
     }
 
     drop(running);
-    assert_eq!(prepared.check_now().await, GateDecision::Clear);
+    assert_eq!(check(&identity, &snapshot().await), GateDecision::Clear);
 }

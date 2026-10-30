@@ -3,13 +3,14 @@ use std::path::{Path, PathBuf};
 
 use tracing::warn;
 
-use crate::platform::app_close;
+use super::machine::Machine;
 use crate::services::package_manager::update_gate::{AppIdentity, Holder};
 
 const SEARCH_DEPTH: usize = 3;
 
 /// Relaunches the apps a forced close stopped, each for the user it ran as; true when any came back.
 pub(super) async fn relaunch(
+    machine: &dyn Machine,
     closed: &[(Holder, Option<String>)],
     identity: Option<&AppIdentity>,
 ) -> bool {
@@ -23,7 +24,7 @@ pub(super) async fn relaunch(
     let mut relaunched = false;
     for (image, session, user) in images {
         match locate(image, identity) {
-            Some(target) => relaunched |= app_close::reopen(&target, session, user).await,
+            Some(target) => relaunched |= machine.reopen(&target, session, user).await,
             None => {
                 warn!(image = %image.display(), "The closed app is gone after the upgrade, not relaunching it")
             }

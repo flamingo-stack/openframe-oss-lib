@@ -23,6 +23,7 @@ impl Fixture {
         let (status, _events) = StatusReporter::in_memory();
         let agent_restart = Latch::default();
         let worker = Arc::new(Worker {
+            machine: Box::new(System),
             orders,
             status,
             config,

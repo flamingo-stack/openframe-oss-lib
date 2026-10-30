@@ -1,4 +1,5 @@
 mod close;
+mod machine;
 mod managers;
 mod orders;
 mod relaunch;
@@ -20,6 +21,7 @@ use crate::services::tool_run_manager::ClientUpdatePending;
 use crate::services::AgentConfigurationService;
 use crate::utils::in_progress::InProgress;
 use crate::utils::latch::LatchView;
+use machine::{Machine, System};
 use run::{Progress, Verdict, POLL_SECS};
 
 /// What must hold an install back: the agent is about to be replaced or restarted.
@@ -41,6 +43,7 @@ pub struct PackageUpdateRunManager {
 }
 
 struct Worker {
+    machine: Box<dyn Machine>,
     orders: Arc<OrderStore>,
     status: StatusReporter,
     config: AgentConfigurationService,
@@ -58,6 +61,7 @@ impl PackageUpdateRunManager {
     ) -> Self {
         Self {
             worker: Arc::new(Worker {
+                machine: Box::new(System),
                 orders,
                 status,
                 config,

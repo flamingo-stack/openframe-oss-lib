@@ -67,39 +67,26 @@ pub enum Undetermined {
     Snapshot(String),
 }
 
-/// The identity resolved once, the slow part; each verdict is taken later against a fresh snapshot.
-pub struct Prepared {
-    identity: Result<AppIdentity, Undetermined>,
-}
-
-impl Prepared {
-    pub async fn check_now(&self) -> GateDecision {
-        match (&self.identity, &snapshot().await) {
-            (Ok(identity), Ok(processes)) => decide(identity, processes),
-            (Err(reason), _) | (_, Err(reason)) => {
-                GateDecision::Blocked(BlockReason::Undetermined(reason.clone()))
-            }
+/// The verdict for an identity resolved once (the slow part) against a fresh snapshot.
+pub fn check(
+    identity: &Result<AppIdentity, Undetermined>,
+    processes: &Result<Vec<RunningProcess>, Undetermined>,
+) -> GateDecision {
+    match (identity, processes) {
+        (Ok(identity), Ok(processes)) => decide(identity, processes),
+        (Err(reason), _) | (_, Err(reason)) => {
+            GateDecision::Blocked(BlockReason::Undetermined(reason.clone()))
         }
     }
-
-    pub fn identity(&self) -> Option<&AppIdentity> {
-        self.identity.as_ref().ok()
-    }
 }
 
-pub async fn prepare(package: &PackageRef) -> Prepared {
-    Prepared {
-        identity: resolve(package).await,
-    }
-}
-
-async fn snapshot() -> Result<Vec<RunningProcess>, Undetermined> {
+pub async fn snapshot() -> Result<Vec<RunningProcess>, Undetermined> {
     tokio::task::spawn_blocking(process_snapshot::snapshot)
         .await
         .map_err(|e| Undetermined::Snapshot(e.to_string()))
 }
 
-async fn resolve(package: &PackageRef) -> Result<AppIdentity, Undetermined> {
+pub async fn resolve(package: &PackageRef) -> Result<AppIdentity, Undetermined> {
     match package {
         PackageRef::Brew {
             kind: BrewKind::Formula,

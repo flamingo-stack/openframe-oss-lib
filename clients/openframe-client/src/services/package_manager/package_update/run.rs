@@ -1,19 +1,16 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use tracing::{info, warn};
 
-use super::managers::{self, ProbeState, QueryError, UpgradeOutcome, UPGRADE_TIMEOUT_SECS};
+use super::managers::{ProbeState, QueryError, UpgradeOutcome, UPGRADE_TIMEOUT_SECS};
 use super::orders::Order;
 use super::status::{self, Report};
-use super::{close, relaunch, Worker};
-use crate::executor::console_user_present;
+use super::{relaunch, Worker};
 use crate::models::{
     Done, DoneResult, FailReason, Failed, HolderInfo, UpdateMode, WaitPhase, WaitReason, Waiting,
 };
-use crate::platform::user_session::session_user;
 use crate::services::package_manager::update_gate::{
-    self, BlockReason, GateDecision, Holder, Prepared, Undetermined,
+    self, AppIdentity, BlockReason, GateDecision, Holder, Undetermined,
 };
 use crate::services::package_manager::{ManagerId, Presence};
 use crate::utils::in_progress::InProgressGuard;
@@ -34,7 +31,7 @@ pub(super) struct Progress {
     pub(super) revision: Option<u64>,
     present_at: Option<u64>,
     probe: Option<Probe>,
-    prepared: Option<Arc<Prepared>>,
+    identity: Option<Result<AppIdentity, Undetermined>>,
     countdown: Option<u64>,
     /// The apps a forced close stopped, with the user each ran as; relaunched once the order ends.
     closed: Vec<(Holder, Option<String>)>,
@@ -108,14 +105,14 @@ impl Worker {
             p.countdown = None;
             p.last_report = None;
             p.probe = None;
-            p.prepared = None;
+            p.identity = None;
         }
         let manager = ManagerId::of(&order.package);
-        if !console_user_present().await {
+        if !self.machine.console_user_present().await {
             return self.no_session(machine_id, order, p, now).await;
         }
         if p.present_at.is_none_or(|at| now >= at + PROBE_TTL_SECS) {
-            match manager.presence().await {
+            match self.machine.presence(manager).await {
                 Presence::Present => p.present_at = Some(now),
                 Presence::Absent => {
                     return self
@@ -146,7 +143,7 @@ impl Worker {
             .as_ref()
             .is_none_or(|probe| now >= probe.at + PROBE_TTL_SECS)
         {
-            match managers::probe(&order.package).await {
+            match self.machine.probe(&order.package).await {
                 Ok(found) => {
                     p.probe = Some(Probe {
                         installed: found.installed_version,
@@ -204,15 +201,13 @@ impl Worker {
             }
         }
 
-        let prepared = match &p.prepared {
-            Some(prepared) => prepared.clone(),
-            None => {
-                let prepared = Arc::new(update_gate::prepare(&order.package).await);
-                p.prepared = Some(prepared.clone());
-                prepared
-            }
+        let identity = match p.identity.take() {
+            Some(identity) => identity,
+            None => self.machine.resolve(&order.package).await,
         };
-        match prepared.check_now().await {
+        let decision = update_gate::check(&identity, &self.machine.snapshot().await);
+        p.identity = Some(identity);
+        match decision {
             GateDecision::Clear => self.install(machine_id, order, p, now, None).await,
             GateDecision::Blocked(BlockReason::Running { holders }) => match order.mode {
                 UpdateMode::Wait => {
@@ -235,7 +230,7 @@ impl Worker {
             GateDecision::Blocked(BlockReason::Undetermined(reason)) => {
                 // A failed resolution is not kept: the next look resolves the identity again.
                 if matches!(reason, Undetermined::Resolver(_)) {
-                    p.prepared = None;
+                    p.identity = None;
                 }
                 self.undetermined(machine_id, order, p, now, reason).await
             }
@@ -320,13 +315,13 @@ impl Worker {
             return Verdict::Finished;
         }
         let pids: Vec<u32> = holders.iter().map(|holder| holder.pid).collect();
-        let survivors = close::close(&pids).await;
+        let survivors = self.machine.close(&pids).await;
         p.countdown = None;
         p.closed = holders
             .into_iter()
             .filter(|holder| !survivors.contains(&holder.pid))
             .map(|holder| {
-                let user = session_user(holder.session);
+                let user = self.machine.session_user(holder.session);
                 (holder, user)
             })
             .collect();
@@ -372,7 +367,7 @@ impl Worker {
                 running
             }
         };
-        let outcome = managers::upgrade(&order.package).await;
+        let outcome = self.machine.upgrade(&order.package).await;
         info!(request_id = %order.request_id, ?outcome, "Package update attempt finished");
         let verdict = match outcome {
             UpgradeOutcome::Upgraded { reboot_required } => {
@@ -457,7 +452,7 @@ impl Worker {
     /// The versions the manager reports once it is done; the probe's target stands in when it cannot tell.
     async fn read_installed(&self, order: &Order, p: &mut Progress, now: u64) {
         let target = p.probe.take().and_then(|probe| probe.available);
-        let (installed, available) = match managers::reread(&order.package).await {
+        let (installed, available) = match self.machine.reread(&order.package).await {
             Ok(after) => (after.installed_version, after.available_version),
             Err(e) => {
                 warn!(request_id = %order.request_id, ?e, "Could not read the version after the upgrade");
@@ -479,7 +474,7 @@ impl Worker {
         now: u64,
         reason: &str,
     ) -> Verdict {
-        if !console_user_present().await {
+        if !self.machine.console_user_present().await {
             return self.no_session(machine_id, order, p, now).await;
         }
         p.held = Hold::Busy;
@@ -567,7 +562,7 @@ impl Worker {
                 .map(|holder| {
                     let user = users
                         .entry(holder.session)
-                        .or_insert_with(|| session_user(holder.session));
+                        .or_insert_with(|| self.machine.session_user(holder.session));
                     holder_info(holder, user.clone())
                 })
                 .collect(),
@@ -626,8 +621,11 @@ impl Worker {
         if closed.is_empty() {
             return false;
         }
-        let identity = p.prepared.as_ref().and_then(|prepared| prepared.identity());
-        relaunch::relaunch(&closed, identity).await
+        let identity = p
+            .identity
+            .as_ref()
+            .and_then(|identity| identity.as_ref().ok());
+        relaunch::relaunch(self.machine.as_ref(), &closed, identity).await
     }
 
     /// A superseded order's forced close still gets its apps back.
@@ -639,7 +637,7 @@ impl Worker {
             request_id,
             "Relaunching the apps a superseded order had closed"
         );
-        relaunch::relaunch(&p.closed, None).await;
+        relaunch::relaunch(self.machine.as_ref(), &p.closed, None).await;
     }
 
     fn event(
