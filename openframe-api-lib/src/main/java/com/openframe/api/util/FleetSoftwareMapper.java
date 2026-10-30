@@ -25,10 +25,20 @@ public class FleetSoftwareMapper {
                 .name(title.getName())
                 .source(FleetSoftwareCategory.of(title.getSource()).source())
                 .currentVersion(current == null ? null : current.getVersion())
+                .latestVersion(latestVersion(versions))
                 .olderVersionsCount(olderVersionsCount(versions))
                 .devicesCount(title.getHostsCount())
                 .vulnerabilitySummary(rollUpVulnerabilities(versions))
                 .build();
+    }
+
+    // the highest version installed on the tenant's devices: Fleet does not say what the newest release is
+    private static String latestVersion(List<SoftwareTitleVersion> versions) {
+        return versions == null ? null : versions.stream()
+                .map(SoftwareTitleVersion::getVersion)
+                .filter(Objects::nonNull)
+                .max(SoftwareVersions::compare)
+                .orElse(null);
     }
 
     private static SoftwareTitleVersion pickCurrentVersion(List<SoftwareTitleVersion> versions) {

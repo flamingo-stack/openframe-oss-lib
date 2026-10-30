@@ -10,6 +10,7 @@ import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
+import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.dto.shared.PageResult;
@@ -25,7 +26,13 @@ import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.api.service.rmm.fleet.HostInventory.CveHit;
 import com.openframe.api.service.rmm.vulnerability.FleetGlobalVulnerabilityMapper;
 import com.openframe.api.util.FleetSoftwareMapper;
+import com.openframe.api.util.SoftwareVersions;
 import com.openframe.api.util.FleetVulnerabilityMapper;
+import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.IntegratedToolId;
@@ -78,6 +85,7 @@ public class SoftwareInventoryService {
     private static final Set<String> SORTABLE = Set.of("name", "devicesCount", "cveCount", "highestSeverity", "severity");
     private static final String SORTABLE_FIELDS = "name, devicesCount, cveCount, highestSeverity";
     private static final String DEFAULT_SORT_FIELD = "name";
+    private static final String DEVICE_SORT_FIELD = "softwareVersion";
     private static final int TITLES_FETCH_PAGE = 500;
     private static final int TITLES_FETCH_CAP = 5000;
     private static final Map<String, String> FLEET_ORDER_KEY = Map.of(
@@ -92,6 +100,8 @@ public class SoftwareInventoryService {
     private final TenantIdProvider tenantIdProvider;
     private final DeviceHostInventoryLoader deviceHostInventoryLoader;
     private final SoftwareAutoUpdateService autoUpdateService;
+    private final TagAssignmentRepository tagAssignmentRepository;
+    private final OrganizationRepository organizationRepository;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -309,7 +319,7 @@ public class SoftwareInventoryService {
     }
 
     public PageResult<SoftwareVulnerabilityResponse> listVulnerabilitiesForSoftware(
-            String softwareId, String search, int page, Integer perPage,
+            String softwareId, SoftwareVulnerabilityFilterInput filter, String search, int page, Integer perPage,
             String sortField, boolean sortAsc) {
         Optional<Long> parsed = parseNumericId(softwareId);
         if (parsed.isEmpty()) {
@@ -338,6 +348,7 @@ public class SoftwareInventoryService {
                 .map(toRow)
                 .filter(Objects::nonNull)
                 .filter(v -> matchesSearch(v, search))
+                .filter(v -> filter == null || selected(filter.getSeverities(), v.getSeverity()))
                 .sorted(comparator(sortField, sortAsc))
                 .toList();
         return paginate(all, page, perPage);
@@ -345,20 +356,70 @@ public class SoftwareInventoryService {
 
     public PageResult<SoftwareOnDeviceResponse> listDevicesForSoftware(String softwareId,
                                                                        SoftwareOnDeviceFilterInput filter,
-                                                                       String search, int page, Integer perPage) {
-        List<SoftwareOnDeviceResponse> all = allDevicesForSoftware(softwareId, search).stream()
-                .filter(row -> matchesStatusFilter(row, filter))
+                                                                       String search, int page, Integer perPage,
+                                                                       SortInput sort) {
+        Comparator<SoftwareOnDeviceResponse> order = deviceOrder(sort);
+        List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
+        Set<String> tagged = taggedMachines(rows, filter);
+        List<SoftwareOnDeviceResponse> all = rows.stream()
+                .filter(row -> matchesDeviceFilter(row, filter, tagged))
+                .sorted(order)
                 .toList();
-        PageResult<SoftwareOnDeviceResponse> result = paginateList(all, page, perPage);
-        autoUpdateService.applyToDevices(softwareId, result.items());
-        return result;
+        return paginateList(all, page, perPage);
     }
 
-    private static boolean matchesStatusFilter(SoftwareOnDeviceResponse row, SoftwareOnDeviceFilterInput filter) {
-        if (filter == null || filter.getStatuses() == null || filter.getStatuses().isEmpty()) {
+    // the filters read auto-update, so it is set on every row, not only on the page
+    private List<SoftwareOnDeviceResponse> devicesWithAutoUpdate(String softwareId, String search) {
+        List<SoftwareOnDeviceResponse> rows = allDevicesForSoftware(softwareId, search);
+        autoUpdateService.applyToDevices(softwareId, rows);
+        return rows;
+    }
+
+    private static Comparator<SoftwareOnDeviceResponse> deviceOrder(SortInput sort) {
+        if (!hasSortField(sort)) {
+            return (a, b) -> 0;
+        }
+        if (!DEVICE_SORT_FIELD.equals(sort.getField())) {
+            throw new BadRequestException("Unknown sort field '" + sort.getField() + "'. Sortable fields: " + DEVICE_SORT_FIELD);
+        }
+        Comparator<String> versions = isDescending(sort)
+                ? Comparator.comparing(Function.identity(), SoftwareVersions::compare).reversed()
+                : SoftwareVersions::compare;
+        return Comparator.comparing(SoftwareOnDeviceResponse::getSoftwareVersion, Comparator.nullsLast(versions));
+    }
+
+    // null = no tag filter; a device matches when it carries any of the tags
+    private Set<String> taggedMachines(List<SoftwareOnDeviceResponse> rows, SoftwareOnDeviceFilterInput filter) {
+        if (filter == null || isEmpty(filter.getDeviceTagIds())) {
+            return null;
+        }
+        List<String> machineIds = rows.stream().map(row -> row.getDevice().getMachineId()).toList();
+        if (machineIds.isEmpty()) {
+            return Set.of();
+        }
+        return tagAssignmentRepository.findByEntityIdInAndTagIdInAndEntityType(
+                        machineIds, filter.getDeviceTagIds(), TagEntityType.DEVICE).stream()
+                .map(TagAssignment::getEntityId)
+                .collect(Collectors.toSet());
+    }
+
+    private static boolean matchesDeviceFilter(SoftwareOnDeviceResponse row, SoftwareOnDeviceFilterInput filter,
+                                               Set<String> tagged) {
+        if (filter == null) {
             return true;
         }
-        return row.getStatus() != null && filter.getStatuses().contains(row.getStatus());
+        Machine device = row.getDevice();
+        return selected(filter.getStatuses(), row.getStatus())
+                && selected(filter.getOrganizationIds(), device.getOrganizationId())
+                && selected(filter.getDeviceStatuses(), device.getStatus())
+                && selected(filter.getInstalledBy(), row.getInstalledBy())
+                && selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate())
+                && (tagged == null || tagged.contains(device.getMachineId()));
+    }
+
+    // nothing chosen in a dropdown matches every row; a row without a value matches no choice
+    private static <T> boolean selected(List<T> chosen, T value) {
+        return isEmpty(chosen) || (value != null && chosen.contains(value));
     }
 
     public PageResult<SoftwareResponse> listSoftwareForDevice(String machineId, SoftwareFilterInput filter,
@@ -367,18 +428,21 @@ public class SoftwareInventoryService {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, filter, search);
+        // the filter reads auto-update, so it is set on every row, not only on the page
+        autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
+        List<SoftwareResponse> chosen = rows.stream()
+                .filter(row -> filter == null || selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate()))
+                .toList();
         if (!fleetPaging) {
-            enrichDevicesCountFromHosts(rows);
+            enrichDevicesCountFromHosts(chosen);
         }
-        List<SoftwareResponse> ordered = rows.stream().sorted(order).toList();
-        PageResult<SoftwareResponse> result = paginateList(ordered, page, perPage);
-        autoUpdateService.applyToSoftwareOnDevice(machineId, result.items());
-        return result;
+        return paginateList(chosen.stream().sorted(order).toList(), page, perPage);
     }
 
     public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, null, search);
+        autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
         return softwareFilters(rows);
     }
 
@@ -484,19 +548,34 @@ public class SoftwareInventoryService {
     }
 
     public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, String search) {
-        Map<SoftwareOnDeviceStatus, Long> counts = allDevicesForSoftware(softwareId, search).stream()
-                .map(SoftwareOnDeviceResponse::getStatus)
+        List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
+        return SoftwareOnDeviceFilters.builder()
+                .statuses(facet(rows, SoftwareOnDeviceResponse::getStatus))
+                .installedBy(facet(rows, SoftwareOnDeviceResponse::getInstalledBy))
+                .autoUpdateStatuses(facet(rows, SoftwareOnDeviceResponse::getAutoUpdate))
+                .deviceStatuses(facet(rows, row -> row.getDevice().getStatus()))
+                .organizations(organizationFacet(rows))
+                .build();
+    }
+
+    private List<SoftwareFilterOption> organizationFacet(List<SoftwareOnDeviceResponse> rows) {
+        Map<String, Long> counts = rows.stream()
+                .map(row -> row.getDevice().getOrganizationId())
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-        List<SoftwareFilterOption> statuses = counts.entrySet().stream()
-                .sorted(Comparator.comparingInt(e -> e.getKey().ordinal()))
+        if (counts.isEmpty()) {
+            return List.of();
+        }
+        Map<String, String> names = organizationRepository.findByOrganizationIdIn(counts.keySet()).stream()
+                .collect(Collectors.toMap(Organization::getOrganizationId, Organization::getName, (a, b) -> a));
+        return counts.entrySet().stream()
                 .map(e -> SoftwareFilterOption.builder()
-                        .value(e.getKey().name())
-                        .label(humanize(e.getKey().name()))
+                        .value(e.getKey())
+                        .label(names.getOrDefault(e.getKey(), e.getKey()))
                         .count(e.getValue().intValue())
                         .build())
+                .sorted(Comparator.comparing(SoftwareFilterOption::getLabel, String.CASE_INSENSITIVE_ORDER))
                 .toList();
-        return SoftwareOnDeviceFilters.builder().statuses(statuses).build();
     }
 
     private List<SoftwareOnDeviceResponse> allDevicesForSoftware(String softwareId, String search) {
@@ -509,6 +588,7 @@ public class SoftwareInventoryService {
             return List.of();
         }
         String latestVersion = FleetSoftwareMapper.toResponse(title).getLatestVersion();
+        SoftwareSource installedBy = installedBy(title.getSource());
 
         List<SoftwareTitleVersion> versions = title.getVersions().stream()
                 .filter(version -> version.getId() != null)
@@ -525,7 +605,7 @@ public class SoftwareInventoryService {
 
         // one machine can carry several versions (e.g. a pip per Python install) and several Fleet hosts
         Map<String, List<SoftwareOnDeviceResponse>> rowsByMachine = hostVersions.stream()
-                .map(hv -> toDeviceResponse(hv, machinesByHostId, latestVersion))
+                .map(hv -> toDeviceResponse(hv, machinesByHostId, latestVersion, installedBy))
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(row -> row.getDevice().getMachineId(),
                         java.util.LinkedHashMap::new, Collectors.toList()));
@@ -541,7 +621,15 @@ public class SoftwareInventoryService {
                 .device(rows.get(0).getDevice())
                 .softwareVersion(joinVersions(rows.stream().map(SoftwareOnDeviceResponse::getSoftwareVersion).toList()))
                 .status(upToDate ? SoftwareOnDeviceStatus.UP_TO_DATE : SoftwareOnDeviceStatus.OUTDATED)
+                .installedBy(rows.get(0).getInstalledBy())
                 .build();
+    }
+
+    // Fleet names only the package managers it lists itself; an app it calls "apps" or "programs" may still have come
+    // from winget or a cask, so it is unknown here, not "Manually"
+    private static SoftwareSource installedBy(String fleetSource) {
+        SoftwareSource source = FleetSoftwareCategory.of(fleetSource).source();
+        return source == SoftwareSource.UNMANAGED ? null : source;
     }
 
     private List<HostVersion> hostVersionsOf(SoftwareTitleVersion version) {
@@ -554,7 +642,7 @@ public class SoftwareInventoryService {
     }
 
     private static SoftwareOnDeviceResponse toDeviceResponse(HostVersion hv, Map<Long, Machine> machinesByHostId,
-                                                             String latestVersion) {
+                                                             String latestVersion, SoftwareSource installedBy) {
         Machine device = hv.host().getId() == null ? null : machinesByHostId.get(hv.host().getId());
         if (device == null) {
             return null;
@@ -565,6 +653,7 @@ public class SoftwareInventoryService {
                 .device(device)
                 .softwareVersion(hv.version())
                 .status(status)
+                .installedBy(installedBy)
                 .build();
     }
 
@@ -608,12 +697,12 @@ public class SoftwareInventoryService {
                 .versionStatuses(facet(titles, SoftwareResponse::getVersionStatus))
                 .severities(facet(titles, row -> row.getVulnerabilitySummary() == null
                         ? null : row.getVulnerabilitySummary().getHighestSeverity()))
+                .autoUpdateStatuses(facet(titles, SoftwareResponse::getAutoUpdate))
                 .build();
     }
 
-    private static <E extends Enum<E>> List<SoftwareFilterOption> facet(List<SoftwareResponse> titles,
-                                                                        Function<SoftwareResponse, E> dimension) {
-        Map<E, Long> counts = titles.stream()
+    private static <T, E extends Enum<E>> List<SoftwareFilterOption> facet(List<T> rows, Function<T, E> dimension) {
+        Map<E, Long> counts = rows.stream()
                 .map(dimension)
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
@@ -661,30 +750,8 @@ public class SoftwareInventoryService {
         return versions.stream()
                 .filter(Objects::nonNull)
                 .distinct()
-                .sorted(SoftwareInventoryService::compareVersions)
+                .sorted(SoftwareVersions::compare)
                 .collect(Collectors.joining(", "));
-    }
-
-    // Numeric, segment-wise version order so "9.0" precedes "10.0" (plain String sort would not).
-    private static int compareVersions(String a, String b) {
-        String[] pa = a.split("\\.");
-        String[] pb = b.split("\\.");
-        for (int i = 0; i < Math.max(pa.length, pb.length); i++) {
-            int va = i < pa.length ? parseSegment(pa[i]) : 0;
-            int vb = i < pb.length ? parseSegment(pb[i]) : 0;
-            if (va != vb) {
-                return Integer.compare(va, vb);
-            }
-        }
-        return a.compareTo(b);
-    }
-
-    private static int parseSegment(String segment) {
-        try {
-            return Integer.parseInt(segment.trim());
-        } catch (NumberFormatException e) {
-            return 0;
-        }
     }
 
     private Map<String, Vulnerability> enrichCves(Set<String> cves) {

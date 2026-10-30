@@ -1,5 +1,6 @@
 package com.openframe.api.dto.rmm.software;
 
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import lombok.Data;
 
 import java.util.List;
@@ -14,4 +15,6 @@ public class SoftwareFilterInput {
     private SoftwareCveSeverity minSeverity;
 
     private List<String> deviceTagIds;
+
+    private List<SoftwareAutoUpdateStatus> autoUpdateStatuses;
 }

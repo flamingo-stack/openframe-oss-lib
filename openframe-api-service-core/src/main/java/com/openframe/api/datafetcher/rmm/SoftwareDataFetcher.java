@@ -13,6 +13,7 @@ import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
@@ -71,16 +72,16 @@ public class SoftwareDataFetcher {
             @InputArgument String softwareId, @InputArgument SoftwareOnDeviceFilterInput filter,
             @InputArgument Integer first, @InputArgument String after,
             @InputArgument Integer last, @InputArgument String before,
-            @InputArgument String search, @InputArgument Object sort) {
+            @InputArgument String search, @InputArgument SortInput sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
         Integer perPage = first != null ? first : last;
         return PageCursors.toConnection(
-                softwareInventoryService.listDevicesForSoftware(softwareId, filter, search, page, perPage));
+                softwareInventoryService.listDevicesForSoftware(softwareId, filter, search, page, perPage, sort));
     }
 
     @DgsQuery
     public CountedGenericConnection<GenericEdge<SoftwareVulnerabilityResponse>> softwareVulnerabilities(
-            @InputArgument String softwareId, @InputArgument Object filter,
+            @InputArgument String softwareId, @InputArgument SoftwareVulnerabilityFilterInput filter,
             @InputArgument Integer first, @InputArgument String after,
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
@@ -89,7 +90,7 @@ public class SoftwareDataFetcher {
         String sortField = sort == null ? null : sort.getField();
         boolean asc = sort != null && sort.getDirection() == SortDirection.ASC;
         return PageCursors.toConnection(softwareInventoryService.listVulnerabilitiesForSoftware(
-                softwareId, search, page, perPage, sortField, asc));
+                softwareId, filter, search, page, perPage, sortField, asc));
     }
 
     @DgsQuery

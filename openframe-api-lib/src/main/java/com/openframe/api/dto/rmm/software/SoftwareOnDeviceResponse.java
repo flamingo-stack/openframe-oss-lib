@@ -12,5 +12,6 @@ public class SoftwareOnDeviceResponse {
     private Machine device;
     private String softwareVersion;
     private SoftwareOnDeviceStatus status;
+    private SoftwareSource installedBy;
     private SoftwareAutoUpdateStatus autoUpdate;
 }
