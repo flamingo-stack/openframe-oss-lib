@@ -13,7 +13,9 @@ describe('emptyStateUrlForTopic', () => {
   });
 
   it('adds the topic to an endpoint that already has a query', () => {
-    expect(emptyStateUrlForTopic('/content/api/ai-agents/fae?x=1', 'home')).toBe('/content/api/ai-agents/fae?x=1&topic=home');
+    expect(emptyStateUrlForTopic('/content/api/ai-agents/fae?x=1', 'home')).toBe(
+      '/content/api/ai-agents/fae?x=1&topic=home',
+    );
   });
 
   it('encodes the topic', () => {
