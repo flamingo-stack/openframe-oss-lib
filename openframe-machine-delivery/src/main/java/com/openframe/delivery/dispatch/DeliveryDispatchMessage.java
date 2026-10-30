@@ -2,6 +2,7 @@ package com.openframe.delivery.dispatch;
 
 import tools.jackson.databind.JsonNode;
 import com.openframe.delivery.spec.DeliveryAudience;
+import com.openframe.kafka.model.KafkaMessage;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,7 +12,7 @@ import java.time.Instant;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class DeliveryDispatchMessage {
+public class DeliveryDispatchMessage implements KafkaMessage {
 
     private DeliveryAudience audience;
     // the one machine; absent when the audience is every machine

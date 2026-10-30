@@ -5,6 +5,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.delivery.LocalDeliverySink;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.ProcessedCommand;
+import com.openframe.data.repository.delivery.ProcessedCommandRepository;
 import com.openframe.delivery.dispatch.DeliveryDispatchMessage;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryAudience;
@@ -19,6 +21,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+
+import java.time.Instant;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -37,6 +41,7 @@ public class DeliveryDispatchListener {
     private final LocalDeliverySink sink;
     private final ObjectMapper objectMapper;
     private final DeliveryMetrics metrics;
+    private final ProcessedCommandRepository processedCommandRepository;
 
     // a bad message is logged and skipped; a Mongo failure propagates and the record is retried until the row is written
     @KafkaListener(
@@ -67,10 +72,16 @@ public class DeliveryDispatchListener {
             return;
         }
         DeliveryType type = delivery.getType();
+        String dispatchId = delivery.getDispatchId();
+        if (processedCommandRepository.existsById(dispatchId)) {
+            metrics.recordDispatchDuplicate(type);
+            log.info("Delivery hand-off already handled, skipped: type={} dispatchId={}", type, dispatchId);
+            return;
+        }
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
         DeliveryPayload payload = objectMapper.convertValue(command, payloadClass);
-        DeliveryRequest<DeliveryPayload> request = DeliveryRequest.<DeliveryPayload>builder()
+        DeliveryRequest<DeliveryPayload> request = DeliveryRequest.builder()
                 .type(type)
                 .targetId(delivery.getTargetId())
                 .machineId(message.getMachineId())
@@ -79,6 +90,7 @@ public class DeliveryDispatchListener {
                 .dueAt(message.getDueAt())
                 .build();
         sink.accept(request);
+        processedCommandRepository.save(new ProcessedCommand(dispatchId, Instant.now()));
     }
 
     private static boolean isComplete(DeliveryDispatchMessage message) {

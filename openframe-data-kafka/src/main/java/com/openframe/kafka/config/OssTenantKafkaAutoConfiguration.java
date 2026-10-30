@@ -1,10 +1,11 @@
 package com.openframe.kafka.config;
 
+import com.openframe.kafka.producer.DualWriteKafkaProducer;
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
-import com.openframe.kafka.producer.MessageProducer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -31,6 +32,8 @@ import java.util.Map;
 @EnableConfigurationProperties({KafkaTopicProperties.class, OssTenantKafkaProperties.class})
 @ConditionalOnProperty(prefix = "spring.oss-tenant.kafka", name = "enabled", havingValue = "true")
 public class OssTenantKafkaAutoConfiguration {
+
+    private static final int DUAL_WRITE_MAX_BLOCK_MS = 1000;
 
     /**
      * ProducerFactory for OSS cluster
@@ -120,6 +123,23 @@ public class OssTenantKafkaAutoConfiguration {
     @Bean("ossTenantKafkaProducer")
     public OssTenantKafkaProducer ossTenantKafkaProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
         return new OssTenantKafkaProducer(ossTenantKafkaTemplate);
+    }
+
+    @Bean(name = "dualWriteKafkaProducer", destroyMethod = "close")
+    @ConditionalOnProperty(prefix = "spring.oss-tenant", name = "dual-write-bootstrap-servers")
+    public DualWriteKafkaProducer dualWriteKafkaProducer(KafkaTemplate<String, Object> ossTenantKafkaTemplate,
+                                                                    OssTenantKafkaProperties properties) {
+        Map<String, Object> producerProperties = new HashMap<>(properties.getKafka().buildProducerProperties());
+        producerProperties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.getDualWriteBootstrapServers());
+        var producerFactory = new DefaultKafkaProducerFactory<>(
+                producerProperties, new StringSerializer(), KafkaJsonSerdes.valueSerializer());
+        return new DualWriteKafkaProducer(producerFactory, secondaryProducerFactory(ossTenantKafkaTemplate));
+    }
+
+    private static ProducerFactory<String, Object> secondaryProducerFactory(KafkaTemplate<String, Object> ossTenantKafkaTemplate) {
+        Map<String, Object> producerProperties = new HashMap<>(ossTenantKafkaTemplate.getProducerFactory().getConfigurationProperties());
+        producerProperties.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, DUAL_WRITE_MAX_BLOCK_MS);
+        return new DefaultKafkaProducerFactory<>(producerProperties, new StringSerializer(), KafkaJsonSerdes.valueSerializer());
     }
 
     @Bean("ossTenantKafkaAdmin")

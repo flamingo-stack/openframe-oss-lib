@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.service.delivery.LocalDeliverySink;
+import com.openframe.data.repository.delivery.ProcessedCommandRepository;
 import com.openframe.delivery.dispatch.DeliveryDispatchMessage;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryAudience;
@@ -137,6 +138,11 @@ class DeliveryDispatchListenerWiringTest {
         @Bean
         LocalDeliverySink localDeliverySink() {
             return mock(LocalDeliverySink.class);
+        }
+
+        @Bean
+        ProcessedCommandRepository processedCommandRepository() {
+            return mock(ProcessedCommandRepository.class);
         }
 
         @Bean
