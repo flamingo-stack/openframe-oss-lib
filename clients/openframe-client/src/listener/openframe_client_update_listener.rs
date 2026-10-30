@@ -154,9 +154,12 @@ impl OpenFrameClientUpdateListener {
 
         let version = client_update_message.version.clone();
 
-        if self
-            .client_update_retry_service
-            .remember(&client_update_message)
+        // a redelivery is the same message again, so it must not restart the saved one's schedule
+        let redelivered = message.info().is_ok_and(|info| info.delivered > 1);
+        if (redelivered && self.client_update_retry_service.has_saved_update())
+            || self
+                .client_update_retry_service
+                .remember(&client_update_message)
         {
             // the saved copy is retried locally from here on, so redelivery would only duplicate it
             if let Err(e) = message.ack().await {

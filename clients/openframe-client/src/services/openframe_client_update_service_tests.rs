@@ -114,8 +114,14 @@ async fn a_probe_that_cannot_tell_the_version_lets_the_update_go_ahead() {
 async fn a_probe_that_hangs_lets_the_update_go_ahead() {
     let dir = TempDir::new().unwrap();
     let staged = staged_script(&dir, "exec sleep 60");
+    let started = tokio::time::Instant::now();
 
     OpenFrameClientUpdateService::verify_staged_version(&staged, "1.5.107")
         .await
         .unwrap();
+
+    assert!(
+        started.elapsed() >= Duration::from_secs(STAGED_VERSION_PROBE_TIMEOUT_SECS),
+        "the probe gave up before its timeout, so another path let the update go ahead"
+    );
 }

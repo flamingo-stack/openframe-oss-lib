@@ -131,7 +131,7 @@ async fn an_applicable_change_restarts_and_anything_else_is_done() {
 
 #[cfg(not(target_os = "linux"))]
 #[tokio::test]
-async fn a_client_update_accepted_by_the_delivery_engine_drops_the_saved_broadcast() {
+async fn a_client_update_run_by_the_delivery_engine_drops_the_saved_broadcast() {
     let dir = tempfile::tempdir().unwrap();
     let fixture = crate::test_support::client_update_fixture(&dir);
     let legacy_retry = ClientUpdateRetryService::new(
@@ -159,6 +159,15 @@ async fn a_client_update_accepted_by_the_delivery_engine_drops_the_saved_broadca
     assert!(saved.exists(), "a deferred delivery keeps the saved copy");
     drop(busy);
 
-    assert!(matches!(handler.begin(&command), Begin::Accepted(_)));
+    let Begin::Accepted(guard) = handler.begin(&command) else {
+        panic!("an idle machine accepts the delivery");
+    };
+    assert!(
+        saved.exists(),
+        "accepting alone keeps the saved copy until the delivery is recorded"
+    );
+    handler
+        .run(MACHINE, &delivery(Some(1)), command, guard)
+        .await;
     assert!(!saved.exists());
 }

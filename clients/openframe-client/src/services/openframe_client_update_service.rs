@@ -129,6 +129,10 @@ impl OpenFrameClientUpdateService {
         self.tool_ops.any_busy()
     }
 
+    pub fn update_in_progress(&self) -> bool {
+        self.update_in_progress.load(Ordering::Acquire)
+    }
+
     /// Update processing with version validation and safety checks, under a reserved update slot
     pub async fn apply(
         &self,

@@ -139,6 +139,11 @@ impl ClientUpdateRetryService {
         }
     }
 
+    pub fn has_saved_update(&self) -> bool {
+        let _clock = self.lock();
+        self.load().is_some()
+    }
+
     /// Drops the saved update, if any.
     pub fn discard(&self, reason: &str) {
         let _clock = self.lock();
@@ -188,15 +193,7 @@ impl ClientUpdateRetryService {
         let version = message.version.clone();
         match self.update_service.apply(message, guard).await {
             Ok(UpdateLaunch::Launched) => self.lock().launched_at = Some(Instant::now()),
-            Ok(UpdateLaunch::Skipped) => {
-                let _clock = self.lock();
-                let saved = self.load().map(|pending| pending.message.version);
-                if saved
-                    .is_some_and(|saved| canonical_version(&saved) == canonical_version(&version))
-                {
-                    self.remove("there is nothing to install");
-                }
-            }
+            Ok(UpdateLaunch::Skipped) => self.drop_if_still_saved(&version),
             Err(e) => {
                 warn!(
                     "Client update to {} failed, retrying it later: {:#}",
@@ -205,6 +202,15 @@ impl ClientUpdateRetryService {
                 // the next attempt is at least the first retry delay away
                 self.tool_run_manager.clear_client_update_pending();
             }
+        }
+    }
+
+    /// Drops the saved copy of `version` unless a newer message replaced it while the attempt ran
+    fn drop_if_still_saved(&self, version: &str) {
+        let _clock = self.lock();
+        let saved = self.load().map(|pending| pending.message.version);
+        if saved.is_some_and(|saved| canonical_version(&saved) == canonical_version(version)) {
+            self.remove("there is nothing to install");
         }
     }
 
@@ -260,6 +266,10 @@ impl ClientUpdateRetryService {
             // a busy tool starts the hold, another update in progress does not
             if self.update_service.tools_busy() {
                 clock.busy_since.get_or_insert_with(Instant::now);
+                // past the hold, a tool that started right after the check above must not stay parked behind it
+                if !park_tools && !self.update_service.update_in_progress() {
+                    self.tool_run_manager.clear_client_update_pending();
+                }
             }
             return None;
         };

@@ -159,6 +159,20 @@ async fn an_installed_update_is_dropped_but_a_newer_saved_one_survives() {
 }
 
 #[tokio::test]
+async fn a_skipped_attempt_keeps_a_newer_message_saved_while_it_ran() {
+    let (_dir, _fixture, retry) = setup();
+    assert!(retry.remember(&message("9.9.8")));
+    let (_message, _guard) = retry.begin_due_attempt().expect("a fresh message is due");
+    assert!(retry.remember(&message("9.9.9")));
+
+    retry.drop_if_still_saved("9.9.8");
+    assert_eq!(saved(&retry).message.version, "9.9.9");
+
+    retry.drop_if_still_saved("9.9.9");
+    assert!(retry.load().is_none());
+}
+
+#[tokio::test]
 async fn an_invalid_version_is_not_saved() {
     let (_dir, _fixture, retry) = setup();
 
@@ -252,9 +266,12 @@ async fn busy_tools_are_parked_for_20_minutes_then_waited_for_without_parking() 
 #[tokio::test]
 async fn discard_drops_the_saved_update() {
     let (_dir, _fixture, retry) = setup();
+    assert!(!retry.has_saved_update());
     assert!(retry.remember(&message("9.9.9")));
+    assert!(retry.has_saved_update());
 
     retry.discard("test");
 
     assert!(retry.load().is_none());
+    assert!(!retry.has_saved_update());
 }

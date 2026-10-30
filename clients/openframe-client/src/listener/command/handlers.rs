@@ -206,12 +206,7 @@ impl CommandHandler for ClientUpdateHandler {
 
     fn begin(&self, command: &Self::Command) -> Begin<UpdateGuard> {
         match self.service.reserve(command) {
-            Ok(guard) => {
-                // the backend re-runs a failed delivery itself, a saved broadcast would only compete with it
-                self.legacy_retry
-                    .discard("the delivery engine took the client update over");
-                Begin::Accepted(guard)
-            }
+            Ok(guard) => Begin::Accepted(guard),
             Err(e) => Begin::Busy(format!("{e:#}")),
         }
     }
@@ -223,6 +218,9 @@ impl CommandHandler for ClientUpdateHandler {
         command: Self::Command,
         guard: UpdateGuard,
     ) -> Outcome {
+        // the backend re-runs a failed delivery itself, a saved broadcast would only compete with it
+        self.legacy_retry
+            .discard("the delivery engine took the client update over");
         match self.service.apply(command, guard).await {
             Ok(UpdateLaunch::Launched) => Outcome::Restarting,
             Ok(UpdateLaunch::Skipped) => Outcome::Done,
