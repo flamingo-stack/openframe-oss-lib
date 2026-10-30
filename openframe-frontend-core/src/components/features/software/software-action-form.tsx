@@ -9,6 +9,11 @@ import { SoftwareScheduleFields, type SoftwareScheduleTiming } from './schedule-
 import { SOFTWARE_ACTION_COPY, type SoftwareActionKind } from './software-action-copy';
 import { newSoftwareRow, type SoftwareRow } from './software-row';
 import { type PackageSearchSlotProps, SoftwareRowFields } from './software-row-fields';
+import {
+  DEFAULT_SOFTWARE_UPDATE_SETTINGS,
+  SoftwareUpdateSettingsFields,
+  type SoftwareUpdateSettingsValues,
+} from './update-settings-fields';
 
 /** Run the packages now, or at a scheduled start. */
 export type SoftwareRunMode = 'now' | 'schedule';
@@ -20,6 +25,8 @@ export interface SoftwareActionFormValues<TRef extends string = string> {
   date: Date | null;
   time: string;
   timeReference: TRef;
+  /** UPDATE only: "Update Settings". Undefined for INSTALL, and when the form hides them (`showUpdateSettings`). */
+  updateSettings?: SoftwareUpdateSettingsValues;
 }
 
 /** What the device picker slot is told: which devices the chosen packages can run on. */
@@ -62,6 +69,11 @@ export interface SoftwareActionFormProps<TRef extends string = string> {
    * schedule's fields on the same row, so the devices start higher.
    */
   runModeLayout?: 'stacked' | 'inline';
+  /**
+   * UPDATE only: the "Update Settings" block under the timing. Default true; a picture of the form that has to
+   * reach the devices passes false, and the values then carry no `updateSettings`.
+   */
+  showUpdateSettings?: boolean;
   /** The "Device Selection" heading over the picker. Default true; a host that titles the picker itself passes false. */
   showDeviceHeading?: boolean;
   className?: string;
@@ -91,6 +103,7 @@ export function SoftwareActionForm<TRef extends string = string>({
   renderDevicePicker,
   addRows = true,
   runModeLayout = 'stacked',
+  showUpdateSettings = true,
   showDeviceHeading = true,
   className = 'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
 }: SoftwareActionFormProps<TRef>) {
@@ -101,6 +114,10 @@ export function SoftwareActionForm<TRef extends string = string>({
   const [date, setDate] = useState<Date | null>(initialValues.date ?? null);
   const [time, setTime] = useState(initialValues.time ?? '');
   const [timeReference, setTimeReference] = useState<TRef>(initialValues.timeReference);
+  const [updateSettings, setUpdateSettings] = useState<SoftwareUpdateSettingsValues>(
+    () => initialValues.updateSettings ?? DEFAULT_SOFTWARE_UPDATE_SETTINGS,
+  );
+  const withUpdateSettings = action === 'UPDATE' && showUpdateSettings;
 
   // The picker's frame: devices on the OS the chosen packages install on.
   const osTypesKey = [...new Set(rows.map(row => PACKAGE_MANAGER_OS[row.packageManager]))].sort().join(',');
@@ -110,7 +127,15 @@ export function SoftwareActionForm<TRef extends string = string>({
     {
       label: mode === 'now' ? copy.runLabel : copy.scheduleLabel,
       variant: 'accent',
-      onClick: () => onSubmit({ rows, mode, date, time, timeReference }),
+      onClick: () =>
+        onSubmit({
+          rows,
+          mode,
+          date,
+          time,
+          timeReference,
+          updateSettings: withUpdateSettings ? updateSettings : undefined,
+        }),
       disabled: submitDisabled,
       loading: submitting,
     },
@@ -189,6 +214,8 @@ export function SoftwareActionForm<TRef extends string = string>({
           {scheduleFields}
         </>
       )}
+
+      {withUpdateSettings && <SoftwareUpdateSettingsFields value={updateSettings} onChange={setUpdateSettings} />}
 
       {showDeviceHeading && (
         <h2 className="pt-[var(--spacing-system-l)] text-ods-text-primary text-h2">Device Selection</h2>

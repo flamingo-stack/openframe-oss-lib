@@ -1,6 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { PackageSearchFieldPlaceholder, SoftwareActionForm } from '../components/features/software';
-import { SOFTWARE_UPDATE_FIXTURE } from '../components/product-demo/fixtures/software-update';
+import { useState } from 'react';
+import {
+  DEFAULT_SOFTWARE_UPDATE_SETTINGS,
+  PackageSearchFieldPlaceholder,
+  SoftwareActionForm,
+  SoftwareUpdateSettingsFields,
+  type SoftwareUpdateSettingsValues,
+} from '../components/features/software';
+import { SOFTWARE_DEMO_TIMING } from '../components/product-demo/fixtures/software-update';
 import SoftwareUpdateScreen from '../components/product-demo/screens/software-update';
 
 const meta: Meta<typeof SoftwareActionForm> = {
@@ -38,9 +45,29 @@ export const EmptyInstall: Story = {
     onBack: () => {},
     onSubmit: () => {},
     submitDisabled: true,
-    timing: SOFTWARE_UPDATE_FIXTURE.timing,
+    timing: SOFTWARE_DEMO_TIMING,
     initialValues: { timeReference: 'SERVER' },
     renderPackageSearch: () => <PackageSearchFieldPlaceholder />,
     renderDevicePicker: () => <p className="text-ods-text-secondary text-h4">The host's device picker goes here.</p>,
+  },
+};
+
+/** Update Software as it opens: "Update Settings" with the server's defaults between the timing and the devices. */
+export const EmptyUpdate: Story = {
+  args: { ...EmptyInstall.args, action: 'UPDATE' },
+};
+
+/** "Update Settings" on its own, auto-updates set separately (design 1034:8173). */
+export const UpdateSettingsSeparateAutoUpdate: Story = {
+  render: () => {
+    const [value, setValue] = useState<SoftwareUpdateSettingsValues>({
+      ...DEFAULT_SOFTWARE_UPDATE_SETTINGS,
+      sameForAutoUpdate: false,
+    });
+    return (
+      <div className="p-[var(--spacing-system-l)]">
+        <SoftwareUpdateSettingsFields value={value} onChange={setValue} />
+      </div>
+    );
   },
 };
