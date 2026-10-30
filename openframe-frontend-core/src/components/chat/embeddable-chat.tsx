@@ -114,7 +114,7 @@ import type {
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { chatChipClass } from './utils/chip-styles';
-import { FALLBACK_TOP_RETRIEVED, splitCitedSources } from './utils/cited-sources';
+import { FALLBACK_TOP_RETRIEVED, groupedRowLabels, splitCitedSources } from './utils/cited-sources';
 import { flattenAssistantContent } from './utils/flatten-assistant-content';
 import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
@@ -757,7 +757,11 @@ function SourceChip(props: {
 
   // Grouped source — hover/click reveals a dropdown with Open + Ask per row.
   if (src.items && src.items.length > 0) {
-    const dropdownItems: HoverDropdownItem[] = src.items.map(item => {
+    // A server-grouped chip answers to one number; a client-built one answers
+    // to every number its rows were cited by.
+    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
+    const rowLabels = groupedRowLabels(src.items);
+    const dropdownItems: HoverDropdownItem[] = src.items.map((item, i) => {
       const itemCta = resolveSourceRowCTA(
         {
           sourceRepo: src.sourceRepo,
@@ -777,9 +781,7 @@ function SourceChip(props: {
       // value is what keeps the handler assertion-free.
       const itemChatRef = itemCta.chatRef;
       return {
-        // A client-built group keeps each row's own citation number, so the
-        // `[3]` in the answer is findable inside the dropdown.
-        label: item.index === undefined ? item.name : `[${item.index}] ${item.name}`,
+        label: rowLabels[i],
         icon: <ItemIcon className="h-3.5 w-3.5" />,
         href: itemCta.href ?? undefined,
         targetPlatform: itemCta.targetPlatform,
@@ -795,9 +797,6 @@ function SourceChip(props: {
       };
     });
 
-    // A server-grouped chip answers to one number; a client-built one answers
-    // to every number its rows were cited by.
-    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
     const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
 
     return (
