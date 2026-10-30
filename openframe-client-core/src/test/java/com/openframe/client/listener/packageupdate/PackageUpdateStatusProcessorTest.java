@@ -48,6 +48,7 @@ class PackageUpdateStatusProcessorTest {
     @Mock private PackageUpdateExecutionRecorder executionRecorder;
     @Mock private DeliveryDispatcher deliveryDispatcher;
     @Mock private DeliveryTracker deliveryTracker;
+    @Mock private PackageAutoUpdateRetry autoUpdateRetry;
 
     @Captor private ArgumentCaptor<PackageUpdateDeliverySeed> seedCaptor;
 
@@ -325,6 +326,77 @@ class PackageUpdateStatusProcessorTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verify(deviceStateRepository, never()).save(any());
+    }
+
+    @Test
+    void failedStatus_retryDecidedBeforeTheStateIsSaved() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT));
+
+        InOrder order = inOrder(autoUpdateRetry, deviceStateRepository);
+        order.verify(autoUpdateRetry).scheduleIfDue(st, req);
+        order.verify(deviceStateRepository).save(st);
+    }
+
+    @Test
+    void schedulingTheRetryFails_stateIsNotSaved_soTheRedeliveryDecidesAgain() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+        doThrow(new IllegalStateException("mongo down")).when(autoUpdateRetry).scheduleIfDue(st, req);
+
+        assertThatThrownBy(() -> processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(deviceStateRepository, never()).save(any());
+    }
+
+    @Test
+    void undelivered_retryDecidedBeforeTheStateIsSaved() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.EXHAUSTED);
+
+        InOrder order = inOrder(autoUpdateRetry, deviceStateRepository);
+        order.verify(autoUpdateRetry).scheduleIfDue(st, req);
+        order.verify(deviceStateRepository).save(st);
+    }
+
+    @Test
+    void undelivered_deviceAlreadyReported_noRetry() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.FAILED);
+        st.setLastEventId("e1");
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.EXHAUSTED);
+
+        verifyNoInteractions(autoUpdateRetry);
+    }
+
+    @Test
+    void undelivered_movesUpdatedAt() {
+        machineResolves();
+        Instant before = Instant.parse("2026-10-30T10:00:00Z");
+        PackageUpdateDeviceState state = PackageUpdateDeviceState.builder()
+                .tenantId("t1").requestId("req-1").machineId("m1").status(SoftwareActionStatus.SCHEDULED).updatedAt(before)
+                .build();
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(state));
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.EXHAUSTED);
+
+        assertThat(state.getUpdatedAt()).isAfter(before);
     }
 
     @Test

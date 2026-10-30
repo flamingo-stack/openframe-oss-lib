@@ -4,6 +4,7 @@ import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.data.document.rmm.software.PackageAutoUpdatePolicy;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.nats.packageupdate.PackageAutoUpdateRetryWithdrawal;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
@@ -30,9 +31,14 @@ public class SoftwareAutoUpdateService {
 
     private final PackageAutoUpdatePolicyRepository policyRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final PackageAutoUpdateRetryWithdrawal retryWithdrawal;
 
     public void turnOff(String softwareId, String actor) {
-        long turnedOff = policyRepository.disableBySoftwareId(tenantIdProvider.getTenantId(), softwareId, actor);
+        String tenantId = tenantIdProvider.getTenantId();
+        long turnedOff = policyRepository.disableBySoftwareId(tenantId, softwareId, actor);
+        // read after the update: from here on a failed device schedules no retry, so none can slip past this
+        policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, List.of(softwareId))
+                .forEach(policy -> retryWithdrawal.withdraw(policy, "auto-update turned off"));
         log.info("Auto-update turned off softwareId={} policies={} actor={}", softwareId, turnedOff, actor);
     }
 
