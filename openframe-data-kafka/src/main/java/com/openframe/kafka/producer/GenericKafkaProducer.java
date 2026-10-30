@@ -2,6 +2,7 @@ package com.openframe.kafka.producer;
 
 import com.openframe.kafka.exception.NonRetryableKafkaException;
 import com.openframe.kafka.exception.TransientKafkaSendException;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.errors.AuthorizationException;
 import org.apache.kafka.common.errors.InvalidTopicException;
@@ -28,6 +29,7 @@ public abstract class GenericKafkaProducer {
 
     private static final int MAX_PAYLOAD_LOG_LEN = 500;
 
+    @Getter
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     protected GenericKafkaProducer(KafkaTemplate<String, Object> kafkaTemplate) {
