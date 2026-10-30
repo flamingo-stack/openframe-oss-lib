@@ -19,8 +19,7 @@ pub fn get_console_user() -> Option<ConsoleUser> {
 
     let username = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    // Filter out: empty, root, and system users (start with _)
-    if username.is_empty() || username == "root" || username.starts_with('_') {
+    if !is_login_user(&username) {
         warn!("No regular user at console (got: '{}')", username);
         return None;
     }
@@ -37,6 +36,16 @@ pub fn get_console_user() -> Option<ConsoleUser> {
 
     info!("Console user: {} (UID: {})", username, uid);
     Some(ConsoleUser { username, uid })
+}
+
+/// The console owner is root at the login window and a `_` system account during Setup Assistant.
+pub(crate) fn is_login_user(user: &str) -> bool {
+    !user.is_empty() && user != "root" && !user.starts_with('_')
+}
+
+/// The console user; a Mac has one GUI session, so the process's session tells nothing more.
+pub(crate) fn session_user(_session: Option<u32>) -> Option<String> {
+    get_console_user().map(|user| user.username)
 }
 
 pub async fn launch_as_user(
