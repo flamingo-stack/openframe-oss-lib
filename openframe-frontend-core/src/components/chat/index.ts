@@ -75,6 +75,8 @@ export {
   type NavLinkAnchorViaRuntimeProps,
   type NavLinkViaRuntimeInput,
   type NavLinkViaRuntimeProps,
+  type NavigateViaRuntimeInput,
+  useNavigateViaRuntime,
   useNavLinkViaRuntime,
 } from './nav-link-anchor-via-runtime';
 export { SourceActionButton, type SourceActionButtonProps, type SourceActionDensity } from './source-action-button';
@@ -151,4 +153,4 @@ export {
 } from './utils/ask-ai-events';
 export { chatDayLabel } from './utils/chat-day-label';
 export * from './proxy-credentials-panel';
-export { InlineAppLinkChip, InlineChip } from './inline-app-link-chip';
+export { InlineChip } from './inline-chip';

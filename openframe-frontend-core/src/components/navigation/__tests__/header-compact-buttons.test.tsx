@@ -133,15 +133,13 @@ describe('TimeTrackerHeaderButton variant="compact"', () => {
 });
 
 describe('TicketAlertsButton variant="compact"', () => {
-  it('is the compact cell with a 20px glyph and the count pill, routing to the newest unread ticket', () => {
-    const onNavigate = vi.fn();
-    render(<TicketAlertsButton variant="compact" href="/help-center/tickets" onNavigate={onNavigate} />);
+  // Its click goes through the host's navigation, as the cell's does (`navigation-surfaces.test.tsx`).
+  it('is the compact cell with a 20px glyph and the count pill', () => {
+    render(<TicketAlertsButton variant="compact" href="/help-center/tickets" />);
     const button = screen.getByRole('button', { name: /Support tickets/ });
     expectCompactBox(button);
     glyphIs20px(button);
     expect(button).toHaveTextContent('3');
-    fireEvent.click(button);
-    expect(onNavigate).toHaveBeenCalledWith(expect.stringContaining('t-9'));
   });
 
   it('still renders nothing with nothing unread', () => {

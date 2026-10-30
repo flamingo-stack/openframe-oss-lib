@@ -3,7 +3,7 @@
 /**
  * EmbeddableChat — lib-portable port of the hub's `<GlobalAskAI>` component.
  *
- * Drops every hub-only import (auth-provider, useNavLink, currentPlatform,
+ * Drops every hub-only import (auth-provider, useNavLinkViaRuntime, currentPlatform,
  * tableIdForDocumentType, rag-table-config, etc.) and routes ALL navigation
  * + identity decisions through `useRequiredChatRuntime()`. Host wires the
  * runtime once at root (HubRuntimeProvider in the hub, custom provider in
@@ -13,8 +13,8 @@
  *   - `useAuth()` → `useRequiredChatRuntime().user` (greeting + identity only;
  *     the requireAuth render gate is dropped — hub's wrapper handles it).
  *   - `currentPlatform()` → `useRequiredChatRuntime().source`.
- *   - `useNavLink`/`NavLinkAnchor` → chip-anchor rewrite via
- *     `handleChatNavClick` + lib's `NavLinkAnchorViaRuntime`.
+ *   - `useNavLinkViaRuntime`/`NavLinkAnchor` → chip-anchor rewrite via
+ *     `executeNavigation` + lib's `NavLinkAnchorViaRuntime`.
  *   - `useDocChat(source)` → `useSseChatAdapter()` (reads source from runtime).
  *   - `tableIdForDocumentType` import deleted (dead per audit).
  *   - `renderChatInlineEntityCard` imported from lib's entity-cards barrel.
@@ -43,8 +43,6 @@ import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, us
 import { createPortal } from 'react-dom';
 import { chatProgressLabel } from '../../chat-protocol/progress';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
-import Link from '../../embed-shims/next-link';
-import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
 import { formatCitationIndices } from '../../utils/source-grouping';
@@ -66,7 +64,7 @@ import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
 import { TextHold } from '../ui/layout-hold';
-import { LoadingItems } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps } from '../ui/loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container';
 import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -118,14 +116,11 @@ import type {
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { chatDayLabel } from './utils/chat-day-label';
-import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
-import { FALLBACK_TOP_RETRIEVED, splitCitedSources } from './utils/cited-sources';
-import { executeNavigation } from './utils/execute-navigation';
+import { FALLBACK_TOP_RETRIEVED, groupedRowLabels, splitCitedSources } from './utils/cited-sources';
 import { flattenAssistantContent } from './utils/flatten-assistant-content';
 import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
-import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
 
@@ -172,14 +167,10 @@ const drawerDefaultWidthWithoutRail = (viewportWidth: number) => drawerDefaultWi
 // =============================================================================
 
 export interface EmbeddableChatProps {
-  /** Base route for in-app doc chip nav (e.g. `/knowledge-base`). When
-   *  omitted, defaults are derived from `runtime.source`. */
-  baseRoute?: string;
-  /** When the embedder doesn't host a `[...path]` route to render markdown
-   *  chips against, set this to a platform that does. Chips with
-   *  `externalUrl: null` resolve to `getPlatformUrl(chipBasePlatform) +
-   *  '/knowledge-base/' + path` and open in a new tab. */
-  chipBasePlatform?: string;
+  /** How many source chips the strip under an answer draws while the answer is written (default 1). `0` draws no
+   *  strip until the answer ends: for a host whose answers rarely cite sources, where a strip that appears and then
+   *  goes away would move the thread. */
+  sourceSkeletonCount?: number;
   /** DB-driven list of enabled RAG table ids (chip catalog filter).
    *  Prefetched server-side by the embedder's wrapper. Empty/null → no
    *  empty-state chips render. */
@@ -821,21 +812,18 @@ function dispatchSlashCommandAction(
 /** A no-break space: one line of the chip's text, so a bar that holds it is exactly one text line tall. */
 const ONE_TEXT_LINE = '\u00a0';
 
-/** How many chips the strip's loading form draws: the count real answers' strips showed (measured). Drawn at every
- *  width: a chip past the row's end is cut. */
-const SOURCE_CHIP_SKELETON_COUNT = 2;
+/** How many chips the strip's loading form draws by default, at every width: one, the row a phone shows a strip's
+ *  first chip in (a strip has no page size, so its loading form draws a typical count, and the strip is one row either
+ *  way). An embedder sets its own with `sourceSkeletonCount`. */
+const SOURCE_CHIP_SKELETON_COUNT = 1;
 
 /**
  * A source chip's loading form, built like the chip (`wrapChip` around `chipBody`): the chip's frame, its icon,
  * its title as a bar one text line tall (so the chip is the loaded chip's height), and the Ask slot beside it.
  */
-function SourceChipSkeleton({ className }: { className?: string }) {
+function SourceChipSkeleton(props: { 'data-loading-item'?: boolean }) {
   return (
-    <span
-      aria-hidden
-      data-loading-item
-      className={cn('pointer-events-none inline-flex shrink-0 items-center', className)}
-    >
+    <span aria-hidden className="pointer-events-none inline-flex shrink-0 items-center" {...loadingItemProps(props)}>
       <span className={chatChipClass({ tone: 'secondary' })}>
         <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3.5 w-3.5 rounded-sm')} />
         <span className={cn(SKELETON_SURFACE_CLASS, 'w-28 rounded-sm')}>{ONE_TEXT_LINE}</span>
@@ -845,21 +833,15 @@ function SourceChipSkeleton({ className }: { className?: string }) {
   );
 }
 
-function SourceChip({
-  src,
-  baseRoute,
-  chipBasePlatform,
-  onClose,
-  onDiscuss,
-}: {
+function SourceChip(props: {
   src: ChatSource;
-  baseRoute: string;
-  chipBasePlatform?: string;
-  onClose: () => void;
   onDiscuss?: (ref: ChatRef) => void;
+  /** The strip's list-item marker, carried by the chip's frame like its loading form's. */
+  'data-loading-item'?: boolean;
 }) {
+  const { src, onDiscuss } = props;
+  const marks = loadingItemProps(props);
   const runtime = useRequiredChatRuntime();
-  const router = useRouter();
   // Single CTA resolver — same icon, same href chain, same ChatRef
   // synthesis the inline card and search-result paths use.
   const cta = resolveSourceRowCTA(
@@ -872,20 +854,19 @@ function SourceChip({
       targetPlatform: src.targetPlatform ?? null,
       path: src.path,
     },
-    sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
+    sourceRowCtxFromRuntime(runtime),
   );
   const Icon = cta.icon;
   const icon = <Icon className="h-3.5 w-3.5" />;
   const chipClass = chatChipClass({ tone: 'secondary' });
 
-  // Single source for the new-tab decision — same `computeIsNewTab` the
-  // inline cards consume via `ChatCardLoader`.
-  const decideTab = (href: string | null, targetPlatform: string | null) =>
-    computeIsNewTab(runtime, href, targetPlatform);
-
   // Grouped source — hover/click reveals a dropdown with Open + Ask per row.
   if (src.items && src.items.length > 0) {
-    const dropdownItems: HoverDropdownItem[] = src.items.map(item => {
+    // A server-grouped chip answers to one number; a client-built one answers
+    // to every number its rows were cited by.
+    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
+    const rowLabels = groupedRowLabels(src.items);
+    const dropdownItems: HoverDropdownItem[] = src.items.map((item, i) => {
       const itemCta = resolveSourceRowCTA(
         {
           sourceRepo: src.sourceRepo,
@@ -896,7 +877,7 @@ function SourceChip({
           targetPlatform: item.targetPlatform ?? null,
           path: item.path,
         },
-        sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
+        sourceRowCtxFromRuntime(runtime),
       );
       const ItemIcon = itemCta.icon;
       // Read out of the CTA before the `onClick` closure below is built: a
@@ -905,9 +886,7 @@ function SourceChip({
       // value is what keeps the handler assertion-free.
       const itemChatRef = itemCta.chatRef;
       return {
-        // A client-built group keeps each row's own citation number, so the
-        // `[3]` in the answer is findable inside the dropdown.
-        label: item.index === undefined ? item.name : `[${item.index}] ${item.name}`,
+        label: rowLabels[i],
         icon: <ItemIcon className="h-3.5 w-3.5" />,
         href: itemCta.href ?? undefined,
         targetPlatform: itemCta.targetPlatform,
@@ -923,32 +902,31 @@ function SourceChip({
       };
     });
 
-    // A server-grouped chip answers to one number; a client-built one answers
-    // to every number its rows were cited by.
-    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
     const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
 
     return (
-      <HoverDropdown
-        items={dropdownItems}
-        renderAnchor={({ href, targetPlatform, path, className, children }) => (
-          <NavLinkAnchorViaRuntime
-            href={href}
-            targetPlatform={targetPlatform ?? null}
-            path={path}
-            className={className}
-          >
-            {children}
-          </NavLinkAnchorViaRuntime>
-        )}
-      >
-        <span className={`${chipClass} cursor-pointer`}>
-          {icon}
-          <span className="max-w-[160px] truncate">
-            [{groupIndices}] {src.name}
+      <span className="inline-flex" {...marks}>
+        <HoverDropdown
+          items={dropdownItems}
+          renderAnchor={({ href, targetPlatform, path, className, children }) => (
+            <NavLinkAnchorViaRuntime
+              href={href}
+              targetPlatform={targetPlatform ?? null}
+              path={path}
+              className={className}
+            >
+              {children}
+            </NavLinkAnchorViaRuntime>
+          )}
+        >
+          <span className={`${chipClass} cursor-pointer`}>
+            {icon}
+            <span className="max-w-[160px] truncate">
+              [{groupIndices}] {src.name}
+            </span>
           </span>
-        </span>
-      </HoverDropdown>
+        </HoverDropdown>
+      </span>
     );
   }
 
@@ -964,63 +942,26 @@ function SourceChip({
     </>
   );
   const wrapChip = (clickable: React.ReactNode) => (
-    <span className="inline-flex items-center">
+    <span className="inline-flex items-center" {...marks}>
       {clickable}
       <SourceActionButton chatRef={cta.chatRef} onDiscuss={onDiscuss} density="inline" className="-mr-1 ml-1" />
     </span>
   );
 
-  // Click handler that routes through chat-runtime AND closes the chat
-  // panel ONLY on same-tab navigation. New-tab clicks leave the chat
-  // open so the user keeps their context while reading the new tab.
-  // Modifier-clicks pass through to the browser's native behavior.
-  // Single close model: matches `ChatCardNavWrap` for inline cards.
-  const buildClickHandler =
-    (href: string, path: string | null | undefined, targetPlatform: string | null, isNewTab: boolean) =>
-    (e: React.MouseEvent<HTMLAnchorElement>) => {
-      const handled = executeNavigation({
-        event: e,
-        runtime,
-        href,
-        path,
-        targetPlatform,
-        fallbackNavigate: router.push,
-      });
-      if (handled && !isNewTab && onClose) onClose();
-    };
-
-  // Entity chip with a resolved external URL. `resolveHrefForRuntime`
-  // applies embed-mode origin prefix so modifier-click / hover-preview
-  // / right-click "copy link" all land on the hub origin.
-  if (cta.href && !!src.externalUrl) {
-    const resolvedHref = resolveHrefForRuntime(cta.href, runtime);
-    const isNewTab = decideTab(resolvedHref, cta.targetPlatform ?? null);
-    return wrapChip(
-      <Link
-        href={resolvedHref}
-        {...newTabAnchorAttrs(isNewTab)}
-        onClick={buildClickHandler(resolvedHref, null, cta.targetPlatform ?? null, isNewTab)}
-        className={chipClass}
-      >
-        {chipBody(src.name)}
-      </Link>,
-    );
-  }
-
-  // In-app navigable doc (markdown / data-room PDF).
+  // A chip that opens something is THE chat link (`NavLinkAnchorViaRuntime`): the one navigation decision, the one
+  // click executor, and the panel closing on a same-tab navigation, exactly as markdown links and cards.
   if (cta.href) {
-    const resolvedHref = resolveHrefForRuntime(cta.href, runtime);
-    const isNewTab = decideTab(resolvedHref, cta.targetPlatform ?? null);
+    const isEntity = !!src.externalUrl;
     return wrapChip(
-      <Link
-        href={resolvedHref}
-        {...newTabAnchorAttrs(isNewTab)}
-        onClick={buildClickHandler(resolvedHref, src.path, cta.targetPlatform ?? null, isNewTab)}
+      <NavLinkAnchorViaRuntime
+        href={cta.href}
+        path={isEntity ? null : src.path}
+        targetPlatform={cta.targetPlatform ?? null}
         className={chipClass}
-        title={displayName}
+        title={isEntity ? undefined : displayName}
       >
-        {chipBody(displayName)}
-      </Link>,
+        {chipBody(isEntity ? src.name : displayName)}
+      </NavLinkAnchorViaRuntime>,
     );
   }
 
@@ -1039,21 +980,18 @@ function SourceChip({
 function SourceChips({
   cited,
   uncited,
-  baseRoute,
-  chipBasePlatform,
-  onClose,
   onDiscuss,
   loading,
+  skeletonCount,
 }: {
   cited: ChatSource[];
   uncited: ChatSource[];
-  baseRoute: string;
-  chipBasePlatform?: string;
-  onClose: () => void;
   onDiscuss?: (ref: ChatRef) => void;
   /** The answer is still being written: the strip's frame, heading and a row of chips in their loading form, so
    *  the strip does not appear under the answer when it finishes. */
   loading?: boolean;
+  /** How many chips the loading form draws (`EmbeddableChatProps.sourceSkeletonCount`). */
+  skeletonCount: number;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -1066,9 +1004,7 @@ function SourceChips({
         {/* One row at every width: a chip that does not fit is cut, never wrapped or hidden (a strip's chips fit one
             row in the answers measured, and a wrapped skeleton shrinks when the answer ends). */}
         <div className="flex flex-nowrap gap-1.5 overflow-hidden">
-          {Array.from({ length: SOURCE_CHIP_SKELETON_COUNT }, (_, i) => (
-            <SourceChipSkeleton key={i} />
-          ))}
+          <LoadingItems count={skeletonCount}>{() => <SourceChipSkeleton data-loading-item />}</LoadingItems>
         </div>
       </div>
     );
@@ -1082,14 +1018,7 @@ function SourceChips({
         <span className="uppercase text-ods-text-muted text-h6">Top retrieved sources</span>
         <div className="flex flex-wrap gap-1.5">
           {fallback.map(src => (
-            <SourceChip
-              key={src.index}
-              src={src}
-              baseRoute={baseRoute}
-              chipBasePlatform={chipBasePlatform}
-              onClose={onClose}
-              onDiscuss={onDiscuss}
-            />
+            <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
           ))}
         </div>
       </div>
@@ -1104,28 +1033,10 @@ function SourceChips({
       <span className="uppercase text-ods-text-muted text-h6">Sources</span>
       <div className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}>
         {cited.map(src => (
-          // The loaded list beside the loading form's: each chip an item of it (`contents`: no box of its own).
-          <span key={src.index} data-loading-item className="contents">
-            <SourceChip
-              src={src}
-              baseRoute={baseRoute}
-              chipBasePlatform={chipBasePlatform}
-              onClose={onClose}
-              onDiscuss={onDiscuss}
-            />
-          </span>
+          <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
         ))}
         {expanded &&
-          uncited.map(src => (
-            <SourceChip
-              key={src.index}
-              src={src}
-              baseRoute={baseRoute}
-              chipBasePlatform={chipBasePlatform}
-              onClose={onClose}
-              onDiscuss={onDiscuss}
-            />
-          ))}
+          uncited.map(src => <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />)}
         {hasOverflow && (
           <Button
             variant="link"
@@ -1206,8 +1117,7 @@ export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableC
 EmbeddableChat.displayName = 'EmbeddableChat';
 
 function EmbeddableChatInner({
-  baseRoute,
-  chipBasePlatform,
+  sourceSkeletonCount = SOURCE_CHIP_SKELETON_COUNT,
   enabledRagTableIds = null,
   emptyStateGreeting = null,
   suggestedQueries = null,
@@ -1827,15 +1737,6 @@ function EmbeddableChatInner({
   // forwards it verbatim to the message list and calls it from the `mention://`
   // override; the host returns a self-fetching chip.
 
-  // Resolve base route. Hub default mapping: flamingo → /knowledge-base,
-  // anything else → /data-room. Embedders override per platform. An embedder that
-  // doesn't host an in-app doc viewer should NOT pass an empty baseRoute (that just
-  // falls back to the platform default here) — instead it sets a truthy baseRoute +
-  // `chipBasePlatform` so doc chips with no externalUrl resolve cross-platform to that
-  // platform's public knowledge hub (`getPlatformUrl(chipBasePlatform)/knowledge-base/…`),
-  // exactly like the hub's openframe config (baseRoute:'/', chipBasePlatform:'openframe').
-  const resolvedBaseRoute = baseRoute || (source === 'flamingo' ? '/knowledge-base' : '/data-room');
-
   const handleClose = useCallback(() => setIsOpen(false), [setIsOpen]);
   // What the header close controls call; absent on a panel that cannot close.
   const closeControl = closable ? handleClose : undefined;
@@ -1881,11 +1782,9 @@ function EmbeddableChatInner({
       renderChatInlineEntityCard(reference, {
         onDiscuss: askAbout,
         onDisplay: displayRef,
-        baseRoute: resolvedBaseRoute,
-        chipBasePlatform,
         extras,
       }),
-    [askAbout, displayRef, resolvedBaseRoute, chipBasePlatform, extras],
+    [askAbout, displayRef, extras],
   );
 
   // Stable assistant-icon element. `<ChatMessageList>` forwards this prop to
@@ -2283,16 +2182,10 @@ function EmbeddableChatInner({
       // for the duration of an unrelated turn.
       // Its strip is drawn in its loading form meanwhile, so the strip is already there when the answer ends.
       if (chatLoading && index === messages.length - 1) {
+        if (sourceSkeletonCount <= 0) return null;
         return (
           <div className="pb-2">
-            <SourceChips
-              loading
-              cited={[]}
-              uncited={[]}
-              baseRoute={resolvedBaseRoute}
-              chipBasePlatform={chipBasePlatform}
-              onClose={handleNavigationClose}
-            />
+            <SourceChips loading skeletonCount={sourceSkeletonCount} cited={[]} uncited={[]} />
           </div>
         );
       }
@@ -2300,18 +2193,11 @@ function EmbeddableChatInner({
       if (cited.length === 0 && uncited.length === 0) return null;
       return (
         <div className="pb-2">
-          <SourceChips
-            cited={cited}
-            uncited={uncited}
-            baseRoute={resolvedBaseRoute}
-            chipBasePlatform={chipBasePlatform}
-            onClose={handleNavigationClose}
-            onDiscuss={askAbout}
-          />
+          <SourceChips cited={cited} uncited={uncited} onDiscuss={askAbout} skeletonCount={sourceSkeletonCount} />
         </div>
       );
     },
-    [chatLoading, messages.length, resolvedBaseRoute, chipBasePlatform, handleNavigationClose, askAbout],
+    [chatLoading, messages.length, askAbout, sourceSkeletonCount],
   );
 
   // Host node for in-panel Radix portals (see the body wrapper below).

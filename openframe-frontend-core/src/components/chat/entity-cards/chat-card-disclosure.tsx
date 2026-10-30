@@ -145,23 +145,20 @@ export function ChatCardDisclosureButton({
   const Icon = spec.icon;
   return (
     <FooterAction
-      // The closed label: what a card that can carry this content shows while it loads.
-      label={loading ? spec.label : label}
-      loading={loading}
-      leftIcon={<Icon className="!h-3 !w-3" />}
-      rightIcon={<ExpandChevron expanded={open} className="!h-3 !w-3" />}
+      label={label}
+      icon={<Icon className="!h-3 !w-3" />}
+      trailingIcon={<ExpandChevron expanded={open} className="!h-3 !w-3" />}
       onClick={(e: React.MouseEvent) => {
         // The card around it is a link: the action must not follow it.
         e.preventDefault();
         e.stopPropagation();
         onToggle?.();
       }}
-      aria-expanded={open}
-      aria-label={title ? `${label}: ${title}` : label}
+      ariaExpanded={open}
+      ariaLabel={title ? `${label}: ${title}` : label}
       className={CARD_FOOTER_ACTION_CLASS}
-    >
-      {label}
-    </FooterAction>
+      loading={loading}
+    />
   );
 }
 

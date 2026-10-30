@@ -21,7 +21,7 @@
 import { MessageSquare, FileText } from 'lucide-react';
 import type React from 'react';
 import { cn } from '../../utils/cn';
-import { Button, type ButtonProps } from '../ui/button';
+import { Button } from '../ui/button';
 import { TextHold } from '../ui/layout-hold';
 import { useLoadingScope } from '../ui/loading-scope';
 import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
@@ -88,59 +88,68 @@ const DENSITY_STYLES: Record<
 };
 
 /**
- * A footer action's loading form: the real button, inert and unread, with its icon and label drawn as skeleton
- * bars, so the box is exactly the loaded action's (same paddings, same line height, same label width).
- */
-export function FooterActionSkeleton({
-  label,
-  className,
-  showLabel = true,
-  size = 'small',
-}: {
-  label: string;
-  className: string;
-  showLabel?: boolean;
-  size?: 'small' | 'icon';
-}): React.ReactElement {
-  const icon = <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3 w-3 rounded-sm')} />;
-  return (
-    <span aria-hidden inert className="contents">
-      <Button
-        variant="transparent"
-        size={size}
-        tabIndex={-1}
-        leftIcon={showLabel ? icon : undefined}
-        className={cn(className, 'pointer-events-none')}
-      >
-        {showLabel ? <TextHold>{label}</TextHold> : icon}
-      </Button>
-    </span>
-  );
-}
-
-/**
- * A card footer's action (Ask, Display, Watch video): the transparent button, or its loading form
- * (`FooterActionSkeleton`) in a loading scope or while `loading`. The one switch every footer action goes through.
+ * A card footer's action: a small transparent button with an icon (and a trailing icon when it opens something below
+ * the card) and its label, or the icon alone when `showLabel` is off. Its loading form is the same button, inert and
+ * unread, with the icons and the label drawn as skeleton bars, so the box is exactly the loaded action's. THE one
+ * footer action: the Ask action and a card's "Watch video" both draw it.
  */
 export function FooterAction({
   label,
-  loading = false,
+  icon,
+  trailingIcon,
+  className,
   showLabel = true,
   size = 'small',
-  className = '',
-  ...props
-}: Omit<ButtonProps, 'variant' | 'size' | 'className'> & {
-  /** The action's name: what its loading form holds the width of. */
+  onClick,
+  ariaLabel,
+  ariaExpanded,
+  title,
+  loading,
+}: {
   label: string;
-  loading?: boolean;
+  icon: React.ReactNode;
+  trailingIcon?: React.ReactNode;
+  className: string;
   showLabel?: boolean;
   size?: 'small' | 'icon';
-  className?: string;
+  onClick?: (event: React.MouseEvent) => void;
+  ariaLabel?: string;
+  ariaExpanded?: boolean;
+  title?: string;
+  loading?: boolean;
 }): React.ReactElement {
   if (useLoadingScope() || loading) {
-    return <FooterActionSkeleton label={label} size={size} showLabel={showLabel} className={className} />;
+    const mark = <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3 w-3 rounded-sm')} />;
+    return (
+      <span aria-hidden inert className="contents">
+        <Button
+          variant="transparent"
+          size={size}
+          tabIndex={-1}
+          leftIcon={showLabel ? mark : undefined}
+          rightIcon={trailingIcon ? mark : undefined}
+          className={cn(className, 'pointer-events-none')}
+        >
+          {showLabel ? <TextHold>{label}</TextHold> : mark}
+        </Button>
+      </span>
+    );
   }
-  return <Button variant="transparent" size={size} className={className} {...props} />;
+  return (
+    <Button
+      variant="transparent"
+      size={size}
+      leftIcon={showLabel ? icon : undefined}
+      rightIcon={trailingIcon}
+      onClick={onClick}
+      aria-label={ariaLabel}
+      aria-expanded={ariaExpanded}
+      title={title}
+      className={className}
+    >
+      {showLabel ? label : icon}
+    </Button>
+  );
 }
 
 export function SourceActionButton({
@@ -171,16 +180,14 @@ export function SourceActionButton({
   return (
     <FooterAction
       label={label}
-      loading={loading}
+      icon={icon}
       size={styles.size}
       showLabel={styles.showLabel}
-      leftIcon={styles.showLabel ? icon : undefined}
       onClick={handle}
-      aria-label={verbLabel}
+      ariaLabel={verbLabel}
       title={verbLabel}
       className={`${styles.className}${className ? ` ${className}` : ''}`}
-    >
-      {styles.showLabel ? label : icon}
-    </FooterAction>
+      loading={loading}
+    />
   );
 }

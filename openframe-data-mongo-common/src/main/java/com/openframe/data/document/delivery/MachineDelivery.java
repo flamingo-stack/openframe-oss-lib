@@ -36,6 +36,9 @@ public class MachineDelivery implements TenantScoped {
     private int reruns;
     private String dispatchId;
     private int sequence;
+    // the body in machine_delivery_payload; rows written before that store carry their body inline in payloadJson
+    // and are read that way until they expire
+    private String payloadId;
     private String payloadJson;
 
     private Instant dispatchedAt;

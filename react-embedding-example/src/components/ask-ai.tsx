@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { EmbeddableChat } from '@flamingo-stack/openframe-frontend-core/components/chat'
 import { openAskAi } from '@flamingo-stack/openframe-frontend-core/components/navigation'
 import type { AssistantOpenRequest } from '@flamingo-stack/openframe-frontend-core/contexts'
-import { DOCS_BASE_ROUTE } from '../config/content'
 
 /**
  * Embedder-side equivalent of the hub's `global-ask-ai-client.tsx`. It reuses the
@@ -22,9 +21,8 @@ import { DOCS_BASE_ROUTE } from '../config/content'
  * content-runtime.ts → `/content/api/ai-agents/:slug`). `activeAgentSlug = undefined`
  * is the default Guide-mode chat.
  *
- * `baseRoute='/knowledge-base'` tells the chip resolver where in-app markdown doc
- * chips land. Doc-card routing for other documentTypes is config-driven via
- * `content-runtime.ts`'s `docPlatformTargets`.
+ * Where a doc or a record opens is the runtime's `composeContentUrl` (content-runtime.ts), for the chat as for
+ * every page.
  */
 /** The event this embed's chat opens on. Its OWN name: nothing but `<AskAi />` listens for it. */
 const EMBED_CHAT_OPEN_EVENT = 'embed-example:open-chat'
@@ -100,7 +98,6 @@ export function AskAi() {
       <EmbeddableChat
         modes={{ guide: {} }}
         defaultActiveMode="guide"
-        baseRoute={DOCS_BASE_ROUTE}
         showInternalTrigger={false}
         activeAgentSlug={activeAgentSlug}
         onAgentChange={setActiveAgentSlug}

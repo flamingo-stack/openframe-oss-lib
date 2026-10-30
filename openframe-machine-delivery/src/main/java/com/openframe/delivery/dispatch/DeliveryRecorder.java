@@ -24,7 +24,12 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DeliveryRecorder {
 
+    // Mongo reaps expired documents once a minute per collection: a body that expired with its last row could go a
+    // minute before the row, in front of a sweep pass. Held longer, the body is always there while any row is
+    static final long BODY_OUTLIVES_ROW_SECONDS = 600;
+
     private final MachineDeliveryRepository repository;
+    private final DeliveryPayloadStore payloads;
     private final MachineDeliverySequenceRepository sequences;
     private final DeliveryProperties properties;
     private final DeliveryPayloadJson payloadJson;
@@ -76,11 +81,14 @@ public class DeliveryRecorder {
         DeliveryPayload payload = request.getPayload();
         DeliveryRef delivery = payload.getDelivery();
         String dispatchId = delivery.getDispatchId();
-        String json = payloadJson.write(payload);
         Policy policy = properties.resolve(type);
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
         long ttlSeconds = policy.getTtlSeconds();
         Instant dueAt = online ? runAt.plusSeconds(ackThresholdSeconds) : runAt;
+        Instant expiresAt = runAt.plusSeconds(ttlSeconds);
+        DeliveryPayloadBody body = payloadJson.body(payload);
+        Instant bodyExpiresAt = expiresAt.plusSeconds(BODY_OUTLIVES_ROW_SECONDS);
+        String payloadId = payloads.hold(type, body, bodyExpiresAt);
         return MachineDelivery.builder()
                 .id(id)
                 .type(type)
@@ -91,10 +99,10 @@ public class DeliveryRecorder {
                 .status(DeliveryStatus.PENDING)
                 .attempts(0)
                 .errors(0)
-                .payloadJson(json)
+                .payloadId(payloadId)
                 .dispatchedAt(runAt)
                 .dueAt(dueAt)
-                .expiresAt(runAt.plusSeconds(ttlSeconds))
+                .expiresAt(expiresAt)
                 .build();
     }
 }

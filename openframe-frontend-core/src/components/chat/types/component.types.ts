@@ -224,7 +224,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   /**
    * Host-provided anchor component for markdown links. When supplied, the
    * `<a>` override in the markdown renderer delegates to this component
-   * so the host's unified click rule (e.g. `useNavLink`) owns routing
+   * so the host's unified click rule (e.g. `useNavLinkViaRuntime`) owns routing
    * for every link in the message — same-origin → soft RSC nav,
    * cross-origin → new tab, modifier-clicks defer to the browser.
    *
