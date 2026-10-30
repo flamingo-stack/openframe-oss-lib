@@ -8,8 +8,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-// Once a day (user, 30-10): fills the hardware facts of machines registered before Fleet facts were stored, and
-// heals facts that went missing since. New machines are filled at once, when their Fleet connection is added.
+// Once a day: fills the hardware facts of machines registered before Fleet facts were stored, and heals facts that
+// went missing since. A machine Fleet could not fill is tried again after
+// openframe.fleet.host-facts.backfill.recheck-after (7 days by default). New machines are filled at once, when their
+// Fleet connection is added.
 @Component
 @RequiredArgsConstructor
 @Slf4j

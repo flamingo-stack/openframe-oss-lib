@@ -11,23 +11,27 @@ import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.Host;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static java.util.stream.Collectors.toMap;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNumeric;
 
 // Machines registered before Fleet facts were stored, and machines whose facts went missing since: at most
-// MACHINES_PER_RUN Fleet host reads per run, for connected Fleet hosts whose machine has no serial.
+// MACHINES_PER_RUN Fleet host reads per run, for connected Fleet hosts whose machine has no serial. Every attempt is stamped on the machine, and a machine is
+// tried again only once the stamp is older than recheck-after, so machines Fleet cannot fill either (a VM without a
+// serial) do not use up the runs, across restarts and pods alike.
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -44,17 +48,14 @@ public class FleetHostFactsBackfillService {
     private final FleetMdmClients fleetMdmClients;
     private final FleetHostFactsWriter fleetHostFactsWriter;
 
-    // Where the previous run stopped, so machines Fleet cannot fill either (a host without a serial) do not hold
-    // the rest back. In memory only: after a restart the walk begins again at the first connection.
-    private final AtomicReference<String> resumeAfter = new AtomicReference<>(BEFORE_FIRST_CONNECTION);
+    @Value("${openframe.fleet.host-facts.backfill.recheck-after:7d}")
+    private Duration recheckAfter;
 
     public void backfill() {
-        String after = resumeAfter.get();
-        Batch batch = nextBatch(after);
-        resumeAfter.set(batch.nextCursor());
-        List<PendingHost> hosts = batch.hosts();
+        Instant now = Instant.now();
+        List<PendingHost> hosts = pendingHosts(now.minus(recheckAfter));
         if (hosts.isEmpty()) {
-            log.debug("Fleet host facts backfill: no machine without a serial after connection {}", after);
+            log.debug("Fleet host facts backfill: no machine missing Fleet facts that is due a check");
             return;
         }
         FleetMdmClient client = fleetMdmClients.client();
@@ -63,13 +64,14 @@ public class FleetHostFactsBackfillService {
             if (fill(client, host)) {
                 read++;
             }
+            machineRepository.markHostFactsChecked(host.machine().getMachineId(), now);
         }
-        log.info("Fleet host facts backfill: {} machines without a serial, {} Fleet hosts read", hosts.size(), read);
+        log.info("Fleet host facts backfill: {} machines missing Fleet facts, {} Fleet hosts read", hosts.size(), read);
     }
 
-    private Batch nextBatch(String after) {
+    private List<PendingHost> pendingHosts(Instant checkedBefore) {
         List<PendingHost> hosts = new ArrayList<>();
-        String cursor = after;
+        String cursor = BEFORE_FIRST_CONNECTION;
         Limit pageSize = Limit.of(MACHINES_PER_RUN);
         while (true) {
             List<ToolConnection> page = toolConnectionRepository.findByToolTypeAndStatusAndIdGreaterThanOrderByIdAsc(
@@ -78,16 +80,16 @@ public class FleetHostFactsBackfillService {
             for (ToolConnection connection : page) {
                 cursor = connection.getId();
                 Machine machine = machines.get(connection.getMachineId());
-                Long hostId = isMissingFacts(machine) ? fleetHostId(connection) : null;
+                Long hostId = isDue(machine, checkedBefore) ? fleetHostId(connection) : null;
                 if (hostId != null) {
                     hosts.add(new PendingHost(machine, hostId));
                 }
                 if (hosts.size() == MACHINES_PER_RUN) {
-                    return new Batch(hosts, cursor);
+                    return hosts;
                 }
             }
             if (page.size() < MACHINES_PER_RUN) {
-                return new Batch(hosts, BEFORE_FIRST_CONNECTION);
+                return hosts;
             }
         }
     }
@@ -102,10 +104,15 @@ public class FleetHostFactsBackfillService {
                 .collect(toMap(Machine::getMachineId, Function.identity(), (first, duplicate) -> first));
     }
 
-    private static boolean isMissingFacts(Machine machine) {
+    private static boolean isDue(Machine machine, Instant checkedBefore) {
         return machine != null
                 && !RETIRED_STATUSES.contains(machine.getStatus())
-                && isBlank(machine.getSerialNumber());
+                && isMissingFleetFacts(machine)
+                && (machine.getHostFactsCheckedAt() == null || machine.getHostFactsCheckedAt().isBefore(checkedBefore));
+    }
+
+    private static boolean isMissingFleetFacts(Machine machine) {
+        return StringUtils.isBlank(machine.getSerialNumber());
     }
 
     // A numeric agentToolId is the Fleet host id the transformer confirmed; a UUID there means Fleet never
@@ -142,8 +149,5 @@ public class FleetHostFactsBackfillService {
     }
 
     private record PendingHost(Machine machine, long hostId) {
-    }
-
-    private record Batch(List<PendingHost> hosts, String nextCursor) {
     }
 }

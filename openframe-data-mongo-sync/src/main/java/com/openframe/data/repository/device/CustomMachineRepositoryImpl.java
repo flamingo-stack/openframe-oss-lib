@@ -53,6 +53,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String OS_TYPE_FIELD = "osType";
     private static final String MACHINE_ID_FIELD = "machineId";
     private static final String LAST_SEEN_FIELD = "lastSeen";
+    private static final String HOST_FACTS_CHECKED_AT_FIELD = "hostFactsCheckedAt";
     private static final String STATUS_FIELD = "status";
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
@@ -734,6 +735,12 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     public void updateLastSeen(String machineId, Instant lastSeen) {
         Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
         mongoTemplate.updateFirst(query, new Update().set(LAST_SEEN_FIELD, lastSeen), Machine.class);
+    }
+
+    @Override
+    public void markHostFactsChecked(String machineId, Instant checkedAt) {
+        Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
+        mongoTemplate.updateFirst(query, new Update().set(HOST_FACTS_CHECKED_AT_FIELD, checkedAt), Machine.class);
     }
 
     @Override

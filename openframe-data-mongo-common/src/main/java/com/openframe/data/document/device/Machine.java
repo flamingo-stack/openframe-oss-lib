@@ -45,6 +45,7 @@ public class Machine implements TenantScoped {
     private String serialNumber;
     private String manufacturer;
     private String model;
+    private Instant hostFactsCheckedAt;   // last time the Fleet host facts backfill tried this machine; null = never
     @Indexed
     private DeviceType type;
     @Indexed

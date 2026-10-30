@@ -44,6 +44,12 @@ public interface CustomMachineRepository {
      */
     void updateLastSeen(String machineId, Instant lastSeen);
 
+    /**
+     * Stamps {@code hostFactsCheckedAt}, leaving every other field untouched. Bypasses {@code save} and
+     * {@code MachineWriter} for the same reason as {@link #updateLastSeen}: the marker is not part of the Pinot payload.
+     */
+    void markHostFactsChecked(String machineId, Instant checkedAt);
+
     boolean isSortableField(String field);
 
     String getDefaultSortField();
