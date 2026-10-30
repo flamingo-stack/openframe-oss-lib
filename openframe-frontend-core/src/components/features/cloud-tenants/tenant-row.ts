@@ -5,6 +5,15 @@ export interface TenantCustomer {
   imageUrl?: string | null;
 }
 
+/** A directory's seats over its paid SKUs. */
+export interface TenantLicenseSummary {
+  assigned: number;
+  /** Absent when the provider does not report purchased seats (Google Workspace). */
+  purchased?: number | null;
+  /** Purchased minus assigned; negative when the provider counts suspended seats as assigned. */
+  unused?: number | null;
+}
+
 /** One connected directory tenant, as the tenants list shows it. */
 export interface TenantRow {
   id: string;
@@ -23,4 +32,8 @@ export interface TenantRow {
   accessState: string;
   /** When the directory was last read; absent when it never was. */
   lastReadAt?: string | null;
+  /** A person paused the sync: the row says so instead of when it was last read. */
+  syncPaused?: boolean;
+  /** Absent until the licence numbers have been read. */
+  licenses?: TenantLicenseSummary | null;
 }

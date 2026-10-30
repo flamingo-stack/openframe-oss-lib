@@ -12,13 +12,20 @@ export interface TenantCustomerCellProps {
   userCount?: number | null;
   /** Users no customer's rule claims: while there are any, the count line says how many, in the warning colour. */
   unattributedUserCount?: number | null;
+  /** Nothing has been read from this directory yet: the count line says so. */
+  neverRead?: boolean;
 }
 
 /**
  * CUSTOMERS column: the first customer's logo + name and "+N" for the rest, over the synced user count — or
- * "30 of 412 unattributed" while some users belong to no customer.
+ * "30 of 412 unattributed" while some users belong to no customer, or "Never read" before the first read.
  */
-export function TenantCustomerCell({ customers, userCount, unattributedUserCount }: TenantCustomerCellProps) {
+export function TenantCustomerCell({
+  customers,
+  userCount,
+  unattributedUserCount,
+  neverRead = false,
+}: TenantCustomerCellProps) {
   // While the tenant is read (a loading scope) the user count is a bar too (its label is never empty).
   const loading = useLoadingScope();
   const [first] = customers;
@@ -52,7 +59,7 @@ export function TenantCustomerCell({ customers, userCount, unattributedUserCount
         loading={loading}
         className={unattributed ? 'text-ods-warning' : undefined}
       >
-        {unattributed ?? usersCountLabel(userCount)}
+        {unattributed ?? (neverRead ? 'Never read' : usersCountLabel(userCount))}
       </TruncateText>
     </div>
   );

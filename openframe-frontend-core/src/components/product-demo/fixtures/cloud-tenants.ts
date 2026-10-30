@@ -5,7 +5,7 @@ import { DEMO_NOW, demoMinutesAgo } from './shared';
 function tenant(
   organization: DemoOrganization,
   provider: TenantRow['provider'],
-  rest: Pick<TenantRow, 'accessState' | 'userCount' | 'unattributedUserCount' | 'lastReadAt'>,
+  rest: Pick<TenantRow, 'accessState' | 'userCount' | 'unattributedUserCount' | 'lastReadAt' | 'licenses'>,
   /** Other customers the same directory serves. */
   sharedWith: readonly DemoOrganization[] = [],
 ): TenantRow {
@@ -40,6 +40,7 @@ export function buildCloudTenantsFixture(cast: DemoCast): CloudTenantsFixture {
           accessState: 'WRITE_ENABLED',
           userCount: 212,
           unattributedUserCount: 14,
+          licenses: { assigned: 198, purchased: 240, unused: 42 },
           lastReadAt: demoMinutesAgo(9),
         },
         [cast.organization('harbor')],
@@ -47,26 +48,31 @@ export function buildCloudTenantsFixture(cast: DemoCast): CloudTenantsFixture {
       tenant(cast.organization('northbridge'), 'GOOGLE_WORKSPACE', {
         accessState: 'WRITE_ENABLED',
         userCount: 48,
+        licenses: { assigned: 48, purchased: null, unused: null },
         lastReadAt: demoMinutesAgo(15),
       }),
       tenant(cast.organization('harbor'), 'GOOGLE_WORKSPACE', {
         accessState: 'DISCONNECTED',
         userCount: 31,
+        licenses: { assigned: 31, purchased: null, unused: null },
         lastReadAt: demoMinutesAgo(26 * 60),
       }),
       tenant(cast.organization('northbridge'), 'MICROSOFT_365', {
         accessState: 'WRITE_ENABLED',
         userCount: 52,
+        licenses: { assigned: 50, purchased: 52, unused: 2 },
         lastReadAt: demoMinutesAgo(21),
       }),
       tenant(cast.organization('acme'), 'GOOGLE_WORKSPACE', {
         accessState: 'WRITE_ENABLED',
         userCount: 18,
+        licenses: { assigned: 18, purchased: null, unused: null },
         lastReadAt: demoMinutesAgo(34),
       }),
       tenant(cast.organization('harbor'), 'MICROSOFT_365', {
         accessState: 'WRITE_ENABLED',
         userCount: 29,
+        licenses: { assigned: 25, purchased: 30, unused: 5 },
         lastReadAt: demoMinutesAgo(47),
       }),
     ],
