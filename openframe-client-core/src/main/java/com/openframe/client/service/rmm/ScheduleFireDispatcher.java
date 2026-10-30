@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
@@ -9,17 +10,16 @@ import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
-import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.Script;
-import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
-import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
+import com.openframe.data.nats.rmm.util.ScriptScheduleBatch;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
@@ -31,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -51,7 +52,7 @@ public class ScheduleFireDispatcher {
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
-    private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private final DeliveryRouter deliveryRouter;
     private final MachineRepository machineRepository;
     private final DeviceOnlineDispatchRepository dispatchRepository;
     private final ScriptDeliveryRetryStore retryStore;
@@ -63,17 +64,41 @@ public class ScheduleFireDispatcher {
             return;
         }
 
-        Set<String> online = onlineTargets(schedule.getTenantId(), targets);
-        List<String> notOnline = targets.stream().filter(id -> !online.contains(id)).toList();
+        // a machine whose route holds the batch gets it now and waits there by the schedule's own rule; a machine on
+        // the route before the engine is held here, the way it was, until that route is gone
+        List<String> unheld = targets.stream().filter(machineId -> !isHeldOnRoute(machineId)).toList();
+        List<String> notOnline = notOnlineAmong(schedule.getTenantId(), unheld);
         if (!notOnline.isEmpty()) {
             handleNotOnlineTargets(schedule, notOnline, now);
         }
 
-        List<String> toDispatch = targets.stream().filter(online::contains).toList();
+        List<String> toDispatch = targets.stream().filter(machineId -> !notOnline.contains(machineId)).toList();
         dispatch(schedule, toDispatch, now);
     }
 
-    private boolean isRetryOnReconnect(ScheduleScript schedule) {
+    // one fire for a machine that is offline at its own moment: the batch waits on its route until the deadline
+    public void dispatchHeldUntil(ScheduleScript schedule, String machineId, Instant now, Instant reconnectDeadline) {
+        long secondsLeft = Math.max(1, Duration.between(now, reconnectDeadline).toSeconds());
+        dispatch(schedule, List.of(machineId), now, secondsLeft);
+    }
+
+    private boolean isHeldOnRoute(String machineId) {
+        return deliveryRouter.holdsForOfflineMachine(DeliveryType.SCRIPT_SCHEDULE, machineId);
+    }
+
+    private List<String> notOnlineAmong(String tenantId, List<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return List.of();
+        }
+        Set<String> online = onlineTargets(tenantId, machineIds);
+        return machineIds.stream().filter(machineId -> !online.contains(machineId)).toList();
+    }
+
+    private static Long reconnectWindowOf(ScheduleScript schedule) {
+        return isRetryOnReconnect(schedule) ? schedule.getReconnectWindowSeconds() : null;
+    }
+
+    private static boolean isRetryOnReconnect(ScheduleScript schedule) {
         return schedule.getTrigger() == ScheduleScriptTrigger.DATE_TIME
                 && schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT
                 && schedule.getReconnectWindowSeconds() != null
@@ -131,6 +156,11 @@ public class ScheduleFireDispatcher {
      * there is nothing to run.
      */
     public void dispatch(ScheduleScript schedule, List<String> machineIds, Instant now) {
+        dispatch(schedule, machineIds, now, reconnectWindowOf(schedule));
+    }
+
+    // reconnectWindowSeconds: how long the batch waits on its route for a machine that is not online, none = skipped
+    private void dispatch(ScheduleScript schedule, List<String> machineIds, Instant now, Long reconnectWindowSeconds) {
         List<String> scriptIds = schedule.getScriptIds();
         if (scriptIds == null || scriptIds.isEmpty() || machineIds == null || machineIds.isEmpty()) {
             log.info("Schedule scheduleId={} has no scripts or no target devices — nothing dispatched",
@@ -146,23 +176,13 @@ public class ScheduleFireDispatcher {
         }
 
         // One executionId for the whole fire, shared across every script and machine.
-        Fire fire = new Fire(schedule, UUID.randomUUID().toString(), scripts, machineIds, now);
+        Fire fire = new Fire(schedule, UUID.randomUUID().toString(), scripts, machineIds, now, reconnectWindowSeconds);
         saveHeader(fire);
         saveLeafRows(fire);
         publish(fire);
 
         log.info("Dispatched schedule fire scheduleId={} executionId={} scripts={} machines={}",
                 fire.scheduleId(), fire.executionId(), scripts.size(), machineIds.size());
-    }
-
-    private static Map<String, ScheduledScriptCustomParams> customParamsByScriptId(ScheduleScript schedule) {
-        List<ScheduledScriptCustomParams> customParams = schedule.getScriptCustomParams();
-        if (customParams == null || customParams.isEmpty()) {
-            return Map.of();
-        }
-        return customParams.stream()
-                .filter(cp -> cp.getScriptId() != null)
-                .collect(Collectors.toMap(ScheduledScriptCustomParams::getScriptId, Function.identity(), (a, b) -> b));
     }
 
     /**
@@ -211,41 +231,33 @@ public class ScheduleFireDispatcher {
 
     /** Build the shared payload once, fan out ONE message per machine. */
     private void publish(Fire fire) {
-        Map<String, ScheduledScriptCustomParams> customParamsByScriptId = customParamsByScriptId(fire.schedule());
-        List<ScriptScheduleExecutionItem> items = fire.scripts().stream()
-                .map(script -> {
-                    ScheduledScriptCustomParams cp = customParamsByScriptId.get(script.getId());
-                    List<String> effectiveArgs = cp != null && cp.getArgs() != null ? cp.getArgs() : script.getDefaultArgs();
-                    List<ScriptEnvVar> effectiveEnv = cp != null && cp.getEnvVars() != null ? cp.getEnvVars() : script.getEnvVars();
-
-                    return ScriptScheduleExecutionItem.builder()
-                            .scriptId(script.getId())
-                            .code(script.getScriptBody())
-                            .shell(script.getShell())
-                            .privilegeLevel(script.getPrivilegeLevel())
-                            .args(ScriptArgsTokenizer.tokenize(effectiveArgs))
-                            .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                            .envVars(effectiveEnv)
-                            .build();
-                })
-                .toList();
-
+        List<ScriptScheduleExecutionItem> items = ScriptScheduleBatch.items(fire.scripts(), fire.schedule().getScriptCustomParams());
         fire.machineIds().forEach(machineId -> {
+            // the same batch for every machine of the fire: the machine is the seed's, the engine keeps one body per fire
             ScriptScheduleExecutionMessage message = ScriptScheduleExecutionMessage.builder()
                     .executionId(fire.executionId())
                     .scheduleId(fire.scheduleId())
-                    .machineId(machineId)
                     .initiatedBy(fire.initiatedBy())
                     .scripts(items)
                     .build();
-            scriptScheduleNatsPublisher.publish(machineId, message);
+            // the retry state serves the path without the engine; stored before the dispatch stamps the delivery block
             retryStore.store(fire.executionId(), machineId, DeliveryChannel.SCHEDULE, message);
+            ScriptScheduleDeliverySeed seed = seed(fire, machineId, message);
+            deliveryRouter.dispatch(seed);
         });
+    }
+
+    private static ScriptScheduleDeliverySeed seed(Fire fire, String machineId, ScriptScheduleExecutionMessage message) {
+        Long reconnectWindowSeconds = fire.reconnectWindowSeconds();
+        if (reconnectWindowSeconds == null) {
+            return ScriptScheduleDeliverySeed.skippingOffline(machineId, message);
+        }
+        return ScriptScheduleDeliverySeed.waitingForReconnect(machineId, message, reconnectWindowSeconds);
     }
 
     /** Everything one fire needs, bundled so the persist/publish steps take a single arg. */
     private record Fire(ScheduleScript schedule, String executionId, List<Script> scripts,
-                        List<String> machineIds, Instant now) {
+                        List<String> machineIds, Instant now, Long reconnectWindowSeconds) {
         String tenantId() {
             return schedule.getTenantId();
         }

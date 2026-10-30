@@ -107,4 +107,9 @@ class EngineDeliveryRouteTest {
         // verifications
         verify(dispatcher, times(2)).dispatch(seed);
     }
+    @Test
+    void holdsForOfflineMachine_always_theRowWaitsByItsRule() {
+        // execution + verifications
+        assertThat(route.holdsForOfflineMachine(DeliveryType.SCRIPT_SCHEDULE)).isTrue();
+    }
 }

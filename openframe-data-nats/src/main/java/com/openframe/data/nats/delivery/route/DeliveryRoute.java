@@ -18,6 +18,10 @@ public interface DeliveryRoute {
 
     boolean canReachEveryMachine(DeliveryType type);
 
+    // true when a command for a machine that is not online waits on this route until the machine shows up; false
+    // when the route delivers to whoever listens at that moment, and the caller must hold the command itself
+    boolean holdsForOfflineMachine(DeliveryType type);
+
     void send(DeliverySeed seed);
 
     void sendToEveryMachine(DeliverySeed seed);

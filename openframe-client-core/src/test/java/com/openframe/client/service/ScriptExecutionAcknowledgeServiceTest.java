@@ -1,14 +1,17 @@
 package com.openframe.client.service;
 
 import com.openframe.client.service.rmm.ScriptExecutionAcknowledgeService;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.nats.rmm.model.ScriptExecutionAcknowledgeMessage;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,14 +21,17 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ScriptExecutionAcknowledgeServiceTest {
 
     @Mock private ScriptExecutionRepository repository;
+    @Mock private DeliveryTracker deliveryTracker;
     @InjectMocks private ScriptExecutionAcknowledgeService service;
 
     private static final String EXEC = "exec-1";
@@ -43,10 +49,23 @@ class ScriptExecutionAcknowledgeServiceTest {
         service.acknowledge(ack());
 
         ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
-        verify(repository).saveAll(captor.capture());
+        InOrder inOrder = inOrder(deliveryTracker, repository);
+        inOrder.verify(deliveryTracker).done(DeliveryType.SCRIPT_SCHEDULE, EXEC, MACHINE);
+        inOrder.verify(repository).saveAll(captor.capture());
         assertThat(captor.getValue()).containsExactlyInAnyOrder(a, b);
         assertThat(captor.getValue()).allMatch(r -> r.getStatus() == ExecutionStatus.RUNNING);
         assertThat(captor.getValue()).allMatch(r -> r.getStatusChangedAt() != null);
+    }
+
+    @Test
+    @DisplayName("ack closes the engine row even when every leaf already moved on (a repeated ack)")
+    void ack_noneQueued_stillClosesTheEngineRow() {
+        when(repository.findByMachineIdAndExecutionIdAndScriptIdIn(MACHINE, EXEC, SCRIPTS))
+                .thenReturn(List.of(leaf("s-a", ExecutionStatus.RUNNING)));
+
+        service.acknowledge(ack());
+
+        verify(deliveryTracker).done(DeliveryType.SCRIPT_SCHEDULE, EXEC, MACHINE);
     }
 
     @Test
@@ -95,6 +114,7 @@ class ScriptExecutionAcknowledgeServiceTest {
 
         verify(repository, never()).findByMachineIdAndExecutionIdAndScriptIdIn(any(), any(), any());
         verify(repository, never()).saveAll(any());
+        verifyNoInteractions(deliveryTracker);
     }
 
     @Test

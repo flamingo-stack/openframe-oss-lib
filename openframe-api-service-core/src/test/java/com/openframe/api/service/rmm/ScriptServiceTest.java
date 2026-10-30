@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.rmm.script.CreateScriptInput;
@@ -80,6 +81,8 @@ class ScriptServiceTest {
     private ScriptTimeoutValidator timeoutValidator;
     @Mock
     private ScriptPrivilegeValidator privilegeValidator;
+    @Mock
+    private ScheduleDeliveryRefresher deliveryRefresher;
 
     @InjectMocks
     private ScriptService scriptService;
@@ -544,6 +547,8 @@ class ScriptServiceTest {
         verify(scriptRepository).save(existing);
         // PUT semantics: the tag set is replaced from the input.
         verify(scriptTagService).replaceTags(SCRIPT_ID, List.of("tag-9"));
+        // the batches still waiting for a machine carry the edited script
+        verify(deliveryRefresher).refreshForScript(SCRIPT_ID);
     }
 
     @Test

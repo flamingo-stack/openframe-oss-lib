@@ -178,4 +178,30 @@ class DeliveryRouterTest {
         // verifications
         assertThat(carried).isFalse();
     }
+    @Test
+    void holdsForOfflineMachine_theReachingRouteAnswers() {
+        // setup
+        when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.of("1.6.0"));
+        when(engine.canReach(DeliveryType.CLIENT_UNINSTALL, "1.6.0")).thenReturn(true);
+        when(engine.holdsForOfflineMachine(DeliveryType.CLIENT_UNINSTALL)).thenReturn(true);
+
+        // execution
+        boolean held = router.holdsForOfflineMachine(DeliveryType.CLIENT_UNINSTALL, MACHINE_ID);
+
+        // verifications
+        assertThat(held).isTrue();
+        verify(legacy, never()).holdsForOfflineMachine(any());
+    }
+
+    @Test
+    void holdsForOfflineMachine_noRouteReachesTheMachine_false() {
+        // setup
+        when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.empty());
+
+        // execution
+        boolean held = router.holdsForOfflineMachine(DeliveryType.CLIENT_UNINSTALL, MACHINE_ID);
+
+        // verifications
+        assertThat(held).isFalse();
+    }
 }

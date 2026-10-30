@@ -17,6 +17,9 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
@@ -65,7 +68,7 @@ class ScriptDispatchServiceTest {
     @Mock
     private ScriptExecutionService scriptExecutionService;
     @Mock
-    private com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private com.openframe.data.nats.delivery.route.DeliveryRouter deliveryRouter;
     @Mock
     private ScheduleScriptService scheduleScriptService;
     @Mock
@@ -438,12 +441,48 @@ class ScriptDispatchServiceTest {
 
         scriptDispatchService.runSchedule(scheduleId, USER_ID);
 
-        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleNatsPublisher).publish(eq(MACHINE_ID), msgCaptor.capture());
-        ScriptScheduleExecutionItem item = msgCaptor.getValue().getScripts().get(0);
+        ArgumentCaptor<com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed> seedCaptor =
+                ArgumentCaptor.forClass(com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(seedCaptor.getValue().getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
+        ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
+        assertThat(batch.getMachineId()).isNull();
+        assertThat(batch.getScheduleId()).isEqualTo(scheduleId);
+        ScriptScheduleExecutionItem item = batch.getScripts().get(0);
         assertThat(item.getArgs()).containsExactly("--custom", "42");
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("OVERRIDE");
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).doesNotContain("BASE");
+    }
+    @Test
+    @DisplayName("runSchedule: a schedule that waits for offline machines sends its window with the batch")
+    void runSchedule_scheduleThatWaitsForOfflineMachines_theWindowTravelsWithTheBatch() {
+        String scheduleId = "sched-1";
+        com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse schedule =
+                com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse.builder()
+                        .id(scheduleId)
+                        .scriptIds(List.of(SCRIPT_ID))
+                        .trigger(ScheduleScriptTrigger.DATE_TIME)
+                        .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT)
+                        .reconnectWindowSeconds(7200L)
+                        .build();
+        when(scheduleScriptService.get(scheduleId)).thenReturn(schedule);
+        when(scheduleScriptDeviceService.getMachineIds(scheduleId)).thenReturn(List.of(MACHINE_ID));
+        when(scriptService.getScriptsByIds(List.of(SCRIPT_ID))).thenReturn(List.of(
+                ScriptResponse.builder()
+                        .id(SCRIPT_ID).name("disk").shell(BASH).scriptBody("df -h")
+                        .status(ACTIVE)
+                        .defaultTimeoutSeconds(60)
+                        .privilegeLevel(PrivilegeLevel.USER)
+                        .build()));
+        when(tenantIdProvider.getTenantId()).thenReturn("tenant-1");
+
+        scriptDispatchService.runSchedule(scheduleId, USER_ID);
+
+        ArgumentCaptor<com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed> seedCaptor =
+                ArgumentCaptor.forClass(com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+        assertThat(seedCaptor.getValue().getReconnectWindowSeconds()).isEqualTo(7200L);
     }
 }
