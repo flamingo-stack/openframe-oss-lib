@@ -217,13 +217,13 @@ const SKELETON_LEAD_LINES = { phone: 5, wide: 3 } as const;
 /** The renderer's root class, on the rendered document and on every skeleton of one: it names a markdown body. */
 export const MARKDOWN_RENDERER_CLASS = 'simple-markdown-renderer';
 const RENDERER_CLASS = MARKDOWN_RENDERER_CLASS;
-const CONTENT_WRAPPER_CLASS = 'content-wrapper max-w-none';
+const CONTENT_WRAPPER_CLASS = 'max-w-none';
 /**
  * The rendered body. `[&>*:last-child]:mb-0`: the last block never pushes what follows the document further down.
- * Prose's own last-child reset has zero specificity, so a block that sets its own margin (a table's `my-6`) kept it,
- * and a document's distance to the next section depended on which block it ended with.
+ * Without it a block that sets its own margin (a table's `my-6`) kept it, and a document's distance to the next
+ * section depended on which block it ended with.
  */
-const ARTICLE_CLASS = 'prose prose-lg max-w-none [&>*:last-child]:mb-0';
+const ARTICLE_CLASS = 'max-w-none [&>*:last-child]:mb-0';
 
 /**
  * One memoized completed block of a streaming message. Parent-level memos

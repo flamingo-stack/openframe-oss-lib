@@ -123,7 +123,7 @@ export function ApprovalRequestNotificationTile({
                 disabled={processing}
                 data-pressed={approvePressed || undefined}
                 className={cn(
-                  'ease-[cubic-bezier(.2,0,0,1)] transition-[filter,transform] duration-200 motion-reduce:transition-none',
+                  'transition-[filter,transform] duration-200 motion-reduce:transition-none',
                   lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS,
                   approvePressed && 'scale-[0.98] brightness-75',
                 )}
