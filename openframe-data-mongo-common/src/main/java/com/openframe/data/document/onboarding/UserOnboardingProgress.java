@@ -19,7 +19,10 @@ import java.util.Set;
  * <p>
  * The stored {@code completedSteps} set is the single source of truth. The flow can be skipped at the
  * start or at any time ({@code skipped}), is finished explicitly ({@code completed} via "Finish"), and
- * can be reset back to a clean state (no steps, not skipped, not completed).
+ * can be reset back to a clean state (no steps, not skipped, not completed, setup wizard not seen).
+ * <p>
+ * {@code setupSeen} records that the setup wizard showed this user its last screen ("You are ready to go" /
+ * "Everything is set up"), so the screen is shown once per user and tenant rather than once per browser.
  */
 @Document(collection = "user_onboarding_progress")
 @CompoundIndex(name = "user_tenant_unique", def = "{'userId': 1, 'tenantId': 1}", unique = true)
@@ -58,4 +61,15 @@ public class UserOnboardingProgress implements TenantScoped {
 
     /** Mingo dialog hosting the Getting Started block; null until "Start with Mingo", overwritten by every start, cleared by reset. */
     private String tourDialogId;
+
+    /**
+     * True once the user has seen the setup wizard's last screen. Set by the explicit mark mutation and by
+     * "Start with Mingo" (a recorded tour implies a seen screen); cleared by reset. Records written before the
+     * field existed read as {@code false}; there is no backfill.
+     */
+    @Builder.Default
+    private boolean setupSeen = false;
+
+    /** When {@link #setupSeen} was first set; null while not seen. */
+    private Instant setupSeenAt;
 }
