@@ -55,10 +55,7 @@ async fn console_user() -> Option<String> {
         .await
         .ok()?;
     let user = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if user.is_empty() || user == "root" {
-        return None;
-    }
-    Some(user)
+    crate::platform::user_session::is_login_user(&user).then_some(user)
 }
 
 #[cfg(not(target_os = "macos"))]

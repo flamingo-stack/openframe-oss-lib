@@ -1,4 +1,3 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::{Notify, OwnedRwLockReadGuard, RwLock};
@@ -9,15 +8,18 @@ use crate::config::update_config::{SELF_RESTART_IDLE_POLL_SECS, SELF_RESTART_IDL
 use crate::services::execution_service::RunningScripts;
 use crate::services::tool_ops::BusyTools;
 use crate::services::tool_run_manager::ClientUpdatePending;
+use crate::utils::in_progress::InProgressView;
+use crate::utils::latch::Latch;
 
 #[derive(Clone)]
 pub struct RestartGate {
-    closing: Arc<AtomicBool>,
+    closing: Latch,
     work: Arc<RwLock<()>>,
     requested: Arc<Notify>,
     busy_tools: BusyTools,
     running_scripts: RunningScripts,
     client_update: ClientUpdatePending,
+    package_upgrades: InProgressView,
 }
 
 impl RestartGate {
@@ -25,27 +27,30 @@ impl RestartGate {
         busy_tools: BusyTools,
         running_scripts: RunningScripts,
         client_update: ClientUpdatePending,
+        package_upgrades: InProgressView,
+        closing: Latch,
     ) -> Self {
         Self {
-            closing: Arc::new(AtomicBool::new(false)),
+            closing,
             work: Arc::new(RwLock::new(())),
             requested: Arc::new(Notify::new()),
             busy_tools,
             running_scripts,
             client_update,
+            package_upgrades,
         }
     }
 
     pub(super) fn admit(&self) -> Option<OwnedRwLockReadGuard<()>> {
         let admitted = self.work.clone().try_read_owned().ok()?;
-        if self.closing.load(Ordering::Acquire) {
+        if self.closing.is_set() {
             return None;
         }
         Some(admitted)
     }
 
     pub(super) async fn drain_and_request(&self) {
-        self.closing.store(true, Ordering::Release);
+        self.closing.set();
         let deadline = Instant::now() + Duration::from_secs(SELF_RESTART_IDLE_WAIT_SECS);
         info!("Restart scheduled: no new commands are taken, waiting for running ones to finish");
 
@@ -60,7 +65,7 @@ impl RestartGate {
         }
         if self.busy() {
             warn!(
-                "Tool operation, script or client update still running after {}s, restarting anyway",
+                "Tool operation, script, package upgrade or client update still running after {}s, restarting anyway",
                 SELF_RESTART_IDLE_WAIT_SECS
             );
         }
@@ -74,7 +79,10 @@ impl RestartGate {
     }
 
     fn busy(&self) -> bool {
-        self.busy_tools.any() || self.running_scripts.any() || self.client_update.is_pending()
+        self.busy_tools.any()
+            || self.running_scripts.any()
+            || self.package_upgrades.is_active()
+            || self.client_update.is_pending()
     }
 
     pub async fn requested(&self) {
