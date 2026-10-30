@@ -27,7 +27,6 @@ describe('toLegalDocumentSummaries', () => {
             summary: 'The agreement for using OpenFrame and our websites.',
             route: '/terms-of-service',
             sourceFile: 'TERMS.md',
-            faqTopic: 'terms-of-service',
             version: '1.0',
             effectiveDate: 'October 14, 2026',
             published: true,
