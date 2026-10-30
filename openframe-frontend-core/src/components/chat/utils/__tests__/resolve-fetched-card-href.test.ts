@@ -242,13 +242,18 @@ describe('readFetchedCardPath', () => {
   });
 
   it('gives a card hydrated from a bare marker the destination its source chip has', () => {
-    const ctx = { docPlatformTargets: { data_room_doc: { platform: 'company-hub', basePath: '/data-room' } } };
+    const ctx = {
+      composeContentUrl: makeComposeContentUrl({
+        hostedTypes: new Set(['data_room_doc']),
+        contentOrigin: 'https://hub.example',
+        suffixes: { data_room_doc: 'data-room' },
+      }),
+    };
     const marker = { documentType: 'data_room_doc', id: 'd-1', title: 'd-1' };
     // The marker alone has nothing to route: this is the card that could not be clicked.
     expect(resolveSourceRowCTA(marker, ctx).href).toBeNull();
     const path = readFetchedCardPath({ id: 'd-1', url: null, metadata: { path: 'legal/ein-cp-575' } });
     const card = resolveSourceRowCTA({ ...marker, path }, ctx);
-    expect(card.href).toMatch(/\/data-room\/legal\/ein-cp-575$/);
-    expect(card.targetPlatform).toBe('company-hub');
+    expect(card.href).toBe('/data-room/legal/ein-cp-575');
   });
 });

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import Link from '../../embed-shims/next-link';
+import { AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { renderedLinkRel } from '../../utils/markdown-link';
 import { socialCache } from '../../utils/social-embed-cache';
 import { XLogoIcon } from '../icons-v2-generated/brand-logos/x-logo-icon';
@@ -248,8 +249,8 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700, rel }: Twitte
                   src={getProfilePicUrl(username)}
                   alt={`${tweetData.author_name} profile picture`}
                   className="h-full w-full object-cover"
-                  width={32}
-                  height={32}
+                  width={AVATAR_SIZE_PX.sm}
+                  height={AVATAR_SIZE_PX.sm}
                   unoptimized
                   onError={e => {
                     // Simple fallback without state updates

@@ -75,6 +75,7 @@ class SoftwareInventoryServiceTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private com.openframe.data.repository.tool.IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
+    @Mock private SoftwareAutoUpdateService autoUpdateService;
 
     @Captor private ArgumentCaptor<List<SoftwareResponse>> pageRowsCaptor;
     @Captor private ArgumentCaptor<Function<FleetSoftware, Stream<String>>> keysOfCaptor;
@@ -84,7 +85,7 @@ class SoftwareInventoryServiceTest {
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader);
+                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }
@@ -138,6 +139,7 @@ class SoftwareInventoryServiceTest {
         assertThat(filters.getSources()).isEmpty();
         assertThat(filters.getVersionStatuses()).isEmpty();
         assertThat(filters.getSeverities()).isEmpty();
+        assertThat(filters.getAutoUpdateStatuses()).isEmpty();
     }
 
     @Test
@@ -331,6 +333,11 @@ class SoftwareInventoryServiceTest {
         assertThat(filters.getStatuses()).isNotEmpty();
         int total = filters.getStatuses().stream().mapToInt(SoftwareFilterOption::getCount).sum();
         assertThat(total).isEqualTo(1); // one correlated device → one status bucket, count 1
+        // non-null in the schema, not backed yet: empty, never null
+        assertThat(filters.getInstalledBy()).isEmpty();
+        assertThat(filters.getAutoUpdateStatuses()).isEmpty();
+        assertThat(filters.getOrganizations()).isEmpty();
+        assertThat(filters.getDeviceStatuses()).isEmpty();
     }
 
     @Test

@@ -34,6 +34,7 @@ export type PageActionButton = {
     | 'chip'
     | 'card'
     | 'cell'
+    | 'stepper'
   >;
   disabled?: boolean;
   /**
@@ -278,8 +279,9 @@ const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]';
  * and an inert control promises nothing and cannot act on a wrong assumption before the data lands. The "…" trigger
  * is drawn the same way (`ActionsMenuDropdown loading`).
  *
- * An empty list is the one placeholder: `loading` means the action set is unknown, not known-empty, so nothing real can
- * be drawn. Its shape is what an empty header settles into for the variant: `icon-buttons` and `menu-primary` the
+ * An empty list is the one placeholder, and only on `loading`: it means the action set is unknown, not known-empty, so
+ * nothing real can be drawn. A loading scope alone does not: a page that knows its actions while it loads (a list
+ * page's header) draws them as passed, an empty set as nothing, exactly as it settles. Its shape is what an empty header settles into for the variant: `icon-buttons` and `menu-primary` the
  * square "…" trigger (`icon`), `primary-buttons` a labelled button (`label`).
  */
 function UnknownActionSkeleton({ shape, fullWidth }: { shape: 'icon' | 'label'; fullWidth?: boolean }) {
@@ -295,7 +297,8 @@ export function PageActions({
   className,
   loading: loadingProp,
 }: PageActionsProps) {
-  const loading = useLoadingScope() || loadingProp;
+  // Each variant reads the loading scope itself; it gets the caller's own flag, which alone says the action set is
+  // not known yet.
   if (variant === 'icon-buttons') {
     return (
       <IconButtonsVariant
@@ -303,7 +306,7 @@ export function PageActions({
         menuActions={menuActions}
         selector={selector}
         className={className}
-        loading={loading}
+        loading={loadingProp}
       />
     );
   }
@@ -315,12 +318,12 @@ export function PageActions({
         menuActions={menuActions || []}
         selector={selector}
         className={className}
-        loading={loading}
+        loading={loadingProp}
       />
     );
   }
 
-  return <PrimaryButtonsVariant actions={actions} className={className} loading={loading} />;
+  return <PrimaryButtonsVariant actions={actions} className={className} loading={loadingProp} />;
 }
 
 function IconButtonsVariant({
@@ -337,6 +340,9 @@ function IconButtonsVariant({
   loading?: boolean;
 }) {
   const loading = useLoadingScope() || loadingProp;
+  // The placeholder for an action set nobody knows yet: only when the caller says so (`loading`), never because a
+  // loading scope is on (a page that knows its actions draws them, an empty set included).
+  const unknownSet = !!loadingProp;
   const desktopActions = actions.filter(a => !a.showOnlyMobile);
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0);
 
@@ -356,7 +362,7 @@ function IconButtonsVariant({
           <React.Fragment key={actionKey(action, idx)}>{renderActionButton(action, { inert: loading })}</React.Fragment>
         ))}
         {/* An unknown set with no menu: the trigger's square. With a menu, the trigger already is it. */}
-        {loading && desktopActions.length === 0 && !hasMenuActions && <UnknownActionSkeleton shape="icon" />}
+        {unknownSet && desktopActions.length === 0 && !hasMenuActions && <UnknownActionSkeleton shape="icon" />}
         {hasMenuActions && <ActionsMenuDropdown groups={menuActions} loading={loading} />}
       </div>
 
@@ -366,7 +372,7 @@ function IconButtonsVariant({
           renderActionButton(singleAction, { iconOnly: true, inert: loading })
         ) : hasMobileMenuItems ? (
           <ActionsMenuDropdown groups={mobileMenuGroups} loading={loading} />
-        ) : loading ? (
+        ) : unknownSet ? (
           <UnknownActionSkeleton shape="icon" />
         ) : null}
       </div>
@@ -394,6 +400,9 @@ function PrimaryButtonsVariant({
   loading?: boolean;
 }) {
   const loading = useLoadingScope() || loadingProp;
+  // The placeholder for an action set nobody knows yet: only when the caller says so (`loading`), never because a
+  // loading scope is on (a page that knows its actions draws them, an empty set included).
+  const unknownSet = !!loadingProp;
   // Sort: outline first, accent last (rightmost on desktop).
   const sortedActions = [...actions].sort((a, b) => {
     if (a.variant === 'accent' && b.variant !== 'accent') return 1;
@@ -412,15 +421,15 @@ function PrimaryButtonsVariant({
           </React.Fragment>
         ))}
         {/* No overflow trigger in this variant: an unknown action set settles into a labelled button. */}
-        {loading && desktopActions.length === 0 && <UnknownActionSkeleton shape="label" />}
+        {unknownSet && desktopActions.length === 0 && <UnknownActionSkeleton shape="label" />}
       </div>
 
       <div className={cn('hidden items-center md:content-max-md:flex', ACTIONS_GAP, className)}>
         <CompactPrimaryActions actions={desktopActions} loading={loading} />
-        {loading && desktopActions.length === 0 && <UnknownActionSkeleton shape="icon" />}
+        {unknownSet && desktopActions.length === 0 && <UnknownActionSkeleton shape="icon" />}
       </div>
 
-      <MobileBottomActions actions={sortedActions} loading={loading} />
+      <MobileBottomActions actions={sortedActions} loading={loadingProp} />
     </>
   );
 }
@@ -443,6 +452,9 @@ function MenuPrimaryVariant({
   loading?: boolean;
 }) {
   const loading = useLoadingScope() || loadingProp;
+  // The placeholder for an action set nobody knows yet: only when the caller says so (`loading`), never because a
+  // loading scope is on (a page that knows its actions draws them, an empty set included).
+  const unknownSet = !!loadingProp;
   const desktopActions = actions.filter(a => !a.showOnlyMobile);
   const hasMenuActions = menuActions.some(g => g.items.length > 0);
 
@@ -460,7 +472,7 @@ function MenuPrimaryVariant({
           </React.Fragment>
         ))}
         {/* An unknown set with no menu: the trigger's square. With a menu, the trigger already is it. */}
-        {loading && desktopActions.length === 0 && !hasMenuActions && <UnknownActionSkeleton shape="icon" />}
+        {unknownSet && desktopActions.length === 0 && !hasMenuActions && <UnknownActionSkeleton shape="icon" />}
       </div>
 
       <div className={cn('flex content-md:hidden', className)}>
@@ -469,7 +481,7 @@ function MenuPrimaryVariant({
           // title row has no room for it, and hiding it entirely (what
           // `icon-buttons` does) would leave no way to switch views at all.
           <ActionsMenuDropdown groups={mobileMenuGroups} header={selector} loading={loading} />
-        ) : loading ? (
+        ) : unknownSet ? (
           <UnknownActionSkeleton shape="icon" />
         ) : null}
       </div>
@@ -501,6 +513,9 @@ function CompactPrimaryActions({ actions, loading: loadingProp }: { actions: Pag
 
 function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageActionButton[]; loading?: boolean }) {
   const loading = useLoadingScope() || loadingProp;
+  // The placeholder for an action set nobody knows yet: only when the caller says so (`loading`), never because a
+  // loading scope is on (a page that knows its actions draws them, an empty set included).
+  const unknownSet = !!loadingProp;
   return (
     <div
       className={cn(
@@ -518,7 +533,7 @@ function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageA
           {renderActionButton(action, { fullWidth: !!action.label, inert: loading })}
         </React.Fragment>
       ))}
-      {loading && actions.length === 0 && <UnknownActionSkeleton shape="label" fullWidth />}
+      {unknownSet && actions.length === 0 && <UnknownActionSkeleton shape="label" fullWidth />}
     </div>
   );
 }

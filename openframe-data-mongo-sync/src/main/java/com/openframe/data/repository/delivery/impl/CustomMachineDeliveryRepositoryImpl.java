@@ -9,6 +9,7 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.delivery.CustomMachineDeliveryRepository;
+import com.openframe.data.repository.delivery.RerunPublication;
 import org.bson.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
@@ -32,6 +33,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_TYPE = "type";
     private static final String FIELD_ATTEMPTS = "attempts";
     private static final String FIELD_ERRORS = "errors";
+    private static final String FIELD_RERUNS = "reruns";
     private static final String FIELD_DISPATCH_ID = "dispatchId";
     private static final String FIELD_SEQUENCE = "sequence";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
@@ -92,6 +94,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         Document document = new Document();
         mongoTemplate.getConverter().write(delivery, document);
         Update update = new Update().set(FIELD_TENANT_ID, tenantId())
+                .unset(FIELD_PAYLOAD_JSON)
                 .unset(FIELD_ACKED_AT)
                 .unset(FIELD_FINISHED_AT)
                 .unset(FIELD_FAILURE)
@@ -173,7 +176,51 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         Update update = closed(DeliveryStatus.FAILED, finishedAt, expiresAt)
                 .set(FIELD_FAILURE, failure)
                 .set(FIELD_ERROR, error);
-        return updateOne(thisDispatch(id, from, dispatchId), update);
+        Criteria agentHadIt = publishedDispatch(id, from, dispatchId);
+        return updateOne(agentHadIt, update);
+    }
+
+    // back to PENDING for a later run; the dispatchId stays until that run is published, so a late DONE still closes the row
+    @Override
+    public boolean scheduleRerun(String id, Set<DeliveryStatus> from, Instant dispatchedAt, int reruns, Instant dueAt) {
+        Criteria thisRun = sameDispatch(id, from, dispatchedAt).andOperator(runNumber(reruns));
+        Update update = rerun(dueAt);
+        return updateOne(thisRun, update);
+    }
+
+    @Override
+    public boolean scheduleRerun(String id, String dispatchId, Set<DeliveryStatus> from, int reruns, Instant dueAt) {
+        Criteria thisRun = publishedDispatch(id, from, dispatchId).andOperator(runNumber(reruns));
+        Update update = rerun(dueAt);
+        return updateOne(thisRun, update);
+    }
+
+    // the first publish of a re-run: a new dispatch of the same row, counted as its first attempt
+    @Override
+    public boolean markRerunPublished(RerunPublication publication) {
+        String id = publication.getId();
+        Set<DeliveryStatus> from = publication.getFrom();
+        Instant dispatchedAt = publication.getDispatchedAt();
+        Criteria notYetPublished = sameDispatch(id, from, dispatchedAt).and(FIELD_ATTEMPTS).is(0);
+        Update update = new Update()
+                .set(FIELD_DISPATCH_ID, publication.getDispatchId())
+                .set(FIELD_DISPATCHED_AT, publication.getPublishedAt())
+                .set(FIELD_ATTEMPTS, 1)
+                .set(FIELD_DUE_AT, publication.getDueAt());
+        return updateOne(notYetPublished, update);
+    }
+
+    private static Update rerun(Instant dueAt) {
+        return new Update()
+                .set(FIELD_STATUS, DeliveryStatus.PENDING)
+                .set(FIELD_ATTEMPTS, 0)
+                .set(FIELD_ERRORS, 0)
+                .inc(FIELD_RERUNS, 1)
+                .set(FIELD_DUE_AT, dueAt)
+                .unset(FIELD_ACKED_AT)
+                .unset(FIELD_FINISHED_AT)
+                .unset(FIELD_FAILURE)
+                .unset(FIELD_ERROR);
     }
 
     private static void setField(Update update, String field, Object value) {
@@ -201,6 +248,21 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
 
     private static Criteria thisDispatch(String id, Set<DeliveryStatus> from, String dispatchId) {
         return stillIn(id, from).and(FIELD_DISPATCH_ID).is(dispatchId);
+    }
+
+    // a dispatch the agent can report on: not a re-run that is scheduled and waits for its publish under the old dispatchId
+    private static Criteria publishedDispatch(String id, Set<DeliveryStatus> from, String dispatchId) {
+        Criteria firstRun = Criteria.where(FIELD_RERUNS).not().gt(0);
+        Criteria published = Criteria.where(FIELD_ATTEMPTS).gt(0);
+        return thisDispatch(id, from, dispatchId).orOperator(firstRun, published);
+    }
+
+    // the run the caller read; a second closer of the same run finds the count moved on and matches nothing
+    private static Criteria runNumber(int reruns) {
+        if (reruns == 0) {
+            return Criteria.where(FIELD_RERUNS).not().gt(0);
+        }
+        return Criteria.where(FIELD_RERUNS).is(reruns);
     }
 
     private boolean updateOne(Criteria criteria, Update update) {

@@ -1,4 +1,5 @@
 use crate::platform::directories::DirectoryManager;
+use crate::utils::fs::{atomic_write, read_json_or_quarantine, JsonFile};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -46,25 +47,20 @@ impl LastKnownGoodService {
     }
 
     pub async fn load(&self) -> Result<Option<String>> {
-        if !self.anchor_file_path.exists() {
+        let anchor: JsonFile<LastKnownGood> = read_json_or_quarantine(&self.anchor_file_path)
+            .with_context(|| {
+                format!(
+                    "Failed to read last-known-good file: {:?}",
+                    self.anchor_file_path
+                )
+            })?;
+        if matches!(anchor, JsonFile::Missing) {
             debug!(
                 "No last-known-good file found at: {}",
                 self.anchor_file_path.display()
             );
-            return Ok(None);
         }
-
-        let json_content = fs::read_to_string(&self.anchor_file_path).with_context(|| {
-            format!(
-                "Failed to read last-known-good file: {:?}",
-                self.anchor_file_path
-            )
-        })?;
-
-        let anchor: LastKnownGood = serde_json::from_str(&json_content)
-            .context("Failed to deserialize last-known-good from JSON")?;
-
-        Ok(Some(anchor.version))
+        Ok(anchor.parsed().map(|anchor| anchor.version))
     }
 
     fn copy_running_to_reserve(&self) -> Result<()> {
@@ -76,6 +72,12 @@ impl LastKnownGoodService {
                 temp_reserve.display()
             )
         })?;
+        // Without the flush a power loss can keep the rename but drop the data, leaving a NUL-filled reserve.
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&temp_reserve)
+            .and_then(|file| file.sync_all())
+            .with_context(|| format!("Failed to flush temp reserve {}", temp_reserve.display()))?;
         fs::rename(&temp_reserve, &self.reserve_path).with_context(|| {
             format!(
                 "Failed to move temp reserve into place: {}",
@@ -92,16 +94,9 @@ impl LastKnownGoodService {
             version: version.to_string(),
         })
         .context("Failed to serialize last-known-good to JSON")?;
-        let temp_anchor = self.anchor_file_path.with_extension("json.tmp");
-        fs::write(&temp_anchor, json_content).with_context(|| {
+        atomic_write(&self.anchor_file_path, json_content).with_context(|| {
             format!(
-                "Failed to write temp last-known-good file: {:?}",
-                temp_anchor
-            )
-        })?;
-        fs::rename(&temp_anchor, &self.anchor_file_path).with_context(|| {
-            format!(
-                "Failed to move last-known-good file into place: {:?}",
+                "Failed to write last-known-good file: {:?}",
                 self.anchor_file_path
             )
         })?;
@@ -116,7 +111,13 @@ impl LastKnownGoodService {
 
     pub async fn seed_if_missing(&self) -> Result<()> {
         let running_version = env!("OPENFRAME_VERSION");
-        let anchor = self.load().await.unwrap_or(None);
+        let anchor = self.load().await.unwrap_or_else(|e| {
+            warn!(
+                "Failed to load last-known-good anchor, treating it as missing: {:#}",
+                e
+            );
+            None
+        });
 
         match anchor {
             Some(ref anchor_version) if self.reserve_path.exists() => {
@@ -220,3 +221,7 @@ impl LastKnownGoodService {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "last_known_good_service_tests.rs"]
+mod tests;

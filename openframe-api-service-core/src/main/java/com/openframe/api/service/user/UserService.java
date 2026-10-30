@@ -1,6 +1,13 @@
 package com.openframe.api.service.user;
 
+import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.user.FilterOption;
 import com.openframe.api.dto.user.UpdateUserRequest;
+import com.openframe.api.dto.user.UserFilterInput;
+import com.openframe.api.dto.user.UserFilters;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.api.exception.OperationNotAllowedException;
@@ -10,8 +17,11 @@ import com.openframe.api.mapper.UserMapper;
 import com.openframe.api.service.processor.UserProcessor;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.User;
+import com.openframe.data.document.user.UserRole;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.auth.SsoIdentityRepository;
+import com.openframe.data.repository.user.UserListFilter;
+import com.openframe.data.repository.user.UserPageCursor;
 import com.openframe.data.repository.user.UserRepository;
 import com.openframe.notification.mail.service.EmailService;
 import lombok.RequiredArgsConstructor;
@@ -19,15 +29,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static com.openframe.data.document.user.UserRole.OWNER;
+import static com.openframe.data.document.user.UserRole.grantedFor;
 import static com.openframe.data.document.user.UserStatus.ACTIVE;
 import static com.openframe.data.document.user.UserStatus.DELETED;
 import static com.openframe.data.document.user.UserStatus.SELF_DELETED;
@@ -51,8 +64,14 @@ public class UserService {
         return userRepository.existsByEmailAndStatus(email, UserStatus.ACTIVE);
     }
 
+    /** Upper bound for a REST page; lower it once no client asks for the whole tenant in one page. */
+    static final int MAX_REST_PAGE_SIZE = 1000;
+
+    /** The order of the GraphQL connection, so a REST page and a GraphQL page agree. */
+    static final Sort USER_ORDER = Sort.by(Sort.Order.asc("email"), Sort.Order.asc("_id"));
+
     public UserPageResponse listUsers(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_REST_PAGE_SIZE), USER_ORDER);
         Page<User> p = userRepository.findAll(pageable);
         UserPageResponse response = UserPageResponse.builder()
                 .items(p.getContent().stream().map(userMapper::toResponse).toList())
@@ -64,6 +83,58 @@ public class UserService {
                 .build();
         userProcessor.postProcessUserGet(response);
         return response;
+    }
+
+    public CountedGenericQueryResult<UserResponse> queryUsers(UserFilterInput filter, String search,
+                                                             CursorPaginationCriteria pagination) {
+        CursorPaginationCriteria page = pagination.normalize();
+        UserListFilter listFilter = toListFilter(filter, search);
+        long filteredCount = userRepository.countUsers(listFilter);
+        List<User> raw = userRepository.findUsersPage(listFilter, page.getCursor(), page.getLimit() + 1);
+        boolean hasNextPage = raw.size() > page.getLimit();
+        List<UserResponse> items = toResponses(hasNextPage ? raw.subList(0, page.getLimit()) : raw);
+        return CountedGenericQueryResult.<UserResponse>builder()
+                .items(items)
+                .pageInfo(PageInfo.builder()
+                        .hasNextPage(hasNextPage)
+                        .hasPreviousPage(page.hasCursor())
+                        .startCursor(items.isEmpty() ? null : cursorOf(items.getFirst()))
+                        .endCursor(items.isEmpty() ? null : cursorOf(items.getLast()))
+                        .build())
+                .filteredCount((int) filteredCount)
+                .build();
+    }
+
+    /**
+     * Counts each status and role under the search, the exclusions and the other funnel's ticks, but not its own
+     * funnel's, so ticking within a funnel keeps all of it on offer. Zero counts included.
+     */
+    public UserFilters userFilters(UserFilterInput filter, String search) {
+        UserListFilter listFilter = toListFilter(filter, search);
+        return new UserFilters(
+                Arrays.stream(UserStatus.values())
+                        .map(status -> new FilterOption<>(status,
+                                (int) userRepository.countUsers(listFilter.withStatuses(List.of(status)))))
+                        .toList(),
+                Arrays.stream(UserRole.values())
+                        .map(role -> new FilterOption<>(role,
+                                (int) userRepository.countUsers(listFilter.withRoles(grantedFor(List.of(role))))))
+                        .toList());
+    }
+
+    private static UserListFilter toListFilter(UserFilterInput filter, String search) {
+        return filter == null
+                ? new UserListFilter(null, null, null, search)
+                : new UserListFilter(filter.getStatuses(), grantedFor(filter.getRoles()), filter.getExcludeIds(),
+                        search);
+    }
+
+    public Optional<UserResponse> findUserById(String id) {
+        return userRepository.findById(id).map(user -> toResponses(List.of(user)).getFirst());
+    }
+
+    private static String cursorOf(UserResponse user) {
+        return CursorCodec.encode(UserPageCursor.of(user.getEmail(), user.getId()));
     }
 
     public UserResponse getUserById(String id) {
@@ -78,7 +149,11 @@ public class UserService {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
-        List<User> users = userRepository.findAllById(ids);
+        return toResponses(userRepository.findAllById(ids));
+    }
+
+    /** Maps through the {@link UserProcessor}, which adds the avatar in SaaS. */
+    private List<UserResponse> toResponses(List<User> users) {
         UserPageResponse pageResponse = UserPageResponse.builder()
                 .items(users.stream().map(userMapper::toResponse).toList())
                 .build();
@@ -89,6 +164,10 @@ public class UserService {
     public UserResponse updateUser(String id, UpdateUserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
+        if (user.getStatus() != ACTIVE) {
+            // A self-deleted account is anonymized: naming it again would undo that.
+            throw new OperationNotAllowedException("Only an active user can be edited");
+        }
 
         if (request.getFirstName() != null) {
             user.setFirstName(request.getFirstName());
@@ -99,7 +178,7 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
         userProcessor.postProcessUserUpdated(savedUser);
-        return userMapper.toResponse(savedUser);
+        return toResponses(List.of(savedUser)).getFirst();
     }
 
     public void softDeleteUser(String id, String requesterUserId) {

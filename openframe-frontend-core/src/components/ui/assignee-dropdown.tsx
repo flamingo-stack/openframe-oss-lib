@@ -35,6 +35,16 @@ export interface AssigneeDropdownProps {
    * open a Take Over confirmation for tickets still worked by the AI.
    */
   onTriggerClick?: () => void;
+  /**
+   * Server search. When set, `options` is the server's answer to the query
+   * reported here and is not filtered locally: called with the picker's raw
+   * query on every keystroke (debounce in the caller), and with `''` when the
+   * picker resets — it closes, or a pick clears it — so the caller can go back
+   * to its unfiltered first page. While `isLoading`, the previous rows stay
+   * listed. The selection renders from `currentAssignee`, so it holds whether
+   * or not the current answer includes it.
+   */
+  onSearchChange?: (query: string) => void;
 }
 
 export function AssigneeDropdown(props: AssigneeDropdownProps) {
@@ -51,6 +61,7 @@ function CompactAssigneeDropdown({
   onAssign,
   className,
   onTriggerClick,
+  onSearchChange,
 }: AssigneeDropdownProps) {
   const hasAssignee = !!currentAssignee;
 
@@ -134,6 +145,7 @@ function CompactAssigneeDropdown({
       searchPlaceholder="Search users..."
       emptyText="No users found"
       isLoading={isLoading}
+      onSearchChange={onSearchChange}
       trigger={trigger}
       align="end"
       contentClassName="w-72"
@@ -141,9 +153,23 @@ function CompactAssigneeDropdown({
   );
 }
 
-function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign, className }: AssigneeDropdownProps) {
+function DefaultAssigneeDropdown({
+  currentAssignee,
+  options,
+  isLoading,
+  onAssign,
+  className,
+  onSearchChange,
+}: AssigneeDropdownProps) {
   const [isEditing, setIsEditing] = useState(false);
   const hasAssignee = !!currentAssignee;
+  // Under server search the current assignee is often not in the answer (not
+  // on the first page, or not matching the query), and the field would then
+  // read the raw id. `currentAssignee` already names them.
+  const selectedOptions: TicketAssigneeOption[] | undefined =
+    onSearchChange && currentAssignee
+      ? [{ value: currentAssignee.id, label: currentAssignee.name, imageUrl: currentAssignee.avatarSrc }]
+      : undefined;
 
   const renderOption = useCallback((option: AutocompleteOption) => {
     const opt = option as TicketAssigneeOption;
@@ -176,6 +202,8 @@ function DefaultAssigneeDropdown({ currentAssignee, options, isLoading, onAssign
           }}
           placeholder="Search users..."
           loading={isLoading}
+          onSearchChange={onSearchChange}
+          selectedOptions={selectedOptions}
           showChevron={false}
           startAdornment={
             hasAssignee ? (

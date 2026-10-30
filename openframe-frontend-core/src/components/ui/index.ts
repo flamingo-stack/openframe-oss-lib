@@ -96,6 +96,7 @@ export * from './benefit-card';
 export * from './brand-association-card';
 export * from './brand-association-grid';
 export * from './bullet-list';
+export * from './step-arrow-button';
 export * from './chevron-button';
 export * from './circular-progress';
 export {
@@ -116,6 +117,19 @@ export * from './compliance-badge';
 export * from './feature-card';
 export * from './feature-list';
 export { FloatingTooltip } from './floating-tooltip';
+export {
+  Trendline,
+  TrendHistory,
+  TREND_TONES,
+  formatTrendChange,
+  trendlinePoints,
+  trendTone,
+  trendToneClass,
+  type TrendTone,
+  type TrendlineProps,
+  type TrendHistoryProps,
+  type TrendHistoryColumn,
+} from './trendline';
 export { SourceTooltip, type SourceTooltipProps, type SourceRef } from './source-tooltip';
 export { TruncateText, type TruncateTextProps } from './truncate-text';
 export * from './highlight-card';
@@ -133,6 +147,7 @@ export * from './deleted-user-avatar';
 export * from './square-avatar';
 // THE sizes of the library's components (avatars, icons, tiles, media, text rows).
 export * from '../../styles/component-sizes';
+export * from '../../styles/image-sizes';
 export * from './tab-selector';
 export * from './tag';
 export * from './title-content-block';
@@ -233,7 +248,7 @@ export { IconTile } from './icon-tile';
 export { PolicyLink } from './policy-link';
 export type { DateRange } from 'react-day-picker';
 export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from '../layout/title-block';
-export type { TitleBlockProps, TitleSkeletonLines } from '../layout/title-block';
+export type { TitleBlockProps } from '../layout/title-block';
 export type { SortableColumn, SortConfig, SortDirection } from './sort-column-item';
 export {
   ORGANIZATION_CARD_RADIUS_CLASS,

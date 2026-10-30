@@ -50,6 +50,7 @@ public class SoftwareActionService {
 
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_ACTION = "action";
+    private static final String FIELD_KIND = "kind";
     private static final String FIELD_ENGINE = "packageManager";
 
     private final SoftwareActionAggregationRepository aggregationRepository;
@@ -97,6 +98,7 @@ public class SoftwareActionService {
 
         Map<String, Integer> statuses = new LinkedHashMap<>(aggregationRepository.facet(tenantId, queryFilter, search, FIELD_STATUS));
         Map<String, Integer> actions = new LinkedHashMap<>(aggregationRepository.facet(tenantId, queryFilter, search, FIELD_ACTION));
+        Map<String, Integer> kinds = new LinkedHashMap<>(aggregationRepository.facet(tenantId, queryFilter, search, FIELD_KIND));
         Map<String, Integer> engines = new LinkedHashMap<>(aggregationRepository.facet(tenantId, queryFilter, search, FIELD_ENGINE));
 
         List<SoftwareActionResponse> scheduled = includeScheduled(filter)
@@ -105,6 +107,7 @@ public class SoftwareActionService {
         for (SoftwareActionResponse row : scheduled) {
             bump(statuses, row.getStatus() != null ? row.getStatus().name() : null);
             bump(actions, row.getAction() != null ? row.getAction().name() : null);
+            bump(kinds, row.getKind() != null ? row.getKind().name() : null);
             bump(engines, row.getEngine() != null ? row.getEngine().name() : null);
         }
 
@@ -113,6 +116,7 @@ public class SoftwareActionService {
         return SoftwareActionFilters.builder()
                 .statuses(optionMapper.selfLabeled(statuses))
                 .actions(optionMapper.selfLabeled(actions))
+                .kinds(optionMapper.selfLabeled(kinds))
                 .engines(optionMapper.selfLabeled(engines))
                 .filteredCount((int) filteredCount)
                 .build();
@@ -152,6 +156,7 @@ public class SoftwareActionService {
                         .executionId(executionId)
                         .software(pkg.getPackageName())
                         .action(schedule.getAction())
+                        .kind(schedule.getAction().kind())
                         .engine(pkg.getPackageManager())
                         .status(SoftwareActionStatus.SCHEDULED)
                         .totalMachineCount(deviceCount)
@@ -170,6 +175,10 @@ public class SoftwareActionService {
         if (filter != null) {
             if (filter.getActions() != null && !filter.getActions().isEmpty()
                     && !filter.getActions().contains(schedule.getAction())) {
+                return false;
+            }
+            if (filter.getKinds() != null && !filter.getKinds().isEmpty()
+                    && !filter.getKinds().contains(schedule.getAction().kind())) {
                 return false;
             }
             if (filter.getEngines() != null && !filter.getEngines().isEmpty()
@@ -209,6 +218,7 @@ public class SoftwareActionService {
         return SoftwareActionQueryFilter.builder()
                 .statuses(input.getStatuses())
                 .actions(input.getActions())
+                .kinds(input.getKinds())
                 .engines(input.getEngines())
                 .build();
     }
@@ -222,11 +232,14 @@ public class SoftwareActionService {
                 .id(SoftwareActionId.of(s.getExecutionId(), s.getBundleId(), s.getScheduleId()).encode())
                 .executionId(s.getExecutionId())
                 .software(s.getPackageName())
+                .version(s.getVersion())
                 .action(s.getAction())
+                .kind(s.getKind())
                 .engine(s.getPackageManager())
                 .status(s.getStatus())
                 .totalMachineCount(s.getTotalMachineCount())
                 .respondedMachineCount(s.getRespondedMachineCount())
+                .waitingMachineCount(s.getWaitingMachineCount())
                 .dispatchedAt(s.getDispatchedAt())
                 .initiatedBy(s.getInitiatedBy())
                 .bundleId(s.getBundleId())

@@ -78,7 +78,8 @@ public class ScriptDeliveryRetryService {
 
     private Map<DeliveryKey, List<ScriptExecution>> findStuckQueuedByDelivery(Instant now) {
         return scriptExecutionRepository
-                .findByStatusAndDispatchedAtBefore(ExecutionStatus.QUEUED, now.minusSeconds(queuedThresholdSeconds))
+                .findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(
+                        ExecutionStatus.QUEUED, now.minusSeconds(queuedThresholdSeconds))
                 .stream()
                 .filter(row -> row.getExecutionId() != null && row.getMachineId() != null)
                 .collect(groupingBy(row -> new DeliveryKey(row.getExecutionId(), row.getMachineId())));

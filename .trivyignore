@@ -1,3 +1,7 @@
-# Vulnerabilities to skip in the Trivy scan: one CVE/GHSA id per line, e.g.:
+# Findings to skip in the Trivy scans: a CVE, GHSA or check ID (e.g. DS-0002), one per line.
+# Reason and owner go on a comment line above it, an expiry on the ID line, e.g.:
 #
-# CVE-2026-12345
+# CVE-2026-12345 exp:2026-12-31
+
+# rustls-webpki 0.102.8 in clients/openframe-client, pulled by async-nats 0.42 (flamingo-stack/nats.rs fork); fix: move the fork to async-nats >= 0.47. Owner: @flamingo-stack/client-engineers
+GHSA-82j2-j2ch-gfr8 exp:2027-06-01

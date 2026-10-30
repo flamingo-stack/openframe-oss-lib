@@ -15,6 +15,7 @@ import { ApprovalRequestMessage } from './approval-request-message';
 import { AskDisplay } from './ask-display';
 import { ChatAppearanceContext, useChatAppearance } from './chat-appearance-context';
 import { ChatContextChipStrip } from './chat-context-picker';
+import { ChatMarkdownLink } from './chat-markdown-link';
 import {
   CHAT_MESSAGE_FACE_PX,
   CHAT_MESSAGE_HEADER_CLASS,
@@ -446,14 +447,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               return <span className="text-ods-text-secondary opacity-60">{cardId}</span>;
             }
           }
-          // Unified click rule — delegated to the host's `NavLinkAnchor`
-          // component. The host wraps its own `useNavLink` hook so EVERY
-          // clickable surface (source chips, inline cards, search rows,
-          // action cards, chat-markdown links) shares the same routing
-          // decision: modifier-clicks pass through, cross-origin → new
-          // tab, in-page doc-tree path → soft swap, same-origin → soft
-          // RSC nav. Single mental model across the app, single source
-          // of truth in the hub.
+          // The host's `NavLinkAnchor` draws the link (the lib's
+          // `NavLinkAnchorViaRuntime`, or a host anchor over the same
+          // `useNavLinkViaRuntime`), so every clickable surface (source chips,
+          // inline cards, search rows, markdown links) follows the one
+          // navigation decision (`navLinkTarget`) and executor.
           //
           // Anchor-only links (`#section`) bypass NavLinkAnchor — the
           // host's router would treat them as navigation, but the user
@@ -461,13 +459,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           //
           // When the host has NOT supplied `NavLinkAnchor` (e.g. the
           // flamingo hero-demo with mock content), fall back to a plain
-          // `<a href>`. No cross-origin sniffing here — the OSS-lib does
-          // not own routing decisions; the host does.
+          // `<a href>`.
           if (typeof href === 'string' && NavLinkAnchor && !href.startsWith('#')) {
             return (
-              <NavLinkAnchor href={href} className={linkClassName} {...rest}>
+              <ChatMarkdownLink anchor={NavLinkAnchor} href={href} className={linkClassName} {...rest}>
                 {children}
-              </NavLinkAnchor>
+              </ChatMarkdownLink>
             );
           }
           return (

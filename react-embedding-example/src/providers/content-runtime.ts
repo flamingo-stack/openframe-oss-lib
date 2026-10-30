@@ -1,8 +1,9 @@
 // ONE factory for both lib runtime contexts. Every endpoint comes from EP, so the
 // `/content` base is the single source. Mounted (memoized) in app-providers.tsx.
 import type { ChatRuntime, EndpointsRuntime } from '@flamingo-stack/openframe-frontend-core/contexts'
-import { buildListUrl, makeComposeContentUrl, DEV_SECTION_PARAM_KEYS, faqItemAnchor } from '@flamingo-stack/openframe-frontend-core/utils'
+import { buildListUrl, makeComposeContentUrl, DEFAULT_CONTENT_SUFFIXES, DEV_SECTION_PARAM_KEYS, faqItemAnchor } from '@flamingo-stack/openframe-frontend-core/utils'
 import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
+import { DOCS_BASE_ROUTE } from '../config/content'
 import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 
 // The content types THIS embedder hosts on its own slugged DETAIL routes (see
@@ -14,14 +15,17 @@ import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 // have no `/<x>/<slug>` detail page; a chat card / page link deep-links into the
 // existing LIST route via `?search=<id>` (see `overrides` below). Suffix logic would
 // wrongly produce `/<suffix>/<id>`, so they need an explicit override instead.
-const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release'])
+// `markdown` (the product docs) is hosted too: this app mounts its own `<DocsHubPage>` at `DOCS_BASE_ROUTE`, so a
+// doc card or chip opens there, by the same rule as every hosted type.
+const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release', 'markdown'])
+const SUFFIXES = { ...DEFAULT_CONTENT_SUFFIXES, markdown: DOCS_BASE_ROUTE.replace(/^\/+/, '') }
 
 // The embedder is platform-agnostic: it does NOT set `source` (the lib types it as
 // optional). The chat wire resolves source server-side from the proxied hub's
 // currentPlatform(); client-side link decisions fall back to an origin comparison; and
 // the chat-history localStorage namespace falls back to a lib constant. So pointing
 // HUB_ORIGIN at any platform's hub just works — no platform knob anywhere on the client.
-export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
+export function buildChatRuntime(navigate: ChatRuntime['navigation']['navigate']): Omit<ChatRuntime, 'source'> {
   return {
     endpoints: {
       chatStreamUrl: EP.chatStream,
@@ -72,10 +76,11 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
       ticketReadUrl: EP.ticketRead,
     },
     navigation: {
-      // 'host' = this app owns routing. react-router is registered into the lib's
-      // embed-shims (embed-router-bridge), so the lib soft-navigates through that
-      // router directly — no `navigate` callback or app-side bridge needed.
+      // 'host' = this app owns routing: every same-tab link the lib opens goes
+      // through `navigate` (react-router, see app-providers.tsx), as in the hub and
+      // the OpenFrame app.
       mode: 'host',
+      navigate,
     },
     // OG-placeholder fallback: NO wiring needed. The lib owns the default URL
     // construction now and derives the route's base from `imageProxyUrlPrefix`
@@ -89,6 +94,7 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
     composeContentUrl: makeComposeContentUrl({
       hostedTypes: HOSTED_TYPES,
       contentOrigin: HUB_PUBLIC_ORIGIN,
+      suffixes: SUFFIXES,
       // List-filter types deep-link into their EXISTING list route with `?search=<id>`
       // — the param `DevSectionView` writes and `RoadmapView` / `DeliveryLists` read.
       // (Verified against the live hub: /api/roadmap + /api/delivery match the task id
@@ -111,23 +117,6 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
         faq: (id) => ({ href: `/faqs#${faqItemAnchor(id)}`, targetPlatform: null }),
       },
     }),
-    // Per-documentType doc-viewer targets. Doc chips with NO public externalUrl
-    // resolve here when their documentType has an entry — the lib emits
-    // `getPlatformUrl(platform)/<basePath>/<path>` and opens it in a NEW TAB.
-    //
-    // `markdown` is intentionally OMITTED — this embedder now mounts its OWN
-    // `<DocsHubPage>` at /knowledge-base (see app-routes.tsx + pages/knowledge-base.tsx),
-    // so markdown chips should soft-navigate IN-APP via react-router instead. With
-    // `markdown` absent here, the lib's chip resolver falls through to the surface's
-    // `baseRoute` (set on `<EmbeddableChat>` in ask-ai.tsx), producing a relative
-    // `<a href="/knowledge-base/<path>">` the registered react-router intercepts.
-    //
-    // `data_room_doc` is kept cross-domain to company-hub — this embedder doesn't host
-    // a data-room viewer, so those chips correctly open in a new tab against the canonical
-    // hub URL.
-    docPlatformTargets: {
-      data_room_doc: { platform: 'company-hub', basePath: 'data-room' },
-    },
   }
 }
 

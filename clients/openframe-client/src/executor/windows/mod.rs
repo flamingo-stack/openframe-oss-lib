@@ -9,8 +9,10 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 
-use crate::executor::tempfile::{temp_script_name, TempFileGuard};
+use crate::executor::tempfile::{temp_script_name, write_temp_script, TempFileGuard};
 use crate::executor::{ExecResult, ScriptParams};
+use crate::platform::directories::get_app_support_directory;
+use crate::platform::powershell::{get_powershell_path, resolve_system32_exe};
 
 pub(crate) struct Interpreter {
     pub exe: String,
@@ -94,10 +96,7 @@ fn spawn_error(msg: String) -> ExecResult {
 fn resolve_interpreter(shell: &str) -> Option<Interpreter> {
     match shell {
         "powershell" => Some(Interpreter {
-            exe: resolve_exe(
-                r"System32\WindowsPowerShell\v1.0\powershell.exe",
-                "powershell.exe",
-            ),
+            exe: get_powershell_path(),
             flags: &[
                 "-NonInteractive",
                 "-NoProfile",
@@ -108,7 +107,7 @@ fn resolve_interpreter(shell: &str) -> Option<Interpreter> {
             ext: "ps1",
         }),
         "cmd" => Some(Interpreter {
-            exe: resolve_exe(r"System32\cmd.exe", "cmd.exe"),
+            exe: resolve_system32_exe(r"System32\cmd.exe", "cmd.exe"),
             flags: &["/C"],
             ext: "bat",
         }),
@@ -116,24 +115,8 @@ fn resolve_interpreter(shell: &str) -> Option<Interpreter> {
     }
 }
 
-fn resolve_exe(system32_rel: &str, bare: &str) -> String {
-    let windir = std::env::var_os("WINDIR")
-        .or_else(|| std::env::var_os("SystemRoot"))
-        .map(PathBuf::from);
-    if let Some(windir) = windir {
-        let abs = windir.join(system32_rel);
-        if abs.is_file() {
-            return abs.to_string_lossy().into_owned();
-        }
-    }
-    bare.to_string()
-}
-
 fn win_tmp_dir() -> Result<PathBuf> {
-    let base = std::env::var_os("PROGRAMDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
-    let dir = base.join("OpenFrame");
+    let dir = get_app_support_directory();
     std::fs::create_dir_all(&dir).map_err(|e| anyhow!("failed to create temp dir: {e}"))?;
     Ok(dir)
 }
@@ -141,8 +124,7 @@ fn win_tmp_dir() -> Result<PathBuf> {
 fn create_temp_script(code: &str, ext: &str) -> Result<PathBuf> {
     let dir = win_tmp_dir()?;
     let path = dir.join(temp_script_name(ext));
-    std::fs::write(&path, code.as_bytes())
-        .map_err(|e| anyhow!("failed to write temp script: {e}"))?;
+    write_temp_script(&path, code, ext).map_err(|e| anyhow!("failed to write temp script: {e}"))?;
     Ok(path)
 }
 

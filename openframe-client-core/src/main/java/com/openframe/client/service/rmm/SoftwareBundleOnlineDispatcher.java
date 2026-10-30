@@ -11,13 +11,16 @@ import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
+import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
+import com.openframe.data.service.rmm.software.PackageAutoUpdatePolicyService;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
+import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -38,6 +41,9 @@ public class SoftwareBundleOnlineDispatcher {
     private final SoftwareNatsPublisher softwareNatsPublisher;
     private final ScriptDeliveryRetryStore retryStore;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final PackageUpdateEligibilityService packageUpdateEligibility;
+    private final PackageUpdateDispatchService packageUpdateDispatchService;
+    private final PackageAutoUpdatePolicyService autoUpdatePolicyService;
 
     public void dispatch(SoftwareBundle bundle, Machine machine) {
         if (bundle.getPackages() == null || bundle.getPackages().isEmpty()) {
@@ -48,12 +54,13 @@ public class SoftwareBundleOnlineDispatcher {
                     bundle.getId(), machine.getMachineId());
             return;
         }
+        boolean viaOrder = packageUpdateEligibility.isEligible(bundle.getAction(), machine);
         for (SoftwareBundlePackage pkg : bundle.getPackages()) {
-            dispatchPackage(bundle, pkg, machine);
+            dispatchPackage(bundle, pkg, machine, viaOrder);
         }
     }
 
-    private void dispatchPackage(SoftwareBundle bundle, SoftwareBundlePackage pkg, Machine machine) {
+    private void dispatchPackage(SoftwareBundle bundle, SoftwareBundlePackage pkg, Machine machine, boolean viaOrder) {
         String machineId = machine.getMachineId();
         PackageManagerHandler handler = packageManagerRegistry.handlerFor(pkg.getPackageManager());
         SoftwareScriptCode code = handler.scriptCode(bundle.getAction());
@@ -76,10 +83,8 @@ public class SoftwareBundleOnlineDispatcher {
             return;
         }
 
-        List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
         String executionId = SoftwareExecutionId.forBundle(bundle.getId(), pkg.getPackageManager(), pkg.getPackageName());
-
-        scriptExecutionRepository.saveQueued(RunningExecutionRows.builder()
+        RunningExecutionRows rows = RunningExecutionRows.builder()
                 .tenantId(bundle.getTenantId())
                 .executionId(executionId)
                 .scriptId(script.getId())
@@ -92,7 +97,16 @@ public class SoftwareBundleOnlineDispatcher {
                 .packageName(pkg.getPackageName())
                 .softwareAction(bundle.getAction())
                 .softwareBundleId(bundle.getId())
-                .build());
+                .build();
+        if (viaOrder) {
+            autoUpdatePolicyService.turnOn(rows, pkg.getBrewPackageType(), pkg.getSoftwareId(),
+                    bundle.getAutoUpdate(), bundle.getUpdateSettings());
+            packageUpdateDispatchService.dispatchAdminUpdate(rows, pkg.getBrewPackageType(), bundle.getUpdateSettings());
+            return;
+        }
+
+        List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
+        scriptExecutionRepository.saveQueued(rows);
 
         ScriptMessage message = ScriptMessage.builder()
                 .executionId(executionId)

@@ -32,8 +32,13 @@ public class MachineDelivery implements TenantScoped {
     private DeliveryStatus status;
     private int attempts;
     private int errors;
+    // runs the row went through after its first: the policy's max-runs bounds reruns + 1
+    private int reruns;
     private String dispatchId;
     private int sequence;
+    // the body in machine_delivery_payload; rows written before that store carry their body inline in payloadJson
+    // and are read that way until they expire
+    private String payloadId;
     private String payloadJson;
 
     private Instant dispatchedAt;

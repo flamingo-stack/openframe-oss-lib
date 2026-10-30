@@ -89,6 +89,7 @@ import { SimpleMarkdownRenderer, RichMarkdownRenderer } from '../markdown';
 import {
   __buildCloserHaystackForTest,
   __findInlineCodeRangesForTest,
+  buildEffectiveTagSet,
   escapeUnknownHtmlTags,
 } from '../markdown/sanitize';
 import { splitStreamingBlocks } from '../markdown/streaming';
@@ -775,6 +776,18 @@ function normalize(html: string): string {
 // ---------------------------------------------------------------------------
 // SimpleMarkdownRenderer parity
 // ---------------------------------------------------------------------------
+/**
+ * The chat surface (Simple) no longer admits `iframe` at all, so it escapes every `<iframe>` whatever surrounds it,
+ * and a case about the RAWTEXT handling of an iframe proves nothing there. Such a case runs where an iframe can still
+ * be live: authored content (Rich), and the pre-pass with `iframe` admitted. Every other case is unchanged.
+ */
+const IFRAME_TAGS = buildEffectiveTagSet(['iframe']);
+const hasIframe = (md: string) => /<iframe/i.test(md);
+const tagsFor = (md: string) => (hasIframe(md) ? IFRAME_TAGS : undefined);
+function RawtextRenderer({ content }: { content: string }) {
+  return hasIframe(content) ? <RichMarkdownRenderer content={content} /> : <SimpleMarkdownRenderer content={content} />;
+}
+
 describe('SimpleMarkdownRenderer golden parity', () => {
   for (const [name, md] of Object.entries(SHARED_FIXTURES)) {
     it(`renders fixture: ${name}`, async () => {
@@ -873,7 +886,7 @@ describe('closer-search mask', () => {
     'rawtext-closer-after-info-string-closer-does-not-unescape',
   ])('escapes the prose opener when the only closer is code: %s', async name => {
     const md = SHARED_FIXTURES[name];
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('textarea').length, name).toBe(0);
     // …and the document after the opener is still structured markdown.
     expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
@@ -885,7 +898,7 @@ describe('closer-search mask', () => {
   // pushed verbatim.
   it('does not shelter a live opener inside a mismatched carve span', async () => {
     const md = SHARED_FIXTURES['mismatched-fence-carve-does-not-shelter-opener'];
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('textarea').length).toBe(0);
     // The text after the opener survives instead of becoming a textarea value.
     expect(container.textContent).toContain('after');
@@ -900,7 +913,7 @@ describe('closer-search mask', () => {
     'rawtext-opener-in-html-block-pre-not-sheltered',
     'rawtext-opener-in-html-block-details-not-sheltered',
   ])('does not shelter an opener inside an HTML block: %s', async name => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+    const container = await renderStable(<RawtextRenderer content={SHARED_FIXTURES[name]} />);
     expect(container.querySelectorAll('textarea').length, name).toBe(0);
     expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
     expect(container.textContent, name).toContain('secret tail');
@@ -917,7 +930,7 @@ describe('closer-search mask', () => {
     'rawtext-opener-in-inline-code-in-html-block-details-not-sheltered',
     'rawtext-opener-in-inline-code-in-html-block-span-not-sheltered',
   ])('does not shelter an opener in INLINE CODE inside an HTML block: %s', async name => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+    const container = await renderStable(<RawtextRenderer content={SHARED_FIXTURES[name]} />);
     expect(container.querySelectorAll('textarea').length, name).toBe(0);
     expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
     expect(container.textContent, name).toContain('secret tail');
@@ -928,7 +941,7 @@ describe('closer-search mask', () => {
   // to match. Pinned because that safety is a coupling, not a local property.
   it('is inert for a slash not immediately before the closing bracket', async () => {
     const container = await renderStable(
-      <SimpleMarkdownRenderer content={SHARED_FIXTURES['rawtext-slash-not-immediately-before-gt-is-inert']} />,
+      <RawtextRenderer content={SHARED_FIXTURES['rawtext-slash-not-immediately-before-gt-is-inert']} />,
     );
     expect(container.querySelectorAll('textarea').length).toBe(0);
     expect(container.querySelector('h2')?.textContent).toBe('After heading');
@@ -939,8 +952,8 @@ describe('closer-search mask', () => {
   // Entity refs are not decoded there, so the reader sees a literal `&lt;`.
   it('does not escape a bare `<` inside an indented code block', async () => {
     const md = SHARED_FIXTURES['indented-code-angle-bracket-not-escaped'];
-    expect(escapeUnknownHtmlTags(md)).toBe(md);
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).toBe(md);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelector('code')?.textContent).toBe('if a <b then\ndone\n');
   });
 
@@ -952,13 +965,13 @@ describe('closer-search mask', () => {
     ['fenced', 'Para\n\n```\n<div ' + 'b'.repeat(5000) + '>\n```\n'],
     ['inline', 'Hi `<div ' + 'b'.repeat(3000) + '>` there'],
   ])('leaves an over-long tag inside code unescaped: %s', (_name, md) => {
-    expect(escapeUnknownHtmlTags(md)).not.toContain('&lt;div');
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).not.toContain('&lt;div');
   });
 
   // …while the SAME shape in PROSE still fails closed (the round-11 fix).
   it('still escapes an over-long tag written in prose', () => {
     const md = 'Hello\n\n<iframe src="' + 'b'.repeat(5000) + '">\n\n## After heading\n';
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;iframe');
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).toContain('&lt;iframe');
   });
 
   // Round-11: HTML ignores the self-closing flag on non-void, non-foreign
@@ -970,7 +983,7 @@ describe('closer-search mask', () => {
     'rawtext-self-closing-iframe-escaped',
     'rawtext-self-closing-title-escaped',
   ])('escapes a SELF-CLOSING rawtext opener: %s', async name => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+    const container = await renderStable(<RawtextRenderer content={SHARED_FIXTURES[name]} />);
     expect(container.querySelectorAll('textarea').length, name).toBe(0);
     expect(container.querySelectorAll('iframe').length, name).toBe(0);
     expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
@@ -979,7 +992,7 @@ describe('closer-search mask', () => {
 
   it('escapes a self-closing rawtext opener written INLINE in prose', async () => {
     const container = await renderStable(
-      <SimpleMarkdownRenderer content={SHARED_FIXTURES['rawtext-self-closing-textarea-inline-escaped']} />,
+      <RawtextRenderer content={SHARED_FIXTURES['rawtext-self-closing-textarea-inline-escaped']} />,
     );
     expect(container.querySelectorAll('textarea').length).toBe(0);
     expect(container.textContent).toContain('<textarea/>');
@@ -1010,8 +1023,8 @@ describe('closer-search mask', () => {
   ])('does not shelter an opener inside a CONTAINER-nested HTML block: %s', async (name, tag) => {
     const md = SHARED_FIXTURES[name];
     // The sanitizer must actually act on it (the round-13 symptom was a no-op).
-    expect(escapeUnknownHtmlTags(md), name).not.toBe(md);
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md)), name).not.toBe(md);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll(tag).length, name).toBe(0);
     expect(container.querySelector('h2')?.textContent, name).toBe('After heading');
     expect(container.textContent, name).toContain('secret tail');
@@ -1035,7 +1048,7 @@ describe('closer-search mask', () => {
   ])('does not shelter an opener behind a column-miscounted container: %s', async (name, tag) => {
     const md = SHARED_FIXTURES[name];
     // The sanitizer must actually act on it (the symptom was a byte-identical no-op).
-    expect(escapeUnknownHtmlTags(md), name).not.toBe(md);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md)), name).not.toBe(md);
     for (const [label, Renderer] of [
       ['simple', SimpleMarkdownRenderer],
       ['rich', RichMarkdownRenderer],
@@ -1052,7 +1065,7 @@ describe('closer-search mask', () => {
     ['- <div>\n  `<textarea>`\n\n## After heading\n\nsecret tail\n'],
     ['> <div>\n> `<textarea>`\n\n## After heading\n\nsecret tail\n'],
   ])('the filler-less control was already safe: %#', async md => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('textarea').length).toBe(0);
   });
 
@@ -1066,7 +1079,7 @@ describe('closer-search mask', () => {
     // The line after the filler is outside the block, so a protected span there
     // is ordinary inline code and is left verbatim.
     const withSpan = md.replace('after', '`<textarea>`');
-    expect(escapeUnknownHtmlTags(withSpan)).toBe(withSpan);
+    expect(escapeUnknownHtmlTags(withSpan, tagsFor(withSpan))).toBe(withSpan);
   });
 
   // Round-11: the WHOLE swallow corpus, re-run in the SELF-CLOSING spelling.
@@ -1201,8 +1214,8 @@ describe('closer-search mask', () => {
     const bare = eolize(SHARED_FIXTURES[name]);
     const md = eolize(selfClose(SHARED_FIXTURES[name]));
     expect(md, name).not.toBe(bare); // the rewrite actually applied
-    const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />);
-    const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const bareEl = await renderStable(<RawtextRenderer content={bare} />);
+    const selfEl = await renderStable(<RawtextRenderer content={md} />);
     // ABSOLUTE: no swallow in EITHER spelling, independent of the comparison.
     const expected = LIVE_RAWTEXT_EXPECTED[name] ?? 0;
     for (const [label, el] of [
@@ -1501,8 +1514,8 @@ describe('closer-search mask', () => {
     const eolize = LINE_ENDINGS[eol];
     const bare = eolize(wrap(SHARED_FIXTURES[name]));
     const md = eolize(selfClose(wrap(SHARED_FIXTURES[name])));
-    const bareEl = await renderStable(<SimpleMarkdownRenderer content={bare} />);
-    const selfEl = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const bareEl = await renderStable(<RawtextRenderer content={bare} />);
+    const selfEl = await renderStable(<RawtextRenderer content={md} />);
     const expected = LIVE_RAWTEXT_EXPECTED[name] ?? 0;
     for (const [label, el] of [
       ['bare', bareEl],
@@ -1579,8 +1592,8 @@ describe('closer-search mask', () => {
     const md =
       'Embedding <iframe src="https://evil.example/x" width="600"> explained.\n\n' +
       '[a](/x "</iframe>")\n\n## After heading\n\nsecret tail\n';
-    expect(escapeUnknownHtmlTags(md)).not.toBe(md);
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).not.toBe(md);
+    const el = await renderStable(<RawtextRenderer content={md} />);
     expect(el.querySelectorAll('iframe').length).toBe(0);
     expect(el.textContent).toContain('secret tail');
   });
@@ -1595,8 +1608,8 @@ describe('closer-search mask', () => {
     const md =
       'Embed: <iframe src="https://evil.example/x" width="600" height="400">\n\n' +
       '![</iframe>](/x)\n\n## After heading\n\nsecret tail\n';
-    expect(escapeUnknownHtmlTags(md)).not.toBe(md);
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).not.toBe(md);
+    const el = await renderStable(<RawtextRenderer content={md} />);
     expect(el.querySelectorAll('iframe').length).toBe(0);
     expect(el.textContent).toContain('secret tail');
   });
@@ -1610,7 +1623,7 @@ describe('closer-search mask', () => {
     ['inline link text', 'The <textarea> element.\n\n[<textarea>hi</textarea>](/x)\n'],
     ['shortcut reference', 'The <textarea> element.\n\n[</textarea>]\n\n[</textarea>]: /x\n'],
   ])('leaves REMARK-EMITTED bracket text visible: %s', (_label, md) => {
-    expect(escapeUnknownHtmlTags(md)).toBe(md);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).toBe(md);
   });
 
   // -------------------------------------------------------------------------
@@ -1634,8 +1647,8 @@ describe('closer-search mask', () => {
     ['definition label', `[${capFiller}]: /x "</textarea>"`],
   ])('an OVER-CAP shelter still blanks: %s', async (_label, shelter) => {
     const md = 'The <textarea> element explained.\n\n' + shelter + '\n\n## After heading\n\nsecret tail\n';
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;');
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).toContain('&lt;textarea&gt;');
+    const el = await renderStable(<RawtextRenderer content={md} />);
     expect(el.querySelectorAll('textarea').length).toBe(0);
     expect(el.textContent).toContain('secret tail');
   });
@@ -1645,7 +1658,7 @@ describe('closer-search mask', () => {
     ['definition title', `[a]: /x "${okFiller}</textarea>"`],
   ])('…and the UNDER-cap control behaves identically: %s', (_label, shelter) => {
     const md = 'The <textarea> element explained.\n\n' + shelter + '\n\n## After heading\n\nsecret tail\n';
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;');
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).toContain('&lt;textarea&gt;');
   });
 
   // The over-cap escalation, with attributes.
@@ -1653,8 +1666,8 @@ describe('closer-search mask', () => {
     const md =
       'Embed: <iframe src="https://evil.example/x" width="600">\n\n' +
       `[a](/x "${capFiller}</iframe>")\n\n## After heading\n\nsecret tail\n`;
-    expect(escapeUnknownHtmlTags(md)).not.toBe(md);
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).not.toBe(md);
+    const el = await renderStable(<RawtextRenderer content={md} />);
     expect(el.querySelectorAll('iframe').length).toBe(0);
   });
 
@@ -1678,8 +1691,8 @@ describe('closer-search mask', () => {
     const md =
       'See <iframe src="https://evil.example/x" width="600" height="400">.\n\n' +
       '[foo\n</iframe>]: /x\n\n## After heading\n\nsecret tail\n';
-    expect(escapeUnknownHtmlTags(md)).not.toBe(md);
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).not.toBe(md);
+    const el = await renderStable(<RawtextRenderer content={md} />);
     expect(el.querySelectorAll('iframe').length).toBe(0);
     expect(el.textContent).toContain('secret tail');
   });
@@ -1702,7 +1715,7 @@ describe('closer-search mask', () => {
     const masked = __buildCloserHaystackForTest(md);
     expect(masked.length).toBe(md.length);
     expect(masked).toContain('</textarea>');
-    expect(escapeUnknownHtmlTags(md)).toBe(md);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).toBe(md);
   });
 
   // …and the consumption side of the same boundary: a title that OPENS and
@@ -1724,9 +1737,9 @@ describe('closer-search mask', () => {
   // security defect — but the two must now agree.
   it('does not blank a GFM footnote definition', async () => {
     const md = 'Body[^a].\n\n[^a]: <textarea>hi</textarea>\n';
-    expect(escapeUnknownHtmlTags(md)).toBe(md);
-    const el = await renderStable(<SimpleMarkdownRenderer content={md} />);
-    const plain = await renderStable(<SimpleMarkdownRenderer content={'Body.\n\nSee <textarea>hi</textarea>\n'} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).toBe(md);
+    const el = await renderStable(<RawtextRenderer content={md} />);
+    const plain = await renderStable(<RawtextRenderer content={'Body.\n\nSee <textarea>hi</textarea>\n'} />);
     expect(el.querySelectorAll('textarea').length).toBe(plain.querySelectorAll('textarea').length);
     expect(el.textContent).not.toContain('<textarea>');
   });
@@ -1737,7 +1750,7 @@ describe('closer-search mask', () => {
     const md =
       'The <textarea> element[^a] explained.\n\n[^a]: note\n\n[a]: /x "</textarea>"\n\n' +
       '## After heading\n\nsecret tail\n';
-    expect(escapeUnknownHtmlTags(md)).toContain('&lt;textarea&gt;');
+    expect(escapeUnknownHtmlTags(md, tagsFor(md))).toContain('&lt;textarea&gt;');
   });
 
   // -------------------------------------------------------------------------
@@ -1788,7 +1801,7 @@ describe('closer-search mask', () => {
       ['bare', bare],
       ['self-closing', md],
     ] as const) {
-      const el = await renderStable(<SimpleMarkdownRenderer content={src} />);
+      const el = await renderStable(<RawtextRenderer content={src} />);
       // Nothing RAWTEXT may be live, in EITHER tag spelling and at EITHER
       // side of the retired cap.
       expect(el.querySelectorAll(RAWTEXT_SELECTORS.join(',')).length, `${label} / ${spelling}`).toBe(0);
@@ -1939,7 +1952,7 @@ describe('closer-search mask', () => {
     ['inline-code-rawtext-title-not-escaped', '<title>'],
     ['inline-code-rawtext-textarea-not-escaped', '<textarea>'],
   ])('keeps a rawtext tag named in inline code verbatim: %s', async (name, tag) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+    const container = await renderStable(<RawtextRenderer content={SHARED_FIXTURES[name]} />);
     const code = container.querySelector('code');
     expect(code?.textContent, name).toBe(tag);
     expect(container.textContent, name).not.toContain('&lt;');
@@ -1957,7 +1970,7 @@ describe('closer-search mask', () => {
     ['textarea', `Hello\n\n<textarea ${'a'.repeat(5000)}>\n\n## After heading\n\n- item\n`],
     ['unknown', `Hello\n\n<their ${'a'.repeat(5000)}>\n\n## After heading\n\n- item\n`],
   ])('escapes a tag whose attribute run exceeds the regex cap: %s', async (tag, md) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll(tag).length, tag).toBe(0);
     expect(container.querySelector('h2')?.textContent, tag).toBe('After heading');
     expect(container.querySelectorAll('li').length, tag).toBe(1);
@@ -1973,7 +1986,7 @@ describe('closer-search mask', () => {
       'plain text with no tags at all',
       '`<title>` in code',
     ]) {
-      expect(escapeUnknownHtmlTags(src), src).not.toContain('&amp;lt;');
+      expect(escapeUnknownHtmlTags(src, tagsFor(src)), src).not.toContain('&amp;lt;');
     }
   });
 
@@ -1981,14 +1994,14 @@ describe('closer-search mask', () => {
   // written inside a fence cannot shift the content-column stack.
   it('a list marker inside a fence does not unblank later indented code', async () => {
     const container = await renderStable(
-      <SimpleMarkdownRenderer content={SHARED_FIXTURES['list-marker-inside-fence-does-not-shift-indent-columns']} />,
+      <RawtextRenderer content={SHARED_FIXTURES['list-marker-inside-fence-does-not-shift-indent-columns']} />,
     );
     expect(container.querySelectorAll('textarea').length).toBe(0);
   });
 
   it('survives the HTML-block + in-fence-list-marker combination', async () => {
     const container = await renderStable(
-      <SimpleMarkdownRenderer content={SHARED_FIXTURES['list-marker-inside-fence-html-block-combo']} />,
+      <RawtextRenderer content={SHARED_FIXTURES['list-marker-inside-fence-html-block-combo']} />,
     );
     expect(container.querySelectorAll('textarea').length).toBe(0);
     expect(container.querySelector('h1')?.textContent).toBe('Heading after');
@@ -1999,7 +2012,7 @@ describe('closer-search mask', () => {
   // followed by more than 4 spaces.
   it('clamps a list content column when the marker gap exceeds 4 spaces', async () => {
     const container = await renderStable(
-      <SimpleMarkdownRenderer content={SHARED_FIXTURES['wide-list-marker-gap-clamps-content-column']} />,
+      <RawtextRenderer content={SHARED_FIXTURES['wide-list-marker-gap-clamps-content-column']} />,
     );
     expect(container.querySelectorAll('textarea').length).toBe(0);
     expect(container.querySelector('h2')?.textContent).toBe('After heading');
@@ -2011,7 +2024,7 @@ describe('closer-search mask', () => {
   it.each(['comment-marker-in-inline-code-does-not-blank-to-eof', 'truncated-comment-in-fence-does-not-blank-to-eof'])(
     'a `<!--` inside code does not disable later closers: %s',
     async name => {
-      const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+      const container = await renderStable(<RawtextRenderer content={SHARED_FIXTURES[name]} />);
       expect(container.querySelectorAll('textarea').length, name).toBe(1);
     },
   );
@@ -2020,7 +2033,7 @@ describe('closer-search mask', () => {
   it.each(['list-continuation-textarea-stays-live-ordered', 'list-continuation-textarea-stays-live-bullet'])(
     'keeps a list-continuation <textarea> live: %s',
     async name => {
-      const container = await renderStable(<SimpleMarkdownRenderer content={SHARED_FIXTURES[name]} />);
+      const container = await renderStable(<RawtextRenderer content={SHARED_FIXTURES[name]} />);
       expect(container.querySelectorAll('textarea').length, name).toBe(1);
     },
   );
@@ -2030,7 +2043,7 @@ describe('closer-search mask', () => {
   // `<textarea>` inside a blockquote keeps rendering as a real element.
   it('keeps a properly paired <textarea> inside a blockquote live', async () => {
     const md = '> quoted intro\n>\n> <textarea>edit me</textarea>\n\n## After heading\n';
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('textarea').length).toBe(1);
     expect(container.querySelector('h2')?.textContent).toBe('After heading');
   });
@@ -2038,7 +2051,7 @@ describe('closer-search mask', () => {
   it('leaves the opener live when a REAL closer follows, regardless of İ count', async () => {
     for (const n of [0, 20, 25, 60]) {
       const md = `${'İ'.repeat(n)} <textarea>a</textarea>\n\n<textarea>\n\n## Later heading\n\n- item one\n`;
-      const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+      const container = await renderStable(<RawtextRenderer content={md} />);
       // Exactly ONE textarea: the properly closed one. The bare opener must be
       // escaped, so the heading and the list below survive as real elements.
       expect(container.querySelectorAll('textarea').length, `n=${n}`).toBe(1);
@@ -2073,8 +2086,8 @@ describe('closer-search mask', () => {
     ],
     ['other-label-referenced', 'Secret prose.\n\n<textarea>\n\nvisible text [^Other]\n\n[^f]: note body </textarea>\n'],
   ])('escapes the opener when the only closer is an UNREFERENCED footnote body: %s', async (name, md) => {
-    expect(escapeUnknownHtmlTags(md), name).toContain('&lt;');
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md)), name).toContain('&lt;');
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('iframe').length, name).toBe(0);
     expect(container.querySelectorAll('textarea').length, name).toBe(0);
     expect(container.textContent, name).toContain('visible text');
@@ -2085,7 +2098,7 @@ describe('closer-search mask', () => {
   // closer written there is REAL and blanking it would over-escape.
   it('keeps a REFERENCED footnote body live (the round-19 decline, narrowed not dropped)', async () => {
     const md = 'See [^f] here.\n\n[^f]: note <textarea>edit me</textarea>\n';
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('textarea').length).toBe(1);
   });
 
@@ -2097,7 +2110,7 @@ describe('closer-search mask', () => {
     ['case', 'See [^Foo] here.\n\n[^foo]: note <textarea>edit me</textarea>\n'],
     ['whitespace', 'See [^a  b] here.\n\n[^a b]: note <textarea>edit me</textarea>\n'],
   ])('normalizes footnote labels when matching reference to definition: %s', async (name, md) => {
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('textarea').length, name).toBe(1);
   });
 
@@ -2124,8 +2137,8 @@ describe('closer-search mask', () => {
     ['angle autolink', 'S.\n\n<textarea>\n\nvisible text <https://e.example/[^f]>\n\n[^f]: b </textarea>\n'],
     ['literal autolink', 'S.\n\n<textarea>\n\nvisible text https://e.example/x[^f]y\n\n[^f]: b </textarea>\n'],
   ])('escapes the opener when the only "reference" is a PHANTOM: %s', async (name, md) => {
-    expect(escapeUnknownHtmlTags(md), name).toContain('&lt;');
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    expect(escapeUnknownHtmlTags(md, tagsFor(md)), name).toContain('&lt;');
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('textarea').length, name).toBe(0);
     expect(container.textContent, name).toContain('visible text');
   });
@@ -2135,7 +2148,7 @@ describe('closer-search mask', () => {
   it('escapes an attribute-bearing iframe opener behind a phantom reference', async () => {
     const md =
       'S.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text ![[^f]](/i.png)\n\n[^f]: b </iframe>\n';
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('iframe').length).toBe(0);
     expect(container.textContent).toContain('visible text');
   });
@@ -2155,7 +2168,7 @@ describe('closer-search mask', () => {
     ['email autolink (the `[` voids it)', 'v <a[^f]b@e.example> t'],
   ])('keeps the element live for a GENUINE reference: %s', async (name, body) => {
     const md = `S.\n\n<iframe src="https://evil.example/x" width="600">\n\n${body}\n\n[^f]: b </iframe>\n`;
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('iframe').length, name).toBe(1);
   });
 
@@ -2167,7 +2180,7 @@ describe('closer-search mask', () => {
   it('KNOWN RESIDUAL: a reference inside another dead definition still counts', async () => {
     const md =
       'S.\n\n<iframe src="https://evil.example/x" width="600">\n\nvisible text\n\n[^a]: see [^f]\n\n[^f]: b </iframe>\n';
-    const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
+    const container = await renderStable(<RawtextRenderer content={md} />);
     expect(container.querySelectorAll('iframe').length).toBe(1);
   });
 

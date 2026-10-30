@@ -43,14 +43,33 @@ Extend the shared Tailwind config in your project:
 
 ```ts
 import designSystemConfig from '@flamingo-stack/openframe-frontend-core/tailwind.config.ts'
+import { appStyleSources } from '@flamingo-stack/openframe-frontend-core/style-sources'
 
 export default {
-  ...designSystemConfig,
-  content: [
-    './src/**/*.{js,ts,jsx,tsx}',
-    './node_modules/@flamingo-stack/openframe-frontend-core/src/**/*.{js,ts,jsx,tsx}'
-  ]
+  presets: [designSystemConfig],
+  // The files your App Router routes import, yours and this library's: never this library's whole
+  // `dist` or `src`, which puts every component's classes in the stylesheet every page blocks on.
+  content: appStyleSources({ root: __dirname, appDir: 'src/app' }),
 }
+```
+
+`appStyleSources` (`scripts/style-sources.cjs`) walks the import graph from the route files, tree-shaken
+as your bundler does. A host can leave the lazily loaded chat out of the page's stylesheet with
+`firstPaint: true`, and give `EmbeddableChat` a `loadStyles` that loads a full stylesheet built
+without it (see the file's header).
+
+Then send the stylesheet inside each page's HTML, so a page never waits on a second request to paint,
+and hold its size to a budget in your checks (`scripts/next-styles.cjs` says why and what it costs):
+
+```js
+// next.config.mjs
+import { withInlineStyles } from '@flamingo-stack/openframe-frontend-core/next-styles'
+export default withInlineStyles(nextConfig)
+```
+
+```bash
+node node_modules/@flamingo-stack/openframe-frontend-core/dist/build/next-styles.cjs budget \
+  --input src/app/globals.css --config tailwind.config.ts --budget 31500
 ```
 
 ## Package Exports
@@ -67,6 +86,8 @@ export default {
 | `./utils` | Utilities (cn, formatDate, formatPrice, getPlatformUrl, platform-config) |
 | `./types` | TypeScript type definitions |
 | `./styles` | CSS styles and ODS design tokens |
+| `./style-sources` | Tailwind `content` for an app: the files its routes import (`appStyleSources`) |
+| `./next-styles` | The stylesheet inside each page's HTML (`withInlineStyles`) and its size gate (`measureStylesheet`, `budget` command) |
 | `./nats` | NATS WebSocket utilities |
 | `./fonts` | Font configuration |
 

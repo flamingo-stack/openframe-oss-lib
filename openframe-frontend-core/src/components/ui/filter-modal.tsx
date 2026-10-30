@@ -173,7 +173,9 @@ export function FilterModal({
   };
 
   const hasSort = !!sortConfig && sortConfig.columns.length > 0;
-  const hasFilterGroups = filterGroups.length > 0;
+  // A group with no options is skipped below, so it does not count: a modal whose
+  // groups are all empty would otherwise draw a blank body instead of its empty state.
+  const hasFilterGroups = filterGroups.some(group => group.options.length > 0);
   const hasTagFilter = !!tagFilterKeys && tagFilterKeys.length > 0 && !!onTagsChange;
   const isEmpty = !isLoading && !hasSort && !hasFilterGroups && !hasTagFilter && !dateFilter;
 

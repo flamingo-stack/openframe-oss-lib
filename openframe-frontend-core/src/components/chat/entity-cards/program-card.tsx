@@ -33,6 +33,7 @@ import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { MEDIA_ASPECT } from '../../../styles/component-sizes';
+import { IMAGE_SLOT, fixedImageSlot } from '../../../styles/image-sizes';
 import { cn } from '../../../utils/cn';
 import { formatProgramDate, formatProgramDateRange } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
@@ -342,8 +343,12 @@ function MediaGallery({ images, title, optional }: { images: ProgramMedia[]; tit
     setIsModalOpen(false);
     setSelectedImageIndex(null);
   };
+  // A whole-card link (`wholeCardClickable`) puts the gallery INSIDE its anchor, the gallery's modal too (it renders
+  // in place). `stopPropagation` does not stop an anchor from navigating, so a thumbnail opened the gallery and then
+  // followed the card's link. Every click in the gallery is the gallery's own: cancel the link in the capture phase,
+  // before any of its handlers runs, and let the handlers run.
   return (
-    <>
+    <div className="contents" onClickCapture={e => e.preventDefault()}>
       <div className="overflow-x-auto" data-loading-optional={optional || undefined}>
         <div className={DEFAULT_GALLERY_ROW} style={{ width: 'max-content' }}>
           {images.map((mediaItem, index) => (
@@ -358,7 +363,7 @@ function MediaGallery({ images, title, optional }: { images: ProgramMedia[]; tit
                 alt={`${title} photo ${index + 1}`}
                 fill
                 className="object-cover transition-transform duration-200 group-hover/thumb:scale-105"
-                sizes="200px"
+                sizes={fixedImageSlot('preview')}
                 loading="lazy"
                 unoptimized
               />
@@ -372,7 +377,7 @@ function MediaGallery({ images, title, optional }: { images: ProgramMedia[]; tit
         onClose={closeImageModal}
         initialIndex={selectedImageIndex || 0}
       />
-    </>
+    </div>
   );
 }
 
@@ -435,7 +440,15 @@ function ProgramEditorialCard({
       <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn(EDITORIAL_ROW_GRID, className)}>
         <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
           {cover && (
-            <Image src={cover} alt="" fill sizes="120px" className="object-cover" priority={priority} unoptimized />
+            <Image
+              src={cover}
+              alt=""
+              fill
+              sizes={fixedImageSlot('feature')}
+              className="object-cover"
+              priority={priority}
+              unoptimized
+            />
           )}
           {playable && cover && <CardHoverPlay size="md" />}
         </span>
@@ -459,7 +472,7 @@ function ProgramEditorialCard({
             src={cover}
             alt=""
             fill
-            sizes="(min-width: 1024px) 640px, 100vw"
+            sizes={IMAGE_SLOT.column}
             className="object-contain"
             priority={priority}
             unoptimized
@@ -613,7 +626,7 @@ function LoadedProgramCard<T extends BaseProgramItem>({
               src={compactCover}
               alt={item.title}
               fill
-              sizes="56px"
+              sizes={fixedImageSlot('tile')}
               className="object-contain"
               priority={priority}
               unoptimized
@@ -704,7 +717,7 @@ function LoadedProgramCard<T extends BaseProgramItem>({
             src={coverImage}
             alt={item.title}
             fill
-            sizes="(min-width: 1280px) 400px, (min-width: 768px) 320px, 100vw"
+            sizes={IMAGE_SLOT.panel}
             className="object-cover"
             priority={priority}
             unoptimized

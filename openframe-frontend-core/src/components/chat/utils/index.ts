@@ -55,26 +55,33 @@ export { getCommandText } from './tool-call-helpers';
 export { CHIP_ACTION_BUTTON_CLASS } from './chip-action-class';
 export { chatChipClass, type ChipClassOptions } from './chip-styles';
 export {
-  NEW_TAB_FEATURES,
   isModifierClick,
   stripSameOriginToPath,
   resolveExternalNavigation,
   type ExternalNavResolution,
 } from './chat-nav-resolution';
-export { handleChatNavClick, type ChatNavClickInput } from './execute-navigation';
 // The unified navigation-execution primitive — single source of truth for
-// new-tab/same-tab + internal/external + embed/host + the runtime→router→window
-// fallback. Every surface routes through it (handleChatNavClick is now a wrapper).
+// new-tab/same-tab + internal/external + embed/host, through the host's
+// `runtime.navigation.navigate`. Every surface routes through it.
 export {
   executeNavigation,
   executeNavigationImperative,
+  executeNewTabNavigation,
   type ExecuteNavigationClickArgs,
   type ExecuteNavigationImperativeArgs,
   type NavClickEvent,
 } from './execute-navigation';
-export { computeIsNewTab, newTabAnchorAttrs, buildAnchorProps } from './nav-anchor-props';
+export {
+  computeIsNewTab,
+  navLinkTarget,
+  type NavLinkTarget,
+  type NavOpenIn,
+  newTabAnchorAttrs,
+  buildAnchorProps,
+} from './nav-anchor-props';
 export { isCrossOriginUrl } from './is-cross-origin-url';
-export { decideNewTab, type DecideNewTabInput, type NavSurface, type RuntimeMode } from './decide-new-tab';
+export { isRelativeHref, newTabFeatures, newTabRel, type NewTabRel } from './new-tab-rel';
+export { decideNewTab, type DecideNewTabInput, type RuntimeMode } from './decide-new-tab';
 
 // Embed-surface auth moved to `utils/` (embed-proxy-auth-storage /
 // embed-authed-fetch) — import the Embed* names from
