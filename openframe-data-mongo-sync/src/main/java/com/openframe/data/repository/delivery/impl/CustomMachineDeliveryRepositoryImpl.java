@@ -9,6 +9,7 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.delivery.CustomMachineDeliveryRepository;
+import com.openframe.data.repository.delivery.PayloadReplacement;
 import com.openframe.data.repository.delivery.RerunPublication;
 import org.bson.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -36,6 +37,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_RERUNS = "reruns";
     private static final String FIELD_DISPATCH_ID = "dispatchId";
     private static final String FIELD_SEQUENCE = "sequence";
+    private static final String FIELD_PAYLOAD_ID = "payloadId";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_DUE_AT = "dueAt";
@@ -208,6 +210,20 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
                 .set(FIELD_ATTEMPTS, 1)
                 .set(FIELD_DUE_AT, publication.getDueAt());
         return updateOne(notYetPublished, update);
+    }
+
+    // only the dispatch the caller looked at: a body replaced twice at once keeps the later caller's
+    @Override
+    public boolean replacePayload(PayloadReplacement replacement) {
+        String id = replacement.getId();
+        Set<DeliveryStatus> from = replacement.getFrom();
+        String dispatchId = replacement.getDispatchId();
+        Update update = new Update()
+                .set(FIELD_PAYLOAD_ID, replacement.getPayloadId())
+                .set(FIELD_DISPATCH_ID, replacement.getNextDispatchId())
+                .set(FIELD_DUE_AT, replacement.getDueAt())
+                .unset(FIELD_PAYLOAD_JSON);
+        return updateOne(thisDispatch(id, from, dispatchId), update);
     }
 
     private static Update rerun(Instant dueAt) {

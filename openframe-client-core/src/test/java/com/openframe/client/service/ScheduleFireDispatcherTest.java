@@ -1,5 +1,7 @@
 package com.openframe.client.service;
 
+import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -162,7 +164,7 @@ class ScheduleFireDispatcherTest {
 
         verify(scheduleScriptExecutionRepository, never()).save(any());
         verify(scriptExecutionRepository, never()).saveAll(any());
-        verifyNoInteractions(deliveryRouter);
+        verify(deliveryRouter, never()).dispatch(any());   // the router is asked which route holds a machine, nothing is sent
     }
 
     @Test
@@ -274,7 +276,7 @@ class ScheduleFireDispatcherTest {
     }
 
     @Test
-    @DisplayName("dispatch SKIP: an OFFLINE target is skipped — no leaf persisted, nothing published, no reconnect sentinel; only the online device runs")
+    @DisplayName("route before the engine, SKIP: an OFFLINE target is skipped — no leaf persisted, nothing published, no reconnect sentinel; only the online device runs")
     void dispatch_skip_offlineTargetNotDispatched() {
         Instant now = Instant.now();
         ScheduleScript schedule = schedule(List.of("script-a"));
@@ -303,7 +305,7 @@ class ScheduleFireDispatcherTest {
     }
 
     @Test
-    @DisplayName("dispatch RETRY_ON_RECONNECT: OFFLINE target is held (sentinel armed NEW + expiresAt), ONLINE target is dispatched")
+    @DisplayName("route before the engine, RETRY_ON_RECONNECT: OFFLINE target is held here (sentinel armed NEW + expiresAt), ONLINE target is dispatched")
     void dispatch_retryOnReconnect_armsOfflineDispatchesOnline() {
         Instant now = Instant.now();
         ScheduleScript schedule = retrySchedule(List.of("script-a"), 7200L);
@@ -335,7 +337,7 @@ class ScheduleFireDispatcherTest {
     }
 
     @Test
-    @DisplayName("dispatch RETRY_ON_RECONNECT: ALL targets OFFLINE → all armed, nothing published, no header")
+    @DisplayName("route before the engine, RETRY_ON_RECONNECT: ALL targets OFFLINE → all armed here, nothing published, no header")
     void dispatch_retryOnReconnect_allOffline_armsAllNoDispatch() {
         Instant now = Instant.now();
         ScheduleScript schedule = retrySchedule(List.of("script-a"), 3600L);
@@ -349,11 +351,11 @@ class ScheduleFireDispatcherTest {
 
         verify(dispatchRepository, times(2)).save(any(DeviceFirstOnlineDispatch.class));
         verify(scheduleScriptExecutionRepository, never()).save(any());   // no online target → no fire
-        verifyNoInteractions(deliveryRouter);
+        verify(deliveryRouter, never()).dispatch(any());   // the router is asked which route holds a machine, nothing is sent
     }
 
     @Test
-    @DisplayName("dispatch RETRY_ON_RECONNECT: a non-OFFLINE status (e.g. no Machine record) is dispatched, not held")
+    @DisplayName("route before the engine, RETRY_ON_RECONNECT: a target without a Machine record is armed here, not dispatched")
     void dispatch_retryOnReconnect_notOnlineIsArmedNotDispatched() {
         Instant now = Instant.now();
         ScheduleScript schedule = retrySchedule(List.of("script-a"), 3600L);
@@ -391,6 +393,99 @@ class ScheduleFireDispatcherTest {
         assertThat(sentinel.getFirstSeenAt()).isEqualTo(firstSeenAt);
         assertThat(sentinel.getExpiresAt()).isEqualTo(expiresAt);
         assertThat(sentinel.getDispatchedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("route that holds the batch, SKIP: every target is dispatched at once with the skip rule, nothing armed, nobody asked who is online")
+    void dispatch_heldRoute_skip_everyTargetDispatchedWithTheSkipRule() {
+        Instant now = Instant.now();
+        ScheduleScript schedule = schedule(List.of("script-a"));
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-online", "m-offline"));
+        when(deliveryRouter.holdsForOfflineMachine(eq(DeliveryType.SCRIPT_SCHEDULE), anyString())).thenReturn(true);
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
+
+        dispatcher.dispatch(schedule, now);
+
+        ArgumentCaptor<ScheduleScriptExecution> headerCaptor = ArgumentCaptor.forClass(ScheduleScriptExecution.class);
+        verify(scheduleScriptExecutionRepository).save(headerCaptor.capture());
+        assertThat(headerCaptor.getValue().getTotalMachineCount()).isEqualTo(2);
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter, times(2)).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getAllValues()).extracting(ScriptScheduleDeliverySeed::getMachineId).containsExactly("m-online", "m-offline");
+        assertThat(seedCaptor.getAllValues()).allSatisfy(seed -> {
+            assertThat(seed.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
+            assertThat(seed.getReconnectWindowSeconds()).isNull();
+        });
+        verifyNoInteractions(machineRepository, dispatchRepository);
+    }
+
+    @Test
+    @DisplayName("route that holds the batch, RETRY_ON_RECONNECT: every target is dispatched with the schedule's window, nothing armed here")
+    void dispatch_heldRoute_retryOnReconnect_everyTargetDispatchedWithTheWindow() {
+        Instant now = Instant.now();
+        ScheduleScript schedule = retrySchedule(List.of("script-a"), 7200L);
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-online", "m-offline"));
+        when(deliveryRouter.holdsForOfflineMachine(eq(DeliveryType.SCRIPT_SCHEDULE), anyString())).thenReturn(true);
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
+
+        dispatcher.dispatch(schedule, now);
+
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter, times(2)).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getAllValues()).allSatisfy(seed -> {
+            assertThat(seed.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+            assertThat(seed.getReconnectWindowSeconds()).isEqualTo(7200L);
+        });
+        verifyNoInteractions(machineRepository, dispatchRepository);
+    }
+
+    @Test
+    @DisplayName("mixed routes, RETRY_ON_RECONNECT: the machine the engine holds is dispatched with the window, the offline one on the old route is armed here")
+    void dispatch_mixedRoutes_heldDispatchedAndTheOtherArmedHere() {
+        Instant now = Instant.now();
+        ScheduleScript schedule = retrySchedule(List.of("script-a"), 3600L);
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-new", "m-old"));
+        when(deliveryRouter.holdsForOfflineMachine(eq(DeliveryType.SCRIPT_SCHEDULE), anyString()))
+                .thenAnswer(invocation -> "m-new".equals(invocation.getArgument(1)));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m-old", DeviceStatus.OFFLINE)));
+        when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT, "m-old", SCHEDULE_ID))
+                .thenReturn(Optional.empty());
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
+
+        dispatcher.dispatch(schedule, now);
+
+        ArgumentCaptor<DeviceFirstOnlineDispatch> sentinelCaptor = ArgumentCaptor.forClass(DeviceFirstOnlineDispatch.class);
+        verify(dispatchRepository).save(sentinelCaptor.capture());
+        assertThat(sentinelCaptor.getValue().getMachineId()).isEqualTo("m-old");
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo("m-new");
+        assertThat(seedCaptor.getValue().getReconnectWindowSeconds()).isEqualTo(3600L);
+        ArgumentCaptor<ScheduleScriptExecution> headerCaptor = ArgumentCaptor.forClass(ScheduleScriptExecution.class);
+        verify(scheduleScriptExecutionRepository).save(headerCaptor.capture());
+        assertThat(headerCaptor.getValue().getTotalMachineCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("dispatchHeldUntil: one machine, the window is what is left until the deadline")
+    void dispatchHeldUntil_windowIsTheTimeLeftUntilTheDeadline() {
+        Instant now = Instant.parse("2026-09-15T06:05:00Z");
+        ScheduleScript schedule = retrySchedule(List.of("script-a"), 3600L);
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
+
+        dispatcher.dispatchHeldUntil(schedule, "m-off", now, Instant.parse("2026-09-15T06:30:00Z"));
+
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seedCaptor = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo("m-off");
+        assertThat(seedCaptor.getValue().getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+        assertThat(seedCaptor.getValue().getReconnectWindowSeconds()).isEqualTo(1500L);
+        verifyNoInteractions(dispatchRepository);
     }
 
     private static ScheduleScript schedule(List<String> scriptIds) {

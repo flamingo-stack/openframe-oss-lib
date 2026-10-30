@@ -14,7 +14,9 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
@@ -234,13 +236,29 @@ public class ScriptDispatchService {
                     .initiatedBy(initiatedBy)
                     .scripts(scheduledScripts)
                     .build();
-            ScriptScheduleDeliverySeed seed = new ScriptScheduleDeliverySeed(machineId, message);
+            ScriptScheduleDeliverySeed seed = seed(schedule, machineId, message);
             deliveryRouter.dispatch(seed);
         });
 
         log.info("Dispatched schedule run scheduleId={} executionId={} scripts={} machines={}",
                 scheduleId, executionId, runnableScripts.size(), machineIds.size());
         return DispatchResponse.builder().executionId(executionId).build();
+    }
+
+    // the schedule's own rule for a machine that is not online travels with the batch
+    private static ScriptScheduleDeliverySeed seed(ScriptScheduleResponse schedule, String machineId,
+                                                   ScriptScheduleExecutionMessage message) {
+        if (isRetryOnReconnect(schedule)) {
+            return ScriptScheduleDeliverySeed.waitingForReconnect(machineId, message, schedule.getReconnectWindowSeconds());
+        }
+        return ScriptScheduleDeliverySeed.skippingOffline(machineId, message);
+    }
+
+    private static boolean isRetryOnReconnect(ScriptScheduleResponse schedule) {
+        return schedule.getTrigger() == ScheduleScriptTrigger.DATE_TIME
+                && schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT
+                && schedule.getReconnectWindowSeconds() != null
+                && schedule.getReconnectWindowSeconds() > 0;
     }
 
     private DispatchResponse dispatchBatch(String executionId, ScriptResponse script, List<String> machineIds,

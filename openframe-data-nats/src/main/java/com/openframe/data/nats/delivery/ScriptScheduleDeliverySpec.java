@@ -34,6 +34,8 @@ public class ScriptScheduleDeliverySpec implements DeliverySpec<ScriptScheduleDe
                 .targetId(seed.getTargetId())
                 .machineId(seed.getMachineId())
                 .payload(seed.getMessage())
+                .offlineBehavior(seed.getOfflineBehavior())
+                .reconnectWindowSeconds(seed.getReconnectWindowSeconds())
                 .build();
     }
 

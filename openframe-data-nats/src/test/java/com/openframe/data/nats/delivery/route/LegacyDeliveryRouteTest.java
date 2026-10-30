@@ -61,7 +61,7 @@ class LegacyDeliveryRouteTest {
     void send_scriptSchedule_aPlainPublishOnTheMachinesSubject_noStreamBehindIt() {
         // setup
         ScriptScheduleExecutionMessage batch = ScriptScheduleExecutionMessage.builder().executionId("exec-1").build();
-        ScriptScheduleDeliverySeed seed = new ScriptScheduleDeliverySeed(MACHINE_ID, batch);
+        ScriptScheduleDeliverySeed seed = ScriptScheduleDeliverySeed.skippingOffline(MACHINE_ID, batch);
         DeliveryRequest<DeliveryPayload> request = DeliveryRequest.<DeliveryPayload>builder()
                 .type(DeliveryType.SCRIPT_SCHEDULE)
                 .targetId("exec-1")
@@ -174,5 +174,11 @@ class LegacyDeliveryRouteTest {
                 .build();
         doReturn(spec).when(specs).require(type);
         doReturn(request).when(spec).request(any());
+    }
+    @Test
+    void holdsForOfflineMachine_streamBehindTheSubjectKeepsIt_plainPublishDoesNot() {
+        // execution + verifications
+        assertThat(route.holdsForOfflineMachine(DeliveryType.TOOL_INSTALLATION)).isTrue();
+        assertThat(route.holdsForOfflineMachine(DeliveryType.SCRIPT_SCHEDULE)).isFalse();
     }
 }

@@ -59,6 +59,12 @@ public class LegacyDeliveryRoute implements DeliveryRoute {
         return subjectOf(type).broadcast();
     }
 
+    // the stream keeps a message for an agent that is not subscribed at that moment, a plain publish loses it
+    @Override
+    public boolean holdsForOfflineMachine(DeliveryType type) {
+        return subjectOf(type).stream();
+    }
+
     @Override
     public void send(DeliverySeed seed) {
         LegacySubject legacySubject = subjectOf(seed.getType());

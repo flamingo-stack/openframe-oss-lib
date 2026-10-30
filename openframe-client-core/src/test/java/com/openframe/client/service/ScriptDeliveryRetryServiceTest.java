@@ -119,7 +119,7 @@ class ScriptDeliveryRetryServiceTest {
     }
 
     @Test
-    @DisplayName("engine row FAILED as OFFLINE → leaves FAILED with the offline text")
+    @DisplayName("engine row FAILED as OFFLINE → leaves FAILED with the reconnect-window text")
     void engineRowOffline_failsAsOffline() {
         ScriptExecution q = queued("exec-1", "m-1", "s-a");
         when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
@@ -129,7 +129,7 @@ class ScriptDeliveryRetryServiceTest {
         service.retryStuckQueuedDeliveries();
         ArgumentCaptor<List<ScriptExecution>> captor = listCaptor();
         verify(repository).saveAll(captor.capture());
-        assertThat(captor.getValue()).allMatch(r -> r.getError().contains("offline"));
+        assertThat(captor.getValue()).allMatch(r -> r.getError().contains("reconnect window"));
     }
 
     @Test

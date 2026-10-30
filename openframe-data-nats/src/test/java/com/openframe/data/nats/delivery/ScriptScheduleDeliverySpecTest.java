@@ -1,5 +1,6 @@
 package com.openframe.data.nats.delivery;
 
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
@@ -15,6 +16,7 @@ class ScriptScheduleDeliverySpecTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String EXECUTION_ID = "exec-1";
+    private static final long WINDOW_SECONDS = 7_200L;
 
     private final ScriptScheduleDeliverySpec spec = new ScriptScheduleDeliverySpec();
 
@@ -30,7 +32,7 @@ class ScriptScheduleDeliverySpecTest {
     void request_theFiresBatchUnderItsExecutionId_forTheSeedsMachine() {
         // setup
         ScriptScheduleExecutionMessage message = batch();
-        ScriptScheduleDeliverySeed seed = new ScriptScheduleDeliverySeed(MACHINE_ID, message);
+        ScriptScheduleDeliverySeed seed = ScriptScheduleDeliverySeed.skippingOffline(MACHINE_ID, message);
 
         // execution
         DeliveryRequest<ScriptScheduleExecutionMessage> request = spec.request(seed);
@@ -42,6 +44,21 @@ class ScriptScheduleDeliverySpecTest {
         assertThat(request.getAudience()).isEqualTo(DeliveryAudience.MACHINE);
         assertThat(request.getPayload()).isSameAs(message);
         assertThat(request.getPayload().getDelivery()).isNull();
+        assertThat(request.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
+        assertThat(request.getReconnectWindowSeconds()).isNull();
+    }
+
+    @Test
+    void request_aFireThatWaitsForItsMachine_carriesTheSchedulesWindow() {
+        // setup
+        ScriptScheduleDeliverySeed seed = ScriptScheduleDeliverySeed.waitingForReconnect(MACHINE_ID, batch(), WINDOW_SECONDS);
+
+        // execution
+        DeliveryRequest<ScriptScheduleExecutionMessage> request = spec.request(seed);
+
+        // verifications
+        assertThat(request.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+        assertThat(request.getReconnectWindowSeconds()).isEqualTo(WINDOW_SECONDS);
     }
 
     @Test

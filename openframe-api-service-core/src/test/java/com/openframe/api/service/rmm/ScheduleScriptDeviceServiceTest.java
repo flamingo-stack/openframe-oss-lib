@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
@@ -27,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.Optional;
 
@@ -52,6 +54,7 @@ class ScheduleScriptDeviceServiceTest {
     private MachineRepository machineRepository;
     private ScheduleDeviceTargetResolver targetResolver;
     private DeviceOnlineDispatchRepository dispatchRepository;
+    private ScheduleDeliveryRefresher deliveryRefresher;
     private ScheduleScriptDeviceService service;
 
     @BeforeEach
@@ -62,7 +65,8 @@ class ScheduleScriptDeviceServiceTest {
         targetResolver = mock(ScheduleDeviceTargetResolver.class);
         TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
         dispatchRepository = mock(DeviceOnlineDispatchRepository.class);
-        service = new ScheduleScriptDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider, dispatchRepository);
+        deliveryRefresher = mock(ScheduleDeliveryRefresher.class);
+        service = new ScheduleScriptDeviceService(assignedRepository, scheduleRepository, machineRepository, targetResolver, tenantIdProvider, dispatchRepository, deliveryRefresher);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT_ID), any())).thenAnswer(inv -> {
             Collection<String> ids = inv.getArgument(1);
@@ -124,6 +128,7 @@ class ScheduleScriptDeviceServiceTest {
         service.removeDevices(SCHEDULE_ID, List.of("m-1", "m-2"), "user-1");
 
         verify(dispatchRepository).deleteByTenantIdAndScheduleIdAndMachineIdIn(eq(TENANT_ID), eq(SCHEDULE_ID), any());
+        verify(deliveryRefresher).cancelForMachines(eq(SCHEDULE_ID), eq(Set.of("m-1", "m-2")), eq("device removed from the schedule"));
     }
 
     @Test

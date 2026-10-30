@@ -47,15 +47,28 @@ public class DeliveryRouter {
         DeliveryType type = seed.getType();
         String machineId = seed.getMachineId();
         String agentVersion = agentVersions.find(machineId).orElse("");
-        Optional<DeliveryRoute> route = routesOf(type).stream()
-                .filter(candidate -> candidate.canReach(type, agentVersion))
-                .findFirst();
+        Optional<DeliveryRoute> route = reachingRoute(type, agentVersion);
         route.ifPresent(reaching -> reaching.send(seed));
         if (route.isEmpty()) {
             metrics.recordUnreachable(type, DeliveryAudience.MACHINE);
             log.info("No delivery route reaches the machine: type={} machineId={} agentVersion={}", type, machineId, agentVersion);
         }
         return route.isPresent();
+    }
+
+    // whether a command dispatched now for a machine that is not online waits for it on its route: a caller that
+    // used to hold such commands itself keeps doing so only for the machines whose route does not
+    public boolean holdsForOfflineMachine(DeliveryType type, String machineId) {
+        String agentVersion = agentVersions.find(machineId).orElse("");
+        return reachingRoute(type, agentVersion)
+                .map(route -> route.holdsForOfflineMachine(type))
+                .orElse(false);
+    }
+
+    private Optional<DeliveryRoute> reachingRoute(DeliveryType type, String agentVersion) {
+        return routesOf(type).stream()
+                .filter(candidate -> candidate.canReach(type, agentVersion))
+                .findFirst();
     }
 
     private boolean dispatchToEveryMachine(DeliverySeed seed) {

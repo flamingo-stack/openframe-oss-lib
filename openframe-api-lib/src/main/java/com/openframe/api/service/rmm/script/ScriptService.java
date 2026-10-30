@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
+import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.ForbiddenException;
@@ -48,6 +49,7 @@ public class ScriptService {
     private final ScriptTagService scriptTagService;
     private final ScriptTimeoutValidator timeoutValidator;
     private final ScriptPrivilegeValidator privilegeValidator;
+    private final ScheduleDeliveryRefresher deliveryRefresher;
 
     public ScriptResponse create(CreateScriptInput input, String createdBy, ScriptCreationSource creationSource) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -198,6 +200,7 @@ public class ScriptService {
         scriptMapper.updateEntity(existing, input);
         Script saved = scriptRepository.save(existing);
         scriptTagService.replaceTags(saved.getId(), input.getTagIds());
+        deliveryRefresher.refreshForScript(saved.getId());
         log.info("Updated script id={} tenantId={}", saved.getId(), tenantId);
         return scriptMapper.toResponse(saved);
     }

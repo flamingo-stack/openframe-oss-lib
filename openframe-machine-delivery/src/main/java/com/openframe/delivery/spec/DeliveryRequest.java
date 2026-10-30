@@ -1,5 +1,6 @@
 package com.openframe.delivery.spec;
 
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,6 +20,10 @@ public class DeliveryRequest<P extends DeliveryPayload> {
     private final P payload;
     // when the command is due to reach the machine, recorded as the row's dueAt; none = at once
     private final Instant dueAt;
+    // the request's own rule for a machine that is not online, none = the type's policy: a caller whose user chose
+    // per request whether to wait, and how long, says so here
+    private final DeliveryOfflineBehavior offlineBehavior;
+    private final Long reconnectWindowSeconds;
 
     public boolean isForEveryMachine() {
         return audience == DeliveryAudience.EVERY_MACHINE;

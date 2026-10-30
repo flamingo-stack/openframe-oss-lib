@@ -46,6 +46,9 @@ public class ScheduleScriptDeviceService {
     private final ScheduleDeviceTargetResolver targetResolver;
     private final TenantIdProvider tenantIdProvider;
     private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
+    private final ScheduleDeliveryRefresher deliveryRefresher;
+
+    private static final String DEVICE_REMOVED = "device removed from the schedule";
 
     @Transactional
     public void setDevices(String scheduleId, List<String> machineIds, String actorUserId) {
@@ -72,6 +75,7 @@ public class ScheduleScriptDeviceService {
         if (!toRemove.isEmpty()) {
             assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(tenantId, scheduleId, toRemove);
             disarmDeviceOnline(tenantId, scheduleId, toRemove);
+            deliveryRefresher.cancelForMachines(scheduleId, toRemove, DEVICE_REMOVED);
         }
         if (!toAdd.isEmpty()) {
             List<ScheduleScriptMachineAssigned> rows = toAdd.stream()
@@ -137,6 +141,7 @@ public class ScheduleScriptDeviceService {
         Set<String> ids = new LinkedHashSet<>(machineIds);
         long removed = assignedRepository.deleteByTenantIdAndScriptScheduleIdAndMachineIdIn(tenantId, scheduleId, ids);
         disarmDeviceOnline(tenantId, scheduleId, ids);
+        deliveryRefresher.cancelForMachines(scheduleId, ids, DEVICE_REMOVED);
         log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
     }
 

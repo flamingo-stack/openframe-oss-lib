@@ -50,6 +50,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ScheduleScriptService {
 
+    private static final String SCHEDULE_DELETED = "schedule deleted";
+    private static final String SCHEDULE_ARCHIVED = "schedule archived";
     private static final List<ScriptStatus> NAME_UNIQUE_STATUSES =
             List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
 
@@ -59,6 +61,7 @@ public class ScheduleScriptService {
     private final TenantIdProvider tenantIdProvider;
     private final ScheduleDeviceLocalDispatchRepository deviceLocalDispatchRepository;
     private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
+    private final ScheduleDeliveryRefresher deliveryRefresher;
 
     /**
      * Create a new schedule in the current tenant.
@@ -212,6 +215,7 @@ public class ScheduleScriptService {
         rescheduleAfterUpdate(existing, trigger, timeReference, priorStartAt, priorRepeat, tenantId);
 
         ScheduleScript saved = scheduleRepository.save(existing);
+        deliveryRefresher.refreshForSchedule(saved.getId());
         log.info("Updated script schedule id={} tenantId={}", saved.getId(), tenantId);
         return scheduleMapper.toResponse(saved);
     }
@@ -265,6 +269,7 @@ public class ScheduleScriptService {
         existing.setStatus(ScriptStatus.DELETED);
         existing.setStatusChangedAt(Instant.now());
         scheduleRepository.save(existing);
+        deliveryRefresher.cancelForSchedule(id, SCHEDULE_DELETED);
         log.info("Soft-deleted script schedule id={} tenantId={}", id, tenantId);
         return existing.getId();
     }
@@ -291,6 +296,9 @@ public class ScheduleScriptService {
         existing.setStatus(target);
         existing.setStatusChangedAt(Instant.now());
         ScheduleScript saved = scheduleRepository.save(existing);
+        if (target == ScriptStatus.ARCHIVED) {
+            deliveryRefresher.cancelForSchedule(id, SCHEDULE_ARCHIVED);
+        }
         log.info("Script schedule id={} tenantId={} status changed to {}", id, tenantId, target);
         return scheduleMapper.toResponse(saved);
     }

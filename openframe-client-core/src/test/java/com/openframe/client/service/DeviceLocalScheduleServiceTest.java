@@ -1,5 +1,7 @@
 package com.openframe.client.service;
 
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.client.service.rmm.DeviceLocalScheduleService;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.device.DeviceStatus;
@@ -48,13 +50,14 @@ class DeviceLocalScheduleServiceTest {
     @Mock private MachineRepository machineRepository;
     @Mock private ScheduleDeviceLocalDispatchRepository dispatchRepository;
     @Mock private ScheduleFireDispatcher fireDispatcher;
+    @Mock private DeliveryRouter deliveryRouter;
 
     private DeviceLocalScheduleService service;
 
     @BeforeEach
     void setUp() {
         service = new DeviceLocalScheduleService(scheduleRepository, targetResolver, machineRepository,
-                dispatchRepository, fireDispatcher);
+                dispatchRepository, fireDispatcher, deliveryRouter);
         ReflectionTestUtils.setField(service, "catchupSeconds", RECONNECT_WINDOW);
     }
 
@@ -178,6 +181,23 @@ class DeviceLocalScheduleServiceTest {
         verify(fireDispatcher, never()).dispatch(any(ScheduleScript.class), any(), any());
         assertThat(capturedSave().getStatus())
                 .isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.ARMED_FOR_RECONNECT);
+    }
+
+    @Test
+    @DisplayName("RETRY + offline inside the window, the machine's route holds the batch: fired now and held on the route until the deadline")
+    void retryOffline_withinWindow_heldRoute_firedAndHeldOnTheRoute() {
+        Instant now = Instant.parse("2026-09-15T06:05:00Z");
+        stubSchedule(retry(null, RECONNECT_WINDOW), List.of("m-off"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(offline("m-off", "Europe/Kyiv")));
+        when(deliveryRouter.holdsForOfflineMachine(DeliveryType.SCRIPT_SCHEDULE, "m-off")).thenReturn(true);
+
+        service.runDueDeviceLocalSchedules(now);
+
+        verify(fireDispatcher).dispatchHeldUntil(any(ScheduleScript.class), eq("m-off"), eq(now),
+                eq(Instant.parse("2026-09-15T06:30:00Z")));
+        verify(fireDispatcher, never()).armReconnectRetry(any(ScheduleScript.class), any(), any(), any());
+        assertThat(capturedSave().getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.FIRED);
     }
 
     @Test

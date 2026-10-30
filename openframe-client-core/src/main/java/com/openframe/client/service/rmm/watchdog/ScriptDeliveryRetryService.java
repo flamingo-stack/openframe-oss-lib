@@ -34,6 +34,7 @@ public class ScriptDeliveryRetryService {
 
     private static final String DELIVERY_FAILED_ERROR_FORMAT = "Agent could not receive the script after %d delivery attempt(s)";
     private static final String OFFLINE_ERROR_MESSAGE = "Target device is offline; script delivery skipped";
+    private static final String RECONNECT_WINDOW_ERROR_MESSAGE = "Target device did not come online within the reconnect window";
     private static final String CANCELLED_ERROR_MESSAGE = "Script delivery was cancelled before the agent received it";
     private static final String ENGINE_FAILED_ERROR_FORMAT = "Script delivery failed: %s";
 
@@ -109,7 +110,7 @@ public class ScriptDeliveryRetryService {
                 delivery.executionId(), delivery.machineId(), failure, row.getAttempts(), leaves.size());
         if (failure == DeliveryFailure.OFFLINE) {
             watchdogMetrics.recordDeliveryFailedOffline(leaves);
-            return failDelivery(delivery, leaves, now, OFFLINE_ERROR_MESSAGE);
+            return failDelivery(delivery, leaves, now, RECONNECT_WINDOW_ERROR_MESSAGE);
         }
         watchdogMetrics.recordDeliveryFailedExhausted(leaves);
         return failDelivery(delivery, leaves, now, engineFailureText(row));
