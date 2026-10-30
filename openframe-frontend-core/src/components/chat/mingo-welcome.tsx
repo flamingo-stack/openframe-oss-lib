@@ -234,7 +234,7 @@ export function MingoWelcome({
             <AlertCircleIcon className="h-8 w-8 shrink-0 text-ods-text-secondary" />
             <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
               <p className="text-ods-text-primary text-h4">Couldn’t load your chats</p>
-              <p className="text-body-sm text-ods-text-secondary">
+              <p className="text-ods-text-secondary">
                 Something went wrong reaching the server. Check your connection and try again.
               </p>
             </div>

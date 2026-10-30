@@ -6,6 +6,7 @@ import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredException;
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
+import com.openframe.security.oauth.exception.RefreshUpstreamException;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
 import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
@@ -14,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,7 @@ import java.util.Map;
 import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static com.openframe.security.oauth.SecurityConstants.*;
 import static org.springframework.http.HttpHeaders.LOCATION;
+import static org.springframework.http.HttpStatus.BAD_GATEWAY;
 import static org.springframework.http.HttpStatus.FOUND;
 import static org.springframework.util.StringUtils.hasText;
 
@@ -146,7 +149,19 @@ public class OAuthBffController {
                 .onErrorResume(InvalidRefreshTokenException.class, e -> {
                     log.warn("Refresh rejected (cookies preserved): {}", e.getMessage());
                     return Mono.just(unauthorized());
+                })
+                .onErrorResume(RefreshUpstreamException.class, e -> {
+                    log.error("Refresh failed upstream ({}): {}", e.getReason(), e.getMessage());
+                    return Mono.just(statusOnly(e.getHttpStatus()));
+                })
+                .onErrorResume(e -> {
+                    log.error("Refresh failed unexpectedly", e);
+                    return Mono.just(statusOnly(BAD_GATEWAY));
                 });
+    }
+
+    private ResponseEntity<Void> statusOnly(HttpStatus status) {
+        return ResponseEntity.status(status).build();
     }
 
 

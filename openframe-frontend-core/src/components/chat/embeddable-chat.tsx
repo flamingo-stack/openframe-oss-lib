@@ -41,7 +41,6 @@ import { isIOS } from '@react-aria/utils';
 import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { chatProgressLabel } from '../../chat-protocol/progress';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
@@ -306,9 +305,6 @@ export interface EmbeddableChatProps {
    * So agent mode works with ZERO wiring, yet every route stays overridable.
    */
   activeAgentSlug?: string;
-
-  /** Optional agent switcher callback (host renders the agent picker UI). */
-  onAgentChange?: (slug: string) => void;
 
   /**
    * Per-component override for the agent display-config route. Highest
@@ -721,8 +717,7 @@ function useRailPresence(open: boolean): { mounted: boolean; active: boolean } {
  * and the body's list column). The OUTER box transitions its width 0 ⇄ 320 +
  * opacity (so the neighbouring chat block slides smoothly); the INNER keeps a
  * fixed `w-80` so the rail content never squishes mid-animation — it's just
- * clipped by the shrinking outer (`overflow-hidden`). One easing both ways;
- * the collapse runs a touch longer than the open for a soft close.
+ * clipped by the shrinking outer (`overflow-hidden`).
  */
 function RailSlot({
   active,
@@ -745,7 +740,7 @@ function RailSlot({
         // Border on the OUTER so the rail/chat divider tracks the animating
         // boundary (and fades out with the panel) instead of vanishing early.
         'shrink-0 overflow-hidden border-r border-ods-border transition-[width,opacity] ease-out',
-        active ? cn('duration-[240ms] opacity-100', width) : 'duration-[300ms] w-0 opacity-0',
+        active ? cn('opacity-100', width) : 'w-0 opacity-0',
         className,
       )}
     >
@@ -1136,7 +1131,6 @@ function EmbeddableChatInner({
   activeMode: controlledActiveMode,
   onActiveModeChange,
   activeAgentSlug,
-  onAgentChange: _onAgentChange,
   aiAgentConfigUrl: aiAgentConfigUrlProp,
   defaultActiveMode,
   shell = 'drawer',
@@ -1427,7 +1421,6 @@ function EmbeddableChatInner({
   const {
     messages: rawMessages,
     isLoading: chatLoading,
-    streamingProgress,
     sendMessage: sendMessageRaw,
     discussRef,
     stopMessage,
@@ -2809,9 +2802,6 @@ function EmbeddableChatInner({
               // faces, 16px between messages (shared with fae v2).
               appearance={appearance}
               isTyping={chatLoading}
-              // The stage the turn reports while the user waits
-              // ("Searching 28 sources"); the generic phrase otherwise.
-              typingMessage={streamingProgress ? chatProgressLabel(streamingProgress) : undefined}
               // Sticky footer for approvals the host lifted out of the
               // thread — see the prop's docblock.
               pendingApprovals={pendingApprovals}
