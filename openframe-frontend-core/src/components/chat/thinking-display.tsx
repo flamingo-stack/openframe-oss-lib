@@ -2,6 +2,7 @@
 
 import { forwardRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
+import { escapeThinkingTags } from '../../chat-protocol/leading-frames';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon } from '../icons-v2-generated';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
@@ -91,7 +92,7 @@ const ThinkingDisplay = forwardRef<HTMLDivElement, ThinkingDisplayProps>(
 
           <div className="min-w-0 flex-1" style={containerStyle}>
             <div ref={innerRef} className={cn('text-sm leading-snug text-ods-text-secondary', thoughtMdClasses)}>
-              <SimpleMarkdownRenderer content={text} textSize="compact" />
+              <SimpleMarkdownRenderer content={escapeThinkingTags(text)} textSize="compact" />
             </div>
           </div>
 
