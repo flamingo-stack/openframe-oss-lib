@@ -17,6 +17,7 @@ import { FAQ_ACCORDION_SKELETON_ROWS, FaqAccordion, type FaqItem } from '../faq-
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { PageTopicLabel } from '../page-topic-label';
 import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { FaqAskCard, faqAskCardShown, type FaqAskOptions } from './faq-ask-card';
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld';
@@ -107,7 +108,6 @@ const ASIDE_GRID_CLASS =
 const ASIDE_QUESTIONS_CELL_CLASS = 'content-lg:col-start-2 content-lg:row-span-2 content-lg:row-start-1';
 const ASIDE_CELL_CLASS = 'content-lg:col-start-1 content-lg:row-start-2';
 const TOPIC_STACK_CLASS = 'space-y-1';
-const TOPIC_CLASS = 'text-ods-text-muted text-h6';
 const CATEGORY_NAV_CLASS = 'flex flex-wrap gap-2';
 /**
  * The nav's row while the categories are read (`skeletonNav`): which categories there are, and how many, is read data,
@@ -207,7 +207,7 @@ function faqHeadingNode(heading: React.ReactNode | null | undefined, showTopic: 
   return (
     <div className={TOPIC_STACK_CLASS}>
       <div>{titleNode}</div>
-      <p className={TOPIC_CLASS}>{topic}</p>
+      <PageTopicLabel />
     </div>
   );
 }
