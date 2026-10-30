@@ -145,7 +145,7 @@ describe('createChatStreamReducer — implicit approve-on-execution transport ga
     expect((card as { status?: string }).status).toBe('approved');
   });
 
-  it("transport 'sse': tool-execution events are ignored — a pending card stays pending", () => {
+  it("transport 'sse': a tool-execution event draws its row and never approves a pending card", () => {
     const r = createChatStreamReducer({ transport: 'sse' });
     r.beginSseSend({ text: 'open a ticket', assistantName: 'Mingo AI' });
     r.apply({
@@ -155,11 +155,9 @@ describe('createChatStreamReducer — implicit approve-on-execution transport ga
       command: 'Create ticket',
       fields: [{ label: 'Subject', value: 'Printer down' }],
     });
-    const before = r.state.messages;
     r.apply(executing());
-    // Ignored entirely: same references, card untouched.
-    expect(r.state.messages).toBe(before);
     const trailing = r.state.messages[r.state.messages.length - 1];
+    expect(trailing.segments?.some(s => s.type === 'tool_execution')).toBe(true);
     const card = trailing.segments?.find(s => s.type === 'approval_request');
     expect((card as { status?: string }).status).toBe('pending');
   });

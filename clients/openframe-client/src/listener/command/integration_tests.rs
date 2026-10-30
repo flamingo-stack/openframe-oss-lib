@@ -10,13 +10,13 @@ use tokio::time::{timeout, Duration};
 
 use super::{
     Begin, ClientUpdateHandler, CommandContext, CommandHandler, CommandListener,
-    FeatureFlagsHandler, Outcome, RestartGate,
+    FeatureFlagsHandler, Outcome, PackageUpdateHandler, RestartGate,
 };
 use crate::clients::AuthClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
 use crate::models::{
-    DeliveryRef, DeliveryResult, DeliveryResultMessage, Feature, FeatureFlagsState,
-    OpenFrameClientUpdateMessage,
+    DeliveryRef, DeliveryResult, DeliveryResultMessage, FailReason, Feature, FeatureFlagsState,
+    OpenFrameClientUpdateMessage, PackageRef, PackageUpdateStatusMessage, UpdateStatus,
 };
 use crate::platform::{DirectoryManager, DmgExtractor};
 use crate::services::encryption_service::EncryptionService;
@@ -29,6 +29,8 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::package_manager::package_update::{OrderStore, StatusReporter};
+use crate::services::package_manager::{is_supported, ManagerId};
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::{LedgerState, ResultStore};
 use crate::services::shared_token_service::SharedTokenService;
@@ -42,6 +44,8 @@ use crate::services::{
     ToolCommandParamsResolver, ToolKillService, ToolOps,
 };
 use crate::test_support::NatsServer;
+use crate::utils::in_progress::InProgress;
+use crate::utils::latch::Latch;
 
 const MACHINE: &str = "it-machine";
 const BOUND: Duration = Duration::from_secs(10);
@@ -163,6 +167,8 @@ impl Agent {
             ToolOps::default().busy_tools(),
             ExecutionService::new().running_scripts(),
             self.tool_run_manager.client_update_pending(),
+            InProgress::default().view(),
+            Latch::default(),
         );
         let context = CommandContext::new(
             self.manager.clone(),
@@ -328,6 +334,7 @@ impl Agent {
             last_known_good,
             self.tool_run_manager.clone(),
             self.tool_ops.clone(),
+            InProgress::default().view(),
             update_handler,
         )
     }
@@ -1021,4 +1028,114 @@ async fn a_client_update_waits_for_a_busy_tool_or_a_running_update_without_an_ac
         .await;
     agent.expect_silence("u2").await;
     assert!(!agent.tool_run_manager.is_client_update_pending());
+}
+
+/// A package-update listener on the agent, with the backend's status stream subscribed first.
+async fn launch_package_update(agent: &mut Agent) -> (Arc<OrderStore>, async_nats::Subscriber) {
+    async_nats::jetstream::new(agent.tester.clone())
+        .create_stream(async_nats::jetstream::stream::Config {
+            name: "PACKAGE_UPDATE_STATUS".into(),
+            subjects: vec!["machine.*.package-update.status".into()],
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let statuses = agent
+        .tester
+        .subscribe(format!("machine.{MACHINE}.package-update.status"))
+        .await
+        .unwrap();
+    agent.tester.flush().await.unwrap();
+    let orders = Arc::new(OrderStore::load(
+        agent.directories.secured_dir().join("package_updates.json"),
+    ));
+    let status = StatusReporter::new(
+        agent.publisher.clone(),
+        agent.store.clone(),
+        agent.flush.clone(),
+    );
+    agent
+        .launch_command(PackageUpdateHandler::new(orders.clone(), status))
+        .await;
+    (orders, statuses)
+}
+
+fn package_order(
+    dispatch_id: &str,
+    request_id: &str,
+    package: serde_json::Value,
+) -> serde_json::Value {
+    json!({
+        "delivery": {
+            "type": "PACKAGE_UPDATE",
+            "targetId": "target",
+            "dispatchId": dispatch_id,
+            "sequence": 1,
+        },
+        "requestId": request_id,
+        "source": {"kind": "MANUAL", "origin": "ADMIN"},
+        "package": package,
+        "mode": "WAIT",
+    })
+}
+
+#[tokio::test]
+async fn a_package_update_order_is_acked_done_and_stored_for_the_worker() {
+    let package = if cfg!(windows) {
+        json!({"manager": "WINGET", "id": "Vendor.App"})
+    } else {
+        json!({"manager": "BREW", "kind": "CASK", "name": "vendor-app"})
+    };
+    let parsed: PackageRef = serde_json::from_value(package.clone()).unwrap();
+    if !is_supported(ManagerId::of(&parsed)) {
+        return;
+    }
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let (orders, _statuses) = launch_package_update(&mut agent).await;
+
+    agent
+        .send_to(
+            format!("machine.{MACHINE}.package-update"),
+            package_order("p1", "req-1", package),
+        )
+        .await;
+
+    agent.expect("p1", DeliveryResult::Acked).await;
+    agent.expect("p1", DeliveryResult::Done).await;
+    let stored = OrderStore::load(agent.directories.secured_dir().join("package_updates.json"));
+    assert_eq!(stored.get("req-1").map(|order| order.package), Some(parsed));
+    assert!(orders.get("req-1").is_some());
+}
+
+#[tokio::test]
+async fn an_unsupported_package_update_is_refused_on_the_status_stream() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let (orders, mut statuses) = launch_package_update(&mut agent).await;
+
+    agent
+        .send_to(
+            format!("machine.{MACHINE}.package-update"),
+            package_order("p2", "req-2", json!({"manager": "CHOCO", "id": "git"})),
+        )
+        .await;
+
+    agent.expect("p2", DeliveryResult::Acked).await;
+    agent.expect("p2", DeliveryResult::Done).await;
+    let message = timeout(BOUND, statuses.next())
+        .await
+        .expect("no event on the status stream")
+        .expect("status subscription ended");
+    let event: PackageUpdateStatusMessage = serde_json::from_slice(&message.payload).unwrap();
+    assert_eq!(event.request_id, "req-2");
+    assert_eq!(event.machine_id, MACHINE);
+    assert_eq!(event.state, UpdateStatus::Failed);
+    assert_eq!(
+        event.failed.map(|failed| failed.reason),
+        Some(FailReason::NotSupported)
+    );
+    assert!(orders.get("req-2").is_none());
 }

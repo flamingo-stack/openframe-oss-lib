@@ -46,10 +46,16 @@ export interface TicketAlertsButtonProps {
    *  drawer also smooth-scrolls the row). */
   href: string;
   disabled?: boolean;
+  /**
+   * - `cell` (default): a cell of the top bar.
+   * - `compact`: `HeaderButton`'s compact cell with a 20px glyph and the same count pill,
+   *   for the navigation sidebar's foot, beside the account row (`footerSlot`).
+   */
+  variant?: 'cell' | 'compact';
   className?: string;
 }
 
-export function TicketAlertsButton({ href, disabled, className }: TicketAlertsButtonProps) {
+export function TicketAlertsButton({ href, disabled, variant = 'cell', className }: TicketAlertsButtonProps) {
   const live = useOptionalTicketLive();
   const runtime = useChatRuntime();
   // Attention-only: no provider, signed out, or nothing unread → no cell.
@@ -71,13 +77,14 @@ export function TicketAlertsButton({ href, disabled, className }: TicketAlertsBu
         // count pill (sidebar count-pill precedent) and by the cell only
         // existing while updates are unread — never by tinting the glyph.
         <span className="relative inline-flex">
-          <LifeBuoyIcon className="h-6 w-6" />
+          <LifeBuoyIcon className={variant === 'compact' ? 'h-5 w-5' : 'h-6 w-6'} />
           <UnreadCountBadge count={live.unreadTotal} />
         </span>
       }
       aria-label={`Support tickets — ${live.unreadTotal} unread ${live.unreadTotal === 1 ? 'update' : 'updates'}`}
       onClick={handleClick}
       disabled={disabled}
+      size={variant}
       className={cn(className)}
     />
   );

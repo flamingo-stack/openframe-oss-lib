@@ -1,6 +1,7 @@
 export { FlamingoLogoIcon } from './flamingo-logo-icon';
 export { FlamingoMarkIcon } from './flamingo-mark-icon';
 export { MiamiCyberGangLogoIcon } from './miami-cyber-gang-logo-icon';
+export { MingoLogoIcon } from './mingo-logo-icon';
 export { MlgLogoIcon } from './mlg-logo-icon';
 export { OpenframeLogoIcon } from './openframe-logo-icon';
 export { OpenframeTextIcon } from './openframe-text-icon';

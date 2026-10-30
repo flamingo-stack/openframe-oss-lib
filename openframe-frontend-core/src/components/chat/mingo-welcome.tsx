@@ -10,8 +10,8 @@ import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { MingoChatHistory } from './mingo-chat-history';
+import { MingoQuickActionWall } from './mingo-quick-action-wall';
 import { QuickActionChipButton } from './quick-action-chip';
-import { QuickActionWall } from './quick-action-wall';
 import type { DialogItem } from './types/component.types';
 
 // =============================================================================
@@ -234,7 +234,7 @@ export function MingoWelcome({
             <AlertCircleIcon className="h-8 w-8 shrink-0 text-ods-text-secondary" />
             <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
               <p className="text-ods-text-primary text-h4">Couldn’t load your chats</p>
-              <p className="text-body-sm text-ods-text-secondary">
+              <p className="text-ods-text-secondary">
                 Something went wrong reaching the server. Check your connection and try again.
               </p>
             </div>
@@ -338,25 +338,11 @@ export function MingoWelcome({
                 />
               )}
               {quickActions && quickActions.length > 0 && (
-                <QuickActionWall
-                  chips={quickActions.map(action => ({
-                    id: action.id,
-                    label: action.label,
-                    icon: action.icon,
-                    variant: action.variant,
-                    onSelect: action.onClick,
-                    onHoverStart: () => onQuickActionHover?.(action),
-                    onHoverEnd: () => onQuickActionHoverEnd?.(),
-                  }))}
+                <MingoQuickActionWall
+                  quickActions={quickActions}
+                  onQuickActionHover={onQuickActionHover}
+                  onQuickActionHoverEnd={onQuickActionHoverEnd}
                   agentSlug={agentSlug}
-                  rows={4}
-                  pauseOnHover
-                  dragScroll
-                  fade={['left', 'right']}
-                  fadeSize={{ left: 32 }}
-                  fadeColor="var(--color-bg)"
-                  copyGap="var(--spacing-system-xxs)"
-                  className="max-h-44 shrink-0"
                 />
               )}
             </div>
