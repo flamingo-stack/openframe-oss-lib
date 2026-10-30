@@ -314,7 +314,7 @@ public class PinotConfigInitializer {
             String url = String.format("http://%s/tables/%s/forceCommit", pinotControllerUrl, tableName);
             ResponseEntity<String> response =
                     restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(null, createHeaders()), String.class);
-            if (response.getStatusCode() == HttpStatus.OK) {
+            if (response.getStatusCode().is2xxSuccessful()) {
                 log.info("Forced commit of the consuming segments of {}: {}", tableName, response.getBody());
             } else {
                 log.warn("Force commit of the consuming segments of {} answered {}", tableName, response.getStatusCode());

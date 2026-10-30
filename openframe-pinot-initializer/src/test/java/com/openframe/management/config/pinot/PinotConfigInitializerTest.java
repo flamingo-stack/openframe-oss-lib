@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.http.HttpEntity;
@@ -19,6 +21,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -29,7 +32,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class PinotConfigInitializerTest {
 
     private static final String CONTROLLER = "pinot-controller:9000";
@@ -122,6 +125,22 @@ class PinotConfigInitializerTest {
         // verifications
         verify(restTemplate).exchange(startsWith("http://" + CONTROLLER + "/segments/logs"), eq(HttpMethod.POST),
                 any(HttpEntity.class), eq(String.class));
+    }
+
+    @Test
+    void init_forceCommitAnswersAccepted_loggedAsForced(CapturedOutput output) {
+        // setup
+        storedDevicesSchema("""
+                {"schemaName": "devices", "dimensionFieldSpecs": [{"name": "machineId", "dataType": "STRING"}]}""");
+        when(restTemplate.exchange(eq(DEVICES_FORCE_COMMIT_URL), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.accepted().body("{\"forceCommitStatus\": \"SUCCESS\"}"));
+
+        // execution
+        initializer.init();
+
+        // verifications
+        assertThat(output).contains("Forced commit of the consuming segments of devices")
+                .doesNotContain("Force commit of the consuming segments of devices answered");
     }
 
     private void storedDevicesSchema(String body) {
