@@ -29,7 +29,7 @@ public class MachineQueryFilter {
     private List<String> nicknames;
     private List<String> tagKeys;
     private List<String> tagValues;
-    // The directory summary the SaaS matcher writes; both empty in OSS. NONE also matches a machine never written.
+    // The directory summary an external directory integration writes; both empty in OSS. NONE also matches a machine never written.
     private List<DirectorySource> directorySources;
     private List<DirectoryUserLink> directoryUserLinks;
 

@@ -15,6 +15,10 @@ import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
+import com.openframe.data.service.machine.MachineField;
+import com.openframe.data.service.machine.MachineUpdate;
+import com.openframe.data.service.machine.MachineWriteResult;
+import com.openframe.data.service.machine.MachineWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +30,19 @@ import java.util.Set;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
 import static com.openframe.core.exception.ErrorCode.CLIENT_SECRET_INVALID;
+import static com.openframe.data.service.machine.MachineFields.AGENT_VERSION;
+import static com.openframe.data.service.machine.MachineFields.HOSTNAME;
+import static com.openframe.data.service.machine.MachineFields.LAST_SEEN;
+import static com.openframe.data.service.machine.MachineFields.MANUFACTURER;
+import static com.openframe.data.service.machine.MachineFields.MODEL;
+import static com.openframe.data.service.machine.MachineFields.ORGANIZATION_ID;
+import static com.openframe.data.service.machine.MachineFields.OS_TYPE;
+import static com.openframe.data.service.machine.MachineFields.OS_UUID;
+import static com.openframe.data.service.machine.MachineFields.SERIAL_NUMBER;
+import static com.openframe.data.service.machine.MachineFields.STATUS;
+import static com.openframe.data.service.machine.MachineFields.TIMEZONE;
+import static com.openframe.data.service.machine.MachineFields.USER_ID;
+import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -41,6 +58,7 @@ public class AgentRegistrationService {
 
     private final OAuthClientRepository oauthClientRepository;
     private final MachineRepository machineRepository;
+    private final MachineWriter machineWriter;
     private final OrganizationIdResolver organizationIdResolver;
     private final AgentRegistrationSecretValidator secretValidator;
     private final ClientSecretValidator clientSecretValidator;
@@ -72,11 +90,6 @@ public class AgentRegistrationService {
         return new AgentRegistrationResponse(machineId, clientId, clientSecret);
     }
 
-    private Machine loadMachine(String machineId) {
-        return machineRepository.findByMachineId(machineId)
-                .orElseThrow(() -> new IllegalStateException("Machine not found for registered client: " + machineId));
-    }
-
     private String buildClientId(String machineId) {
         return format(CLIENT_ID_TEMPLATE, machineId);
     }
@@ -100,7 +113,7 @@ public class AgentRegistrationService {
     private Machine createMachine(String machineId, AgentRegistrationRequest request, String organizationId) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
-        applyRegistrationRequestFields(machine, request);
+        registrationRequestFields(request).applyTo(machine);
         machine.setStatus(DeviceStatus.PENDING);
         machine.setOrganizationId(organizationId);
         machine.setType(DeviceType.DESKTOP);
@@ -120,8 +133,7 @@ public class AgentRegistrationService {
 
         log.info("Reinstall for existing machine {}", machineId);
 
-        Machine machine = loadMachine(machineId);
-        updateMachine(machine, request);
+        Machine machine = updateMachine(machineId, request);
         toolConnectionService.disconnectAll(machineId);
         installedAgentService.disconnectAll(machineId);
         postProcessMachine(machine, request);
@@ -155,48 +167,48 @@ public class AgentRegistrationService {
         installedAgentService.addInstalledAgent(machineId, OPENFRAME_CLIENT_AGENT_TYPE, agentVersion, false);
     }
 
-    private void updateMachine(Machine machine, AgentRegistrationRequest request) {
-        applyRegistrationRequestFields(machine, request);
-        machine.setStatus(DeviceStatus.PENDING);
-
+    // Field-level: the machine already exists, and a whole-document save would overwrite what other writers set on it
+    // (the directory summary, Fleet hardware facts) since it was read
+    private Machine updateMachine(String machineId, AgentRegistrationRequest request) {
+        MachineUpdate update = registrationRequestFields(request).set(STATUS, DeviceStatus.PENDING);
         String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
-        machine.setOrganizationId(organizationId);
+        update.set(ORGANIZATION_ID, organizationId);
 
-        machineRepository.save(machine);
+        Machine machine = machineWriter.update(machineId, update)
+                .map(MachineWriteResult::after)
+                .orElseThrow(() -> new IllegalStateException("Machine not found for registered client: " + machineId));
 
-        String machineId = machine.getMachineId();
         log.info("Updated machine {} on reinstall, organizationId {}", machineId, organizationId);
+        return machine;
     }
 
-    private void applyRegistrationRequestFields(Machine machine, AgentRegistrationRequest request) {
-        machine.setHostname(request.getHostname());
-        machine.setOsType(normalizeOsType(request.getOsType()));
-        machine.setAgentVersion(request.getAgentVersion());
-        machine.setLastSeen(Instant.now());
+    private MachineUpdate registrationRequestFields(AgentRegistrationRequest request) {
+        MachineUpdate update = machineUpdate()
+                .set(HOSTNAME, request.getHostname())
+                .set(OS_TYPE, normalizeOsType(request.getOsType()))
+                .set(AGENT_VERSION, request.getAgentVersion())
+                .set(LAST_SEEN, Instant.now());
         // Optional; keep the existing value on reinstall when the agent doesn't send it
-        if (isNotBlank(request.getUserId())) {
-            machine.setUserId(request.getUserId());
-        }
+        setIfNotBlank(update, USER_ID, request.getUserId());
         if (isNotBlank(request.getTimezone()) && isValidZone(request.getTimezone())) {
-            machine.setTimezone(request.getTimezone());
+            update.set(TIMEZONE, request.getTimezone());
         }
-        copyHardwareFacts(machine, request);
+        copyHardwareFacts(update, request);
+        return update;
     }
 
     // Optional like userId: a fact the agent does not send keeps the stored value, and Fleet fills what is still
     // blank once it knows the host (FleetHostFactsWriter)
-    private static void copyHardwareFacts(Machine machine, AgentRegistrationRequest request) {
-        if (isNotBlank(request.getSerialNumber())) {
-            machine.setSerialNumber(request.getSerialNumber());
-        }
-        if (isNotBlank(request.getManufacturer())) {
-            machine.setManufacturer(request.getManufacturer());
-        }
-        if (isNotBlank(request.getModel())) {
-            machine.setModel(request.getModel());
-        }
-        if (isNotBlank(request.getOsUuid())) {
-            machine.setOsUuid(request.getOsUuid());
+    private static void copyHardwareFacts(MachineUpdate update, AgentRegistrationRequest request) {
+        setIfNotBlank(update, SERIAL_NUMBER, request.getSerialNumber());
+        setIfNotBlank(update, MANUFACTURER, request.getManufacturer());
+        setIfNotBlank(update, MODEL, request.getModel());
+        setIfNotBlank(update, OS_UUID, request.getOsUuid());
+    }
+
+    private static void setIfNotBlank(MachineUpdate update, MachineField<String> field, String value) {
+        if (isNotBlank(value)) {
+            update.set(field, value);
         }
     }
 

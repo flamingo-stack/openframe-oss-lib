@@ -125,7 +125,7 @@ class GraphQLDeviceMapperTest {
     }
 
     @Test
-    @DisplayName("directorySources: a machine the SaaS matcher never wrote (every OSS machine) reads []")
+    @DisplayName("directorySources: a machine no directory integration wrote (every OSS machine) reads []")
     void toDirectorySources_nullStored_emptyList() {
         assertThat(mapper.toDirectorySources(machine(null))).isEmpty();
     }

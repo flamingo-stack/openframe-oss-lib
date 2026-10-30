@@ -66,7 +66,7 @@ public class GraphQLDeviceMapper {
                 .build();
     }
 
-    // Only the SaaS directory matcher writes these, so a machine it never wrote (every machine in OSS) reads as
+    // Only an external directory integration writes these, so a machine it never wrote (every machine in OSS) reads as
     // having no directory: [] and NONE, which the schema declares non-null
     public List<DirectorySource> toDirectorySources(Machine machine) {
         List<DirectorySource> sources = machine.getDirectorySources();

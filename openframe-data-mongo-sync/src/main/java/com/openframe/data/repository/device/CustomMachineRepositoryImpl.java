@@ -675,7 +675,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         }
     }
 
-    // NONE is also every machine the SaaS matcher never wrote, and every machine in OSS: $in with null matches a
+    // NONE is also every machine no directory integration wrote, and every machine in OSS: $in with null matches a
     // missing field as well as an explicit null
     private static void addDirectoryCriteria(List<Criteria> criteriaList, MachineQueryFilter filter) {
         List<DirectorySource> sources = filter.getDirectorySources();

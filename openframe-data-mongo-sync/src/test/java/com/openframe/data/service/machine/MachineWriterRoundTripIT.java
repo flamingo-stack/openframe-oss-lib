@@ -30,7 +30,7 @@ import static com.openframe.data.service.machine.MachineFields.SERIAL_NUMBER;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static org.assertj.core.api.Assertions.assertThat;
 
-// The SaaS matcher writes the directory summary through MachineWriter, and the OSS GraphQL and Mongo device filters
+// An external directory integration writes the directory summary through MachineWriter, and the OSS GraphQL and Mongo device filters
 // read it back, so the stored shape is the contract: enums by name, lists as arrays.
 @SpringBootTest(classes = MachineIntegrationTestApplication.class)
 @Tag("integration")

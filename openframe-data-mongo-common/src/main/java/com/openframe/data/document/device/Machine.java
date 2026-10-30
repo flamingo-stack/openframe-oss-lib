@@ -59,7 +59,7 @@ public class Machine implements TenantScoped {
     private Instant lastSecurityScan;
     private Instant lastComplianceScan;
     private List<ComplianceRequirement> complianceRequirements;
-    // Directory summary of the machine's linked directory records. Only the SaaS directory matcher writes it,
+    // Directory summary of the machine's linked directory records. Only an external directory integration writes it,
     // so it stays null in OSS, and GraphQL reads null as [] / NONE.
     private List<DirectorySource> directorySources;
     private DirectoryUserLink directoryUserLink;
