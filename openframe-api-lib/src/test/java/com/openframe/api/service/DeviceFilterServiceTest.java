@@ -50,6 +50,10 @@ class DeviceFilterServiceTest {
     @Mock private com.openframe.data.repository.organization.OrganizationRepository organizationRepository;
 
     private DeviceFilterService service() {
+        return service(true);
+    }
+
+    private DeviceFilterService service(boolean directoryFacetsEnabled) {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
         // Direct executor: the production pool is about wall-clock, not semantics, and running the
         // facet queries inline keeps assertion order deterministic.
@@ -57,7 +61,8 @@ class DeviceFilterServiceTest {
                 pinotDeviceRepository,
                 new DeviceFilterOptionMapper(organizationRepository),
                 tenantIdProvider,
-                Runnable::run);
+                Runnable::run,
+                directoryFacetsEnabled);
     }
 
     @Test
@@ -230,5 +235,63 @@ class DeviceFilterServiceTest {
                 sources.capture(), links.capture());
         assertThat(sources.getValue()).isEmpty();
         assertThat(links.getValue()).isEmpty();
+    }
+
+    @Test
+    void directoryFacetsDisabled_selectedDirectoryFacets_neverQueriedAndEmpty() {
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(5);
+
+        DeviceFilters result = service(false)
+                .getDeviceFilters(DeviceFilterCriteria.builder().build(), EnumSet.of(DeviceFilterFacet.DIRECTORY_SOURCES,
+                        DeviceFilterFacet.USER_LINKS, DeviceFilterFacet.FILTERED_COUNT))
+                .join();
+
+        assertThat(result.getDirectorySources()).isEmpty();
+        assertThat(result.getUserLinks()).isEmpty();
+        assertThat(result.getFilteredCount()).isEqualTo(5);
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verifyNoMoreInteractions(pinotDeviceRepository);
+    }
+
+    @Test
+    void directoryFacetsDisabled_allFacets_runsEveryOtherQuery() {
+        service(false).getDeviceFilters(DeviceFilterCriteria.builder().build()).join();
+
+        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getDeviceTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getOsTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getOrganizationFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getTagKeyFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository, never()).getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository, never()).getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void directoryFacetsDisabled_directoryCriteriaStillFilter() {
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> sources = ArgumentCaptor.forClass(List.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> links = ArgumentCaptor.forClass(List.class);
+        DeviceFilterCriteria criteria = DeviceFilterCriteria.builder()
+                .directorySources(List.of(DirectorySource.MICROSOFT_365))
+                .userLinks(List.of(DirectoryUserLink.SHARED))
+                .build();
+
+        service(false).getDeviceFilters(criteria, Set.of(DeviceFilterFacet.STATUSES)).join();
+
+        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(),
+                sources.capture(), links.capture());
+        assertThat(sources.getValue()).containsExactly("MICROSOFT_365");
+        assertThat(links.getValue()).containsExactly("SHARED");
+    }
+
+    @Test
+    void directoryFacetsEnabled_allFacets_queriesTheDirectoryFacetsToo() {
+        service(true).getDeviceFilters(DeviceFilterCriteria.builder().build()).join();
+
+        verify(pinotDeviceRepository).getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

@@ -141,14 +141,14 @@ enum DeviceType {
     OTHER
 }
 
-"""Who the machine is tied to (D20). PRIMARY: one declared user. SHARED: several users, or recent users only. NONE: nobody."""
+"""Who the machine is tied to. PRIMARY: one declared user. SHARED: several users, or recent users only. NONE: nobody."""
 enum DirectoryUserLink {
     PRIMARY
     SHARED
     NONE
 }
 
-"""A directory that knows the machine besides the agent (D19)."""
+"""A directory that knows the machine besides the agent."""
 enum DirectorySource {
     MICROSOFT_365
     GOOGLE_WORKSPACE

@@ -9,9 +9,11 @@ import com.openframe.data.pinot.repository.PinotDeviceRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,20 +37,29 @@ import static java.util.concurrent.CompletableFuture.supplyAsync;
 @Slf4j
 public class DeviceFilterService {
 
+    private static final Set<DeviceFilterFacet> DIRECTORY_FACETS = EnumSet.of(DIRECTORY_SOURCES, USER_LINKS);
+
     private final PinotDeviceRepository pinotDeviceRepository;
     private final DeviceFilterOptionMapper optionMapper;
     private final TenantIdProvider tenantIdProvider;
     private final Executor facetExecutor;
+    private final boolean directoryFacetsEnabled;
 
+    // The directory facets count values only an external directory integration writes. Without one (OSS) every
+    // machine reads as no source and NONE, so the two Pinot queries are skipped and the facets stay empty. The
+    // directory filters still apply either way.
     public DeviceFilterService(PinotDeviceRepository pinotDeviceRepository,
                               DeviceFilterOptionMapper optionMapper,
                               TenantIdProvider tenantIdProvider,
                               @Qualifier(DeviceFilterExecutorConfig.DEVICE_FILTER_FACET_EXECUTOR)
-                              Executor facetExecutor) {
+                              Executor facetExecutor,
+                              @Value("${openframe.device.directory-facets.enabled:false}")
+                              boolean directoryFacetsEnabled) {
         this.pinotDeviceRepository = pinotDeviceRepository;
         this.optionMapper = optionMapper;
         this.tenantIdProvider = tenantIdProvider;
         this.facetExecutor = facetExecutor;
+        this.directoryFacetsEnabled = directoryFacetsEnabled;
     }
 
     /**
@@ -73,7 +84,7 @@ public class DeviceFilterService {
      */
     public CompletableFuture<DeviceFilters> getDeviceFilters(DeviceFilterCriteria filters,
                                                              Set<DeviceFilterFacet> requestedFacets) {
-        Set<DeviceFilterFacet> facets = requestedFacets != null ? requestedFacets : DeviceFilterFacet.ALL;
+        Set<DeviceFilterFacet> facets = queriedFacets(requestedFacets != null ? requestedFacets : DeviceFilterFacet.ALL);
         List<String> statuses = filters != null && filters.getStatuses() != null ?
                 filters.getStatuses().stream().map(Enum::name).toList() : emptyList();
         List<String> deviceTypes = filters != null && filters.getDeviceTypes() != null ?
@@ -121,6 +132,15 @@ public class DeviceFilterService {
                         .filteredCount(filteredCountFuture.join())
                         .build()
                 );
+    }
+
+    private Set<DeviceFilterFacet> queriedFacets(Set<DeviceFilterFacet> requested) {
+        if (directoryFacetsEnabled || requested.isEmpty()) {
+            return requested;
+        }
+        EnumSet<DeviceFilterFacet> queried = EnumSet.copyOf(requested);
+        queried.removeAll(DIRECTORY_FACETS);
+        return queried;
     }
 
     /**
