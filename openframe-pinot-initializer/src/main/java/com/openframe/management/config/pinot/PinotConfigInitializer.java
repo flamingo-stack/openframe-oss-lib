@@ -6,7 +6,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import tools.jackson.databind.json.JsonMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,15 +53,22 @@ public class PinotConfigInitializer {
     @Value("${pinot.config.retry.delay-ms:5000}")
     private long retryDelayMs;
 
+    private static final List<String> FIELD_SPECS =
+            List.of("dimensionFieldSpecs", "metricFieldSpecs", "dateTimeFieldSpecs", "complexFieldSpecs");
+
     private static final List<PinotConfig> PINOT_CONFIGS = Arrays.asList(
             new PinotConfig("devices", "schema-devices.json", "table-config-devices.json", null),
             new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null)
     );
 
     public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
+        this(resourceLoader, environment, new RestTemplate());
+    }
+
+    PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment, RestTemplate restTemplate) {
         this.resourceLoader = resourceLoader;
         this.environment = environment;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = restTemplate;
         this.objectMapper = new JsonMapper();
     }
 
@@ -98,6 +108,8 @@ public class PinotConfigInitializer {
             String schemaConfig = resolvePlaceholders(loadResource(config.getSchemaFile()));
             String realtimeTableConfig = resolvePlaceholders(loadResource(config.getTableRealtimeConfigFile()));
 
+            AtomicBoolean schemaChanged = new AtomicBoolean();
+            deployWithRetry(() -> schemaChanged.set(columnsChange(schemaConfig)), "schema comparison for " + config.getName());
             deployWithRetry(() -> deploySchema(schemaConfig), "schema for " + config.getName());
             deployWithRetry(() -> deployTableConfig(realtimeTableConfig, config.getName()), "realtime table config for " + config.getName());
 
@@ -109,6 +121,9 @@ public class PinotConfigInitializer {
             }
 
             deployWithRetry(() -> reloadSegments(realtimeTableConfig), "segment reload for " + config.getName());
+            if (schemaChanged.get()) {
+                forceCommitConsumingSegments(realtimeTableConfig);
+            }
 
             log.info("Successfully deployed Pinot configuration for: {}", config.getName());
 
@@ -249,6 +264,63 @@ public class PinotConfigInitializer {
         } catch (Exception e) {
             log.error("Error triggering segment reload", e);
             throw new RuntimeException("Failed to trigger segment reload", e);
+        }
+    }
+
+    // Whether the schema about to be posted adds, drops or retypes a column of the one the controller holds. A schema
+    // the controller does not have yet is no change: no consuming segment was built on an older one. When the stored
+    // schema cannot be read or compared, it counts as a change, so the consuming segment is committed anyway.
+    private boolean columnsChange(String schemaConfig) {
+        try {
+            JsonNode desired = objectMapper.readTree(schemaConfig);
+            String url = String.format("http://%s/schemas/%s", pinotControllerUrl, desired.get("schemaName").asString());
+            ResponseEntity<String> response =
+                    restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(createHeaders()), String.class);
+            boolean changed = !columns(objectMapper.readTree(response.getBody())).equals(columns(desired));
+            log.info("Pinot schema {}: columns {}", desired.get("schemaName").asString(), changed ? "changed" : "unchanged");
+            return changed;
+        } catch (HttpClientErrorException.NotFound e) {
+            return false;
+        } catch (ResourceAccessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Could not compare the Pinot schema with the stored one, treating it as changed", e);
+            return true;
+        }
+    }
+
+    private static Map<String, String> columns(JsonNode schema) {
+        Map<String, String> columns = new TreeMap<>();
+        for (String specs : FIELD_SPECS) {
+            for (JsonNode field : schema.path(specs).values()) {
+                String arity = field.path("singleValueField").asBoolean(true) ? "" : "[]";
+                columns.put(field.path("name").asString(), field.path("dataType").asString() + arity);
+            }
+        }
+        return columns;
+    }
+
+    // A REALTIME table's consuming segment keeps the columns it started with; the segment reload only reaches
+    // completed segments. Committing the consuming segments now starts new ones on the new schema, so values written
+    // to the new columns from here on are not lost until the machine is written again. Best effort: a failure here
+    // leaves the table as it was before this fix and must not fail the deployment.
+    private void forceCommitConsumingSegments(String tableConfig) {
+        try {
+            JsonNode tableConfigJson = objectMapper.readTree(tableConfig);
+            if (!"REALTIME".equalsIgnoreCase(tableConfigJson.get("tableType").asString())) {
+                return;
+            }
+            String tableName = tableConfigJson.get("tableName").asString();
+            String url = String.format("http://%s/tables/%s/forceCommit", pinotControllerUrl, tableName);
+            ResponseEntity<String> response =
+                    restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(null, createHeaders()), String.class);
+            if (response.getStatusCode() == HttpStatus.OK) {
+                log.info("Forced commit of the consuming segments of {}: {}", tableName, response.getBody());
+            } else {
+                log.warn("Force commit of the consuming segments of {} answered {}", tableName, response.getStatusCode());
+            }
+        } catch (Exception e) {
+            log.warn("Force commit of the consuming segments failed; new columns fill from the next segment", e);
         }
     }
 
