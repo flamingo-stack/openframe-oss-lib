@@ -2,14 +2,20 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
 
+import { NotificationsProvider } from '../components/features/notifications/notifications-context';
+import type { Notification } from '../components/features/notifications/types';
 import {
   BracketCurlyIcon,
   ChartDonutIcon,
+  ClockHistoryIcon,
   IdCardIcon,
   MonitorIcon,
+  SendIcon,
   Settings02Icon,
 } from '../components/icons-v2-generated';
 import { AppLayout } from '../components/navigation/app-layout';
+import { NotificationsBellButton } from '../components/navigation/notifications-bell-button';
+import { Button, Input, PageLayout } from '../components/ui';
 import type { NavigationSidebarConfig } from '../types/navigation';
 
 const defaultNavigationItems: NavigationSidebarConfig['items'] = [
@@ -459,4 +465,118 @@ export const DashboardExample: Story = {
       </div>
     ),
   },
+};
+
+const SHELL_USER = {
+  userName: 'Alex Developer',
+  userEmail: 'alex@openframe.dev',
+  userAvatarUrl: 'https://github.com/shadcn.png',
+  userRole: 'Admin',
+};
+
+const SHELL_NOTIFICATIONS: Notification[] = [
+  {
+    id: 'n1',
+    type: 'Device alert',
+    title: 'Disk space low on FIN-LAPTOP-07',
+    description: 'C: has 4% free. Cleanup recommended before the next patch window.',
+    severity: 'WARNING',
+    createdAt: Date.now() - 5 * 60_000,
+  },
+];
+
+const onMingo = fn();
+const onChatHistory = fn();
+const onSend = fn();
+
+/** Stand-in for the Mingo composer: the real one is the app's, built on the chat lib. */
+function ComposerDockStandIn() {
+  return (
+    <div className="border-t border-ods-border bg-ods-bg px-[var(--spacing-system-l)] py-[var(--spacing-system-m)]">
+      <form
+        className="mx-auto flex w-full max-w-[880px] items-center gap-[var(--spacing-system-xsf)]"
+        onSubmit={event => {
+          event.preventDefault();
+          onSend();
+        }}
+      >
+        <Input aria-label="Message Mingo" placeholder="Ask Mingo about this page" className="flex-1" />
+        <Button type="submit" variant="primary" leftIcon={<SendIcon size={20} />} aria-label="Send">
+          {/* A content-area variant: follows the page column, not the window. */}
+          <span className="hidden content-md:inline">Send</span>
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+/** A page long enough to scroll: its last row stays visible above the dock. */
+function ShellPage() {
+  return (
+    <PageLayout title="Devices" subtitle="Scroll to the end: the last row stops above the composer.">
+      <ul className="flex flex-col gap-[var(--spacing-system-xsf)]">
+        {Array.from({ length: 40 }, (_, i) => (
+          <li
+            key={i}
+            className="rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-m)] text-ods-text-primary text-h4"
+          >
+            Device {i + 1}
+          </li>
+        ))}
+      </ul>
+    </PageLayout>
+  );
+}
+
+/**
+ * The Mingo-first shell: no desktop header, the notifications bell in the
+ * page column's top-right corner (`contentCorner`), the composer docked under
+ * the page (`composerDock`), no side panel. The bell opens the same
+ * `NotificationDrawer` the header bell does — it reads the
+ * `NotificationsProvider`, not the header. Below md the phone top bar stays,
+ * with a custom "Chat history" cell before the bell and the Mingo cell last.
+ */
+export const MingoShell: Story = {
+  args: {
+    mobileBurgerMenuProps: { user: SHELL_USER },
+  },
+  render: function MingoShellStory(args) {
+    const [items, setItems] = useState(allNavigationItems);
+    return (
+      <NotificationsProvider initialNotifications={SHELL_NOTIFICATIONS}>
+        <AppLayout
+          mobileBurgerMenuProps={args.mobileBurgerMenuProps}
+          sidebarConfig={{
+            items,
+            onNavigate: path => setItems(prev => prev.map(item => ({ ...item, isActive: item.path === path }))),
+          }}
+          desktopHeader={false}
+          contentCorner={<NotificationsBellButton variant="floating" />}
+          composerDock={<ComposerDockStandIn />}
+          headerProps={{
+            showNotifications: true,
+            showMingoAI: true,
+            onMingoAI: onMingo,
+            customCells: [
+              {
+                id: 'chat-history',
+                icon: <ClockHistoryIcon className="h-6 w-6" />,
+                label: 'Chat history',
+                onClick: onChatHistory,
+                mobileOnly: true,
+              },
+            ],
+          }}
+        >
+          <ShellPage />
+        </AppLayout>
+      </NotificationsProvider>
+    );
+  },
+};
+
+/** The Mingo-first shell on a phone: top bar (burger, logo, Chat history, bell, Mingo) and the docked composer. */
+export const MingoShellMobile: Story = {
+  ...MingoShell,
+  globals: { viewport: { value: 'mobile', isRotated: false } },
 };
