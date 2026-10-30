@@ -404,7 +404,10 @@ public class OAuthBffService {
                         resp.bodyToMono(String.class).defaultIfEmpty("")
                                 .flatMap(body -> {
                                     String oauthError = extractOAuthErrorCode(body);
-                                    if (INVALID_GRANT.equals(oauthError)) {
+                                    // A bare 401 is the auth server refusing the token itself; invalid_client
+                                    // (our credentials) still carries its code and stays a server fault.
+                                    boolean bareUnauthorized = resp.statusCode().value() == 401 && oauthError == null;
+                                    if (INVALID_GRANT.equals(oauthError) || bareUnauthorized) {
                                         log.warn("Auth server rejected refresh for tenant {} ({}): error={}",
                                                 tenantId, resp.statusCode(), oauthError);
                                         return Mono.error(new InvalidRefreshTokenException());
