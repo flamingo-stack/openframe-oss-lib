@@ -16,6 +16,7 @@ import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
+import com.openframe.data.service.rmm.software.PackageAutoUpdatePolicyService;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
@@ -42,6 +43,7 @@ public class SoftwareBundleOnlineDispatcher {
     private final PackageManagerAvailability packageManagerAvailability;
     private final PackageUpdateEligibilityService packageUpdateEligibility;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
+    private final PackageAutoUpdatePolicyService autoUpdatePolicyService;
 
     public void dispatch(SoftwareBundle bundle, Machine machine) {
         if (bundle.getPackages() == null || bundle.getPackages().isEmpty()) {
@@ -97,6 +99,8 @@ public class SoftwareBundleOnlineDispatcher {
                 .softwareBundleId(bundle.getId())
                 .build();
         if (viaOrder) {
+            autoUpdatePolicyService.turnOn(rows, pkg.getBrewPackageType(), pkg.getSoftwareId(),
+                    bundle.getAutoUpdate(), bundle.getUpdateSettings());
             packageUpdateDispatchService.dispatchAdminUpdate(rows, pkg.getBrewPackageType(), bundle.getUpdateSettings());
             return;
         }

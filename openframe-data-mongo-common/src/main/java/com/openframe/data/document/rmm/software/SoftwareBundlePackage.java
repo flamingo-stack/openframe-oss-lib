@@ -17,4 +17,5 @@ public class SoftwareBundlePackage {
     private String packageName;
     private BrewPackageType brewPackageType;
     private String version;
+    private String softwareId;
 }

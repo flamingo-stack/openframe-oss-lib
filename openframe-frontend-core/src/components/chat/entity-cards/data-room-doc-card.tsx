@@ -10,7 +10,7 @@
  *
  * Renders `[card://data_room_doc:<id>]` and `[card://markdown:<id>]` markers
  * — both use this card because their viewer surface is structurally
- * identical; only the `baseRoute` differs (`/data-room` vs `/knowledge-base`).
+ * identical; where each one's viewer lives is the host composer's decision.
  */
 
 import { ExternalLink } from 'lucide-react';

@@ -37,11 +37,6 @@
             <artifactId>openframe-data-mongo-sync</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.github.pravin-raha</groupId>
-            <artifactId>lexorank4j</artifactId>
-            <version>0.1.0</version>
-        </dependency>
-        <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-debezium-initializer</artifactId>
         </dependency>
@@ -102,16 +97,6 @@
             <groupId>net.javacrumbs.shedlock</groupId>
             <artifactId>shedlock-provider-redis-spring</artifactId>
             <version>5.10.2</version>
-        </dependency>
-        <dependency>
-            <groupId>io.mongock</groupId>
-            <artifactId>mongock-springboot-v3</artifactId>
-            <version>5.5.1</version>
-        </dependency>
-        <dependency>
-            <groupId>io.mongock</groupId>
-            <artifactId>mongodb-springdata-v4-driver</artifactId>
-            <version>5.5.1</version>
         </dependency>
 
         <dependency>

@@ -5,7 +5,7 @@
  *
  * Pure-presentation cards (BlogCard, OnboardingGuideCard, etc.)
  * historically required callers to pre-compute `target`/`rel` via a
- * hub-side `useNavLink` wrapper because the same-tab-vs-new-tab
+ * `useNavLinkViaRuntime` because the same-tab-vs-new-tab
  * decision depends on `currentPlatform()` and the cross-platform
  * URL topology — neither of which the lib knows.
  *
@@ -25,7 +25,8 @@
 
 import { useMemo } from 'react';
 import { useChatRuntime } from '../../../contexts/chat-runtime-context';
-import { computeIsNewTab } from '../utils/nav-anchor-props';
+import { navLinkTarget, newTabAnchorAttrs } from '../utils/nav-anchor-props';
+import { type NewTabRel, newTabRel } from '../utils/new-tab-rel';
 
 export interface UseEntityCardLinkArgs {
   href: string;
@@ -33,12 +34,12 @@ export interface UseEntityCardLinkArgs {
   /** Explicit override. When set, runtime decision is skipped. */
   target?: '_blank';
   /** Explicit override. When set, runtime decision is skipped. */
-  rel?: 'noopener' | 'noopener noreferrer';
+  rel?: NewTabRel;
 }
 
 export interface EntityCardLinkProps {
   target: '_blank' | undefined;
-  rel: 'noopener' | 'noopener noreferrer' | undefined;
+  rel: NewTabRel | undefined;
 }
 
 export function useEntityCardLink({ href, targetPlatform, target, rel }: UseEntityCardLinkArgs): EntityCardLinkProps {
@@ -50,19 +51,13 @@ export function useEntityCardLink({ href, targetPlatform, target, rel }: UseEnti
     // to close the tabnabbing vector (window.opener access from the
     // new tab back to the parent).
     if (target !== undefined || rel !== undefined) {
-      const safeRel = rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined);
+      const safeRel = rel ?? (target === '_blank' ? newTabRel(href, targetPlatform) : undefined);
       return { target, rel: safeRel };
     }
-    // Use the UNIFIED new-tab decision so the rendered anchor's target/rel ALWAYS
-    // agrees with the click handler (executeNavigation also calls computeIsNewTab) —
-    // including the embed-mode short-circuit + the origin/platform fallback.
-    // Previously this used `decideNewTab ?? false`, which diverged from the click
-    // when decideNewTab was unwired (embed mode rendered a same-tab anchor that
-    // clicked into a new tab). Hub behavior is unchanged: it wires decideNewTab,
-    // which computeIsNewTab consumes identically.
-    const newTab = runtime ? computeIsNewTab(runtime, href, targetPlatform ?? null) : false;
-    return newTab
-      ? { target: '_blank' as const, rel: 'noopener noreferrer' as const }
-      : { target: undefined, rel: undefined };
+    // THE navigation decision (`navLinkTarget`), the one the click handler executes by, so the rendered anchor's
+    // target/rel always agrees with the click; `rel` is the one referrer rule.
+    const resolved = navLinkTarget(runtime, href, targetPlatform);
+    const attrs = newTabAnchorAttrs(resolved.isNewTab, resolved.href, targetPlatform);
+    return { target: attrs.target, rel: attrs.rel };
   }, [target, rel, href, targetPlatform, runtime]);
 }

@@ -343,7 +343,7 @@ export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scro
 
 // Same-page hash navigation — owns pushState + synthetic hashchange +
 // anchoring-proof scroll. Pair of `scrollElementIntoView`. Used by the
-// hub's `useUnifiedNav` + chat-runtime `navigate`, AND by every
+// `useNavigateViaRuntime` + chat-runtime `navigate`, AND by every
 // embeddable surface that drives state off the URL hash.
 export {
   ACTIVE_ANCHOR_ATTRIBUTE,
