@@ -13,7 +13,7 @@
 // declarations of one wire contract. Type-only import from a React-free
 // module; `nats-decoder.ts` already depends on the same file for MESSAGE_TYPE.
 import type { ChatRef } from '../components/chat/chat-ref.types';
-import type { AskOptionData, ChatSource } from '../components/chat/types/message.types';
+import type { AskOptionData, ChatSource, CommandReviewData } from '../components/chat/types/message.types';
 // The wire-frame shapes these events carry through are defined ONCE in
 // `./frames.ts` — reuse them here rather than restating their fields.
 import type { ApprovalRequestField, DecisionResolvedFrame, UsageTelemetry } from './frames';
@@ -91,6 +91,7 @@ export interface ToolExecutionEvent extends ChatStreamEventBase {
      * replay, which is exactly what happened while it was missing here.
      */
     toolExplanation?: string;
+    commandReview?: CommandReviewData;
     parameters?: Record<string, unknown>;
     result?: string;
     success?: boolean;
@@ -108,6 +109,7 @@ export interface ApprovalToolCall {
   requiresApproval: boolean;
   approvalType?: string | null;
   toolCallArguments?: Record<string, unknown> | null;
+  commandReview?: CommandReviewData;
 }
 
 /** A tool call awaits user approval. SSE fills `command`/`fields`
