@@ -47,6 +47,18 @@ function Set-UpdatePhase {
     }
 }
 
+# Start-Service keeps the actual Win32 error (timeout, access denied) in the innermost exception
+function Get-ErrorText {
+    param($ErrorRecord)
+    $text = "$ErrorRecord"
+    $inner = $ErrorRecord.Exception.InnerException
+    while ($inner -and $inner.InnerException) { $inner = $inner.InnerException }
+    if ($inner -and $inner.Message -and -not $text.Contains($inner.Message)) {
+        $text = "$text ($($inner.Message))"
+    }
+    return $text
+}
+
 function Remove-NewExe {
     if ($NewExePath -and (Test-Path $NewExePath)) {
         Remove-Item -Path $NewExePath -Force -ErrorAction SilentlyContinue
@@ -180,7 +192,7 @@ try {
     exit 0
 }
 catch {
-    $failure = "$_"
+    $failure = Get-ErrorText $_
     Write-Output "Updater failed: $failure"
 
     if (Test-AgentUninstalled) {
@@ -234,7 +246,7 @@ catch {
         }
         catch {
             Write-Output "Rollback failed: $_"
-            Set-UpdatePhase -Phase "failed" -Reason "$failure; rollback failed: $_"
+            Set-UpdatePhase -Phase "failed" -Reason "$failure; rollback failed: $(Get-ErrorText $_)"
             try {
                 if ((Get-Service -Name $ServiceName -ErrorAction Stop).Status -ne 'Running') {
                     Start-Service -Name $ServiceName -ErrorAction Stop

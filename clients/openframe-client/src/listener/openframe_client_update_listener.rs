@@ -4,6 +4,7 @@ use crate::config::update_config::{
     RECONNECTION_DELAY_MS,
 };
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
+use crate::services::client_update_retry_service::ClientUpdateRetryService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::AgentConfigurationService;
@@ -23,6 +24,7 @@ use tracing::{error, info, warn};
 pub struct OpenFrameClientUpdateListener {
     pub nats_connection_manager: NatsConnectionManager,
     pub openframe_client_update_service: OpenFrameClientUpdateService,
+    pub client_update_retry_service: ClientUpdateRetryService,
     pub config_service: AgentConfigurationService,
 }
 
@@ -32,11 +34,13 @@ impl OpenFrameClientUpdateListener {
     pub fn new(
         nats_connection_manager: NatsConnectionManager,
         openframe_client_update_service: OpenFrameClientUpdateService,
+        client_update_retry_service: ClientUpdateRetryService,
         config_service: AgentConfigurationService,
     ) -> Self {
         Self {
             nats_connection_manager,
             openframe_client_update_service,
+            client_update_retry_service,
             config_service,
         }
     }
@@ -149,6 +153,24 @@ impl OpenFrameClientUpdateListener {
             };
 
         let version = client_update_message.version.clone();
+
+        // a redelivery is the same message again, so it must not restart the saved one's schedule
+        let redelivered = message.info().is_ok_and(|info| info.delivered > 1);
+        if (redelivered && self.client_update_retry_service.has_saved_update())
+            || self
+                .client_update_retry_service
+                .remember(&client_update_message)
+        {
+            // the saved copy is retried locally from here on, so redelivery would only duplicate it
+            if let Err(e) = message.ack().await {
+                warn!(
+                    "Failed to ack client update message for version {}: {}",
+                    version, e
+                );
+            }
+            self.client_update_retry_service.run_due().await;
+            return Ok(());
+        }
 
         match self
             .openframe_client_update_service

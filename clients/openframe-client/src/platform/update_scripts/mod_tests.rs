@@ -40,6 +40,7 @@ fn windows_update_script_stays_powershell3_compatible() {
         "rolled_back must be stamped before the service is started"
     );
     assert!(script.contains("-NotePropertyName last_error"));
+    assert!(script.contains("$failure = Get-ErrorText $_"));
 }
 
 #[cfg(target_os = "macos")]

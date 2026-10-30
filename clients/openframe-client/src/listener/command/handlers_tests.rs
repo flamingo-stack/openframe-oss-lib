@@ -128,3 +128,46 @@ async fn an_applicable_change_restarts_and_anything_else_is_done() {
         assert_eq!(outcome, expected, "{why}");
     }
 }
+
+#[cfg(not(target_os = "linux"))]
+#[tokio::test]
+async fn a_client_update_run_by_the_delivery_engine_drops_the_saved_broadcast() {
+    let dir = tempfile::tempdir().unwrap();
+    let fixture = crate::test_support::client_update_fixture(&dir);
+    let legacy_retry = ClientUpdateRetryService::new(
+        &fixture.directories,
+        fixture.service.clone(),
+        fixture.tool_run_manager.clone(),
+        fixture.nats.clone(),
+    );
+    let saved = fixture
+        .directories
+        .secured_dir()
+        .join("pending_client_update.json");
+    let command: OpenFrameClientUpdateMessage =
+        serde_json::from_value(json!({ "version": "9.9.9", "downloadConfigurations": [] }))
+            .unwrap();
+    assert!(legacy_retry.remember(&command));
+    let handler = ClientUpdateHandler::new(
+        fixture.service.clone(),
+        legacy_retry,
+        fixture.tool_run_manager.clone(),
+    );
+
+    let busy = fixture.tool_ops.lock("mesh").await.mark_busy();
+    assert!(matches!(handler.begin(&command), Begin::Busy(_)));
+    assert!(saved.exists(), "a deferred delivery keeps the saved copy");
+    drop(busy);
+
+    let Begin::Accepted(guard) = handler.begin(&command) else {
+        panic!("an idle machine accepts the delivery");
+    };
+    assert!(
+        saved.exists(),
+        "accepting alone keeps the saved copy until the delivery is recorded"
+    );
+    handler
+        .run(MACHINE, &delivery(Some(1)), command, guard)
+        .await;
+    assert!(!saved.exists());
+}

@@ -1,4 +1,4 @@
-use crate::config::update_config::ALLOW_DOWNGRADE;
+use crate::config::update_config::{ALLOW_DOWNGRADE, STAGED_VERSION_PROBE_TIMEOUT_SECS};
 use crate::models::openframe_client_info::ClientUpdateStatus;
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
 use crate::models::update_state::{UpdatePhase, UpdateState};
@@ -18,9 +18,10 @@ use crate::utils::version_comparator;
 use anyhow::{anyhow, Context, Result};
 use semver::Version;
 use std::path::{Path, PathBuf};
-use std::process::ExitStatus;
+use std::process::{ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -110,16 +111,30 @@ impl OpenFrameClientUpdateService {
         };
         info!("Acquired update lock for version: {}", requested_version);
 
+        // apply() skips it anyway, so neither wait for busy tools nor park them
+        if canonical_version(requested_version).as_deref() == Some(env!("OPENFRAME_VERSION")) {
+            return Ok(guard);
+        }
+
         self.tool_run_manager.mark_client_update_pending();
 
         if let Some(busy) = self.busy_with() {
             warn!(
-                "{} in progress, deferring client update to version {} (will redeliver)",
+                "{} in progress, deferring client update to version {} (will retry)",
                 busy, requested_version
             );
             return Err(anyhow!("{} in progress, deferring client update", busy));
         }
         Ok(guard)
+    }
+
+    /// A tool operation or a package upgrade is running, which the client update waits for
+    pub fn is_busy(&self) -> bool {
+        self.busy_with().is_some()
+    }
+
+    pub fn update_in_progress(&self) -> bool {
+        self.update_in_progress.load(Ordering::Acquire)
     }
 
     /// What must finish before the agent may be replaced; the client update waits for it.
@@ -247,8 +262,6 @@ impl OpenFrameClientUpdateService {
             {
                 error!("Failed to set update status to Failed: {:#}", status_err);
             }
-
-            info!("Update failed, NATS will retry");
         }
 
         update_result.map(|()| UpdateLaunch::Launched)
@@ -319,6 +332,21 @@ impl OpenFrameClientUpdateService {
 
         info!("Update binary staged: {}", staged_path.display());
 
+        // A wrong build would only be rolled back after the service stop and swap
+        if let Err(e) =
+            Self::verify_staged_version(&staged_path, &update_state.target_version).await
+        {
+            error!("{:#}", e);
+            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
+                warn!(
+                    "Failed to remove staged binary after the version check: {}",
+                    cleanup_err
+                );
+            }
+            self.update_state_service.clear().await?;
+            return Err(e);
+        }
+
         // 5. Launch update process (platform-specific)
         update_state.set_phase(UpdatePhase::UpdaterLaunched);
         self.update_state_service.save(update_state).await?;
@@ -345,7 +373,7 @@ impl OpenFrameClientUpdateService {
 
         if let Some(busy) = self.busy_with() {
             warn!(
-                "{} started during client download, deferring client update (will redeliver)",
+                "{} started during client download, deferring client update (will retry)",
                 busy
             );
             if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
@@ -498,6 +526,95 @@ impl OpenFrameClientUpdateService {
         Ok(binary_path)
     }
 
+    /// Fails only when the staged binary clearly reports another version; a probe that cannot tell lets the update go ahead.
+    async fn verify_staged_version(staged_path: &Path, expected_version: &str) -> Result<()> {
+        let Some(staged_version) = Self::staged_binary_version(staged_path).await else {
+            return Ok(());
+        };
+        let Some(expected) = version_comparator::parse_version(expected_version) else {
+            return Ok(());
+        };
+        if version_comparator::precedence(&staged_version, &expected) != std::cmp::Ordering::Equal {
+            return Err(anyhow!(
+                "Downloaded binary reports version {}, expected {}; not installing it",
+                staged_version,
+                expected_version
+            ));
+        }
+        info!(
+            "Downloaded binary reports the expected version {}",
+            staged_version
+        );
+        Ok(())
+    }
+
+    async fn staged_binary_version(staged_path: &Path) -> Option<Version> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Err(e) =
+                tokio::fs::set_permissions(staged_path, std::fs::Permissions::from_mode(0o755))
+                    .await
+            {
+                warn!(
+                    "Cannot make the downloaded binary executable to check its version, updating anyway: {}",
+                    e
+                );
+                return None;
+            }
+        }
+
+        let mut command = tokio::process::Command::new(staged_path);
+        command
+            .arg("--version")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true);
+        #[cfg(windows)]
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+        let output = match tokio::time::timeout(
+            Duration::from_secs(STAGED_VERSION_PROBE_TIMEOUT_SECS),
+            command.output(),
+        )
+        .await
+        {
+            Ok(Ok(output)) => output,
+            Ok(Err(e)) => {
+                warn!(
+                    "Cannot run the downloaded binary to check its version, updating anyway: {}",
+                    e
+                );
+                return None;
+            }
+            Err(_) => {
+                warn!(
+                    "Downloaded binary did not print its version within {}s, updating anyway",
+                    STAGED_VERSION_PROBE_TIMEOUT_SECS
+                );
+                return None;
+            }
+        };
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if !output.status.success() {
+            warn!(
+                "Downloaded binary exited with {} on --version, updating anyway: {}",
+                output.status,
+                stdout.trim()
+            );
+            return None;
+        }
+        let version = parse_version_output(&stdout);
+        if version.is_none() {
+            warn!(
+                "Downloaded binary printed no version, updating anyway: {}",
+                stdout.trim()
+            );
+        }
+        version
+    }
+
     /// Parse version string into semver Version
     /// Supports formats like: "1.2.3", "v1.2.3", "1.2.3-beta", "1.2.3+build"
     fn parse_version(version: &str) -> Result<Version> {
@@ -519,3 +636,25 @@ impl OpenFrameClientUpdateService {
                 .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+')
     }
 }
+
+/// The version as apply() compares it with the running one; None for a version apply() rejects.
+pub(crate) fn canonical_version(version: &str) -> Option<String> {
+    let version = version.trim();
+    if !OpenFrameClientUpdateService::is_valid_version(version) {
+        return None;
+    }
+    version_comparator::parse_version(version).map(|parsed| parsed.to_string())
+}
+
+/// Reads clap's `openframe-client <version>` line.
+fn parse_version_output(stdout: &str) -> Option<Version> {
+    stdout.lines().find_map(|line| {
+        line.split_whitespace()
+            .last()
+            .and_then(version_comparator::parse_version)
+    })
+}
+
+#[cfg(test)]
+#[path = "openframe_client_update_service_tests.rs"]
+mod tests;

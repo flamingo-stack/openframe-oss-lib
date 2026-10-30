@@ -7,9 +7,22 @@ use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+use crate::clients::AuthClient;
 use crate::platform::directories::DirectoryManager;
+use crate::platform::DmgExtractor;
 use crate::services::backend_call_retry::RetryTiming;
-use crate::services::AgentConfigurationService;
+use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
+use crate::services::result_store::ResultStore;
+use crate::services::shared_token_service::SharedTokenService;
+use crate::services::{
+    AgentAuthService, AgentConfigurationService, DeactivationService, EncryptionService,
+    GithubDownloadService, InitialConfigurationService, InstalledAgentMessagePublisher,
+    InstalledToolsService, LastKnownGoodService, MachineIdService, NatsConnectionManager,
+    NatsMessagePublisher, OpenFrameClientInfoService, OpenFrameClientUpdateService,
+    ToolCommandParamsResolver, ToolKillService, ToolOps, ToolRunManager, UpdateCleanupService,
+    UpdateHandlerService, UpdateStateService,
+};
+use crate::utils::in_progress::InProgress;
 
 const READY_BOUND: Duration = Duration::from_secs(10);
 
@@ -85,6 +98,80 @@ pub(crate) fn directories(dir: &TempDir) -> DirectoryManager {
         dir.path().join("app"),
         dir.path().join("secured"),
     )
+}
+
+/// A client update service over `dir`, with a NATS manager that never connects.
+pub(crate) struct ClientUpdateFixture {
+    pub(crate) directories: DirectoryManager,
+    pub(crate) service: OpenFrameClientUpdateService,
+    pub(crate) tool_ops: ToolOps,
+    pub(crate) tool_run_manager: ToolRunManager,
+    pub(crate) nats: NatsConnectionManager,
+}
+
+pub(crate) fn client_update_fixture(dir: &TempDir) -> ClientUpdateFixture {
+    let dm = directories(dir);
+    let config = AgentConfigurationService::new(dm.clone()).unwrap();
+    let initial = InitialConfigurationService::new(dm.clone()).unwrap();
+    let tool_ops = ToolOps::default();
+    let tool_run_manager = ToolRunManager::new(
+        InstalledToolsService::new(dm.clone()).unwrap(),
+        ToolCommandParamsResolver::new(dm.clone(), initial.clone(), config.clone()),
+        ToolKillService::new(),
+        tool_ops.clone(),
+    );
+    let deactivation = DeactivationService::new(&dm);
+    let auth = AgentAuthService::new(
+        AuthClient::new(
+            "http://127.0.0.1:9".into(),
+            reqwest::Client::new(),
+            deactivation.clone(),
+        ),
+        config.clone(),
+        SharedTokenService::new(dm.clone(), EncryptionService::new()),
+    );
+    let nats = NatsConnectionManager::new(
+        "nats://127.0.0.1:9".into(),
+        config.clone(),
+        initial.clone(),
+        auth,
+        LocalTlsConfigProvider::new(initial),
+        deactivation,
+        MachineIdService::new(&dm),
+    );
+
+    let update_state = UpdateStateService::new(dm.clone()).unwrap();
+    let client_info = OpenFrameClientInfoService::new(dm.clone()).unwrap();
+    let last_known_good = LastKnownGoodService::new(dm.clone()).unwrap();
+    let update_handler = UpdateHandlerService::new(
+        update_state.clone(),
+        client_info.clone(),
+        UpdateCleanupService::for_binary(dir.path().join("openframe-client")),
+        last_known_good.clone(),
+        InstalledAgentMessagePublisher::new(NatsMessagePublisher::new(nats.clone())),
+        config,
+        Arc::new(ResultStore::open_or_degrade(
+            dm.secured_dir().join("scheduled_outbox.redb"),
+        )),
+    );
+    let service = OpenFrameClientUpdateService::new(
+        client_info,
+        GithubDownloadService::new(reqwest::Client::new(), DmgExtractor::new()),
+        update_state,
+        last_known_good,
+        tool_run_manager.clone(),
+        tool_ops.clone(),
+        InProgress::default().view(),
+        update_handler,
+    );
+
+    ClientUpdateFixture {
+        directories: dm,
+        service,
+        tool_ops,
+        tool_run_manager,
+        nats,
+    }
 }
 
 /// Agent configuration of a registered machine whose access token is `machine-token`.
