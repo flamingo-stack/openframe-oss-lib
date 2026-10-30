@@ -70,13 +70,20 @@ class DeliveryPropertiesBindingTest {
     }
 
     @Test
-    void bind_defaultsWithoutMaxRuns_rejected() {
+    void bind_defaultsWithoutRunKeys_singleRunFromTheCode() {
         // setup
         Map<String, String> config = fullDefaults();
         config.remove(PREFIX + ".defaults.max-runs");
+        config.remove(PREFIX + ".defaults.rerun-after-seconds");
 
-        // execution + verifications
-        assertThatThrownBy(() -> bind(config)).hasRootCauseInstanceOf(BindValidationException.class);
+        // execution
+        DeliveryProperties properties = bind(config);
+
+        // verifications
+        Policy defaults = properties.getDefaults();
+        assertThat(defaults.getMaxRuns()).isEqualTo(1);
+        assertThat(defaults.getRerunAfterSeconds()).isEqualTo(10_800L);
+        assertThat(defaults.hasRunsLeft(0)).isFalse();
     }
 
     private static DeliveryProperties bind(Map<String, String> config) {
