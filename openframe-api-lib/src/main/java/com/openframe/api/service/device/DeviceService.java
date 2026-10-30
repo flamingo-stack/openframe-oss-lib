@@ -273,7 +273,9 @@ public class DeviceService {
                     .hostnames(filter.getHostnames())
                     .nicknames(filter.getNicknames())
                     .tagKeys(filter.getTagKeys())
-                    .tagValues(filter.getTagValues());
+                    .tagValues(filter.getTagValues())
+                    .directorySources(filter.getDirectorySources())
+                    .directoryUserLinks(filter.getUserLinks());
             filterOsTypes = filter.getOsTypes();
         }
         return builder.osTypes(resolveOsTypes(filterOsTypes, osTypeScope))

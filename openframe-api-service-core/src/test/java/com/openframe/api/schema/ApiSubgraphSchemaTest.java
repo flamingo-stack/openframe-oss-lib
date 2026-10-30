@@ -1,6 +1,8 @@
 package com.openframe.api.schema;
 
 import com.apollographql.federation.graphqljava.Federation;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.ticket.TicketCreationSource;
 import com.openframe.data.document.ticket.TicketStatus;
 import graphql.ExecutionResult;
@@ -11,6 +13,8 @@ import graphql.schema.GraphQLDirectiveContainer;
 import graphql.schema.GraphQLEnumType;
 import graphql.schema.GraphQLEnumValueDefinition;
 import graphql.schema.GraphQLFieldDefinition;
+import graphql.schema.GraphQLInputObjectField;
+import graphql.schema.GraphQLInputObjectType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLTypeUtil;
@@ -180,6 +184,58 @@ class ApiSubgraphSchemaTest {
         assertThat(sdlNames).containsExactlyInAnyOrderElementsOf(javaNames);
     }
 
+    @ParameterizedTest
+    @MethodSource("machineDirectoryFields")
+    void machineDirectoryField_typedLikeTheContract(String field, String type) {
+        // setup
+        GraphQLFieldDefinition definition = schema.getObjectType("Machine").getFieldDefinition(field);
+
+        // execution
+        String printed = GraphQLTypeUtil.simplePrint(definition.getType());
+
+        // verifications
+        assertThat(printed).isEqualTo(type);
+    }
+
+    @Test
+    void machine_computerName_notExposed() {
+        // setup
+        GraphQLObjectType machine = schema.getObjectType("Machine");
+
+        // execution
+        GraphQLFieldDefinition computerName = machine.getFieldDefinition("computerName");
+
+        // verifications
+        assertThat(computerName).isNull();
+    }
+
+    @ParameterizedTest
+    @MethodSource("deviceFilterInputDirectoryFields")
+    void deviceFilterInputDirectoryField_typedLikeTheContract(String field, String type) {
+        // setup
+        GraphQLInputObjectType input = schema.getTypeAs("DeviceFilterInput");
+        GraphQLInputObjectField definition = input.getFieldDefinition(field);
+
+        // execution
+        String printed = GraphQLTypeUtil.simplePrint(definition.getType());
+
+        // verifications
+        assertThat(printed).isEqualTo(type);
+    }
+
+    @ParameterizedTest
+    @MethodSource("directoryEnums")
+    void directoryEnum_valuesEqualJavaEnum(String type, Class<? extends Enum<?>> javaEnum) {
+        // setup
+        List<String> javaNames = javaEnumNames(javaEnum);
+
+        // execution
+        List<String> sdlNames = sdlEnumNames(type);
+
+        // verifications
+        assertThat(sdlNames).containsExactlyInAnyOrderElementsOf(javaNames);
+    }
+
     @Test
     void entities_rootFieldAdded() {
         // execution
@@ -208,6 +264,26 @@ class ApiSubgraphSchemaTest {
         return Stream.of(
                 Arguments.of("TicketStatus", TicketStatus.class),
                 Arguments.of("TicketCreationSource", TicketCreationSource.class));
+    }
+
+    private static Stream<Arguments> machineDirectoryFields() {
+        return Stream.of(
+                Arguments.of("directorySources", "[DirectorySource!]!"),
+                Arguments.of("directoryUserLink", "DirectoryUserLink!"),
+                Arguments.of("directoryUserIds", "[String!]!"),
+                Arguments.of("directoryUserName", "String"));
+    }
+
+    private static Stream<Arguments> deviceFilterInputDirectoryFields() {
+        return Stream.of(
+                Arguments.of("directorySources", "[DirectorySource!]"),
+                Arguments.of("userLinks", "[DirectoryUserLink!]"));
+    }
+
+    private static Stream<Arguments> directoryEnums() {
+        return Stream.of(
+                Arguments.of("DirectorySource", DirectorySource.class),
+                Arguments.of("DirectoryUserLink", DirectoryUserLink.class));
     }
 
     private static List<String> sdlEnumNames(String type) {

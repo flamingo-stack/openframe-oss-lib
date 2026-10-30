@@ -1,6 +1,10 @@
 package com.openframe.api.mapper;
 
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
+import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilterInput;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
@@ -118,5 +122,59 @@ class GraphQLDeviceMapperTest {
         assertThat(mapper.toEnrollment(machine(CONNECTED), List.of()).isReady()).as("connected only").isFalse();
         assertThat(mapper.toEnrollment(machine(null), inventory).isReady()).as("inventory only").isFalse();
         assertThat(mapper.toEnrollment(machine(null), List.of()).isReady()).as("neither").isFalse();
+    }
+
+    @Test
+    @DisplayName("directorySources: a machine the SaaS matcher never wrote (every OSS machine) reads []")
+    void toDirectorySources_nullStored_emptyList() {
+        assertThat(mapper.toDirectorySources(machine(null))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("directorySources: stored sources are returned as they are")
+    void toDirectorySources_stored_returned() {
+        Machine machine = machine(null);
+        machine.setDirectorySources(List.of(DirectorySource.MICROSOFT_365));
+
+        assertThat(mapper.toDirectorySources(machine)).containsExactly(DirectorySource.MICROSOFT_365);
+    }
+
+    @Test
+    @DisplayName("directoryUserLink: a machine without a link reads NONE")
+    void toDirectoryUserLink_nullStored_none() {
+        assertThat(mapper.toDirectoryUserLink(machine(null))).isEqualTo(DirectoryUserLink.NONE);
+    }
+
+    @Test
+    @DisplayName("directoryUserLink: a stored link is returned")
+    void toDirectoryUserLink_stored_returned() {
+        Machine machine = machine(null);
+        machine.setDirectoryUserLink(DirectoryUserLink.SHARED);
+
+        assertThat(mapper.toDirectoryUserLink(machine)).isEqualTo(DirectoryUserLink.SHARED);
+    }
+
+    @Test
+    @DisplayName("directoryUserIds: null reads [], stored ids keep their order (the primary user first)")
+    void toDirectoryUserIds_nullAndStored() {
+        Machine stored = machine(null);
+        stored.setDirectoryUserIds(List.of("acc-2", "acc-1"));
+
+        assertThat(mapper.toDirectoryUserIds(machine(null))).isEmpty();
+        assertThat(mapper.toDirectoryUserIds(stored)).containsExactly("acc-2", "acc-1");
+    }
+
+    @Test
+    @DisplayName("toDeviceFilterCriteria: the SOURCES and USER filters are copied from the input")
+    void toDeviceFilterCriteria_directoryFilters_copied() {
+        DeviceFilterInput input = DeviceFilterInput.builder()
+                .directorySources(List.of(DirectorySource.MICROSOFT_365))
+                .userLinks(List.of(DirectoryUserLink.PRIMARY, DirectoryUserLink.NONE))
+                .build();
+
+        DeviceFilterCriteria criteria = mapper.toDeviceFilterCriteria(input);
+
+        assertThat(criteria.getDirectorySources()).containsExactly(DirectorySource.MICROSOFT_365);
+        assertThat(criteria.getUserLinks()).containsExactly(DirectoryUserLink.PRIMARY, DirectoryUserLink.NONE);
     }
 }

@@ -46,6 +46,10 @@ input DeviceFilterInput {
     organizationIds: [String!]
     tagKeys: [String!]
     tagValues: [String!]
+    """SOURCES filter: machines one of these directories knows. Matches nothing in OSS."""
+    directorySources: [DirectorySource!]
+    """USER filter. NONE also matches a machine the directory matcher never wrote (every machine in OSS)."""
+    userLinks: [DirectoryUserLink!]
 }
 
 type Machine implements Node @key(fields: "machineId") @shareable {
@@ -82,6 +86,14 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     from device pickers and skips it at dispatch; inventory and vulnerabilities still show it."""
     softwareManagementSupported: Boolean!
     enrollment: DeviceEnrollment
+    """SOURCES column: the directories that know this machine besides the agent; [] when none, and always in OSS."""
+    directorySources: [DirectorySource!]!
+    """USER column: who the machine is tied to; NONE when nobody, and always in OSS."""
+    directoryUserLink: DirectoryUserLink!
+    """Account ids (DirectoryAccount.id) of the tied users, the primary user first. SHARED shows 'N recent users' with N = its length."""
+    directoryUserIds: [String!]!
+    """Display name of the user for PRIMARY; null otherwise. devices(search) also matches it."""
+    directoryUserName: String
 }
 
 type DeviceEnrollment {
@@ -123,6 +135,19 @@ enum DeviceType {
     VIRTUAL_MACHINE
     CONTAINER_HOST
     OTHER
+}
+
+"""Who the machine is tied to (D20). PRIMARY: one declared user. SHARED: several users, or recent users only. NONE: nobody."""
+enum DirectoryUserLink {
+    PRIMARY
+    SHARED
+    NONE
+}
+
+"""A directory that knows the machine besides the agent (D19)."""
+enum DirectorySource {
+    MICROSOFT_365
+    GOOGLE_WORKSPACE
 }
 
 type DeviceConnection {

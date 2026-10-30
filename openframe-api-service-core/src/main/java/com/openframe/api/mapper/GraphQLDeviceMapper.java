@@ -10,6 +10,8 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -41,6 +43,8 @@ public class GraphQLDeviceMapper {
                 .organizationIds(input.getOrganizationIds())
                 .tagKeys(input.getTagKeys())
                 .tagValues(input.getTagValues())
+                .directorySources(input.getDirectorySources())
+                .userLinks(input.getUserLinks())
                 .build();
     }
 
@@ -60,6 +64,23 @@ public class GraphQLDeviceMapper {
                 .winget(states.get(PackageManagerType.WINGET))
                 .choco(states.get(PackageManagerType.CHOCO))
                 .build();
+    }
+
+    // Only the SaaS directory matcher writes these, so a machine it never wrote (every machine in OSS) reads as
+    // having no directory: [] and NONE, which the schema declares non-null
+    public List<DirectorySource> toDirectorySources(Machine machine) {
+        List<DirectorySource> sources = machine.getDirectorySources();
+        return sources != null ? sources : List.of();
+    }
+
+    public DirectoryUserLink toDirectoryUserLink(Machine machine) {
+        DirectoryUserLink link = machine.getDirectoryUserLink();
+        return link != null ? link : DirectoryUserLink.NONE;
+    }
+
+    public List<String> toDirectoryUserIds(Machine machine) {
+        List<String> userIds = machine.getDirectoryUserIds();
+        return userIds != null ? userIds : List.of();
     }
 
     public DeviceEnrollmentResponse toEnrollment(Machine machine, List<ToolConnection> toolConnections) {

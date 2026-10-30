@@ -1,5 +1,7 @@
 package com.openframe.data.document.device.filter;
 
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import lombok.AllArgsConstructor;
@@ -27,6 +29,9 @@ public class MachineQueryFilter {
     private List<String> nicknames;
     private List<String> tagKeys;
     private List<String> tagValues;
+    // The directory summary the SaaS matcher writes; both empty in OSS. NONE also matches a machine never written.
+    private List<DirectorySource> directorySources;
+    private List<DirectoryUserLink> directoryUserLinks;
 
     public MachineQueryFilter(List<String> statuses, List<String> excludeStatuses, List<String> deviceTypes,
                               List<OsType> osTypes, List<String> organizationIds,
