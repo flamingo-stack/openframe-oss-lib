@@ -25,5 +25,7 @@ public class MachinePinotMessage implements KafkaMessage {
     private String osType;
     private List<String> tags;              // tag key names for Pinot MV column
     private List<String> tagKeyValues;      // "key:value" pairs for Pinot indexing
+    private List<String> directorySources;  // DirectorySource names for the Pinot MV column; [] when none
+    private String directoryUserLink;       // DirectoryUserLink name; NONE when the machine has no link
     private long ingestionTime;
 }

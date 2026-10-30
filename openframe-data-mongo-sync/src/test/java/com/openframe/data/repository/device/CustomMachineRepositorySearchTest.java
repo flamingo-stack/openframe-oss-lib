@@ -1,5 +1,7 @@
 package com.openframe.data.repository.device;
 
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.tag.Tag;
@@ -20,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
@@ -336,7 +339,7 @@ class CustomMachineRepositorySearchTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"(a+)+$", "web-*", "db?prod"})
-    void buildDeviceQuery_dashboardSearch_keepsLiteralSubstringAcrossSevenFields(String search) {
+    void buildDeviceQuery_dashboardSearch_keepsLiteralSubstringAcrossEightFields(String search) {
         // setup
         MachineQueryFilter filter = MachineQueryFilter.builder().build();
 
@@ -346,9 +349,80 @@ class CustomMachineRepositorySearchTest {
         // verifications
         assertThat(clauses(query.getQueryObject()).filter(clause -> clause.values().stream().anyMatch(Pattern.class::isInstance)))
                 .flatExtracting(Document::keySet)
-                .containsExactlyInAnyOrder("hostname", "nickname", "displayName", "ip", "serialNumber", "manufacturer", "model");
+                .containsExactlyInAnyOrder("hostname", "nickname", "displayName", "ip", "serialNumber", "manufacturer",
+                        "model", "directoryUserName");
         assertThat(nameRegex(query, "hostname").matcher("prefix-" + search + "-suffix").find()).isTrue();
         assertThat(nameRegex(query, "hostname").matcher("web-prod").find()).isFalse();
+    }
+
+    @Test
+    void buildDeviceQuery_userNameSearch_matchesTheDirectoryUserCaseInsensitively() {
+        // setup
+        MachineQueryFilter filter = MachineQueryFilter.builder().build();
+
+        // execution
+        Query query = repository.buildDeviceQuery(filter, "jane");
+
+        // verifications
+        assertThat(nameRegex(query, "directoryUserName").matcher("Jane Doe").find()).isTrue();
+        assertThat(nameRegex(query, "directoryUserName").matcher("John Smith").find()).isFalse();
+    }
+
+    @Test
+    void buildDeviceQuery_directorySources_inClauseOnTheStoredSources() {
+        // setup
+        MachineQueryFilter filter = MachineQueryFilter.builder()
+                .directorySources(List.of(DirectorySource.MICROSOFT_365)).build();
+
+        // execution
+        Query query = repository.buildDeviceQuery(filter, "");
+
+        // verifications
+        assertThat(clauseFor(query, "directorySources"))
+                .containsEntry("directorySources", new Document("$in", List.of(DirectorySource.MICROSOFT_365)));
+    }
+
+    @Test
+    void buildDeviceQuery_userLinksWithNone_alsoMatchesMachinesWithoutALink() {
+        // setup
+        MachineQueryFilter filter = MachineQueryFilter.builder()
+                .directoryUserLinks(List.of(DirectoryUserLink.SHARED, DirectoryUserLink.NONE)).build();
+
+        // execution
+        Query query = repository.buildDeviceQuery(filter, "");
+
+        // verifications
+        List<DirectoryUserLink> sharedOrNone = Arrays.asList(DirectoryUserLink.SHARED, DirectoryUserLink.NONE, null);
+        assertThat(clauseFor(query, "directoryUserLink"))
+                .containsEntry("directoryUserLink", new Document("$in", sharedOrNone));
+    }
+
+    @Test
+    void buildDeviceQuery_userLinksWithoutNone_onlyThoseLinks() {
+        // setup
+        MachineQueryFilter filter = MachineQueryFilter.builder()
+                .directoryUserLinks(List.of(DirectoryUserLink.PRIMARY)).build();
+
+        // execution
+        Query query = repository.buildDeviceQuery(filter, "");
+
+        // verifications
+        assertThat(clauseFor(query, "directoryUserLink"))
+                .containsEntry("directoryUserLink", new Document("$in", List.of(DirectoryUserLink.PRIMARY)));
+    }
+
+    @Test
+    void buildDeviceQuery_emptyDirectoryFilters_noDirectoryClause() {
+        // setup
+        MachineQueryFilter filter = MachineQueryFilter.builder()
+                .directorySources(List.of()).directoryUserLinks(List.of()).build();
+
+        // execution
+        Query query = repository.buildDeviceQuery(filter, "");
+
+        // verifications
+        assertThat(clauses(query.getQueryObject()))
+                .noneMatch(clause -> clause.containsKey("directorySources") || clause.containsKey("directoryUserLink"));
     }
 
     @Test

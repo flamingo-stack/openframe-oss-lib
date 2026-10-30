@@ -3,9 +3,12 @@ package com.openframe.client.service;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.service.machine.MachineUpdate;
+import com.openframe.data.service.machine.MachineWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -14,6 +17,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -24,6 +29,7 @@ class MachineTimezoneServiceTest {
     private static final String MACHINE_ID = "m-1";
 
     @Mock private MachineRepository machineRepository;
+    @Mock private MachineWriter machineWriter;
     @InjectMocks private MachineTimezoneService service;
 
     @Test
@@ -34,8 +40,13 @@ class MachineTimezoneServiceTest {
 
         service.updateTimezone(MACHINE_ID, "Europe/Kyiv");
 
-        assertThat(machine.getTimezone()).isEqualTo("Europe/Kyiv");
-        verify(machineRepository).save(machine);
+        ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
+        verify(machineWriter).update(eq(MACHINE_ID), update.capture());
+        assertThat(update.getValue().paths()).containsExactly("timezone");
+        Machine written = machine("UTC");
+        update.getValue().applyTo(written);
+        assertThat(written.getTimezone()).isEqualTo("Europe/Kyiv");
+        verify(machineRepository, never()).save(any());
     }
 
     @Test
@@ -44,7 +55,7 @@ class MachineTimezoneServiceTest {
         service.updateTimezone(MACHINE_ID, "Not/AZone");
 
         verify(machineRepository, never()).findByMachineId(any());
-        verify(machineRepository, never()).save(any());
+        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
     }
 
     @Test
@@ -53,7 +64,7 @@ class MachineTimezoneServiceTest {
         service.updateTimezone(MACHINE_ID, "  ");
 
         verify(machineRepository, never()).findByMachineId(any());
-        verify(machineRepository, never()).save(any());
+        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
     }
 
     @Test
@@ -63,7 +74,7 @@ class MachineTimezoneServiceTest {
 
         service.updateTimezone(MACHINE_ID, "America/New_York");
 
-        verify(machineRepository, never()).save(any());
+        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
     }
 
     @Test
@@ -74,7 +85,7 @@ class MachineTimezoneServiceTest {
 
         service.updateTimezone(MACHINE_ID, "Europe/Kyiv");
 
-        verify(machineRepository, never()).save(any());
+        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
     }
 
     @Test
@@ -86,7 +97,7 @@ class MachineTimezoneServiceTest {
 
         service.updateTimezone(MACHINE_ID, "Europe/Kyiv");
 
-        verify(machineRepository, never()).save(any());
+        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
     }
 
     private static Machine machine(String timezone) {

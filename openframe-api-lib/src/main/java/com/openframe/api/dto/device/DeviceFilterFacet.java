@@ -22,11 +22,26 @@ public enum DeviceFilterFacet {
     OS_TYPES("osTypes"),
     ORGANIZATION_IDS("organizationIds"),
     TAG_KEYS("tagKeys"),
+    DIRECTORY_SOURCES("directorySources"),
+    USER_LINKS("userLinks"),
     FILTERED_COUNT("filteredCount");
 
-    /** Every facet — the behaviour non-GraphQL callers (the external REST API) still want. */
+    /**
+     * Every facet, the directory ones included. For a caller that has no selection set to narrow
+     * it and whose response can carry all of them. A caller whose response does not expose a
+     * facet must not use this: each unused facet is a Pinot round trip made for nothing.
+     */
     public static final Set<DeviceFilterFacet> ALL =
             Collections.unmodifiableSet(EnumSet.allOf(DeviceFilterFacet.class));
+
+    /**
+     * What the external REST {@code /filters} response carries: everything except the directory
+     * facets ({@link #DIRECTORY_SOURCES}, {@link #USER_LINKS}), which its DTO does not expose.
+     * Listed explicitly so a facet added later stays off the REST path until the DTO exposes it.
+     */
+    public static final Set<DeviceFilterFacet> REST =
+            Collections.unmodifiableSet(EnumSet.of(
+                    STATUSES, DEVICE_TYPES, OS_TYPES, ORGANIZATION_IDS, TAG_KEYS, FILTERED_COUNT));
 
     private final String graphQlField;
 

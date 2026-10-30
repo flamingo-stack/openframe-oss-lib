@@ -23,6 +23,8 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     private static final String ORGANIZATION_ID = "organizationId";
     private static final String TAGS = "tags";
     private static final String TAG_KEY_VALUES = "tagKeyValues";
+    private static final String DIRECTORY_SOURCES = "directorySources";
+    private static final String DIRECTORY_USER_LINK = "directoryUserLink";
 
     /**
      * Statuses considered "active" for the organization device counts facet
@@ -55,8 +57,11 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues) {
-        return executeFacetQuery(STATUS, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, STATUS);
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks) {
+        return executeFacetQuery(STATUS, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+                directorySources, userLinks, STATUS);
     }
 
     @Override
@@ -67,8 +72,11 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues) {
-        return executeFacetQuery(DEVICE_TYPE, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, DEVICE_TYPE);
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks) {
+        return executeFacetQuery(DEVICE_TYPE, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+                directorySources, userLinks, DEVICE_TYPE);
     }
 
     @Override
@@ -79,8 +87,11 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues) {
-        return executeFacetQuery(OS_TYPE, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, OS_TYPE);
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks) {
+        return executeFacetQuery(OS_TYPE, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+                directorySources, userLinks, OS_TYPE);
     }
 
     @Override
@@ -91,9 +102,12 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues) {
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks) {
         // Organization device counts only include active devices (ONLINE / OFFLINE).
-        return executeActiveFacetQuery(ORGANIZATION_ID, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, ORGANIZATION_ID);
+        return executeActiveFacetQuery(ORGANIZATION_ID, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys,
+                tagKeyValues, directorySources, userLinks, ORGANIZATION_ID);
     }
 
     @Override
@@ -104,8 +118,44 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues) {
-        return executeFacetQuery(TAG_KEY_VALUES, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, TAG_KEY_VALUES);
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks) {
+        return executeFacetQuery(TAG_KEY_VALUES, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys,
+                tagKeyValues, directorySources, userLinks, TAG_KEY_VALUES);
+    }
+
+    @Override
+    public Map<String, Integer> getDirectorySourceFilterOptions(
+            String tenantId,
+            List<String> statuses,
+            List<String> deviceTypes,
+            List<String> osTypes,
+            List<String> organizationIds,
+            List<String> tagKeys,
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks) {
+        // A machine no directory knows stores [""] (the column's defaultNullValue), which executeKeyCountQuery skips.
+        return executeFacetQuery(DIRECTORY_SOURCES, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys,
+                tagKeyValues, directorySources, userLinks, DIRECTORY_SOURCES);
+    }
+
+    @Override
+    public Map<String, Integer> getUserLinkFilterOptions(
+            String tenantId,
+            List<String> statuses,
+            List<String> deviceTypes,
+            List<String> osTypes,
+            List<String> organizationIds,
+            List<String> tagKeys,
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks) {
+        // A machine no external directory integration wrote reads NONE (the column's defaultNullValue), so it is
+        // counted.
+        return executeFacetQuery(DIRECTORY_USER_LINK, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys,
+                tagKeyValues, directorySources, userLinks, DIRECTORY_USER_LINK);
     }
 
     @Override
@@ -116,10 +166,13 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues) {
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(devicesTable, tenantId)
                 .selectCountAll();
-        applyDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, null);
+        applyDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+                directorySources, userLinks, null);
         return executeCountQuery(queryBuilder.build());
     }
 
@@ -137,9 +190,12 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                                     List<String> organizationIds,
                                                     List<String> tagKeys,
                                                     List<String> tagKeyValues,
+                                                    List<String> directorySources,
+                                                    List<String> userLinks,
                                                     String excludeField) {
         PinotQueryBuilder queryBuilder = newFacetQueryBuilder(facetField, tenantId);
-        applyDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
+        applyDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+                directorySources, userLinks, excludeField);
         return executeKeyCountQuery(queryBuilder.build());
     }
 
@@ -155,9 +211,12 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                                          List<String> organizationIds,
                                                          List<String> tagKeys,
                                                          List<String> tagKeyValues,
+                                                         List<String> directorySources,
+                                                         List<String> userLinks,
                                                          String excludeField) {
         PinotQueryBuilder queryBuilder = newFacetQueryBuilder(facetField, tenantId);
-        applyActiveDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
+        applyActiveDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+                directorySources, userLinks, excludeField);
         return executeKeyCountQuery(queryBuilder.build());
     }
 
@@ -184,13 +243,16 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                     List<String> organizationIds,
                                     List<String> tagKeys,
                                     List<String> tagKeyValues,
+                                    List<String> directorySources,
+                                    List<String> userLinks,
                                     String excludeField) {
         List<String> requestedStatuses = sanitizeStatuses(statuses);
         if (!requestedStatuses.contains(DELETED.name())) {
             queryBuilder.whereNotEquals(STATUS, DELETED.name());
         }
         applyStatusFilter(queryBuilder, requestedStatuses, excludeField);
-        applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
+        applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+                directorySources, userLinks, excludeField);
     }
 
     /**
@@ -205,10 +267,13 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                           List<String> organizationIds,
                                           List<String> tagKeys,
                                           List<String> tagKeyValues,
+                                          List<String> directorySources,
+                                          List<String> userLinks,
                                           String excludeField) {
         queryBuilder.whereIn(STATUS, ACTIVE_STATUSES);
         applyStatusFilter(queryBuilder, sanitizeStatuses(statuses), excludeField);
-        applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
+        applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues,
+                directorySources, userLinks, excludeField);
     }
 
     private static List<String> sanitizeStatuses(List<String> statuses) {
@@ -241,6 +306,8 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                        List<String> organizationIds,
                                        List<String> tagKeys,
                                        List<String> tagKeyValues,
+                                       List<String> directorySources,
+                                       List<String> userLinks,
                                        String excludeField) {
         if (!DEVICE_TYPE.equals(excludeField) && deviceTypes != null && !deviceTypes.isEmpty()) {
             queryBuilder.whereOr(DEVICE_TYPE, deviceTypes);
@@ -260,6 +327,15 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
 
         if (!TAG_KEY_VALUES.equals(excludeField) && tagKeyValues != null && !tagKeyValues.isEmpty()) {
             queryBuilder.whereOr(TAG_KEY_VALUES, tagKeyValues);
+        }
+
+        // MV column: "directorySources = 'X'" holds when any of the machine's sources is X
+        if (!DIRECTORY_SOURCES.equals(excludeField) && directorySources != null && !directorySources.isEmpty()) {
+            queryBuilder.whereOr(DIRECTORY_SOURCES, directorySources);
+        }
+
+        if (!DIRECTORY_USER_LINK.equals(excludeField) && userLinks != null && !userLinks.isEmpty()) {
+            queryBuilder.whereOr(DIRECTORY_USER_LINK, userLinks);
         }
     }
 }

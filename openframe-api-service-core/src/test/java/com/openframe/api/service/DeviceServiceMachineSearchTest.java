@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
@@ -9,6 +10,8 @@ import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
@@ -73,6 +76,28 @@ class DeviceServiceMachineSearchTest {
         verify(machineRepository).countMachines(eq(TENANT_ID), filterCaptor.capture(), isNull());
         assertThat(filterCaptor.getValue()).extracting(MachineQueryFilter::getTagKeys, MachineQueryFilter::getTagValues)
                 .containsExactly(List.of("environment"), List.of("production"));
+    }
+
+    @Test
+    void queryDevices_directoryFilters_passedToTheMachineQuery() {
+        // setup
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder()
+                .directorySources(List.of(DirectorySource.MICROSOFT_365))
+                .userLinks(List.of(DirectoryUserLink.NONE)).build();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().limit(10).build();
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
+        when(machineRepository.getDefaultSortField()).thenReturn("_id");
+        when(machineRepository.findMachinesWithCursor(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(),
+                isNull(), eq(11), eq("_id"), eq("DESC"))).thenReturn(List.of());
+
+        // execution
+        service.queryDevices(filter, pagination, null, null);
+
+        // verifications
+        verify(machineRepository).countMachines(eq(TENANT_ID), filterCaptor.capture(), isNull());
+        assertThat(filterCaptor.getValue())
+                .extracting(MachineQueryFilter::getDirectorySources, MachineQueryFilter::getDirectoryUserLinks)
+                .containsExactly(List.of(DirectorySource.MICROSOFT_365), List.of(DirectoryUserLink.NONE));
     }
 
     @Test
@@ -218,5 +243,18 @@ class DeviceServiceMachineSearchTest {
         machine.setId("012345678901234567890123");
         machine.setMachineId("machine-1");
         return machine;
+    }
+
+    @Test
+    void getAssignedDeviceFilters_mongoFacets_directoryFacetsEmptyNotNull() {
+        // setup
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder().build();
+
+        // execution
+        DeviceFilters filters = service.getAssignedDeviceFilters(List.of("machine-1"), filter, null);
+
+        // verifications
+        assertThat(filters.getDirectorySources()).isNotNull().isEmpty();
+        assertThat(filters.getUserLinks()).isNotNull().isEmpty();
     }
 }

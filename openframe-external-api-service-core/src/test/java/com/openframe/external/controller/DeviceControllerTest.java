@@ -2,6 +2,7 @@ package com.openframe.external.controller;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.device.TagFilterOption;
@@ -35,9 +36,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -261,7 +264,7 @@ class DeviceControllerTest {
 
     @Test
     void filtersPassEveryParamToTheDomainAndRenameOrganizationsToCustomers() throws Exception {
-        when(deviceFilterService.getDeviceFilters(any(DeviceFilterCriteria.class))).thenReturn(CompletableFuture.completedFuture(
+        when(deviceFilterService.getDeviceFilters(any(DeviceFilterCriteria.class), any())).thenReturn(CompletableFuture.completedFuture(
                 DeviceFilters.builder()
                         .statuses(List.of(new DeviceFilterOption("ONLINE", "Online", 4)))
                         .deviceTypes(List.of(new DeviceFilterOption("LAPTOP", "Laptop", 3)))
@@ -294,7 +297,7 @@ class DeviceControllerTest {
                 .andExpect(jsonPath("$.filteredCount").value(9));
 
         ArgumentCaptor<DeviceFilterCriteria> filter = ArgumentCaptor.forClass(DeviceFilterCriteria.class);
-        verify(deviceFilterService).getDeviceFilters(filter.capture());
+        verify(deviceFilterService).getDeviceFilters(filter.capture(), any());
         assertEquals(DeviceFilterCriteria.builder()
                 .statuses(List.of(DeviceStatus.ONLINE))
                 .deviceTypes(List.of(DeviceType.LAPTOP))
@@ -304,6 +307,27 @@ class DeviceControllerTest {
                 .tagValues(List.of("hq"))
                 .build(), filter.getValue());
         verifyNoInteractions(deviceService);
+    }
+
+    @Test
+    void filtersAskOnlyForTheFacetsTheResponseExposesAndSkipTheDirectoryOnes() throws Exception {
+        when(deviceFilterService.getDeviceFilters(any(DeviceFilterCriteria.class), any())).thenReturn(
+                CompletableFuture.completedFuture(DeviceFilters.builder().filteredCount(0).build()));
+
+        mockMvc.perform(get(BASE + "/filters")).andExpect(status().isOk());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Set<DeviceFilterFacet>> facets = ArgumentCaptor.forClass(Set.class);
+        verify(deviceFilterService).getDeviceFilters(any(DeviceFilterCriteria.class), facets.capture());
+        assertFalse(facets.getValue().contains(DeviceFilterFacet.DIRECTORY_SOURCES));
+        assertFalse(facets.getValue().contains(DeviceFilterFacet.USER_LINKS));
+        assertEquals(EnumSet.of(
+                DeviceFilterFacet.STATUSES,
+                DeviceFilterFacet.DEVICE_TYPES,
+                DeviceFilterFacet.OS_TYPES,
+                DeviceFilterFacet.ORGANIZATION_IDS,
+                DeviceFilterFacet.TAG_KEYS,
+                DeviceFilterFacet.FILTERED_COUNT), facets.getValue());
     }
 
     @Test

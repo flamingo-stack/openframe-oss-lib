@@ -25,6 +25,8 @@ import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.organization.Organization;
@@ -199,6 +201,24 @@ public class DeviceDataFetcher {
     public boolean softwareManagementSupported(DgsDataFetchingEnvironment dfe) {
         Machine machine = dfe.getSource();
         return packageManagerAvailability.isSoftwareManageable(machine);
+    }
+
+    @DgsData(parentType = "Machine")
+    public List<DirectorySource> directorySources(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return mapper.toDirectorySources(machine);
+    }
+
+    @DgsData(parentType = "Machine")
+    public DirectoryUserLink directoryUserLink(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return mapper.toDirectoryUserLink(machine);
+    }
+
+    @DgsData(parentType = "Machine")
+    public List<String> directoryUserIds(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return mapper.toDirectoryUserIds(machine);
     }
 
 }

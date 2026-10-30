@@ -1,6 +1,8 @@
 package com.openframe.data.repository.device;
 
 import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -51,10 +53,13 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String OS_TYPE_FIELD = "osType";
     private static final String MACHINE_ID_FIELD = "machineId";
     private static final String LAST_SEEN_FIELD = "lastSeen";
+    private static final String HOST_FACTS_CHECKED_AT_FIELD = "hostFactsCheckedAt";
     private static final String STATUS_FIELD = "status";
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
     private static final String PACKAGE_MANAGERS_FIELD = "packageManagers";
+    private static final String DIRECTORY_SOURCES_FIELD = "directorySources";
+    private static final String DIRECTORY_USER_LINK_FIELD = "directoryUserLink";
     private static final String COUNT_FIELD = "count";
     private static final String BUCKET_FIELD = "_availableBucket";
     private static final String ONLINE_STATUS = "ONLINE";
@@ -631,6 +636,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                 criteriaList.add(softwareManageableCriteria(manageableBy));
             }
             addNameCriteria(criteriaList, filter);
+            addDirectoryCriteria(criteriaList, filter);
         }
 
         if (search != null && !search.isEmpty()) {
@@ -642,7 +648,8 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                     Criteria.where("ip").regex(quoted, "i"),
                     Criteria.where("serialNumber").regex(quoted, "i"),
                     Criteria.where("manufacturer").regex(quoted, "i"),
-                    Criteria.where("model").regex(quoted, "i")
+                    Criteria.where("model").regex(quoted, "i"),
+                    Criteria.where("directoryUserName").regex(quoted, "i")
             ));
         }
 
@@ -667,6 +674,24 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             Criteria names = namePatternCriteria(regex);
             criteriaList.add(names);
         }
+    }
+
+    // NONE is also every machine no directory integration wrote, and every machine in OSS: $in with null matches a
+    // missing field as well as an explicit null
+    private static void addDirectoryCriteria(List<Criteria> criteriaList, MachineQueryFilter filter) {
+        List<DirectorySource> sources = filter.getDirectorySources();
+        if (!isEmpty(sources)) {
+            criteriaList.add(Criteria.where(DIRECTORY_SOURCES_FIELD).in(sources));
+        }
+        List<DirectoryUserLink> links = filter.getDirectoryUserLinks();
+        if (isEmpty(links)) {
+            return;
+        }
+        List<DirectoryUserLink> matching = new ArrayList<>(links);
+        if (links.contains(DirectoryUserLink.NONE)) {
+            matching.add(null);
+        }
+        criteriaList.add(Criteria.where(DIRECTORY_USER_LINK_FIELD).in(matching));
     }
 
     private List<Criteria> exactNameCriteria(MachineQueryFilter filter) {
@@ -710,6 +735,12 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     public void updateLastSeen(String machineId, Instant lastSeen) {
         Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
         mongoTemplate.updateFirst(query, new Update().set(LAST_SEEN_FIELD, lastSeen), Machine.class);
+    }
+
+    @Override
+    public void markHostFactsChecked(String machineId, Instant checkedAt) {
+        Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
+        mongoTemplate.updateFirst(query, new Update().set(HOST_FACTS_CHECKED_AT_FIELD, checkedAt), Machine.class);
     }
 
     @Override
