@@ -86,6 +86,24 @@ describe('ComposerSheet', () => {
     vi.restoreAllMocks();
   });
 
+  it('stays inside a layer shorter than its floor, its header under what stands over it', () => {
+    // A tall dock in a short window: 294px above the dock, a 320px floor.
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(294);
+    render(sheet({ height: 500 }));
+    expect(screen.getByRole('dialog', { name: 'Mingo chat' })).toHaveStyle({ height: '274px', minHeight: '274px' });
+    const handle = screen.getByRole('separator', { name: 'Resize the chat' });
+    expect(handle).toHaveAttribute('aria-valuemin', '274');
+    expect(handle).toHaveAttribute('aria-valuemax', '274');
+    vi.restoreAllMocks();
+  });
+
+  it('keeps its floor in a layer with room for it', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(800);
+    render(sheet({ height: 100 }));
+    expect(screen.getByRole('dialog', { name: 'Mingo chat' })).toHaveStyle({ height: '320px', minHeight: '320px' });
+    vi.restoreAllMocks();
+  });
+
   it('has no tab when it is not resizable, and takes the whole layer', () => {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(800);
     render(sheet({ resizable: false, defaultShare: 1 }));

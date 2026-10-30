@@ -2780,8 +2780,11 @@ function EmbeddableChatInner({
         'flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]',
         // With a host block above the composer the thread keeps room
         // for a line and the working status: the block gives way
-        // instead (below), so the status never lands on it.
-        hasAboveComposer && 'min-h-32',
+        // instead (below), so the status never lands on it. Not when
+        // the thread is portalled out (`threadContainer`): the block
+        // stays in the host's dock and takes no height from it, so the
+        // floor would only push the thread's end out of its own box.
+        hasAboveComposer && !splitMode && 'min-h-32',
       )}
     >
       <div key={contentViewKey} className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0">
