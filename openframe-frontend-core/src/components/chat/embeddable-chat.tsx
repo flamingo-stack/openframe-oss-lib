@@ -640,7 +640,7 @@ function RailSlot({
         // Border on the OUTER so the rail/chat divider tracks the animating
         // boundary (and fades out with the panel) instead of vanishing early.
         'shrink-0 overflow-hidden border-r border-ods-border transition-[width,opacity] ease-out',
-        active ? cn('duration-[240ms] opacity-100', width) : 'duration-[300ms] w-0 opacity-0',
+        active ? cn('opacity-100', width) : 'w-0 opacity-0',
         className,
       )}
     >

@@ -6,7 +6,7 @@ export function OpenmspHeartbeatLoader({
   className = '',
   progress = 0,
   label,
-  barWidth = 'w-128',
+  barWidth = '',
 }: {
   className?: string;
   progress?: number;
@@ -15,7 +15,7 @@ export function OpenmspHeartbeatLoader({
 }) {
   return (
     <div
-      className={'max-w-screen flex max-h-screen min-h-screen items-center justify-center ' + className}
+      className={'flex max-h-screen min-h-screen items-center justify-center ' + className}
       role="status"
       aria-label="Generating report"
     >
@@ -35,7 +35,7 @@ export function OpenmspHeartbeatLoader({
           100% { transform: scale(1);      opacity: 0.96; }
         }
       `}</style>
-      <div className="justify-top flex flex-col items-center">
+      <div className="flex flex-col items-center">
         <div
           style={{
             animation: 'heartbeatInline 3.6s ease-in-out infinite',
