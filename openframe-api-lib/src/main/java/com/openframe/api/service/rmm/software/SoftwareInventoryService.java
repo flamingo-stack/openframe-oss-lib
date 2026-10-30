@@ -567,6 +567,7 @@ public class SoftwareInventoryService {
             return List.of();
         }
         Map<String, String> names = organizationRepository.findByOrganizationIdIn(counts.keySet()).stream()
+                .filter(organization -> organization.getName() != null)
                 .collect(Collectors.toMap(Organization::getOrganizationId, Organization::getName, (a, b) -> a));
         return counts.entrySet().stream()
                 .map(e -> SoftwareFilterOption.builder()

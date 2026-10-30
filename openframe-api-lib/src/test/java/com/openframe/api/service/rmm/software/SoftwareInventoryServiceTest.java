@@ -828,6 +828,20 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
+    void softwareDeviceFilters_organizationWithoutName_labelledByItsId() {
+        Machine machine = device("m-1", "1.0");
+        machine.setOrganizationId("org-unnamed");
+        stubDevices("apps", machine);
+        Organization organization = new Organization();
+        organization.setOrganizationId("org-unnamed");
+        when(organizationRepository.findByOrganizationIdIn(Set.of("org-unnamed"))).thenReturn(List.of(organization));
+
+        assertThat(service.getSoftwareDeviceFilters("42", null).getOrganizations())
+                .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getLabel)
+                .containsExactly(tuple("org-unnamed", "org-unnamed"));
+    }
+
+    @Test
     void softwareDeviceFilters_noOrganizationOnAnyDevice_noLookup() {
         stubDevices("apps", device("m-1", "1.0"));
 
