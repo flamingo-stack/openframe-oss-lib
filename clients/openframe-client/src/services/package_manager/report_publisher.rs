@@ -1,5 +1,5 @@
 use super::state::{state_of, ManagerState};
-use super::ManagerId;
+use super::{Dependency, ManagerId, Presence};
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use anyhow::Result;
@@ -13,6 +13,14 @@ const PACKAGE_MANAGERS_SUBJECT: &str = "package-managers";
 #[serde(rename_all = "camelCase")]
 struct PackageManagerReport {
     package_managers: BTreeMap<ManagerId, ManagerState>,
+    dependencies: Vec<DependencyReport>,
+}
+
+#[derive(Debug, Serialize)]
+struct DependencyReport {
+    manager: ManagerId,
+    name: Dependency,
+    state: ManagerState,
 }
 
 #[derive(Clone)]
@@ -43,13 +51,36 @@ impl PackageManagerReportPublisher {
             package_managers.insert(*id, state_of(*id, console_user_present).await);
         }
 
+        let dependencies: Vec<DependencyReport> = Dependency::ALL
+            .iter()
+            .filter(|dependency| {
+                package_managers.get(&dependency.manager()) == Some(&ManagerState::Present)
+            })
+            .map(|dependency| DependencyReport {
+                manager: dependency.manager(),
+                name: *dependency,
+                state: match dependency.presence() {
+                    Presence::Present => ManagerState::Present,
+                    Presence::Absent => ManagerState::Missing,
+                    Presence::Unknown => ManagerState::Unknown,
+                },
+            })
+            .collect();
+
         info!(
             report = ?package_managers,
+            ?dependencies,
             console_user_present,
             "Reporting package manager state"
         );
         self.nats_publisher
-            .publish(&subject, PackageManagerReport { package_managers })
+            .publish(
+                &subject,
+                PackageManagerReport {
+                    package_managers,
+                    dependencies,
+                },
+            )
             .await
     }
 }
