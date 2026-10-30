@@ -1,6 +1,7 @@
 package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.model.ClientOwnerScope;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -122,5 +124,53 @@ class CustomTicketRepositoryFilterTest {
 
         // verifications
         assertThat(query).doesNotContainKey(ESCALATED_BY_USER);
+    }
+
+    @Test
+    void buildTicketQuery_ownerScopeWithOrganization_machineAndOrganizationSnapshotOrLegacyNull() {
+        // setup
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b");
+
+        // execution
+        Document query = repository.buildTicketQuery(null, null, null, scope).getQueryObject();
+
+        // verifications
+        assertThat(query).containsEntry("owner.machineId", "machine-1");
+        assertThat(query.get("owner.organizationId", Document.class))
+                .isEqualTo(new Document("$in", Arrays.asList("org-b", null)));
+    }
+
+    @Test
+    void buildTicketQuery_ownerScopeWithoutOrganization_machineOnly() {
+        // setup
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", null);
+
+        // execution
+        Document query = repository.buildTicketQuery(null, null, null, scope).getQueryObject();
+
+        // verifications
+        assertThat(query).containsEntry("owner.machineId", "machine-1");
+        assertThat(query).doesNotContainKey("owner.organizationId");
+    }
+
+    @Test
+    void buildTicketQuery_ownerScopeAndSearch_bothClausesKept() {
+        // setup
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b");
+
+        // execution
+        Document query = repository.buildTicketQuery(null, "printer", null, scope).getQueryObject();
+
+        // verifications
+        assertThat(query).containsKeys("owner.machineId", "owner.organizationId", "$or");
+    }
+
+    @Test
+    void buildTicketQuery_noOwnerScope_noOwnerClauses() {
+        // execution
+        Document query = repository.buildTicketQuery(null, null, null, null).getQueryObject();
+
+        // verifications
+        assertThat(query).doesNotContainKeys("owner.machineId", "owner.organizationId");
     }
 }
