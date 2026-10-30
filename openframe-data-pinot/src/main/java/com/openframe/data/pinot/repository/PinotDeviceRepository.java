@@ -84,7 +84,7 @@ public interface PinotDeviceRepository {
     );
 
     /**
-     * USER filter options from the directoryUserLink column. A machine the directory matcher never wrote is NONE.
+     * USER filter options from the directoryUserLink column. A machine no external directory integration wrote is NONE.
      */
     Map<String, Integer> getUserLinkFilterOptions(
             String tenantId,

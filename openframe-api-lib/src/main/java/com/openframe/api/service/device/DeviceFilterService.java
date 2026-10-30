@@ -63,9 +63,10 @@ public class DeviceFilterService {
     }
 
     /**
-     * Every facet, the directory ones included ({@link DeviceFilterFacet#ALL}). A caller whose
-     * response does not expose all of them should pass its own set instead, as the external REST
-     * API does with {@link DeviceFilterFacet#REST}.
+     * Every facet ({@link DeviceFilterFacet#ALL}); the directory ones only while
+     * {@code openframe.device.directory-facets.enabled} is true, otherwise they come back empty. A
+     * caller whose response does not expose all of them should pass its own set instead, as the
+     * external REST API does with {@link DeviceFilterFacet#REST}.
      */
     public CompletableFuture<DeviceFilters> getDeviceFilters(DeviceFilterCriteria filters) {
         return getDeviceFilters(filters, DeviceFilterFacet.ALL);

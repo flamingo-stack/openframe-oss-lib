@@ -152,7 +152,8 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> tagKeyValues,
             List<String> directorySources,
             List<String> userLinks) {
-        // A machine the directory matcher never wrote reads NONE (the column's defaultNullValue), so it is counted.
+        // A machine no external directory integration wrote reads NONE (the column's defaultNullValue), so it is
+        // counted.
         return executeFacetQuery(DIRECTORY_USER_LINK, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys,
                 tagKeyValues, directorySources, userLinks, DIRECTORY_USER_LINK);
     }

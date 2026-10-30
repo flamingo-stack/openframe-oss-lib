@@ -52,7 +52,7 @@ input DeviceFilterInput {
     tagValues: [String!]
     """SOURCES filter: machines one of these directories knows. Matches nothing in OSS."""
     directorySources: [DirectorySource!]
-    """USER filter. NONE also matches a machine the directory matcher never wrote (every machine in OSS)."""
+    """USER filter. NONE also matches a machine no external directory integration wrote (every machine in OSS)."""
     userLinks: [DirectoryUserLink!]
 }
 
