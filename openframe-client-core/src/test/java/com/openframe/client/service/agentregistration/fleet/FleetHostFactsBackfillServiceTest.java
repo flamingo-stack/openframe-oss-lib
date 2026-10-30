@@ -190,8 +190,33 @@ class FleetHostFactsBackfillServiceTest {
 
         // verifications
         verify(fleetClient, times(CAP)).getHostById(anyLong());
-        verify(toolConnectionRepository, times(1)).findByToolTypeAndStatusAndIdGreaterThanOrderByIdAsc(
-                any(), any(), any(), any());
+    }
+
+    @Test
+    void backfill_moreDueThanTheCap_neverCheckedFirstThenOldestStamp_whateverTheWalkOrder() {
+        // setup
+        Instant now = Instant.now();
+        List<ToolConnection> reDuePage = IntStream.range(0, CAP)
+                .mapToObj(index -> connection("c-" + index, "m-" + index, String.valueOf(1000 + index)))
+                .toList();
+        List<Machine> reDue = IntStream.range(0, CAP)
+                .mapToObj(index -> checkedAt(machine("m-" + index, null), now.minus(Duration.ofDays(8 + index))))
+                .toList();
+        Machine neverChecked = machine("m-new", null);
+        pageAfter(BEFORE_FIRST, reDuePage);
+        pageAfter("c-" + (CAP - 1), List.of(connection("c-new", "m-new", "77")));
+        when(machineRepository.findByMachineIdIn(anyCollection())).thenReturn(reDue, List.of(neverChecked));
+        when(fleetMdmClients.client()).thenReturn(fleetClient);
+        when(fleetClient.getHostById(anyLong())).thenReturn(new Host());
+
+        // execution
+        service.backfill();
+
+        // verifications
+        verify(fleetClient, times(CAP)).getHostById(anyLong());
+        verify(fleetClient).getHostById(77L);
+        verify(fleetClient).getHostById(1000L + CAP - 1);
+        verify(fleetClient, never()).getHostById(1000L);
     }
 
     @Test

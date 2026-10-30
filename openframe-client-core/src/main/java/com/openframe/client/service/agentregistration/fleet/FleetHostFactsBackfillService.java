@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,11 @@ public class FleetHostFactsBackfillService {
 
     static final String BEFORE_FIRST_CONNECTION = "000000000000000000000000";
     static final int MACHINES_PER_RUN = 200;
+
+    // Stable: machines with the same stamp, never checked included, keep their walk order
+    private static final Comparator<PendingHost> MOST_OVERDUE_FIRST = Comparator.comparing(
+            (PendingHost pending) -> pending.machine().getHostFactsCheckedAt(),
+            Comparator.nullsFirst(Comparator.naturalOrder()));
 
     private static final Set<DeviceStatus> RETIRED_STATUSES =
             EnumSet.of(DeviceStatus.PENDING_DELETION, DeviceStatus.DELETED, DeviceStatus.ARCHIVED);
@@ -76,6 +82,9 @@ public class FleetHostFactsBackfillService {
         log.info("Fleet host facts backfill: {} machines missing Fleet facts, {} Fleet hosts read", hosts.size(), read);
     }
 
+    // Walks every connection, so the run takes the machines most overdue wherever they sit in the walk: never checked
+    // first, then the oldest stamp. Taking the first due ones in walk order would let machines that came due again
+    // keep the never-checked ones behind them out of every run. At most MACHINES_PER_RUN are held at a time.
     private List<PendingHost> pendingHosts(Instant checkedBefore) {
         List<PendingHost> hosts = new ArrayList<>();
         String cursor = BEFORE_FIRST_CONNECTION;
@@ -91,13 +100,18 @@ public class FleetHostFactsBackfillService {
                 if (hostId != null) {
                     hosts.add(new PendingHost(machine, hostId));
                 }
-                if (hosts.size() == MACHINES_PER_RUN) {
-                    return hosts;
-                }
             }
+            keepMostOverdue(hosts);
             if (page.size() < MACHINES_PER_RUN) {
                 return hosts;
             }
+        }
+    }
+
+    private static void keepMostOverdue(List<PendingHost> hosts) {
+        hosts.sort(MOST_OVERDUE_FIRST);
+        if (hosts.size() > MACHINES_PER_RUN) {
+            hosts.subList(MACHINES_PER_RUN, hosts.size()).clear();
         }
     }
 
