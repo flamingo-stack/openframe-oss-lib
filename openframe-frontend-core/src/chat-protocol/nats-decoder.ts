@@ -17,7 +17,8 @@
  */
 
 import { MESSAGE_TYPE } from '../components/chat/types/message.types';
-import type { AskOptionData } from '../components/chat/types/message.types';
+import type { AskOptionData, CommandReviewData } from '../components/chat/types/message.types';
+import { normalizeCommandReview } from '../components/chat/utils/command-review';
 import { ESCALATION_STATE, escalationResolvedStatus } from './events';
 import type { ApprovalToolCall, ChatStreamEvent } from './events';
 import { attachmentsEvent, sourceMetadataEvent } from './source-metadata';
@@ -44,6 +45,12 @@ function numOr(value: unknown, fallback = 0): number {
   return typeof value === 'number' ? value : fallback;
 }
 
+/** The review rides only RMM commands: absent on the wire, absent on the event (no `undefined` key). */
+function commandReviewField(raw: unknown): { commandReview?: CommandReviewData } {
+  const commandReview = normalizeCommandReview(raw);
+  return commandReview ? { commandReview } : {};
+}
+
 /** Coerce the wire's `toolCalls[]` into the batch-approval shape, dropping
  *  non-object entries and defaulting every field. */
 function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
@@ -57,6 +64,7 @@ function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
     requiresApproval: item.requiresApproval === true,
     approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
     toolCallArguments: isRecord(item.toolCallArguments) ? item.toolCallArguments : null,
+    ...commandReviewField(item.commandReview),
   }));
 }
 
@@ -166,6 +174,7 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
           // the EXECUTING segment held. Dropping it here therefore blanks the
           // card for the whole lifetime of the run.
           toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
+          ...commandReviewField(data.commandReview),
           parameters: isRecord(data.parameters) ? data.parameters : undefined,
           toolExecutionRequestId:
             typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,

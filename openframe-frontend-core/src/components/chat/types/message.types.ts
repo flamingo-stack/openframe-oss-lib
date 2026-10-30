@@ -55,6 +55,27 @@ export const SCROLL_ANCHOR = { TOP: 'top', BOTTOM: 'bottom' } as const;
 
 export type ScrollAnchor = (typeof SCROLL_ANCHOR)[keyof typeof SCROLL_ANCHOR];
 
+// ========== Command Review Types ==========
+
+export interface CommandReviewRuleData {
+  code: string;
+  label: string;
+}
+
+/**
+ * Why the AI guardrail chose an RMM command's approval level. `decision` is
+ * `POLICY` | `FALLBACK` | `SOFT_DENY` | `HARD_DENY` | `CLASSIFIER_FAILURE`; kept
+ * a string so a value added on the backend still renders.
+ */
+export interface CommandReviewData {
+  decision?: string;
+  approvalLevel?: string;
+  policyLevel?: string;
+  operationCodes?: string[];
+  matchedRules?: CommandReviewRuleData[];
+  reason?: string;
+}
+
 // ========== Tool Execution Types ==========
 
 export interface ToolExecutionData {
@@ -72,6 +93,8 @@ export interface ToolExecutionData {
   parameters?: Record<string, unknown>;
   result?: string;
   success?: boolean;
+  /** The AI guardrail's review of an RMM command. Only sent on `EXECUTING_TOOL`, like `toolExplanation`. */
+  commandReview?: CommandReviewData;
   /**
    * The words of the row's status line where it is drawn as a card (the
    * end-client view): e.g. "Fixed on its own". Omitted: "Working on it",
@@ -100,6 +123,8 @@ export interface ExecutingToolState {
   toolTitle?: string;
   /** Mirrors {@link ToolExecutionData.toolExplanation}; absent on `EXECUTED_TOOL`. */
   toolExplanation?: string;
+  /** Mirrors {@link ToolExecutionData.commandReview}; absent on `EXECUTED_TOOL`. */
+  commandReview?: CommandReviewData;
   parameters?: Record<string, unknown>;
 }
 
@@ -211,6 +236,7 @@ export interface PendingToolCallData {
   requiresApproval: boolean;
   approvalType?: string | null;
   toolCallArguments?: Record<string, unknown> | null;
+  commandReview?: CommandReviewData;
 }
 
 /**
@@ -517,6 +543,8 @@ export interface ExecutingToolMessageData extends MessageDataBase {
   title?: string;
   /** Backend-issued human-readable explanation (what/why) of the tool call. */
   toolExplanation?: string;
+  /** The AI guardrail's review of an RMM command (wire shape; normalized on read). */
+  commandReview?: unknown;
   parameters?: Record<string, unknown>;
   toolExecutionRequestId?: string;
 }
