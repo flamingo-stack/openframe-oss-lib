@@ -40,7 +40,6 @@ import { usePreventScroll } from '@react-aria/overlays';
 import { isIOS } from '@react-aria/utils';
 import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { chatProgressLabel } from '../../chat-protocol/progress';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
@@ -1278,7 +1277,6 @@ function EmbeddableChatInner({
   const {
     messages: rawMessages,
     isLoading: chatLoading,
-    streamingProgress,
     sendMessage: sendMessageRaw,
     discussRef,
     stopMessage,
@@ -2912,9 +2910,6 @@ function EmbeddableChatInner({
                                   // faces, 16px between messages (shared with fae v2).
                                   appearance={appearance}
                                   isTyping={chatLoading}
-                                  // The stage the turn reports while the user waits
-                                  // ("Searching 28 sources"); the generic phrase otherwise.
-                                  typingMessage={streamingProgress ? chatProgressLabel(streamingProgress) : undefined}
                                   // Sticky footer for approvals the host lifted out of the
                                   // thread — see the prop's docblock.
                                   pendingApprovals={pendingApprovals}

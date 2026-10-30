@@ -60,7 +60,6 @@ import {
   type UsageEvent,
 } from '../../../chat-protocol/events';
 import { escapeThinkingTags } from '../../../chat-protocol/leading-frames';
-import type { ChatProgress } from '../../../chat-protocol/progress';
 import { mergeSourceMetadata, type SourceMetadata } from '../../../chat-protocol/source-metadata';
 import type {
   ApprovalBatchSegment,
@@ -156,9 +155,6 @@ export interface ChatTurnMetaState {
 export interface ChatReducerState {
   messages: UnifiedChatMessage[];
   streamingPhase: StreamingPhase;
-  /** What the pending turn is doing, while it is still thinking and the server
-   *  has said (`chat-protocol/progress`). Null once text streams or the turn ends. */
-  streamingProgress: ChatProgress | null;
   turnMeta: ChatTurnMetaState;
   dialogTokenUsage?: DialogTokenUsage | null;
   liveModel?: {
@@ -534,7 +530,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   // ── Mutable internals ──────────────────────────────────────────────────
   let messages: UnifiedChatMessage[] = [];
   let streamingPhase: StreamingPhase = 'idle';
-  let streamingProgress: ChatProgress | null = null;
   let dialogTokenUsage: DialogTokenUsage | null = null;
   let liveModel: ChatReducerState['liveModel'] = null;
   let approvalStatuses: Record<string, ChatApprovalStatus> = {
@@ -694,8 +689,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       stateCache = {
         messages,
         streamingPhase,
-        // A stage describes the wait before the first token only.
-        streamingProgress: streamingPhase === 'thinking' ? streamingProgress : null,
         turnMeta: { meta: metaMap, sources: sourcesMap, sendCount },
         dialogTokenUsage,
         liveModel,
@@ -1589,10 +1582,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     const sendIdx = sendCount - 1;
     switch (event.type) {
       case 'status':
-        if (event.progress) {
-          streamingProgress = event.progress;
-          invalidate();
-        }
         setPhaseInternal('thinking');
         break;
       case 'thinking-delta':
@@ -1697,10 +1686,12 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       case 'usage':
         applySseUsage(event, sendIdx);
         break;
-      // NOTE: 'tool-execution' is intentionally NOT handled on the SSE
-      // kernel — the SSE wire never carries it, and routing it through the
-      // accumulator would invoke resolvePendingApprovalForExecution, which
-      // is a NATS-only semantic (observer streams without APPROVAL_RESULT).
+      // A step the server reports before the answer (the hub's turn stages): the same row a NATS tool run is,
+      // through the same message updater (it merges EXECUTED into its EXECUTING row). Not through the accumulator:
+      // that would invoke resolvePendingApprovalForExecution, a NATS-only semantic.
+      case 'tool-execution':
+        setMessagesInternal(applyToolExecutionToMessages(messages, { type: 'tool_execution', data: event.data }));
+        break;
       default:
         break;
     }
@@ -1913,7 +1904,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         { id: nextId('assistant'), role: 'assistant', content: '', segments: [] },
       ];
       streamingPhase = 'thinking';
-      streamingProgress = null;
       invalidate();
     },
     clearThread() {
@@ -1961,7 +1951,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       sendCount += 1;
       sseCurrentText = '';
       streamingPhase = 'thinking';
-      streamingProgress = null;
       invalidate();
     },
     endSseTurn() {

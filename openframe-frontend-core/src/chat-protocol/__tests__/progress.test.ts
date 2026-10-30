@@ -1,30 +1,35 @@
 import { describe, expect, it } from 'vitest';
 import { createSseFrameDecoder } from '../decode';
-import { chatProgressLabel, chatProgressOf } from '../progress';
+import { encodeLeadingFrame } from '../encode';
+import { chatProgressFrame, chatProgressLabel } from '../progress';
 
-const frame = (o: unknown) => new TextEncoder().encode(`${JSON.stringify(o)}\0`);
-
-describe('chat progress: the stage a turn reports before its first token', () => {
-  it('a status frame with a stage decodes to a status event carrying it', () => {
+describe('chat progress: the stages a turn reports before its first token', () => {
+  it('a stage frame decodes to the tool-execution event a NATS tool run has', () => {
     const d = createSseFrameDecoder();
-    expect(d.push(frame({ status: 'thinking', stage: 'searching', count: 28 }))).toEqual([
-      { type: 'status', phase: 'thinking', progress: { stage: 'searching', count: 28 } },
+    const progress = { stage: 'searching', count: 28 } as const;
+    expect(d.push(encodeLeadingFrame(chatProgressFrame(progress, 'running', 't1')))).toEqual([
+      {
+        type: 'tool-execution',
+        data: {
+          type: 'EXECUTING_TOOL',
+          integratedToolType: '',
+          toolFunction: 'searching',
+          toolTitle: 'Searching 28 sources',
+          toolExplanation: undefined,
+          parameters: undefined,
+          toolExecutionRequestId: 't1:searching',
+        },
+      },
     ]);
+    expect(d.push(encodeLeadingFrame(chatProgressFrame(progress, 'done', 't1')))[0]).toMatchObject({
+      type: 'tool-execution',
+      data: { type: 'EXECUTED_TOOL', success: true, toolExecutionRequestId: 't1:searching' },
+    });
   });
 
-  it('a plain status frame, and one whose stage this client does not know, is a plain "thinking"', () => {
+  it('a status frame is a plain "thinking"', () => {
     const d = createSseFrameDecoder();
-    expect(d.push(frame({ status: 'thinking' }))).toEqual([{ type: 'status', phase: 'thinking' }]);
-    expect(d.push(frame({ status: 'thinking', stage: 'a-stage-from-the-future' }))).toEqual([
-      { type: 'status', phase: 'thinking' },
-    ]);
-  });
-
-  it('keeps only a real count', () => {
-    expect(chatProgressOf({ stage: 'reading', count: 0 })).toEqual({ stage: 'reading' });
-    expect(chatProgressOf({ stage: 'reading', count: '12' })).toEqual({ stage: 'reading' });
-    expect(chatProgressOf({ stage: 'reading', count: 12.7 })).toEqual({ stage: 'reading', count: 12 });
-    expect(chatProgressOf({ stage: 'nope' })).toBeNull();
+    expect(d.push(encodeLeadingFrame({ status: 'thinking' }))).toEqual([{ type: 'status', phase: 'thinking' }]);
   });
 
   it('words each stage, specific when a count is known', () => {
