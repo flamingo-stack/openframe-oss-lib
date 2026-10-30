@@ -29,13 +29,22 @@ function segmentsOf(path: string): string[] {
   return path.split('/').filter(Boolean);
 }
 
+/** A path segment decoded, or as written when its escapes are malformed (`%E0`): an address never throws. */
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 /** The values of the route's `[name]` segments for `pathname`, or null when the route does not cover it. */
 function matchRoute(route: string[], path: string[]): Record<string, string> | null {
   if (path.length < route.length) return null;
   const params: Record<string, string> = {};
   for (let i = 0; i < route.length; i += 1) {
     const param = PARAM_RE.exec(route[i]);
-    if (param) params[param[1]] = decodeURIComponent(path[i]);
+    if (param) params[param[1]] = decodeSegment(path[i]);
     else if (route[i] !== path[i]) return null;
   }
   return params;

@@ -45,6 +45,11 @@ describe('pageTopicFor', () => {
     expect(pageTopicFor('/help-center/legal', TOPICS)).toBeNull();
   });
 
+  it('reads a segment with a malformed escape as written instead of throwing', () => {
+    expect(pageTopicFor('/blog/%E0%A4%A', TOPICS)).toBe('blog_post');
+    expect(pageTopicFor('/help-center/legal/%ZZ', TOPICS)).toBe('%ZZ');
+  });
+
   it('prefers a literal segment over a `[name]` one at the same depth', () => {
     expect(pageTopicFor('/blog/new', { '/blog/[slug]': 'blog_post', '/blog/new': 'new-post' })).toBe('new-post');
   });
