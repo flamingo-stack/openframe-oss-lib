@@ -613,8 +613,7 @@ function useRailPresence(open: boolean): { mounted: boolean; active: boolean } {
  * and the body's list column). The OUTER box transitions its width 0 ⇄ 320 +
  * opacity (so the neighbouring chat block slides smoothly); the INNER keeps a
  * fixed `w-80` so the rail content never squishes mid-animation — it's just
- * clipped by the shrinking outer (`overflow-hidden`). One easing both ways;
- * the collapse runs a touch longer than the open for a soft close.
+ * clipped by the shrinking outer (`overflow-hidden`).
  */
 function RailSlot({
   active,
