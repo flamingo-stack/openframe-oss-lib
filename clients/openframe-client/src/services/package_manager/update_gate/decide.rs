@@ -35,6 +35,7 @@ pub fn decide(identity: &AppIdentity, processes: &[RunningProcess]) -> GateDecis
         .map(|p| Holder {
             pid: p.pid,
             image: p.image.clone(),
+            session: p.session,
         })
         .collect();
 

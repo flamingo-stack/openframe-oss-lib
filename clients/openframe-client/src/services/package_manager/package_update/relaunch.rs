@@ -8,16 +8,19 @@ use crate::services::package_manager::update_gate::{AppIdentity, Holder};
 
 const SEARCH_DEPTH: usize = 3;
 
-/// Relaunches the apps a forced close stopped, as the console user; true when any came back.
+/// Relaunches the apps a forced close stopped, each in the session it ran in; true when any came back.
 pub(super) async fn relaunch(closed: &[Holder], identity: Option<&AppIdentity>) -> bool {
-    let mut images: Vec<&PathBuf> = closed.iter().map(|holder| &holder.image).collect();
+    let mut images: Vec<(&PathBuf, Option<u32>)> = closed
+        .iter()
+        .map(|holder| (&holder.image, holder.session))
+        .collect();
     images.sort();
     images.dedup();
 
     let mut relaunched = false;
-    for image in images {
+    for (image, session) in images {
         match locate(image, identity) {
-            Some(target) => relaunched |= app_close::reopen(&target).await,
+            Some(target) => relaunched |= app_close::reopen(&target, session).await,
             None => {
                 warn!(image = %image.display(), "The closed app is gone after the upgrade, not relaunching it")
             }

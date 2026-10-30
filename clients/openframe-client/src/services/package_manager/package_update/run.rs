@@ -552,17 +552,12 @@ impl Worker {
             return;
         }
         p.last_report = Some(key);
-        let user = if holders.is_empty() {
-            None
-        } else {
-            console_user_name()
-        };
         let waiting = Waiting {
             reason,
             phase,
             holders: holders
                 .iter()
-                .map(|holder| holder_info(holder, user.clone()))
+                .map(|holder| holder_info(holder, holder_user(holder)))
                 .collect(),
             closes_at: closes_at.map(status::rfc3339),
         };
@@ -665,12 +660,19 @@ fn holder_info(holder: &Holder, user: Option<String>) -> HolderInfo {
 }
 
 #[cfg(target_os = "macos")]
-fn console_user_name() -> Option<String> {
+fn holder_user(_holder: &Holder) -> Option<String> {
     crate::platform::user_session::get_console_user().map(|user| user.username)
 }
 
-#[cfg(not(target_os = "macos"))]
-fn console_user_name() -> Option<String> {
+#[cfg(target_os = "windows")]
+fn holder_user(holder: &Holder) -> Option<String> {
+    holder
+        .session
+        .and_then(crate::platform::user_session::session_user_name)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn holder_user(_holder: &Holder) -> Option<String> {
     None
 }
 

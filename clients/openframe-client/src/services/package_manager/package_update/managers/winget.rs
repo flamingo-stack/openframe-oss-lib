@@ -17,7 +17,8 @@ $rows = @(
     Get-WinGetPackage -Id $args[0] -MatchOption EqualsCaseInsensitive |
         ForEach-Object { [pscustomobject]@{ installed = $_.InstalledVersion; available = @($_.AvailableVersions)[0]; source = $_.Source; update = [bool]$_.IsUpdateAvailable } }
 )
-ConvertTo-Json -InputObject $rows -Compress
+$json = ConvertTo-Json -InputObject $rows -Compress
+[regex]::Replace($json, '[^\x00-\x7F]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
 "#;
 
 /// The backend's `winget-update-software.ps1`, verbatim, so both paths upgrade the same way.
@@ -176,6 +177,18 @@ fn interpret(result: &ExecResult) -> UpgradeOutcome {
         }
         REBOOT_REQUIRED_FOR_INSTALL => {
             UpgradeOutcome::Busy("a reboot is required before installing".to_string())
+        }
+        COULD_NOT_LAUNCH
+            if result.stderr.contains("no linked token")
+                || result.stderr.contains("not a local administrator") =>
+        {
+            UpgradeOutcome::Failed {
+                exit_code: i64::from(code),
+                message: format!(
+                    "the console user cannot run elevated: {}",
+                    result.stderr.trim()
+                ),
+            }
         }
         COULD_NOT_LAUNCH => UpgradeOutcome::Busy(format!(
             "could not run in the console user's session: {}",

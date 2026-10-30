@@ -52,7 +52,7 @@ pub async fn ask_to_close(pids: &[u32]) {
 
 /// Reopens a closed app as the console user; true once its launcher succeeded or the app is still up.
 #[cfg(target_os = "macos")]
-pub async fn reopen(image: &Path) -> bool {
+pub async fn reopen(image: &Path, _session: Option<u32>) -> bool {
     use std::time::Duration;
 
     use crate::platform::user_session::{get_console_user, launch_as_user};
@@ -87,13 +87,14 @@ pub async fn reopen(image: &Path) -> bool {
     }
 }
 
+/// Reopens a closed app in the session it ran in, or the active one when that is unknown.
 #[cfg(target_os = "windows")]
-pub async fn reopen(image: &Path) -> bool {
-    use crate::platform::user_session::launch_in_user_session;
+pub async fn reopen(image: &Path, session: Option<u32>) -> bool {
+    use crate::platform::user_session::launch_app_in_session;
 
-    match launch_in_user_session(&image.to_string_lossy(), &[]) {
+    match launch_app_in_session(image, session) {
         Ok(pid) => {
-            info!(image = %image.display(), pid, "Relaunched the app after its forced upgrade");
+            info!(image = %image.display(), ?session, pid, "Relaunched the app after its forced upgrade");
             true
         }
         Err(e) => {
@@ -104,7 +105,7 @@ pub async fn reopen(image: &Path) -> bool {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub async fn reopen(image: &Path) -> bool {
+pub async fn reopen(image: &Path, _session: Option<u32>) -> bool {
     warn!(image = %image.display(), "Relaunching apps is not supported here");
     false
 }

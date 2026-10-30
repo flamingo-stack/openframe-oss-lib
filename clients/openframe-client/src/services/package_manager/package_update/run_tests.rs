@@ -7,6 +7,7 @@ fn a_holder_is_named_by_its_image_file() {
         image: std::path::PathBuf::from(
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         ),
+        session: None,
     };
 
     let info = holder_info(&holder, Some("jane".to_string()));

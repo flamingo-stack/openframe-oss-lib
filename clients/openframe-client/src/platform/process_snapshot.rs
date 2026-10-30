@@ -9,6 +9,8 @@ pub struct RunningProcess {
     pub parent_image: Option<PathBuf>,
     /// Started by the service control manager; always false off Windows, where parents tell nothing.
     pub is_service: bool,
+    /// The Windows session the process runs in; `None` off Windows or when it cannot be read.
+    pub session: Option<u32>,
 }
 
 /// Every process with a readable image, in all sessions.
@@ -35,9 +37,23 @@ pub fn snapshot() -> Vec<RunningProcess> {
                 image,
                 parent_image,
                 is_service,
+                session: session_of(pid.as_u32()),
             })
         })
         .collect()
+}
+
+#[cfg(windows)]
+fn session_of(pid: u32) -> Option<u32> {
+    let mut session = 0;
+    unsafe { windows::Win32::System::RemoteDesktop::ProcessIdToSessionId(pid, &mut session) }
+        .ok()
+        .map(|()| session)
+}
+
+#[cfg(not(windows))]
+fn session_of(_pid: u32) -> Option<u32> {
+    None
 }
 
 /// Which of `pids` are still running, read the same way as [`snapshot`].
@@ -48,3 +64,7 @@ pub fn alive(pids: &[u32]) -> Vec<u32> {
         .filter(|pid| processes.iter().any(|p| p.pid == *pid))
         .collect()
 }
+
+#[cfg(test)]
+#[path = "process_snapshot_tests.rs"]
+mod tests;

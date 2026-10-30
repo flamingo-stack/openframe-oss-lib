@@ -35,6 +35,7 @@ pub enum MainImages {
 pub struct Holder {
     pub pid: u32,
     pub image: PathBuf,
+    pub session: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -64,7 +64,8 @@ $packages = @(
     }
 )
 
-ConvertTo-Json -InputObject @{ shortcuts = $shortcuts; packages = $packages } -Depth 4 -Compress
+$json = ConvertTo-Json -InputObject @{ shortcuts = $shortcuts; packages = $packages } -Depth 4 -Compress
+[regex]::Replace($json, '[^\x00-\x7F]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
 "#;
 
 const BROAD_DIRS: &[&str] = &[

@@ -174,3 +174,45 @@ fn a_failure_names_the_code_and_the_last_line() {
         }
     );
 }
+
+#[test]
+fn a_console_user_who_cannot_elevate_fails_instead_of_retrying() {
+    for stderr in [
+        "no linked token for the interactive user: A specified logon session does not exist.",
+        "linked token is not elevated; interactive user is not a local administrator",
+    ] {
+        let result = ExecResult {
+            stderr: stderr.to_string(),
+            ..exited(85)
+        };
+
+        assert!(
+            matches!(
+                interpret(&result),
+                UpgradeOutcome::Failed { exit_code: 85, .. }
+            ),
+            "{stderr}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_probe_output_keeps_non_ascii_text() {
+    let emit = PROBE_SCRIPT.trim_end().lines().last().unwrap();
+    let code = format!(
+        "$json = ConvertTo-Json -InputObject @{{ installed = '1.0-' + [char]0x0414 + [char]0x00E9 }} -Compress\n{emit}\n"
+    );
+    let result = execute_script(ScriptParams {
+        code: &code,
+        shell: "powershell",
+        args: &[],
+        timeout_secs: 60,
+        privilege: Privilege::Agent,
+        env_vars: &[],
+    })
+    .await;
+
+    assert_eq!(result.retcode, 0, "stderr: {}", result.stderr);
+    let row: Row = serde_json::from_str(result.stdout.trim()).unwrap();
+    assert_eq!(row.installed.as_deref(), Some("1.0-Дé"));
+}

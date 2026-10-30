@@ -26,6 +26,7 @@ fn process(pid: u32, image: &str, parent: Option<&str>) -> RunningProcess {
         image: PathBuf::from(image),
         parent_image: parent.map(PathBuf::from),
         is_service: false,
+        session: None,
     }
 }
 
@@ -231,13 +232,19 @@ fn no_app_is_clear_whatever_runs() {
 }
 
 #[test]
-fn holders_carry_the_image() {
+fn holders_carry_the_image_and_session() {
+    let in_session_2 = RunningProcess {
+        session: Some(2),
+        ..process(7, MAIN, Some(EXPLORER))
+    };
+
     assert_eq!(
-        decide(&derived(&["app.exe"]), &[process(7, MAIN, Some(EXPLORER))]),
+        decide(&derived(&["app.exe"]), &[in_session_2]),
         GateDecision::Blocked(BlockReason::Running {
             holders: vec![Holder {
                 pid: 7,
                 image: PathBuf::from(MAIN),
+                session: Some(2),
             }]
         })
     );

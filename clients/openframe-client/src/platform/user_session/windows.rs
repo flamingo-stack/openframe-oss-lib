@@ -1,10 +1,12 @@
 use crate::utils::windows_helpers::{build_command_line, to_wide, wcslen};
 use anyhow::{Context, Result};
+use std::path::Path;
 use tracing::{error, info, warn};
 use windows::{
     core::{PCWSTR, PWSTR},
     Win32::Foundation::*,
     Win32::Security::*,
+    Win32::System::Environment::{CreateEnvironmentBlock, DestroyEnvironmentBlock},
     Win32::System::RemoteDesktop::*,
     Win32::System::Threading::*,
     Win32::UI::WindowsAndMessaging::SW_SHOW,
@@ -12,11 +14,50 @@ use windows::{
 
 pub(crate) fn launch_in_user_session(command_path: &str, args: &[String]) -> Result<u32> {
     let session_id = get_active_user_session().context("No active user session found")?;
-    let (pid, process_handle) = launch_process_in_target_session(command_path, args, session_id)?;
+    let (pid, process_handle) =
+        launch_process_in_target_session(command_path, args, session_id, false, None)?;
     unsafe {
         let _ = CloseHandle(process_handle);
     }
     Ok(pid)
+}
+
+/// Starts an app as the session's user would: their environment, the app's folder as working directory.
+pub(crate) fn launch_app_in_session(image: &Path, session_id: Option<u32>) -> Result<u32> {
+    let session_id = match session_id {
+        Some(session_id) => session_id,
+        None => get_active_user_session().context("No active user session found")?,
+    };
+    let (pid, process_handle) = launch_process_in_target_session(
+        &image.to_string_lossy(),
+        &[],
+        session_id,
+        true,
+        image.parent(),
+    )?;
+    unsafe {
+        let _ = CloseHandle(process_handle);
+    }
+    Ok(pid)
+}
+
+/// The user logged on to a session; `None` for session 0 or when it cannot be read.
+pub(crate) fn session_user_name(session_id: u32) -> Option<String> {
+    unsafe {
+        let mut buffer = PWSTR::null();
+        let mut bytes = 0u32;
+        WTSQuerySessionInformationW(
+            WTS_CURRENT_SERVER_HANDLE,
+            session_id,
+            WTSUserName,
+            &mut buffer,
+            &mut bytes,
+        )
+        .ok()?;
+        let name = String::from_utf16_lossy(std::slice::from_raw_parts(buffer.0, wcslen(buffer.0)));
+        WTSFreeMemory(buffer.0 as _);
+        (!name.is_empty()).then_some(name)
+    }
 }
 
 fn get_active_user_session() -> Option<u32> {
@@ -138,6 +179,8 @@ fn launch_process_in_target_session(
     command_path: &str,
     args: &[String],
     session_id: u32,
+    user_environment: bool,
+    working_dir: Option<&Path>,
 ) -> Result<(u32, HANDLE)> {
     unsafe {
         info!("Step 1: Querying user token for session {}", session_id);
@@ -208,12 +251,34 @@ fn launch_process_in_target_session(
 
         let mut cmdline_wide = to_wide(&cmdline);
 
+        let mut env_block: *mut core::ffi::c_void = std::ptr::null_mut();
+        let environment = if user_environment {
+            match CreateEnvironmentBlock(&mut env_block, primary_token, false) {
+                Ok(()) => Some(env_block as *const core::ffi::c_void),
+                Err(e) => {
+                    warn!(
+                        "CreateEnvironmentBlock failed, using the agent environment: {:?}",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let flags = if environment.is_some() {
+            CREATE_NEW_PROCESS_GROUP | CREATE_UNICODE_ENVIRONMENT
+        } else {
+            CREATE_NEW_PROCESS_GROUP
+        };
+        let working_dir = working_dir.map(|dir| to_wide(&dir.to_string_lossy()));
+        let working_dir = working_dir
+            .as_ref()
+            .map_or(PCWSTR::null(), |dir| PCWSTR(dir.as_ptr()));
+
         info!("Step 5: Calling CreateProcessAsUserW");
         info!("  lpApplicationName: NULL (using command line parsing)");
         info!("  Creation flags: CREATE_NEW_PROCESS_GROUP");
-
-        // For GUI applications, use CREATE_NEW_PROCESS_GROUP for proper process isolation
-        use windows::Win32::System::Threading::CREATE_NEW_PROCESS_GROUP;
 
         // Try with lpApplicationName = NULL and full command line
         let result = CreateProcessAsUserW(
@@ -223,9 +288,9 @@ fn launch_process_in_target_session(
             None,
             None,
             false,
-            CREATE_NEW_PROCESS_GROUP,
-            None,
-            None,
+            flags,
+            environment,
+            working_dir,
             &si,
             &mut pi,
         );
@@ -250,14 +315,17 @@ fn launch_process_in_target_session(
                 None,
                 None,
                 false,
-                CREATE_NEW_PROCESS_GROUP,
-                None,
-                None,
+                flags,
+                environment,
+                working_dir,
                 &si,
                 &mut pi,
             );
 
             let _ = CloseHandle(primary_token);
+            if !env_block.is_null() {
+                let _ = DestroyEnvironmentBlock(env_block);
+            }
 
             if let Err(e2) = result_retry {
                 error!(
@@ -272,6 +340,9 @@ fn launch_process_in_target_session(
         } else {
             info!("CreateProcessAsUserW succeeded on first attempt");
             let _ = CloseHandle(primary_token);
+            if !env_block.is_null() {
+                let _ = DestroyEnvironmentBlock(env_block);
+            }
         }
 
         let pid = pi.dwProcessId;
@@ -294,3 +365,7 @@ fn launch_process_in_target_session(
         Ok((pid, process_handle))
     }
 }
+
+#[cfg(test)]
+#[path = "windows_tests.rs"]
+mod tests;

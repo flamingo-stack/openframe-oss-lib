@@ -255,3 +255,29 @@ fn shortcut_image_edges() {
         );
     }
 }
+
+#[tokio::test]
+async fn the_identity_output_keeps_non_ascii_paths() {
+    let emit = IDENTITY_SCRIPT.trim_end().lines().last().unwrap();
+    let code = format!(
+        "$path = 'C:\\Users\\' + [char]0x0414 + [char]0x0435 + [char]0x043D + '\\AppData\\Local\\Programs\\App\\app.exe'\n\
+         $json = ConvertTo-Json -InputObject @{{ shortcuts = @(@{{ target = $path }}); packages = @() }} -Depth 4 -Compress\n\
+         {emit}\n"
+    );
+    let result = execute_script(ScriptParams {
+        code: &code,
+        shell: "powershell",
+        args: &[],
+        timeout_secs: 60,
+        privilege: Privilege::Agent,
+        env_vars: &[],
+    })
+    .await;
+
+    assert_eq!(result.retcode, 0, "stderr: {}", result.stderr);
+    let output: Output = serde_json::from_str(result.stdout.trim()).unwrap();
+    assert_eq!(
+        output.shortcuts[0].target,
+        r"C:\Users\Ден\AppData\Local\Programs\App\app.exe"
+    );
+}
