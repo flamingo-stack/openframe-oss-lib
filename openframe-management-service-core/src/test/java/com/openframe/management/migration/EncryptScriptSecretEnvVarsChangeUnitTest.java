@@ -16,14 +16,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.mock.env.MockEnvironment;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +37,8 @@ class EncryptScriptSecretEnvVarsChangeUnitTest {
     private final EncryptionService encryptionService =
             new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
     private final EncryptScriptSecretEnvVarsChangeUnit changeUnit = new EncryptScriptSecretEnvVarsChangeUnit();
+    private final MockEnvironment enabled =
+            new MockEnvironment().withProperty("openframe.features.scripts.secret-encryption.enabled", "true");
 
     @Mock
     private MongoTemplate mongoTemplate;
@@ -42,7 +47,18 @@ class EncryptScriptSecretEnvVarsChangeUnitTest {
 
     @BeforeEach
     void setUp() {
-        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+        lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+    }
+
+    @Test
+    @DisplayName("flag off or absent: nothing is read or rewritten")
+    void flagOff_touchesNothing() {
+        changeUnit.execution(mongoTemplate, new MockEnvironment(), tenantIdProvider, encryptionService);
+        changeUnit.execution(mongoTemplate,
+                new MockEnvironment().withProperty("openframe.features.scripts.secret-encryption.enabled", "false"),
+                tenantIdProvider, encryptionService);
+
+        verifyNoInteractions(mongoTemplate);
     }
 
     @Test
@@ -56,7 +72,7 @@ class EncryptScriptSecretEnvVarsChangeUnitTest {
         when(mongoTemplate.find(any(Query.class), eq(Script.class))).thenReturn(List.of(script));
         when(mongoTemplate.find(any(Query.class), eq(ScheduleScript.class))).thenReturn(List.of());
 
-        changeUnit.execution(mongoTemplate, tenantIdProvider, encryptionService);
+        changeUnit.execution(mongoTemplate, enabled, tenantIdProvider, encryptionService);
 
         List<ScriptEnvVar> written = writtenField("envVars", Script.class);
         assertThat(written.get(0).isEncrypted()).isTrue();
@@ -76,7 +92,7 @@ class EncryptScriptSecretEnvVarsChangeUnitTest {
         when(mongoTemplate.find(any(Query.class), eq(Script.class))).thenReturn(List.of());
         when(mongoTemplate.find(any(Query.class), eq(ScheduleScript.class))).thenReturn(List.of(schedule));
 
-        changeUnit.execution(mongoTemplate, tenantIdProvider, encryptionService);
+        changeUnit.execution(mongoTemplate, enabled, tenantIdProvider, encryptionService);
 
         List<ScheduledScriptCustomParams> written = writtenField("scriptCustomParams", ScheduleScript.class);
         ScriptEnvVar stored = written.get(0).getEnvVars().get(0);
@@ -90,7 +106,7 @@ class EncryptScriptSecretEnvVarsChangeUnitTest {
         when(mongoTemplate.find(any(Query.class), eq(Script.class))).thenReturn(List.of());
         when(mongoTemplate.find(any(Query.class), eq(ScheduleScript.class))).thenReturn(List.of());
 
-        changeUnit.execution(mongoTemplate, tenantIdProvider, encryptionService);
+        changeUnit.execution(mongoTemplate, enabled, tenantIdProvider, encryptionService);
 
         verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), any(Class.class));
     }

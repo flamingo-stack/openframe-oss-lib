@@ -10,6 +10,7 @@ import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -19,8 +20,10 @@ import java.util.List;
 import java.util.function.UnaryOperator;
 
 @Slf4j
-@ChangeUnit(id = "encrypt-script-secret-env-vars", order = "020", author = "openframe")
+@ChangeUnit(id = "encrypt-script-secret-env-vars", order = "021", author = "openframe", runAlways = true)
 public class EncryptScriptSecretEnvVarsChangeUnit {
+
+    private static final String SECRET_ENCRYPTION_FLAG = "openframe.features.scripts.secret-encryption.enabled";
 
     private static final String TENANT_ID_FIELD = "tenantId";
     private static final String ID_FIELD = "_id";
@@ -28,8 +31,12 @@ public class EncryptScriptSecretEnvVarsChangeUnit {
     private static final String CUSTOM_PARAMS_FIELD = "scriptCustomParams";
 
     @Execution
-    public void execution(MongoTemplate mongoTemplate, TenantIdProvider tenantIdProvider,
+    public void execution(MongoTemplate mongoTemplate, Environment environment, TenantIdProvider tenantIdProvider,
                           EncryptionService encryptionService) {
+        if (!Boolean.TRUE.equals(environment.getProperty(SECRET_ENCRYPTION_FLAG, Boolean.class))) {
+            log.info("Script secret encryption disabled; skipping");
+            return;
+        }
         String tenantId = tenantIdProvider.getTenantId();
         UnaryOperator<String> encrypt = encryptionService::encrypt;
         int scripts = encryptScripts(mongoTemplate, tenantId, encrypt);
@@ -73,8 +80,9 @@ public class EncryptScriptSecretEnvVarsChangeUnit {
         return params.toBuilder().envVars(sealedEnvVars).build();
     }
 
+    // an empty value is never sealed, so matching it would rewrite the same document on every start
     private static Criteria plaintextSecret() {
-        return Criteria.where("secret").is(true).and("encrypted").ne(true);
+        return Criteria.where("secret").is(true).and("encrypted").ne(true).and("value").nin(null, "");
     }
 
     private static Query byId(String id) {

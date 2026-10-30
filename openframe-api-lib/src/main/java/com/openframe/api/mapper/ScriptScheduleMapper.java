@@ -14,6 +14,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 public class ScriptScheduleMapper {
 
     private final EncryptionService encryptionService;
+    private final ObjectProvider<ScriptSecretSealer> secretSealer;
 
     public ScheduleScript toEntity(String tenantId, CreateScriptScheduleInput input,
                                    Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId) {
@@ -147,7 +149,8 @@ public class ScriptScheduleMapper {
     }
 
     private List<ScheduledScriptCustomParams> seal(List<ScheduledScriptCustomParams> customParams) {
-        return withEnvVars(customParams, envVars -> ScriptEnvVar.sealAll(envVars, encryptionService::encrypt));
+        ScriptSecretSealer sealer = secretSealer.getIfAvailable();
+        return sealer == null ? customParams : withEnvVars(customParams, sealer::seal);
     }
 
     private List<ScheduledScriptCustomParams> reveal(List<ScheduledScriptCustomParams> customParams) {

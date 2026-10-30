@@ -11,6 +11,7 @@ import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.List;
 public class ScriptMapper {
 
     private final EncryptionService encryptionService;
+    private final ObjectProvider<ScriptSecretSealer> secretSealer;
 
     public Script toEntity(String tenantId, CreateScriptInput input) {
         List<ScriptEnvVar> envVars = seal(ScriptEnvVarMapper.toEntity(input.getEnvVars()));
@@ -95,7 +97,8 @@ public class ScriptMapper {
     }
 
     private List<ScriptEnvVar> seal(List<ScriptEnvVar> envVars) {
-        return ScriptEnvVar.sealAll(envVars, encryptionService::encrypt);
+        ScriptSecretSealer sealer = secretSealer.getIfAvailable();
+        return sealer == null ? envVars : sealer.seal(envVars);
     }
 
     private static ScriptCreationSource creationSourceOf(Script entity) {

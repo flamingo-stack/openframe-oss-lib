@@ -12,6 +12,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
+import com.openframe.api.mapper.ScriptSecretSealer;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.core.crypto.service.EncryptionService;
@@ -32,10 +33,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
@@ -78,9 +81,13 @@ class ScheduleScriptServiceTest {
         tenantIdProvider = mock(TenantIdProvider.class);
         deviceLocalDispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
         onlineDeviceDispatchRepository = mock(DeviceOnlineDispatchRepository.class);
-        scheduleService = new ScheduleScriptService(scheduleRepository, new ScriptScheduleMapper(
-                new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0")), scriptService,
-                tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository);
+        EncryptionService encryptionService =
+                new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
+        scheduleService = new ScheduleScriptService(scheduleRepository,
+                new ScriptScheduleMapper(encryptionService, new StaticListableBeanFactory(
+                        Map.of("sealer", new ScriptSecretSealer(encryptionService)))
+                        .getBeanProvider(ScriptSecretSealer.class)),
+                scriptService, tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository);
 
         createInput = new CreateScriptScheduleInput();
         createInput.setName("Nightly Maintenance");

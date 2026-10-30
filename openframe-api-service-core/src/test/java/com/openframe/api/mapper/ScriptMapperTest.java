@@ -13,8 +13,11 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.openframe.data.document.rmm.script.ScriptStatus.ACTIVE;
 import static com.openframe.data.document.rmm.script.ScriptStatus.ARCHIVED;
@@ -32,7 +35,33 @@ class ScriptMapperTest {
 
     private final EncryptionService encryptionService =
             new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
-    private final ScriptMapper mapper = new ScriptMapper(encryptionService);
+    private final ScriptMapper mapper = new ScriptMapper(encryptionService, sealerOn(encryptionService));
+
+    static ObjectProvider<ScriptSecretSealer> sealerOn(EncryptionService encryptionService) {
+        return new StaticListableBeanFactory(Map.of("sealer", new ScriptSecretSealer(encryptionService)))
+                .getBeanProvider(ScriptSecretSealer.class);
+    }
+
+    static ObjectProvider<ScriptSecretSealer> sealerOff() {
+        return new StaticListableBeanFactory().getBeanProvider(ScriptSecretSealer.class);
+    }
+
+    @Test
+    @DisplayName("encryption off: a secret is stored as given, and an already encrypted one still comes back plain")
+    void encryptionOff_storesPlain_stillDecrypts() {
+        ScriptMapper plainMapper = new ScriptMapper(encryptionService, sealerOff());
+        CreateScriptInput input = new CreateScriptInput();
+        input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()));
+
+        ScriptEnvVar stored = plainMapper.toEntity("tenant-1", input).getEnvVars().get(0);
+        assertThat(stored.isEncrypted()).isFalse();
+        assertThat(stored.getValue()).isEqualTo("s3cr3t");
+
+        Script sealedEarlier = Script.builder().envVars(List.of(ScriptEnvVar.builder()
+                .name("TOKEN").value("s3cr3t").secret(true).build()
+                .sealed(encryptionService::encrypt))).build();
+        assertThat(plainMapper.toResponse(sealedEarlier).getEnvVars().get(0).getValue()).isEqualTo("s3cr3t");
+    }
 
     @Test
     @DisplayName("toEntity: a secret is stored encrypted, a plain var stays plain")
