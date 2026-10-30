@@ -31,9 +31,9 @@ import static org.apache.commons.lang3.StringUtils.isNumeric;
 
 // Machines registered before Fleet facts were stored, and machines whose facts went missing since: at most
 // MACHINES_PER_RUN Fleet host reads per run, for connected Fleet hosts whose machine is missing any fact Fleet can fill
-// (serial, computer name, model, manufacturer, OS UUID). Every attempt is stamped on the machine, and a machine is
-// tried again only once the stamp is older than recheck-after, so machines Fleet cannot fill either (a VM without a
-// serial) do not use up the runs, across restarts and pods alike.
+// (serial, computer name, model, manufacturer, OS UUID). Every completed Fleet read is stamped on the machine (a read
+// that threw is not), and a machine is tried again only once the stamp is older than recheck-after, so machines
+// Fleet cannot fill either (a VM without a serial) do not use up the runs, across restarts and pods alike.
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -63,10 +63,15 @@ public class FleetHostFactsBackfillService {
         FleetMdmClient client = fleetMdmClients.client();
         int read = 0;
         for (PendingHost host : hosts) {
-            if (fill(client, host)) {
+            HostRead outcome = fill(client, host);
+            if (outcome == HostRead.FOUND) {
                 read++;
             }
-            machineRepository.markHostFactsChecked(host.machine().getMachineId(), now);
+            // A read that threw is a transient failure, not an answer: the machine stays due, so a Fleet outage
+            // does not push it back by recheck-after
+            if (outcome != HostRead.FAILED) {
+                machineRepository.markHostFactsChecked(host.machine().getMachineId(), now);
+            }
         }
         log.info("Fleet host facts backfill: {} machines missing Fleet facts, {} Fleet hosts read", hosts.size(), read);
     }
@@ -136,21 +141,25 @@ public class FleetHostFactsBackfillService {
         }
     }
 
-    private boolean fill(FleetMdmClient client, PendingHost pending) {
+    private HostRead fill(FleetMdmClient client, PendingHost pending) {
         Machine machine = pending.machine();
         long hostId = pending.hostId();
         try {
             Host host = client.getHostById(hostId);
             if (host == null) {
                 log.debug("Fleet host {} of machine {} no longer exists", hostId, machine.getMachineId());
-                return false;
+                return HostRead.GONE;
             }
             fleetHostFactsWriter.fill(machine, host);
-            return true;
+            return HostRead.FOUND;
         } catch (Exception e) {
             log.warn("Fleet host facts backfill failed: machineId={}, host_id={}", machine.getMachineId(), hostId, e);
-            return false;
+            return HostRead.FAILED;
         }
+    }
+
+    private enum HostRead {
+        FOUND, GONE, FAILED
     }
 
     private record PendingHost(Machine machine, long hostId) {

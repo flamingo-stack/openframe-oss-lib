@@ -243,7 +243,7 @@ class FleetHostFactsBackfillServiceTest {
     }
 
     @Test
-    void backfill_eachAttempt_stampedOnTheMachineWhetherFleetFilledAnythingOrNot() {
+    void backfill_eachCompletedRead_stampedWhetherFleetFilledAnythingOrNot_aFailedReadNot() {
         // setup
         Machine filled = machine("m-1", null);
         Machine goneFromFleet = machine("m-2", null);
@@ -266,7 +266,7 @@ class FleetHostFactsBackfillServiceTest {
         ArgumentCaptor<Instant> stamp = ArgumentCaptor.forClass(Instant.class);
         verify(machineRepository).markHostFactsChecked(eq("m-1"), stamp.capture());
         verify(machineRepository).markHostFactsChecked(eq("m-2"), any(Instant.class));
-        verify(machineRepository).markHostFactsChecked(eq("m-3"), any(Instant.class));
+        verify(machineRepository, never()).markHostFactsChecked(eq("m-3"), any(Instant.class));
         assertThat(stamp.getValue()).isAfterOrEqualTo(before);
     }
 
