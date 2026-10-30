@@ -19,7 +19,7 @@ export interface DevicesListNarrowing {
   statuses: string[];
   osTypes: string[];
   organizationIds: string[];
-  /** Chips as typed. `key:value` narrows; a bare word stays visible and filters nothing. */
+  /** Chips from the tag filter, `key:value`. A bare word from an old link stays visible and filters nothing. */
   tags: string[];
 }
 
@@ -262,15 +262,6 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
     [patch, narrowing.tags],
   );
 
-  const handleTagSubmit = useCallback(
-    (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) return;
-      patch({ search: '', tags: narrowing.tags.includes(trimmed) ? narrowing.tags : [...narrowing.tags, trimmed] });
-    },
-    [patch, narrowing.tags],
-  );
-
   const handleClearAll = useCallback(() => patch({ search: '', tags: [] }), [patch]);
 
   const narrowed = isNarrowed(narrowing);
@@ -308,7 +299,6 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
           tags={tagOptions}
           onTagRemove={handleTagRemove}
           onClearAll={handleClearAll}
-          onSubmit={handleTagSubmit}
           onOpenFilterModal={openFilterModal}
           isFilterModalOpen={filterModalOpen}
           onCloseFilterModal={closeFilterModal}

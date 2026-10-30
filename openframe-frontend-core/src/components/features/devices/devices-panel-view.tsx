@@ -35,7 +35,6 @@ export const IDLE_DEVICES_TOOLBAR: DevicesFilterToolbarProps = {
   tags: NO_TAGS,
   onTagRemove: noop,
   onClearAll: noop,
-  onSubmit: noop,
   onOpenFilterModal: noop,
   isFilterModalOpen: false,
   onCloseFilterModal: noop,
