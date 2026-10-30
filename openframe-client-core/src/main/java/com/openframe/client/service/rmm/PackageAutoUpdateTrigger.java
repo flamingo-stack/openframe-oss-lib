@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
@@ -22,6 +23,7 @@ import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
+import com.openframe.delivery.track.DeliveryTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -53,6 +55,7 @@ public class PackageAutoUpdateTrigger {
     private final ScriptRepository scriptRepository;
     private final SoftwareActionResultRepository actionResultRepository;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
+    private final DeliveryTracker deliveryTracker;
     private final TenantIdProvider tenantIdProvider;
 
     public void run() {
@@ -89,6 +92,7 @@ public class PackageAutoUpdateTrigger {
             return;
         }
         Script script = updateScript(tenantId, pkg.manager());
+        due.forEach(this::withdrawRetry);
 
         String executionId = SoftwareExecutionId.forAutoUpdate(tenantId, pkg.manager(), pkg.name(), version);
         recordJob(tenantId, executionId, pkg, version, machineIds(due));
@@ -110,6 +114,14 @@ public class PackageAutoUpdateTrigger {
         });
         log.info("Auto-update ordered package={}/{} version={} machines={} executionId={}",
                 pkg.manager(), pkg.name(), version, due.size(), executionId);
+    }
+
+    // a retry still waiting would replace this order on the agent
+    private void withdrawRetry(PackageAutoUpdatePolicy policy) {
+        String retryRequestId = policy.getRetryRequestId();
+        if (retryRequestId != null) {
+            deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, retryRequestId, policy.getMachineId(), "a newer version is ordered");
+        }
     }
 
     // every tenant is seeded with the update scripts, so a missing one is a broken tenant, not a skip

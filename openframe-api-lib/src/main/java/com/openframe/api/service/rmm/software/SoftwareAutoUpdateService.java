@@ -1,5 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.track.DeliveryTracker;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.data.document.rmm.software.PackageAutoUpdatePolicy;
@@ -30,10 +32,21 @@ public class SoftwareAutoUpdateService {
 
     private final PackageAutoUpdatePolicyRepository policyRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final DeliveryTracker deliveryTracker;
 
     public void turnOff(String softwareId, String actor) {
-        long turnedOff = policyRepository.disableBySoftwareId(tenantIdProvider.getTenantId(), softwareId, actor);
+        String tenantId = tenantIdProvider.getTenantId();
+        long turnedOff = policyRepository.disableBySoftwareId(tenantId, softwareId, actor);
+        // read after the update: from here on a failed device schedules no retry, so none can slip past this
+        policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, List.of(softwareId)).forEach(this::withdrawRetry);
         log.info("Auto-update turned off softwareId={} policies={} actor={}", softwareId, turnedOff, actor);
+    }
+
+    private void withdrawRetry(PackageAutoUpdatePolicy policy) {
+        String retryRequestId = policy.getRetryRequestId();
+        if (retryRequestId != null) {
+            deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, retryRequestId, policy.getMachineId(), "auto-update turned off");
+        }
     }
 
     public void applyToSoftware(List<SoftwareResponse> rows) {
