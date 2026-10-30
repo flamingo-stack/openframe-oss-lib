@@ -18,6 +18,8 @@
  * Server-safe: no React, no browser APIs beyond TextEncoder/TextDecoder.
  */
 
+import type { ToolType } from '../types/tool.types';
+
 // =============================================================================
 // Sentinel constants
 // =============================================================================
@@ -88,6 +90,7 @@ export interface StatusThinkingFrame {
  *  `decodeNatsChunk` and the chat draws it as that run's row. */
 export interface ToolExecutionFrame {
   type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL';
+  integratedToolType: ToolType;
   toolFunction: string;
   title: string;
   toolExecutionRequestId: string;
