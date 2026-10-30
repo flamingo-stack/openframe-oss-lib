@@ -37,7 +37,7 @@ describe("useEmptyStateConfig: the page's topic", () => {
       json: () => Promise.resolve({ quickActions: [] }),
     } as unknown as Response);
     const client = new QueryClient();
-    renderHook(() => useEmptyStateConfig('/api/docs/empty-state'), {
+    renderHook(() => useEmptyStateConfig('https://hub.test/api/docs/empty-state'), {
       wrapper: ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={client}>
           <PageTopicsProvider topics={{ '/': 'pricing' }}>{children}</PageTopicsProvider>
