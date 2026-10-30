@@ -24,6 +24,10 @@ type DeviceFilters {
     osTypes: [DeviceFilterOption!]!
     organizationIds: [DeviceFilterOption!]!
     tagKeys: [TagFilterOption!]!
+    """SOURCES filter options; [] in OSS, and on the schedule and bundle device pickers."""
+    directorySources: [DeviceFilterOption!]!
+    """USER filter options: PRIMARY, SHARED, NONE. A machine without a directory link counts as NONE."""
+    userLinks: [DeviceFilterOption!]!
     filteredCount: Int!
 }
 

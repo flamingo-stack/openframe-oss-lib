@@ -38,7 +38,9 @@
       "osType",
       "organizationId",
       "tags",
-      "tagKeyValues"
+      "tagKeyValues",
+      "directorySources",
+      "directoryUserLink"
     ],
 
     "streamConfigs": {

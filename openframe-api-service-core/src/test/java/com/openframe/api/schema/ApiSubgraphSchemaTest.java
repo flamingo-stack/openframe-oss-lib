@@ -224,6 +224,19 @@ class ApiSubgraphSchemaTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"directorySources", "userLinks"})
+    void deviceFiltersDirectoryFacet_nonNullOptionList(String field) {
+        // setup
+        GraphQLFieldDefinition definition = schema.getObjectType("DeviceFilters").getFieldDefinition(field);
+
+        // execution
+        String printed = GraphQLTypeUtil.simplePrint(definition.getType());
+
+        // verifications
+        assertThat(printed).isEqualTo("[DeviceFilterOption!]!");
+    }
+
+    @ParameterizedTest
     @MethodSource("directoryEnums")
     void directoryEnum_valuesEqualJavaEnum(String type, Class<? extends Enum<?>> javaEnum) {
         // setup

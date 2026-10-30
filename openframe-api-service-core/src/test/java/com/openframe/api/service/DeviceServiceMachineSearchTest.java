@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
@@ -242,5 +243,18 @@ class DeviceServiceMachineSearchTest {
         machine.setId("012345678901234567890123");
         machine.setMachineId("machine-1");
         return machine;
+    }
+
+    @Test
+    void getAssignedDeviceFilters_mongoFacets_directoryFacetsEmptyNotNull() {
+        // setup
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder().build();
+
+        // execution
+        DeviceFilters filters = service.getAssignedDeviceFilters(List.of("machine-1"), filter, null);
+
+        // verifications
+        assertThat(filters.getDirectorySources()).isNotNull().isEmpty();
+        assertThat(filters.getUserLinks()).isNotNull().isEmpty();
     }
 }

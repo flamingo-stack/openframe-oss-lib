@@ -181,6 +181,9 @@ public class DeviceService {
                 .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.OS_TYPE)))
                 .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
                 .tagKeys(List.of())
+                // The pickers' Mongo facets have no directory dimension: the two filters apply, their counts are []
+                .directorySources(List.of())
+                .userLinks(List.of())
                 .filteredCount((int) machineRepository.countMachines(tenantId, filter, search))
                 .build();
     }

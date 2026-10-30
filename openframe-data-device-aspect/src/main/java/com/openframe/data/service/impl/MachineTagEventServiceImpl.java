@@ -1,5 +1,7 @@
 package com.openframe.data.service.impl;
 
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
@@ -355,7 +357,23 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                 .osType(machine.getOsType() != null ? machine.getOsType().name() : null)
                 .tags(tagKeyNames)
                 .tagKeyValues(tagKeyValues)
+                .directorySources(directorySourceNames(machine))
+                .directoryUserLink(directoryUserLinkName(machine))
                 .ingestionTime(System.currentTimeMillis())
                 .build();
+    }
+
+    private static List<String> directorySourceNames(Machine machine) {
+        List<DirectorySource> sources = machine.getDirectorySources();
+        if (sources == null) {
+            return List.of();
+        }
+        return sources.stream().map(Enum::name).toList();
+    }
+
+    // Sent as NONE rather than null, so the USER facet counts a machine without a link instead of dropping it
+    private static String directoryUserLinkName(Machine machine) {
+        DirectoryUserLink link = machine.getDirectoryUserLink();
+        return link != null ? link.name() : DirectoryUserLink.NONE.name();
     }
 }

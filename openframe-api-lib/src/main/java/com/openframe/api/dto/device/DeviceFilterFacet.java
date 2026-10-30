@@ -22,6 +22,8 @@ public enum DeviceFilterFacet {
     OS_TYPES("osTypes"),
     ORGANIZATION_IDS("organizationIds"),
     TAG_KEYS("tagKeys"),
+    DIRECTORY_SOURCES("directorySources"),
+    USER_LINKS("userLinks"),
     FILTERED_COUNT("filteredCount");
 
     /** Every facet — the behaviour non-GraphQL callers (the external REST API) still want. */
