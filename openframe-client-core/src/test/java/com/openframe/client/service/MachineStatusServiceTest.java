@@ -20,8 +20,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.BeanUtils;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -31,6 +33,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,6 +60,11 @@ class MachineStatusServiceTest {
         lenient().when(machineWriter.update(eq(MACHINE), any(MachineUpdate.class))).thenAnswer(invocation -> {
             Machine after = copyOf(stored);
             invocation.getArgument(1, MachineUpdate.class).applyTo(after);
+            return Optional.of(new MachineWriteResult(stored, after));
+        });
+        lenient().when(machineWriter.update(eq(MACHINE), any(Criteria.class), any(MachineUpdate.class))).thenAnswer(invocation -> {
+            Machine after = copyOf(stored);
+            invocation.getArgument(2, MachineUpdate.class).applyTo(after);
             return Optional.of(new MachineWriteResult(stored, after));
         });
     }
@@ -121,7 +130,7 @@ class MachineStatusServiceTest {
         service.processHeartbeat(MACHINE, LATER);
 
         verify(machineRepository).updateLastSeen(MACHINE, LATER);
-        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
+        verifyNoInteractions(machineWriter);
     }
 
     @Test
@@ -155,7 +164,7 @@ class MachineStatusServiceTest {
 
         service.updateToOnline(MACHINE, LATER);
 
-        verify(machineWriter).update(eq(MACHINE), any(MachineUpdate.class));
+        verify(machineWriter).update(eq(MACHINE), any(Criteria.class), any(MachineUpdate.class));
         verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
         verify(eventPublisher).publishEvent(any(DeviceFirstConnectedEvent.class));
     }
@@ -167,7 +176,7 @@ class MachineStatusServiceTest {
 
         service.updateToOffline(MACHINE, LATER);
 
-        verify(machineWriter).update(eq(MACHINE), any(MachineUpdate.class));
+        verify(machineWriter).update(eq(MACHINE), any(Criteria.class), any(MachineUpdate.class));
         verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
         verify(eventPublisher).publishEvent(any(DeviceFirstConnectedEvent.class));
     }
@@ -179,7 +188,7 @@ class MachineStatusServiceTest {
 
         service.processHeartbeat(MACHINE, LATER);
 
-        verify(machineWriter).update(eq(MACHINE), any(MachineUpdate.class));
+        verify(machineWriter).update(eq(MACHINE), any(Criteria.class), any(MachineUpdate.class));
         verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 
@@ -190,7 +199,7 @@ class MachineStatusServiceTest {
 
         service.processHeartbeat(MACHINE, EARLIER);
 
-        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
+        verifyNoInteractions(machineWriter);
         verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 
@@ -201,7 +210,7 @@ class MachineStatusServiceTest {
 
         service.processHeartbeat(MACHINE, SEEN);
 
-        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
+        verifyNoInteractions(machineWriter);
         verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 
@@ -213,7 +222,7 @@ class MachineStatusServiceTest {
         service.updateToOffline(MACHINE, LATER);
 
         verify(machineRepository).updateLastSeen(MACHINE, LATER);
-        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
+        verifyNoInteractions(machineWriter);
     }
 
     @Test
@@ -224,7 +233,7 @@ class MachineStatusServiceTest {
         service.processHeartbeat(MACHINE, LATER);
 
         verify(machineRepository).updateLastSeen(MACHINE, LATER);
-        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
+        verifyNoInteractions(machineWriter);
     }
 
     @Test
@@ -235,7 +244,7 @@ class MachineStatusServiceTest {
         assertThatThrownBy(() -> service.processHeartbeat(MACHINE, LATER))
                 .isInstanceOf(MachineNotFoundException.class);
 
-        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
+        verifyNoInteractions(machineWriter);
         verify(machineRepository, never()).updateLastSeen(anyString(), any(Instant.class));
     }
 
@@ -247,7 +256,7 @@ class MachineStatusServiceTest {
         service.processHeartbeat(MACHINE, LATER);
 
         verify(machineRepository).updateLastSeen(MACHINE, LATER);
-        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
+        verifyNoInteractions(machineWriter);
     }
 
     @Test
@@ -328,17 +337,34 @@ class MachineStatusServiceTest {
     @DisplayName("L2: a machine deleted between the read and the write publishes no application event")
     void machineGoneBeforeTheWrite_noEvents() {
         machineIs(DeviceStatus.PENDING);
-        when(machineWriter.update(eq(MACHINE), any(MachineUpdate.class))).thenReturn(Optional.empty());
+        when(machineWriter.update(eq(MACHINE), any(Criteria.class), any(MachineUpdate.class))).thenReturn(Optional.empty());
 
         service.updateToOnline(MACHINE, LATER);
 
         verify(eventPublisher, never()).publishEvent(any());
     }
 
+    // The one MachineWriter.update call, guarded or not
     private MachineUpdate writtenUpdate() {
-        ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
-        verify(machineWriter).update(eq(MACHINE), update.capture());
-        return update.getValue();
+        List<Object[]> writes = mockingDetails(machineWriter).getInvocations().stream()
+                .filter(invocation -> invocation.getMethod().getName().equals("update"))
+                .map(invocation -> invocation.getArguments())
+                .toList();
+        assertThat(writes).hasSize(1);
+        Object[] arguments = writes.getFirst();
+        return (MachineUpdate) arguments[arguments.length - 1];
+    }
+
+    @Test
+    @DisplayName("L3: a status transition only lands while the status is still the one it was decided from")
+    void statusChange_guardedOnThePreviousStatus() {
+        machineIs(DeviceStatus.OFFLINE);
+
+        service.updateToOnline(MACHINE, LATER);
+
+        ArgumentCaptor<Criteria> guard = ArgumentCaptor.forClass(Criteria.class);
+        verify(machineWriter).update(eq(MACHINE), guard.capture(), any(MachineUpdate.class));
+        assertThat(guard.getValue().getCriteriaObject().get("status")).isEqualTo(DeviceStatus.OFFLINE);
     }
 
     private Set<String> writtenPaths() {

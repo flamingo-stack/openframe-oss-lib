@@ -61,6 +61,7 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
         assertThat(written.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
         Document lastSeenGuard = (Document) guardCaptor.getValue().getCriteriaObject().get("lastSeen");
         assertThat(lastSeenGuard.get("$lt")).isInstanceOf(Instant.class);
+        assertThat(guardCaptor.getValue().getCriteriaObject().get("status")).isEqualTo(DeviceStatus.ONLINE);
         verify(machineRepository, never()).saveAll(any());
     }
 
@@ -76,8 +77,9 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
         service.markStaleDevicesOffline();
 
         // verifications
-        verify(machineWriter).update(eq("m-1"), any(Criteria.class), updateCaptor.capture());
+        verify(machineWriter).update(eq("m-1"), guardCaptor.capture(), updateCaptor.capture());
         assertThat(updateCaptor.getValue().paths()).containsExactly("telemetryStatus");
+        assertThat(guardCaptor.getValue().getCriteriaObject().containsKey("status")).isFalse();
         Machine written = applied(machine);
         assertThat(written.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
         assertThat(written.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);

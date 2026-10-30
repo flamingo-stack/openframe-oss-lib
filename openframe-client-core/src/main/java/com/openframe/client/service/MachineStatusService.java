@@ -13,6 +13,7 @@ import com.openframe.data.service.machine.MachineWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -91,8 +92,14 @@ public class MachineStatusService {
         if (firstConnect && machine.getFirstConnectedAt() == null) {
             update.set(FIRST_CONNECTED_AT, eventTimestamp);
         }
-        Optional<Machine> written = write(machine.getMachineId(), update);
+        // The transition only lands while the status is still the one it was decided from, so an uninstall or a
+        // status change that landed since the read is not overwritten
+        Optional<Machine> written = machineWriter
+                .update(machine.getMachineId(), Criteria.where(STATUS.path()).is(previousStatus), update)
+                .map(MachineWriteResult::after);
         if (written.isEmpty()) {
+            log.info("Status of machineId={} changed since it was read, {} -> {} not applied",
+                    machine.getMachineId(), previousStatus, newStatus);
             return;
         }
         Machine updated = written.get();

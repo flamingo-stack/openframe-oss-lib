@@ -32,6 +32,7 @@ import static com.openframe.data.service.machine.MachineFields.DIRECTORY_SOURCES
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_IDS;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_LINK;
 import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_NAME;
+import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.AdditionalAnswers.delegatesTo;
@@ -127,6 +128,20 @@ class DeviceHeartbeatOfflineDetectionIT {
         Machine stored = storedMachines.findByMachineId(MACHINE_ID).orElseThrow();
         assertThat(stored).extracting(Machine::getStatus, Machine::getTelemetryStatus)
                 .containsExactly(DeviceStatus.ONLINE, TelemetryStatus.ONLINE);
+    }
+
+    @Test
+    void markStaleDevicesOffline_uninstallAfterTheRead_deletedStatusKept() {
+        // setup
+        DeviceHeartbeatOfflineDetectionService service = serviceWithWriteAfterTheRead(() -> machineWriter.update(
+                MACHINE_ID, machineUpdate().set(STATUS, DeviceStatus.DELETED)));
+
+        // execution
+        service.markStaleDevicesOffline();
+
+        // verifications
+        Machine stored = storedMachines.findByMachineId(MACHINE_ID).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(DeviceStatus.DELETED);
     }
 
     private static DeviceHeartbeatOfflineDetectionService serviceWithWriteAfterTheRead(Runnable concurrentWrite) {

@@ -53,13 +53,16 @@ public class DeviceHeartbeatOfflineDetectionService {
     }
 
     // Field-level, one machine at a time: a whole-document save would overwrite what other writers set since the
-    // read, and the lastSeen guard lets a heartbeat that arrived meanwhile win
+    // read. The lastSeen guard lets a heartbeat that arrived meanwhile win, and the status guard lets an uninstall
+    // that landed meanwhile (DELETED, PENDING_DELETION) keep its status
     private boolean markDeviceAsOffline(Machine machine, Instant threshold) {
         MachineUpdate update = machineUpdate().set(TELEMETRY_STATUS, TelemetryStatus.OFFLINE);
+        Criteria guard = stillSilentSince(threshold);
         if (machine.getStatus() == DeviceStatus.ONLINE) {
             update.set(STATUS, DeviceStatus.OFFLINE);
+            guard = guard.and(STATUS.path()).is(DeviceStatus.ONLINE);
         }
-        boolean marked = machineWriter.update(machine.getMachineId(), stillSilentSince(threshold), update).isPresent();
+        boolean marked = machineWriter.update(machine.getMachineId(), guard, update).isPresent();
         log.info("Marking device {} as OFFLINE (status={}, lastSeen={}, marked={})",
                 machine.getMachineId(), machine.getStatus(), machine.getLastSeen(), marked);
         return marked;
