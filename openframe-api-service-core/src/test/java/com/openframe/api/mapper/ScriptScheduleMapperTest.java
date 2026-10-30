@@ -4,6 +4,7 @@ import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
@@ -11,6 +12,7 @@ import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -22,7 +24,11 @@ class ScriptScheduleMapperTest {
 
     private static final String SCRIPT_ID = "6a8b9460e0e12b4188881ae2";
 
-    private final ScriptScheduleMapper mapper = new ScriptScheduleMapper();
+    private final EncryptionService encryptionService =
+            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
+    private final ScriptScheduleMapper mapper = new ScriptScheduleMapper(encryptionService,
+            new StaticListableBeanFactory(Map.of("sealer", new ScriptSecretSealer(encryptionService)))
+                    .getBeanProvider(ScriptSecretSealer.class));
 
     @Test
     @DisplayName("toEntity (create): secret override with value=null resolves from the script's own env vars — first-time customization keeps the script's stored secret")
@@ -43,7 +49,7 @@ class ScriptScheduleMapperTest {
                 .satisfies(p -> {
                     assertThat(p.getScriptId()).isEqualTo(SCRIPT_ID);
                     assertThat(p.getArgs()).containsExactly("--custom");
-                    assertThat(p.getEnvVars())
+                    assertThat(revealed(p.getEnvVars()))
                             .extracting(ScriptEnvVar::getName, ScriptEnvVar::getValue, ScriptEnvVar::isSecret)
                             .containsExactly(
                                     Tuple.tuple("PLAIN", "staging", false),
@@ -68,7 +74,7 @@ class ScriptScheduleMapperTest {
 
         mapper.updateEntity(existing, input, scriptDefaults);
 
-        assertThat(existing.getScriptCustomParams().get(0).getEnvVars())
+        assertThat(revealed(existing.getScriptCustomParams().get(0).getEnvVars()))
                 .extracting(ScriptEnvVar::getName, ScriptEnvVar::getValue, ScriptEnvVar::isSecret)
                 .containsExactly(
                         Tuple.tuple("PLAIN", "staging", false),
@@ -94,7 +100,7 @@ class ScriptScheduleMapperTest {
 
         assertThat(existing.getScriptCustomParams())
                 .singleElement()
-                .satisfies(p -> assertThat(p.getEnvVars())
+                .satisfies(p -> assertThat(revealed(p.getEnvVars()))
                         .singleElement()
                         .extracting(ScriptEnvVar::getValue)
                         .isEqualTo("script-secret"));
@@ -140,6 +146,26 @@ class ScriptScheduleMapperTest {
                     assertThat(p.getArgs()).containsExactly("--only-args");
                     assertThat(p.getEnvVars()).isNull();
                 });
+    }
+
+    @Test
+    @DisplayName("toEntity + toResponse: a secret override is stored encrypted and comes back plain in the response")
+    void secretOverride_storedEncrypted_respondedPlain() {
+        CreateScriptScheduleInput input = createInput(customParams(SCRIPT_ID, null, List.of(
+                ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build())));
+
+        ScheduleScript entity = mapper.toEntity("tenant-1", input, Map.of());
+
+        ScriptEnvVar stored = entity.getScriptCustomParams().get(0).getEnvVars().get(0);
+        assertThat(stored.isEncrypted()).isTrue();
+        assertThat(stored.getValue()).isNotEqualTo("s3cr3t");
+        ScriptEnvVar responded = mapper.toResponse(entity).getScriptCustomParams().get(0).getEnvVars().get(0);
+        assertThat(responded.getValue()).isEqualTo("s3cr3t");
+        assertThat(entity.getScriptCustomParams().get(0).getEnvVars().get(0)).isSameAs(stored);
+    }
+
+    private List<ScriptEnvVar> revealed(List<ScriptEnvVar> envVars) {
+        return ScriptEnvVar.revealAll(envVars, encryptionService::decrypt);
     }
 
     private static CreateScriptScheduleInput createInput(ScheduledScriptCustomParamsInput params) {

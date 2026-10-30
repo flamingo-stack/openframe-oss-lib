@@ -4,6 +4,7 @@ import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.Script;
@@ -12,8 +13,11 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.openframe.data.document.rmm.script.ScriptStatus.ACTIVE;
 import static com.openframe.data.document.rmm.script.ScriptStatus.ARCHIVED;
@@ -29,7 +33,83 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ScriptMapperTest {
 
-    private final ScriptMapper mapper = new ScriptMapper();
+    private final EncryptionService encryptionService =
+            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
+    private final ScriptMapper mapper = new ScriptMapper(encryptionService, sealerOn(encryptionService));
+
+    static ObjectProvider<ScriptSecretSealer> sealerOn(EncryptionService encryptionService) {
+        return new StaticListableBeanFactory(Map.of("sealer", new ScriptSecretSealer(encryptionService)))
+                .getBeanProvider(ScriptSecretSealer.class);
+    }
+
+    static ObjectProvider<ScriptSecretSealer> sealerOff() {
+        return new StaticListableBeanFactory().getBeanProvider(ScriptSecretSealer.class);
+    }
+
+    @Test
+    @DisplayName("encryption off: a secret is stored as given, and an already encrypted one still comes back plain")
+    void encryptionOff_storesPlain_stillDecrypts() {
+        ScriptMapper plainMapper = new ScriptMapper(encryptionService, sealerOff());
+        CreateScriptInput input = new CreateScriptInput();
+        input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()));
+
+        ScriptEnvVar stored = plainMapper.toEntity("tenant-1", input).getEnvVars().get(0);
+        assertThat(stored.isEncrypted()).isFalse();
+        assertThat(stored.getValue()).isEqualTo("s3cr3t");
+
+        Script sealedEarlier = Script.builder().envVars(List.of(ScriptEnvVar.builder()
+                .name("TOKEN").value("s3cr3t").secret(true).build()
+                .sealed(encryptionService::encrypt))).build();
+        assertThat(plainMapper.toResponse(sealedEarlier).getEnvVars().get(0).getValue()).isEqualTo("s3cr3t");
+    }
+
+    @Test
+    @DisplayName("toEntity: a secret is stored encrypted, a plain var stays plain")
+    void toEntity_encryptsSecretsOnly() {
+        CreateScriptInput input = new CreateScriptInput();
+        input.setEnvVars(List.of(
+                ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build(),
+                ScriptEnvVarInput.builder().name("REGION").value("eu").secret(false).build()));
+
+        List<ScriptEnvVar> stored = mapper.toEntity("tenant-1", input).getEnvVars();
+
+        assertThat(stored.get(0).isEncrypted()).isTrue();
+        assertThat(stored.get(0).getValue()).isNotEqualTo("s3cr3t");
+        assertThat(encryptionService.decrypt(stored.get(0).getValue())).isEqualTo("s3cr3t");
+        assertThat(stored.get(1).isEncrypted()).isFalse();
+        assertThat(stored.get(1).getValue()).isEqualTo("eu");
+    }
+
+    @Test
+    @DisplayName("toResponse: a stored secret is decrypted — the response carries the plain value dispatch sends")
+    void toResponse_decryptsSecrets() {
+        Script entity = Script.builder().envVars(List.of(
+                ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                        .sealed(encryptionService::encrypt))).build();
+
+        ScriptResponse response = mapper.toResponse(entity);
+
+        assertThat(response.getEnvVars()).singleElement()
+                .extracting(ScriptEnvVarInput::getValue, ScriptEnvVarInput::isSecret)
+                .containsExactly("s3cr3t", true);
+    }
+
+    @Test
+    @DisplayName("updateEntity: a kept secret (no value sent) keeps its stored ciphertext — never encrypted twice")
+    void updateEntity_keptSecretIsNotEncryptedTwice() {
+        ScriptEnvVar stored = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                .sealed(encryptionService::encrypt);
+        Script existing = Script.builder().envVars(List.of(stored)).build();
+        UpdateScriptInput input = new UpdateScriptInput();
+        input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").secret(true).build()));
+
+        mapper.updateEntity(existing, input);
+
+        ScriptEnvVar kept = existing.getEnvVars().get(0);
+        assertThat(kept.getValue()).isEqualTo(stored.getValue());
+        assertThat(kept.isEncrypted()).isTrue();
+        assertThat(encryptionService.decrypt(kept.getValue())).isEqualTo("s3cr3t");
+    }
 
     @Test
     @DisplayName("toEntity: maps every CreateScriptInput field onto a new Script, including shell and privilegeLevel")
@@ -165,7 +245,7 @@ class ScriptMapperTest {
 
         mapper.updateEntity(existing, input);
 
-        assertThat(existing.getEnvVars())
+        assertThat(revealed(existing.getEnvVars()))
                 .extracting(ScriptEnvVar::getName, ScriptEnvVar::getValue, ScriptEnvVar::isSecret)
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple("PLAIN", "staging", false),
@@ -185,7 +265,7 @@ class ScriptMapperTest {
 
         mapper.updateEntity(existing, input);
 
-        assertThat(existing.getEnvVars())
+        assertThat(revealed(existing.getEnvVars()))
                 .singleElement()
                 .extracting(ScriptEnvVar::getValue)
                 .isEqualTo("new-secret");
@@ -292,6 +372,10 @@ class ScriptMapperTest {
 
         // verifications
         assertThat(response.getCreationSource()).isEqualTo(ScriptCreationSource.AI_ASSISTANT);
+    }
+
+    private List<ScriptEnvVar> revealed(List<ScriptEnvVar> envVars) {
+        return ScriptEnvVar.revealAll(envVars, encryptionService::decrypt);
     }
 
     private static Script fullyPopulated() {
