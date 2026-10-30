@@ -1,5 +1,6 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
@@ -75,6 +76,31 @@ public class PackageUpdateStatusProcessor {
                 state.getWaitingReason(), state.getWaitingPhase(), state.getClosesAt(), state.getDoneResult(),
                 state.getRebootRequired(), state.getRelaunched(), state.getFailedReason(), state.getExitCode(),
                 state.getFailedMessage(), state.getDeadlineAt());
+
+        rollUp(tenantId, requestId, request);
+    }
+
+    public void failUndelivered(String machineId, String requestId, DeliveryFailure failure) {
+        Machine machine = machineRepository.findByMachineId(machineId).orElse(null);
+        if (machine == null) {
+            log.warn("[package-update] undelivered order for unknown machine {} requestId={} — ignoring", machineId, requestId);
+            return;
+        }
+        String tenantId = machine.getTenantId();
+        PackageUpdateDeviceState state = deviceStateRepository
+                .findByTenantIdAndRequestIdAndMachineId(tenantId, requestId, machineId)
+                .orElseGet(() -> newState(tenantId, requestId, machineId));
+        if (state.getLastEventId() != null) {
+            log.info("[package-update] delivery {} for requestId={} machineId={}, but the device already reports on it — left as is",
+                    failure, requestId, machineId);
+            return;
+        }
+
+        PackageUpdateRequest request = requestRepository.findByTenantIdAndRequestId(tenantId, requestId).orElse(null);
+        PackageUpdateDeviceStateReducer.applyUndelivered(state, failure);
+        executionRecorder.recordUndelivered(request, machineId, failure);
+        deviceStateRepository.save(state);
+        log.warn("[package-update] order not delivered requestId={} machineId={} reason={}", requestId, machineId, failure);
 
         rollUp(tenantId, requestId, request);
     }

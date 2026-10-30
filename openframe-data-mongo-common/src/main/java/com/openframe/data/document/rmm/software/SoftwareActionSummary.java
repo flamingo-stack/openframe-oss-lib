@@ -21,6 +21,7 @@ public class SoftwareActionSummary {
     private int respondedMachineCount;
     private int waitingMachineCount;
     private Instant dispatchedAt;
+    private Instant finishedAt;
     private String initiatedBy;
 
     private String bundleId;

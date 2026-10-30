@@ -241,6 +241,7 @@ public class SoftwareActionService {
                 .respondedMachineCount(s.getRespondedMachineCount())
                 .waitingMachineCount(s.getWaitingMachineCount())
                 .dispatchedAt(s.getDispatchedAt())
+                .finishedAt(s.getFinishedAt())
                 .initiatedBy(s.getInitiatedBy())
                 .bundleId(s.getBundleId())
                 .scheduleId(s.getScheduleId())

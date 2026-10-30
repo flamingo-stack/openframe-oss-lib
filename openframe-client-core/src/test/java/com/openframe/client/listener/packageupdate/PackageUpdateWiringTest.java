@@ -30,7 +30,7 @@ class PackageUpdateWiringTest {
             .withBean(PackageUpdateRequestRepository.class, () -> mock(PackageUpdateRequestRepository.class))
             .withBean(ScriptExecutionRepository.class, () -> mock(ScriptExecutionRepository.class))
             .withUserConfiguration(PackageUpdateStatusListener.class, PackageUpdateStatusProcessor.class,
-                    PackageUpdateExecutionRecorder.class);
+                    PackageUpdateExecutionRecorder.class, PackageUpdateDeliveryFailureListener.class);
 
     @Test
     void packageUpdateOff_nothingOfTheFeatureRuns() {
@@ -39,6 +39,7 @@ class PackageUpdateWiringTest {
             assertThat(context).doesNotHaveBean(PackageUpdateStatusListener.class);
             assertThat(context).doesNotHaveBean(PackageUpdateStatusProcessor.class);
             assertThat(context).doesNotHaveBean(PackageUpdateExecutionRecorder.class);
+            assertThat(context).doesNotHaveBean(PackageUpdateDeliveryFailureListener.class);
         });
     }
 
@@ -51,6 +52,7 @@ class PackageUpdateWiringTest {
                     assertThat(context).hasSingleBean(PackageUpdateStatusListener.class);
                     assertThat(context).hasSingleBean(PackageUpdateStatusProcessor.class);
                     assertThat(context).hasSingleBean(PackageUpdateExecutionRecorder.class);
+                    assertThat(context).hasSingleBean(PackageUpdateDeliveryFailureListener.class);
                 });
     }
 }

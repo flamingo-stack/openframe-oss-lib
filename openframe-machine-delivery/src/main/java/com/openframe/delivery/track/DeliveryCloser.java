@@ -10,6 +10,7 @@ import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -24,6 +25,7 @@ public class DeliveryCloser {
     private final MachineDeliveryRepository repository;
     private final DeliveryProperties properties;
     private final DeliveryMetrics metrics;
+    private final ApplicationEventPublisher eventPublisher;
 
     public void fail(MachineDelivery delivery, DeliveryFailure failure, Set<DeliveryStatus> from, Instant now) {
         DeliveryType type = delivery.getType();
@@ -56,6 +58,7 @@ public class DeliveryCloser {
         metrics.recordFailed(type, failure);
         log.warn("Delivery FAILED: type={} targetId={} machineId={} attempts={} reason={}",
                 type, delivery.getTargetId(), delivery.getMachineId(), delivery.getAttempts(), failure);
+        eventPublisher.publishEvent(new DeliveryFailedEvent(type, delivery.getTargetId(), delivery.getMachineId(), failure));
     }
 
     public void failReported(DeliveryType type, String targetId, String machineId, String dispatchId, String error, Instant now) {
@@ -75,6 +78,7 @@ public class DeliveryCloser {
         metrics.recordFailed(type, DeliveryFailure.AGENT_ERROR);
         log.warn("Delivery FAILED by agent: type={} targetId={} machineId={} dispatchId={} error={}",
                 type, targetId, machineId, dispatchId, error);
+        eventPublisher.publishEvent(new DeliveryFailedEvent(type, targetId, machineId, DeliveryFailure.AGENT_ERROR));
     }
 
     public void cancel(MachineDelivery delivery, Set<DeliveryStatus> from, String reason, Instant now) {
