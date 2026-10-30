@@ -344,6 +344,25 @@ class MachineStatusServiceTest {
         verify(eventPublisher, never()).publishEvent(any());
     }
 
+    @Test
+    @DisplayName("L4: a transition whose status guard misses still records the event's presence, without status or events")
+    void statusGuardMissed_presenceStillWritten() {
+        machineIs(DeviceStatus.OFFLINE);
+        when(machineWriter.update(eq(MACHINE), any(Criteria.class), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        service.updateToOnline(MACHINE, LATER);
+
+        ArgumentCaptor<MachineUpdate> presence = ArgumentCaptor.forClass(MachineUpdate.class);
+        verify(machineWriter).update(eq(MACHINE), presence.capture());
+        assertThat(presence.getValue().paths()).containsExactlyInAnyOrder("telemetryStatus", "lastSeen");
+        Machine written = copyOf(stored);
+        presence.getValue().applyTo(written);
+        assertThat(written.getStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        assertThat(written.getTelemetryStatus()).isEqualTo(TelemetryStatus.ONLINE);
+        assertThat(written.getLastSeen()).isEqualTo(LATER);
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
     // The one MachineWriter.update call, guarded or not
     private MachineUpdate writtenUpdate() {
         List<Object[]> writes = mockingDetails(machineWriter).getInvocations().stream()

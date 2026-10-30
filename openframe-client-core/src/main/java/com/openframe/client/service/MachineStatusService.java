@@ -98,8 +98,10 @@ public class MachineStatusService {
                 .update(machine.getMachineId(), Criteria.where(STATUS.path()).is(previousStatus), update)
                 .map(MachineWriteResult::after);
         if (written.isEmpty()) {
-            log.info("Status of machineId={} changed since it was read, {} -> {} not applied",
+            // The status is no longer this event's to change, but the device was still heard from: its presence lands
+            log.info("Status of machineId={} changed since it was read, {} -> {} not applied, presence recorded",
                     machine.getMachineId(), previousStatus, newStatus);
+            touchPresence(machine, telemetry, eventTimestamp);
             return;
         }
         Machine updated = written.get();
