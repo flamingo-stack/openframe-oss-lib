@@ -58,42 +58,42 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
             return agentToolId;
         }
 
+        IntegratedTool integratedTool = integratedToolService.getToolByKey(TOOL_ID)
+                .orElseThrow(() -> new FleetMdmToolNotConfiguredException("Found no tool with id " + TOOL_ID));
+
+        ToolUrl toolUrl = toolUrlService.getUrlByToolType(integratedTool, ToolUrlType.API)
+                .orElseThrow(() -> new FleetMdmToolNotConfiguredException("Found no api url for tool with id " + TOOL_ID));
+
+        String apiUrl = toolUrl.getUrl() + ":" + toolUrl.getPort();
+        String apiToken = integratedTool.getCredentials().getApiKey().getKey();
+
+        FleetMdmClient fleetClient = new FleetMdmClient(apiUrl, apiToken, tenantId);
+
+        List<Host> hosts;
         try {
-            IntegratedTool integratedTool = integratedToolService.getToolByKey(TOOL_ID)
-                    .orElseThrow(() -> new IllegalStateException("Found no tool with id " + TOOL_ID));
-            
-            ToolUrl toolUrl = toolUrlService.getUrlByToolType(integratedTool, ToolUrlType.API)
-                    .orElseThrow(() -> new IllegalStateException("Found no api url for tool with id " + TOOL_ID));
-
-            String apiUrl = toolUrl.getUrl() + ":" + toolUrl.getPort();
-            String apiToken = integratedTool.getCredentials().getApiKey().getKey();
-
-            FleetMdmClient fleetClient = new FleetMdmClient(apiUrl, apiToken, tenantId);
-
-            List<Host> hosts = fleetClient.searchHosts(agentToolId, 0, 2);
-            
-            if (hosts.isEmpty()) {
-                throw new IllegalStateException("No hosts found in Fleet MDM for UUID: " + agentToolId);
-            }
-            logHosts(machineId, agentToolId, hosts);
-
-            List<Host> uuidMatched = hosts.stream()
-                    .filter(host -> agentToolId.equals(host.getUuid()))
-                    .toList();
-
-            return uuidMatched.stream()
-                    .filter(host -> agentToolId.equals(host.getUuid()))
-                    .filter(host -> isNotBlank(host.getOsqueryVersion()))
-                    .max(Comparator.comparing(host -> isNotBlank(host.getLastEnrolledAt()) ? host.getLastEnrolledAt() : ""))
-                    .map(host -> {
-                        logOsqueryHostIdMatch(machineId, agentToolId, host);
-                        return processMatchingHost(machineId, agentToolId, host);
-                    })
-                    .orElseGet(() -> processNoMatchingHost(machineId, agentToolId, lastAttempt));
+            hosts = fleetClient.searchHosts(agentToolId, 0, 2);
         } catch (Exception e) {
             log.error("Failed to transform Fleet MDM agent tool ID, machineId={}, uuid={}", machineId, agentToolId, e);
             throw new IllegalStateException("Failed to transform Fleet MDM agent tool ID", e);
         }
+
+        if (hosts.isEmpty()) {
+            throw new FleetMdmHostNotFoundException("No hosts found in Fleet MDM for UUID: " + agentToolId);
+        }
+        logHosts(machineId, agentToolId, hosts);
+
+        List<Host> uuidMatched = hosts.stream()
+                .filter(host -> agentToolId.equals(host.getUuid()))
+                .toList();
+
+        return uuidMatched.stream()
+                .filter(host -> isNotBlank(host.getOsqueryVersion()))
+                .max(Comparator.comparing(host -> isNotBlank(host.getLastEnrolledAt()) ? host.getLastEnrolledAt() : ""))
+                .map(host -> {
+                    logOsqueryHostIdMatch(machineId, agentToolId, host);
+                    return processMatchingHost(machineId, agentToolId, host);
+                })
+                .orElseGet(() -> processNoMatchingHost(machineId, agentToolId, lastAttempt));
     }
 
     private String processMatchingHost(String machineId, String agentToolId, Host host) {
@@ -105,7 +105,7 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
     private String processNoMatchingHost(String machineId, String agentToolId, boolean lastAttempt) {
         log.warn("No matching host found, machineId={}, uuid={}", machineId, agentToolId);
         if (!lastAttempt) {
-            throw new IllegalStateException("No valid fleetmdm-agent mdm host found with machineId=" + machineId + ", uuid=" + agentToolId);
+            throw new FleetMdmHostNotFoundException("No valid fleetmdm-agent mdm host found with machineId=" + machineId + ", uuid=" + agentToolId);
         }
         log.info("Use uuid to fix it manually, machineId={}, uuid={}", machineId, agentToolId);
         return agentToolId;
