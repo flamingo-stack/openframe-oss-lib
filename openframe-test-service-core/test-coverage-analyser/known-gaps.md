@@ -159,3 +159,9 @@ confirmed by the suite owner. Confirm, reclassify, or delete.
   RewritePath to `/api/v1/backoffice/`), guarded by its own `X-API-Key` from
   `openframe-saas-management-api.yml`. That is reachable external surface with a real consumer and needs
   its own decision, not this exclusion — it stays an open gap.
+
+## KG-17 — SSO provider configuration — OUT-OF-SCOPE(owner decision) — *confirmed*
+- **Ops:** `SSOConfigController` (openframe-api-service-core: `GET /sso/providers`, `GET /sso/providers/available`,
+  `GET|POST|PUT|DELETE /sso/{provider}`, `PATCH /sso/{provider}/toggle`).
+- **Why:** owner's decision, 2026-10-01: SSO is out of scope and is never to be automated. A saved provider is
+  tenant-wide login surface. Plan item CP-36 is dropped.
