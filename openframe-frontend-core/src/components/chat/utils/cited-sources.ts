@@ -116,3 +116,13 @@ function splitByCards(sources: ChatSource[], cards: CardReference[]): CitedSourc
   const uncited = records.filter(record => !cited.includes(record));
   return { cited: groupSourcesByTable(cited), uncited: groupSourcesByTable(uncited) };
 }
+
+/**
+ * A grouped chip's dropdown row label. A row prints its citation number only to tell rows of different citations
+ * apart (a client-built group of several numbers); when every row was cited by the same number, the chip already
+ * shows it and each row printing it again is noise.
+ */
+export function groupedRowLabels(items: ReadonlyArray<{ name: string; index?: number }>): string[] {
+  const numbers = new Set(items.flatMap(item => (item.index === undefined ? [] : [item.index])));
+  return items.map(item => (numbers.size > 1 && item.index !== undefined ? `[${item.index}] ${item.name}` : item.name));
+}

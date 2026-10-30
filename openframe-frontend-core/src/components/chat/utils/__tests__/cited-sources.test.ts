@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ChatSource } from '../../types/message.types';
-import { splitCitedSources } from '../cited-sources';
+import { groupedRowLabels, splitCitedSources } from '../cited-sources';
 
 const source = (index: number): ChatSource => ({
   index,
@@ -124,5 +124,25 @@ describe('splitCitedSources, an answer with cards', () => {
   it('falls back to its numbers when none of its cards shows a retrieved record', () => {
     const { cited } = splitCitedSources(all, '[card://onboarding_guide:zzz]\n\nSee the quick start [1].');
     expect(cited.flatMap(s => s.items?.map(i => i.id) ?? [s.id])).toEqual(['cli/quick-start.md']);
+  });
+});
+
+describe('groupedRowLabels', () => {
+  it('leaves the number off when every row shares it', () => {
+    expect(
+      groupedRowLabels([
+        { name: 'A', index: 2 },
+        { name: 'B', index: 2 },
+      ]),
+    ).toEqual(['A', 'B']);
+    expect(groupedRowLabels([{ name: 'A' }, { name: 'B' }])).toEqual(['A', 'B']);
+  });
+  it('keeps each row its own number when the rows were cited apart', () => {
+    expect(
+      groupedRowLabels([
+        { name: 'A', index: 1 },
+        { name: 'B', index: 3 },
+      ]),
+    ).toEqual(['[1] A', '[3] B']);
   });
 });
