@@ -1,4 +1,4 @@
-name: OpenFrame OSS Libs Test
+name: OpenFrame OSS Libs Build
 
 permissions:
   contents: read
@@ -6,7 +6,7 @@ permissions:
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened, closed]
+    types: [opened, synchronize, ready_for_review, reopened, labeled, closed]
     branches: [main]
   merge_group:
 
@@ -27,7 +27,8 @@ jobs:
   changes:
     name: Changes
     uses: ./.github/workflows/changes.yaml
-    if: github.event_name == 'merge_group' || (github.event.pull_request.state == 'open' && !github.event.pull_request.draft)
+    # PR builds (and snapshots) only with the build label; the merge queue always builds.
+    if: github.event_name == 'merge_group' || (github.event.pull_request.state == 'open' && !github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build'))
 
 
   lint:
@@ -53,8 +54,8 @@ jobs:
             | grep -qE "^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\(.+\))?!?: .+ CU-[0-9a-z]+$" \
             || { echo "::error::Expected 'fix(armor): exclude billing action CU-17tkuw5x3yh' (no-task label drops CU-); fix the title and re-run"; exit 1; }
 
-  test-java:
-    name: Test Java
+  build-java:
+    name: Build Java
     runs-on: ubuntu-latest
     needs: [changes]
     if: fromJSON(needs.changes.outputs.changes || '{}').java == 'true'
@@ -82,6 +83,7 @@ jobs:
       # Merge queue only builds and tests; snapshots are published per PR.
       - name: Resolve PR Snapshot Version
         if: github.event_name == 'pull_request'
+        shell: bash  # pipefail: a failed lookup must fail, not publish .1-<PR>-SNAPSHOT
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -105,8 +107,8 @@ jobs:
 
 
 
-  test-node:
-    name: Test Node (openframe-frontend-core)
+  build-node:
+    name: Build Node (openframe-frontend-core)
     runs-on: ubuntu-latest
     needs: [changes]
     if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
@@ -160,9 +162,7 @@ jobs:
         if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run lint:types
 
-      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run format in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Format
-        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run format
 
       - name: Test
@@ -194,45 +194,8 @@ jobs:
           jq -r '.packages[0].url' pkg-pr-new.json >> "$GITHUB_STEP_SUMMARY"
 
 
-  # Own job for wall clock: graph-wide and slower than all of test-node; sequential made PR checks ~16 min.
-  # Keep it in all-checks; it once reported zero for months with a real cycle in the tree.
-  test-node-cycles:
-    name: Test Node Cycles (openframe-frontend-core)
-    runs-on: ubuntu-latest
-    needs: [changes]
-    # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:cycles in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
-    # was: if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
-    if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
-    env:
-      NPM_CONFIG_FETCH_TIMEOUT: 30000
-      NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
-      NPM_CONFIG_LOGLEVEL: http
-    defaults:
-      run:
-        working-directory: openframe-frontend-core
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: openframe-frontend-core/package.json
-
-      # Same bundled-npm bug as in test-node.
-      - name: Upgrade npm
-        run: npm install -g npm@11.9.0
-
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Lint (import cycles)
-        run: npm run lint:cycles
-
-
-  test-rust:
-    name: "Test Rust (${{ matrix.os }})"
+  build-rust:
+    name: "Build Rust (${{ matrix.os }})"
     needs: changes
     if: fromJSON(needs.changes.outputs.changes || '{}').rust == 'true'
     runs-on: ${{ matrix.os }}
@@ -273,29 +236,29 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.state != 'open'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.ref }}
-
+      # One package's API error (a 504 left 40 of 48 with snapshots) must not stop the rest; fails at the end so a re-run finishes it.
       - name: Delete PR ${{ github.event.pull_request.number }} java snapshots
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           SUFFIX: -${{ github.event.pull_request.number }}-SNAPSHOT
         run: |
-          gh api "/orgs/${{ env.ORGANISATION }}/packages?package_type=maven" --paginate \
-            --jq '.[] | select(.name | startswith("${{ env.REGISTRY }}.")) | .name' |
-          while read -r PKG; do
+          PKGS=$(gh api "/orgs/${{ env.ORGANISATION }}/packages?package_type=maven" --paginate \
+            --jq '.[] | select(.name | startswith("${{ env.REGISTRY }}.")) | .name')
+          FAILED=0
+          for PKG in $PKGS; do
             gh api "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions" --paginate \
               --jq "[.[] | select(.name | endswith(\"$SUFFIX\"))] | .[].id" |
-              xargs -r -I{} gh api --silent -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}"
+              xargs -r -I{} gh api --silent -X DELETE "/orgs/${{ env.ORGANISATION }}/packages/maven/$PKG/versions/{}" ||
+              { echo "::warning::$PKG: snapshot cleanup failed"; FAILED=1; }
           done
+          exit $FAILED
 
   all-checks:
     name: "All Checks"
-    needs: [changes, test-java, test-node, test-node-cycles, test-rust, lint]
+    needs: [changes, build-java, build-node, build-rust, lint]
     runs-on: ubuntu-latest
     if: |
       always() &&
