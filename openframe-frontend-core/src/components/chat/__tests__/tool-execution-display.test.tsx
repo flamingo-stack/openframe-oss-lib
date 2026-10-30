@@ -79,4 +79,15 @@ describe('ToolExecutionDisplay', () => {
     render(<ToolExecutionDisplay message={{ ...remoteRead, toolTitle: undefined }} assistantType="mingo" />);
     expect(expander()).toBeTruthy();
   });
+
+  it("squares the expander's corners: the frame clips them, and the open body meets it flat", () => {
+    render(
+      <ToolExecutionDisplay
+        message={{ ...remoteRead, type: 'EXECUTED_TOOL', success: true, result: '{"tickets":[]}' }}
+        assistantType="mingo"
+      />,
+    );
+    expect(expander()).toHaveClass('rounded-none');
+    expect(expander()).not.toHaveClass('rounded-md');
+  });
 });

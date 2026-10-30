@@ -35,6 +35,7 @@ export function TouchBoard({
   collapseStorageKey,
   initialCollapsed,
   loadMoreRootMargin,
+  laneEndInset,
   className,
 }: BoardProps) {
   const { collapsed, toggle } = useBoardCollapse(collapseStorageKey, initialCollapsed);
@@ -68,6 +69,7 @@ export function TouchBoard({
             onReject={onReject}
             onLoadMore={onLoadMore}
             loadMoreRootMargin={loadMoreRootMargin}
+            endInset={laneEndInset}
           />
         ))}
       </div>
