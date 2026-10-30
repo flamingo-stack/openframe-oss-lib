@@ -40,9 +40,6 @@ export interface AppHeaderProps {
    *  the SSOT deep link `<href>?ticket=<id>` for the newest-unread
    *  ticket before navigating. */
   ticketAlertsHref?: string;
-  /** Host navigation (router push) — receives the FULL computed href.
-   *  Defaults to `window.location.assign`. */
-  onTicketAlerts?: (href: string) => void;
   /** Render the time-tracker button + popup. Requires wrapping the app in `<TimeTrackerProvider>`. */
   showTimeTracker?: boolean;
   /** Render the "Mingo AI" launcher button (drawer-style trigger for an
@@ -135,7 +132,6 @@ export const AppHeader = React.memo(function AppHeaderImpl({
   unreadCount = 0,
   showTicketAlerts = false,
   ticketAlertsHref,
-  onTicketAlerts,
   showTimeTracker = false,
   showMingoAI = false,
   onMingoAI,
@@ -259,7 +255,6 @@ export const AppHeader = React.memo(function AppHeaderImpl({
           {showTicketAlerts && (
             <TicketAlertsButton
               href={ticketAlertsHref ?? '/tickets'}
-              onNavigate={onTicketAlerts}
               disabled={disabled}
               className={cn(cellDivider, dimmedClass)}
             />

@@ -144,6 +144,23 @@ class PackageUpdateDispatchServiceTest {
     }
 
     @Test
+    void autoUpdate_ordersAsAutoWithThePolicysSettings() {
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        PackageUpdateSettings settings = PackageUpdateSettings.builder()
+                .mode(PackageUpdateMode.WAIT).deadlineSeconds(604_800L).countdownSeconds(300).build();
+
+        service.dispatchAutoUpdate(rows("exec-auto", PackageManagerType.WINGET, "Google.Chrome", "m1"), null, settings);
+
+        ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
+        verify(requestRepository).save(req.capture());
+        assertThat(req.getValue().getSource()).isEqualTo(PackageUpdateSource.AUTO);
+        assertThat(req.getValue().getDeadlineSeconds()).isEqualTo(604_800L);
+        ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
+        verify(deliveryDispatcher).dispatch(seed.capture());
+        assertThat(seed.getValue().getSource().getKind()).isEqualTo(UpdateSource.Kind.AUTO);
+    }
+
+    @Test
     void adminUpdate_withoutSettings_keepsTheUpdateNowDefaults() {
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
 

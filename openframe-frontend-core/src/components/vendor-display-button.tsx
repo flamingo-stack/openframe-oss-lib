@@ -1,10 +1,12 @@
 'use client';
 
+import { useChatRuntime } from '../contexts/chat-runtime-context';
 import Image from '../embed-shims/next-image';
 import { IMAGE_FIXED_PX } from '../styles/image-sizes';
 import { cn } from '../utils/cn';
 import { getVendorLogo, type VendorWithMedia } from '../utils/vendor-media-stub';
 import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
+import { executeNewTabNavigation } from './chat/utils/execute-navigation';
 import { BUTTON_KIND_CLASS, Button } from './ui/button';
 
 /** The default button's place in its row (it never outgrows it). */
@@ -22,12 +24,13 @@ interface VendorDisplayButtonProps {
 }
 
 export function VendorDisplayButton({ vendor, onClick, variant = 'default', externalUrl }: VendorDisplayButtonProps) {
+  const runtime = useChatRuntime();
   const handleClick = () => {
     if (externalUrl && vendor.slug) {
       // `externalUrl` is the caller-resolved platform base URL (the openmsp SSOT via
       // getPlatformProductionUrl, scheme-normalized). The old `process.env.NEXT_PUBLIC_OPENMSP_URL`
-      // override is gone — it's stored scheme-less, which made this a relative window.open().
-      window.open(`${externalUrl}/vendor/${vendor.slug}`, '_blank', 'noopener,noreferrer');
+      // override is gone — it's stored scheme-less, which made this a relative link.
+      executeNewTabNavigation({ runtime, href: `${externalUrl}/vendor/${vendor.slug}`, targetPlatform: 'openmsp' });
     } else if (onClick && vendor.slug) {
       onClick(vendor.slug);
     }

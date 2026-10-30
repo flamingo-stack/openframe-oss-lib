@@ -28,8 +28,10 @@
  * this dedicated cell, not the bell.
  */
 
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { cn } from '../../utils/cn';
 import { buildTicketOpenHref } from '../../utils/dev-sections/dev-section-param-keys';
+import { executeNavigationImperative } from '../chat/utils/execute-navigation';
 import { LifeBuoyIcon } from '../icons-v2-generated/interface/life-buoy-icon';
 import { useOptionalTicketLive } from '../tickets/ticket-live-provider';
 import { HeaderButton } from './header-button';
@@ -43,25 +45,22 @@ export interface TicketAlertsButtonProps {
    *  param `HelpCenterList` derives its drawer state from; opening the
    *  drawer also smooth-scrolls the row). */
   href: string;
-  /** Host navigation (router push) — receives the FULL computed href.
-   *  Defaults to `window.location.assign`. */
-  onNavigate?: (href: string) => void;
   disabled?: boolean;
   className?: string;
 }
 
-export function TicketAlertsButton({ href, onNavigate, disabled, className }: TicketAlertsButtonProps) {
+export function TicketAlertsButton({ href, disabled, className }: TicketAlertsButtonProps) {
   const live = useOptionalTicketLive();
+  const runtime = useChatRuntime();
   // Attention-only: no provider, signed out, or nothing unread → no cell.
   if (!live || !live.authed || live.unreadTotal === 0) return null;
 
   const targetId = live.nextUnreadTicketId;
   const target = targetId ? buildTicketOpenHref(href, targetId) : href;
 
-  const handleClick = () => {
-    if (onNavigate) onNavigate(target);
-    else window.location.assign(target);
-  };
+  // Followed through the lib's navigation executor: the host's `navigate` (a soft navigation, so the ticket drawer
+  // opens on its row).
+  const handleClick = () => executeNavigationImperative({ runtime, href: target });
 
   return (
     <HeaderButton
