@@ -277,7 +277,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   }, [disabled, server, onSelectionChange]);
 
   // Tag chips in the search bar take "key:value" form (e.g. "env:prod").
-  // Plain text chips are kept visually but don't filter (matches DevicesPanel behavior).
+  // A chip without a key filters nothing (matches DevicesPanel behavior).
   const selectedTagValues = useMemo(
     () =>
       selectedTags.flatMap(t => {
@@ -498,16 +498,6 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     setSearchTerm('');
     setSelectedTags([]);
   }, [setSearchTerm, setSelectedTags]);
-
-  const handleTagSubmit = useCallback(
-    (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) return;
-      if (!selectedTags.includes(trimmed)) setSelectedTags([...selectedTags, trimmed]);
-      setSearchTerm('');
-    },
-    [selectedTags, setSelectedTags, setSearchTerm],
-  );
 
   const columns = useMemo<ColumnDef<T>[]>(
     () => [
@@ -810,7 +800,6 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
                 tags={tagOptions}
                 onTagRemove={handleTagRemove}
                 onClearAll={handleClearAll}
-                onSubmit={handleTagSubmit}
                 onOpenFilterModal={openTagsModal}
                 isFilterModalOpen={tagsModalOpen}
                 onCloseFilterModal={closeTagsModal}
