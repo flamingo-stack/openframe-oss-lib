@@ -37,8 +37,8 @@ export interface RoadmapPageProps {
    *  hub's related-content rail. */
   belowContent?: ReactNode;
   /**
-   * The page's own FAQ block: the topic the page is about (stated by the host,
-   * never read from its address) and where the host serves the FAQs. Rendered
+   * The page's own FAQ block: where the host serves the FAQs (its topic is the
+   * page's, read from the address: `usePageTopic`). Rendered
    * after the page's content, inside its container. Absent: no FAQ block.
    */
   faq?: PageFaqSlot;

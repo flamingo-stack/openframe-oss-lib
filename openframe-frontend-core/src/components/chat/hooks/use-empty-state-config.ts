@@ -14,6 +14,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { usePageTopic } from '../../../contexts/page-topics-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 
 /** A structured empty-state quick-action chip — `{ id, label, prompt }` plus an
@@ -135,8 +136,10 @@ export function emptyStateUrlForTopic(emptyStateUrl: string, topic?: string | nu
 
 /**
  * Shared empty-state config (single fetch per chat surface), via react-query
- * so every consumer dedupes to ONE request. Keyed on the URL ALONE (the
- * endpoint plus the page's `topic`, `emptyStateUrlForTopic`) — the request
+ * so every consumer dedupes to ONE request. The request carries the topic of
+ * the page on screen, read from its address (`usePageTopic`), so the host
+ * places the quick actions for it. Keyed on the URL ALONE (the endpoint plus
+ * the topic, `emptyStateUrlForTopic`) — the request
  * sends no `source` param (resolved server-side), so the URL fully determines
  * the response: each topic is read once per session.
  *
@@ -149,10 +152,11 @@ export function emptyStateUrlForTopic(emptyStateUrl: string, topic?: string | nu
  */
 export function useEmptyStateConfig(
   emptyStateUrl: string | undefined,
-  options?: { enabled?: boolean; topic?: string | null },
+  options?: { enabled?: boolean },
 ): { config: EmptyStateConfig; loading: boolean; loaded: boolean } {
   const enabled = (options?.enabled ?? true) && !!emptyStateUrl;
-  const url = emptyStateUrl ? emptyStateUrlForTopic(emptyStateUrl, options?.topic) : undefined;
+  const topic = usePageTopic();
+  const url = emptyStateUrl ? emptyStateUrlForTopic(emptyStateUrl, topic) : undefined;
   const query = useQuery({
     queryKey: ['chat-empty-state', url],
     queryFn: ({ signal }) => fetchEmptyStateConfig(signal, url as string),

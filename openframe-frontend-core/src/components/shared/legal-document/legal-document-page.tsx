@@ -74,12 +74,11 @@ export interface LegalDocumentPageProps {
    */
   documentsEndpoint?: string;
   /**
-   * The page's own FAQ block: the topic the page is about and where the host
-   * serves the FAQs. Rendered after the page's content, inside its container.
-   * Without a `topic`, the topic is the one the list (`documentsEndpoint`)
-   * gives the document. Absent, or no topic known: no FAQ block.
+   * The page's own FAQ block: where the host serves the FAQs. Rendered after
+   * the page's content, inside its container; its topic is the page's, read
+   * from the address (`usePageTopic`). Absent: no FAQ block.
    */
-  faq?: PageFaqSlot | Omit<PageFaqSlot, 'topic'>;
+  faq?: PageFaqSlot;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container — only the padding box renders,
    *  avoiding a nested `<main>`. */
@@ -155,8 +154,6 @@ export function LegalDocumentPage({
   const { documents } = useLegalDocuments({ apiEndpoint: documentsEndpoint, enabled: Boolean(documentsEndpoint) });
   const listed = documents.find(doc => doc.docType === docType);
   const title = titleProp ?? data?.title ?? listed?.title ?? 'Legal document';
-  const faqTopic = faq && 'topic' in faq ? faq.topic : listed?.faqTopic;
-  const faqSlot = faq && faqTopic ? { ...faq, topic: faqTopic } : null;
   const errorTitle = errorTitleProp ?? `Unable to load ${title}`;
   const emptyStateMessage = emptyStateMessageProp ?? `${title} is not available at this time.`;
 
@@ -221,7 +218,7 @@ export function LegalDocumentPage({
           </div>
         </div>
       </div>
-      {faqSlot && <FaqSection {...pageFaqProps(faqSlot)} />}
+      {faq && <FaqSection {...pageFaqProps(faq)} />}
     </PageLayout>
   );
 

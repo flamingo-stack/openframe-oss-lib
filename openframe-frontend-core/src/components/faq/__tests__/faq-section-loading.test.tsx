@@ -7,6 +7,7 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PageTopicsProvider } from '../../../contexts/page-topics-context';
 import type { Faq } from '../../../types/faq';
 import { LoadingScope } from '../../ui/loading-scope';
 import { FAQ_SECTION_SKELETON_QUESTIONS, FaqSection } from '../faq-section';
@@ -80,9 +81,11 @@ describe('FaqSection loading state', () => {
 
   it('draws the count of questions the instance asks for, and the topic line for real', () => {
     render(
-      <LoadingScope>
-        <FaqSection topic="pricing" showTopic minResults={3} />
-      </LoadingScope>,
+      <PageTopicsProvider topics={{ '/': 'pricing' }}>
+        <LoadingScope>
+          <FaqSection showTopic minResults={3} />
+        </LoadingScope>
+      </PageTopicsProvider>,
     );
     expect(level3()).toBe(3);
     expect(screen.getByText('pricing')).toBeTruthy();
@@ -100,7 +103,11 @@ describe('FaqSection loading state', () => {
 
   it('draws the same skeleton while its own request is unanswered, and says it is loading', () => {
     fetchMock.mockReturnValue(new Promise(() => {}));
-    render(<FaqSection topic="pricing" minResults={3} />);
+    render(
+      <PageTopicsProvider topics={{ '/': 'pricing' }}>
+        <FaqSection minResults={3} />
+      </PageTopicsProvider>,
+    );
     expect(fetchMock).toHaveBeenCalled();
     expect(level3()).toBe(3);
     expect(screen.getByRole('status').textContent).toBe('Loading questions');
