@@ -304,9 +304,6 @@ export interface EmbeddableChatProps {
    */
   activeAgentSlug?: string;
 
-  /** Optional agent switcher callback (host renders the agent picker UI). */
-  onAgentChange?: (slug: string) => void;
-
   /**
    * Per-component override for the agent display-config route. Highest
    * precedence (over `runtime.endpoints.aiAgentConfigUrl` and the built-in
@@ -1018,7 +1015,6 @@ function EmbeddableChatInner({
   activeMode: controlledActiveMode,
   onActiveModeChange,
   activeAgentSlug,
-  onAgentChange: _onAgentChange,
   aiAgentConfigUrl: aiAgentConfigUrlProp,
   defaultActiveMode,
   shell = 'drawer',
