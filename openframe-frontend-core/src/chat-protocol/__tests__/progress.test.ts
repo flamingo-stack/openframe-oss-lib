@@ -12,7 +12,7 @@ describe('chat progress: the stages a turn reports before its first token', () =
         type: 'tool-execution',
         data: {
           type: 'EXECUTING_TOOL',
-          integratedToolType: '',
+          integratedToolType: 'OPENFRAME',
           toolFunction: 'searching',
           toolTitle: 'Searching 28 sources',
           toolExplanation: undefined,

@@ -11,6 +11,7 @@
  * Server-safe: no React, no browser APIs.
  */
 
+import { ToolTypeValues } from '../types/tool.types';
 import type { ToolExecutionFrame } from './frames';
 
 export const CHAT_PROGRESS_STAGES = ['understanding', 'searching', 'searching_again', 'reading'] as const;
@@ -37,7 +38,8 @@ export function chatProgressLabel(progress: ChatProgress): string {
 
 /**
  * The frame for a stage of one turn: `running` opens its row, `done` or `failed` closes it. `turnId` keeps the row's id
- * unique to the turn, since a closing frame updates the open row of the same id anywhere in the thread.
+ * unique to the turn, since a closing frame updates the open row of the same id anywhere in the thread. The tool type is
+ * the OpenFrame one, the icon Mingo's rows for the hub's tools show, so the stage is drawn as their one-line row.
  */
 export function chatProgressFrame(
   progress: ChatProgress,
@@ -45,14 +47,13 @@ export function chatProgressFrame(
   turnId: string,
 ): ToolExecutionFrame {
   const id = `${turnId}:${progress.stage}`;
-  const title = chatProgressLabel(progress);
+  const row = {
+    integratedToolType: ToolTypeValues.OPENFRAME,
+    toolFunction: progress.stage,
+    title: chatProgressLabel(progress),
+    toolExecutionRequestId: id,
+  };
   return state === 'running'
-    ? { type: 'EXECUTING_TOOL', toolFunction: progress.stage, title, toolExecutionRequestId: id }
-    : {
-        type: 'EXECUTED_TOOL',
-        toolFunction: progress.stage,
-        title,
-        toolExecutionRequestId: id,
-        success: state === 'done',
-      };
+    ? { type: 'EXECUTING_TOOL', ...row }
+    : { type: 'EXECUTED_TOOL', ...row, success: state === 'done' };
 }
