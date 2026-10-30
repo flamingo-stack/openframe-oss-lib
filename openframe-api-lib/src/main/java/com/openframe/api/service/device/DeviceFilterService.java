@@ -52,8 +52,9 @@ public class DeviceFilterService {
     }
 
     /**
-     * Every facet. For callers with no selection set of their own — the external REST API, whose
-     * response DTO always carries all of them.
+     * Every facet, the directory ones included ({@link DeviceFilterFacet#ALL}). A caller whose
+     * response does not expose all of them should pass its own set instead, as the external REST
+     * API does with {@link DeviceFilterFacet#REST}.
      */
     public CompletableFuture<DeviceFilters> getDeviceFilters(DeviceFilterCriteria filters) {
         return getDeviceFilters(filters, DeviceFilterFacet.ALL);
