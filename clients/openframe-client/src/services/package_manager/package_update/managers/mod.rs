@@ -13,7 +13,7 @@ pub(super) const UPGRADE_TIMEOUT_SECS: u32 = 900;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum QueryError {
-    /// The manager cannot be queried on this machine (e.g. winget without its PowerShell module).
+    /// The manager cannot be queried on this machine.
     Unavailable(String),
     /// The query ran and failed; worth another try later.
     Failed(String),

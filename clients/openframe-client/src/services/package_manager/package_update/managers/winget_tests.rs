@@ -104,10 +104,10 @@ fn garbage_output_is_a_failure() {
 }
 
 #[test]
-fn a_missing_powershell_module_makes_winget_unavailable_not_failed() {
+fn a_missing_powershell_module_is_retried_until_the_bootstrap_installs_it() {
     assert!(matches!(
         read_probe(&query(3, "")),
-        Err(QueryError::Unavailable(_))
+        Err(QueryError::Failed(reason)) if reason.contains("Microsoft.WinGet.Client")
     ));
 }
 

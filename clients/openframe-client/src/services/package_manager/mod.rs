@@ -122,3 +122,55 @@ async fn winget_presence() -> Presence {
 async fn winget_presence() -> Presence {
     Presence::Unknown
 }
+
+/// Something a present manager needs besides itself; the backend bootstraps it when missing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum Dependency {
+    WingetClientModule,
+}
+
+impl Dependency {
+    pub const ALL: &'static [Dependency] = &[Dependency::WingetClientModule];
+
+    pub fn manager(self) -> ManagerId {
+        match self {
+            Dependency::WingetClientModule => ManagerId::Winget,
+        }
+    }
+
+    pub fn presence(self) -> Presence {
+        match self {
+            Dependency::WingetClientModule => winget_client_module_presence(),
+        }
+    }
+}
+
+/// Only the all-users install counts: a copy in one user's Documents leaves every other user without it.
+#[cfg(target_os = "windows")]
+fn winget_client_module_presence() -> Presence {
+    let program_files =
+        std::env::var("ProgramFiles").unwrap_or_else(|_| r"C:\Program Files".to_string());
+    let module =
+        Path::new(&program_files).join(r"WindowsPowerShell\Modules\Microsoft.WinGet.Client");
+    let installed = std::fs::read_dir(module)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .any(|version| {
+            version
+                .path()
+                .join("Microsoft.WinGet.Client.psd1")
+                .is_file()
+        });
+    if installed {
+        Presence::Present
+    } else {
+        Presence::Absent
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn winget_client_module_presence() -> Presence {
+    Presence::Unknown
+}
