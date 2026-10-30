@@ -1,5 +1,6 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -166,6 +167,31 @@ class PackageUpdateExecutionRecorderTest {
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(row.getError()).isEqualTo(PackageUpdateExecutionRecorder.SUPERSEDED_ERROR);
+    }
+
+    @Test
+    void undelivered_failsTheRowWithTheDeliveryReason() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+
+        recorder.recordUndelivered(request, "m1", DeliveryFailure.EXHAUSTED);
+
+        verify(scriptExecutionRepository).save(row);
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(row.getError()).isEqualTo("The device did not receive the update (EXHAUSTED)");
+        assertThat(row.getFinishedAt()).isNotNull();
+        assertThat(row.getStatusChangedAt()).isNotNull();
+        assertThat(row.getExitCode()).isNull();
+    }
+
+    @Test
+    void undelivered_noRowOwnedByThisRequest_writesNothing() {
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineIdAndPackageUpdateRequestId(
+                "t1", "exec-1", "m1", "req-1")).thenReturn(Optional.empty());
+
+        recorder.recordUndelivered(request, "m1", DeliveryFailure.OFFLINE);
+        recorder.recordUndelivered(null, "m1", DeliveryFailure.OFFLINE);
+
+        verify(scriptExecutionRepository, never()).save(any());
     }
 
     @Test

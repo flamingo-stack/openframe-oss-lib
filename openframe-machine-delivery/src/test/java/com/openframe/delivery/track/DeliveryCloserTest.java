@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 import java.time.Instant;
@@ -40,6 +41,7 @@ class DeliveryCloserTest {
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliveryMetrics metrics;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private DeliveryCloser closer;
 
@@ -62,7 +64,7 @@ class DeliveryCloserTest {
                 .dispatchedAt(dispatchedAt)
                 .build();
         DeliveryProperties properties = DeliveryTestPolicies.properties();
-        closer = new DeliveryCloser(repository, properties, metrics);
+        closer = new DeliveryCloser(repository, properties, metrics, eventPublisher);
     }
 
     @Test
@@ -80,6 +82,8 @@ class DeliveryCloserTest {
         assertThat(delivery.getFinishedAt()).isEqualTo(now);
         assertThat(delivery.getExpiresAt()).isEqualTo(expiresAt);
         verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.EXHAUSTED);
+        verify(eventPublisher).publishEvent(
+                new DeliveryFailedEvent(DeliveryType.CLIENT_UNINSTALL, TARGET_ID, MACHINE_ID, DeliveryFailure.EXHAUSTED));
     }
 
     @Test
@@ -87,7 +91,7 @@ class DeliveryCloserTest {
         // setup
         DeliveryProperties properties = DeliveryTestPolicies.properties();
         properties.getDefaults().setMaxRuns(MAX_RUNS);
-        closer = new DeliveryCloser(repository, properties, metrics);
+        closer = new DeliveryCloser(repository, properties, metrics, eventPublisher);
         when(repository.scheduleRerun(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, 0, now.plusSeconds(RERUN_AFTER))).thenReturn(true);
 
         // execution
@@ -97,6 +101,7 @@ class DeliveryCloserTest {
         verify(repository, never()).markFailed(any(), any(), any(Instant.class), any(), any(), any());
         verify(metrics).recordRerun(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.EXHAUSTED);
         verify(metrics, never()).recordFailed(any(), any());
+        verifyNoInteractions(eventPublisher);
         assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(delivery.getReruns()).isEqualTo(1);
         assertThat(delivery.getAttempts()).isZero();
@@ -108,7 +113,7 @@ class DeliveryCloserTest {
         // setup
         DeliveryProperties properties = DeliveryTestPolicies.properties();
         properties.getDefaults().setMaxRuns(MAX_RUNS);
-        closer = new DeliveryCloser(repository, properties, metrics);
+        closer = new DeliveryCloser(repository, properties, metrics, eventPublisher);
         Instant expiresAt = now.plusSeconds(TTL);
         when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, DeliveryFailure.OFFLINE, now, expiresAt)).thenReturn(true);
 
@@ -128,7 +133,7 @@ class DeliveryCloserTest {
         // setup
         DeliveryProperties properties = DeliveryTestPolicies.properties();
         properties.getDefaults().setMaxRuns(MAX_RUNS);
-        closer = new DeliveryCloser(repository, properties, metrics);
+        closer = new DeliveryCloser(repository, properties, metrics, eventPublisher);
         delivery.setReruns(MAX_RUNS - 1);
         Instant expiresAt = now.plusSeconds(TTL);
         when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, DeliveryFailure.TIMEOUT, now, expiresAt)).thenReturn(true);
@@ -147,7 +152,7 @@ class DeliveryCloserTest {
         // setup
         DeliveryProperties properties = DeliveryTestPolicies.properties();
         properties.getDefaults().setMaxRuns(MAX_RUNS);
-        closer = new DeliveryCloser(repository, properties, metrics);
+        closer = new DeliveryCloser(repository, properties, metrics, eventPublisher);
         when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.of(delivery));
         when(repository.scheduleRerun(DELIVERY_ID, DISPATCH_ID, DeliveryStatus.OPEN, 0, now.plusSeconds(RERUN_AFTER))).thenReturn(true);
 
@@ -157,6 +162,7 @@ class DeliveryCloserTest {
         // verifications
         verify(repository, never()).markFailed(any(), any(), any(), any(), any(), any(), any());
         verify(metrics).recordRerun(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.AGENT_ERROR);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -164,7 +170,7 @@ class DeliveryCloserTest {
         // setup
         DeliveryProperties properties = DeliveryTestPolicies.properties();
         properties.getDefaults().setMaxRuns(MAX_RUNS);
-        closer = new DeliveryCloser(repository, properties, metrics);
+        closer = new DeliveryCloser(repository, properties, metrics, eventPublisher);
         when(repository.scheduleRerun(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, 0, now.plusSeconds(RERUN_AFTER))).thenReturn(false);
 
         // execution
@@ -195,7 +201,7 @@ class DeliveryCloserTest {
         // setup
         DeliveryProperties properties = DeliveryTestPolicies.properties();
         properties.getDefaults().setMaxRuns(MAX_RUNS);
-        closer = new DeliveryCloser(repository, properties, metrics);
+        closer = new DeliveryCloser(repository, properties, metrics, eventPublisher);
         delivery.setReruns(1);
         delivery.setAttempts(0);
         when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.of(delivery));
@@ -221,7 +227,7 @@ class DeliveryCloserTest {
 
         // verifications
         assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.PENDING);
-        verifyNoInteractions(metrics);
+        verifyNoInteractions(metrics, eventPublisher);
     }
 
     @Test
@@ -234,6 +240,8 @@ class DeliveryCloserTest {
 
         // verifications
         verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.AGENT_ERROR);
+        verify(eventPublisher).publishEvent(
+                new DeliveryFailedEvent(DeliveryType.CLIENT_UNINSTALL, TARGET_ID, MACHINE_ID, DeliveryFailure.AGENT_ERROR));
     }
 
     @Test
@@ -245,7 +253,7 @@ class DeliveryCloserTest {
         closer.failReported(DeliveryType.CLIENT_UNINSTALL, TARGET_ID, MACHINE_ID, DISPATCH_ID, ERROR, now);
 
         // verifications
-        verifyNoInteractions(metrics);
+        verifyNoInteractions(metrics, eventPublisher);
     }
 
     @Test
