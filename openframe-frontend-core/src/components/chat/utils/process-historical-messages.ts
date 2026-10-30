@@ -54,6 +54,7 @@ import {
   type MessageOwner,
 } from '../types';
 import { approvalDisplaysInline } from './approval-display';
+import { normalizeCommandReview } from './command-review';
 import { type MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator';
 import { getCommandText } from './tool-call-helpers';
 
@@ -166,6 +167,7 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
             // EXECUTING chunk only, so a history replay that drops it renders
             // an empty tool card even though the live stream showed one.
             toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
+            ...(data.commandReview ? { commandReview: normalizeCommandReview(data.commandReview) } : {}),
             parameters: data.parameters,
             toolExecutionRequestId: data.toolExecutionRequestId,
           },

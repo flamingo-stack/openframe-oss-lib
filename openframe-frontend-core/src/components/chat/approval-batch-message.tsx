@@ -11,6 +11,7 @@ import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { StatusLine } from '../ui/status-line';
 import { CHAT_BLOCK_CLASS, CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
+import { CommandReviewBlock } from './command-review-block';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
@@ -405,7 +406,8 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       );
     }
 
-    const showFooterBlock = explanations.length > 0 || showFooterActions;
+    const reviewedCalls = data.toolCalls.filter(call => !!call.commandReview);
+    const showFooterBlock = explanations.length > 0 || reviewedCalls.length > 0 || showFooterActions;
 
     return (
       <div
@@ -444,6 +446,12 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
                   <li key={i}>{expl}</li>
                 ))}
               </ul>
+            )}
+
+            {reviewedCalls.map(call =>
+              call.commandReview ? (
+                <CommandReviewBlock key={call.toolExecutionRequestId} review={call.commandReview} />
+              ) : null,
             )}
 
             {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
