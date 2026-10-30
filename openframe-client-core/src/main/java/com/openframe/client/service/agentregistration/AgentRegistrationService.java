@@ -180,6 +180,24 @@ public class AgentRegistrationService {
         if (isNotBlank(request.getTimezone()) && isValidZone(request.getTimezone())) {
             machine.setTimezone(request.getTimezone());
         }
+        copyHardwareFacts(machine, request);
+    }
+
+    // Optional like userId: a fact the agent does not send keeps the stored value, and Fleet fills what is still
+    // blank once it knows the host (FleetHostFactsWriter)
+    private static void copyHardwareFacts(Machine machine, AgentRegistrationRequest request) {
+        if (isNotBlank(request.getSerialNumber())) {
+            machine.setSerialNumber(request.getSerialNumber());
+        }
+        if (isNotBlank(request.getManufacturer())) {
+            machine.setManufacturer(request.getManufacturer());
+        }
+        if (isNotBlank(request.getModel())) {
+            machine.setModel(request.getModel());
+        }
+        if (isNotBlank(request.getOsUuid())) {
+            machine.setOsUuid(request.getOsUuid());
+        }
     }
 
     private static boolean isValidZone(String timezone) {
