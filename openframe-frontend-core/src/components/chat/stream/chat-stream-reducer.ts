@@ -59,7 +59,6 @@ import {
   type ParticipantEvent,
   type UsageEvent,
 } from '../../../chat-protocol/events';
-import { escapeThinkingTags } from '../../../chat-protocol/leading-frames';
 import { mergeSourceMetadata, type SourceMetadata } from '../../../chat-protocol/source-metadata';
 import type {
   ApprovalBatchSegment,
@@ -1485,22 +1484,6 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     sseWriteTrailingText(sseCurrentText);
   }
 
-  /** Single thinking segment per message, ALWAYS before the answer text:
-   *  replaced in place when present, inserted at the FRONT otherwise. */
-  function sseAppendThinking(escapedDelta: string): void {
-    const last = messages[messages.length - 1];
-    if (!last || last.role !== 'assistant') return;
-    const segments = [...(last.segments ?? [])];
-    const idx = segments.findIndex(s => s.type === 'thinking');
-    if (idx !== -1) {
-      const existing = segments[idx] as { type: 'thinking'; text: string };
-      segments[idx] = { type: 'thinking', text: existing.text + escapedDelta };
-    } else {
-      segments.unshift({ type: 'thinking', text: escapedDelta });
-    }
-    setMessagesInternal([...messages.slice(0, -1), { ...last, segments }]);
-  }
-
   function mergeTurnMeta(sendIdx: number, partial: Partial<ChatTurnMeta>): void {
     const prev = metaMap.get(sendIdx) ?? createEmptyTurnMeta();
     const filtered = Object.fromEntries(
@@ -1585,7 +1568,10 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         setPhaseInternal('thinking');
         break;
       case 'thinking-delta':
-        sseAppendThinking(escapeThinkingTags(event.text));
+        // In order, extending the thinking block it continues: the store a NATS thinking delta gets. Answer text
+        // after it starts a new text segment.
+        setMessagesInternal(appendToTrailingAssistant(messages, [{ type: 'thinking', text: event.text }]));
+        sseCurrentText = '';
         break;
       case 'turn-start':
         setPhaseInternal('streaming');
