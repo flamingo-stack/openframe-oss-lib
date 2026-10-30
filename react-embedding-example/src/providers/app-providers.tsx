@@ -4,11 +4,12 @@
 // theme provider — the lib's ThemeProvider isn't publicly exported, and the ODS
 // tokens key off the data-theme attribute directly.
 import { useCallback, useMemo, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   ChatRuntimeContext,
   EndpointsRuntimeContext,
+  PageTopicsProvider,
 } from '@flamingo-stack/openframe-frontend-core/contexts'
 import { AgentIdentityProvider } from '@flamingo-stack/openframe-frontend-core/components'
 import {
@@ -21,11 +22,13 @@ import { TicketLiveProvider } from '@flamingo-stack/openframe-frontend-core/comp
 import { buildChatRuntime, buildEndpointsRuntime } from './content-runtime'
 import { EP } from '../config/endpoints'
 import { AssistantRuntimeProvider } from './assistant-identity'
+import { PAGE_TOPICS } from '../config/page-topics'
 
 const queryClient = new QueryClient()
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const routerNavigate = useNavigate()
+  const { pathname } = useLocation()
   // The lib's in-app navigation: a link on this origin is a react-router navigation; any other origin is the
   // browser's (returning false).
   const navigate = useCallback(
@@ -69,7 +72,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
                   mark of Fae or Mingo the lib draws is the icon its identity holds. */}
               <AgentIdentityProvider endpoint={EP.aiAgents}>
                 <AssistantRuntimeProvider>
-                  <TicketLiveProvider>{children}</TicketLiveProvider>
+                  {/* The page's topic, read from react-router's address by the FAQ block, its ask card and the
+                      chat's quick actions (config/page-topics.ts). */}
+                  <PageTopicsProvider topics={PAGE_TOPICS} pathname={pathname}>
+                    <TicketLiveProvider>{children}</TicketLiveProvider>
+                  </PageTopicsProvider>
                 </AssistantRuntimeProvider>
               </AgentIdentityProvider>
             </RichMarkdownRuntimeProvider>
