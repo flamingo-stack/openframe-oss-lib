@@ -24,12 +24,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toMap;
 import static org.apache.commons.lang3.StringUtils.isNumeric;
 
 // Machines registered before Fleet facts were stored, and machines whose facts went missing since: at most
-// MACHINES_PER_RUN Fleet host reads per run, for connected Fleet hosts whose machine has no serial. Every attempt is stamped on the machine, and a machine is
+// MACHINES_PER_RUN Fleet host reads per run, for connected Fleet hosts whose machine is missing any fact Fleet can fill
+// (serial, computer name, model, manufacturer, OS UUID). Every attempt is stamped on the machine, and a machine is
 // tried again only once the stamp is older than recheck-after, so machines Fleet cannot fill either (a VM without a
 // serial) do not use up the runs, across restarts and pods alike.
 @Service
@@ -111,8 +113,11 @@ public class FleetHostFactsBackfillService {
                 && (machine.getHostFactsCheckedAt() == null || machine.getHostFactsCheckedAt().isBefore(checkedBefore));
     }
 
+    // The facts FleetHostFactsWriter fills where blank
     private static boolean isMissingFleetFacts(Machine machine) {
-        return StringUtils.isBlank(machine.getSerialNumber());
+        return Stream.of(machine.getSerialNumber(), machine.getComputerName(), machine.getModel(),
+                        machine.getManufacturer(), machine.getOsUuid())
+                .anyMatch(StringUtils::isBlank);
     }
 
     // A numeric agentToolId is the Fleet host id the transformer confirmed; a UUID there means Fleet never

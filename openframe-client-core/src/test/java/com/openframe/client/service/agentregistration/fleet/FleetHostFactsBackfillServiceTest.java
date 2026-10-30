@@ -13,6 +13,8 @@ import com.openframe.sdk.fleetmdm.model.Host;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -266,6 +268,46 @@ class FleetHostFactsBackfillServiceTest {
         verify(machineRepository).markHostFactsChecked(eq("m-2"), any(Instant.class));
         verify(machineRepository).markHostFactsChecked(eq("m-3"), any(Instant.class));
         assertThat(stamp.getValue()).isAfterOrEqualTo(before);
+    }
+
+    @Test
+    void backfill_machineWithASerialButNoComputerName_picked() {
+        // setup
+        Machine withoutComputerName = fullyKnown(machine("m-1", "C02XG2JHJG5H"));
+        withoutComputerName.setComputerName(null);
+        Host host = new Host();
+        pageAfter(BEFORE_FIRST, List.of(connection("c-1", "m-1", "11")));
+        when(machineRepository.findByMachineIdIn(List.of("m-1"))).thenReturn(List.of(withoutComputerName));
+        when(fleetMdmClients.client()).thenReturn(fleetClient);
+        when(fleetClient.getHostById(11L)).thenReturn(host);
+
+        // execution
+        service.backfill();
+
+        // verifications
+        verify(fleetHostFactsWriter).fill(withoutComputerName, host);
+    }
+
+    @ParameterizedTest(name = "{0} blank")
+    @ValueSource(strings = {"model", "manufacturer", "osUuid"})
+    void backfill_machineMissingAnyOtherFleetFact_picked(String blankFact) {
+        // setup
+        Machine machine = fullyKnown(machine("m-1", "C02XG2JHJG5H"));
+        switch (blankFact) {
+            case "model" -> machine.setModel(" ");
+            case "manufacturer" -> machine.setManufacturer(null);
+            default -> machine.setOsUuid("");
+        }
+        pageAfter(BEFORE_FIRST, List.of(connection("c-1", "m-1", "11")));
+        when(machineRepository.findByMachineIdIn(List.of("m-1"))).thenReturn(List.of(machine));
+        when(fleetMdmClients.client()).thenReturn(fleetClient);
+        when(fleetClient.getHostById(11L)).thenReturn(new Host());
+
+        // execution
+        service.backfill();
+
+        // verifications
+        verify(fleetClient).getHostById(11L);
     }
 
     @Test
