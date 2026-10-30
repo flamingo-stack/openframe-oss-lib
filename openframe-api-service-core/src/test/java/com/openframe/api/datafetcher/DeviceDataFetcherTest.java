@@ -5,10 +5,12 @@ import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.device.DeviceTagService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +27,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.graphql.relay.NodeType.TAG;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -37,6 +40,7 @@ class DeviceDataFetcherTest {
 
     @Mock private DeviceService deviceService;
     @Mock private DeviceFilterService deviceFilterService;
+    @Mock private DeviceTagService deviceTagService;
     @Mock private TagService tagService;
     @Mock private GraphQLDeviceMapper mapper;
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
@@ -99,6 +103,65 @@ class DeviceDataFetcherTest {
 
         assertThat(result).isNull();
         verify(fleetVulnerabilityStatusService, never()).getLastCompletedVulnerabilityRunAt();
+    }
+
+    @Test
+    @DisplayName("assignDeviceTag: delegates to DeviceTagService.assignTag and returns the device-scoped tag")
+    void assignDeviceTag_delegates() {
+        Tag assigned = Tag.builder().id("tag-1").key("site").values(List.of("chicago")).build();
+        when(deviceTagService.assignTag("m1", "site", List.of("chicago"))).thenReturn(assigned);
+
+        Tag result = fetcher.assignDeviceTag("m1", "site", List.of("chicago"));
+
+        assertThat(result).isSameAs(assigned);
+        verify(deviceTagService).assignTag("m1", "site", List.of("chicago"));
+    }
+
+    @Test
+    @DisplayName("assignDeviceTag: passes null values through for a plain label tag")
+    void assignDeviceTag_nullValues() {
+        Tag assigned = Tag.builder().id("tag-1").key("vip").values(List.of()).build();
+        when(deviceTagService.assignTag("m1", "vip", null)).thenReturn(assigned);
+
+        Tag result = fetcher.assignDeviceTag("m1", "vip", null);
+
+        assertThat(result).isSameAs(assigned);
+    }
+
+    @Test
+    @DisplayName("setDeviceTagValues: delegates to DeviceTagService.setTagValues, not the additive assignTag")
+    void setDeviceTagValues_delegates() {
+        Tag updated = Tag.builder().id("tag-1").key("site").values(List.of("chicago")).build();
+        when(deviceTagService.setTagValues("m1", "site", List.of("chicago"))).thenReturn(updated);
+
+        Tag result = fetcher.setDeviceTagValues("m1", "site", List.of("chicago"));
+
+        assertThat(result).isSameAs(updated);
+        verify(deviceTagService).setTagValues("m1", "site", List.of("chicago"));
+        verify(deviceTagService, never()).assignTag("m1", "site", List.of("chicago"));
+    }
+
+    @Test
+    @DisplayName("removeDeviceTag: decodes the Relay global id before delegating")
+    void removeDeviceTag_decodesGlobalId() {
+        String globalId = relayIdCodec.encode(TAG, "tag-1");
+        when(deviceTagService.removeTag("m1", "tag-1")).thenReturn(true);
+
+        boolean result = fetcher.removeDeviceTag("m1", globalId);
+
+        assertThat(result).isTrue();
+        verify(deviceTagService).removeTag("m1", "tag-1");
+        verify(deviceTagService, never()).removeTag("m1", globalId);
+    }
+
+    @Test
+    @DisplayName("removeDeviceTag: returns false when the device did not carry the tag")
+    void removeDeviceTag_notAssigned() {
+        when(deviceTagService.removeTag("m1", "tag-1")).thenReturn(false);
+
+        boolean result = fetcher.removeDeviceTag("m1", relayIdCodec.encode(TAG, "tag-1"));
+
+        assertThat(result).isFalse();
     }
 
     @Test

@@ -23,6 +23,7 @@ import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.device.DeviceTagService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.Machine;
@@ -48,6 +49,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static com.openframe.graphql.relay.NodeType.MACHINE;
+import static com.openframe.graphql.relay.NodeType.TAG;
 
 @DgsComponent
 @Slf4j
@@ -57,6 +59,7 @@ public class DeviceDataFetcher {
 
     private final DeviceService deviceService;
     private final DeviceFilterService deviceFilterService;
+    private final DeviceTagService deviceTagService;
     private final TagService tagService;
     private final FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     private final GraphQLDeviceMapper mapper;
@@ -135,6 +138,30 @@ public class DeviceDataFetcher {
                                         @InputArgument String nickname) {
         log.debug("Updating nickname for machineId: {}", machineId);
         return deviceService.updateNickname(machineId, nickname);
+    }
+
+    @DgsMutation
+    public Tag assignDeviceTag(@InputArgument @NotBlank String machineId,
+                               @InputArgument @NotBlank String key,
+                               @InputArgument List<String> values) {
+        log.debug("Assigning tag '{}' to machineId: {}", key, machineId);
+        return deviceTagService.assignTag(machineId, key, values);
+    }
+
+    @DgsMutation
+    public Tag setDeviceTagValues(@InputArgument @NotBlank String machineId,
+                                  @InputArgument @NotBlank String key,
+                                  @InputArgument List<String> values) {
+        log.debug("Setting values of tag '{}' on machineId: {}", key, machineId);
+        return deviceTagService.setTagValues(machineId, key, values);
+    }
+
+    @DgsMutation
+    public boolean removeDeviceTag(@InputArgument @NotBlank String machineId,
+                                   @InputArgument @NotBlank String tagId) {
+        String rawTagId = relayIdCodec.decode(tagId, TAG);
+        log.debug("Removing tag {} (rawId: {}) from machineId: {}", tagId, rawTagId, machineId);
+        return deviceTagService.removeTag(machineId, rawTagId);
     }
 
     @DgsData(parentType = "ToolConnection", field = "vulnerabilitiesUpdatedAt")

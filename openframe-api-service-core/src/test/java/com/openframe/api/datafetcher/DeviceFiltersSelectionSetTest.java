@@ -8,6 +8,7 @@ import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.device.DeviceTagService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
@@ -73,6 +74,7 @@ class DeviceFiltersSelectionSetTest {
 
     @Mock private DeviceService deviceService;
     @Mock private DeviceFilterService deviceFilterService;
+    @Mock private DeviceTagService deviceTagService;
     @Mock private TagService tagService;
     @Mock private GraphQLDeviceMapper mapper;
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
@@ -84,7 +86,7 @@ class DeviceFiltersSelectionSetTest {
 
     @BeforeEach
     void setUp() {
-        DeviceDataFetcher dataFetcher = new DeviceDataFetcher(deviceService, deviceFilterService, tagService,
+        DeviceDataFetcher dataFetcher = new DeviceDataFetcher(deviceService, deviceFilterService, deviceTagService, tagService,
                 fleetVulnerabilityStatusService, mapper, packageManagerAvailability, new RelayIdCodec());
 
         TypeDefinitionRegistry registry = new SchemaParser().parse(SDL);
