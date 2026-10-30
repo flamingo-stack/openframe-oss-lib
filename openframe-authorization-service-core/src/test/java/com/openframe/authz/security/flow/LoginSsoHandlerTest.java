@@ -3,6 +3,7 @@ package com.openframe.authz.security.flow;
 import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
 import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.security.EmailTrustPolicy;
+import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.service.sso.SSOConfigService;
@@ -59,6 +60,8 @@ class LoginSsoHandlerTest {
     @Mock
     private SignupTicketService signupTicketService;
     @Mock
+    private SessionPrincipalBinder sessionPrincipalBinder;
+    @Mock
     private SsoIdentityService ssoIdentityService;
     @Mock
     private SsoOidcUserService ssoOidcUserService;
@@ -80,7 +83,7 @@ class LoginSsoHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new LoginSsoHandler(codec, signupTicketService, ssoIdentityService, ssoOidcUserService,
-                new EmailTrustPolicy(new MicrosoftSSOProperties()), userService, tenantService, ssoConfigService);
+                new EmailTrustPolicy(new MicrosoftSSOProperties()), userService, tenantService, ssoConfigService, sessionPrincipalBinder);
         lenient().when(ssoIdentityService.findLink(anyString(), anyMap())).thenReturn(Optional.empty());
         lenient().when(ssoConfigService.getSSOConfig(anyString(), anyString())).thenReturn(Optional.empty());
         lenient().when(tenantService.findById(TENANT)).thenReturn(Optional.of(tenant(TENANT, TenantStatus.ACTIVE)));

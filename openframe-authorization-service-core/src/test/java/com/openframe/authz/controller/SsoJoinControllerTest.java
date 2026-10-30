@@ -1,6 +1,7 @@
 package com.openframe.authz.controller;
 
 import com.openframe.authz.dto.InvitationRegistrationRequest;
+import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.security.SsoLoginCookiePayload;
@@ -55,6 +56,8 @@ class SsoJoinControllerTest {
     @Mock
     private InvitationValidator invitationValidator;
     @Mock
+    private SessionPrincipalBinder sessionPrincipalBinder;
+    @Mock
     private InvitationRegistrationService invitationRegistrationService;
     @Mock
     private SsoOidcUserService ssoOidcUserService;
@@ -72,7 +75,7 @@ class SsoJoinControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new SsoJoinController(codec, invitationValidator, invitationRegistrationService, ssoOidcUserService, tenantService);
+        controller = new SsoJoinController(codec, invitationValidator, invitationRegistrationService, ssoOidcUserService, tenantService, sessionPrincipalBinder);
         lenient().when(tenantService.findById("tenant-1")).thenReturn(Optional.of(tenant("tenant-1", TenantStatus.ACTIVE)));
     }
 

@@ -1,6 +1,7 @@
 package com.openframe.authz.security;
 
 import com.openframe.authz.security.flow.SsoFlowHandler;
+import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.web.AuthStateUtils;
@@ -19,6 +20,7 @@ import java.util.List;
 
 import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
 import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 
 
@@ -37,6 +39,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
     private final AppleWebTokenCapture appleWebTokenCapture;
     private final MicrosoftLoginEmailGate microsoftLoginEmailGate;
     private final SsoIdentityCapture ssoIdentityCapture;
+    private final SsoOidcUserService ssoOidcUserService;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -56,6 +59,16 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                     microsoftLoginEmailGate.require(authentication);
                 } catch (IllegalStateException e) {
                     authErrorResponder.send(response, request, "sso-login-unverified-email", e, EMAIL_NOT_VERIFIED);
+                    return;
+                }
+                // Only a plain login may auto-provision: an invitation or registration callback
+                // creates its own user, and provisioning the IdP email alongside it would mint a
+                // second account that skips that flow's rules (switch-tenant, consent gate). Only a
+                // policy refusal ends the login here; other provisioning failures are logged inside.
+                try {
+                    ssoOidcUserService.autoProvisionForTenantLogin(authentication);
+                } catch (AuthFlowException e) {
+                    authErrorResponder.send(response, request, "sso-login-auto-provision", e, SSO_LOGIN_FAILED);
                     return;
                 }
                 super.onAuthenticationSuccess(request, response, authentication);
