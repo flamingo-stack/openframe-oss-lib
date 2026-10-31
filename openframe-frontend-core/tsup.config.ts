@@ -41,6 +41,7 @@ export default defineConfig([
       // `./utils/humanity-signals` without pulling the full utils barrel.
       'utils/humanity-signals': 'src/utils/humanity-signals.ts',
       'utils/form-rescue': 'src/utils/form-rescue.ts',
+      'utils/page-topics': 'src/utils/page-topics.ts',
       'utils/mobile-app': 'src/utils/mobile-app.ts',
       // JSX-free leaves, each with its own `exports` subpath so hub SCRIPTS and
       // `server-only` modules import them without React or the utils barrel.
