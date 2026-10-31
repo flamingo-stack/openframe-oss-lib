@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { usePageTopicStamp } from '../../contexts/page-topics-context';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon } from '../icons-v2-generated';
@@ -69,13 +69,36 @@ export function QuickActionSet({
   const rest = overflows ? chips.slice(QUICK_ACTION_SET_SLOTS - 1) : [];
   const empty = loading ? 0 : QUICK_ACTION_SET_SLOTS - shown.length - (overflows ? 1 : 0);
 
+  // The menu row the pointer or focus is on: its preview ends when the menu closes, which unmounts the row before
+  // it can report leaving (a pick, Escape, a click outside).
+  const hoveredRef = useRef<QuickActionChip | null>(null);
   const moreItems = rest.map(chip => {
     const icon =
       theme && isQuickActionIconSpec(chip.icon) && !chip.icon.accent
         ? { ...chip.icon, accent: theme.accent }
         : chip.icon;
-    return { id: chip.id, label: chip.label, icon: renderQuickActionIcon(icon), onClick: chip.onSelect };
+    return {
+      id: chip.id,
+      label: chip.label,
+      icon: renderQuickActionIcon(icon),
+      onClick: chip.onSelect,
+      // The hidden actions preview their prompt like the shown chips do.
+      onHoverStart: () => {
+        hoveredRef.current = chip;
+        chip.onHoverStart?.();
+      },
+      onHoverEnd: () => {
+        if (hoveredRef.current === chip) hoveredRef.current = null;
+        chip.onHoverEnd?.();
+      },
+    };
   });
+  const endMenuPreview = (open: boolean) => {
+    if (open || !hoveredRef.current) return;
+    const chip = hoveredRef.current;
+    hoveredRef.current = null;
+    chip.onHoverEnd?.();
+  };
 
   return (
     <div
@@ -113,6 +136,7 @@ export function QuickActionSet({
                   groups={[{ items: moreItems }]}
                   align="end"
                   side="top"
+                  onOpenChange={endMenuPreview}
                   customTrigger={
                     <Button
                       variant="card"

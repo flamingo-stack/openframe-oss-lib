@@ -60,6 +60,36 @@ describe('QuickActionSet', () => {
   });
 });
 
+describe('QuickActionSet More menu', () => {
+  const openMore = (count: number) => {
+    fireEvent.pointerDown(screen.getByRole('button', { name: `More quick actions (${count})` }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+  };
+
+  it('previews a hidden action like a shown chip, and ends it when the pointer leaves', () => {
+    const chips = chipsOf(5).map(chip => ({ ...chip, onHoverStart: vi.fn(), onHoverEnd: vi.fn() }));
+    render(<QuickActionSet chips={chips} />);
+    openMore(2);
+    const row = screen.getByRole('menuitem', { name: 'Action 4' });
+    fireEvent.mouseEnter(row);
+    expect(chips[4].onHoverStart).toHaveBeenCalledTimes(1);
+    fireEvent.mouseLeave(row);
+    expect(chips[4].onHoverEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends the preview when the menu closes on the row', () => {
+    const chips = chipsOf(5).map(chip => ({ ...chip, onHoverStart: vi.fn(), onHoverEnd: vi.fn() }));
+    render(<QuickActionSet chips={chips} />);
+    openMore(2);
+    fireEvent.focus(screen.getByRole('menuitem', { name: 'Action 3' }));
+    expect(chips[3].onHoverStart).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(chips[3].onHoverEnd).toHaveBeenCalled();
+  });
+});
+
 describe('QuickActionSet page topic', () => {
   it("prints the page's topic when the host turns the stamp on, loaded and loading alike", () => {
     const { rerender } = render(

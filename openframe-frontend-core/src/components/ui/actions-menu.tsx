@@ -59,6 +59,11 @@ export interface ActionsMenuItem {
    * the secondary is independently clickable (e.g. "open in new tab").
    */
   iconAction?: ActionsMenuItemIconAction;
+  /** The pointer or keyboard focus enters the row: e.g. preview what choosing it would do (a quick action's prompt
+   *  in the composer, as the quick-action chips do). Plain and link rows. */
+  onHoverStart?: () => void;
+  /** The pointer or keyboard focus leaves the row. */
+  onHoverEnd?: () => void;
 }
 
 export interface ActionsMenuGroup {
@@ -250,6 +255,10 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
           rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
           className={itemClasses}
           onClick={handleLinkClick}
+          onMouseEnter={item.onHoverStart}
+          onMouseLeave={item.onHoverEnd}
+          onFocus={item.onHoverStart}
+          onBlur={item.onHoverEnd}
           aria-disabled={item.disabled}
           tabIndex={item.disabled ? -1 : undefined}
         >
@@ -298,6 +307,10 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
         className={itemClasses}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
+        onMouseEnter={item.onHoverStart}
+        onMouseLeave={item.onHoverEnd}
+        onFocus={item.onHoverStart}
+        onBlur={item.onHoverEnd}
       >
         {rowContent}
       </div>
