@@ -796,7 +796,8 @@ describe('SimpleMarkdownRenderer golden parity', () => {
   it('colours a code block once the highlighter has loaded', async () => {
     const { container } = render(<SimpleMarkdownRenderer content={'```js\nconst x = 1;\n```'} />);
     await waitFor(() => expect(container.querySelector('.hljs-keyword')).not.toBeNull(), { timeout: 10_000 });
-  });
+    // The test's own limit above the wait's, so a slow load fails on the wait's message, not the runner's timeout.
+  }, 15_000);
 
   for (const [name, md] of Object.entries(SHARED_FIXTURES)) {
     it(`renders fixture: ${name}`, async () => {
