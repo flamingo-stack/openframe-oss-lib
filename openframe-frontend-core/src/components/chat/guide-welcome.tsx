@@ -1,12 +1,10 @@
 'use client';
 
 import { type ReactNode, useMemo } from 'react';
-import { usePageTopicStamp } from '../../contexts/page-topics-context';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { PageTopicLabel } from '../page-topic-label';
 import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { QuickActionSet } from './mingo-quick-action-wall';
@@ -110,9 +108,6 @@ export function GuideWelcome({
   children,
   className,
 }: GuideWelcomeProps) {
-  // The host's choice (`PageTopicsProvider showTopic`) unless this surface states its own.
-  const topicStamp = usePageTopicStamp();
-  const showTopic = showTopicProp ?? topicStamp;
   // Scroll-fade affordances: a 48px gradient at the top/bottom edge of the
   // scroll region, shown only while content is actually hidden in that
   // direction. (Same behaviour as MingoWelcome.)
@@ -204,12 +199,10 @@ export function GuideWelcome({
 
       {/* The quick actions, pinned above the composer: the static {@link QuickActionSet} (fixed slots, its height
           set by the width alone, "More" for the rest). Hover/focus previews the action's full prompt in the
-          composer, click sends it. */}
-      {/* Right-aligned and pulled against the chips, so it reads as a stamp on the wall, not a row of its own. */}
-      {showTopic && (
-        <PageTopicLabel className="-mb-[var(--spacing-system-xs)] shrink-0 px-[var(--spacing-system-l)] text-right" />
+          composer, click sends it. The set prints the page's topic over itself. */}
+      {(quickActions.length > 0 || chipsAreLoading) && (
+        <QuickActionSet chips={chipItems} loading={chipsAreLoading} showTopic={showTopicProp} />
       )}
-      {(quickActions.length > 0 || chipsAreLoading) && <QuickActionSet chips={chipItems} loading={chipsAreLoading} />}
     </div>
   );
 }

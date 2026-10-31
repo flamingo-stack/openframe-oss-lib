@@ -1,8 +1,10 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { usePageTopicStamp } from '../../contexts/page-topics-context';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon } from '../icons-v2-generated';
+import { PageTopicLabel } from '../page-topic-label';
 import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
@@ -33,6 +35,11 @@ export interface QuickActionSetProps {
   loading?: boolean;
   /** The group's accessible name. */
   label?: string;
+  /** Print the page's topic (`PageTopicLabel`, the stamp the FAQ block prints) over the set, right-aligned, so
+   *  whoever tags quick actions on the hub sees which topic this page asks for. Default: the host's choice
+   *  (`PageTopicsProvider showTopic`), so every surface that draws the set prints it alike. Drawn in the loading
+   *  form too, so the set is the same box either way. */
+  showTopic?: boolean;
   className?: string;
 }
 
@@ -51,9 +58,12 @@ export function QuickActionSet({
   theme,
   loading: loadingProp = false,
   label = 'Quick actions',
+  showTopic: showTopicProp,
   className,
 }: QuickActionSetProps) {
   const loading = useLoadingScope() || loadingProp;
+  const topicStamp = usePageTopicStamp();
+  const showTopic = showTopicProp ?? topicStamp;
   const overflows = chips.length > QUICK_ACTION_SET_SLOTS;
   const shown = overflows ? chips.slice(0, QUICK_ACTION_SET_SLOTS - 1) : chips;
   const rest = overflows ? chips.slice(QUICK_ACTION_SET_SLOTS - 1) : [];
@@ -68,7 +78,12 @@ export function QuickActionSet({
   });
 
   return (
-    <div role="group" aria-label={label} className={cn('shrink-0 @container', className)}>
+    <div
+      role="group"
+      aria-label={label}
+      className={cn('flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] @container', className)}
+    >
+      {showTopic && <PageTopicLabel className="text-right" />}
       <div className="grid grid-cols-1 gap-[var(--spacing-system-xs)] @[24rem]:grid-cols-2 @[48rem]:grid-cols-4">
         {loading ? (
           <LoadingItems count={QUICK_ACTION_SET_SLOTS}>
@@ -154,6 +169,8 @@ export interface MingoQuickActionWallProps {
    * layout around it (a composer under it, a greeting centred above) does not move when the actions land.
    */
   loading?: boolean;
+  /** See {@link QuickActionSetProps.showTopic}. */
+  showTopic?: boolean;
   className?: string;
 }
 
@@ -166,6 +183,7 @@ export function MingoQuickActionWall({
   onQuickActionHover,
   onQuickActionHoverEnd,
   loading = false,
+  showTopic,
   className,
 }: MingoQuickActionWallProps) {
   if (quickActions.length === 0 && !loading) return null;
@@ -181,6 +199,7 @@ export function MingoQuickActionWall({
         onHoverEnd: () => onQuickActionHoverEnd?.(),
       }))}
       loading={loading}
+      showTopic={showTopic}
       className={className}
     />
   );

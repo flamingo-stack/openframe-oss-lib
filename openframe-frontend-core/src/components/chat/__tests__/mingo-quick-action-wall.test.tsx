@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { PageTopicsProvider } from '../../../contexts/page-topics-context';
 import { MingoQuickActionWall, QUICK_ACTION_SET_SLOTS, QuickActionSet } from '../mingo-quick-action-wall';
 import { MingoWelcome } from '../mingo-welcome';
 
@@ -56,6 +57,41 @@ describe('QuickActionSet', () => {
   it('is one labelled group of buttons', () => {
     render(<QuickActionSet chips={chipsOf(2)} label="Suggested questions" />);
     expect(screen.getByRole('group', { name: 'Suggested questions' })).toBeTruthy();
+  });
+});
+
+describe('QuickActionSet page topic', () => {
+  it("prints the page's topic when the host turns the stamp on, loaded and loading alike", () => {
+    const { rerender } = render(
+      <PageTopicsProvider pathname="/devices" showTopic>
+        <QuickActionSet chips={chipsOf(2)} />
+      </PageTopicsProvider>,
+    );
+    expect(screen.getByText('/devices')).toBeTruthy();
+    rerender(
+      <PageTopicsProvider pathname="/devices" showTopic>
+        <QuickActionSet chips={[]} loading />
+      </PageTopicsProvider>,
+    );
+    expect(screen.getByText('/devices')).toBeTruthy();
+  });
+
+  it('prints nothing unless the host asks', () => {
+    render(
+      <PageTopicsProvider pathname="/devices">
+        <QuickActionSet chips={chipsOf(2)} />
+      </PageTopicsProvider>,
+    );
+    expect(screen.queryByText('/devices')).toBeNull();
+  });
+
+  it("is the same stamp on Mingo's set", () => {
+    render(
+      <PageTopicsProvider pathname="/scripts" showTopic>
+        <MingoQuickActionWall quickActions={ACTIONS} />
+      </PageTopicsProvider>,
+    );
+    expect(screen.getByText('/scripts')).toBeTruthy();
   });
 });
 
