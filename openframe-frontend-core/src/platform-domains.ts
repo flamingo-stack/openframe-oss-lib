@@ -297,6 +297,11 @@ export function isPreviewEnv(): boolean {
   return process.env.VERCEL_ENV === 'preview';
 }
 
+/** Env-form production predicate (Vercel `VERCEL_ENV`): the production deployment, not a preview, not a local run. */
+export function isProductionEnv(env: Record<string, string | undefined> = process.env): boolean {
+  return env.VERCEL_ENV === 'production';
+}
+
 /** Host-form preview predicate (a `*.vercel.app` host). Dot-bounded suffix so a
  *  malicious `foo.vercel.app.evil.com` is NOT treated as preview. */
 export function isPreviewHost(hostname: string): boolean {

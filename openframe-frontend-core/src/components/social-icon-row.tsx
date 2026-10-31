@@ -1,13 +1,15 @@
 'use client';
 
 import { createElement } from 'react';
+import type { NavLink } from '../types/navigation';
 import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-platforms';
 import { iconOf, type IconComponent, type IconRef } from './chat/utils/icon-loading';
 import { Button } from './ui/button';
 
 interface SocialIconRowProps {
   className?: string;
-  links?: SocialIconLink[];
+  /** The links to draw: a person's profiles, or a site's own (`siteNavSocialLinks`). */
+  links: SocialIconLink[];
   variant?: 'accent' | 'outline' | 'transparent' | 'destructive' | null | undefined;
   /** Quiet metadata row for page-level identity/share slots: 32px ghost
    *  icon buttons (size="icon-sm", 16px glyphs), gap-2, w-fit container,
@@ -22,16 +24,15 @@ interface SocialIconRowProps {
   groupByVisibility?: boolean;
   /**
    * The links are a read list (a person's profiles, whose number is the data's): every button carries
-   * `data-loading-item`, as the caller's loading state's buttons do. Default false (a fixed set, e.g. the defaults).
+   * `data-loading-item`, as the caller's loading state's buttons do. Default false (a fixed set, e.g. a site's own).
    */
   listItems?: boolean;
 }
 
-const defaultLinks: SocialIconLink[] = [
-  { platform: 'github', href: 'https://github.com/flamingo-stack', label: 'GitHub' },
-  { platform: 'linkedin', href: 'https://linkedin.com/company/flamingo.run', label: 'LinkedIn' },
-  { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' },
-];
+/** A site's social links as a row draws them: the `brand.social` links of its navigation (the header and the footer read the same list). */
+export function siteNavSocialLinks(social: readonly NavLink[]): SocialIconLink[] {
+  return social.map(link => ({ platform: link.iconName ?? link.id, href: link.href, label: link.label }));
+}
 
 /** The colour a social mark is drawn in: the themed foreground, so a row reads as one set. */
 const MARK = 'var(--color-text-primary)';
@@ -94,7 +95,7 @@ export function socialIconButtonProps(compact = false): { size: 'icon-sm' | 'ico
 
 export function SocialIconRow({
   className = '',
-  links = defaultLinks,
+  links,
   variant,
   compact = false,
   groupByVisibility = false,

@@ -1,66 +1,73 @@
 /**
  * Marketing Campaign Types
  *
- * Types for the Marketing AI system including campaigns, content, media,
- * distribution channels, scheduled posts, and usage tracking.
+ * The rows of the marketing tables as the database holds them (`marketing_campaigns`, `ai_content`, `ai_media`),
+ * column for column, and the vocabularies their check constraints allow. A type here names no column the table
+ * does not have.
  */
 
 // =============================================================================
-// Core Campaign Types
+// Campaign Types
 // =============================================================================
+
+/** `marketing_campaigns.status` (its check constraint). */
+export type CampaignStatus = 'draft' | 'active' | 'completed';
+
+/** What a campaign is about (`marketing_campaigns.content_source`). */
+export interface CampaignContentSource {
+  type: ContentSourceType | null;
+  id: number | string | null;
+  url?: string | null;
+  /** The blog a seed-blog campaign writes its article for. */
+  blog_account_id?: number | null;
+}
 
 export interface MarketingCampaign {
   id: number;
   name: string;
-  description: string | null; // Optional - ONLY used for blog_post + new mode OR from_scratch
-  platform: string;
+  description: string | null;
   start_date: string | null;
-  end_date: string | null;
-  goals: string[] | null; // Optional - ONLY used for blog_post + new mode OR from_scratch
-  // NEW: Content seed fields
-  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
-  content_source_id?: number | null;
-  content_source_url?: string | null;
-  future_blog_distribution_channel_id?: number | null; // For blog_post + new mode - target account for AI-generated blog
+  goals: string[] | null;
+  status: CampaignStatus;
+  content_source: CampaignContentSource | null;
+  /** The accounts the campaign writes for, each with what to generate (the hub's own shape). */
+  selected_accounts: unknown[] | null;
+  settings: Record<string, unknown> | null;
+  strategy_settings: Record<string, unknown> | null;
+  copy_settings: Record<string, unknown> | null;
+  image_settings: Record<string, unknown> | null;
+  video_settings: Record<string, unknown> | null;
+  details_feedback: unknown;
+  copy_feedback: unknown;
+  image_feedback: unknown;
+  video_feedback: unknown;
+  designer_feedback: unknown;
+  strategy_feedback: unknown;
   /** Editor-provided AI generation instructions (steers Generate Content / Image / Video / Workflow prompts) */
-  custom_instructions?: string | null;
+  custom_instructions: string | null;
+  ai_effort_score: number | null;
   created_by: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface CreateCampaignInput {
-  name: string;
-  description?: string; // Optional - ONLY for blog_post + new mode OR from_scratch
-  start_date?: string;
-  goals?: string[]; // Optional - ONLY for blog_post + new mode OR from_scratch
-  // NEW: Content seed fields
-  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch';
-  content_source_id?: number;
-  content_source_url?: string;
-  future_blog_distribution_channel_id?: number; // For blog_post + new mode - target account for AI-generated blog
-  custom_instructions?: string | null;
-}
-
-export interface UpdateCampaignInput {
-  name?: string;
-  description?: string; // Optional - ONLY for blog_post + new mode OR from_scratch
-  start_date?: string;
-  goals?: string[]; // Optional - ONLY for blog_post + new mode OR from_scratch
-  // NEW: Content seed fields
-  content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
-  content_source_id?: number | null;
-  content_source_url?: string | null;
-  future_blog_distribution_channel_id?: number | null; // For blog_post + new mode - target account for AI-generated blog
-  custom_instructions?: string | null;
 }
 
 // =============================================================================
 // AI Content Types
 // =============================================================================
 
-export type ContentType = 'blog_post' | 'channel_post' | 'ad_copy' | 'email';
-export type ContentStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'published';
+/** `ai_content.content_type` (its check constraint). */
+export type ContentType = 'blog_post' | 'channel_post' | 'ad_copy' | 'email' | 'video_script';
+
+/** `ai_content.status` and `ai_media.status` (their check constraints). */
+export type ContentStatus =
+  | 'generating'
+  | 'draft'
+  | 'pending_review'
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
+  | 'revision_requested'
+  | 'published';
 
 export interface AIContent {
   id: number;
@@ -69,40 +76,23 @@ export interface AIContent {
   title: string | null;
   content: string;
   prompt_used: string | null;
-  ai_model: string;
-  generation_tokens: number | null;
-  cost_cents: number | null;
-  confidence_score: number | null;
+  ai_provider: 'anthropic' | 'openai' | null;
+  ai_model: string | null;
   metadata: Record<string, unknown> | null;
   status: ContentStatus;
-  reviewed_by: string | null;
-  reviewed_at: string | null;
-  platform?: string; // Optional - legacy field, use distribution_channel_id instead
-  distribution_channel_id: number | null; // FK to distribution_channels table - primary source of truth
+  selected_for_publish: boolean;
+  blog_post_id: number | null;
+  workflow_id: string | null;
+  /** The distribution channel the post is written for. */
+  distribution_channel_id: number | null;
+  published_at: string | null;
+  external_post_id: string | null;
+  external_post_url: string | null;
+  url_injection_preference?: URLInjectionPreference;
+  /** The comment that carries the link, when the link went `as_comment`. */
+  external_comment_id?: string | null;
   created_at: string;
   updated_at: string;
-  // Publishing & Override fields
-  selected_for_publish: boolean;
-  override_url: string | null;
-  override_at: string | null;
-  override_by: string | null;
-  // NEW: URL injection preference (per-item control)
-  url_injection_preference?: URLInjectionPreference;
-  // NEW: External comment ID tracking (for 'as_comment' mode)
-  external_comment_id?: string | null;
-}
-
-export interface CreateAIContentInput {
-  campaign_id?: number;
-  content_type: ContentType;
-  title?: string;
-  content: string;
-  prompt_used?: string;
-  ai_model: string;
-  generation_tokens?: number;
-  cost_cents?: number;
-  confidence_score?: number;
-  metadata?: Record<string, unknown>;
 }
 
 // =============================================================================
@@ -111,6 +101,8 @@ export interface CreateAIContentInput {
 
 /** Row union. Compare through `utils/media-type` (`isVideoMedia` / `isImageMedia` / `MEDIA_TYPE`), never a literal. */
 export type MediaType = 'image' | 'video' | 'figma_export';
+
+/** `ai_media.provider` (its check constraint). */
 export type MediaProvider =
   | 'dalle'
   | 'dalle-3'
@@ -119,17 +111,31 @@ export type MediaProvider =
   | 'figma'
   | 'manual'
   | 'midjourney'
+  | 'flux-2-pro'
   | 'flux-pro'
   | 'flux-dev'
+  | 'flux-schnell'
   | 'ideogram-v2'
+  | 'ideogram-v3-turbo'
   | 'recraft-v3'
+  | 'imagen-4'
+  | 'nano-banana-pro'
+  | 'seedream-4.5'
+  | 'sd-3.5-large'
+  | 'veo-3-fast'
+  | 'veo-3'
   | 'kling-v2.5'
   | 'luma-ray2'
+  | 'pixverse-v5'
+  | 'mochi-1'
+  | 'cogvideox-t2v'
+  | 'cogvideox-i2v'
   | 'hailuo'
+  | 'wan-2.5'
   | 'ltx-video'
   | 'stable-video-diffusion';
-export type MediaStatus =
-  'draft' | 'pending_review' | 'pending_approval' | 'approved' | 'rejected' | 'published' | 'generating';
+
+export type MediaStatus = ContentStatus;
 
 export interface AIMedia {
   id: number;
@@ -140,214 +146,25 @@ export interface AIMedia {
   prompt_used: string | null;
   provider: MediaProvider;
   model_version: string | null;
-  cost_cents: number | null;
-  storage_path: string | null;
   storage_url: string | null;
   thumbnail_url: string | null;
   dimensions: MediaDimensions | null;
   file_size_bytes: number | null;
   status: MediaStatus;
-  figma_file_id: string | null;
-  figma_node_id: string | null;
-  reviewed_by: string | null;
-  reviewed_at: string | null;
   metadata: Record<string, unknown> | null;
-  platform?: string; // Optional - legacy field, use distribution_channel_id instead
-  distribution_channel_id: number | null; // FK to distribution_channels table - primary source of truth
+  workflow_id: string | null;
+  /** The distribution channel the media is made for. NOTE: there is no `selected_for_publish` on media — a media
+   *  item is "selected" by being ATTACHED to a post that is selected (`ai_content_media`). */
+  distribution_channel_id: number | null;
+  published_at: string | null;
   created_at: string;
   updated_at: string;
-  // Override fields. NOTE: there is no `selected_for_publish` on media — a
-  // media item is "selected" by being ATTACHED to a post that is selected
-  // (`ai_content_media`); consumers derive the flag in their DAL.
-  override_url: string | null;
-  override_at: string | null;
-  override_by: string | null;
 }
 
 export interface MediaDimensions {
   width?: number;
   height?: number;
   aspectRatio?: string; // e.g., "16:9", "9:16", "1:1"
-}
-
-export interface CreateAIMediaInput {
-  campaign_id?: number;
-  media_type: MediaType;
-  title?: string;
-  description?: string;
-  prompt_used?: string;
-  provider: MediaProvider;
-  model_version?: string;
-  cost_cents?: number;
-  storage_path?: string;
-  storage_url?: string;
-  thumbnail_url?: string;
-  dimensions?: MediaDimensions;
-  file_size_bytes?: number;
-  figma_file_id?: string;
-  figma_node_id?: string;
-}
-
-// =============================================================================
-// Distribution Channel Types
-// =============================================================================
-
-export type ChannelKind = 'slack' | 'linkedin' | 'facebook' | 'instagram' | 'twitter' | 'youtube';
-export type DistributionChannelType = 'personal' | 'page' | 'organization' | 'channel';
-
-export interface DistributionChannel {
-  id: number;
-  channel: ChannelKind;
-  account_type: DistributionChannelType;
-  account_name: string;
-  account_id: string;
-  platform: string;
-  access_token_encrypted: string | null;
-  refresh_token_encrypted: string | null;
-  token_expires_at: string | null;
-  permissions: string[] | null;
-  is_active: boolean;
-  last_sync_at: string | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateDistributionChannelInput {
-  channel: ChannelKind;
-  account_type: DistributionChannelType;
-  account_name: string;
-  account_id: string;
-  access_token?: string;
-  refresh_token?: string;
-  token_expires_at?: string;
-  permissions?: string[];
-  metadata?: Record<string, unknown>;
-}
-
-// =============================================================================
-// Scheduled Post Types
-// =============================================================================
-
-export type ScheduledPostStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
-
-export interface ScheduledPost {
-  id: number;
-  campaign_id: number;
-  content_id: number | null;
-  media_ids: number[];
-  distribution_channel_id: number;
-  scheduled_at: string;
-  published_at: string | null;
-  status: ScheduledPostStatus;
-  external_post_id: string | null;
-  external_post_url: string | null;
-  error_message: string | null;
-  retry_count: number;
-  created_by: string | null;
-  platform: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateScheduledPostInput {
-  campaign_id: number;
-  content_id?: number;
-  media_ids?: number[];
-  distribution_channel_id: number;
-  scheduled_at: string;
-  created_by?: string;
-}
-
-// =============================================================================
-// Content Approval Types
-// =============================================================================
-
-export type ContentApprovalType = 'ai_content' | 'ai_media' | 'campaign';
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'revision_requested';
-
-export interface ContentApproval {
-  id: number;
-  content_type: ContentApprovalType;
-  content_id: number;
-  status: ApprovalStatus;
-  reviewer_id: string | null;
-  reviewer_notes: string | null;
-  revision_notes: string | null;
-  approved_at: string | null;
-  platform: string;
-  created_at: string;
-}
-
-export interface CreateContentApprovalInput {
-  content_type: ContentApprovalType;
-  content_id: number;
-  status: ApprovalStatus;
-  reviewer_id?: string;
-  reviewer_notes?: string;
-  revision_notes?: string;
-}
-
-// =============================================================================
-// AI Usage Tracking Types
-// =============================================================================
-
-export type AIService = 'anthropic' | 'openai' | 'replicate' | 'figma' | 'google';
-export type AIOperation = 'text_generation' | 'image_generation' | 'video_generation' | 'figma_export';
-
-export interface AIUsage {
-  id: number;
-  service: AIService;
-  operation: AIOperation;
-  model: string;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  cost_cents: number | null;
-  user_id: string | null;
-  content_id: number | null;
-  media_id: number | null;
-  platform: string;
-  created_at: string;
-}
-
-export interface TrackAIUsageInput {
-  service: AIService;
-  operation: AIOperation;
-  model: string;
-  input_tokens?: number;
-  output_tokens?: number;
-  cost_cents?: number;
-  user_id?: string;
-  content_id?: number;
-  media_id?: number;
-  metadata?: Record<string, unknown>;
-}
-
-// =============================================================================
-// Statistics Types
-// =============================================================================
-
-export interface CampaignStats {
-  totalCampaigns: number;
-  drafts: number; // Campaigns with 0 workflow runs
-  active: number; // Campaigns with ≥1 workflow run (not completed)
-  completed: number; // Campaigns marked as completed
-}
-
-export interface AIUsageSummary {
-  totalCostCents: number;
-  totalTokens: number;
-  byService: Record<string, { cost: number; count: number }>;
-}
-
-// =============================================================================
-// Campaign with Related Data
-// =============================================================================
-
-export interface CampaignWithDetails {
-  campaign: MarketingCampaign;
-  content: AIContent[];
-  media: AIMedia[];
 }
 
 // =============================================================================
