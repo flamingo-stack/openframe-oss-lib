@@ -3,7 +3,7 @@
  *
  * Pins what every host depends on: the card appears only where the assistant
  * runtime says a chat is there to open, a host can switch it off, the page's
- * topic (read from its address through the host's map) reaches the questions
+ * topic (its path) reaches the questions
  * endpoint as ANY string (no list of topics lives here), and a click goes to the opener the host or the runtime supplies, so
  * a FAQ beside an embedded chat never opens the site's one.
  */
@@ -58,9 +58,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** The page under test is `/` (jsdom's address); its topic is the host map's entry for it. `null`: no topic. */
+/** The page under test is `/` (jsdom's address); its topic is `/<topic>`, the path it is given. `null`: no topic. */
 function onPage(topic: string | null, node: ReactNode) {
-  return topic === null ? node : <PageTopicsProvider topics={{ '/': topic }}>{node}</PageTopicsProvider>;
+  return topic === null ? node : <PageTopicsProvider pathname={`/${topic}`}>{node}</PageTopicsProvider>;
 }
 
 function renderFaq(runtime: AssistantRuntime | null, faq: ReactNode, topic: string | null = 'faq') {
@@ -118,7 +118,7 @@ describe('FaqSection ask card', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const url = new URL(requestedUrl(), 'https://host.test');
     expect(url.pathname).toBe('/api/faqs/questions');
-    expect(url.searchParams.get('topic')).toBe('a topic nobody listed');
+    expect(url.searchParams.get('topic')).toBe('/a topic nobody listed');
     expect(url.searchParams.get('count')).toBe('2');
     expect(url.searchParams.get('exclude')).toBe('a,b');
   });
@@ -126,7 +126,7 @@ describe('FaqSection ask card', () => {
   it("asks for the page's questions beside an entity's FAQ too", async () => {
     renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} entityType="case_study" entityId={7} />, 'case_study');
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('topic')).toBe('case_study');
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('topic')).toBe('/case_study');
   });
 
   it('shows no card on a page with no topic: the lib names no topic of its own', () => {
@@ -156,11 +156,11 @@ describe('FaqSection ask card', () => {
     renderFaq({ ...RUNTIME, open, onAsk }, <FaqSection initialFaqs={FAQS} />);
 
     fireEvent.click(await screen.findByText('How does pricing work?'));
-    expect(open).toHaveBeenCalledWith({ prompt: 'Explain the pricing', topic: 'faq' });
-    expect(onAsk).toHaveBeenCalledWith({ promptId: 'q1', topic: 'faq' });
+    expect(open).toHaveBeenCalledWith({ prompt: 'Explain the pricing', topic: '/faq' });
+    expect(onAsk).toHaveBeenCalledWith({ promptId: 'q1', topic: '/faq' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Mingo' }));
-    expect(open).toHaveBeenLastCalledWith({ topic: 'faq' });
+    expect(open).toHaveBeenLastCalledWith({ topic: '/faq' });
     // The runtime's opener replaces the site chat's event: it is never also dispatched.
     expect(siteChat).not.toHaveBeenCalled();
     window.removeEventListener(ASK_AI_OPEN_EVENT, siteChat);
@@ -176,7 +176,7 @@ describe('FaqSection ask card', () => {
     );
 
     fireEvent.click(await screen.findByText('Is it open source?'));
-    expect(embeddedOpen).toHaveBeenCalledWith({ prompt: 'Is it open source?', topic: 'docs' });
+    expect(embeddedOpen).toHaveBeenCalledWith({ prompt: 'Is it open source?', topic: '/docs' });
     expect(runtimeOpen).not.toHaveBeenCalled();
   });
 
@@ -214,9 +214,9 @@ describe("FaqSection: the page's topic", () => {
     expect(await screen.findByText('What is OpenFrame?')).toBeInTheDocument();
     expect(await screen.findByText('How does pricing work?')).toBeInTheDocument();
     const [faqs] = requested('/content/api/faqs');
-    expect(faqs.searchParams.get('topic')).toBe('pricing');
+    expect(faqs.searchParams.get('topic')).toBe('/pricing');
     const [questions] = requested('/api/faqs/questions');
-    expect(questions.searchParams.get('topic')).toBe('pricing');
+    expect(questions.searchParams.get('topic')).toBe('/pricing');
   });
 
   it("does not re-fetch the host's own read of the topic", async () => {
@@ -239,7 +239,9 @@ describe("FaqSection: the page's topic", () => {
     fetchMock.mockImplementation((input: unknown) => {
       const url = new URL(String(input), 'https://host.test');
       const faqs =
-        url.searchParams.get('topic') === 'careers' ? [{ ...FAQS[0], id: 2, question: 'Do you hire remotely?' }] : FAQS;
+        url.searchParams.get('topic') === '/careers'
+          ? [{ ...FAQS[0], id: 2, question: 'Do you hire remotely?' }]
+          : FAQS;
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ faqs }) });
     });
     const { rerender } = render(onPage('pricing', <FaqSection ask={false} />));
@@ -334,7 +336,7 @@ describe('AssistantAskPrompts', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const card = fetchMock.mock.calls
       .map(call => new URL(String(call[0]), 'https://host.test'))
-      .find(url => url.searchParams.get('topic') === 'faq');
+      .find(url => url.searchParams.get('topic') === '/faq');
     // One request for the card, made after the row's pick: it names the row's question.
     expect(card?.searchParams.get('exclude')).toBe('q1');
   });
@@ -388,7 +390,7 @@ describe('ask surfaces of one page', () => {
     expect(requests().map(url => [url.searchParams.get('topic'), url.searchParams.get('exclude')])).toEqual([
       ['agents', null],
       ['pricing', 'q1'],
-      ['faq', 'q1,q2'],
+      ['/faq', 'q1,q2'],
     ]);
   });
 
@@ -440,7 +442,7 @@ describe('ask surfaces of one page', () => {
     );
 
     expect(await screen.findByText('Is it open source?')).toBeInTheDocument();
-    const card = requests().find(url => url.searchParams.get('topic') === 'faq');
+    const card = requests().find(url => url.searchParams.get('topic') === '/faq');
     expect(card?.searchParams.get('exclude')).toBe('q5');
   });
 

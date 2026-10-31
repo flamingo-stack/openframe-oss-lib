@@ -81,14 +81,14 @@ describe('FaqSection loading state', () => {
 
   it('draws the count of questions the instance asks for, and the topic line for real', () => {
     render(
-      <PageTopicsProvider topics={{ '/': 'pricing' }}>
+      <PageTopicsProvider pathname="/pricing">
         <LoadingScope>
           <FaqSection showTopic minResults={3} />
         </LoadingScope>
       </PageTopicsProvider>,
     );
     expect(level3()).toBe(3);
-    expect(screen.getByText('pricing')).toBeTruthy();
+    expect(screen.getByText('/pricing')).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -104,7 +104,7 @@ describe('FaqSection loading state', () => {
   it('draws the same skeleton while its own request is unanswered, and says it is loading', () => {
     fetchMock.mockReturnValue(new Promise(() => {}));
     render(
-      <PageTopicsProvider topics={{ '/': 'pricing' }}>
+      <PageTopicsProvider pathname="/pricing">
         <FaqSection minResults={3} />
       </PageTopicsProvider>,
     );

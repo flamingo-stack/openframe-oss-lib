@@ -1,56 +1,48 @@
 import { describe, expect, it } from 'vitest';
-import { pageTopicFor, type PageTopics } from '../page-topics';
+import { deepestTopic, isPagePathTopic, pageTopicFor, topicCandidates, topicMatchesPath } from '../page-topics';
 
-const TOPICS: PageTopics = {
-  '/': 'home',
-  '/pricing': 'pricing',
-  '/blog': 'blog',
-  '/blog/[slug]': 'blog_post',
-  '/roadmap': 'roadmap',
-  '/roadmap-and-releases': 'roadmap-and-releases',
-  '/admin/performance/employee/[id]/who-am-i': 'who-am-i',
-  '/help-center/legal/[docType]': '[docType]',
-};
-
-describe('pageTopicFor', () => {
-  it('reads the home page from `/` only', () => {
-    expect(pageTopicFor('/', TOPICS)).toBe('home');
-    expect(pageTopicFor('/unknown', TOPICS)).toBeNull();
-    expect(pageTopicFor('/', { '/pricing': 'pricing' })).toBeNull();
-  });
-
-  it('covers a route and every page under it', () => {
-    expect(pageTopicFor('/pricing', TOPICS)).toBe('pricing');
-    expect(pageTopicFor('/pricing/calculator', TOPICS)).toBe('pricing');
-    expect(pageTopicFor('/pricing?plan=yearly#faq', TOPICS)).toBe('pricing');
-  });
-
-  it('never reads a longer route name as a shorter one', () => {
-    expect(pageTopicFor('/roadmap-and-releases', TOPICS)).toBe('roadmap-and-releases');
-    expect(pageTopicFor('/roadmap', TOPICS)).toBe('roadmap');
-  });
-
-  it('prefers the more specific route: a record page over its list page', () => {
-    expect(pageTopicFor('/blog', TOPICS)).toBe('blog');
-    expect(pageTopicFor('/blog/how-we-ship', TOPICS)).toBe('blog_post');
-  });
-
-  it('matches a `[name]` segment anywhere in a route', () => {
-    expect(pageTopicFor('/admin/performance/employee/42/who-am-i', TOPICS)).toBe('who-am-i');
-    expect(pageTopicFor('/admin/performance/employee/42', TOPICS)).toBeNull();
-  });
-
-  it("names a segment's value as the topic when the topic is that segment's name", () => {
-    expect(pageTopicFor('/help-center/legal/privacy-policy', TOPICS)).toBe('privacy-policy');
-    expect(pageTopicFor('/help-center/legal', TOPICS)).toBeNull();
+describe('pageTopicFor: a page asks with its path', () => {
+  it('drops the query, the hash and a trailing slash, lowercased and decoded', () => {
+    expect(pageTopicFor('/Blog/My-Post/?x=1#faq')).toBe('/blog/my-post');
+    expect(pageTopicFor('/caf%C3%A9')).toBe('/café');
+    expect(pageTopicFor('/')).toBe('/');
+    expect(pageTopicFor('')).toBe('/');
   });
 
   it('reads a segment with a malformed escape as written instead of throwing', () => {
-    expect(pageTopicFor('/blog/%E0%A4%A', TOPICS)).toBe('blog_post');
-    expect(pageTopicFor('/help-center/legal/%ZZ', TOPICS)).toBe('%ZZ');
+    expect(pageTopicFor('/blog/%E0%A4%A')).toBe('/blog/%e0%a4%a');
   });
 
-  it('prefers a literal segment over a `[name]` one at the same depth', () => {
-    expect(pageTopicFor('/blog/new', { '/blog/[slug]': 'blog_post', '/blog/new': 'new-post' })).toBe('new-post');
+  it("asks without the host's mount, and leaves a path outside it as it is", () => {
+    const options = { basePath: '/help-center' };
+    expect(pageTopicFor('/help-center/roadmap', options)).toBe('/roadmap');
+    expect(pageTopicFor('/help-center/releases/detail?slug=x', options)).toBe('/releases/detail');
+    expect(pageTopicFor('/help-center', options)).toBe('/');
+    expect(pageTopicFor('/devices', options)).toBe('/devices');
+    expect(pageTopicFor('/help-centerx/roadmap', options)).toBe('/help-centerx/roadmap');
+  });
+});
+
+describe('which tags are written for a page', () => {
+  it('matches the path itself and its parents; the home tag only the home page', () => {
+    expect(topicMatchesPath('/blog', '/blog')).toBe(true);
+    expect(topicMatchesPath('/blog', '/blog/my-post')).toBe(true);
+    expect(topicMatchesPath('/blog', '/blogs')).toBe(false);
+    expect(topicMatchesPath('/blog/my-post', '/blog')).toBe(false);
+    expect(topicMatchesPath('/', '/')).toBe(true);
+    expect(topicMatchesPath('/', '/pricing')).toBe(false);
+  });
+
+  it('never matches a section word to a page', () => {
+    expect(isPagePathTopic('agents')).toBe(false);
+    expect(topicMatchesPath('agents', '/openframe')).toBe(false);
+  });
+
+  it('lists the candidates deepest first, and picks the deepest tag', () => {
+    expect(topicCandidates('/blog/my-post')).toEqual(['/blog/my-post', '/blog']);
+    expect(topicCandidates('/')).toEqual(['/']);
+    expect(deepestTopic(['/blog', '/blog/my-post', '/pricing'], '/blog/my-post')).toBe('/blog/my-post');
+    expect(deepestTopic(['/blog', '/pricing'], '/blog/other-post')).toBe('/blog');
+    expect(deepestTopic(['/pricing'], '/blog')).toBeNull();
   });
 });

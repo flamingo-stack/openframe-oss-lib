@@ -22,7 +22,6 @@ import { TicketLiveProvider } from '@flamingo-stack/openframe-frontend-core/comp
 import { buildChatRuntime, buildEndpointsRuntime } from './content-runtime'
 import { EP } from '../config/endpoints'
 import { AssistantRuntimeProvider } from './assistant-identity'
-import { PAGE_TOPICS } from '../config/page-topics'
 
 const queryClient = new QueryClient()
 
@@ -72,9 +71,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
                   mark of Fae or Mingo the lib draws is the icon its identity holds. */}
               <AgentIdentityProvider endpoint={EP.aiAgents}>
                 <AssistantRuntimeProvider>
-                  {/* The page's topic, read from react-router's address by the FAQ block, its ask card and the
-                      chat's quick actions (config/page-topics.ts). */}
-                  <PageTopicsProvider topics={PAGE_TOPICS} pathname={pathname}>
+                  {/* The page's topic is its path, read from react-router's address by the FAQ block, its ask card
+                      and the chat's quick actions. This app's pages sit at the hub's own paths, so no mount. */}
+                  <PageTopicsProvider pathname={pathname}>
                     <TicketLiveProvider>{children}</TicketLiveProvider>
                   </PageTopicsProvider>
                 </AssistantRuntimeProvider>

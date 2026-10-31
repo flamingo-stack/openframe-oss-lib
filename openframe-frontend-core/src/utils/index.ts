@@ -378,7 +378,14 @@ export { buildListUrl, canonicalContentRefType } from './list-url';
 // zero drift across page + chat + future consumers.
 export { faqSectionSlug, faqItemAnchor, parseFaqHash } from './faq-anchor';
 export type { FaqHashTarget } from './faq-anchor';
-export { pageTopicFor, type PageTopics } from './page-topics';
+export {
+  deepestTopic,
+  isPagePathTopic,
+  pageTopicFor,
+  type PageTopicOptions,
+  topicCandidates,
+  topicMatchesPath,
+} from './page-topics';
 
 // Content-ref group registry (labels/order/layout per rail type) + list-API
 // response normalizers + the shared suggestion-fetch URL composer — all

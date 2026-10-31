@@ -40,11 +40,11 @@ describe("useEmptyStateConfig: the page's topic", () => {
     renderHook(() => useEmptyStateConfig('https://hub.test/api/docs/empty-state'), {
       wrapper: ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={client}>
-          <PageTopicsProvider topics={{ '/': 'pricing' }}>{children}</PageTopicsProvider>
+          <PageTopicsProvider pathname="/pricing">{children}</PageTopicsProvider>
         </QueryClientProvider>
       ),
     });
     await waitFor(() => expect(embedAuthedFetch).toHaveBeenCalledTimes(1));
-    expect(new URL(String(vi.mocked(embedAuthedFetch).mock.calls[0][0])).searchParams.get('topic')).toBe('pricing');
+    expect(new URL(String(vi.mocked(embedAuthedFetch).mock.calls[0][0])).searchParams.get('topic')).toBe('/pricing');
   });
 });

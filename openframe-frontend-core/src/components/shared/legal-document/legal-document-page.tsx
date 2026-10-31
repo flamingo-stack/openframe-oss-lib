@@ -68,7 +68,7 @@ export interface LegalDocumentPageProps {
   backButton?: { label?: string; href?: string } | false;
   /**
    * The hub's list of legal documents (`GET /api/legal`). Given it, the page
-   * takes the document's title and FAQ topic from the list, so a host passes
+   * takes the document's title from the list, so a host passes
    * only the type and its endpoints and states nothing per document; the title
    * then names the document even when its text fails to load.
    */

@@ -1,6 +1,6 @@
 /**
  * `FaqSection` as a page's own FAQ block. Pins what every host depends on: the
- * topic is the page's, read from its address through the host's map, the
+ * topic is the page's, its path, the
  * block fetches that topic's FAQs or shows the host's own read, it renders
  * nothing when there is no FAQ, it can print its topic for whoever edits the
  * FAQs, and a shared page of the lib renders it only when its host passes
@@ -16,9 +16,9 @@ import type { Faq } from '../../../types/faq';
 import { DeliveryPage } from '../../help-center-pages/delivery-page';
 import { FaqSection, PAGE_FAQ_SECTION_ID } from '../faq-section';
 
-/** The page under test is `/` (jsdom's address); its topic is the host map's entry for it. */
+/** The page under test is `/` (jsdom's address); its topic is the path it is given. */
 const onPage = (topic: string, node: React.ReactNode) => (
-  <PageTopicsProvider topics={{ '/': topic }}>{node}</PageTopicsProvider>
+  <PageTopicsProvider pathname={topic}>{node}</PageTopicsProvider>
 );
 
 const FAQS = [{ id: 1, question: 'Do I pay per technician?', answer: 'No.', section: null }] as unknown as Faq[];
@@ -36,7 +36,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockImplementation((input: unknown) => {
     const url = new URL(String(input), 'https://host.test');
-    const faqs = url.pathname.endsWith('/api/faqs') && url.searchParams.get('topic') === 'pricing' ? FAQS : [];
+    const faqs = url.pathname.endsWith('/api/faqs') && url.searchParams.get('topic') === '/pricing' ? FAQS : [];
     return Promise.resolve({ ok: true, json: () => Promise.resolve({ faqs, completed: [], inProgress: [] }) });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -48,20 +48,20 @@ afterEach(() => {
 
 describe("a page's own FAQ block", () => {
   it("fetches the FAQs of the page's topic, from the host's base", async () => {
-    render(onPage('pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} apiBaseUrl="/content" />));
+    render(onPage('/pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} apiBaseUrl="/content" />));
 
     expect(await screen.findByText('Do I pay per technician?')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Frequently Asked Questions' })).toBeInTheDocument();
     expect(markup()).toContain(FAQ_SECTION);
     const [request] = requestedFaqs();
     expect(request.pathname).toBe('/content/api/faqs');
-    expect(request.searchParams.get('topic')).toBe('pricing');
+    expect(request.searchParams.get('topic')).toBe('/pricing');
   });
 
   it("shows the host's own read of the page's topic without fetching it", () => {
     render(
       onPage(
-        'pricing',
+        '/pricing',
         <FaqSection id={PAGE_FAQ_SECTION_ID} initialFaqs={FAQS} heading={<h2>Pricing questions</h2>} />,
       ),
     );
@@ -71,19 +71,19 @@ describe("a page's own FAQ block", () => {
   });
 
   it('prints its bare topic under the heading only when asked, and always carries it as data', () => {
-    const { unmount } = render(onPage('pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} initialFaqs={FAQS} />));
-    expect(screen.queryByText('pricing')).not.toBeInTheDocument();
-    expect(markup()).toContain('data-faq-topic="pricing"');
+    const { unmount } = render(onPage('/pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} initialFaqs={FAQS} />));
+    expect(screen.queryByText('/pricing')).not.toBeInTheDocument();
+    expect(markup()).toContain('data-faq-topic="/pricing"');
     unmount();
 
-    render(onPage('pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} initialFaqs={FAQS} showTopic />));
-    expect(screen.getByText('pricing')).toBeInTheDocument();
+    render(onPage('/pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} initialFaqs={FAQS} showTopic />));
+    expect(screen.getByText('/pricing')).toBeInTheDocument();
     expect(screen.queryByText(/Topic:/)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Frequently Asked Questions' })).toBeInTheDocument();
   });
 
   it('emits FAQPage JSON-LD for the page’s own questions', () => {
-    render(onPage('pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} initialFaqs={FAQS} emitJsonLd />));
+    render(onPage('/pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} initialFaqs={FAQS} emitJsonLd />));
     const schema = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(markup())?.[1] ?? '{}') as {
       '@type'?: string;
       mainEntity?: unknown[];
@@ -93,7 +93,7 @@ describe("a page's own FAQ block", () => {
   });
 
   it('renders nothing for a topic with no FAQ: no heading, no section, no schema', async () => {
-    render(onPage('careers', <FaqSection id={PAGE_FAQ_SECTION_ID} />));
+    render(onPage('/careers', <FaqSection id={PAGE_FAQ_SECTION_ID} />));
     await waitFor(() => expect(requestedFaqs()).toHaveLength(1));
     await waitFor(() => expect(markup()).not.toContain('animate-pulse'));
     expect(markup()).not.toContain(FAQ_SECTION);
@@ -104,9 +104,9 @@ describe("a page's own FAQ block", () => {
 
 describe('a shared page of the lib', () => {
   it("shows the FAQ block of the page's topic when its host passes `faq`", async () => {
-    render(onPage('pricing', <DeliveryPage shell={false} backButton={false} faq={{ apiBaseUrl: '/content' }} />));
+    render(onPage('/pricing', <DeliveryPage shell={false} backButton={false} faq={{ apiBaseUrl: '/content' }} />));
     expect(await screen.findByText('Do I pay per technician?')).toBeInTheDocument();
-    expect(requestedFaqs()[0].searchParams.get('topic')).toBe('pricing');
+    expect(requestedFaqs()[0].searchParams.get('topic')).toBe('/pricing');
   });
 
   it('shows no FAQ block, and asks for none, without the prop', async () => {

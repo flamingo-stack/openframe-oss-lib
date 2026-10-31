@@ -125,7 +125,7 @@ export async function fetchEmptyStateConfig(
 
 /**
  * The empty-state URL for the page the chat is on: the host's endpoint with the
- * page's `topic` (a FAQ topic: `pricing`, `home`), which the host uses to place
+ * page's `topic` (its path: `/pricing`, `/`), which the host uses to place
  * the quick actions (that topic's first, then the ones written for no topic,
  * never another topic's). No topic: the endpoint as given.
  */

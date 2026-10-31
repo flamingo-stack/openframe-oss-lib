@@ -11,7 +11,6 @@ import { FaqSection } from '../../components/faq/faq-section';
 import type { Faq } from '../../types/faq';
 import { PageTopicsProvider } from '../page-topics-context';
 
-const TOPICS = { '/pricing': 'pricing' };
 const FAQS: Faq[] = [
   {
     id: 1,
@@ -27,40 +26,40 @@ const FAQS: Faq[] = [
 describe('PageTopicsProvider showTopic', () => {
   it('stamps the FAQ block and the chat when the host turns it on', () => {
     render(
-      <PageTopicsProvider topics={TOPICS} pathname="/pricing" showTopic>
+      <PageTopicsProvider pathname="/pricing" showTopic>
         <FaqSection initialFaqs={FAQS} ask={false} />
         <GuideWelcome quickActions={[{ id: 'a', label: 'How much?' }]} />
       </PageTopicsProvider>,
     );
-    expect(screen.getAllByText('pricing')).toHaveLength(2);
+    expect(screen.getAllByText('/pricing')).toHaveLength(2);
   });
 
   it('stamps nothing when the host leaves it off', () => {
     render(
-      <PageTopicsProvider topics={TOPICS} pathname="/pricing">
+      <PageTopicsProvider pathname="/pricing">
         <FaqSection initialFaqs={FAQS} ask={false} />
       </PageTopicsProvider>,
     );
-    expect(screen.queryByText('pricing')).toBeNull();
+    expect(screen.queryByText('/pricing')).toBeNull();
   });
 
   it('keeps the host choice in a nested provider', () => {
     render(
-      <PageTopicsProvider topics={TOPICS} showTopic>
-        <PageTopicsProvider topics={TOPICS} pathname="/pricing">
+      <PageTopicsProvider showTopic>
+        <PageTopicsProvider pathname="/pricing">
           <FaqSection initialFaqs={FAQS} ask={false} />
         </PageTopicsProvider>
       </PageTopicsProvider>,
     );
-    expect(screen.getByText('pricing')).toBeTruthy();
+    expect(screen.getByText('/pricing')).toBeTruthy();
   });
 
   it("lets a surface's own prop override the host", () => {
     render(
-      <PageTopicsProvider topics={TOPICS} pathname="/pricing" showTopic>
+      <PageTopicsProvider pathname="/pricing" showTopic>
         <FaqSection initialFaqs={FAQS} ask={false} showTopic={false} />
       </PageTopicsProvider>,
     );
-    expect(screen.queryByText('pricing')).toBeNull();
+    expect(screen.queryByText('/pricing')).toBeNull();
   });
 });
