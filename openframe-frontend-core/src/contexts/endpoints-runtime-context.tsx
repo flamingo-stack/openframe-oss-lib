@@ -45,6 +45,11 @@ export interface EndpointsRuntime {
    *  without the proxy simply omits it and claude embeds fall back to
    *  claude.ai — no probing happens. */
   storageViewBaseUrl?: string;
+  /** GET the host's FAQ list (the hub's `/api/faqs`). Every `FaqSection` reads its questions from it, and a shared
+   *  page of the lib (roadmap, delivery, releases, onboarding guides, downloads, legal documents) draws its own FAQ
+   *  block from it, for the page's topic (`usePageTopic`). OPTIONAL: a host whose layout draws every page's FAQ itself
+   *  (the hub) leaves it unset, and `FaqSection` then asks the same-origin `/api/faqs`. */
+  faqsUrl?: string;
 }
 
 export const EndpointsRuntimeContext = createContext<EndpointsRuntime | null>(null);
