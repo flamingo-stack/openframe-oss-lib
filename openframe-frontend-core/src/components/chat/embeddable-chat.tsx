@@ -2882,9 +2882,6 @@ function EmbeddableChatInner({
             // spread so the host can't override it.
             onQuickActionHover={action => setQuickActionPreview(action.prompt ?? action.label)}
             onQuickActionHoverEnd={() => setQuickActionPreview(null)}
-            // A built-in agent caps the quick-action wall at 2 rows;
-            // this is the Mingo surface, so fall back to 'mingo'.
-            agentSlug={activeAgentSlug ?? 'mingo'}
           />
         ) : (
           /* Figma node 7532:328214 — Guide-mode empty state: greeting
@@ -2933,9 +2930,6 @@ function EmbeddableChatInner({
             // `quickActionPreview` / `ChatInput.previewText`.
             onQuickActionHover={action => setQuickActionPreview(action.prompt ?? action.label)}
             onQuickActionHoverEnd={() => setQuickActionPreview(null)}
-            // In agent mode a built-in agent (fae/mingo) caps the wall at
-            // 2 rows; host/guide mode (no active agent) keeps the default.
-            agentSlug={activeAgentSlug}
           >
             {/* Figma node 7363:205938 — single-column slash-command
                 list. No own scroll (GuideWelcome's region scrolls); the
