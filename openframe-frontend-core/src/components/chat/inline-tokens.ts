@@ -33,15 +33,20 @@ import type { PluggableList, Plugin } from 'unified';
 import { unified } from 'unified';
 
 import { CARD_TOKEN_EXACT, createCardMarkerScanner } from '../../chat-protocol/card-marker';
+import { parseRecordHref } from '../../chat-protocol/record-link';
 
-export type ChatTokenKind = 'mention' | 'card';
+/** `mention` and `card` are the two LEGACY grammars, read only for answers stored before record links; `record` is a
+ *  markdown link to a record (`chat-protocol/record-link.ts`), which the renderer reads as an ordinary link. */
+export type ChatTokenKind = 'mention' | 'card' | 'record';
 
 /** One token found in a message: its grammar, its two halves and where it sits in the source. */
 export interface ChatToken {
   kind: ChatTokenKind;
-  /** The mention's marker (`script`) or the card's type (`webinar`). */
+  /** The mention's marker (`script`), the card's or the record's type (`webinar`). */
   type: string;
   id: string;
+  /** The name a record link shows (its link text). Legacy tokens carry none. */
+  label?: string;
   /** Source offsets of everything the token replaced (`[start, end)`), or null when they cannot be known exactly. */
   range: [number, number] | null;
   /** True when the raw text may be CUT at this token without breaking the markdown around it: it sits directly in a
@@ -59,7 +64,7 @@ interface FoundToken {
 }
 
 interface TokenGrammar {
-  kind: ChatTokenKind;
+  kind: 'mention' | 'card';
   /** Every token in a run of text, in order, non-overlapping. */
   find(text: string): FoundToken[];
   /** The token a whole string IS (a code span's value, a link's text), or null. */
@@ -113,10 +118,10 @@ export const CARD_GRAMMAR: TokenGrammar = {
   literal: (type, id) => `[card://${type}:${id}]`,
 };
 
-const SCHEME: Record<ChatTokenKind, string> = { mention: 'mention://', card: 'card://' };
+const SCHEME: Record<Exclude<ChatTokenKind, 'record'>, string> = { mention: 'mention://', card: 'card://' };
 
 /** The href a produced link carries. */
-function tokenUrl(kind: ChatTokenKind, type: string, id: string): string {
+function tokenUrl(kind: TokenGrammar['kind'], type: string, id: string): string {
   return `${SCHEME[kind]}${type}:${id}`;
 }
 
@@ -125,7 +130,7 @@ function tokenUrl(kind: ChatTokenKind, type: string, id: string): string {
  * URL may not hold (a space in a card id arrives as `%20`), so the id is decoded here; the type never holds a `:`, so
  * the FIRST colon is the separator (an id may hold more). Null when the href is not a token of that kind.
  */
-export function parseTokenHref(kind: ChatTokenKind, href: unknown): { type: string; id: string } | null {
+export function parseTokenHref(kind: TokenGrammar['kind'], href: unknown): { type: string; id: string } | null {
   if (typeof href !== 'string' || !href.startsWith(SCHEME[kind])) return null;
   const rest = href.slice(SCHEME[kind].length);
   const sep = rest.indexOf(':');
@@ -370,7 +375,8 @@ export function scanChatTokens(markdown: string, kinds: readonly ChatTokenKind[]
   if (!markdown) return [];
   const wantsMention = kinds.includes('mention') && markdown.includes('@');
   const wantsCard = kinds.includes('card') && markdown.includes('card://');
-  if (!wantsMention && !wantsCard) return [];
+  const wantsRecord = kinds.includes('record') && markdown.includes('record://');
+  if (!wantsMention && !wantsCard && !wantsRecord) return [];
   const plugins: PluggableList = [remarkParse, remarkGfm];
   if (wantsCard) plugins.push(remarkCardLinks);
   if (wantsMention) plugins.push(remarkMentionChips);
@@ -378,6 +384,13 @@ export function scanChatTokens(markdown: string, kinds: readonly ChatTokenKind[]
   const tree = processor.runSync(processor.parse(markdown), markdown) as Root;
   const out: ChatToken[] = [];
   const collect = (node: Nodes) => {
+    if (wantsRecord && node.type === 'link') {
+      const record = parseRecordHref(node.url);
+      if (record) {
+        out.push({ kind: 'record', ...record, label: toString(node), range: rangeOf(node), splittable: false });
+        return;
+      }
+    }
     if (isTokenLink(node)) {
       const token = node.data?.chatToken;
       if (token) out.push(token);

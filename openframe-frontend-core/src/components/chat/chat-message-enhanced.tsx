@@ -1,6 +1,7 @@
 'use client';
 
 import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
+import { parseRecordHref, type RecordLink } from '../../chat-protocol/record-link';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
@@ -28,9 +29,11 @@ import {
 import type { ChatRef } from './chat-ref.types';
 import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
+import { chatCardLabel } from './entity-cards/dispatch';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
 import { parseTokenHref, remarkCardLinks, remarkMentionChips, scanChatTokens } from './inline-tokens';
+import { RecordChip } from './record-chip';
 import { remarkStripCitations } from './remark-strip-citations';
 import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
@@ -47,6 +50,27 @@ import { CHAT_APPEARANCE } from './types/chat.types';
 function formatMessageTimestamp(timestamp: Date): string {
   const time = formatTime(timestamp);
   return isToday(timestamp) ? time : `${formatDate(timestamp)} ${time}`;
+}
+
+/** The plain text of a link's children (its name), as markdown hands them to the `<a>` override. */
+function textOf(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join('');
+  if (React.isValidElement<{ children?: ReactNode }>(node)) return textOf(node.props.children);
+  return '';
+}
+
+/** The records an answer links, once each, in the order it first links them, with the name it gave each. */
+function linkedRecords(segments: MessageSegment[]): Array<RecordLink & { label: string }> {
+  const byKey = new Map<string, RecordLink & { label: string }>();
+  for (const segment of segments) {
+    if (segment.type !== 'text' || !segment.text) continue;
+    for (const token of scanChatTokens(segment.text, ['record'])) {
+      const key = `${token.type}:${token.id}`;
+      if (!byKey.has(key)) byKey.set(key, { type: token.type, id: token.id, label: token.label || token.id });
+    }
+  }
+  return [...byKey.values()];
 }
 
 function normalizeContent(content: MessageContent): MessageSegment[] {
@@ -154,12 +178,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // excluded from the chip strip below (no duplicate inline + strip).
     const inlineMentionIds = useMemo(() => {
       const ids = new Set<string>();
-      if (!hasMentionSupport) return ids;
       for (const seg of segments) {
         if (seg.type !== 'text' || !seg.text) continue;
         // The same parse and walk as the body (`inline-tokens.ts`): an id counts as inline only when the body DRAWS
         // it, so a mention in a code block never takes its item off the strip without showing it anywhere.
-        for (const token of scanChatTokens(seg.text, ['mention'])) ids.add(token.id);
+        // A record link is always drawn (its own chip); a legacy mention only where the host draws mentions.
+        for (const token of scanChatTokens(seg.text, hasMentionSupport ? ['mention', 'record'] : ['record'])) {
+          ids.add(token.id);
+        }
       }
       return ids;
     }, [hasMentionSupport, segments]);
@@ -395,6 +421,51 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       }
     }, [renderingPlan]);
 
+    /**
+     * The cards under the answer: one per record the answer LINKS (`[name](record://type/id)`), in the order it first
+     * links them, for every type the chat has a card for (a device or a script is a chip only). The server already
+     * checked each link against the records the turn loaded, so a card is never drawn for a record nobody offered.
+     *
+     * Each card's node is kept across renders (same `type:id`, same render function, same described ref) so a card
+     * does not remount, re-fetch or close its open menu on every streamed token.
+     */
+    const recordCardCache = useRef(
+      new Map<
+        string,
+        { render: (ref: ChatRef) => React.ReactNode; ref: ChatRef | undefined; label: string; node: React.ReactNode }
+      >(),
+    );
+    const recordCards = useMemo(() => {
+      if (!renderEntityCard || isHuman) return [];
+      const cache = recordCardCache.current;
+      const cards: Array<{ key: string; node: React.ReactNode }> = [];
+      for (const record of linkedRecords(segments)) {
+        if (record.type !== 'video' && !chatCardLabel(record.type)) continue;
+        const key = `${record.type}:${record.id}`;
+        const described = refByKey.get(key);
+        let entry = cache.get(key);
+        if (!entry || entry.render !== renderEntityCard || entry.ref !== described || entry.label !== record.label) {
+          const cardRef: ChatRef = described ?? { type: record.type, id: record.id, title: record.label, url: null };
+          const rendered = renderEntityCard(cardRef);
+          // A block card (a video) draws its block here; its inline half is the chip in the sentence.
+          const node =
+            React.isValidElement(rendered) && rendered.type === BlockCard
+              ? (rendered.props as BlockCardProps).children
+              : rendered;
+          entry = { render: renderEntityCard, ref: described, label: record.label, node };
+          cache.set(key, entry);
+        }
+        if (entry.node != null) cards.push({ key, node: entry.node });
+      }
+      return cards;
+    }, [renderEntityCard, isHuman, segments, refByKey]);
+
+    useEffect(() => {
+      const cache = recordCardCache.current;
+      const shown = new Set(recordCards.map(card => card.key));
+      for (const key of [...cache.keys()]) if (!shown.has(key)) cache.delete(key);
+    }, [recordCards]);
+
     // The plan is read through a REF inside the `<a>` override, not captured
     // in the override's closure. `renderingPlan` is rebuilt on every text
     // delta (its `segments` dep is a fresh array per delta), so depending on
@@ -407,7 +478,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     renderingPlanRef.current = renderingPlan;
 
     const cardComponentOverrides = useMemo(() => {
-      if (!hasMarkerSupport && !hasMentionSupport) return undefined;
       return {
         // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`.
         // The render result was pre-computed in `renderingPlan` so block-level
@@ -415,6 +485,17 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         // paragraph as siblings — the inline pill stays at the marker
         // position. Other href schemes pass through unchanged.
         a: ({ href, children, className: linkClassName, ...rest }: MdRenderProps<'a'>) => {
+          // A record link (`[Patch script](record://script/<id>)`, `chat-protocol/record-link.ts`): the chip, inside
+          // the sentence, showing the link's own text. The host draws its own chip for the type where it has one
+          // (`renderMention`, given the name); otherwise the lib's.
+          const record = parseRecordHref(href);
+          if (record) {
+            const label = textOf(children) || record.id;
+            const hosted = renderMention?.({ marker: record.type, id: record.id, label });
+            if (hosted != null) return <>{hosted}</>;
+            return <RecordChip type={record.type} label={label} />;
+          }
+          // LEGACY grammars, read for answers stored before record links.
           // Inline entity mention `@marker:id`, emitted as a `mention://marker:id`
           // link by `remarkMentionChips`. Delegate to the host's `renderMention`
           // (mirror of the `card://` → `renderEntityCard` path): the host returns
@@ -471,7 +552,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       // streaming turn (booleans + host-stable fn/component identities, both
       // enforced by this file's `memo` comparator). The rendering plan is
       // read through a ref above precisely so it does NOT appear here.
-    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor]);
+    }, [renderMention, NavLinkAnchor]);
 
     /**
      * Body of a markdown-bearing segment (`text` / `guide`).
@@ -730,6 +811,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   }
                   return null;
                 })}
+                {recordCards.length > 0 && (
+                  <div className={CHAT_MESSAGE_SEGMENTS_CLASS} data-testid="chat-record-cards">
+                    {recordCards.map(card => (
+                      <div key={`r-${card.key}`}>{card.node}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

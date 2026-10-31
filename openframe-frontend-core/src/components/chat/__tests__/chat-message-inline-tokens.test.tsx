@@ -21,9 +21,8 @@ function NavLinkAnchor({ href, children }: React.AnchorHTMLAttributes<HTMLAnchor
 /** A fetch-mode card: a plain element, which the bubble hoists as a block. */
 const renderEntityCard = (ref: ChatRef) => <div data-testid={`card-${ref.id}`}>{ref.title}</div>;
 
-const renderMention = ({ marker, id }: { marker: string; id: string }) => (
-  <span data-testid={`chip-${marker}-${id}`}>{id}</span>
-);
+const renderMention = ({ marker, id }: { marker: string; id: string; label?: string }) =>
+  marker === 'script' ? <span data-testid={`chip-${marker}-${id}`}>{id}</span> : null;
 
 function show(text: string) {
   return render(
@@ -62,5 +61,26 @@ describe('ChatMessageEnhanced — inline tokens', () => {
   it('draws a card whose id markdown reads as emphasis', () => {
     show('See [card://blog:a*b*c] now.');
     expect(screen.getByTestId('card-abc')).toBeTruthy();
+  });
+
+  describe('record links', () => {
+    it('draws a record the host has a chip for with the host chip, and no card for a chip-only type', () => {
+      show('Run [Patch script](record://script/6aad91a3b776f95ad7491bd9) again.');
+      expect(screen.getByTestId('chip-script-6aad91a3b776f95ad7491bd9')).toBeTruthy();
+      expect(screen.queryByTestId('chat-record-cards')).toBeNull();
+    });
+
+    it('draws a linked record as a chip with its name in the sentence and its card under the answer', () => {
+      show('The [Mac guide](record://onboarding_guide/mac-guide) covers it.');
+      expect(within(screen.getByTestId('inline-chip')).getByText('Mac guide')).toBeTruthy();
+      const cards = screen.getByTestId('chat-record-cards');
+      expect(within(cards).getByTestId('card-mac-guide')).toBeTruthy();
+      expect(screen.queryByText(/record:\/\//)).toBeNull();
+    });
+
+    it('draws one card per record however many times the answer links it', () => {
+      show('[Guide](record://onboarding_guide/mac-guide), again [the guide](record://onboarding_guide/mac-guide).');
+      expect(within(screen.getByTestId('chat-record-cards')).getAllByTestId('card-mac-guide')).toHaveLength(1);
+    });
   });
 });

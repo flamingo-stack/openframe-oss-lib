@@ -445,7 +445,7 @@ export interface EmbeddableChatProps {
    * `useCallback`) so the thread's streaming memo holds. Return null for a
    * marker the host can't render → the lib falls back to the bare token.
    */
-  renderMention?: (reference: { marker: string; id: string }) => React.ReactNode;
+  renderMention?: (reference: { marker: string; id: string; label?: string }) => React.ReactNode;
   /**
    * Host renderer that REPLACES the default label-only context chip on a sent
    * user bubble with a self-fetching entity chip — so a user's manually

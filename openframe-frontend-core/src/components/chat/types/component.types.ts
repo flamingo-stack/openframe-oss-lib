@@ -183,10 +183,10 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    */
   renderContextItem?: (item: ChatContextItem) => ReactNode;
   /**
-   * Host renderer for inline AI mentions `@marker:id` — the ASSISTANT echoing
-   * `@device:<machineId>` (etc.) in its reply. DIRECT MIRROR of
-   * `renderEntityCard` for the `[card://]` grammar: the lib detects the token
-   * (via `remarkMentionChips` in `inline-tokens`), parses `{marker, id}`, and renders whatever
+   * Host renderer for a record the answer names inline: a record link
+   * `[Patch script](record://script/<id>)` (`chat-protocol/record-link.ts`; `label` is the link's text, the name the
+   * answer gave it) and, in answers stored before record links, the LEGACY token `@marker:id` (no label). The lib
+   * finds the link or the token, parses `{marker, id}`, and renders whatever
    * node the host returns — typically a SELF-FETCHING chip (each entity type
    * has its own fetcher) that resolves its own display name by id. The lib
    * stays data-agnostic: it knows nothing about entity types or how to fetch
@@ -195,7 +195,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * own attachments). Keep the function identity stable (e.g. a module const or
    * `useCallback`) so the message memo holds across streaming chunks.
    */
-  renderMention?: (reference: { marker: string; id: string }) => ReactNode;
+  renderMention?: (reference: { marker: string; id: string; label?: string }) => ReactNode;
   /**
    * Host-provided renderer for inline entity cards (v6.1 §B.2.7 — DRY
    * duplications #2). The OSS-lib delegates all entity-specific rendering
@@ -343,7 +343,7 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   /** Host renderer for inline AI mentions `@marker:id` (mirror of
    *  `renderEntityCard`). Forwarded verbatim to every message's
    *  ChatMessageEnhanced; returns a self-fetching chip per entity type. */
-  renderMention?: (reference: { marker: string; id: string }) => ReactNode;
+  renderMention?: (reference: { marker: string; id: string; label?: string }) => ReactNode;
   /** Host-provided renderer for inline entity cards. Forwarded verbatim
    *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
   renderEntityCard?: (reference: ChatRef) => ReactNode;

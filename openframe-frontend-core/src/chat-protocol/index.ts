@@ -28,6 +28,7 @@ export { isRecord, unwrapEnvelope } from './wire-narrow';
 // The `[card://<type>:<id>]` grammar — the renderer's and the server's one
 // definition, so a reference the hub emits is one the client expands.
 export * from './card-marker';
+export * from './record-link';
 // The `[N]` citation chip grammar — written by the server, read and hidden by the renderer.
 export * from './citation-chip';
 export { escapeThinkingTags } from './leading-frames';

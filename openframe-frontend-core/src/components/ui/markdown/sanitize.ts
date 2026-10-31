@@ -405,7 +405,7 @@ export interface BuildSanitizeSchemaOptions {
  *   (`<h2 id="…">`) keep their ids so `[jump](#anchor)` deep-links work.
  *   (The renderer's own heading ids are injected at the React layer,
  *   post-rehype, and were never affected.)
- * - `card`/`mention` protocols registered for href so chat markers survive
+ * - `card`/`mention`/`record` protocols registered for href so chat markers and record links survive
  *   (the urlTransform below is the second gate).
  */
 export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
@@ -511,7 +511,7 @@ export function buildSanitizeSchema(options: BuildSanitizeSchemaOptions = {}) {
     clobber: [],
     protocols: {
       ...defaultSchema.protocols,
-      href: [...(defaultSchema.protocols?.href ?? []), 'card', 'mention'],
+      href: [...(defaultSchema.protocols?.href ?? []), 'card', 'mention', 'record'],
     },
   };
 }
@@ -3958,12 +3958,17 @@ function escapeOutsideFences(
 // URL transform
 // ---------------------------------------------------------------------------
 /**
- * Extends react-markdown's default safe-protocol allowlist with the two
- * internal schemes the chat remark plugins emit (`card://`, `mention://`),
+ * Extends react-markdown's default safe-protocol allowlist with the
+ * internal schemes the chat remark plugins emit (`card://`, `mention://`) and the record links an answer writes
+ * (`record://`, `chat-protocol/record-link.ts`),
  * for `href` ONLY. All other URLs go through `defaultUrlTransform`.
  */
 export function cardAwareUrlTransform(url: string, key: string): string {
-  if (key === 'href' && typeof url === 'string' && (url.startsWith('card://') || url.startsWith('mention://')))
+  if (
+    key === 'href' &&
+    typeof url === 'string' &&
+    (url.startsWith('card://') || url.startsWith('mention://') || url.startsWith('record://'))
+  )
     return url;
   return defaultUrlTransform(url);
 }
