@@ -87,7 +87,7 @@ export interface AIContent {
   override_at: string | null;
   override_by: string | null;
   // NEW: URL injection preference (per-item control)
-  url_injection_preference?: 'none' | 'in_post' | 'as_comment';
+  url_injection_preference?: URLInjectionPreference;
   // NEW: External comment ID tracking (for 'as_comment' mode)
   external_comment_id?: string | null;
 }
@@ -373,7 +373,11 @@ export type ContentSourceType =
   | 'design_doc' // Internal design docs (product-hub admin; preview route only, no public page)
   | 'from_scratch';
 
-export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';
+/**
+ * Where a post's link goes: nowhere, written into the post, posted as a comment, or opened by the post itself
+ * (`as_link`: tapping the notification of an OpenFrame announcement opens it).
+ */
+export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment' | 'as_link';
 
 export interface ContentSourceOption {
   id: number | string; // Events/podcasts/webinars use UUID strings
