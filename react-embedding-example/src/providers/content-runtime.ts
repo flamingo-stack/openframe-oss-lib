@@ -108,7 +108,7 @@ export function buildChatRuntime(navigate: ChatRuntime['navigation']['navigate']
       // 404s in this app), and roadmap_item to a `#hash` the list never reads.
       overrides: {
         roadmap_item: (id) => ({ href: `/roadmap?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
-        delivery_item: (id) => ({ href: `/delivery?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
+        delivery_item: (id) => ({ href: `/bug-fixes-and-enhancements?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`, targetPlatform: null }),
         // FAQ deep-link: the hub bakes `/faqs#faq-item-<id>` as the card's externalUrl
         // (the canonical HUB origin → opens in a new tab here). Override to the in-app
         // `/faqs` hash so the card soft-navigates instead; `<FaqSection>`'s hash dispatch
@@ -126,5 +126,6 @@ export function buildEndpointsRuntime(): EndpointsRuntime {
     accessCode: { validateUrl: EP.accessValidate, consumeUrl: EP.accessConsume },
     contactUrl: EP.contact,
     storageViewBaseUrl: EP.storageView,
+    faqsUrl: EP.faqs,
   }
 }

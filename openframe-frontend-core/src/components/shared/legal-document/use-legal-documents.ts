@@ -25,8 +25,6 @@ export interface LegalDocumentSummary {
   /** The document's page on the hub's own site (a path). */
   route: string;
   sourceFile: string;
-  /** The topic the document's FAQs are written for, when the hub has one. */
-  faqTopic: string | null;
   version: string | null;
   effectiveDate: string | null;
   /** False while the hub has no content for it yet. */
@@ -71,7 +69,6 @@ export function toLegalDocumentSummaries(payload: unknown): LegalDocumentSummary
       summary: text(row, 'summary') ?? '',
       route: text(row, 'route') ?? '',
       sourceFile: text(row, 'sourceFile') ?? '',
-      faqTopic: text(row, 'faqTopic'),
       version: text(row, 'version'),
       effectiveDate: text(row, 'effectiveDate'),
       published: row.published === true,
