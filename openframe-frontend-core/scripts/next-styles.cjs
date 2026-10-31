@@ -32,11 +32,24 @@
  * page's sheet is mostly its layout's. Inlining removes the wait; a smaller sheet only makes it cheap.
  */
 const { execFile } = require('node:child_process');
+const crypto = require('node:crypto');
 const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { dirname, isAbsolute, join, resolve } = require('node:path');
 const { promisify } = require('node:util');
 const { brotliCompressSync, constants } = require('node:zlib');
+
+/** Where `next-styles build` keeps the build's route sheets (the app's directory), and the build's settings file. */
+const STYLES_DIR = '.next-styles';
+const BUILD_INFO = 'build.json';
+
+/**
+ * The route-sheet build (`./route-styles.cjs`), loaded only by the `build` command. The app's next.config imports
+ * this file and Turbopack traces what it imports (`join(__dirname, …)` included): reaching the build tool pulled
+ * Next's own server, sharp's native libraries and esbuild into the trace and failed the build (Next 16.3).
+ */
+const loadRouteStyles = () =>
+  require(/* turbopackIgnore: true */ /* webpackIgnore: true */ join(__dirname, 'route-styles.cjs'));
 
 /** `nextConfig` with every route's stylesheets written into its HTML. Composes with a config function. */
 function withInlineStyles(nextConfig) {
@@ -45,6 +58,41 @@ function withInlineStyles(nextConfig) {
     return async (...args) => apply(await nextConfig(...args));
   }
   return apply(nextConfig);
+}
+
+/**
+ * `withInlineStyles`, and per-route stylesheets when the build is `next-styles build` (`./route-styles.cjs`): the
+ * server bundle carries `.next-styles/` (filled after the build) and knows its build, and the build records the
+ * settings the route step reads. Any other build, and `next dev`, is `withInlineStyles` alone.
+ */
+function withRouteStyles(nextConfig) {
+  return async (phase, ...rest) => {
+    const config = typeof nextConfig === 'function' ? await nextConfig(phase, ...rest) : nextConfig;
+    const inline = withInlineStyles(config);
+    if (process.env.NEXT_STYLES !== 'routes' || phase !== 'phase-production-build') return inline;
+    const root = process.cwd();
+    const infoFile = join(root, STYLES_DIR, BUILD_INFO);
+    // One id per build: the server checks the sheets it reads were written for it.
+    const buildId = existsSync(infoFile) ? JSON.parse(readFileSync(infoFile, 'utf8')).buildId : crypto.randomUUID();
+    writeFileSync(
+      infoFile,
+      `${JSON.stringify(
+        {
+          buildId,
+          distDir: inline.distDir ?? '.next',
+          output: inline.output ?? null,
+          assetPrefix: inline.assetPrefix ?? '',
+          basePath: inline.basePath ?? '',
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    // Every route: the files are read at run time by `RouteStyles`, which no static trace can follow.
+    const includes = { ...inline.outputFileTracingIncludes };
+    for (const route of ['/', '/*', '/*/**']) includes[route] = [...(includes[route] ?? []), `./${STYLES_DIR}/**/*`];
+    return { ...inline, env: { ...inline.env, NEXT_STYLES_BUILD: buildId }, outputFileTracingIncludes: includes };
+  };
 }
 
 /**
@@ -158,8 +206,9 @@ if (require.main === module) {
   const [command, ...rest] = process.argv.slice(2);
   Promise.resolve()
     .then(() => {
-      if (command !== 'budget') throw new Error(`next-styles: unknown command ${command ?? '(none)'}; try "budget"`);
-      return budgetCommand(rest);
+      if (command === 'budget') return budgetCommand(rest);
+      if (command === 'build') return buildCommand(rest);
+      throw new Error(`next-styles: unknown command ${command ?? '(none)'}; try "build" or "budget"`);
     })
     .catch(error => {
       console.error(`[css-budget] ${error.message}`);
@@ -167,4 +216,33 @@ if (require.main === module) {
     });
 }
 
-module.exports = { withInlineStyles, measureStylesheet, resolveImports };
+/**
+ * `build [--budget <brotli bytes>] [--input <css>] [--config <tailwind config>] [--full-config <tailwind config>]
+ * [-- <next build args>]`: `next build` with a stylesheet per route (`./route-styles.cjs`).
+ */
+async function buildCommand(argv) {
+  const root = process.cwd();
+  const split = argv.indexOf('--');
+  const args = parseArgs(split < 0 ? argv : argv.slice(0, split));
+  const nextArgs = split < 0 ? [] : argv.slice(split + 1);
+  const config =
+    args.config ??
+    firstExisting(
+      root,
+      ['ts', 'js', 'cjs', 'mjs'].map(ext => `tailwind.config.${ext}`),
+    );
+  const input = args.input ?? firstExisting(root, ['src/app/globals.css', 'app/globals.css']);
+  if (!input || !config)
+    throw new Error('usage: next-styles build [--input <css>] [--config <tailwind config>] [-- <next build args>]');
+  const { buildWithRouteStyles, DEFAULT_BUDGET } = loadRouteStyles();
+  await buildWithRouteStyles({
+    root,
+    nextArgs,
+    input,
+    config,
+    fullConfig: args['full-config'] ?? config,
+    budget: args.budget ? Number(args.budget) : DEFAULT_BUDGET,
+  });
+}
+
+module.exports = { STYLES_DIR, BUILD_INFO, withInlineStyles, withRouteStyles, measureStylesheet, resolveImports };
