@@ -103,7 +103,7 @@ export {
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
 // `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin
-// social-account screens) keep working without changing their import path.
+// distribution-channel screens) keep working without changing their import path.
 export {
   getDynamicIcon,
   type DynamicIconSize,

@@ -2,7 +2,7 @@
  * Marketing Campaign Types
  *
  * Types for the Marketing AI system including campaigns, content, media,
- * social accounts, scheduled posts, and usage tracking.
+ * distribution channels, scheduled posts, and usage tracking.
  */
 
 // =============================================================================
@@ -21,7 +21,7 @@ export interface MarketingCampaign {
   content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
   content_source_id?: number | null;
   content_source_url?: string | null;
-  future_blog_social_account_id?: number | null; // For blog_post + new mode - target account for AI-generated blog
+  future_blog_distribution_channel_id?: number | null; // For blog_post + new mode - target account for AI-generated blog
   /** Editor-provided AI generation instructions (steers Generate Content / Image / Video / Workflow prompts) */
   custom_instructions?: string | null;
   created_by: string;
@@ -38,7 +38,7 @@ export interface CreateCampaignInput {
   content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch';
   content_source_id?: number;
   content_source_url?: string;
-  future_blog_social_account_id?: number; // For blog_post + new mode - target account for AI-generated blog
+  future_blog_distribution_channel_id?: number; // For blog_post + new mode - target account for AI-generated blog
   custom_instructions?: string | null;
 }
 
@@ -51,7 +51,7 @@ export interface UpdateCampaignInput {
   content_source_type?: 'product_release' | 'blog_post' | 'case_study' | 'from_scratch' | null;
   content_source_id?: number | null;
   content_source_url?: string | null;
-  future_blog_social_account_id?: number | null; // For blog_post + new mode - target account for AI-generated blog
+  future_blog_distribution_channel_id?: number | null; // For blog_post + new mode - target account for AI-generated blog
   custom_instructions?: string | null;
 }
 
@@ -59,7 +59,7 @@ export interface UpdateCampaignInput {
 // AI Content Types
 // =============================================================================
 
-export type ContentType = 'blog_post' | 'social_post' | 'ad_copy' | 'email';
+export type ContentType = 'blog_post' | 'channel_post' | 'ad_copy' | 'email';
 export type ContentStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'published';
 
 export interface AIContent {
@@ -77,8 +77,8 @@ export interface AIContent {
   status: ContentStatus;
   reviewed_by: string | null;
   reviewed_at: string | null;
-  platform?: string; // Optional - legacy field, use social_account_id instead
-  social_account_id: number | null; // FK to social_accounts table - primary source of truth
+  platform?: string; // Optional - legacy field, use distribution_channel_id instead
+  distribution_channel_id: number | null; // FK to distribution_channels table - primary source of truth
   created_at: string;
   updated_at: string;
   // Publishing & Override fields
@@ -87,7 +87,7 @@ export interface AIContent {
   override_at: string | null;
   override_by: string | null;
   // NEW: URL injection preference (per-item control)
-  url_injection_preference?: 'none' | 'in_post' | 'as_comment';
+  url_injection_preference?: URLInjectionPreference;
   // NEW: External comment ID tracking (for 'as_comment' mode)
   external_comment_id?: string | null;
 }
@@ -152,8 +152,8 @@ export interface AIMedia {
   reviewed_by: string | null;
   reviewed_at: string | null;
   metadata: Record<string, unknown> | null;
-  platform?: string; // Optional - legacy field, use social_account_id instead
-  social_account_id: number | null; // FK to social_accounts table - primary source of truth
+  platform?: string; // Optional - legacy field, use distribution_channel_id instead
+  distribution_channel_id: number | null; // FK to distribution_channels table - primary source of truth
   created_at: string;
   updated_at: string;
   // Override fields. NOTE: there is no `selected_for_publish` on media — a
@@ -189,16 +189,16 @@ export interface CreateAIMediaInput {
 }
 
 // =============================================================================
-// Social Account Types
+// Distribution Channel Types
 // =============================================================================
 
-export type SocialChannel = 'slack' | 'linkedin' | 'facebook' | 'instagram' | 'twitter' | 'youtube';
-export type SocialAccountType = 'personal' | 'page' | 'organization' | 'channel';
+export type ChannelKind = 'slack' | 'linkedin' | 'facebook' | 'instagram' | 'twitter' | 'youtube';
+export type DistributionChannelType = 'personal' | 'page' | 'organization' | 'channel';
 
-export interface SocialAccount {
+export interface DistributionChannel {
   id: number;
-  channel: SocialChannel;
-  account_type: SocialAccountType;
+  channel: ChannelKind;
+  account_type: DistributionChannelType;
   account_name: string;
   account_id: string;
   platform: string;
@@ -213,9 +213,9 @@ export interface SocialAccount {
   updated_at: string;
 }
 
-export interface CreateSocialAccountInput {
-  channel: SocialChannel;
-  account_type: SocialAccountType;
+export interface CreateDistributionChannelInput {
+  channel: ChannelKind;
+  account_type: DistributionChannelType;
   account_name: string;
   account_id: string;
   access_token?: string;
@@ -236,7 +236,7 @@ export interface ScheduledPost {
   campaign_id: number;
   content_id: number | null;
   media_ids: number[];
-  social_account_id: number;
+  distribution_channel_id: number;
   scheduled_at: string;
   published_at: string | null;
   status: ScheduledPostStatus;
@@ -254,7 +254,7 @@ export interface CreateScheduledPostInput {
   campaign_id: number;
   content_id?: number;
   media_ids?: number[];
-  social_account_id: number;
+  distribution_channel_id: number;
   scheduled_at: string;
   created_by?: string;
 }
@@ -373,7 +373,11 @@ export type ContentSourceType =
   | 'design_doc' // Internal design docs (product-hub admin; preview route only, no public page)
   | 'from_scratch';
 
-export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment';
+/**
+ * Where a post's link goes: nowhere, written into the post, posted as a comment, or opened by the post itself
+ * (`as_link`: tapping the notification of an OpenFrame announcement opens it).
+ */
+export type URLInjectionPreference = 'none' | 'in_post' | 'as_comment' | 'as_link';
 
 export interface ContentSourceOption {
   id: number | string; // Events/podcasts/webinars use UUID strings
