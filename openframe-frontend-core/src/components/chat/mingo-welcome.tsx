@@ -88,10 +88,9 @@ export interface MingoWelcomeProps {
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
   onStartGuideChat?: () => void;
-  /** Agent this empty state belongs to — forwarded to the quick-action
-   *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
-   *  brick stack at 2 rows. Defaults to `'mingo'` (this is the Mingo surface). */
-  agentSlug?: string;
+  /** The host is still reading the quick actions: the set draws its loading form in every slot, so the empty state
+   *  keeps its height when they land. */
+  quickActionsLoading?: boolean;
   /** Appended to the root element. */
   className?: string;
 }
@@ -146,7 +145,7 @@ export function MingoWelcome({
   loadError = false,
   onRetry,
   onStartGuideChat,
-  agentSlug = 'mingo',
+  quickActionsLoading = false,
   className,
 }: MingoWelcomeProps) {
   // Greeting never weaves the user's name in — always the plain "Hey, I'm
@@ -316,18 +315,12 @@ export function MingoWelcome({
             </div>
           )}
 
-          {/* Quick actions. "Start Guide Chat" stays pinned above the wall — it's
-          the primary mode switch and must never scroll out of reach. The rest
-          render in the shared {@link QuickActionWall} in BRICK mode (the SAME
-          chip wall the website hero uses): 2 stacked row marquees under left/
-          right edge fades, so a long agent action set gets "reach" without
-          squeezing the composer. `pauseOnHover` freezes the hovered row so a
-          moving chip never dodges a click; hover/focus previews the action's
-          full prompt in the composer. */}
-          {/* The standalone chip sits one WALL PITCH above the wall, so it reads
-              as that wall's first row rather than a separate control. */}
-          {(onStartGuideChat || (quickActions && quickActions.length > 0)) && (
-            <div className="flex shrink-0 flex-col gap-[var(--chip-wall-gap)]">
+          {/* Quick actions. "Start Guide Chat" stays pinned above the set: it is the primary mode switch and must
+              never move out of reach. The rest are the static {@link QuickActionSet} (fixed slots, "More" for the
+              rest); hover/focus previews the action's full prompt in the composer. The standalone chip sits one
+              chip gap above the set, so it reads as its first row rather than a separate control. */}
+          {(onStartGuideChat || (quickActions && quickActions.length > 0) || quickActionsLoading) && (
+            <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xs)]">
               {onStartGuideChat && (
                 <QuickActionChipButton
                   label="Start Guide Chat"
@@ -337,14 +330,12 @@ export function MingoWelcome({
                   className="self-start"
                 />
               )}
-              {quickActions && quickActions.length > 0 && (
-                <MingoQuickActionWall
-                  quickActions={quickActions}
-                  onQuickActionHover={onQuickActionHover}
-                  onQuickActionHoverEnd={onQuickActionHoverEnd}
-                  agentSlug={agentSlug}
-                />
-              )}
+              <MingoQuickActionWall
+                quickActions={quickActions ?? []}
+                loading={quickActionsLoading && !quickActions?.length}
+                onQuickActionHover={onQuickActionHover}
+                onQuickActionHoverEnd={onQuickActionHoverEnd}
+              />
             </div>
           )}
         </div>
