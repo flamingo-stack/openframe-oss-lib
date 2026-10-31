@@ -42,6 +42,7 @@ export default defineConfig([
       'utils/humanity-signals': 'src/utils/humanity-signals.ts',
       'utils/form-rescue': 'src/utils/form-rescue.ts',
       'utils/mobile-app': 'src/utils/mobile-app.ts',
+      'utils/notifications': 'src/utils/notifications.ts',
       // JSX-free leaves, each with its own `exports` subpath so hub SCRIPTS and
       // `server-only` modules import them without React or the utils barrel.
       'utils/platform-identity': 'src/utils/platform-identity.ts',

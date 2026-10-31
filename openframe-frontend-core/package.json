@@ -287,6 +287,12 @@
       "require": "./dist/utils/mobile-app.cjs",
       "default": "./dist/utils/mobile-app.js"
     },
+    "./utils/notifications": {
+      "types": "./dist/utils/notifications.d.ts",
+      "import": "./dist/utils/notifications.js",
+      "require": "./dist/utils/notifications.cjs",
+      "default": "./dist/utils/notifications.js"
+    },
     "./utils/platform-identity": {
       "types": "./dist/utils/platform-identity.d.ts",
       "import": "./dist/utils/platform-identity.js",

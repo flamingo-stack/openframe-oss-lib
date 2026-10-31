@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
+import type { NotificationSeverity } from '../../../utils/notifications';
 import { APPROVAL_STATUS, type ApprovalBatchData, type ChatApprovalStatus } from '../../chat/types';
 
 export type NotificationVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
-
-export type NotificationSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'DANGER';
 
 export interface Notification {
   id: string;
