@@ -16,7 +16,8 @@ export type CampaignStatus = 'draft' | 'active' | 'completed';
 /** What a campaign is about (`marketing_campaigns.content_source`). */
 export interface CampaignContentSource {
   type: ContentSourceType | null;
-  id: number | string | null;
+  /** The source record; absent for a campaign written from scratch. */
+  id?: number | string | null;
   url?: string | null;
   /** The blog a seed-blog campaign writes its article for. */
   blog_account_id?: number | null;
