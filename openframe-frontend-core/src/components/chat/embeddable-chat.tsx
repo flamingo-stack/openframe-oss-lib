@@ -2897,6 +2897,9 @@ function EmbeddableChatInner({
             // While the admin greeting is still being fetched, render a
             // subtitle skeleton instead of flashing empty → text.
             subtitleLoading={emptyStateLoading}
+            // The page's topic is read with the empty state: the chip wall
+            // draws its loading form until that topic's chips land.
+            quickActionsLoading={!!emptyStateUrl && emptyStateLoading}
             {...guideWelcome}
             // Agent identity (name → title, icon → empty-state glyph)
             // wins over the host `guideWelcome` spread + built-in

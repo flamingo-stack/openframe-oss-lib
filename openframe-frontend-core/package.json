@@ -281,6 +281,12 @@
       "require": "./dist/utils/form-rescue.cjs",
       "default": "./dist/utils/form-rescue.js"
     },
+    "./utils/page-topics": {
+      "types": "./dist/utils/page-topics.d.ts",
+      "import": "./dist/utils/page-topics.js",
+      "require": "./dist/utils/page-topics.cjs",
+      "default": "./dist/utils/page-topics.js"
+    },
     "./utils/mobile-app": {
       "types": "./dist/utils/mobile-app.d.ts",
       "import": "./dist/utils/mobile-app.js",

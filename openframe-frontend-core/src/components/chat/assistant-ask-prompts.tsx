@@ -5,6 +5,7 @@ import {
   useAssistantRuntime,
   type AssistantOpenRequest,
 } from '../../contexts/assistant-runtime-context';
+import { usePageTopic } from '../../contexts/page-topics-context';
 import { AskCard, AskPrompts, type AskPromptsProps } from './ask-prompts';
 import { assistantAvailable, ASK_PROMPTS_DEFAULT_COUNT, useAskSurface } from './hooks/use-ask-prompts';
 
@@ -23,7 +24,11 @@ export interface AssistantAskPromptsProps extends Pick<AskPromptsProps, 'align' 
    * questions (a FAQ), with a title, a line of description and the launcher.
    */
   variant?: 'row' | 'card';
-  /** What this surface is about: any string the host's questions endpoint knows. Reported with every click. */
+  /**
+   * A topic of the surface's OWN (a page section with a topic of its own, such
+   * as one row of questions). Absent: the page's topic, read from its address
+   * (`usePageTopic`), as every other surface of the page uses.
+   */
   topic?: string;
   /** How many questions it offers: the same number of slots on every load. Absent: three (a card: the runtime's, else three). */
   count?: number;
@@ -78,7 +83,8 @@ export function AssistantAskPrompts({
   const card = variant === 'card';
   const assistant = useAssistantRuntime();
   const slots = count ?? (card ? assistant?.askCard?.count : undefined) ?? ASK_PROMPTS_DEFAULT_COUNT;
-  const ask = useAskSurface({ topic, count: slots, exclude, enabled, onOpen });
+  const pageTopic = usePageTopic();
+  const ask = useAskSurface({ topic: topic ?? pageTopic, count: slots, exclude, enabled, onOpen });
   if (!assistantAvailable(assistant)) return null;
 
   const shared = {
