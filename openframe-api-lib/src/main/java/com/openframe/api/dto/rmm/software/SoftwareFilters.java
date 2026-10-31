@@ -13,7 +13,7 @@ public class SoftwareFilters {
     private List<SoftwareFilterOption> versionStatuses;
     private List<SoftwareFilterOption> severities;
 
-    // empty until the auto-update policy backs it: the schema field is non-null
+    // non-null in the schema; the tenant-wide facet stays empty until the read model backs it
     @Builder.Default
     private List<SoftwareFilterOption> autoUpdateStatuses = List.of();
 

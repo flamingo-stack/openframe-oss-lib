@@ -10,6 +10,7 @@ import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
+import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
@@ -19,7 +20,14 @@ import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
 import com.openframe.api.service.rmm.fleet.HostInventory;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
+import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -42,6 +50,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -76,6 +85,8 @@ class SoftwareInventoryServiceTest {
     @Mock private com.openframe.data.repository.tool.IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
     @Mock private SoftwareAutoUpdateService autoUpdateService;
+    @Mock private TagAssignmentRepository tagAssignmentRepository;
+    @Mock private OrganizationRepository organizationRepository;
 
     @Captor private ArgumentCaptor<List<SoftwareResponse>> pageRowsCaptor;
     @Captor private ArgumentCaptor<Function<FleetSoftware, Stream<String>>> keysOfCaptor;
@@ -85,7 +96,7 @@ class SoftwareInventoryServiceTest {
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService);
+                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService, tagAssignmentRepository, organizationRepository);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }
@@ -93,7 +104,7 @@ class SoftwareInventoryServiceTest {
     @Test
     @DisplayName("listDevicesForSoftware: a non-numeric id short-circuits to empty without touching Fleet")
     void listDevices_nonNumericId_emptyNoFleet() {
-        assertThat(service.listDevicesForSoftware("not-a-number", null, null, 0, 50).items()).isEmpty();
+        assertThat(service.listDevicesForSoftware("not-a-number", null, null, 0, 50, null).items()).isEmpty();
         verifyNoInteractions(fleet, hostMachineResolver);
     }
 
@@ -118,7 +129,7 @@ class SoftwareInventoryServiceTest {
         machine.setHostname("host-1");
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(1L, machine));
 
-        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 50);
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 50, null);
 
         assertThat(result.items()).hasSize(1);
         SoftwareOnDeviceResponse row = result.items().get(0);
@@ -272,7 +283,7 @@ class SoftwareInventoryServiceTest {
         pc.setHostname("pc");
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(1L, mac, 2L, mac, 3L, pc));
 
-        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("103", null, null, 0, 50);
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("103", null, null, 0, 50, null);
 
         assertThat(result.items())
                 .extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getSoftwareVersion)
@@ -303,12 +314,12 @@ class SoftwareInventoryServiceTest {
         // The device is UP_TO_DATE or OUTDATED; a lifecycle status it cannot have filters it out.
         SoftwareOnDeviceFilterInput drop = new SoftwareOnDeviceFilterInput();
         drop.setStatuses(List.of(SoftwareOnDeviceStatus.SCHEDULED_UNINSTALL));
-        assertThat(service.listDevicesForSoftware("42", drop, null, 0, 50).items()).isEmpty();
+        assertThat(service.listDevicesForSoftware("42", drop, null, 0, 50, null).items()).isEmpty();
 
         // Selecting both possible static statuses keeps it.
         SoftwareOnDeviceFilterInput keep = new SoftwareOnDeviceFilterInput();
         keep.setStatuses(List.of(SoftwareOnDeviceStatus.UP_TO_DATE, SoftwareOnDeviceStatus.OUTDATED));
-        assertThat(service.listDevicesForSoftware("42", keep, null, 0, 50).items()).hasSize(1);
+        assertThat(service.listDevicesForSoftware("42", keep, null, 0, 50, null).items()).hasSize(1);
     }
 
     @Test
@@ -333,7 +344,7 @@ class SoftwareInventoryServiceTest {
         assertThat(filters.getStatuses()).isNotEmpty();
         int total = filters.getStatuses().stream().mapToInt(SoftwareFilterOption::getCount).sum();
         assertThat(total).isEqualTo(1); // one correlated device → one status bucket, count 1
-        // non-null in the schema, not backed yet: empty, never null
+        // non-null in the schema: no device has a value for these, so empty, never null
         assertThat(filters.getInstalledBy()).isEmpty();
         assertThat(filters.getAutoUpdateStatuses()).isEmpty();
         assertThat(filters.getOrganizations()).isEmpty();
@@ -416,7 +427,7 @@ class SoftwareInventoryServiceTest {
                 .thenReturn(new com.openframe.sdk.fleetmdm.model.Vulnerability());
 
         PageResult<SoftwareVulnerabilityResponse> result =
-                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
+                service.listVulnerabilitiesForSoftware("42", null, null, 0, 50, null, true);
 
         assertThat(result.items()).hasSize(1);
         SoftwareVulnerabilityResponse row = result.items().get(0);
@@ -436,7 +447,7 @@ class SoftwareInventoryServiceTest {
         when(fleet.getVulnerability(org.mockito.ArgumentMatchers.anyString())).thenReturn(null); // 404 from Fleet
 
         PageResult<SoftwareVulnerabilityResponse> result =
-                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
+                service.listVulnerabilitiesForSoftware("42", null, null, 0, 50, null, true);
 
         assertThat(result.items()).hasSize(1);
         assertThat(result.items().get(0).getCveId()).isEqualTo("CVE-2026-00000");
@@ -693,6 +704,237 @@ class SoftwareInventoryServiceTest {
             rows.forEach(row -> setter.accept(row, countByName.get(row.getName())));
             return null;
         }).when(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("softwareDevices status: a device on the highest version seen is UP_TO_DATE, the rest OUTDATED, in numeric order")
+    void listDevices_statusAgainstTheHighestVersion() {
+        stubDevices("homebrew_packages", device("m-1", "9.0"), device("m-2", "10.0"));
+
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        assertThat(rows).extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getStatus)
+                .containsExactlyInAnyOrder(tuple("m-1", SoftwareOnDeviceStatus.OUTDATED), tuple("m-2", SoftwareOnDeviceStatus.UP_TO_DATE));
+    }
+
+    @Test
+    @DisplayName("softwareDevices sort: by softwareVersion in numeric order, both directions; an unknown field is a client error before Fleet")
+    void listDevices_sortBySoftwareVersion() {
+        stubDevices("apps", device("m-1", "9.0"), device("m-2", "10.0"), device("m-3", "1.5"));
+
+        assertThat(service.listDevicesForSoftware("42", null, null, 0, 50, sort("softwareVersion", SortDirection.ASC)).items())
+                .extracting(SoftwareOnDeviceResponse::getSoftwareVersion).containsExactly("1.5", "9.0", "10.0");
+        assertThat(service.listDevicesForSoftware("42", null, null, 0, 50, sort("softwareVersion", SortDirection.DESC)).items())
+                .extracting(SoftwareOnDeviceResponse::getSoftwareVersion).containsExactly("10.0", "9.0", "1.5");
+    }
+
+    @Test
+    void listDevices_unknownSortField_rejectedBeforeFleet() {
+        assertThrows(BadRequestException.class,
+                () -> service.listDevicesForSoftware("42", null, null, 0, 50, sort("hostname", SortDirection.ASC)));
+        verifyNoInteractions(fleet);
+    }
+
+    @Test
+    @DisplayName("softwareDevices installedBy: the package manager Fleet names; an app it only calls apps/programs is unknown, not Manually")
+    void listDevices_installedBy() {
+        stubDevices("homebrew_packages", device("m-1", "1.0"));
+        assertThat(service.listDevicesForSoftware("42", null, null, 0, 50, null).items())
+                .extracting(SoftwareOnDeviceResponse::getInstalledBy).containsExactly(SoftwareSource.BREW);
+
+        stubDevices("apps", device("m-1", "1.0"));
+        assertThat(service.listDevicesForSoftware("42", null, null, 0, 50, null).items().get(0).getInstalledBy()).isNull();
+    }
+
+    @Test
+    @DisplayName("softwareDevices filters: customer, device status, installedBy, tags and auto-update each narrow the list")
+    void listDevices_filters() {
+        Machine acme = device("m-1", "1.0");
+        acme.setOrganizationId("org-acme");
+        acme.setStatus(DeviceStatus.ONLINE);
+        Machine globex = device("m-2", "1.0");
+        globex.setOrganizationId("org-globex");
+        globex.setStatus(DeviceStatus.OFFLINE);
+        stubDevices("homebrew_packages", acme, globex);
+        autoUpdateOn("m-1");
+
+        SoftwareOnDeviceFilterInput byCustomer = new SoftwareOnDeviceFilterInput();
+        byCustomer.setOrganizationIds(List.of("org-globex"));
+        assertThat(machineIds(byCustomer)).containsExactly("m-2");
+
+        SoftwareOnDeviceFilterInput byDeviceStatus = new SoftwareOnDeviceFilterInput();
+        byDeviceStatus.setDeviceStatuses(List.of(DeviceStatus.ONLINE));
+        assertThat(machineIds(byDeviceStatus)).containsExactly("m-1");
+
+        SoftwareOnDeviceFilterInput byAutoUpdate = new SoftwareOnDeviceFilterInput();
+        byAutoUpdate.setAutoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.ON));
+        assertThat(machineIds(byAutoUpdate)).containsExactly("m-1");
+
+        SoftwareOnDeviceFilterInput byInstalledBy = new SoftwareOnDeviceFilterInput();
+        byInstalledBy.setInstalledBy(List.of(SoftwareSource.WINGET));
+        assertThat(machineIds(byInstalledBy)).isEmpty();
+
+        SoftwareOnDeviceFilterInput byTag = new SoftwareOnDeviceFilterInput();
+        byTag.setDeviceTagIds(List.of("tag-1"));
+        when(tagAssignmentRepository.findByEntityIdInAndTagIdInAndEntityType(List.of("m-1", "m-2"), List.of("tag-1"), TagEntityType.DEVICE))
+                .thenReturn(List.of(TagAssignment.builder().entityId("m-2").build()));
+        assertThat(machineIds(byTag)).containsExactly("m-2");
+    }
+
+    @Test
+    @DisplayName("softwareDevices: the auto-update filter sees every device, not only the page, and the count follows it")
+    void listDevices_autoUpdateFilter_beforeThePage() {
+        stubDevices("homebrew_packages", device("m-1", "1.0"), device("m-2", "1.0"), device("m-3", "1.0"));
+        autoUpdateOn("m-3");
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setAutoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.ON));
+
+        PageResult<SoftwareOnDeviceResponse> page = service.listDevicesForSoftware("42", filter, null, 0, 1, null);
+
+        assertThat(page.items()).extracting(row -> row.getDevice().getMachineId()).containsExactly("m-3");
+        assertThat(page.filteredCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("softwareDeviceFilters: installedBy, auto-update, device status and customer are counted over the devices")
+    void softwareDeviceFilters_allFacets() {
+        Machine acme = device("m-1", "1.0");
+        acme.setOrganizationId("org-acme");
+        acme.setStatus(DeviceStatus.ONLINE);
+        Machine alsoAcme = device("m-2", "1.0");
+        alsoAcme.setOrganizationId("org-acme");
+        alsoAcme.setStatus(DeviceStatus.OFFLINE);
+        Machine lost = device("m-3", "1.0");
+        lost.setOrganizationId("org-gone");
+        lost.setStatus(DeviceStatus.ONLINE);
+        stubDevices("homebrew_packages", acme, alsoAcme, lost);
+        autoUpdateOn("m-1");
+        Organization organization = new Organization();
+        organization.setOrganizationId("org-acme");
+        organization.setName("Acme");
+        when(organizationRepository.findByOrganizationIdIn(Set.of("org-acme", "org-gone"))).thenReturn(List.of(organization));
+
+        SoftwareOnDeviceFilters filters = service.getSoftwareDeviceFilters("42", null);
+
+        assertThat(filters.getInstalledBy()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("BREW", 3));
+        assertThat(filters.getAutoUpdateStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("ON", 1));
+        assertThat(filters.getDeviceStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactlyInAnyOrder(tuple("ONLINE", 2), tuple("OFFLINE", 1));
+        // a customer without a record still shows, by its id
+        assertThat(filters.getOrganizations()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getLabel, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("org-acme", "Acme", 2), tuple("org-gone", "org-gone", 1));
+    }
+
+    @Test
+    void softwareDeviceFilters_organizationWithoutName_labelledByItsId() {
+        Machine machine = device("m-1", "1.0");
+        machine.setOrganizationId("org-unnamed");
+        stubDevices("apps", machine);
+        Organization organization = new Organization();
+        organization.setOrganizationId("org-unnamed");
+        when(organizationRepository.findByOrganizationIdIn(Set.of("org-unnamed"))).thenReturn(List.of(organization));
+
+        assertThat(service.getSoftwareDeviceFilters("42", null).getOrganizations())
+                .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getLabel)
+                .containsExactly(tuple("org-unnamed", "org-unnamed"));
+    }
+
+    @Test
+    void softwareDeviceFilters_noOrganizationOnAnyDevice_noLookup() {
+        stubDevices("apps", device("m-1", "1.0"));
+
+        assertThat(service.getSoftwareDeviceFilters("42", null).getOrganizations()).isEmpty();
+        verifyNoInteractions(organizationRepository);
+    }
+
+    @Test
+    @DisplayName("softwareVulnerabilities: the severities filter keeps only those bands; no filter keeps all")
+    void listVulnerabilitiesForSoftware_severitiesFilter() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(42L);
+        title.setVersions(List.of(versionWithCve("1.0", "CVE-HIGH"), versionWithCve("1.0", "CVE-LOW")));
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+        when(fleet.getVulnerability("CVE-HIGH")).thenReturn(cvss(8.5));
+        when(fleet.getVulnerability("CVE-LOW")).thenReturn(cvss(2.0));
+        SoftwareVulnerabilityFilterInput high = new SoftwareVulnerabilityFilterInput();
+        high.setSeverities(List.of(SoftwareCveSeverity.HIGH));
+
+        assertThat(service.listVulnerabilitiesForSoftware("42", high, null, 0, 50, null, true).items())
+                .extracting(SoftwareVulnerabilityResponse::getCveId).containsExactly("CVE-HIGH");
+        assertThat(service.listVulnerabilitiesForSoftware("42", null, null, 0, 50, null, true).items()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("deviceSoftware: the auto-update filter narrows the rows and the count, and the facet counts it")
+    void listSoftwareForDevice_autoUpdateFilterAndFacet() {
+        stubInventory(List.of(title(10L, "Google Chrome", "apps", "120.0"), title(11L, "node", "homebrew_packages", "20.1")), List.of());
+        org.mockito.Mockito.doAnswer(call -> {
+            List<SoftwareResponse> rows = call.getArgument(1);
+            rows.stream().filter(row -> "node".equals(row.getName())).forEach(row -> row.setAutoUpdate(SoftwareAutoUpdateStatus.ON));
+            return null;
+        }).when(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setAutoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.ON));
+
+        PageResult<SoftwareResponse> page = service.listSoftwareForDevice(MACHINE_ID, filter, null, 0, 1, null);
+
+        assertThat(page.items()).extracting(SoftwareResponse::getName).containsExactly("node");
+        assertThat(page.filteredCount()).isEqualTo(1);
+        assertThat(service.getDeviceSoftwareFilters(MACHINE_ID, null).getAutoUpdateStatuses())
+                .extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount).containsExactly(tuple("ON", 1));
+    }
+
+    private List<String> machineIds(SoftwareOnDeviceFilterInput filter) {
+        return service.listDevicesForSoftware("42", filter, null, 0, 50, null).items().stream()
+                .map(row -> row.getDevice().getMachineId()).toList();
+    }
+
+    private void autoUpdateOn(String machineId) {
+        org.mockito.Mockito.doAnswer(call -> {
+            List<SoftwareOnDeviceResponse> rows = call.getArgument(1);
+            rows.stream().filter(row -> machineId.equals(row.getDevice().getMachineId()))
+                    .forEach(row -> row.setAutoUpdate(SoftwareAutoUpdateStatus.ON));
+            return null;
+        }).when(autoUpdateService).applyToDevices(eq("42"), anyList());
+    }
+
+    // one Fleet version per device; the version is carried on the machine's hostname for the stub below
+    private void stubDevices(String fleetSource, Machine... machines) {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setSource(fleetSource);
+        List<SoftwareTitleVersion> versions = new java.util.ArrayList<>();
+        Map<Long, Host> hostByVersion = new java.util.HashMap<>();
+        Map<Long, Machine> machineByHost = new java.util.HashMap<>();
+        for (int i = 0; i < machines.length; i++) {
+            long id = i + 1L;
+            SoftwareTitleVersion version = new SoftwareTitleVersion();
+            version.setId(id);
+            version.setVersion(machines[i].getHostname());
+            versions.add(version);
+            hostByVersion.put(id, host(id, "u" + id, machines[i].getHostname()));
+            machineByHost.put(id, machines[i]);
+        }
+        title.setVersions(versions);
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+        when(fleet.searchHosts(any(HostSearchRequest.class)))
+                .thenAnswer(call -> List.of(hostByVersion.get(call.<HostSearchRequest>getArgument(0).getSoftwareVersionId())));
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(machineByHost);
+    }
+
+    private static Machine device(String machineId, String version) {
+        Machine machine = new Machine();
+        machine.setMachineId(machineId);
+        machine.setHostname(version);
+        return machine;
+    }
+
+    private static com.openframe.sdk.fleetmdm.model.Vulnerability cvss(double score) {
+        com.openframe.sdk.fleetmdm.model.Vulnerability vulnerability = new com.openframe.sdk.fleetmdm.model.Vulnerability();
+        vulnerability.setCvssScore(score);
+        return vulnerability;
     }
 
     private void stubInventory(List<HostSoftwareTitle> titles, List<FleetSoftware> hostSoftware) {

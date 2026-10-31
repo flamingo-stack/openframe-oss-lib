@@ -173,6 +173,9 @@ type Software {
     always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with).
     Sortable as adoptionCount."""
     adoptionCount: Int
+
+    "Devices that have this title installed."
+    devicesCount: Int
 }
 
 type SoftwareVulnerabilitySummary {
