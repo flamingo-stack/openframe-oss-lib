@@ -188,8 +188,9 @@ export interface QuickActionChipButtonProps {
   loading?: boolean;
   /** While loading, the label placeholder's width in `ch` (see {@link QuickActionChipSkeletonProps.labelCh}). */
   labelCh?: number;
-  /** The chip fills its slot: full width, label clipped on one line (its tooltip shows it whole). The
-   *  quick-action set's fixed grid draws its chips this way, so a long name never changes the slot's size. */
+  /** The chip fills its slot: full width and a FIXED two-line height, the label in sentence type as it was
+   *  written (not the uppercase label type), wrapping to at most two lines. The quick-action set's fixed grid draws
+   *  its chips this way, so a long name never changes the slot's size. */
   fill?: boolean;
   /** The list's markers (`data-loading-item`), forwarded in both forms. */
   [marker: `data-${string}`]: unknown;
@@ -218,8 +219,15 @@ interface QuickActionChipSkeletonProps {
   [marker: `data-${string}`]: unknown;
 }
 
-/** A chip that fills its slot: the tag spans the slot, its content starts at the leading edge. */
-const FILL_TAG_CLASS = 'w-full min-w-0 justify-start';
+/** A chip that fills its slot: the tag spans the slot at a fixed two-line height, its content at the leading edge.
+ *  Prompts read better in sentence case and whole than uppercase and cut (NN/g, "glanceable fonts"; AWS Cloudscape,
+ *  support prompts), so a filled chip uses the sentence type and wraps instead of clipping on one line. */
+const FILL_TAG_CLASS = 'h-14 w-full min-w-0 justify-start text-left';
+
+/** A filled chip's label: at most two lines, broken anywhere a long word needs it. */
+function fillLabel(label: ReactNode): ReactNode {
+  return <span className="line-clamp-2 whitespace-normal [overflow-wrap:anywhere]">{label}</span>;
+}
 
 /**
  * Loading placeholder for {@link QuickActionChipButton} — renders the REAL
@@ -244,7 +252,7 @@ function QuickActionChipSkeleton({
     <Tag
       {...loadingItemProps(props)}
       variant="outline"
-      size={question ? 'sentence' : size}
+      size={question || fill ? 'sentence' : size}
       className={cn(question && 'max-w-full', fill && FILL_TAG_CLASS, className)}
       icon={
         icon && !question ? (
@@ -320,7 +328,8 @@ export function QuickActionChipButton({
   const themedIcon = theme && isQuickActionIconSpec(icon) && !icon.accent ? { ...icon, accent: theme.accent } : icon;
   const resolvedLozenge = lozenge === true ? theme?.lozenge : lozenge === false ? undefined : lozenge;
   const resolvedIcon = renderQuickActionIcon(themedIcon);
-  const resolvedLabel = composeChipLabel(label, resolvedLozenge);
+  const composedLabel = composeChipLabel(label, resolvedLozenge);
+  const resolvedLabel = fill ? fillLabel(composedLabel) : composedLabel;
   const question = variant === 'question';
   const tagVariant = selected
     ? selectedAccent === 'cyan'
@@ -329,7 +338,7 @@ export function QuickActionChipButton({
     : question
       ? 'outline'
       : variant;
-  const tagSize = question ? 'sentence' : size;
+  const tagSize = question || fill ? 'sentence' : size;
   if (!interactive) {
     return (
       <Tag

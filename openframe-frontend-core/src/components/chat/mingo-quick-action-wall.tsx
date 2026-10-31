@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { usePageTopicStamp } from '../../contexts/page-topics-context';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon } from '../icons-v2-generated';
@@ -45,13 +45,14 @@ export interface QuickActionSetProps {
 
 /**
  * A chat's quick actions: a STATIC set of {@link QUICK_ACTION_SET_SLOTS} fixed slots above the composer, never a
- * moving wall. Its height is decided by its container's width alone (one column under 24rem, two under 48rem, four
+ * moving wall. Its height is decided by its container's width alone (one column under 18rem, two under 48rem, four
  * above), never by the actions: fewer actions leave their slots empty, more turn the last slot into "More (n)", which
  * opens the rest in a menu that floats over the page, and a long name clips on its one line (its tooltip shows it
  * whole). Loading draws the same slots, each the chip's own loading form. So the set is the same box loading,
  * loaded, with 1 action or 40, and opening "More" moves nothing.
  *
- * Hover or focus on a chip previews its prompt (`onHoverStart`), a click sends it (`onSelect`).
+ * A click on a chip, or on a row of the "More" menu, calls its `onSelect` (the chat puts the action's prompt into the
+ * composer to edit and send).
  */
 export function QuickActionSet({
   chips,
@@ -69,36 +70,13 @@ export function QuickActionSet({
   const rest = overflows ? chips.slice(QUICK_ACTION_SET_SLOTS - 1) : [];
   const empty = loading ? 0 : QUICK_ACTION_SET_SLOTS - shown.length - (overflows ? 1 : 0);
 
-  // The menu row the pointer or focus is on: its preview ends when the menu closes, which unmounts the row before
-  // it can report leaving (a pick, Escape, a click outside).
-  const hoveredRef = useRef<QuickActionChip | null>(null);
   const moreItems = rest.map(chip => {
     const icon =
       theme && isQuickActionIconSpec(chip.icon) && !chip.icon.accent
         ? { ...chip.icon, accent: theme.accent }
         : chip.icon;
-    return {
-      id: chip.id,
-      label: chip.label,
-      icon: renderQuickActionIcon(icon),
-      onClick: chip.onSelect,
-      // The hidden actions preview their prompt like the shown chips do.
-      onHoverStart: () => {
-        hoveredRef.current = chip;
-        chip.onHoverStart?.();
-      },
-      onHoverEnd: () => {
-        if (hoveredRef.current === chip) hoveredRef.current = null;
-        chip.onHoverEnd?.();
-      },
-    };
+    return { id: chip.id, label: chip.label, icon: renderQuickActionIcon(icon), onClick: chip.onSelect };
   });
-  const endMenuPreview = (open: boolean) => {
-    if (open || !hoveredRef.current) return;
-    const chip = hoveredRef.current;
-    hoveredRef.current = null;
-    chip.onHoverEnd?.();
-  };
 
   return (
     <div
@@ -107,7 +85,7 @@ export function QuickActionSet({
       className={cn('flex shrink-0 flex-col gap-[var(--spacing-system-xxs)] @container', className)}
     >
       {showTopic && <PageTopicLabel className="text-right" />}
-      <div className="grid grid-cols-1 gap-[var(--spacing-system-xs)] @[24rem]:grid-cols-2 @[48rem]:grid-cols-4">
+      <div className="grid grid-cols-1 gap-[var(--spacing-system-xs)] @[18rem]:grid-cols-2 @[48rem]:grid-cols-4">
         {loading ? (
           <LoadingItems count={QUICK_ACTION_SET_SLOTS}>
             {i => (
@@ -136,7 +114,6 @@ export function QuickActionSet({
                   groups={[{ items: moreItems }]}
                   align="end"
                   side="top"
-                  onOpenChange={endMenuPreview}
                   customTrigger={
                     <Button
                       variant="card"
@@ -184,10 +161,6 @@ function Slot({ unused = false, children }: { unused?: boolean; children: ReactN
 
 export interface MingoQuickActionWallProps {
   quickActions: ReadonlyArray<MingoQuickAction>;
-  /** Pointer/keyboard focus enters a chip — e.g. preview its prompt in the composer. */
-  onQuickActionHover?: (action: MingoQuickAction) => void;
-  /** Pointer/keyboard focus leaves the chip. */
-  onQuickActionHoverEnd?: () => void;
   /**
    * The actions are still being read: the set draws its chips' loading form in every slot, so a host that holds its
    * layout around it (a composer under it, a greeting centred above) does not move when the actions land.
@@ -204,8 +177,6 @@ export interface MingoQuickActionWallProps {
  */
 export function MingoQuickActionWall({
   quickActions,
-  onQuickActionHover,
-  onQuickActionHoverEnd,
   loading = false,
   showTopic,
   className,
@@ -219,8 +190,6 @@ export function MingoQuickActionWall({
         icon: action.icon,
         variant: action.variant,
         onSelect: action.onClick,
-        onHoverStart: () => onQuickActionHover?.(action),
-        onHoverEnd: () => onQuickActionHoverEnd?.(),
       }))}
       loading={loading}
       showTopic={showTopic}

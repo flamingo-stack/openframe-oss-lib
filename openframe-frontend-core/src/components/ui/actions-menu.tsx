@@ -59,11 +59,6 @@ export interface ActionsMenuItem {
    * the secondary is independently clickable (e.g. "open in new tab").
    */
   iconAction?: ActionsMenuItemIconAction;
-  /** The pointer or keyboard focus enters the row: e.g. preview what choosing it would do (a quick action's prompt
-   *  in the composer, as the quick-action chips do). Plain and link rows. */
-  onHoverStart?: () => void;
-  /** The pointer or keyboard focus leaves the row. */
-  onHoverEnd?: () => void;
 }
 
 export interface ActionsMenuGroup {
@@ -195,7 +190,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
     ROW_CLASSES,
     item.disabled
       ? 'pointer-events-none cursor-not-allowed text-ods-text-secondary opacity-60'
-      : 'text-ods-text-primary hover:bg-ods-bg-hover',
+      : 'text-ods-text-primary hover:bg-ods-bg-hover focus-visible:bg-ods-bg-hover',
   );
 
   const subTriggerClasses = cn(itemClasses, 'focus:bg-ods-bg-hover data-[state=open]:bg-ods-bg-active');
@@ -255,10 +250,6 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
           rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
           className={itemClasses}
           onClick={handleLinkClick}
-          onMouseEnter={item.onHoverStart}
-          onMouseLeave={item.onHoverEnd}
-          onFocus={item.onHoverStart}
-          onBlur={item.onHoverEnd}
           aria-disabled={item.disabled}
           tabIndex={item.disabled ? -1 : undefined}
         >
@@ -307,16 +298,26 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
         className={itemClasses}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
-        onMouseEnter={item.onHoverStart}
-        onMouseLeave={item.onHoverEnd}
-        onFocus={item.onHoverStart}
-        onBlur={item.onHoverEnd}
       >
         {rowContent}
       </div>
       {item.iconAction && <SecondaryAction action={item.iconAction} />}
     </div>
   );
+};
+
+/** The rows a keyboard moves between in an open menu: every enabled `menuitem` (plain, radio, submenu trigger). */
+function menuRows(content: HTMLElement | null): HTMLElement[] {
+  if (!content) return [];
+  return [...content.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([aria-disabled="true"])')];
+}
+
+/** The menu-button keys (WAI-ARIA APG, "Menu Button"): ↓/↑ move between rows (wrapping), Home/End jump to the ends. */
+const MENU_ROW_KEYS: Record<string, (index: number, count: number) => number> = {
+  ArrowDown: (index, count) => (index + 1) % count,
+  ArrowUp: (index, count) => (index - 1 + count) % count,
+  Home: () => 0,
+  End: (_index, count) => count - 1,
 };
 
 const GroupSeparator: React.FC = () => <div className="h-[3px] w-full bg-ods-bg-surface" />;
@@ -420,6 +421,14 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
   //     momentum and the ~1px settle after opening don't close the menu the
   //     user is reaching for.
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+  // On open, focus goes to the first row (WAI-ARIA APG, "Menu Button"). The rows are not Radix items, so Radix only
+  // focuses the menu itself; one frame later, once it has, the first row takes focus.
+  React.useEffect(() => {
+    if (!open) return undefined;
+    const frame = requestAnimationFrame(() => menuRows(contentRef.current)[0]?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
   React.useEffect(() => {
     if (!open) return undefined;
     if (typeof document === 'undefined') return undefined;
@@ -474,9 +483,21 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
         {triggerNode}
       </DropdownMenuTrigger>
       <DropdownMenuContent
+        ref={contentRef}
         align={align}
         side={side}
         sideOffset={sideOffset}
+        // The rows are this menu's own, not Radix items, so Radix does not move between them: the menu-button
+        // pattern's keys are done here, and the first row takes focus on open (the effect above).
+        onKeyDown={event => {
+          const move = MENU_ROW_KEYS[event.key];
+          if (!move) return;
+          const rows = menuRows(contentRef.current);
+          if (rows.length === 0) return;
+          event.preventDefault();
+          const current = rows.indexOf(document.activeElement as HTMLElement);
+          rows[move(Math.max(current, 0), rows.length)]?.focus();
+        }}
         onCloseAutoFocus={onCloseAutoFocus}
         className={cn('overflow-visible border-0 bg-transparent p-0 shadow-none', contentClassName)}
       >

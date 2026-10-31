@@ -33,9 +33,8 @@ export interface MingoQuickAction {
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip. */
   variant?: 'primary' | 'outline';
   onClick?: () => void;
-  /** Full prompt text previewed as ghost text in the composer on hover/focus.
-   *  The chip `label` is short; this reveals what the action will actually ask.
-   *  Omitted → falls back to `label`. */
+  /** The full prompt the action asks: in `EmbeddableChat` a click puts it into the composer to edit and send. The
+   *  chip `label` is short. Omitted → falls back to `label`. */
   prompt?: string;
 }
 
@@ -55,11 +54,6 @@ export interface MingoWelcomeProps {
   promoStorage?: 'local' | 'session';
   /** Extra quick-action chips appended after the "Start Guide Chat" chip. */
   quickActions?: ReadonlyArray<MingoQuickAction>;
-  /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
-   *  action's full `prompt` in the composer input. */
-  onQuickActionHover?: (action: MingoQuickAction) => void;
-  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
-  onQuickActionHoverEnd?: () => void;
   /** Returning-user variation: the user already has chats. Hides the
    *  "New to OpenFrame?" notification entirely and renders the "Start Guide
    *  Chat" chip in the muted `outline` style instead of the accent yellow. */
@@ -136,8 +130,6 @@ export function MingoWelcome({
   promoStorageKey = DEFAULT_PROMO_STORAGE_KEY,
   promoStorage = 'local',
   quickActions,
-  onQuickActionHover,
-  onQuickActionHoverEnd,
   hasExistingChats = false,
   dialogHistory,
   isLoadingHistory = false,
@@ -317,7 +309,7 @@ export function MingoWelcome({
 
           {/* Quick actions. "Start Guide Chat" stays pinned above the set: it is the primary mode switch and must
               never move out of reach. The rest are the static {@link QuickActionSet} (fixed slots, "More" for the
-              rest); hover/focus previews the action's full prompt in the composer. The standalone chip sits one
+              rest); a click puts the action's prompt into the composer. The standalone chip sits one
               chip gap above the set, so it reads as its first row rather than a separate control. */}
           {(onStartGuideChat || (quickActions && quickActions.length > 0) || quickActionsLoading) && (
             <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xs)]">
@@ -333,8 +325,6 @@ export function MingoWelcome({
               <MingoQuickActionWall
                 quickActions={quickActions ?? []}
                 loading={quickActionsLoading && !quickActions?.length}
-                onQuickActionHover={onQuickActionHover}
-                onQuickActionHoverEnd={onQuickActionHoverEnd}
               />
             </div>
           )}

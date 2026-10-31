@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { PageTopicsProvider } from '../../../contexts/page-topics-context';
 import { MingoQuickActionWall, QUICK_ACTION_SET_SLOTS, QuickActionSet } from '../mingo-quick-action-wall';
@@ -68,25 +68,44 @@ describe('QuickActionSet More menu', () => {
     });
   };
 
-  it('previews a hidden action like a shown chip, and ends it when the pointer leaves', () => {
-    const chips = chipsOf(5).map(chip => ({ ...chip, onHoverStart: vi.fn(), onHoverEnd: vi.fn() }));
+  it('picks a hidden action from its row, as a shown chip is picked', () => {
+    const chips = chipsOf(5);
     render(<QuickActionSet chips={chips} />);
     openMore(2);
-    const row = screen.getByRole('menuitem', { name: 'Action 4' });
-    fireEvent.mouseEnter(row);
-    expect(chips[4].onHoverStart).toHaveBeenCalledTimes(1);
-    fireEvent.mouseLeave(row);
-    expect(chips[4].onHoverEnd).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Action 4' }));
+    expect(chips[4].onSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('ends the preview when the menu closes on the row', () => {
-    const chips = chipsOf(5).map(chip => ({ ...chip, onHoverStart: vi.fn(), onHoverEnd: vi.fn() }));
-    render(<QuickActionSet chips={chips} />);
+  it('says it opens a menu and whether it is open', () => {
+    render(<QuickActionSet chips={chipsOf(5)} />);
+    const more = screen.getByRole('button', { name: 'More quick actions (2)' });
+    expect(more).toHaveAttribute('aria-haspopup', 'menu');
+    expect(more).toHaveAttribute('aria-expanded', 'false');
     openMore(2);
-    fireEvent.focus(screen.getByRole('menuitem', { name: 'Action 3' }));
-    expect(chips[3].onHoverStart).toHaveBeenCalledTimes(1);
-    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
-    expect(chips[3].onHoverEnd).toHaveBeenCalled();
+    expect(more).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('moves focus to the first row when it opens', async () => {
+    render(<QuickActionSet chips={chipsOf(5)} />);
+    const more = screen.getByRole('button', { name: 'More quick actions (2)' });
+    more.focus();
+    fireEvent.keyDown(more, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Action 3' })).toHaveFocus());
+  });
+
+  it('moves between its rows with the arrow keys, wrapping at the ends', async () => {
+    render(<QuickActionSet chips={chipsOf(6)} />);
+    const more = screen.getByRole('button', { name: 'More quick actions (3)' });
+    more.focus();
+    fireEvent.keyDown(more, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Action 3' })).toHaveFocus());
+    const menu = screen.getByRole('menu');
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: 'Action 4' })).toHaveFocus();
+    fireEvent.keyDown(menu, { key: 'End' });
+    expect(screen.getByRole('menuitem', { name: 'Action 5' })).toHaveFocus();
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: 'Action 3' })).toHaveFocus();
   });
 });
 
@@ -126,22 +145,9 @@ describe('QuickActionSet page topic', () => {
 });
 
 describe('MingoQuickActionWall', () => {
-  it('sends a chip and reports hover, as the welcome does', () => {
-    const onQuickActionHover = vi.fn();
-    const onQuickActionHoverEnd = vi.fn();
-    render(
-      <MingoQuickActionWall
-        quickActions={ACTIONS}
-        onQuickActionHover={onQuickActionHover}
-        onQuickActionHoverEnd={onQuickActionHoverEnd}
-      />,
-    );
-    const chip = screen.getByRole('button', { name: 'Patching' });
-    fireEvent.focus(chip);
-    expect(onQuickActionHover).toHaveBeenCalledWith(ACTIONS[0]);
-    fireEvent.blur(chip);
-    expect(onQuickActionHoverEnd).toHaveBeenCalled();
-    fireEvent.click(chip);
+  it('hands a clicked chip to its action', () => {
+    render(<MingoQuickActionWall quickActions={ACTIONS} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Patching' }));
     expect(ACTIONS[0].onClick).toHaveBeenCalledTimes(1);
   });
 

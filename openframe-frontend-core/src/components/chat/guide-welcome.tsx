@@ -49,8 +49,8 @@ export interface GuideWelcomeProps {
   subtitleLoading?: boolean;
   /** Quick-action chips — caller-provided; there are no built-in defaults, so
    *  the set is omitted entirely unless the host supplies actions. The first
-   *  ones fill the set's slots and the rest open from its "More" slot; hover/focus
-   *  previews the action's full `prompt` in the composer, click sends it. */
+   *  ones fill the set's slots and the rest open from its "More" slot; a click
+   *  hands the action to `onQuickAction` (the chat puts its `prompt` into the composer). */
   quickActions?: ReadonlyArray<GuideQuickAction>;
   /** The host is still reading the chips (e.g. the quick actions of the page's
    *  topic): with none to show yet the wall draws its own loading form. A
@@ -63,11 +63,6 @@ export interface GuideWelcomeProps {
   showTopic?: boolean;
   /** Fired when a quick-action chip is activated (click). */
   onQuickAction?: (action: GuideQuickAction) => void;
-  /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
-   *  action's full `prompt` in the composer input. */
-  onQuickActionHover?: (action: GuideQuickAction) => void;
-  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
-  onQuickActionHoverEnd?: () => void;
   /** Slash-command onboarding list — rendered inside the shared scroll region
    *  below the greeting (so greeting + list scroll together, with edge fades). */
   children?: ReactNode;
@@ -103,8 +98,6 @@ export function GuideWelcome({
   quickActionsLoading = false,
   showTopic: showTopicProp,
   onQuickAction,
-  onQuickActionHover,
-  onQuickActionHoverEnd,
   children,
   className,
 }: GuideWelcomeProps) {
@@ -119,8 +112,7 @@ export function GuideWelcome({
   const chipsAreLoading = inLoadingScope || (quickActionsLoading && quickActions.length === 0);
 
   // Map to the shared {@link QuickActionChip} shape the chat's {@link QuickActionSet} draws (the set Mingo's empty
-  // state and the OpenFrame dock draw too). `onHoverStart`/`onHoverEnd` drive the composer prompt preview and
-  // `onSelect` sends.
+  // state and the OpenFrame dock draw too). `onSelect` hands the action to the host.
   const chipItems = useMemo(
     () =>
       quickActions.map(action => ({
@@ -138,10 +130,8 @@ export function GuideWelcome({
           accent: action.accent ?? accentFromIdentityIcon(icon) ?? 'cyan',
         },
         onSelect: () => onQuickAction?.(action),
-        onHoverStart: () => onQuickActionHover?.(action),
-        onHoverEnd: () => onQuickActionHoverEnd?.(),
       })),
-    [quickActions, icon, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
+    [quickActions, icon, onQuickAction],
   );
 
   return (
@@ -198,8 +188,8 @@ export function GuideWelcome({
       </div>
 
       {/* The quick actions, pinned above the composer: the static {@link QuickActionSet} (fixed slots, its height
-          set by the width alone, "More" for the rest). Hover/focus previews the action's full prompt in the
-          composer, click sends it. The set prints the page's topic over itself. */}
+          set by the width alone, "More" for the rest). A click hands the action to `onQuickAction`. The set prints
+          the page's topic over itself. */}
       {(quickActions.length > 0 || chipsAreLoading) && (
         <QuickActionSet chips={chipItems} loading={chipsAreLoading} showTopic={showTopicProp} />
       )}
