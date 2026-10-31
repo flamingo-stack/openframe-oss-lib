@@ -3,14 +3,15 @@
  * topic is the page's, its path, the
  * block fetches that topic's FAQs or shows the host's own read, it renders
  * nothing when there is no FAQ, it can print its topic for whoever edits the
- * FAQs, and a shared page of the lib renders it only when its host passes
- * `faq`.
+ * FAQs, it reads the host's FAQ endpoint, and a shared page of the lib renders
+ * it only when its host names that endpoint (`EndpointsRuntime.faqsUrl`).
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { EndpointsRuntimeContext, type EndpointsRuntime } from '../../../contexts/endpoints-runtime-context';
 import { PageTopicsProvider } from '../../../contexts/page-topics-context';
 import type { Faq } from '../../../types/faq';
 import { DeliveryPage } from '../../help-center-pages/delivery-page';
@@ -19,6 +20,17 @@ import { FaqSection, PAGE_FAQ_SECTION_ID } from '../faq-section';
 /** The page under test is `/` (jsdom's address); its topic is the path it is given. */
 const onPage = (topic: string, node: React.ReactNode) => (
   <PageTopicsProvider pathname={topic}>{node}</PageTopicsProvider>
+);
+
+/** A host that serves its FAQs behind a proxy, as the OpenFrame app does. */
+const HOST_ENDPOINTS: EndpointsRuntime = {
+  announcementsUrl: '/content/api/announcements/active',
+  accessCode: { validateUrl: '/content/api/validate-access-code', consumeUrl: '/content/api/consume-access-code' },
+  contactUrl: '/content/api/contact',
+  faqsUrl: '/content/api/faqs',
+};
+const withHost = (node: React.ReactNode) => (
+  <EndpointsRuntimeContext.Provider value={HOST_ENDPOINTS}>{node}</EndpointsRuntimeContext.Provider>
 );
 
 const FAQS = [{ id: 1, question: 'Do I pay per technician?', answer: 'No.', section: null }] as unknown as Faq[];
@@ -56,6 +68,18 @@ describe("a page's own FAQ block", () => {
     const [request] = requestedFaqs();
     expect(request.pathname).toBe('/content/api/faqs');
     expect(request.searchParams.get('topic')).toBe('/pricing');
+  });
+
+  it("reads the host's FAQ endpoint when it states no base of its own", async () => {
+    render(withHost(onPage('/pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} />)));
+    expect(await screen.findByText('Do I pay per technician?')).toBeInTheDocument();
+    expect(requestedFaqs()[0].pathname).toBe('/content/api/faqs');
+  });
+
+  it('asks the same-origin /api/faqs with no base and no host endpoint', async () => {
+    render(onPage('/pricing', <FaqSection id={PAGE_FAQ_SECTION_ID} />));
+    await waitFor(() => expect(requestedFaqs()).toHaveLength(1));
+    expect(new URL(String(fetchMock.mock.calls[0][0]), 'https://host.test').pathname).toBe('/api/faqs');
   });
 
   it("shows the host's own read of the page's topic without fetching it", () => {
@@ -103,13 +127,13 @@ describe("a page's own FAQ block", () => {
 });
 
 describe('a shared page of the lib', () => {
-  it("shows the FAQ block of the page's topic when its host passes `faq`", async () => {
-    render(onPage('/pricing', <DeliveryPage shell={false} backButton={false} faq={{ apiBaseUrl: '/content' }} />));
+  it("shows the FAQ block of the page's topic when its host names its FAQ endpoint", async () => {
+    render(withHost(onPage('/pricing', <DeliveryPage shell={false} backButton={false} />)));
     expect(await screen.findByText('Do I pay per technician?')).toBeInTheDocument();
     expect(requestedFaqs()[0].searchParams.get('topic')).toBe('/pricing');
   });
 
-  it('shows no FAQ block, and asks for none, without the prop', async () => {
+  it('shows no FAQ block, and asks for none, when the host names no FAQ endpoint', async () => {
     render(<DeliveryPage shell={false} backButton={false} />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(requestedFaqs()).toHaveLength(0);

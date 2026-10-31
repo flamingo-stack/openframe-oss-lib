@@ -3,6 +3,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
+import { useEndpointsRuntime } from '../../contexts/endpoints-runtime-context';
 import { usePageTopic, usePageTopicStamp } from '../../contexts/page-topics-context';
 import Link from '../../embed-shims/next-link';
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
@@ -59,8 +60,8 @@ export interface FaqSectionProps {
   /** Maps to /api/faqs `?count=` (the 5-tier fill target). Absent → param
    *  not sent (server default applies). */
   minResults?: number;
-  /** Fetch-URL prefix for third-party embeds / reverse proxies
-   *  ('' = same-origin relative). */
+  /** Fetch-URL prefix for third-party embeds / reverse proxies ('' = same-origin relative). Absent: the host's
+   *  `EndpointsRuntime.faqsUrl`, else the same-origin `/api/faqs`. */
   apiBaseUrl?: string;
   /**
    * A block beside the questions, in place of the "ask the assistant" card.
@@ -94,6 +95,8 @@ export interface FaqSectionProps {
 }
 
 const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
+/** The hub's FAQ list, same-origin: what a host with no `apiBaseUrl` and no `faqsUrl` is asked. */
+const DEFAULT_FAQS_PATH = '/api/faqs';
 
 /** The block's layout, read by the block and by its skeleton, so the skeleton is the block's size. */
 const SECTION_DEFAULT_CLASS = 'space-y-10';
@@ -219,35 +222,27 @@ export const PAGE_FAQ_SECTION_ID = 'faq';
 const PAGE_FAQ_IN_PAGE_CLASS = 'space-y-10 pt-12 md:pt-20';
 
 /**
- * What a shared page of the lib takes as its `faq` prop: where the host serves
- * the FAQs and how the block looks. Its topic is the page's, read from the
- * address (`usePageTopic`). The page renders `FaqSection` with it, inside its
- * own container, after its content (`pageFaqProps`).
+ * A shared page's own FAQ block (roadmap, delivery, releases, onboarding guides, downloads, legal documents): the
+ * page's questions, for its topic, after its content and inside its container. Drawn where the host names its FAQ
+ * endpoint (`EndpointsRuntime.faqsUrl`); a host that draws every page's FAQ itself (the hub's layout) names none, so a
+ * page never shows two. No page passes anything: the endpoint is the host's, the topic is the page's path.
  */
-export type PageFaqSlot = Pick<
-  FaqSectionProps,
-  'apiBaseUrl' | 'initialFaqs' | 'heading' | 'ask' | 'emitJsonLd' | 'jsonLd' | 'showTopic'
->;
-
-/** The `FaqSection` props of a shared page's own FAQ block: the host's slot, as the page's `#faq` section. */
-export function pageFaqProps(faq: PageFaqSlot): FaqSectionProps {
-  return { ...faq, id: PAGE_FAQ_SECTION_ID, className: PAGE_FAQ_IN_PAGE_CLASS };
+export function SharedPageFaq() {
+  const faqsUrl = useEndpointsRuntime()?.faqsUrl;
+  return faqsUrl ? <FaqSection id={PAGE_FAQ_SECTION_ID} className={PAGE_FAQ_IN_PAGE_CLASS} /> : null;
 }
 
-/** URL composition shared with RelatedContentSection (`buildSuggestionUrl`)
- *  — byte-identical to the historical `buildFaqsUrl` output when
- *  `minResults`/`apiBaseUrl` are absent. */
+/** The FAQ request on `endpoint`: the composition shared with RelatedContentSection (`buildSuggestionUrl`). */
 function buildFaqsUrl(
+  endpoint: string,
   entityType?: string,
   entityId?: number | string,
   minResults?: number,
-  apiBaseUrl = '',
   topic?: string,
 ): string {
   // An entity's FAQs are the entity's: a topic narrows only the platform's own list.
   const entityScoped = !!entityType && entityId !== undefined && entityId !== null && entityId !== '';
-  return buildSuggestionUrl('/api/faqs', {
-    apiBaseUrl,
+  return buildSuggestionUrl(endpoint, {
     entityType,
     entityId,
     count: minResults,
@@ -565,7 +560,7 @@ export function FaqSection({
   id,
   showTopic: showTopicProp,
   minResults,
-  apiBaseUrl = '',
+  apiBaseUrl,
   aside: asideProp,
   ask,
   skeletonShape,
@@ -581,7 +576,11 @@ export function FaqSection({
   // The host's own block wins; else the card, where a chat is there to open and the page has a topic.
   const aside =
     asideProp ?? (ask !== false && topic && faqAskCardShown(assistant) ? <FaqAskCard {...ask} /> : undefined);
-  const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl, topic);
+  // The endpoint: the caller's base (`apiBaseUrl`), else the host's (`EndpointsRuntime.faqsUrl`), else same-origin.
+  const runtimeFaqsUrl = useEndpointsRuntime()?.faqsUrl;
+  const endpoint =
+    apiBaseUrl !== undefined ? `${apiBaseUrl}${DEFAULT_FAQS_PATH}` : (runtimeFaqsUrl ?? DEFAULT_FAQS_PATH);
+  const url = buildFaqsUrl(endpoint, entityType, entityId, minResults, topic);
   // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
   // wrapper object would setState-loop under re-rendering parents.
   const initialData = useMemo<FaqsResponse | undefined>(

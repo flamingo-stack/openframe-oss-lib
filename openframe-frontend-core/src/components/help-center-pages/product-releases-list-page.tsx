@@ -10,7 +10,6 @@
 
 import type { ReactNode } from 'react';
 import type { ProductRelease, ProductReleaseListResponse } from '../../types/product-release';
-import type { PageFaqSlot } from '../faq/faq-section';
 import { DevSectionPage } from '../shared/dev-section';
 import { ProductReleasesView, type ProductReleaseCardExtras } from '../shared/product-release';
 
@@ -29,12 +28,6 @@ export interface ProductReleasesListPageProps {
   subtitle?: string;
   /** Optional slot rendered below the list, inside the page chrome. */
   belowContent?: ReactNode;
-  /**
-   * The page's own FAQ block: where the host serves the FAQs (its topic is the
-   * page's, read from the address: `usePageTopic`). Rendered
-   * after the page's content, inside its container. Absent: no FAQ block.
-   */
-  faq?: PageFaqSlot;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container (forwarded to `DevSectionPage`). */
   shell?: boolean;
@@ -49,18 +42,10 @@ export function ProductReleasesListPage({
   title,
   subtitle,
   belowContent,
-  faq,
   shell,
 }: ProductReleasesListPageProps) {
   return (
-    <DevSectionPage
-      sectionKey="releases"
-      backButton={backButton}
-      title={title}
-      subtitle={subtitle}
-      faq={faq}
-      shell={shell}
-    >
+    <DevSectionPage sectionKey="releases" backButton={backButton} title={title} subtitle={subtitle} shell={shell}>
       <ProductReleasesView
         endpoint={releasesEndpoint}
         basePath={basePath}

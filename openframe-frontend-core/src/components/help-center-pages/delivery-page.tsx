@@ -8,7 +8,6 @@
  */
 
 import type { ReactNode } from 'react';
-import type { PageFaqSlot } from '../faq/faq-section';
 import { DeliveryLists } from '../shared/delivery';
 import { DevSectionPage } from '../shared/dev-section';
 
@@ -23,12 +22,6 @@ export interface DeliveryPageProps {
   subtitle?: string;
   /** Optional slot rendered below the lists, inside the page chrome. */
   belowContent?: ReactNode;
-  /**
-   * The page's own FAQ block: where the host serves the FAQs (its topic is the
-   * page's, read from the address: `usePageTopic`). Rendered
-   * after the page's content, inside its container. Absent: no FAQ block.
-   */
-  faq?: PageFaqSlot;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container (forwarded to `DevSectionPage`). */
   shell?: boolean;
@@ -41,18 +34,10 @@ export function DeliveryPage({
   title,
   subtitle,
   belowContent,
-  faq,
   shell,
 }: DeliveryPageProps) {
   return (
-    <DevSectionPage
-      sectionKey="delivery"
-      backButton={backButton}
-      title={title}
-      subtitle={subtitle}
-      faq={faq}
-      shell={shell}
-    >
+    <DevSectionPage sectionKey="delivery" backButton={backButton} title={title} subtitle={subtitle} shell={shell}>
       <DeliveryLists completedApiEndpoint={completedEndpoint} inProgressApiEndpoint={inProgressEndpoint} />
       {belowContent}
     </DevSectionPage>

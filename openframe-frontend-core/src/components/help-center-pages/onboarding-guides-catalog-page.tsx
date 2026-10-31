@@ -10,7 +10,6 @@
 
 import type { ReactNode } from 'react';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
-import type { PageFaqSlot } from '../faq/faq-section';
 import { OnboardingGuidesCatalogView } from '../onboarding-guides';
 import { DevSectionPage } from '../shared/dev-section';
 
@@ -33,12 +32,6 @@ export interface OnboardingGuidesCatalogPageProps {
   subtitle?: string;
   /** Optional slot rendered below the catalog, inside the page chrome. */
   belowContent?: ReactNode;
-  /**
-   * The page's own FAQ block: where the host serves the FAQs (its topic is the
-   * page's, read from the address: `usePageTopic`). Rendered
-   * after the page's content, inside its container. Absent: no FAQ block.
-   */
-  faq?: PageFaqSlot;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container (forwarded to `DevSectionPage`). */
   shell?: boolean;
@@ -55,18 +48,10 @@ export function OnboardingGuidesCatalogPage({
   title,
   subtitle,
   belowContent,
-  faq,
   shell,
 }: OnboardingGuidesCatalogPageProps) {
   return (
-    <DevSectionPage
-      sectionKey="onboarding"
-      backButton={backButton}
-      title={title}
-      subtitle={subtitle}
-      faq={faq}
-      shell={shell}
-    >
+    <DevSectionPage sectionKey="onboarding" backButton={backButton} title={title} subtitle={subtitle} shell={shell}>
       <OnboardingGuidesCatalogView
         guidesEndpoint={guidesEndpoint}
         sectionsEndpoint={sectionsEndpoint}

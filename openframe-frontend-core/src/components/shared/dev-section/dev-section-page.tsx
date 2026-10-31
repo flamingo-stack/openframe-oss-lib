@@ -22,7 +22,7 @@ import {
   OPENFRAME_DEV_SECTIONS,
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
-import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
+import { SharedPageFaq } from '../../faq/faq-section';
 import { PageShell, PageLayout } from '../../ui';
 import { DevSectionView } from './dev-section-view';
 
@@ -52,12 +52,6 @@ export interface DevSectionPageProps {
    *  `false` when the host layout already provides the page container (e.g.
    *  openframe-frontend's `AppLayout` `<main>`): then only the
    *  `page-shell-content` padding box is rendered, avoiding a nested `<main>`. */
-  /**
-   * The page's own FAQ block: where the host serves the FAQs (its topic is the
-   * page's, read from the address: `usePageTopic`). Rendered
-   * after the page's content, inside its container. Absent: no FAQ block.
-   */
-  faq?: PageFaqSlot;
   shell?: boolean;
 }
 
@@ -68,7 +62,6 @@ export function DevSectionPage({
   backButton,
   title,
   subtitle,
-  faq,
   shell = true,
 }: DevSectionPageProps) {
   const router = useRouter();
@@ -103,7 +96,7 @@ export function DevSectionPage({
       <DevSectionView sectionKey={sectionKey} showHeading={false} preControls={preControls}>
         {children}
       </DevSectionView>
-      {faq && <FaqSection {...pageFaqProps(faq)} />}
+      <SharedPageFaq />
     </PageLayout>
   );
 

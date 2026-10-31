@@ -21,7 +21,7 @@ import type { ComponentType } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { cn } from '../../../utils/cn';
-import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
+import { SharedPageFaq } from '../../faq/faq-section';
 import { LoadingRegion } from '../../loading/loading-region';
 import { PageShell, PageLayout } from '../../ui';
 import { DataSyncLine } from '../../ui/data-attribution';
@@ -73,12 +73,6 @@ export interface LegalDocumentPageProps {
    * then names the document even when its text fails to load.
    */
   documentsEndpoint?: string;
-  /**
-   * The page's own FAQ block: where the host serves the FAQs. Rendered after
-   * the page's content, inside its container; its topic is the page's, read
-   * from the address (`usePageTopic`). Absent: no FAQ block.
-   */
-  faq?: PageFaqSlot;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container — only the padding box renders,
    *  avoiding a nested `<main>`. */
@@ -132,7 +126,6 @@ export function LegalDocumentPage({
   MarkdownRenderer = RichMarkdownRenderer,
   documentsEndpoint,
   backButton,
-  faq,
   shell = true,
 }: LegalDocumentPageProps) {
   const router = useRouter();
@@ -218,7 +211,7 @@ export function LegalDocumentPage({
           </div>
         </div>
       </div>
-      {faq && <FaqSection {...pageFaqProps(faq)} />}
+      <SharedPageFaq />
     </PageLayout>
   );
 
