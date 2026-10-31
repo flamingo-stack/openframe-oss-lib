@@ -1,5 +1,6 @@
 package com.openframe.security.jwt;
 
+import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
@@ -12,15 +13,19 @@ public class KeyConfig {
 
     private String value;
 
-    public RSAPublicKey toRSAPublicKey() throws Exception {
+    public RSAPublicKey toRSAPublicKey() {
         String publicKeyPEM = value
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")
                 .replaceAll("\\s", "");
 
         byte[] encoded = Base64.getDecoder().decode(publicKeyPEM);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(encoded);
-        return (RSAPublicKey) keyFactory.generatePublic(keySpec);
+        try {
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            X509EncodedKeySpec keySpec = new X509EncodedKeySpec(encoded);
+            return (RSAPublicKey) keyFactory.generatePublic(keySpec);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Failed to construct RSA public key", e);
+        }
     }
 }
