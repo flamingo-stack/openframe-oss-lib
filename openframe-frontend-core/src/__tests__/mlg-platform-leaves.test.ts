@@ -166,7 +166,7 @@ describe('csv leaf', () => {
 });
 
 describe('social platforms leaf', () => {
-  // Rows as `social_platforms` actually holds them — the table is the
+  // Rows as `channel_platforms` actually holds them — the table is the
   // vocabulary, so every test here feeds it in rather than trusting a list
   // compiled into the module.
   const SOCIAL_ROWS = [

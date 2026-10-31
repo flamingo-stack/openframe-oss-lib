@@ -154,7 +154,7 @@ export {
 // the SINGLE source of truth for all icon-name → React-component lookup
 // across the lib + the hub — kebab-case keys, with PascalCase aliases
 // routed through `normalizeIconKey()` for DB columns that store
-// component-style names (e.g. social_platforms.icon_name).
+// component-style names (e.g. channel_platforms.icon_name).
 export {
   ICON_REGISTRY,
   getIconComponent,

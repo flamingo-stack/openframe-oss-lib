@@ -7,7 +7,7 @@
  *
  *   - `chat_admin_slash_commands.icon_name` — kebab-case (`'rocket'`,
  *     `'hubspot'`, `'github'`, `'dollar-sign'`).
- *   - `social_platforms.icon_name` — PascalCase component names
+ *   - `channel_platforms.icon_name` — PascalCase component names
  *     (`'LinkedInIcon'`, `'XLogo'`, `'YouTubeIcon'`, `'Github'`).
  *
  * The registry stores entries under kebab-case keys (URL/DB-friendly,
@@ -53,7 +53,7 @@ export const ICON_REGISTRY: Readonly<Record<string, IconRef>> = {
   'facebook-lucide': lucide('facebook'),
   'file-text': lucide('file-text'),
   // `'github-lucide'` is the lucide outline glyph (used by
-  // `social_platforms.icon_name='Github'`); `'github'` is the brand icon
+  // `channel_platforms.icon_name='Github'`); `'github'` is the brand icon
   // (used by `chat_admin_slash_commands.icon_name='github'`).
   github: fromSet('GithubClassicIcon'),
   'github-lucide': lucide('github'),
@@ -115,7 +115,7 @@ const fallbackIcon = (name: string): IconComponent => lucideIcon(name) as IconCo
 
 /**
  * PascalCase → kebab-case alias table for DB columns that store icon
- * names as component identifiers (currently `social_platforms.icon_name`).
+ * names as component identifiers (currently `channel_platforms.icon_name`).
  * Keep these in sync with the actual rows in those tables.
  */
 const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
@@ -164,7 +164,7 @@ const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
   ClickUpIcon: 'clickup',
   HubspotIcon: 'hubspot',
   LinkedInIcon: 'linkedin',
-  // `social_platforms.icon_name` stores the names these marks were first exported under.
+  // `channel_platforms.icon_name` stores the names these marks were first exported under.
   FacebookIcon: 'facebook',
   InstagramIcon: 'instagram',
   FacebookClassicIcon: 'facebook',
@@ -179,7 +179,7 @@ const PASCAL_TO_KEBAB_ALIASES: Record<string, string> = {
 
 /**
  * Normalize an icon key to the registry's canonical kebab-case form.
- * Accepts PascalCase variants (from `social_platforms.icon_name`-style
+ * Accepts PascalCase variants (from `channel_platforms.icon_name`-style
  * columns) and passes kebab-case keys through unchanged.
  */
 export function normalizeIconKey(key: string): string {

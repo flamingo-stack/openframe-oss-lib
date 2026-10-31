@@ -40,10 +40,10 @@ const MARK = 'var(--color-text-primary)';
  * Platform name → the icon it draws, as DATA: the icon is loaded when a link to
  * that platform is drawn, so a row fetches only the marks of its own links. The
  * ONLY thing about a social platform that lives in code; the DB names the glyph
- * it wants through `social_platforms.icon_name`.
+ * it wants through `channel_platforms.icon_name`.
  *
  * Deliberately an OPEN record, not `satisfies Record<SomeUnion, …>`: the set of
- * platforms is the `social_platforms` table's to decide, and a row added there
+ * platforms is the `channel_platforms` table's to decide, and a row added there
  * must render — with the globe, until somebody adds art for it — rather than
  * fail to type-check against a list in this file.
  */

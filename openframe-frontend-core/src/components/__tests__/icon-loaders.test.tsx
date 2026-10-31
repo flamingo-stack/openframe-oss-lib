@@ -86,7 +86,7 @@ describe('an icon resolved by name from the set', () => {
     expect(resolveIcon('git-pull-request')).not.toBe(resolveIcon('definitely-not-an-icon'));
   });
 
-  it('resolves the names `social_platforms.icon_name` stores', () => {
+  it('resolves the names `channel_platforms.icon_name` stores', () => {
     const stored = [
       'FacebookIcon',
       'FileText',
