@@ -6,7 +6,7 @@ const SURFACES = [
   { to: '/knowledge-base', title: 'Knowledge Hub', desc: 'DocsHubPage (sidebar tree + content + scroll-spy + in-source RAG search) over /content/api/docs/*.' },
   { to: '/onboarding-guides', title: 'Onboarding guides', desc: 'Catalog + detail, props-driven from /content/api/onboarding-guides.' },
   { to: '/roadmap', title: 'Roadmap', desc: 'Voting grid; votes + refresh hit /content/api/roadmap.' },
-  { to: '/delivery', title: 'Delivery', desc: 'Bug-fix + enhancement tables; /content/api/delivery/*.' },
+  { to: '/bug-fixes-and-enhancements', title: 'Delivery', desc: 'Bug-fix + enhancement tables; /content/api/delivery/*.' },
   { to: '/releases', title: 'Product releases', desc: 'List via the shared ProductReleasesView; detail injects a roadmap section.' },
   { to: '/authors', title: 'Authors', desc: 'Author byline (description card) + author-scoped related-content rail via /content/api/related-content?authorId=…' },
   { to: '/faqs', title: 'FAQ', desc: 'FaqDocumentPage — grouped accordion + category jump-nav + FAQPage JSON-LD; self-fetches /content/api/faqs.' },

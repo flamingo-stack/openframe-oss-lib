@@ -50,6 +50,7 @@ export * from './persistent-pagination';
 export * from './pricing-display';
 export * from './agent-identity';
 export * from './agent-mark';
+export * from './page-topic-label';
 export * from './results-count';
 export * from './selection-source-badge';
 export * from './social-icon-row';

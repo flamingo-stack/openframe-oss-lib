@@ -13,11 +13,10 @@ export {
   FaqSection,
   FAQ_SECTION_SKELETON_QUESTIONS,
   PAGE_FAQ_SECTION_ID,
-  pageFaqProps,
+  SharedPageFaq,
   type FaqSectionProps,
   type FaqSkeletonGroup,
   type FaqSkeletonShape,
-  type PageFaqSlot,
 } from './faq-section';
 export { FaqDocumentPage, type FaqDocumentPageProps } from './faq-document-page';
 export { FaqAskCard, type FaqAskOptions } from './faq-ask-card';
