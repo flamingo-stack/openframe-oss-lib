@@ -1,4 +1,4 @@
-import { render, act } from '@testing-library/react';
+import { render, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 /**
@@ -789,6 +789,15 @@ function RawtextRenderer({ content }: { content: string }) {
 }
 
 describe('SimpleMarkdownRenderer golden parity', () => {
+  // The code highlighter is fetched the first time a text with code is drawn, and until it lands the block is drawn
+  // unhighlighted with no further DOM change, so `renderStable` cannot see that it is still coming: under a loaded
+  // run the `fenced-code-js` golden snapshotted the plain block. The suite's first test loads it, so every golden
+  // after it is drawn with the highlighter in place (the tests of one file run in order).
+  it('colours a code block once the highlighter has loaded', async () => {
+    const { container } = render(<SimpleMarkdownRenderer content={'```js\nconst x = 1;\n```'} />);
+    await waitFor(() => expect(container.querySelector('.hljs-keyword')).not.toBeNull(), { timeout: 10_000 });
+  });
+
   for (const [name, md] of Object.entries(SHARED_FIXTURES)) {
     it(`renders fixture: ${name}`, async () => {
       const container = await renderStable(<SimpleMarkdownRenderer content={md} />);
