@@ -83,8 +83,7 @@ import { unified } from 'unified';
 import { isBlankLine } from '../../../utils/markdown-fences';
 import { scanHeadings } from '../../../utils/markdown-heading-id';
 import { extractSections } from '../../../utils/markdown-section-extractor';
-import { remarkCardLinks } from '../../chat/remark-card-links';
-import { remarkMentionChips } from '../../chat/remark-mention-chips';
+import { remarkCardLinks, remarkMentionChips } from '../../chat/inline-tokens';
 import { SimpleMarkdownRenderer, RichMarkdownRenderer } from '../markdown';
 import {
   __buildCloserHaystackForTest,

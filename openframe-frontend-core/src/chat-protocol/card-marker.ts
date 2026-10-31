@@ -29,6 +29,13 @@ const CARD_ID = '[^\\]\\r\\n)]+';
 export const CARD_REFERENCE = new RegExp(`^\\[card://(${CARD_TYPE}):(${CARD_ID})\\]$`);
 
 /**
+ * A whole string that IS one marker, as a model wraps one: a code span (`` `[card://webinar:42]` ``) or a link's text
+ * (`[card://webinar:42](https://…)`, whose brackets markdown consumes, leaving `card://webinar:42`). The brackets are
+ * optional and the closer may be `)` like the body form.
+ */
+export const CARD_TOKEN_EXACT = new RegExp(`^\\[?card://(${CARD_TYPE}):(${CARD_ID})[\\])]?$`);
+
+/**
  * A marker EMBEDDED in answer text, unanchored and global.
  *
  * Terminates on `]` or `)` so a marker used as a markdown link target

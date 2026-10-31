@@ -186,7 +186,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * Host renderer for inline AI mentions `@marker:id` — the ASSISTANT echoing
    * `@device:<machineId>` (etc.) in its reply. DIRECT MIRROR of
    * `renderEntityCard` for the `[card://]` grammar: the lib detects the token
-   * (via `remark-mention-chips`), parses `{marker, id}`, and renders whatever
+   * (via `remarkMentionChips` in `inline-tokens`), parses `{marker, id}`, and renders whatever
    * node the host returns — typically a SELF-FETCHING chip (each entity type
    * has its own fetcher) that resolves its own display name by id. The lib
    * stays data-agnostic: it knows nothing about entity types or how to fetch

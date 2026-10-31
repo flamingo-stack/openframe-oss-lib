@@ -30,7 +30,7 @@ export const remarkStripCitations: Plugin<[], Root> = () => {
       // No citation matched → leave the node untouched.
       if (withoutCitations === node.value) return;
       // Replace the text node rather than editing `node.value` in place —
-      // same idiom as remark-card-links / remark-mention-chips next door, and
+      // same idiom as the token plugins in inline-tokens next door, and
       // the node the visitor was handed is left alone. The spread keeps
       // `position` so source mapping survives. Length is unchanged, so the
       // walker needs no index steering: it has already captured the original

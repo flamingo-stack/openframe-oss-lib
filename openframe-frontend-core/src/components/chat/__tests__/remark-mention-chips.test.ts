@@ -1,6 +1,6 @@
 import type { Root, Text, Link, Paragraph } from 'mdast';
 import { describe, it, expect } from 'vitest';
-import { remarkMentionChips } from '../remark-mention-chips';
+import { remarkMentionChips } from '../inline-tokens';
 
 /** One-paragraph tree holding a single text leaf — what the plugin walks. */
 function treeOf(text: string): Root {

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
-import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
@@ -31,8 +30,7 @@ import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
-import { remarkCardLinks } from './remark-card-links';
-import { remarkMentionChips } from './remark-mention-chips';
+import { parseTokenHref, remarkCardLinks, remarkMentionChips, scanChatTokens } from './inline-tokens';
 import { remarkStripCitations } from './remark-strip-citations';
 import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
@@ -42,22 +40,6 @@ import { TicketEventMessage } from './ticket-event-message';
 import { ToolExecutionDisplay } from './tool-execution-display';
 import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
-
-/** Inline `@marker:id` mention token in the message body (sibling of the
- *  `[card://]` grammar) — used to filter out items rendered inline from the
- *  chip strip below. MUST mirror the left-boundary `(^|\s)` of `MENTION_REGEX`
- *  in `remark-mention-chips.ts`: without it this regex is WIDER than the plugin
- *  (e.g. it matches `x@device:1` mid-word, which the plugin skips), so a context
- *  item would be stripped from the chip strip yet never rendered inline — lost
- *  from display entirely. The id is capture group 2 (group 1 is the boundary).
- *  Marker `[a-zA-Z]+` (markers are mostly lowercase but not all — e.g.
- *  `scheduledScript`); id is the mention-token charset. */
-const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g;
-
-/** Scanner for `[card://type:id]` in answer text. Built from the shared
- *  grammar so the body renderer and the metadata decoder cannot disagree on
- *  what a marker is — see `chat-protocol/card-marker.ts`. */
-const CARD_MARKER_REGEX = createCardMarkerScanner();
 
 /** Timestamp label: today's messages show time only ("2:47 PM"),
  *  older messages prepend a locale-formatted date ("05/05/2026 2:47 PM"
@@ -174,8 +156,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       const ids = new Set<string>();
       if (!hasMentionSupport) return ids;
       for (const seg of segments) {
-        if (seg.type !== 'text' || !seg.text || !seg.text.includes('@')) continue;
-        for (const mm of seg.text.matchAll(MENTION_MARKER_REGEX)) ids.add(mm[2]);
+        if (seg.type !== 'text' || !seg.text) continue;
+        // The same parse and walk as the body (`inline-tokens.ts`): an id counts as inline only when the body DRAWS
+        // it, so a mention in a code block never takes its item off the strip without showing it anywhere.
+        for (const token of scanChatTokens(seg.text, ['mention'])) ids.add(token.id);
       }
       return ids;
     }, [hasMentionSupport, segments]);
@@ -277,13 +261,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         if (segment.type !== 'text') return;
         const text = segment.text;
         const parts: SegmentPart[] = [];
+        // Blocks of cards the text cannot be cut at (in a table, a heading, a quote): drawn after the segment.
+        const trailingBlocks: SegmentPart[] = [];
         let cursor = 0;
-        CARD_MARKER_REGEX.lastIndex = 0;
-        let match: RegExpExecArray | null;
-        while ((match = CARD_MARKER_REGEX.exec(text)) !== null) {
-          const cardType = match[1];
-          const cardId = match[2];
+        // The markers the body DRAWS, found by the same parse and walk (`inline-tokens.ts`), each with the source
+        // range it replaced: cutting at that range never cuts through a code span or a link around the marker.
+        for (const token of scanChatTokens(text, ['card'])) {
+          const cardType = token.type;
+          const cardId = token.id;
           const key = `${cardType}:${cardId}`;
+          const range = token.splittable ? token.range : null;
           usedKeys.add(key);
           // Reuse the cached node when the render fn didn't change —
           // returning the SAME element reference across renders is what
@@ -321,18 +308,22 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           const rendered = entry.node;
           if (React.isValidElement(rendered) && rendered.type === BlockCard) {
             const cardProps = rendered.props as BlockCardProps;
-            const markerEnd = match.index + match[0].length;
-            // Text chunk INCLUDING the marker — the inline pill renders
-            // at the marker position via the `<a>` override.
-            parts.push({ kind: 'text', text: text.slice(cursor, markerEnd) });
             // Hoist the block payload only on the FIRST occurrence of this key
             // — a repeated marker still gets its inline pill (text + override
-            // above) but must not push a second `b-<key>` sibling.
-            if (!emittedBlockKeys.has(key)) {
-              emittedBlockKeys.add(key);
-              parts.push({ kind: 'block', key, node: cardProps.children });
+            // below) but must not push a second `b-<key>` sibling.
+            const block: SegmentPart | null = emittedBlockKeys.has(key)
+              ? null
+              : { kind: 'block', key, node: cardProps.children };
+            if (block) emittedBlockKeys.add(key);
+            if (range) {
+              // Text chunk INCLUDING the marker — the inline pill renders
+              // at the marker position via the `<a>` override.
+              parts.push({ kind: 'text', text: text.slice(cursor, range[1]) });
+              if (block) parts.push(block);
+              cursor = range[1];
+            } else if (block) {
+              trailingBlocks.push(block);
             }
-            cursor = markerEnd;
             inlineByKey.set(
               key,
               cardProps.inline != null ? (
@@ -356,12 +347,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             // Hoist only the FIRST occurrence; a duplicate marker is dropped
             // entirely (no inline pill for hoisted cards) so we never push a
             // second sibling colliding on the same `b-<key>` React key.
-            parts.push({ kind: 'text', text: text.slice(cursor, match.index) });
+            //
+            // Where the text cannot be cut at the marker (a table cell, a
+            // heading), the card is drawn IN PLACE by the `<a>` override.
+            if (!range) {
+              inlineByKey.set(key, rendered);
+              continue;
+            }
+            parts.push({ kind: 'text', text: text.slice(cursor, range[0]) });
             if (!emittedBlockKeys.has(key)) {
               emittedBlockKeys.add(key);
               parts.push({ kind: 'block', key, node: rendered });
             }
-            cursor = match.index + match[0].length;
+            cursor = range[1];
           }
         }
         // Trailing text after the last block marker (or the entire
@@ -369,6 +367,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         if (cursor < text.length) {
           parts.push({ kind: 'text', text: text.slice(cursor) });
         }
+        parts.push(...trailingBlocks);
         // Only register the split plan when at least one block marker
         // fired — otherwise the segment renders as one SimpleMarkdown-
         // Renderer call (existing behaviour preserved for the
@@ -420,32 +419,26 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // link by `remarkMentionChips`. Delegate to the host's `renderMention`
           // (mirror of the `card://` → `renderEntityCard` path): the host returns
           // a self-fetching chip for that entity type. Null/unknown → raw token.
-          if (typeof href === 'string' && href.startsWith('mention://')) {
-            const stripped = href.slice('mention://'.length);
-            const sepIdx = stripped.indexOf(':');
-            const marker = sepIdx === -1 ? stripped : stripped.slice(0, sepIdx);
-            const id = sepIdx === -1 ? '' : stripped.slice(sepIdx + 1);
-            const node = renderMention?.({ marker, id });
+          // Both hrefs are read by `parseTokenHref`: the FIRST colon splits type
+          // from id (an id may hold more), and the id is decoded (the HTML step
+          // percent-encodes a space or a non-ASCII character in it).
+          const mention = parseTokenHref('mention', href);
+          if (mention) {
+            const node = renderMention?.({ marker: mention.type, id: mention.id });
             if (node != null) return <>{node}</>;
             return <span className="text-ods-text-secondary opacity-60">{children}</span>;
           }
-          if (typeof href === 'string' && href.startsWith('card://')) {
-            const stripped = href.slice('card://'.length);
-            const sepIdx = stripped.lastIndexOf(':');
-            if (sepIdx !== -1) {
-              const cardType = stripped.slice(0, sepIdx);
-              const cardId = stripped.slice(sepIdx + 1);
-              const key = `${cardType}:${cardId}`;
-              const inline = renderingPlanRef.current?.inlineByKey.get(key);
-              if (inline != null) return inline;
-              // No rendered card for this marker (the host's renderer
-              // returned null — no card type registered for `cardType`, or
-              // the id resolved to nothing). Render the raw `cardId` as a
-              // dim span so the marker never LOOKS like a real card: a
-              // hallucinated id must stay visibly broken, never dressed up
-              // with borrowed data.
-              return <span className="text-ods-text-secondary opacity-60">{cardId}</span>;
-            }
+          const card = parseTokenHref('card', href);
+          if (card) {
+            const inline = renderingPlanRef.current?.inlineByKey.get(`${card.type}:${card.id}`);
+            if (inline != null) return inline;
+            // No rendered card for this marker (the host's renderer
+            // returned null — no card type registered for `cardType`, or
+            // the id resolved to nothing). Render the raw `cardId` as a
+            // dim span so the marker never LOOKS like a real card: a
+            // hallucinated id must stay visibly broken, never dressed up
+            // with borrowed data.
+            return <span className="text-ods-text-secondary opacity-60">{card.id}</span>;
           }
           // The host's `NavLinkAnchor` draws the link (the lib's
           // `NavLinkAnchorViaRuntime`, or a host anchor over the same
