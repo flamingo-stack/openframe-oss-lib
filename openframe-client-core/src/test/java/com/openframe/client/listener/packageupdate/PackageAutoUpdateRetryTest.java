@@ -95,7 +95,7 @@ class PackageAutoUpdateRetryTest {
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = {"SUPERSEDED", "NOT_SUPPORTED", "MANAGER_MISSING", "NOT_INSTALLED"})
+    @ValueSource(strings = {"SUPERSEDED", "NOT_SUPPORTED", "MANAGER_MISSING", "NOT_INSTALLED", "NOT_UPGRADABLE"})
     void failureThatWillNotPass_staysFailed(String reason) {
         retry.scheduleIfDue(failed(reason), request);
 
