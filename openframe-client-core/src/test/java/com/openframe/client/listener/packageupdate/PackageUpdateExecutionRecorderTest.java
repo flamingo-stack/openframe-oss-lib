@@ -159,6 +159,16 @@ class PackageUpdateExecutionRecorderTest {
     }
 
     @Test
+    void notInstalled_keepsTheReasonOnTheRow() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+
+        recorder.record(request, "m1", failed(Failed.Reason.NOT_INSTALLED, null, null));
+
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(row.getError()).isEqualTo("NOT_INSTALLED");
+    }
+
+    @Test
     void superseded_closesTheRow() {
         // a newer request carries the update on under another execution — this one will not finish it
         ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
