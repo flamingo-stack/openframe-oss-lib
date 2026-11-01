@@ -399,13 +399,10 @@ export interface EmbeddableChatProps {
    * extra `quickActions` chips.
    * Each field falls back to the built-in OpenFrame defaults, so the kit
    * stays platform-agnostic. `onStartGuideChat` and `hasExistingChats` are
-   * wired internally and are NOT overridable here. The quick-action
-   * hover-preview callbacks are also wired internally.
+   * wired internally and are NOT overridable here. A quick action's click is wired internally too: it puts the
+   * action's prompt into the composer to edit and send, then calls the action's own `onClick` (e.g. analytics).
    */
-  mingoWelcome?: Omit<
-    MingoWelcomeProps,
-    'onStartGuideChat' | 'hasExistingChats' | 'onQuickActionHover' | 'onQuickActionHoverEnd'
-  >;
+  mingoWelcome?: Omit<MingoWelcomeProps, 'onStartGuideChat' | 'hasExistingChats'>;
 
   /**
    * The host's conversation page size: how many dialogs one page of the list
@@ -1271,11 +1268,20 @@ function EmbeddableChatInner({
 
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null);
-  // Full prompt of the currently hovered/focused quick-action chip, previewed
-  // as ghost text in the empty composer (`ChatInput.previewText`) — declarative
-  // + non-destructive: it never writes the editor value, so it can't clobber a
-  // draft. `null` = not previewing.
-  const [quickActionPreview, setQuickActionPreview] = useState<string | null>(null);
+  // A quick action (a starter) puts its prompt into the composer to edit and send, the way support prompts that
+  // start a conversation work (AWS Cloudscape, "support prompts"): nothing is sent on the click. It never loses what
+  // the user typed: an empty composer, or one holding only the prompt a quick action put there, takes the new prompt;
+  // a draft of the user's own keeps its text and gets the prompt after it.
+  const insertedPromptRef = useRef<string | null>(null);
+  const insertQuickAction = useCallback((prompt: string) => {
+    const input = chatInputRef.current;
+    if (!input) return;
+    const draft = input.getValue().trim();
+    const next = draft === '' || draft === insertedPromptRef.current ? prompt : `${draft}\n\n${prompt}`;
+    insertedPromptRef.current = next;
+    input.setValue(next);
+    input.focus();
+  }, []);
 
   // The slash-command registry (Guide onboarding cards) is loaded via
   // react-query below, after `activeMode` is resolved — gated on Guide mode and
@@ -2117,16 +2123,6 @@ function EmbeddableChatInner({
   // Guide-mode empty state (no open conversation) — drives the "Mingo Guide"
   // header, the guide banner, and the GuideWelcome content branch.
   const isGuideEmpty = !hasConversation && activeMode === 'guide';
-  // Quick-action chips exist in BOTH empty states (Guide onboarding + Mingo
-  // welcome). If the chip row goes away (a message is sent, or the mode
-  // switches) while a chip is still hovered, drop the in-flight preview so it
-  // can't leak into the next composer state.
-  const isQuickActionEmpty = !hasConversation && (activeMode === 'guide' || activeMode === 'mingo');
-  // Dropped while rendering, not from an effect: the composer reads
-  // `quickActionPreview` in THIS render, so an effect committed one frame with
-  // the hovered chip's prompt still ghosted into a composer whose chip row had
-  // already gone. Guarded, so the extra render pass takes the early exit.
-  if (!isQuickActionEmpty && quickActionPreview !== null) setQuickActionPreview(null);
   // The guide-empty back-chevron returns to Mingo — only offer it when Mingo
   // mode actually exists to return to (guide is normally entered from Mingo).
   const guideCanReturnToMingo = isGuideEmpty && hasMingoMode;
@@ -2876,15 +2872,15 @@ function EmbeddableChatInner({
             // the new-user compose surface: greeting + grid + promo +
             // primary Guide chip.
             hasExistingChats={false}
-            // Hover/focus PREVIEWS the action's full prompt as ghost text
-            // in the empty composer (see `quickActionPreview` /
-            // `ChatInput.previewText`). Wired after the `{...mingoWelcome}`
-            // spread so the host can't override it.
-            onQuickActionHover={action => setQuickActionPreview(action.prompt ?? action.label)}
-            onQuickActionHoverEnd={() => setQuickActionPreview(null)}
-            // A built-in agent caps the quick-action wall at 2 rows;
-            // this is the Mingo surface, so fall back to 'mingo'.
-            agentSlug={activeAgentSlug ?? 'mingo'}
+            // A quick action puts its prompt into the composer to edit and send (`insertQuickAction`), then runs
+            // the host's own click. Wired after the `{...mingoWelcome}` spread so nothing is sent from here.
+            quickActions={mingoWelcome?.quickActions?.map(action => ({
+              ...action,
+              onClick: () => {
+                insertQuickAction(action.prompt ?? action.label);
+                action.onClick?.();
+              },
+            }))}
           />
         ) : (
           /* Figma node 7532:328214 — Guide-mode empty state: greeting
@@ -2922,20 +2918,8 @@ function EmbeddableChatInner({
                 ? guideSuggestedActions
                 : (guideWelcome?.quickActions ?? guideSuggestedActions)
             }
-            // Quick-action chips SEND the prompt immediately on click.
-            onQuickAction={action => {
-              setQuickActionPreview(null);
-              handleSend(action.prompt ?? action.label);
-            }}
-            // Hover/focus PREVIEWS the action's full prompt as ghost text
-            // in the empty composer (the chip label is short; this reveals
-            // what will be sent). Declarative + non-destructive — see
-            // `quickActionPreview` / `ChatInput.previewText`.
-            onQuickActionHover={action => setQuickActionPreview(action.prompt ?? action.label)}
-            onQuickActionHoverEnd={() => setQuickActionPreview(null)}
-            // In agent mode a built-in agent (fae/mingo) caps the wall at
-            // 2 rows; host/guide mode (no active agent) keeps the default.
-            agentSlug={activeAgentSlug}
+            // A quick action puts its prompt into the composer to edit and send.
+            onQuickAction={action => insertQuickAction(action.prompt ?? action.label)}
           >
             {/* Figma node 7363:205938 — single-column slash-command
                 list. No own scroll (GuideWelcome's region scrolls); the
@@ -3009,7 +2993,7 @@ function EmbeddableChatInner({
       }
       autoFocus={previewMode ? false : autoFocusInput}
       slashCommands={slashCommandsProp}
-      previewText={quickActionPreview ?? composerPreviewText ?? undefined}
+      previewText={composerPreviewText ?? undefined}
       safeAreaBottom={safeAreaBottom}
       edgeLight={composerEdgeLight}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
