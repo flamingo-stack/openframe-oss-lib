@@ -64,8 +64,8 @@ export interface CommandReviewRuleData {
 
 /**
  * Why the AI guardrail chose an RMM command's approval level. `decision` is
- * `POLICY` | `FALLBACK` | `SOFT_DENY` | `HARD_DENY` | `CLASSIFIER_FAILURE`; kept
- * a string so a value added on the backend still renders.
+ * `POLICY` | `FALLBACK` | `SOFT_DENY` | `HARD_DENY`; kept a string so a value
+ * added on the backend still renders.
  */
 export interface CommandReviewData {
   decision?: string;
