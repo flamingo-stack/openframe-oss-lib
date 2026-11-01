@@ -400,7 +400,7 @@ export interface EmbeddableChatProps {
    * Each field falls back to the built-in OpenFrame defaults, so the kit
    * stays platform-agnostic. `onStartGuideChat` and `hasExistingChats` are
    * wired internally and are NOT overridable here. A quick action's click is wired internally too: it puts the
-   * action's prompt into the composer to edit and send (its `onClick` is not called here).
+   * action's prompt into the composer to edit and send, then calls the action's own `onClick` (e.g. analytics).
    */
   mingoWelcome?: Omit<MingoWelcomeProps, 'onStartGuideChat' | 'hasExistingChats'>;
 
@@ -2866,11 +2866,14 @@ function EmbeddableChatInner({
             // the new-user compose surface: greeting + grid + promo +
             // primary Guide chip.
             hasExistingChats={false}
-            // A quick action puts its prompt into the composer to edit and send (`insertQuickAction`). Wired after
-            // the `{...mingoWelcome}` spread so the host's own click does not send from here.
+            // A quick action puts its prompt into the composer to edit and send (`insertQuickAction`), then runs
+            // the host's own click. Wired after the `{...mingoWelcome}` spread so nothing is sent from here.
             quickActions={mingoWelcome?.quickActions?.map(action => ({
               ...action,
-              onClick: () => insertQuickAction(action.prompt ?? action.label),
+              onClick: () => {
+                insertQuickAction(action.prompt ?? action.label);
+                action.onClick?.();
+              },
             }))}
           />
         ) : (
