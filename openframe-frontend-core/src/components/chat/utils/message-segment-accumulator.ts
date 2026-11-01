@@ -169,21 +169,13 @@ export class MessageSegmentAccumulator {
   }
 
   /**
-   * Add the records the answer shows as cards. A message holds ONE
-   * `record_cards` segment, and it is the FIRST: cards are drawn above the
-   * text that talks about them, wherever in the turn they arrived. A second
-   * part adds its records to the first.
+   * Add records the answer shows as cards. Like any part, they sit where they
+   * arrived: after the text before the `show_records` call, before the text
+   * after it. Arrives whole, so it is always a NEW segment.
    */
   addRecordCards(cards: RecordCard[]): MessageSegment[] {
-    const index = this.segments.findIndex(segment => segment.type === 'record_cards');
-    if (index === -1) {
-      const unique = uniqueCards(cards);
-      if (unique.length > 0) this.segments.unshift({ type: 'record_cards', cards: unique });
-    } else {
-      const current = this.segments[index] as Extract<MessageSegment, { type: 'record_cards' }>;
-      this.segments.splice(index, 1);
-      this.segments.unshift({ type: 'record_cards', cards: uniqueCards([...current.cards, ...cards]) });
-    }
+    const unique = uniqueCards(cards);
+    if (unique.length > 0) this.segments.push({ type: 'record_cards', cards: unique });
     return this.getSegments();
   }
 

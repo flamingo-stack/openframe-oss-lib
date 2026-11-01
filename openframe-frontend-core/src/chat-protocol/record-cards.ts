@@ -1,18 +1,20 @@
 /**
  * Record cards: the records an answer SHOWS, as a part of the message of its own.
  *
- * Chat products keep two things apart that look alike (OpenAI's Apps SDK, the AI SDK's message parts, MCP Apps):
+ * Chat products keep two things apart that look alike (the AI SDK's message parts, MCP Apps, Claude's own widgets):
  *   - a CHIP is an annotation on a span of the answer's text: a citation `[N]` (from the model API's citations) or a
  *     record link `[name](record://<type>/<id>)`, drawn where the text names it;
- *   - a CARD is a typed part of the message, produced by a tool call, drawn ABOVE the text that talks about it
- *     ("inline surfaces appear before the generated model response").
+ *   - a CARD is a typed part of the message, produced by a tool call, drawn WHERE THE CALL HAPPENED: between the text
+ *     written before it and the text written after it, the way a tool's widget sits in a reply.
  * So a card is never read out of the answer's text. The model calls `show_records` with the records it wants shown;
- * the server keeps only records the turn retrieved, and sends them as ONE part:
+ * the server keeps only records the turn retrieved, and sends them as ONE part at that point of the stream:
  *
  *   `{ type: 'RECORD_CARDS', cards: [{ entityType, entityId }] }`
  *
- * the same shape on every transport: a hub stream frame, a Mingo chunk, a stored Mongo row and the hub's stored
- * answer. {@link recordCardsEvent} is the one decoder of it.
+ * the same shape on every transport: a hub stream frame (a leading frame, or a frame inside the text), a Mingo chunk
+ * and a stored Mongo row, all in message order. {@link recordCardsEvent} is the one decoder of it. The hub stores an
+ * answer as its text plus its parts' places in it ({@link RecordCardsPlacement}); {@link placeRecordCards} puts them
+ * back.
  *
  * Server-safe: no React, no browser APIs.
  */
@@ -29,7 +31,8 @@ export const RECORD_CARDS_MAX = 8;
 
 /** The tool's description, the one wording every host offers it with. */
 export const SHOW_RECORDS_TOOL_DESCRIPTION =
-  'Show records to the user as cards, drawn above your answer. Call it BEFORE writing the answer, at most once, ' +
+  'Show records to the user as cards, drawn at the point of your answer where you call it. Call it where the cards ' +
+  'belong, usually before the sentences about them, once for the answer, ' +
   `with up to ${RECORD_CARDS_MAX} records the answer is about, by their record links (record://<type>/<id>) as the ` +
   'records give them. Show a record when the user would open it: the guide, release, video, article or ticket the ' +
   'answer is about. Do not show every record you read, and do not repeat the cards in the text: the answer that ' +
@@ -62,6 +65,45 @@ export function recordCardsEvent(raw: unknown): RecordCardsEvent | null {
       ),
   );
   return cards.length > 0 ? { type: 'record-cards', cards } : null;
+}
+
+/** Where a part sat in an answer stored as text: `at` is the character offset in the text (the cards come after the
+ *  text before it), `cards` the part's cards. */
+export interface RecordCardsPlacement {
+  at: number;
+  cards: RecordCardsPart['cards'];
+}
+
+/**
+ * An answer's segments from its text and its record-cards parts' places in it, in order: text, a part, text, … A place
+ * past the end is clamped to it; a place with no valid card is left out; an empty text between parts makes no segment.
+ */
+export function placeRecordCards(
+  text: string,
+  placements: unknown,
+): Array<{ type: 'text'; text: string } | { type: 'record_cards'; cards: RecordCard[] }> {
+  const parts = (Array.isArray(placements) ? placements : [])
+    .filter(isRecord)
+    .map(placement => ({
+      at:
+        typeof placement.at === 'number' && Number.isFinite(placement.at)
+          ? Math.max(0, Math.min(text.length, Math.floor(placement.at)))
+          : text.length,
+      event: recordCardsEvent(placement),
+    }))
+    .filter((part): part is { at: number; event: RecordCardsEvent } => part.event !== null)
+    .sort((a, b) => a.at - b.at);
+  const out: Array<{ type: 'text'; text: string } | { type: 'record_cards'; cards: RecordCard[] }> = [];
+  let from = 0;
+  for (const part of parts) {
+    const before = text.slice(from, part.at);
+    if (before.trim()) out.push({ type: 'text', text: before });
+    out.push({ type: 'record_cards', cards: part.event.cards });
+    from = part.at;
+  }
+  const rest = text.slice(from);
+  if (rest.trim() || out.length === 0) out.push({ type: 'text', text: rest });
+  return out;
 }
 
 /** Cards in order, each record once, at most {@link RECORD_CARDS_MAX}. */

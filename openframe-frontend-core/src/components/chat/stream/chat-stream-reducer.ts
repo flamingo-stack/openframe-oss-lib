@@ -1098,7 +1098,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         break;
       }
 
-      // The records the answer shows as cards: one segment, first in the message, whenever it arrived.
+      // Records the answer shows as cards: a part where it arrived, between the text around the show_records call.
       case 'record-cards': {
         if (isInStream || !hasEverStreamed) {
           const segments = accumulator.addRecordCards(event.cards);
@@ -1523,7 +1523,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     if (receipt === null) return;
     sseCurrentText = receipt + '\n\n';
     sseWriteTrailingText(sseCurrentText);
-    // The record the write acted on: the receipt's card, above it.
+    // The record the write acted on: the receipt's card, right after it. What follows starts below the card.
     if (event.recordCards && event.recordCards.length > 0) {
       const last = messages[messages.length - 1];
       if (last && last.role === 'assistant') {
@@ -1531,6 +1531,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
           ...messages.slice(0, -1),
           { ...last, segments: withRecordCards(last.segments ?? [], event.recordCards) },
         ]);
+        sseCurrentText = '';
       }
     }
   }
@@ -1605,13 +1606,15 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         sseAppendText(event.text);
         break;
       case 'record-cards': {
-        // Drawn above the answer: the one `record_cards` segment, first in the message (a leading frame or the trailer).
+        // A part at this point of the answer (a leading frame, or a frame inside the text).
         const last = messages[messages.length - 1];
         if (!last || last.role !== 'assistant') break;
         setMessagesInternal([
           ...messages.slice(0, -1),
           { ...last, segments: withRecordCards(last.segments ?? [], event.cards) },
         ]);
+        // The text after the cards starts a new text segment, below them.
+        sseCurrentText = '';
         break;
       }
       case 'error':

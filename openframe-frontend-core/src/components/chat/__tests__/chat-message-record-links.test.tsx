@@ -1,7 +1,7 @@
 /**
  * Chips and cards through the real component and the real markdown engine. A record link
  * (`[name](record://type/id)`) is a chip in the sentence and never a card; a card comes only from the message's
- * `record_cards` part and is drawn ABOVE the text.
+ * `record_cards` part and is drawn where that part sits in the message.
  */
 
 import { render, screen, within } from '@testing-library/react';
@@ -51,18 +51,27 @@ describe('ChatMessageEnhanced — record links', () => {
     expect(screen.queryByText(/record:\/\//)).toBeNull();
   });
 
-  it('draws the record-cards part above the text, titled by the name the text gives the record', () => {
-    const view = show('The [Mac guide](record://onboarding_guide/mac-guide) covers it.', [
-      { type: 'onboarding_guide', id: 'mac-guide' },
-    ]);
+  it('draws a record-cards part where it sits: between the text before and after it', () => {
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        content={[
+          { type: 'text', text: 'Putting it in the same list:' },
+          { type: 'record_cards', cards: [{ type: 'onboarding_guide', id: 'mac-guide' }] },
+          { type: 'text', text: 'The [Mac guide](record://onboarding_guide/mac-guide) covers it.' },
+        ]}
+        renderEntityCard={renderEntityCard}
+        renderRecordChip={renderRecordChip}
+        NavLinkAnchor={NavLinkAnchor}
+      />,
+    );
     const cards = screen.getByTestId('chat-record-cards');
+    // Titled by the name the text gives the record.
     expect(within(cards).getByTestId('card-mac-guide').textContent).toBe('Mac guide');
-    // Above the answer: the cards come before the sentence in the document.
-    const text = view.container.textContent ?? '';
-    expect(text.indexOf('Mac guide')).toBeLessThan(text.indexOf('covers it'));
-    expect(
-      cards.compareDocumentPosition(screen.getByText(/covers it/)) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    const before = screen.getByText(/Putting it in the same list/);
+    const after = screen.getByText(/covers it/);
+    expect(before.compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cards.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('draws one card per record however many times the part names it', () => {

@@ -180,10 +180,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     }, [refs]);
 
     /**
-     * The answer's record cards: the message's `record_cards` part (the model's `show_records` call, checked by the
-     * server), drawn above the text, the way a tool's result is shown before the reply about it. Never read out of the
-     * text: a record the text names is a chip there. A card takes its title from the answer's own references, else
-     * from the name the text gives the record, and loads the rest itself.
+     * The answer's record cards, by segment: each `record_cards` part (the model's `show_records` call, checked by the
+     * server) is drawn where it sits in the message, between the text before and after the call, the way a tool's
+     * widget sits in a reply. Never read out of the text: a record the text names is a chip there. A card takes its
+     * title from the answer's own references, else from the name the text gives the record, and loads the rest itself.
      *
      * Each card's node is kept across renders (same `type:id`, same render function, same described ref) so a card
      * does not remount, re-fetch or close its open menu on every streamed token.
@@ -195,38 +195,42 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       >(),
     );
     const recordCards = useMemo(() => {
-      if (!renderEntityCard || isHuman) return [];
-      const shown = segments.flatMap(segment => (segment.type === 'record_cards' ? segment.cards : []));
-      if (shown.length === 0) return [];
+      const bySegment = new Map<number, Array<{ key: string; node: React.ReactNode }>>();
+      if (!renderEntityCard || isHuman) return bySegment;
+      if (!segments.some(segment => segment.type === 'record_cards')) return bySegment;
       const names = new Map(linkedRecords(segments).map(record => [`${record.type}:${record.id}`, record.label]));
       const cache = recordCardCache.current;
-      const cards: Array<{ key: string; node: React.ReactNode }> = [];
-      for (const record of shown) {
-        // A type the chat draws no card for (a device, a script) stays a chip in the text.
-        if (record.type !== 'video' && !chatCardLabel(record.type)) continue;
-        const key = `${record.type}:${record.id}`;
-        const described = refByKey.get(key);
-        const label = names.get(key) ?? '';
-        let entry = cache.get(key);
-        if (!entry || entry.render !== renderEntityCard || entry.ref !== described || entry.label !== label) {
-          const cardRef: ChatRef = described ?? { type: record.type, id: record.id, title: label, url: null };
-          const rendered = renderEntityCard(cardRef);
-          // A block card (a video) draws its block here.
-          const node =
-            React.isValidElement(rendered) && rendered.type === BlockCard
-              ? (rendered.props as BlockCardProps).children
-              : rendered;
-          entry = { render: renderEntityCard, ref: described, label, node };
-          cache.set(key, entry);
+      segments.forEach((segment, index) => {
+        if (segment.type !== 'record_cards') return;
+        const cards: Array<{ key: string; node: React.ReactNode }> = [];
+        for (const record of segment.cards) {
+          // A type the chat draws no card for (a device, a script) stays a chip in the text.
+          if (record.type !== 'video' && !chatCardLabel(record.type)) continue;
+          const key = `${record.type}:${record.id}`;
+          const described = refByKey.get(key);
+          const label = names.get(key) ?? '';
+          let entry = cache.get(key);
+          if (!entry || entry.render !== renderEntityCard || entry.ref !== described || entry.label !== label) {
+            const cardRef: ChatRef = described ?? { type: record.type, id: record.id, title: label, url: null };
+            const rendered = renderEntityCard(cardRef);
+            // A block card (a video) draws its block here.
+            const node =
+              React.isValidElement(rendered) && rendered.type === BlockCard
+                ? (rendered.props as BlockCardProps).children
+                : rendered;
+            entry = { render: renderEntityCard, ref: described, label, node };
+            cache.set(key, entry);
+          }
+          if (entry.node != null && !cards.some(card => card.key === key)) cards.push({ key, node: entry.node });
         }
-        if (entry.node != null && !cards.some(card => card.key === key)) cards.push({ key, node: entry.node });
-      }
-      return cards;
+        if (cards.length > 0) bySegment.set(index, cards);
+      });
+      return bySegment;
     }, [renderEntityCard, isHuman, segments, refByKey]);
 
     useEffect(() => {
       const cache = recordCardCache.current;
-      const shown = new Set(recordCards.map(card => card.key));
+      const shown = new Set([...recordCards.values()].flat().map(card => card.key));
       for (const key of [...cache.keys()]) if (!shown.has(key)) cache.delete(key);
     }, [recordCards]);
 
@@ -491,11 +495,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     const isStreaming = index === segments.length - 1 && isTyping;
                     return <ThinkingDisplay key={index} text={segment.text} isStreaming={isStreaming} />;
                   } else if (segment.type === 'record_cards') {
-                    // The message's one record-cards part, first in its segments: above the text.
-                    if (recordCards.length === 0) return null;
+                    // A record-cards part, drawn where it sits: between the text around the call.
+                    const cards = recordCards.get(index);
+                    if (!cards) return null;
                     return (
                       <div key={index} className={CHAT_MESSAGE_SEGMENTS_CLASS} data-testid="chat-record-cards">
-                        {recordCards.map(card => (
+                        {cards.map(card => (
                           <div key={`r-${card.key}`}>{card.node}</div>
                         ))}
                       </div>

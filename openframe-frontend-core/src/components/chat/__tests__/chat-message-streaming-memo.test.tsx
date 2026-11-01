@@ -93,7 +93,7 @@ describe('ChatMessageEnhanced — override identity across a streamed turn', () 
   it('mounts the card of a shown record from its id alone, titled by the link (hydrate-by-id)', () => {
     // No refs frame exists: the renderer receives the minimal
     // `{type, id, title: <link text>, url: null}` descriptor and is expected
-    // to self-fetch. It is drawn above the answer.
+    // to self-fetch. It is drawn where its part sits.
     const seenRefs: Array<{ type: string; id: string; title: string }> = [];
     render(
       <ChatMessageEnhanced

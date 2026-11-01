@@ -154,15 +154,13 @@ function withFirstKnownOccurredAt(existing: MessageSegment, incoming: MessageSeg
  * upsert by identity (see `upsertKey`) so a replayed emit stays idempotent.
  */
 /**
- * A message's segments with `cards` added to its ONE `record_cards` segment,
- * which is always the first: cards are drawn above the text, whenever in the
- * turn they arrived. The same rule as the accumulator's `addRecordCards`.
+ * A message's segments with a `record_cards` part added where it arrived: at
+ * the end of what the message holds so far. The same rule as the
+ * accumulator's `addRecordCards`.
  */
 export function withRecordCards(segments: readonly MessageSegment[], cards: readonly RecordCard[]): MessageSegment[] {
-  const current = segments.find(segment => segment.type === 'record_cards');
-  const rest = segments.filter(segment => segment.type !== 'record_cards');
-  const merged = uniqueCards([...(current?.type === 'record_cards' ? current.cards : []), ...cards]);
-  return merged.length > 0 ? [{ type: 'record_cards', cards: merged }, ...rest] : rest;
+  const unique = uniqueCards(cards);
+  return unique.length > 0 ? [...segments, { type: 'record_cards', cards: unique }] : [...segments];
 }
 
 export function appendToTrailingAssistant(
@@ -178,10 +176,7 @@ export function appendToTrailingAssistant(
   for (const seg of segments) {
     const tail = merged[merged.length - 1];
     const key = upsertKey(seg);
-    if (seg.type === 'record_cards') {
-      const next = withRecordCards(merged, seg.cards);
-      merged.splice(0, merged.length, ...next);
-    } else if (seg.type === 'text' && tail?.type === 'text') {
+    if (seg.type === 'text' && tail?.type === 'text') {
       merged[merged.length - 1] = { type: 'text', text: tail.text + seg.text };
     } else if (seg.type === 'thinking' && tail?.type === 'thinking') {
       merged[merged.length - 1] = { type: 'thinking', text: tail.text + seg.text };

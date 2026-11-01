@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { recordCardsEvent } from '../../../chat-protocol/record-cards';
+import { placeRecordCards } from '../../../chat-protocol/record-cards';
 import { isRecord, unwrapEnvelope } from '../../../chat-protocol/wire-narrow';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import type { Message } from '../types/message.types';
@@ -155,18 +155,13 @@ export function useChatHistoryHydration({
           if (role === 'assistant' && Array.isArray(row.sources) && row.sources.length > 0) {
             sourcesSeed.set(Math.max(0, userTurns - 1), row.sources as unknown[]);
           }
-          // The answer's record cards are a part of their own (`record_cards`, the wire part the stream sent), drawn
-          // above its text, never read out of the text.
-          const cards = role === 'assistant' ? recordCardsEvent({ cards: row.record_cards }) : null;
+          // The answer's record cards are parts of their own, stored with their places in its text and put back there
+          // (`placeRecordCards`), never read out of the text.
+          const placed = role === 'assistant' && Array.isArray(row.record_cards) && row.record_cards.length > 0;
           hydrated.push({
             id: `hydrated-${String(row.seq ?? hydrated.length)}`,
             role,
-            content: cards
-              ? [
-                  { type: 'record_cards', cards: cards.cards },
-                  { type: 'text', text: content },
-                ]
-              : content,
+            content: placed ? placeRecordCards(content, row.record_cards) : content,
             ...(typeof row.created_at === 'string' ? { timestamp: new Date(row.created_at) } : {}),
             ...(hidden ? { hidden: true } : {}),
           });

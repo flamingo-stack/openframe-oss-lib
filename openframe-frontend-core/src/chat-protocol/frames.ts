@@ -5,14 +5,17 @@
  *
  * Wire format (custom byte framing, NOT standard SSE `data:` lines):
  *
- *   [JSON frame]\0 [JSON frame]\0 …  \x1E  <raw UTF-8 answer deltas>  \x1F [JSON usage trailer]
+ *   [JSON frame]\0 …  \x1E  <answer deltas> [\x1D JSON frame \0] <answer deltas> …  \x1F [JSON usage trailer]
  *
  *   1. LEADING frames — each a JSON object terminated by `\0`
  *      (FRAME_TERMINATOR). Status, metadata, routing, live thinking
  *      deltas, usage:start, tool approval frames.
  *   2. ONE `\x1E` byte (END_OF_LEADING) — flips the stream into raw
  *      UTF-8 answer-text mode.
- *   3. `\x1F` (TRAILER_SENTINEL) + one JSON usage frame running to
+ *   3. Inside the answer, `\x1D` (INLINE_FRAME) + one JSON frame + `\0`: a part of the message that sits at THAT
+ *      point of the answer (record cards the model showed mid-answer), the way a tool's widget sits between the
+ *      paragraphs around its call. Read by the same frame table as a leading frame.
+ *   4. `\x1F` (TRAILER_SENTINEL) + one JSON usage frame running to
  *      stream end (no terminator).
  *
  * Server-safe: no React, no browser APIs beyond TextEncoder/TextDecoder.
@@ -31,6 +34,8 @@ export const FRAME_TERMINATOR = '\0';
 export const END_OF_LEADING = '\x1E';
 /** Unit Separator — start of the trailing usage JSON frame. */
 export const TRAILER_SENTINEL = '\x1F';
+/** Group Separator — a JSON frame inside the answer text, terminated by `\0`. */
+export const INLINE_FRAME = '\x1D';
 
 // =============================================================================
 // Routing types (moved verbatim from the hub's `lib/chat/wire-frames.ts`;
@@ -280,8 +285,4 @@ export interface SseTrailingUsageFrame {
   /** Gated deep-debug payload (only present when the request carried
    *  the privileged debug secret). */
   debug?: Record<string, unknown>;
-  /** The answer's record cards, when the model chose them after its text had
-   *  started and no leading frame could carry them. Drawn above the text all
-   *  the same: where a card is drawn is the renderer's, not the wire's. */
-  record_cards?: RecordCardsPart;
 }

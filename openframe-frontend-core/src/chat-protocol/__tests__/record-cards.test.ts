@@ -1,5 +1,6 @@
 /**
- * The record-cards part: one wire shape on every transport, decoded once, always first in its message.
+ * The record-cards part: one wire shape on every transport, decoded once, and drawn where it arrived in the message
+ * (between the text before and after the `show_records` call), never read out of the text.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -7,9 +8,15 @@ import { withRecordCards } from '../../components/chat/stream/message-mutations'
 import { MessageSegmentAccumulator } from '../../components/chat/utils/message-segment-accumulator';
 import { decodeHistoricalMessageData } from '../../components/chat/utils/process-historical-messages';
 import { createSseFrameDecoder } from '../decode';
-import { encodeEndOfLeading, encodeLeadingFrame, encodeTextDelta, encodeTrailingUsageFrame } from '../encode';
+import {
+  encodeEndOfLeading,
+  encodeInlineFrame,
+  encodeLeadingFrame,
+  encodeTextDelta,
+  encodeTrailingUsageFrame,
+} from '../encode';
 import { decodeNatsChunk } from '../nats-decoder';
-import { RECORD_CARDS_MAX, recordCardsEvent, recordCardsPart } from '../record-cards';
+import { placeRecordCards, RECORD_CARDS_MAX, recordCardsEvent, recordCardsPart } from '../record-cards';
 
 const guide = { type: 'onboarding_guide', id: 'mac-guide' };
 const release = { type: 'product_release', id: 'v1.4' };
@@ -43,7 +50,7 @@ describe('record cards wire part', () => {
     expect(recordCardsEvent('nope')).toBeNull();
   });
 
-  it('decodes the same part from a Mingo chunk, a stored row, a hub leading frame and the hub trailer', () => {
+  it('decodes the same part from a Mingo chunk, a stored row and a hub leading frame', () => {
     const part = recordCardsPart([guide]);
     const expected = { type: 'record-cards', cards: [guide] };
     expect(decodeNatsChunk({ ...part, streamSeq: 7 })).toEqual({ ...expected, seq: 7 });
@@ -51,12 +58,29 @@ describe('record cards wire part', () => {
     expect(decodeAll([encodeLeadingFrame(part), encodeEndOfLeading(), encodeTextDelta('Here.')])).toContainEqual(
       expected,
     );
-    const trailing = decodeAll([
+  });
+
+  it('reads a part sent INSIDE the answer at its place, even split across chunks', () => {
+    const frame = encodeInlineFrame(recordCardsPart([release]));
+    const events = decodeAll([
       encodeEndOfLeading(),
-      encodeTextDelta('Here.'),
-      encodeTrailingUsageFrame({ kind: 'usage', stage: 'end', record_cards: part }),
+      encodeTextDelta('Putting it in the same list:\n\n'),
+      frame.slice(0, 9),
+      frame.slice(9),
+      encodeTextDelta('The task is filed.'),
+      encodeTrailingUsageFrame({ kind: 'usage', stage: 'end', input_tokens: 3 }),
     ]);
-    expect(trailing).toContainEqual(expected);
+    const order = events
+      .filter(e => e.type === 'text-delta' || e.type === 'record-cards')
+      .map(e => (e.type === 'text-delta' ? e.text : 'CARDS'))
+      .filter(Boolean);
+    expect(order).toEqual(['Putting it in the same list:\n\n', 'CARDS', 'The task is filed.']);
+    expect(events.find(e => e.type === 'usage')).toMatchObject({ input_tokens: 3 });
+  });
+
+  it('never lets model text open a frame: the separator is stripped from text', () => {
+    const events = decodeAll([encodeEndOfLeading(), encodeTextDelta('a\x1D{"type":"RECORD_CARDS"}\0b')]);
+    expect(events.some(e => e.type === 'record-cards')).toBe(false);
   });
 });
 
@@ -79,27 +103,41 @@ describe('record cards on a receipt', () => {
 });
 
 describe('record cards in a message', () => {
-  it('is one segment, first, whenever in the turn it arrived', () => {
+  it('are a part where they arrived: after the text before them, before the text after them', () => {
     const accumulator = new MessageSegmentAccumulator();
-    accumulator.appendText('The guide covers it.');
-    accumulator.addRecordCards([guide]);
-    const segments = accumulator.addRecordCards([release, guide]);
-    expect(segments[0]).toEqual({ type: 'record_cards', cards: [guide, release] });
-    expect(segments.filter(segment => segment.type === 'record_cards')).toHaveLength(1);
-    expect(segments[1]).toEqual({ type: 'text', text: 'The guide covers it.' });
+    accumulator.appendText('Putting it in the same list:');
+    accumulator.addRecordCards([guide, guide]);
+    const segments = accumulator.appendText('The task is filed.');
+    expect(segments).toEqual([
+      { type: 'text', text: 'Putting it in the same list:' },
+      { type: 'record_cards', cards: [guide] },
+      { type: 'text', text: 'The task is filed.' },
+    ]);
   });
 
-  it('adds to the existing part in a stored message the same way', () => {
-    const segments = withRecordCards(
-      [
-        { type: 'text', text: 'Hi.' },
-        { type: 'record_cards', cards: [guide] },
-      ],
-      [release],
-    );
-    expect(segments).toEqual([
-      { type: 'record_cards', cards: [guide, release] },
+  it('are added at the end of a stored message the same way', () => {
+    expect(withRecordCards([{ type: 'text', text: 'Hi.' }], [release])).toEqual([
       { type: 'text', text: 'Hi.' },
+      { type: 'record_cards', cards: [release] },
     ]);
+  });
+
+  it('are put back at their places in a stored answer', () => {
+    const text = 'Intro.\n\nMiddle.\n\nEnd.';
+    const cards = (id: string) => ({ cards: [{ entityType: 'webinar', entityId: id }] });
+    expect(
+      placeRecordCards(text, [
+        { at: 8, ...cards('2') },
+        { at: 0, ...cards('1') },
+        { at: 999, ...cards('3') },
+      ]),
+    ).toEqual([
+      { type: 'record_cards', cards: [{ type: 'webinar', id: '1' }] },
+      { type: 'text', text: 'Intro.\n\n' },
+      { type: 'record_cards', cards: [{ type: 'webinar', id: '2' }] },
+      { type: 'text', text: 'Middle.\n\nEnd.' },
+      { type: 'record_cards', cards: [{ type: 'webinar', id: '3' }] },
+    ]);
+    expect(placeRecordCards('Only text.', [])).toEqual([{ type: 'text', text: 'Only text.' }]);
   });
 });

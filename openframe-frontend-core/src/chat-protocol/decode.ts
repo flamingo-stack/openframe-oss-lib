@@ -10,8 +10,9 @@
  *     stream into text mode and the WHOLE buffer (including the `\0`)
  *     is emitted as answer text (legacy no-frame stream fallback). This
  *     transition is marked `turn-start { implicit: true }`.
- *   - In text mode only `\x1F` is scanned — literal `\0` / `\x1E` bytes
- *     pass through into the answer; the FIRST literal `\x1F` flips into
+ *   - In text mode `\x1D` opens a frame inside the answer (JSON up to `\0`, read by the leading-frame table, so a
+ *     part lands where it was sent; it may span chunks) and `\x1F` starts the trailer. Literal `\0` / `\x1E`
+ *     bytes pass through into the answer; the FIRST literal `\x1F` flips into
  *     trailer mode and everything after is captured as the trailer
  *     (golden fixture (d) characterizes this mis-framing; the fix lives
  *     in `encode.ts`'s sentinel stripping, NOT here).
@@ -35,12 +36,11 @@
 
 import type { ChatStreamEvent } from './events';
 import type { UsageTelemetry } from './frames';
-import { FRAME_TERMINATOR, END_OF_LEADING, TRAILER_SENTINEL } from './frames';
+import { FRAME_TERMINATOR, END_OF_LEADING, INLINE_FRAME, TRAILER_SENTINEL } from './frames';
 // The frame table lives in its own module so it is reusable outside this
 // decoder. `frameNum` comes from there too: the trailing usage frame's token
 // counts must pass the SAME typeof gate the leading `usage:start` frame's do.
 import { mapLeadingFrame, frameNum } from './leading-frames';
-import { recordCardsEvent } from './record-cards';
 
 export interface SseFrameDecoder {
   /** Feed raw response bytes; returns the events they produced. */
@@ -91,6 +91,49 @@ export function createSseFrameDecoder(): SseFrameDecoder {
   let inTrailer = false;
   let trailerBuffer = '';
   let ended = false;
+  /** A frame inside the answer, read so far (`null` outside one). */
+  let inlineFrame: string | null = null;
+
+  /** Text-mode input: answer text, frames inside it, and the trailer's start. */
+  function pushText(text: string, out: ChatStreamEvent[]): void {
+    let rest = text;
+    while (rest.length > 0 && !inTrailer) {
+      if (inlineFrame !== null) {
+        const frameEnd = rest.indexOf(FRAME_TERMINATOR);
+        if (frameEnd === -1) {
+          inlineFrame += rest;
+          return;
+        }
+        const raw = inlineFrame + rest.slice(0, frameEnd);
+        inlineFrame = null;
+        rest = rest.slice(frameEnd + 1);
+        try {
+          const meta: unknown = JSON.parse(raw);
+          if (isFrameObject(meta)) mapLeadingFrame(meta, out);
+        } catch {
+          // A malformed frame inside the answer is dropped; the answer goes on.
+        }
+        continue;
+      }
+      const frameAt = rest.indexOf(INLINE_FRAME);
+      const trailerAt = rest.indexOf(TRAILER_SENTINEL);
+      if (trailerAt !== -1 && (frameAt === -1 || trailerAt < frameAt)) {
+        const before = rest.slice(0, trailerAt);
+        if (before) out.push({ type: 'text-delta', text: before });
+        inTrailer = true;
+        trailerBuffer = rest.slice(trailerAt + 1);
+        return;
+      }
+      if (frameAt === -1) {
+        out.push({ type: 'text-delta', text: rest });
+        return;
+      }
+      const before = rest.slice(0, frameAt);
+      if (before) out.push({ type: 'text-delta', text: before });
+      inlineFrame = '';
+      rest = rest.slice(frameAt + 1);
+    }
+  }
 
   function push(bytes: Uint8Array): ChatStreamEvent[] {
     const out: ChatStreamEvent[] = [];
@@ -106,23 +149,10 @@ export function createSseFrameDecoder(): SseFrameDecoder {
           out.push({ type: 'turn-start' });
           const after = buffer.slice(recIdx + 1);
           buffer = '';
-          if (after) {
-            // The `after` slice may ALSO contain the `\x1F` trailing-
-            // usage sentinel — common for fixed-answer responses where
-            // the whole frame sequence arrives in ONE TCP chunk.
-            const unitIdx = after.indexOf(TRAILER_SENTINEL);
-            if (unitIdx === -1) {
-              out.push({ type: 'text-delta', text: after });
-            } else {
-              const textBefore = after.slice(0, unitIdx);
-              const trailerAfter = after.slice(unitIdx + 1);
-              if (textBefore) {
-                out.push({ type: 'text-delta', text: textBefore });
-              }
-              inTrailer = true;
-              trailerBuffer = trailerAfter;
-            }
-          }
+          // The `after` slice may ALSO hold frames inside the answer and the
+          // `\x1F` trailer — common for fixed-answer responses where the whole
+          // frame sequence arrives in ONE TCP chunk.
+          if (after) pushText(after, out);
           break;
         }
         if (nullIdx === -1) break; // need more bytes
@@ -152,20 +182,12 @@ export function createSseFrameDecoder(): SseFrameDecoder {
       }
     } else if (inTrailer) {
       trailerBuffer += chunk;
-    } else {
-      // Text mode: only the `\x1F` trailer sentinel is scanned. The
-      // unconditional emit (even for an empty decode of a partial
+    } else if (chunk.length === 0 && inlineFrame === null) {
+      // The unconditional emit (even for an empty decode of a partial
       // multi-byte code point) mirrors the legacy per-chunk yield.
-      const sepIdx = chunk.indexOf(TRAILER_SENTINEL);
-      if (sepIdx === -1) {
-        out.push({ type: 'text-delta', text: chunk });
-      } else {
-        const before = chunk.slice(0, sepIdx);
-        const after = chunk.slice(sepIdx + 1);
-        if (before) out.push({ type: 'text-delta', text: before });
-        inTrailer = true;
-        trailerBuffer = after;
-      }
+      out.push({ type: 'text-delta', text: chunk });
+    } else {
+      pushText(chunk, out);
     }
     return out;
   }
@@ -185,9 +207,6 @@ export function createSseFrameDecoder(): SseFrameDecoder {
         // object and simply fails the gate — no throw, no event.
         const meta: unknown = JSON.parse(raw);
         if (isFrameObject(meta) && meta.kind === 'usage' && (meta.stage === 'end' || meta.stage === 'display')) {
-          // Record cards chosen after the text started ride the trailer; they are the same part as a leading one.
-          const cards = recordCardsEvent(meta.record_cards);
-          if (cards) out.push(cards);
           // Token counts pass `frameNum`, the SAME gate the leading
           // `usage:start` frame's counts already pass. Un-gated, a wire value
           // of the wrong type (a string count from a server that stringifies

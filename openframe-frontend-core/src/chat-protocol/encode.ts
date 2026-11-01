@@ -7,6 +7,7 @@
 import {
   FRAME_TERMINATOR,
   END_OF_LEADING,
+  INLINE_FRAME,
   TRAILER_SENTINEL,
   type SseLeadingFrame,
   type SseTrailingUsageFrame,
@@ -14,12 +15,12 @@ import {
 
 const encoder = new TextEncoder();
 
-/** Matches every framing sentinel byte: `\0`, `\x1E`, `\x1F`. THE one
+/** Matches every framing sentinel byte: `\0`, `\x1D`, `\x1E`, `\x1F`. THE one
  *  regex — `stripSentinelBytes` is its only consumer. */
-const SENTINEL_BYTES_RE = /[\u0000\u001E\u001F]/g;
+const SENTINEL_BYTES_RE = /[\u0000\u001D\u001E\u001F]/g;
 
 /**
- * Remove the SSE framing sentinel bytes (`\0`, `\x1E`, `\x1F`) from model
+ * Remove the SSE framing sentinel bytes (`\0`, `\x1D`, `\x1E`, `\x1F`) from model
  * text. Exported as a STANDALONE helper — not just folded into
  * `encodeTextDelta` — because producers must strip at the point where they
  * first take custody of the text, BEFORE any local accumulation.
@@ -42,6 +43,12 @@ export function stripSentinelBytes(text: string): string {
 /** Encode one leading frame: JSON + `\0` terminator. */
 export function encodeLeadingFrame(frame: SseLeadingFrame): Uint8Array {
   return encoder.encode(JSON.stringify(frame) + FRAME_TERMINATOR);
+}
+
+/** Encode one frame INSIDE the answer text (after `\x1E`): `\x1D` + JSON + `\0`. The part sits at this point of the
+ *  answer. */
+export function encodeInlineFrame(frame: SseLeadingFrame): Uint8Array {
+  return encoder.encode(INLINE_FRAME + JSON.stringify(frame) + FRAME_TERMINATOR);
 }
 
 /** Encode the single `\x1E` end-of-leading-frames sentinel. */
