@@ -147,6 +147,7 @@ function main() {
   copyFileSync(join(ROOT, 'scripts', 'next-styles.cjs'), join(OUT_DIR, 'next-styles.cjs'));
   copyFileSync(join(ROOT, 'scripts', 'next-styles.d.ts'), join(OUT_DIR, 'next-styles.d.ts'));
   copyFileSync(join(ROOT, 'scripts', 'route-styles.cjs'), join(OUT_DIR, 'route-styles.cjs'));
+  copyFileSync(join(ROOT, 'scripts', 'route-styles-markers.cjs'), join(OUT_DIR, 'route-styles-markers.cjs'));
   copyFileSync(join(ROOT, 'scripts', 'route-styles-server.mjs'), join(OUT_DIR, 'route-styles-server.mjs'));
   copyFileSync(join(ROOT, 'scripts', 'route-styles-client.mjs'), join(OUT_DIR, 'route-styles-client.mjs'));
   copyFileSync(join(ROOT, 'scripts', 'route-styles.d.ts'), join(OUT_DIR, 'route-styles.d.ts'));

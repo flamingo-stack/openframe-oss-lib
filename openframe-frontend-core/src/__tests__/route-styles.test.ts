@@ -8,6 +8,12 @@ const require = createRequire(import.meta.url);
 const routeStyles = require('../../scripts/route-styles.cjs') as {
   UTILITIES_MARK: string;
   PLACEHOLDER: string;
+  COMPLETE_PLACEHOLDER: string;
+  crawlRoutes: (
+    root: string,
+    routes: string[],
+    options?: { timeoutMs?: number },
+  ) => Promise<{ route: string; html: string }[]>;
   renderedClasses: (html: string) => Set<string>;
   stylesheetBuilder: (options: {
     root: string;
@@ -240,5 +246,66 @@ describe('RouteStyles: the rules a page gets on the server', () => {
     expect(resolve('/docs/a/b', false).css).toBe('.docs{}');
     expect(resolve('/unknown', false)).toEqual({ css: '.full{}', fullUrl: null });
     expect(resolve('/blog', true)).toEqual({ css: '.full{}', fullUrl: null });
+  });
+});
+
+/**
+ * A stand-in for `next start` in an app directory: `node_modules/next/dist/bin/next` serving `pages` (path → status
+ * and body) on the port it is given, the way the crawl starts the finished build.
+ */
+function fakeNextApp(pages: Record<string, { status: number; body: string }>) {
+  const root = mkdtempSync(join(tmpdir(), 'route-styles-crawl-'));
+  mkdirSync(join(root, 'node_modules', 'next', 'dist', 'bin'), { recursive: true });
+  writeFileSync(join(root, 'node_modules', 'next', 'package.json'), JSON.stringify({ name: 'next', version: '0.0.0' }));
+  writeFileSync(
+    join(root, 'node_modules', 'next', 'dist', 'bin', 'next.js'),
+    `const pages = ${JSON.stringify(pages)};
+const port = Number(process.argv[process.argv.indexOf('-p') + 1]);
+require('node:http')
+  .createServer((req, res) => {
+    const page = pages[req.url] ?? { status: 404, body: '<html><body>missing</body></html>' };
+    res.writeHead(page.status, page.status === 302 ? { location: '/' } : { 'content-type': 'text/html' });
+    res.end(page.body);
+  })
+  .listen(port, '127.0.0.1');
+`,
+  );
+  return root;
+}
+
+describe('route-styles: sampling the routes rendered per request', () => {
+  const roots: string[] = [];
+  afterAll(() => {
+    for (const root of roots) rmSync(root, { recursive: true, force: true });
+  });
+
+  it('keeps the pages that answer 200 with a document, and leaves a redirect or an error to the complete sheet', async () => {
+    const root = fakeNextApp({
+      '/': { status: 200, body: '<html><body class="home">home</body></html>' },
+      '/pricing': { status: 200, body: '<html><body class="p-2">pricing</body></html>' },
+      '/moved': { status: 302, body: '' },
+      '/broken': { status: 500, body: '<html><body class="p-4">error</body></html>' },
+    });
+    roots.push(root);
+    const pages = await routeStyles.crawlRoutes(root, ['/pricing', '/moved', '/broken'], { timeoutMs: 10_000 });
+    expect(pages.map(page => page.route)).toEqual(['/pricing']);
+    expect(routeStyles.renderedClasses(pages[0].html)).toEqual(new Set(['p-2']));
+  });
+
+  it("samples nothing when the app's pages carry the complete sheet", async () => {
+    const root = fakeNextApp({
+      '/': { status: 200, body: '<html><body>home</body></html>' },
+      '/hub': {
+        status: 200,
+        body: `<html><head><style>${routeStyles.COMPLETE_PLACEHOLDER}</style></head><body class="p-2">hub</body></html>`,
+      },
+      '/other': { status: 200, body: '<html><body class="p-4">other</body></html>' },
+    });
+    roots.push(root);
+    expect(await routeStyles.crawlRoutes(root, ['/hub', '/other'], { timeoutMs: 10_000 })).toEqual([]);
+  });
+
+  it('asks nothing when every route was sampled', async () => {
+    expect(await routeStyles.crawlRoutes('/nonexistent', [])).toEqual([]);
   });
 });

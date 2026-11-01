@@ -39,9 +39,7 @@ const { dirname, isAbsolute, join, resolve } = require('node:path');
 const { promisify } = require('node:util');
 const { brotliCompressSync, constants } = require('node:zlib');
 
-/** Where `next-styles build` keeps the build's route sheets (the app's directory), and the build's settings file. */
-const STYLES_DIR = '.next-styles';
-const BUILD_INFO = 'build.json';
+const { STYLES_DIR, BUILD_INFO } = require('./route-styles-markers.cjs');
 
 /**
  * The complete sheet's address for a build (`{ buildId, assetPrefix, basePath }`). Named by the build, so the browser

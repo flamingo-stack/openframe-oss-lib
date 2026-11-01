@@ -12,8 +12,9 @@
  */
 import { usePathname } from 'next/navigation';
 import { createElement, Fragment, useEffect } from 'react';
+import markers from './route-styles-markers.cjs';
 
-const REGISTRY = Symbol.for('flamingo.next-styles');
+const REGISTRY = Symbol.for(markers.REGISTRY_KEY);
 const FULL_URL = process.env.NEXT_STYLES_FULL_URL || '';
 /** Appends the complete sheet named by its own `<script data-next-styles-full>` once, at low priority. */
 const LOADER =

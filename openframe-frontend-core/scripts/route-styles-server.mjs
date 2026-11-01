@@ -17,12 +17,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createElement } from 'react';
 import { RouteStyle } from './route-styles-client.mjs';
+import markers from './route-styles-markers.cjs';
 
-const STYLES_DIR = '.next-styles';
-/** Filled into prerendered pages by `next-styles build` (the same strings as `route-styles.cjs`). */
-const PLACEHOLDER = '/*next-styles:route*/';
-const COMPLETE_PLACEHOLDER = '/*next-styles:complete*/';
-const REGISTRY = Symbol.for('flamingo.next-styles');
+const { STYLES_DIR, MANIFEST, PLACEHOLDER, COMPLETE_PLACEHOLDER, REGISTRY_KEY } = markers;
+const REGISTRY = Symbol.for(REGISTRY_KEY);
 
 /** The build these rules belong to, and its complete sheet: written by `withRouteStyles` into the bundles. */
 const BUILD = process.env.NEXT_STYLES_BUILD || '';
@@ -62,7 +60,7 @@ function createResolver() {
   // Read at run time from the server's own directory (traced in by `withRouteStyles`), never followed by the
   // bundler's file tracing.
   const dir = join(/* turbopackIgnore: true */ process.cwd(), STYLES_DIR);
-  const file = join(dir, 'manifest.json');
+  const file = join(dir, MANIFEST);
   if (!existsSync(file)) {
     throw new Error(
       `next-styles: ${file} is missing: this server was built by next-styles build and needs its ${STYLES_DIR}`,

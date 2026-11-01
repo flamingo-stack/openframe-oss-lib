@@ -37,15 +37,10 @@ const fs = require('node:fs');
 const { join, relative, resolve } = require('node:path');
 const { brotliCompressSync, constants } = require('node:zlib');
 
-/** Where the build's route sheets live, relative to the app's directory; traced into the server bundle. */
-const { STYLES_DIR, BUILD_INFO, fullSheetUrl } = require('./next-styles.cjs');
-const MANIFEST = 'manifest.json';
+const { fullSheetUrl } = require('./next-styles.cjs');
+const { STYLES_DIR, BUILD_INFO, MANIFEST, PLACEHOLDER, COMPLETE_PLACEHOLDER } = require('./route-styles-markers.cjs');
 /** The mark the package's stylesheet carries before `@tailwind components`: the utilities start there. */
 const UTILITIES_MARK = '/*! next-styles:utilities */';
-/** What a prerendered page's route `<style>` holds until this step fills it. */
-const PLACEHOLDER = '/*next-styles:route*/';
-/** What a page that carries the complete sheet (`RouteStyles complete`) holds until this step fills it. */
-const COMPLETE_PLACEHOLDER = '/*next-styles:complete*/';
 const DEFAULT_BUDGET = 15 * 1024;
 
 const kb = bytes => `${(bytes / 1024).toFixed(1)} KB`;
@@ -414,6 +409,7 @@ module.exports = {
   renderedClasses,
   stylesheetBuilder,
   prerenderedPages,
+  crawlRoutes,
   writeRouteStyles,
   buildWithRouteStyles,
 };
