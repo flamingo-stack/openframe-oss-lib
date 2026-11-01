@@ -43,6 +43,11 @@
       "require": "./dist/build/next-styles.cjs",
       "default": "./dist/build/next-styles.cjs"
     },
+    "./route-styles": {
+      "types": "./dist/build/route-styles.d.ts",
+      "import": "./dist/build/route-styles-server.mjs",
+      "default": "./dist/build/route-styles-server.mjs"
+    },
     "./dist/*.js": {
       "import": "./dist/*.js",
       "default": "./dist/*.js"

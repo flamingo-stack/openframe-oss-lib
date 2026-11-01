@@ -146,6 +146,11 @@ function main() {
   copyFileSync(join(ROOT, 'scripts', 'style-sources.d.ts'), join(OUT_DIR, 'style-sources.d.ts'));
   copyFileSync(join(ROOT, 'scripts', 'next-styles.cjs'), join(OUT_DIR, 'next-styles.cjs'));
   copyFileSync(join(ROOT, 'scripts', 'next-styles.d.ts'), join(OUT_DIR, 'next-styles.d.ts'));
+  copyFileSync(join(ROOT, 'scripts', 'route-styles.cjs'), join(OUT_DIR, 'route-styles.cjs'));
+  copyFileSync(join(ROOT, 'scripts', 'route-styles-markers.cjs'), join(OUT_DIR, 'route-styles-markers.cjs'));
+  copyFileSync(join(ROOT, 'scripts', 'route-styles-server.mjs'), join(OUT_DIR, 'route-styles-server.mjs'));
+  copyFileSync(join(ROOT, 'scripts', 'route-styles-client.mjs'), join(OUT_DIR, 'route-styles-client.mjs'));
+  copyFileSync(join(ROOT, 'scripts', 'route-styles.d.ts'), join(OUT_DIR, 'route-styles.d.ts'));
   // style-sources leaves these built files out of the first-paint stylesheet by path: a build that moves
   // one would silently put its classes back on every page, so a missing one fails the build instead.
   const missing = createRequire(import.meta.url)(join(ROOT, 'scripts', 'style-sources.cjs')).LAZY_STYLED.filter(
