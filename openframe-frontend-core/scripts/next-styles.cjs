@@ -32,11 +32,30 @@
  * page's sheet is mostly its layout's. Inlining removes the wait; a smaller sheet only makes it cheap.
  */
 const { execFile } = require('node:child_process');
+const crypto = require('node:crypto');
 const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { dirname, isAbsolute, join, resolve } = require('node:path');
 const { promisify } = require('node:util');
 const { brotliCompressSync, constants } = require('node:zlib');
+
+const { STYLES_DIR, BUILD_INFO } = require('./route-styles-markers.cjs');
+
+/**
+ * The complete sheet's address for a build (`{ buildId, assetPrefix, basePath }`). Named by the build, so the browser
+ * bundle knows it too: a page Next draws only in the browser (a 404 is served as an empty error shell, then rendered
+ * from its data) has no route sheet from the server and loads this one itself.
+ */
+const fullSheetUrl = ({ buildId, assetPrefix, basePath }) =>
+  `${(assetPrefix || basePath || '').replace(/\/$/, '')}/_next/static/next-styles/full-${buildId}.css`;
+
+/**
+ * The route-sheet build (`./route-styles.cjs`), loaded only by the `build` command. The app's next.config imports
+ * this file and Turbopack traces what it imports (`join(__dirname, …)` included): reaching the build tool pulled
+ * Next's own server, sharp's native libraries and esbuild into the trace and failed the build (Next 16.3).
+ */
+const loadRouteStyles = () =>
+  require(/* turbopackIgnore: true */ /* webpackIgnore: true */ join(__dirname, 'route-styles.cjs'));
 
 /** `nextConfig` with every route's stylesheets written into its HTML. Composes with a config function. */
 function withInlineStyles(nextConfig) {
@@ -45,6 +64,45 @@ function withInlineStyles(nextConfig) {
     return async (...args) => apply(await nextConfig(...args));
   }
   return apply(nextConfig);
+}
+
+/**
+ * `withInlineStyles`, and per-route stylesheets when the build is `next-styles build` (`./route-styles.cjs`): the
+ * build runs the route step as its build adapter (`./route-styles-adapter.cjs`, which wraps the adapter the build
+ * would have had: the config's own `adapterPath`, else the host's `NEXT_ADAPTER_PATH`), knows its build, and records
+ * the settings the route step reads. Any other build, and `next dev`, is `withInlineStyles` alone.
+ */
+function withRouteStyles(nextConfig) {
+  return async (phase, ...rest) => {
+    const config = typeof nextConfig === 'function' ? await nextConfig(phase, ...rest) : nextConfig;
+    const inline = withInlineStyles(config);
+    if (process.env.NEXT_STYLES !== 'routes' || phase !== 'phase-production-build') return inline;
+    const root = process.cwd();
+    const infoFile = join(root, STYLES_DIR, BUILD_INFO);
+    // One id per build: the server checks the sheets it reads were written for it.
+    const buildId = existsSync(infoFile) ? JSON.parse(readFileSync(infoFile, 'utf8')).buildId : crypto.randomUUID();
+    const info = {
+      buildId,
+      distDir: inline.distDir ?? '.next',
+      output: inline.output ?? null,
+      assetPrefix: inline.assetPrefix ?? '',
+      basePath: inline.basePath ?? '',
+      inner: inline.adapterPath ?? process.env.NEXT_ADAPTER_PATH ?? null,
+      options: JSON.parse(process.env.NEXT_STYLES_OPTIONS || '{}'),
+    };
+    writeFileSync(infoFile, `${JSON.stringify(info, null, 2)}\n`);
+    // Every route: the files are read at run time by `RouteStyles`, which no static trace can follow (the adapter
+    // adds the sheets it writes after the trace to the server functions it hands on).
+    const includes = { ...inline.outputFileTracingIncludes };
+    for (const route of ['/', '/*', '/*/**']) includes[route] = [...(includes[route] ?? []), `./${STYLES_DIR}/**/*`];
+    return {
+      ...inline,
+      // A path, never a require: the config must not reach the build tool (see `loadRouteStyles`).
+      adapterPath: join(__dirname, 'route-styles-adapter.cjs'),
+      env: { ...inline.env, NEXT_STYLES_BUILD: buildId, NEXT_STYLES_FULL_URL: fullSheetUrl(info) },
+      outputFileTracingIncludes: includes,
+    };
+  };
 }
 
 /**
@@ -158,8 +216,9 @@ if (require.main === module) {
   const [command, ...rest] = process.argv.slice(2);
   Promise.resolve()
     .then(() => {
-      if (command !== 'budget') throw new Error(`next-styles: unknown command ${command ?? '(none)'}; try "budget"`);
-      return budgetCommand(rest);
+      if (command === 'budget') return budgetCommand(rest);
+      if (command === 'build') return buildCommand(rest);
+      throw new Error(`next-styles: unknown command ${command ?? '(none)'}; try "build" or "budget"`);
     })
     .catch(error => {
       console.error(`[css-budget] ${error.message}`);
@@ -167,4 +226,41 @@ if (require.main === module) {
     });
 }
 
-module.exports = { withInlineStyles, measureStylesheet, resolveImports };
+/**
+ * `build [--budget <brotli bytes>] [--input <css>] [--config <tailwind config>] [--full-config <tailwind config>]
+ * [-- <next build args>]`: `next build` with a stylesheet per route (`./route-styles.cjs`).
+ */
+async function buildCommand(argv) {
+  const root = process.cwd();
+  const split = argv.indexOf('--');
+  const args = parseArgs(split < 0 ? argv : argv.slice(0, split));
+  const nextArgs = split < 0 ? [] : argv.slice(split + 1);
+  const config =
+    args.config ??
+    firstExisting(
+      root,
+      ['ts', 'js', 'cjs', 'mjs'].map(ext => `tailwind.config.${ext}`),
+    );
+  const input = args.input ?? firstExisting(root, ['src/app/globals.css', 'app/globals.css']);
+  if (!input || !config)
+    throw new Error('usage: next-styles build [--input <css>] [--config <tailwind config>] [-- <next build args>]');
+  const { buildWithRouteStyles, DEFAULT_BUDGET } = loadRouteStyles();
+  await buildWithRouteStyles({
+    root,
+    nextArgs,
+    input,
+    config,
+    fullConfig: args['full-config'] ?? config,
+    budget: args.budget ? Number(args.budget) : DEFAULT_BUDGET,
+  });
+}
+
+module.exports = {
+  STYLES_DIR,
+  BUILD_INFO,
+  fullSheetUrl,
+  withInlineStyles,
+  withRouteStyles,
+  measureStylesheet,
+  resolveImports,
+};

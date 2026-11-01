@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
 import { MobileNavSheet } from '../components/navigation/mobile-nav-sheet';
-import { SocialIconRow } from '../components/social-icon-row';
+import { SocialIconRow, siteNavSocialLinks } from '../components/social-icon-row';
 import { Button } from '../components/ui/button';
 import { simpleNav, siteNav } from './site-nav-fixtures';
 
@@ -45,7 +45,7 @@ export const SimplePlatform: Story = {
     nav: simpleNav,
     pathname: '/members',
     badges: { messages: 3, requests: 12 },
-    social: <SocialIconRow compact />,
+    social: <SocialIconRow compact links={siteNavSocialLinks(siteNav.brand.social)} />,
     cta: <Button onClick={fn()}>Join the waitlist</Button>,
     extraMenus: [
       {
