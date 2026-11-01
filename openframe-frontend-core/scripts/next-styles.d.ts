@@ -19,3 +19,11 @@ export function measureStylesheet(
 
 /** The stylesheet at `input` with each `@import` resolved to an absolute path (packages through their `exports`). */
 export function resolveImports(input: string, root: string): string;
+
+/**
+ * `withInlineStyles`, plus per-route stylesheets when the build runs as `next-styles build`: the server bundle
+ * carries `.next-styles/` and knows its build. Any other build and `next dev` get `withInlineStyles` alone.
+ */
+export function withRouteStyles<T extends object>(
+  nextConfig: T | ((...args: unknown[]) => T | Promise<T>),
+): (phase: string, ...rest: unknown[]) => Promise<T & { experimental: { inlineCss: true } }>;

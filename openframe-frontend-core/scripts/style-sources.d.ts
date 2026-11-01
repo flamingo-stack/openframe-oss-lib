@@ -10,3 +10,6 @@ export interface AppStyleSourcesOptions {
 
 /** The files a Next.js app's served routes import, for Tailwind's `content`. */
 export function appStyleSources(options: AppStyleSourcesOptions): string[];
+
+/** The root sheet's Tailwind config: no utilities under `next-styles build` (each route brings its own). */
+export function withRouteStylesTailwind<T extends object>(config: T): T;

@@ -1,13 +1,15 @@
 'use client';
 
 import { createElement } from 'react';
+import type { NavLink } from '../types/navigation';
 import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-platforms';
 import { iconOf, type IconComponent, type IconRef } from './chat/utils/icon-loading';
 import { Button } from './ui/button';
 
 interface SocialIconRowProps {
   className?: string;
-  links?: SocialIconLink[];
+  /** The links to draw: a person's profiles, or a site's own (`siteNavSocialLinks`). */
+  links: SocialIconLink[];
   variant?: 'accent' | 'outline' | 'transparent' | 'destructive' | null | undefined;
   /** Quiet metadata row for page-level identity/share slots: 32px ghost
    *  icon buttons (size="icon-sm", 16px glyphs), gap-2, w-fit container,
@@ -22,16 +24,15 @@ interface SocialIconRowProps {
   groupByVisibility?: boolean;
   /**
    * The links are a read list (a person's profiles, whose number is the data's): every button carries
-   * `data-loading-item`, as the caller's loading state's buttons do. Default false (a fixed set, e.g. the defaults).
+   * `data-loading-item`, as the caller's loading state's buttons do. Default false (a fixed set, e.g. a site's own).
    */
   listItems?: boolean;
 }
 
-const defaultLinks: SocialIconLink[] = [
-  { platform: 'github', href: 'https://github.com/flamingo-stack', label: 'GitHub' },
-  { platform: 'linkedin', href: 'https://linkedin.com/company/flamingo.run', label: 'LinkedIn' },
-  { platform: 'facebook', href: 'https://www.facebook.com/flamingoai.msp', label: 'Facebook' },
-];
+/** A site's social links as a row draws them: the `brand.social` links of its navigation (the header and the footer read the same list). */
+export function siteNavSocialLinks(social: readonly NavLink[]): SocialIconLink[] {
+  return social.map(link => ({ platform: link.iconName ?? link.id, href: link.href, label: link.label }));
+}
 
 /** The colour a social mark is drawn in: the themed foreground, so a row reads as one set. */
 const MARK = 'var(--color-text-primary)';
@@ -40,10 +41,10 @@ const MARK = 'var(--color-text-primary)';
  * Platform name → the icon it draws, as DATA: the icon is loaded when a link to
  * that platform is drawn, so a row fetches only the marks of its own links. The
  * ONLY thing about a social platform that lives in code; the DB names the glyph
- * it wants through `social_platforms.icon_name`.
+ * it wants through `channel_platforms.icon_name`.
  *
  * Deliberately an OPEN record, not `satisfies Record<SomeUnion, …>`: the set of
- * platforms is the `social_platforms` table's to decide, and a row added there
+ * platforms is the `channel_platforms` table's to decide, and a row added there
  * must render — with the globe, until somebody adds art for it — rather than
  * fail to type-check against a list in this file.
  */
@@ -94,7 +95,7 @@ export function socialIconButtonProps(compact = false): { size: 'icon-sm' | 'ico
 
 export function SocialIconRow({
   className = '',
-  links = defaultLinks,
+  links,
   variant,
   compact = false,
   groupByVisibility = false,
