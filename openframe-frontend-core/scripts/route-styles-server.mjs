@@ -47,9 +47,14 @@ function routePattern(route) {
   return { route, dynamic, regex: new RegExp(`^${source || '/'}$`) };
 }
 
+/**
+ * The page's path as a route is written. `/index` is the home page: Next calls it that on the server (Vercel serves it
+ * as the `index` function, and a page regenerated there renders with `/index` as its path), and no app route is
+ * named `index` because Next answers `/index` itself.
+ */
 function normalize(pathname) {
   const path = `/${String(pathname || '').replace(/^\/+/, '')}`.replace(/\/+$/, '');
-  return path === '' ? '/' : path;
+  return path === '' || path === '/index' ? '/' : path;
 }
 
 /**
