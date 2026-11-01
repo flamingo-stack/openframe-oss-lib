@@ -16,7 +16,10 @@ export interface DrawnRecordLink extends RecordLink {
   label: string;
 }
 
-const parser = unified().use(remarkParse).use(remarkGfm);
+/** Built on first use, never at import: the CommonJS build loads `unified` through an interop that is not ready
+ *  while this module is still being evaluated. */
+let parser: ReturnType<typeof createParser> | null = null;
+const createParser = () => unified().use(remarkParse).use(remarkGfm);
 
 /** The plain text a node shows. */
 function textOf(node: Nodes): string {
@@ -28,6 +31,7 @@ function textOf(node: Nodes): string {
 /** Every record link `markdown` draws, repeats included. */
 export function recordLinksIn(markdown: string): DrawnRecordLink[] {
   if (!markdown || !markdown.includes('record://')) return [];
+  parser ??= createParser();
   const tree = parser.runSync(parser.parse(markdown), markdown) as Root;
   const found: DrawnRecordLink[] = [];
   const visit = (node: Nodes) => {
