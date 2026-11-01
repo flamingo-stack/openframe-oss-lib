@@ -41,7 +41,8 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
         log.debug("Saving authorization: {}", authorization.getId());
 
         MongoOAuth2Authorization entity = MongoAuthorizationMapper.toEntity(authorization);
-        entity.setRetiredRefreshTokens(retiredTokensAfterSaving(entity));
+        List<RetiredRefreshToken> retiredRefreshTokens = retiredTokensAfterSaving(entity);
+        entity.setRetiredRefreshTokens(retiredRefreshTokens);
         repository.save(entity);
     }
 
@@ -53,7 +54,8 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
      * token a concurrent request has just received.
      */
     private List<RetiredRefreshToken> retiredTokensAfterSaving(MongoOAuth2Authorization entity) {
-        MongoOAuth2Authorization stored = repository.findById(entity.getId()).orElse(null);
+        String authorizationId = entity.getId();
+        MongoOAuth2Authorization stored = repository.findById(authorizationId).orElse(null);
         if (stored == null) {
             return null;
         }
@@ -158,26 +160,33 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
                 .orElse(null);
     }
 
-    /**
-     * The presented value goes onto the returned authorization because Spring's revocation looks the
-     * token up by value on it; the metadata stays the current token's, so a revoked session stays revoked.
-     */
     private OAuth2Authorization findByRetiredRefreshToken(String token) {
         Instant now = Instant.now();
         return repository.findByRetiredRefreshTokensValue(token)
-                .filter(entity -> entity.getRetiredRefreshTokens().stream()
-                        .anyMatch(retired -> retired.value().equals(token) && isWithinGrace(retired, now)))
-                .map(entity -> {
-                    log.info("Accepted a rotated refresh token within the grace window: authorization {}", entity.getId());
-                    OAuth2Authorization authorization = MongoAuthorizationMapper.toDomain(entity, registeredClientRepository);
-                    OAuth2Authorization.Token<OAuth2RefreshToken> current = authorization.getRefreshToken();
-                    OAuth2RefreshToken presented = new OAuth2RefreshToken(
-                            token, current.getToken().getIssuedAt(), current.getToken().getExpiresAt());
-                    return OAuth2Authorization.from(authorization)
-                            .token(presented, metadata -> metadata.putAll(current.getMetadata()))
-                            .build();
-                })
+                .filter(entity -> hasUsableRetiredToken(entity, token, now))
+                .map(entity -> toAuthorizationWithPresentedToken(entity, token))
                 .orElse(null);
+    }
+
+    private boolean hasUsableRetiredToken(MongoOAuth2Authorization entity, String token, Instant now) {
+        return entity.getRetiredRefreshTokens().stream()
+                .filter(retired -> retired.value().equals(token))
+                .anyMatch(retired -> isWithinGrace(retired, now));
+    }
+
+    /**
+     * The presented value goes onto the returned authorization because Spring's revocation looks the
+     * token up by value on it. The builder keeps the replaced token's metadata, so a revoked session
+     * stays revoked.
+     */
+    private OAuth2Authorization toAuthorizationWithPresentedToken(MongoOAuth2Authorization entity, String token) {
+        log.info("Accepted a rotated refresh token within the grace window: authorization {}", entity.getId());
+        OAuth2Authorization authorization = MongoAuthorizationMapper.toDomain(entity, registeredClientRepository);
+        OAuth2RefreshToken current = authorization.getRefreshToken().getToken();
+        OAuth2RefreshToken presented = new OAuth2RefreshToken(token, current.getIssuedAt(), current.getExpiresAt());
+        return OAuth2Authorization.from(authorization)
+                .token(presented)
+                .build();
     }
 }
 
