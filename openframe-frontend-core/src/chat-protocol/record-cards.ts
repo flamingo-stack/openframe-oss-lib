@@ -85,7 +85,7 @@ export function segmentsOfParts(
       if (part.text.trim()) out.push({ type: 'text', text: part.text });
       continue;
     }
-    const event = recordCardsEvent(part);
+    const event = part.type === MESSAGE_TYPE.RECORD_CARDS ? recordCardsEvent(part) : null;
     if (event) out.push({ type: 'record_cards', cards: event.cards });
   }
   return out;

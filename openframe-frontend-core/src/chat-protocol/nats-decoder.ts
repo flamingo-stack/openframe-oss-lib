@@ -130,7 +130,7 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
       return event ? { ...event, ...seq } : null;
     }
 
-    // The records the answer shows as cards: a part of its own, drawn above the text.
+    // The records the answer shows as cards: a part of its own, drawn where it arrives.
     case MESSAGE_TYPE.RECORD_CARDS: {
       const event = recordCardsEvent(data);
       return event ? { ...event, ...seq } : null;

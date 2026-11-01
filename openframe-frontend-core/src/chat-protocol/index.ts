@@ -27,7 +27,7 @@ export * from './env-flag';
 export { isRecord, unwrapEnvelope } from './wire-narrow';
 // Record links (`[name](record://<type>/<id>)`): the one grammar a record is named by, server and renderer alike.
 export * from './record-link';
-// Record cards: the records an answer shows, a typed part drawn above its text (never read from the text).
+// Record cards: the records an answer shows, a typed part drawn where it sits (never read from the text).
 export * from './record-cards';
 export type { RecordCard } from '../components/chat/types/message.types';
 // The `[N]` citation chip grammar — written by the server, read and hidden by the renderer.

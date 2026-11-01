@@ -22,7 +22,7 @@ export const MESSAGE_TYPE = {
   GUIDE: 'GUIDE',
   /** The records the answer shows as cards, chosen by the model's `show_records`
    *  tool call and checked by the server: a part of the message of its own, drawn
-   *  above the answer text. A record named in the text is a chip, never a card. */
+   *  where the call was made. A record named in the text is a chip, never a card. */
   RECORD_CARDS: 'RECORD_CARDS',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
@@ -289,9 +289,9 @@ export interface RecordCard {
   id: string;
 }
 
-/** The records the answer shows as cards (the `RECORD_CARDS` part). Drawn above
- *  the answer's text, the way a tool's result is shown before the reply that
- *  talks about it; never derived from the text. */
+/** The records the answer shows as cards (the `RECORD_CARDS` part). Drawn where
+ *  it sits among the message's segments, the way a tool's result sits where the
+ *  tool was called; never derived from the text. */
 export type RecordCardsSegment = {
   type: 'record_cards';
   cards: RecordCard[];
