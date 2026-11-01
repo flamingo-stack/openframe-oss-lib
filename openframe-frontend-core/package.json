@@ -595,5 +595,10 @@
     "*.{json,css,scss,yml,yaml,html}": [
       "prettier --write --ignore-unknown"
     ]
+  },
+  "overrides": {
+    "jsdom": {
+      "parse5": "8.0.1"
+    }
   }
 }
