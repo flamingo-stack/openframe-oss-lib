@@ -31,9 +31,9 @@ export const RECORD_CARDS_MAX = 8;
 export const SHOW_RECORDS_TOOL_DESCRIPTION =
   'Show records to the user as cards, drawn above your answer. Call it BEFORE writing the answer, at most once, ' +
   `with up to ${RECORD_CARDS_MAX} records the answer is about, by their record links (record://<type>/<id>) as the ` +
-  'records give them. Show a record when the user would open it: the release, ticket, guide or video the answer is ' +
-  'about. Do not show every record you read, and do not repeat the cards in the text: the answer that follows says ' +
-  'what they are for.';
+  'records give them. Show a record when the user would open it: the guide, release, video, article or ticket the ' +
+  'answer is about. Do not show every record you read, and do not repeat the cards in the text: the answer that ' +
+  'follows says what they are for.';
 
 /** The wire part: `{ type: 'RECORD_CARDS', cards }`. */
 export interface RecordCardsPart {
