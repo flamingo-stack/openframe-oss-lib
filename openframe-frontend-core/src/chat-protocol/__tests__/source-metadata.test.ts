@@ -165,14 +165,29 @@ describe('sourceMetadataEvent', () => {
     expect(event?.sources?.[0].targetPlatform).toBeNull();
   });
 
+  it('reads a card and a video from their ids when the row sends no record link', () => {
+    const event = sourceMetadataEvent({
+      videos: [{ id: 'MdFJNoJeqZQ', type: 'video' }],
+      cards: [{ entityType: 'device', entityId: 'device-42' }],
+    });
+    expect(event?.refs?.map(ref => `${ref.type}:${ref.id}`)).toEqual(['video:MdFJNoJeqZQ', 'device:device-42']);
+  });
+
   it('drops malformed video and card rows', () => {
     const event = sourceMetadataEvent({
-      videos: [{ recordLink: 'card://video:x' }, { id: 'no-record-link' }, { recordLink: 'record://video/ok' }],
+      videos: [
+        // a link naming another record than the row's id
+        { id: 'x', recordLink: 'card://video:x' },
+        // not a video
+        { id: 'w', type: 'webinar' },
+        { recordLink: 'record://video/no-id' },
+        { id: 'ok', recordLink: 'record://video/ok' },
+      ],
       cards: [
         // entityType disagrees with the parsed record link — the row was built wrongly.
         { recordLink: 'record://faq/a', entityType: 'blog_post', entityId: 'a' },
         // a card must not claim the video type: it would render without a player
-        { recordLink: 'record://video/b', entityType: 'video', entityId: 'b' },
+        { id: 'b', recordLink: 'record://video/b', entityType: 'video', entityId: 'b' },
       ],
     });
     expect(event?.refs).toEqual([{ type: 'video', id: 'ok', title: 'ok', url: null }]);
@@ -181,8 +196,8 @@ describe('sourceMetadataEvent', () => {
   it('keeps the first ref per type:id', () => {
     const event = sourceMetadataEvent({
       videos: [
-        { recordLink: 'record://video/a', title: 'First' },
-        { recordLink: 'record://video/a', title: 'Second' },
+        { id: 'a', recordLink: 'record://video/a', title: 'First' },
+        { id: 'a', recordLink: 'record://video/a', title: 'Second' },
       ],
     });
     expect(event?.refs).toHaveLength(1);
@@ -193,7 +208,7 @@ describe('sourceMetadataEvent', () => {
     // `youtubeUrl` holding an ID is the lib's existing vocabulary — see the
     // note on `videoMetadata`. The card dispatcher reads exactly this key.
     const event = sourceMetadataEvent({
-      videos: [{ recordLink: 'record://video/MdFJNoJeqZQ', url: 'https://youtu.be/MdFJNoJeqZQ' }],
+      videos: [{ id: 'MdFJNoJeqZQ', recordLink: 'record://video/MdFJNoJeqZQ', url: 'https://youtu.be/MdFJNoJeqZQ' }],
     });
     expect(event?.refs?.[0].metadata).toEqual({ youtubeUrl: 'MdFJNoJeqZQ' });
   });
@@ -201,11 +216,13 @@ describe('sourceMetadataEvent', () => {
   it('routes a non-YouTube video URL to the plain player', () => {
     // Mux/HLS and direct mp4 are played as a video source, not an embed.
     const hls = sourceMetadataEvent({
-      videos: [{ recordLink: 'record://video/mux-9b', url: 'https://stream.mux.com/install-agent.m3u8' }],
+      videos: [{ id: 'mux-9b', recordLink: 'record://video/mux-9b', url: 'https://stream.mux.com/install-agent.m3u8' }],
     });
     expect(hls?.refs?.[0].metadata).toEqual({ videoUrl: 'https://stream.mux.com/install-agent.m3u8' });
 
-    const mp4 = sourceMetadataEvent({ videos: [{ recordLink: 'record://video/v1', url: 'https://cdn.test/a.mp4' }] });
+    const mp4 = sourceMetadataEvent({
+      videos: [{ id: 'v1', recordLink: 'record://video/v1', url: 'https://cdn.test/a.mp4' }],
+    });
     expect(mp4?.refs?.[0].metadata).toEqual({ videoUrl: 'https://cdn.test/a.mp4' });
   });
 
@@ -246,7 +263,7 @@ describe('attachmentsEvent', () => {
         { index: 1, name: 'Guide', documentType: 'onboarding_guide', externalUrl: '/onboarding-guides/x' },
         { index: 2, name: 'Guides', items: [{ id: 'a', documentType: 'onboarding_guide', name: 'A' }] },
       ],
-      videos: [{ recordLink: 'record://video/MdFJNoJeqZQ', url: 'https://youtu.be/MdFJNoJeqZQ' }],
+      videos: [{ id: 'MdFJNoJeqZQ', recordLink: 'record://video/MdFJNoJeqZQ', url: 'https://youtu.be/MdFJNoJeqZQ' }],
       cards: [],
     };
     const unset = { path: null, targetPlatform: null, id: null, sourceRepo: null };
@@ -261,7 +278,7 @@ describe('attachmentsEvent', () => {
           items: [{ ...live.sources[1].items?.[0], path: null, externalUrl: null, targetPlatform: null }],
         },
       ],
-      videos: [{ ...live.videos[0], type: null, sourceRepo: null, id: null, title: null, metadata: null }],
+      videos: [{ ...live.videos[0], type: null, sourceRepo: null, title: null, metadata: null }],
       cards: [],
     };
 

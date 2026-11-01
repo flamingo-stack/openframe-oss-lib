@@ -215,15 +215,22 @@ function videoMetadata(value: unknown, url: string | null): Record<string, strin
   return metadata;
 }
 
-/** Video references. `recordLink` must parse AND be of type `video` — a mistyped row
- *  would otherwise render through the entity-card path with no player. */
+/** True when the row sends no `recordLink`, or one naming exactly this record. */
+function agreesWithLink(recordLink: unknown, type: string, id: string): boolean {
+  if (recordLink === undefined || recordLink === null) return true;
+  const record = parseRecordHref(recordLink);
+  return record !== null && record.type === type && record.id === id;
+}
+
+/** Video references, by their `id`. A row of another `type` is dropped — it would otherwise render through the
+ *  entity-card path with no player — and so is one whose `recordLink`, when sent, names another record. */
 function videos(value: unknown): ChatRef[] {
   if (!Array.isArray(value)) return [];
   return value.filter(isRecord).flatMap(video => {
-    const record = parseRecordHref(video.recordLink);
-    if (!record || record.type !== 'video') return [];
+    const id = text(video.id);
+    const type = text(video.type);
+    if (!id || (type && type !== 'video') || !agreesWithLink(video.recordLink, 'video', id)) return [];
 
-    const id = record.id;
     const url = httpsUrl(video.url) ?? null;
     const sourceRepo = text(video.sourceRepo);
     const metadata = videoMetadata(video.metadata, url);
@@ -249,21 +256,17 @@ function videos(value: unknown): ChatRef[] {
  * id as the title, which is ugly but honest, and better than dropping a card
  * the answer text explicitly points at.
  *
- * `entityType`/`entityId` are cross-checked against the parsed `recordLink`
- * because they state the same fact twice, and a disagreement means the row was
- * assembled wrongly upstream.
+ * A card is its `entityType` + `entityId`, which every backend sends. When it also sends a `recordLink`, the two
+ * state the same fact twice, and a disagreement means the row was assembled wrongly upstream.
  */
 function cards(value: unknown, decodedSources: ChatSource[]): ChatRef[] {
   if (!Array.isArray(value)) return [];
   return value.filter(isRecord).flatMap(card => {
-    const record = parseRecordHref(card.recordLink);
-    // `video` is handled by `videos()`; a card claiming that type would render
-    // the wrong component.
-    if (!record || record.type === 'video') return [];
-
     const type = text(card.entityType);
     const id = text(card.entityId);
-    if (!type || !id || type !== record.type || id !== record.id) return [];
+    // `video` is handled by `videos()`; a card claiming that type would render
+    // the wrong component.
+    if (!type || !id || type === 'video' || !agreesWithLink(card.recordLink, type, id)) return [];
 
     const source = decodedSources.find(candidate => candidate.id === id && candidate.documentType === type);
     return [
