@@ -158,6 +158,7 @@ export {
   RecordActionsProvider,
   type RecordActionHandlers,
   RecordChipActions,
+  RecordChipProvider,
   type RecordChipSubject,
   useRecordActions,
   useRecordChipMenu,
