@@ -4,6 +4,7 @@ import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
@@ -26,6 +27,9 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
     private final RegisteredClientRepository registeredClientRepository;
 
     private static final OAuth2TokenType AUTH_CODE = new OAuth2TokenType("code");
+
+    @Value("${openframe.authz.refresh-token-grace-seconds:60}")
+    private long refreshTokenGraceSeconds;
 
     @Override
     public void save(OAuth2Authorization authorization) {

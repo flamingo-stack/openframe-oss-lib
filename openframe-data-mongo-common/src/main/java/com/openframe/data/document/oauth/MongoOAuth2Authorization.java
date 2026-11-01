@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -18,6 +19,7 @@ import java.util.stream.Stream;
 @AllArgsConstructor
 @Document(collection = "oauth2_authorizations")
 @CompoundIndex(def = "{'registeredClientId': 1, 'principalName': 1}")
+@CompoundIndex(def = "{'retiredRefreshTokens.value': 1}", sparse = true)
 public class MongoOAuth2Authorization implements TenantScoped {
     @Id
     private String id;
@@ -55,6 +57,7 @@ public class MongoOAuth2Authorization implements TenantScoped {
     private Instant refreshTokenIssuedAt;
     private Instant refreshTokenExpiresAt;
     private Map<String, Object> refreshTokenMetadata;
+    private List<RetiredRefreshToken> retiredRefreshTokens;
     // TTL index for automatic cleanup
     @Indexed(expireAfterSeconds = 0)
     private Instant expiresAt;  // Set to latest token expiration
