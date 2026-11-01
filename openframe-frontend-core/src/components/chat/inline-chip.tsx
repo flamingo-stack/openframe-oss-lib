@@ -14,32 +14,42 @@
  * repeat on every line it spans (`box-decoration-break: clone`), and an unbroken name (an id, a host name) breaks
  * anywhere rather than run out of its column.
  *
- * `link` wraps the icon and the name in the chip's link (the host's anchor, or the record's). `trailing` is an
- * action inside the SAME box, after the name past a hairline (the record's "⋯" menu, a new-tab link), so a chip is
- * one box however many actions it has. `loading` draws the lib `Tag`'s own skeleton.
+ *
+ * It READS as text: the sentence's own font, size and case (`font: inherit`), never monospace or capitals, set apart
+ * by a light tint, its icon and a hover tint, the way an inline smart link or a mention is (body type, a tint and an
+ * icon, never a typeface of its own). A border, mono capitals and a visible action after every name made a sentence
+ * of several chips hard to read (2026-11-01).
+ *
+ * `link` wraps the icon and the name in the chip's link (the host's anchor, or the record's); a chip with a link
+ * tints on hover. `trailing` is an action inside the SAME box, after the name (the record's "⋯" menu, a new-tab
+ * link): faint until the chip is hovered or focused, so a sentence of chips stays quiet and the action is still there
+ * to see and reach by keyboard, without the text moving. `loading` draws the lib `Tag`'s own skeleton.
  */
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Tag } from '../ui/tag';
 
-/** The `Tag` badge's surface (border, card fill, mono uppercase) as an inline box that wraps with its line. */
+/** An inline box in the sentence's own type, tinted, that wraps with its line. */
 const INLINE_CHIP_CLASS = cn(
-  'inline rounded-md border border-ods-border bg-ods-card font-mono uppercase tracking-wide text-ods-text-primary text-h5',
-  'px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)] transition-colors duration-150',
+  'group/chip inline rounded-md bg-ods-bg-surface text-ods-text-primary [font:inherit]',
+  'px-[var(--spacing-system-xxs)] py-px transition-colors duration-150',
   'whitespace-normal [-webkit-box-decoration-break:clone] [box-decoration-break:clone] [overflow-wrap:anywhere]',
 );
+
+/** A chip with a link: its tint deepens on hover (applied with `link`; a chip inside its anchor passes it as `className`). */
+export const INLINE_CHIP_LINKED_CLASS = 'hover:bg-ods-bg-surface-hover';
 
 /** A 16px muted lead icon, set on the text's line (an inline box has no flex to centre it). */
 const INLINE_CHIP_ICON_CLASS =
   'mr-[var(--spacing-system-xxs)] inline-block size-4 align-[-0.2em] text-ods-text-secondary [&_svg]:size-4';
 
-/** What follows the name inside the box: a hairline, then the action. */
-const INLINE_CHIP_TRAILING_CLASS =
-  'ml-[var(--spacing-system-xsf)] border-l border-ods-border pl-[var(--spacing-system-xxs)] text-ods-text-secondary';
+/** The action after the name: faint, full on the chip's hover or keyboard focus. */
+const INLINE_CHIP_TRAILING_CLASS = cn(
+  'ml-[var(--spacing-system-xxs)] text-ods-text-secondary opacity-50 transition-opacity',
+  'group-focus-within/chip:opacity-100 group-hover/chip:opacity-100',
+);
 
-/** How the chip asks for its link (`link`): `label` is the anchor's accessible name when the visible name is split
- *  across two anchors; `hidden` marks the second anchor, which is a click target only (no tab stop, no name). */
 export interface InlineChipAnchor {
   label?: string;
   hidden?: boolean;
@@ -74,7 +84,7 @@ export function InlineChip({
   if (split) {
     const wrap = (content: React.ReactNode, anchor: InlineChipAnchor) => (link ? link(content, anchor) : content);
     return (
-      <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, className)}>
+      <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, link && INLINE_CHIP_LINKED_CLASS, className)}>
         {split.head
           ? wrap(
               <>
@@ -106,7 +116,7 @@ export function InlineChip({
     </>
   );
   return (
-    <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, className)}>
+    <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, link && INLINE_CHIP_LINKED_CLASS, className)}>
       {link ? link(content, {}) : content}
       {trailing ? (
         <span className="whitespace-nowrap">

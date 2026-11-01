@@ -18,11 +18,10 @@
  */
 
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { segmentsOfParts } from '../../../chat-protocol/record-cards';
 import { isRecord, unwrapEnvelope } from '../../../chat-protocol/wire-narrow';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { messageFromStoredRow } from '../stored-message';
 import type { Message } from '../types/message.types';
-import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive';
 
 export interface UseChatHistoryHydrationArgs {
   /** Mirrors the adapter's `active` gate — an idle (Mingo-mode) mount never fetches. */
@@ -145,26 +144,15 @@ export function useChatHistoryHydration({
         for (const row of rows) {
           const role = row.role === 'assistant' ? 'assistant' : row.role === 'user' ? 'user' : null;
           if (!role) continue;
-          const content = typeof row.content === 'string' ? row.content : '';
-          // The approval placeholder ('') and the server-built auto-continuation
-          // directive are part of the LLM history but never rendered.
-          const hidden = role === 'user' && (content === '' || content.startsWith(AUTO_CONTINUATION_DIRECTIVE_PREFIX));
           if (role === 'user') {
             userTurns += 1;
           }
           if (role === 'assistant' && Array.isArray(row.sources) && row.sources.length > 0) {
             sourcesSeed.set(Math.max(0, userTurns - 1), row.sources as unknown[]);
           }
-          // An answer with record cards is stored as its ordered parts (text and cards, in the order they streamed);
-          // the cards are never read out of the text.
-          const parts = role === 'assistant' ? segmentsOfParts(row.parts) : null;
-          hydrated.push({
-            id: `hydrated-${String(row.seq ?? hydrated.length)}`,
-            role,
-            content: parts && parts.length > 0 ? parts : content,
-            ...(typeof row.created_at === 'string' ? { timestamp: new Date(row.created_at) } : {}),
-            ...(hidden ? { hidden: true } : {}),
-          });
+          // The one stored-row mapping (`messageFromStoredRow`): an answer with record cards is its ordered parts.
+          const message = messageFromStoredRow(row, `hydrated-${String(row.seq ?? hydrated.length)}`);
+          if (message) hydrated.push(message);
         }
         if (cancelled || hydrated.length === 0) return;
         sendCountRef.current = userTurns;

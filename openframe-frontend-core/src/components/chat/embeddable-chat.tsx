@@ -38,14 +38,12 @@ import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { usePreventScroll } from '@react-aria/overlays';
 import { isIOS } from '@react-aria/utils';
-import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createRecordLinkScanner, recordHref } from '../../chat-protocol/record-link';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
-import { formatCitationIndices } from '../../utils/source-grouping';
 import { getSourceIconName } from '../../utils/source-icons';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
@@ -62,8 +60,7 @@ import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
-import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
-import { LoadingItems, loadingItemProps } from '../ui/loading-scope';
+import { LoadingItems } from '../ui/loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatAppearanceContext } from './chat-appearance-context';
@@ -74,6 +71,7 @@ import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { CHAT_BLOCK_MIN_WIDTH, MINGO_V2_RAIL_WIDTH } from './chat-dimensions';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatMessageList } from './chat-message-list';
+import { ChatMessageSources } from './chat-message-sources';
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context';
 import { ChatPanelHeader, type ChatPanelHeaderProps } from './chat-panel-header';
 import type { ChatRef } from './chat-ref.types';
@@ -102,11 +100,10 @@ import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { RecordActionsProvider } from './record-actions';
-import { SourceActionButton } from './source-action-button';
 import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
-import type { ChatSource, MessageSegment, Message } from './types/message.types';
+import type { MessageSegment, Message } from './types/message.types';
 import type {
   ChatDialogCapabilities,
   UnifiedChatState,
@@ -115,13 +112,9 @@ import type {
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { chatDayLabel } from './utils/chat-day-label';
-import { chatChipClass } from './utils/chip-styles';
-import { FALLBACK_TOP_RETRIEVED, groupedRowLabels, splitCitedSources } from './utils/cited-sources';
-import { flattenAssistantContent } from './utils/flatten-assistant-content';
 import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
-import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
 
 /**
  * Split (wide) Mingo layout metrics (Figma 113:60931 / 113:63630). The
@@ -621,9 +614,6 @@ export interface EmbeddableChatProps {
 // Chip href resolution
 // =============================================================================
 
-/** Tiny inline replacement for hub's `formatRelativePath`. */
-const formatRelativePath = (p: string): string => p.replace(/^\/+/, '').replace(/\/+$/, '');
-
 /**
  * The committed `@`-mention's token: the href of its record link (`record://device/<id>`), derived from a `type:id`
  * identity key. The TYPE is replaced with its backend MARKER (`markerByType`, e.g. `KB_ARTICLE → 'kb'`), falling back
@@ -782,216 +772,6 @@ function dispatchSlashCommandAction(
       return;
     }
   }
-}
-
-// =============================================================================
-// SourceChip
-// =============================================================================
-
-/**
- * Source chip — TWO affordances per the hub original:
- *  1. Open: click → chip's URL (in-app for docs, new-tab for external).
- *  2. Ask: small `MessageSquare` icon-button on the right → fires
- *     `onDiscuss(ref)` to drill into THIS row via `entityIdFilter`.
- */
-function SourceChip(props: {
-  src: ChatSource;
-  onDiscuss?: (ref: ChatRef) => void;
-  /** The strip's list-item marker, carried by the chip's frame like its loading form's. */
-  'data-loading-item'?: boolean;
-}) {
-  const { src, onDiscuss } = props;
-  const marks = loadingItemProps(props);
-  const runtime = useRequiredChatRuntime();
-  // Single CTA resolver — same icon, same href chain, same ChatRef
-  // synthesis the inline card and search-result paths use.
-  const cta = resolveSourceRowCTA(
-    {
-      sourceRepo: src.sourceRepo,
-      documentType: src.documentType,
-      id: src.id,
-      title: src.name,
-      externalUrl: src.externalUrl,
-      targetPlatform: src.targetPlatform ?? null,
-      path: src.path,
-    },
-    sourceRowCtxFromRuntime(runtime),
-  );
-  const Icon = cta.icon;
-  const icon = <Icon className="h-3.5 w-3.5" />;
-  const chipClass = chatChipClass({ tone: 'secondary' });
-
-  // Grouped source — hover/click reveals a dropdown with Open + Ask per row.
-  if (src.items && src.items.length > 0) {
-    // A server-grouped chip answers to one number; a client-built one answers
-    // to every number its rows were cited by.
-    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
-    const rowLabels = groupedRowLabels(src.items);
-    const dropdownItems: HoverDropdownItem[] = src.items.map((item, i) => {
-      const itemCta = resolveSourceRowCTA(
-        {
-          sourceRepo: src.sourceRepo,
-          documentType: item.documentType,
-          id: item.id,
-          title: item.name,
-          externalUrl: item.externalUrl,
-          targetPlatform: item.targetPlatform ?? null,
-          path: item.path,
-        },
-        sourceRowCtxFromRuntime(runtime),
-      );
-      const ItemIcon = itemCta.icon;
-      // Read out of the CTA before the `onClick` closure below is built: a
-      // property narrowing does not survive into a callback (the property
-      // could in principle be reassigned before it fires), so capturing the
-      // value is what keeps the handler assertion-free.
-      const itemChatRef = itemCta.chatRef;
-      return {
-        label: rowLabels[i],
-        icon: <ItemIcon className="h-3.5 w-3.5" />,
-        href: itemCta.href ?? undefined,
-        targetPlatform: itemCta.targetPlatform,
-        path: item.path ?? null,
-        secondaryAction:
-          onDiscuss && itemCta.askable && itemChatRef
-            ? {
-                icon: <MessageSquare />,
-                label: `Ask about ${item.name}`,
-                onClick: () => onDiscuss(itemChatRef),
-              }
-            : undefined,
-      };
-    });
-
-    const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
-
-    return (
-      <span className="inline-flex" {...marks}>
-        <HoverDropdown
-          items={dropdownItems}
-          renderAnchor={({ href, targetPlatform, path, className, children }) => (
-            <NavLinkAnchorViaRuntime
-              href={href}
-              targetPlatform={targetPlatform ?? null}
-              path={path}
-              className={className}
-            >
-              {children}
-            </NavLinkAnchorViaRuntime>
-          )}
-        >
-          <span className={`${chipClass} cursor-pointer`}>
-            {icon}
-            <span className="max-w-[160px] truncate">
-              [{groupIndices}] {src.name}
-            </span>
-          </span>
-        </HoverDropdown>
-      </span>
-    );
-  }
-
-  // Single-row chip helpers — wrap whatever clickable element each branch
-  // produces with the trailing Ask `SourceActionButton`.
-  const displayName = src.name || formatRelativePath(src.path);
-  const chipBody = (label: string) => (
-    <>
-      {icon}
-      <span className="max-w-[160px] truncate">
-        [{src.index}] {label}
-      </span>
-    </>
-  );
-  const wrapChip = (clickable: React.ReactNode) => (
-    <span className="inline-flex items-center" {...marks}>
-      {clickable}
-      <SourceActionButton chatRef={cta.chatRef} onDiscuss={onDiscuss} density="inline" className="-mr-1 ml-1" />
-    </span>
-  );
-
-  // A chip that opens something is THE chat link (`NavLinkAnchorViaRuntime`): the one navigation decision, the one
-  // click executor, and the panel closing on a same-tab navigation, exactly as markdown links and cards.
-  if (cta.href) {
-    const isEntity = !!src.externalUrl;
-    return wrapChip(
-      <NavLinkAnchorViaRuntime
-        href={cta.href}
-        path={isEntity ? null : src.path}
-        targetPlatform={cta.targetPlatform ?? null}
-        className={chipClass}
-        title={isEntity ? undefined : displayName}
-      >
-        {chipBody(isEntity ? src.name : displayName)}
-      </NavLinkAnchorViaRuntime>,
-    );
-  }
-
-  // No openable destination — static label + Ask affordance only.
-  return wrapChip(
-    <span className={`${chipClass} cursor-default`} title={displayName}>
-      {chipBody(displayName)}
-    </span>,
-  );
-}
-
-/**
- * Cited-by-default source chip strip (Perplexity / ChatGPT pattern).
- * Cited rows render first; uncited tail hidden behind an expander.
- */
-function SourceChips({
-  cited,
-  uncited,
-  onDiscuss,
-}: {
-  cited: ChatSource[];
-  uncited: ChatSource[];
-  onDiscuss?: (ref: ChatRef) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (cited.length === 0) {
-    const fallback = uncited.slice(0, FALLBACK_TOP_RETRIEVED);
-    if (fallback.length === 0) return null;
-    return (
-      <div className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
-        <span className="uppercase text-ods-text-muted text-h6">Top retrieved sources</span>
-        <div className="flex flex-wrap gap-1.5">
-          {fallback.map(src => (
-            <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const hiddenCount = uncited.length;
-  const hasOverflow = hiddenCount > 0;
-
-  return (
-    <div className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
-      <span className="uppercase text-ods-text-muted text-h6">Sources</span>
-      <div className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}>
-        {cited.map(src => (
-          <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
-        ))}
-        {expanded &&
-          uncited.map(src => <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />)}
-        {hasOverflow && (
-          <Button
-            variant="link"
-            size="compact"
-            noPaddingX
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            aria-expanded={expanded}
-            aria-label={expanded ? 'Show fewer sources' : `Show ${hiddenCount} additional retrieved sources`}
-          >
-            {expanded ? 'Show less' : `+${hiddenCount} more retrieved ${hiddenCount === 1 ? 'source' : 'sources'}`}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
 }
 
 // =============================================================================
@@ -2104,13 +1884,7 @@ function EmbeddableChatInner({
       // for the duration of an unrelated turn. Nothing stands in for it meanwhile:
       // the turn's own stage rows already say it is working.
       if (chatLoading && index === messages.length - 1) return null;
-      const { cited, uncited } = splitCitedSources(message.sources, flattenAssistantContent(message.content));
-      if (cited.length === 0 && uncited.length === 0) return null;
-      return (
-        <div className="pb-2">
-          <SourceChips cited={cited} uncited={uncited} onDiscuss={askAbout} />
-        </div>
-      );
+      return <ChatMessageSources message={message} onDiscuss={askAbout} />;
     },
     [chatLoading, messages.length, askAbout],
   );

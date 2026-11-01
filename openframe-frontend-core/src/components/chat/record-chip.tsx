@@ -47,7 +47,6 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
     <InlineChip
       icon={iconFor(type)}
       label={label}
-      className={url ? 'hover:bg-ods-bg-hover' : undefined}
       link={
         url
           ? (content, anchor) => (
