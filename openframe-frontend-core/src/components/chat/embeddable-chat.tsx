@@ -63,10 +63,8 @@ import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
-import { TextHold } from '../ui/layout-hold';
 import { LoadingItems, loadingItemProps } from '../ui/loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container';
-import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatAppearanceContext } from './chat-appearance-context';
 import { ChatArchivePage } from './chat-archive-page';
@@ -167,10 +165,6 @@ const drawerDefaultWidthWithoutRail = (viewportWidth: number) => drawerDefaultWi
 // =============================================================================
 
 export interface EmbeddableChatProps {
-  /** How many source chips the strip under an answer draws while the answer is written (default 1). `0` draws no
-   *  strip until the answer ends: for a host whose answers rarely cite sources, where a strip that appears and then
-   *  goes away would move the thread. */
-  sourceSkeletonCount?: number;
   /** DB-driven list of enabled RAG table ids (chip catalog filter).
    *  Prefetched server-side by the embedder's wrapper. Empty/null → no
    *  empty-state chips render. */
@@ -799,30 +793,6 @@ function dispatchSlashCommandAction(
  *  2. Ask: small `MessageSquare` icon-button on the right → fires
  *     `onDiscuss(ref)` to drill into THIS row via `entityIdFilter`.
  */
-/** A no-break space: one line of the chip's text, so a bar that holds it is exactly one text line tall. */
-const ONE_TEXT_LINE = '\u00a0';
-
-/** How many chips the strip's loading form draws by default, at every width: one, the row a phone shows a strip's
- *  first chip in (a strip has no page size, so its loading form draws a typical count, and the strip is one row either
- *  way). An embedder sets its own with `sourceSkeletonCount`. */
-const SOURCE_CHIP_SKELETON_COUNT = 1;
-
-/**
- * A source chip's loading form, built like the chip (`wrapChip` around `chipBody`): the chip's frame, its icon,
- * its title as a bar one text line tall (so the chip is the loaded chip's height), and the Ask slot beside it.
- */
-function SourceChipSkeleton(props: { 'data-loading-item'?: boolean }) {
-  return (
-    <span aria-hidden className="pointer-events-none inline-flex shrink-0 items-center" {...loadingItemProps(props)}>
-      <span className={chatChipClass({ tone: 'secondary' })}>
-        <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3.5 w-3.5 rounded-sm')} />
-        <span className={cn(SKELETON_SURFACE_CLASS, 'w-28 rounded-sm')}>{ONE_TEXT_LINE}</span>
-      </span>
-      <span className={cn(SKELETON_SURFACE_CLASS, '-mr-1 ml-1 inline-block h-5 w-5 rounded-sm')} />
-    </span>
-  );
-}
-
 function SourceChip(props: {
   src: ChatSource;
   onDiscuss?: (ref: ChatRef) => void;
@@ -971,34 +941,12 @@ function SourceChips({
   cited,
   uncited,
   onDiscuss,
-  loading,
-  skeletonCount,
 }: {
   cited: ChatSource[];
   uncited: ChatSource[];
   onDiscuss?: (ref: ChatRef) => void;
-  /** The answer is still being written: the strip's frame, heading and a row of chips in their loading form, so
-   *  the strip does not appear under the answer when it finishes. */
-  loading?: boolean;
-  /** How many chips the loading form draws (`EmbeddableChatProps.sourceSkeletonCount`). */
-  skeletonCount: number;
 }) {
   const [expanded, setExpanded] = useState(false);
-
-  if (loading) {
-    return (
-      <div aria-hidden className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
-        <span className="uppercase text-ods-text-muted text-h6">
-          <TextHold>Sources</TextHold>
-        </span>
-        {/* One row at every width: a chip that does not fit is cut, never wrapped or hidden (a strip's chips fit one
-            row in the answers measured, and a wrapped skeleton shrinks when the answer ends). */}
-        <div className="flex flex-nowrap gap-1.5 overflow-hidden">
-          <LoadingItems count={skeletonCount}>{() => <SourceChipSkeleton data-loading-item />}</LoadingItems>
-        </div>
-      </div>
-    );
-  }
 
   if (cited.length === 0) {
     const fallback = uncited.slice(0, FALLBACK_TOP_RETRIEVED);
@@ -1107,7 +1055,6 @@ export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableC
 EmbeddableChat.displayName = 'EmbeddableChat';
 
 function EmbeddableChatInner({
-  sourceSkeletonCount = SOURCE_CHIP_SKELETON_COUNT,
   enabledRagTableIds = null,
   emptyStateGreeting = null,
   suggestedQueries = null,
@@ -2150,25 +2097,18 @@ function EmbeddableChatInner({
       // Scoped to the trailing row on purpose. `chatLoading` is a property of
       // the THREAD, so testing it alone pulls the strips off every earlier
       // answer too — a reader scrolled up watches finished citations blink out
-      // for the duration of an unrelated turn.
-      // Its strip is drawn in its loading form meanwhile, so the strip is already there when the answer ends.
-      if (chatLoading && index === messages.length - 1) {
-        if (sourceSkeletonCount <= 0) return null;
-        return (
-          <div className="pb-2">
-            <SourceChips loading skeletonCount={sourceSkeletonCount} cited={[]} uncited={[]} />
-          </div>
-        );
-      }
+      // for the duration of an unrelated turn. Nothing stands in for it meanwhile:
+      // the turn's own stage rows already say it is working.
+      if (chatLoading && index === messages.length - 1) return null;
       const { cited, uncited } = splitCitedSources(message.sources, flattenAssistantContent(message.content));
       if (cited.length === 0 && uncited.length === 0) return null;
       return (
         <div className="pb-2">
-          <SourceChips cited={cited} uncited={uncited} onDiscuss={askAbout} skeletonCount={sourceSkeletonCount} />
+          <SourceChips cited={cited} uncited={uncited} onDiscuss={askAbout} />
         </div>
       );
     },
-    [chatLoading, messages.length, askAbout, sourceSkeletonCount],
+    [chatLoading, messages.length, askAbout],
   );
 
   // Host node for in-panel Radix portals (see the body wrapper below).

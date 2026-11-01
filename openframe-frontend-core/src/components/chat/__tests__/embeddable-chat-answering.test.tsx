@@ -1,7 +1,7 @@
 /**
- * `sourceSkeletonCount`: how many source chips the strip under an answer draws while the answer is written. The
- * host decides; one by default, and `0` draws no strip until the answer ends (openframe-oss-frontend, whose Mingo
- * answers rarely cite sources).
+ * While an answer is written, the turn's own rows say it is working: no sources strip in a loading form under it, and
+ * no second "Thinking…" indicator under the thread once the turn has drawn a row. Before the turn has drawn anything,
+ * the indicator is the only sign of life and stays.
  */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -78,7 +78,7 @@ const THREAD: UnifiedChatState['messages'] = [
   { id: 'm-2', role: 'assistant', content: 'Working on it', timestamp: new Date('2026-01-01T00:00:01Z') },
 ];
 
-function renderAnswering(sourceSkeletonCount?: number) {
+function renderAnswering(messages: UnifiedChatState['messages']) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -91,11 +91,10 @@ function renderAnswering(sourceSkeletonCount?: number) {
             showInternalTrigger={false}
             mingoState={createState({
               activeDialogId: 'd-1',
-              messages: THREAD,
+              messages,
               isLoading: true,
               streamingPhase: 'streaming',
             })}
-            sourceSkeletonCount={sourceSkeletonCount}
           />
         </DialogPrimitive.Root>
       </ChatRuntimeContext.Provider>
@@ -103,24 +102,19 @@ function renderAnswering(sourceSkeletonCount?: number) {
   );
 }
 
-/** The strip's skeleton chips: the loading items inside its ruled frame (the thread has other loading items). */
-const chipSkeletons = (container: HTMLElement) => container.querySelectorAll('.border-t [data-loading-item]');
-
-describe('EmbeddableChat - sourceSkeletonCount', () => {
-  it('draws one source chip in the loading strip by default', () => {
-    const { container } = renderAnswering();
-    expect(screen.getByText('Sources')).toBeInTheDocument();
-    expect(chipSkeletons(container)).toHaveLength(1);
-  });
-
-  it('draws the count the host passes', () => {
-    const { container } = renderAnswering(3);
-    expect(chipSkeletons(container)).toHaveLength(3);
-  });
-
-  it('draws no strip while the answer is written when the host passes 0', () => {
-    const { container } = renderAnswering(0);
+describe('EmbeddableChat - an answer being written', () => {
+  it('draws no sources strip under it', () => {
+    renderAnswering(THREAD);
     expect(screen.queryByText('Sources')).not.toBeInTheDocument();
-    expect(chipSkeletons(container)).toHaveLength(0);
+  });
+
+  it('draws no second working indicator once the turn has drawn a row', () => {
+    renderAnswering(THREAD);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('keeps the working indicator while the turn has drawn nothing yet', () => {
+    renderAnswering(THREAD.slice(0, 1));
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 });

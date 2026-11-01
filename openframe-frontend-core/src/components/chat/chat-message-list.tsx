@@ -964,7 +964,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // stays put while messages stream and grow — no jitter from the
     // last-message height changing under it.
     //
-    // Hidden when the agent is actually PAUSED waiting on the user: the
+    // Shown only while the turn has drawn nothing of its own: once its first
+    // row lands (a stage, a tool, thinking or text), that row says what the
+    // turn is doing, and a second indicator under it only repeats it.
+    // Hidden too when the agent is PAUSED waiting on the user: the
     // last message's last segment is a pending approval (inline), or
     // there are escalated pending approvals shown in the sticky bar.
     const lastMessage = messages[messages.length - 1];
@@ -976,7 +979,13 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         lastSegment.type === 'approval_batch' ||
         lastSegment.type === 'escalation_offer') &&
       (lastSegment.status === undefined || lastSegment.status === 'pending');
-    const showStreamingLoader = isTyping && !isPausedOnApproval && !(pendingApprovals && pendingApprovals.length > 0);
+    const turnHasDrawn =
+      lastMessage?.role === 'assistant' &&
+      (lastSegments
+        ? lastSegments.length > 0
+        : typeof lastMessage.content === 'string' && lastMessage.content.length > 0);
+    const showStreamingLoader =
+      isTyping && !turnHasDrawn && !isPausedOnApproval && !(pendingApprovals && pendingApprovals.length > 0);
 
     return (
       <ChatAppearanceContext.Provider value={appearance}>
