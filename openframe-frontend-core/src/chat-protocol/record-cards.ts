@@ -12,9 +12,9 @@
  *   `{ type: 'RECORD_CARDS', cards: [{ entityType, entityId }] }`
  *
  * the same shape on every transport: a hub stream frame (a leading frame, or a frame inside the text), a Mingo chunk
- * and a stored Mongo row, all in message order. {@link recordCardsEvent} is the one decoder of it. The hub stores an
- * answer as its text plus its parts' places in it ({@link RecordCardsPlacement}); {@link placeRecordCards} puts them
- * back.
+ * and a stored row, all in message order. {@link recordCardsEvent} is the one decoder of it. A stored answer is its
+ * ORDERED PARTS ({@link MessagePart}: text and record cards, in the order they streamed), like Mingo's `messageData`
+ * and the AI SDK's `message.parts`; {@link segmentsOfParts} reads them back.
  *
  * Server-safe: no React, no browser APIs.
  */
@@ -67,42 +67,27 @@ export function recordCardsEvent(raw: unknown): RecordCardsEvent | null {
   return cards.length > 0 ? { type: 'record-cards', cards } : null;
 }
 
-/** Where a part sat in an answer stored as text: `at` is the character offset in the text (the cards come after the
- *  text before it), `cards` the part's cards. */
-export interface RecordCardsPlacement {
-  at: number;
-  cards: RecordCardsPart['cards'];
-}
+/** One part of a stored answer, in message order: its text, or a set of record cards (the wire part, unchanged). */
+export type MessagePart = { type: 'text'; text: string } | RecordCardsPart;
 
 /**
- * An answer's segments from its text and its record-cards parts' places in it, in order: text, a part, text, … A place
- * past the end is clamped to it; a place with no valid card is left out; an empty text between parts makes no segment.
+ * A stored answer's parts as the message's segments, in order: text parts as text, a `RECORD_CARDS` part as its
+ * cards. A malformed part is left out. Null when `parts` is not a list (the message is its text alone).
  */
-export function placeRecordCards(
-  text: string,
-  placements: unknown,
-): Array<{ type: 'text'; text: string } | { type: 'record_cards'; cards: RecordCard[] }> {
-  const parts = (Array.isArray(placements) ? placements : [])
-    .filter(isRecord)
-    .map(placement => ({
-      at:
-        typeof placement.at === 'number' && Number.isFinite(placement.at)
-          ? Math.max(0, Math.min(text.length, Math.floor(placement.at)))
-          : text.length,
-      event: recordCardsEvent(placement),
-    }))
-    .filter((part): part is { at: number; event: RecordCardsEvent } => part.event !== null)
-    .sort((a, b) => a.at - b.at);
+export function segmentsOfParts(
+  parts: unknown,
+): Array<{ type: 'text'; text: string } | { type: 'record_cards'; cards: RecordCard[] }> | null {
+  if (!Array.isArray(parts)) return null;
   const out: Array<{ type: 'text'; text: string } | { type: 'record_cards'; cards: RecordCard[] }> = [];
-  let from = 0;
   for (const part of parts) {
-    const before = text.slice(from, part.at);
-    if (before.trim()) out.push({ type: 'text', text: before });
-    out.push({ type: 'record_cards', cards: part.event.cards });
-    from = part.at;
+    if (!isRecord(part)) continue;
+    if (part.type === 'text' && typeof part.text === 'string') {
+      if (part.text.trim()) out.push({ type: 'text', text: part.text });
+      continue;
+    }
+    const event = recordCardsEvent(part);
+    if (event) out.push({ type: 'record_cards', cards: event.cards });
   }
-  const rest = text.slice(from);
-  if (rest.trim() || out.length === 0) out.push({ type: 'text', text: rest });
   return out;
 }
 

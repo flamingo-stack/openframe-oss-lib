@@ -16,7 +16,7 @@ import {
   encodeTrailingUsageFrame,
 } from '../encode';
 import { decodeNatsChunk } from '../nats-decoder';
-import { placeRecordCards, RECORD_CARDS_MAX, recordCardsEvent, recordCardsPart } from '../record-cards';
+import { RECORD_CARDS_MAX, recordCardsEvent, recordCardsPart, segmentsOfParts } from '../record-cards';
 
 const guide = { type: 'onboarding_guide', id: 'mac-guide' };
 const release = { type: 'product_release', id: 'v1.4' };
@@ -122,22 +122,20 @@ describe('record cards in a message', () => {
     ]);
   });
 
-  it('are put back at their places in a stored answer', () => {
-    const text = 'Intro.\n\nMiddle.\n\nEnd.';
-    const cards = (id: string) => ({ cards: [{ entityType: 'webinar', entityId: id }] });
+  it("are read back from a stored answer's ordered parts, in order", () => {
     expect(
-      placeRecordCards(text, [
-        { at: 8, ...cards('2') },
-        { at: 0, ...cards('1') },
-        { at: 999, ...cards('3') },
+      segmentsOfParts([
+        { type: 'text', text: 'Intro.\n\n' },
+        { type: 'RECORD_CARDS', cards: [{ entityType: 'webinar', entityId: '2' }] },
+        { type: 'text', text: 'End.' },
+        { type: 'RECORD_CARDS', cards: [] },
+        null,
       ]),
     ).toEqual([
-      { type: 'record_cards', cards: [{ type: 'webinar', id: '1' }] },
       { type: 'text', text: 'Intro.\n\n' },
       { type: 'record_cards', cards: [{ type: 'webinar', id: '2' }] },
-      { type: 'text', text: 'Middle.\n\nEnd.' },
-      { type: 'record_cards', cards: [{ type: 'webinar', id: '3' }] },
+      { type: 'text', text: 'End.' },
     ]);
-    expect(placeRecordCards('Only text.', [])).toEqual([{ type: 'text', text: 'Only text.' }]);
+    expect(segmentsOfParts(null)).toBeNull();
   });
 });
