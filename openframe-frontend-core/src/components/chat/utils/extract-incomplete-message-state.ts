@@ -135,6 +135,8 @@ export function extractIncompleteMessageState(
       // - `error` ended the turn; resuming it would re-open a bubble the
       //   backend has already abandoned.
       // - `suggestions` is built locally by the host and never comes from a turn.
+      // - `record_cards` arrives whole: the cards the answer shows, nothing left to finish.
+      case 'record_cards':
       case 'text':
       case 'thinking':
       case 'ask':

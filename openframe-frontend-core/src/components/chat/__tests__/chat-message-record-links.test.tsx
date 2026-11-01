@@ -1,6 +1,7 @@
 /**
- * Record links (`[name](record://type/id)`) through the real component and the real markdown engine: the chip in the
- * sentence, the card under the answer, and nothing drawn for a link that is text (in code).
+ * Chips and cards through the real component and the real markdown engine. A record link
+ * (`[name](record://type/id)`) is a chip in the sentence and never a card; a card comes only from the message's
+ * `record_cards` part and is drawn ABOVE the text.
  */
 
 import { render, screen, within } from '@testing-library/react';
@@ -8,6 +9,7 @@ import type React from 'react';
 import { describe, expect, it } from 'vitest';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import type { ChatRef } from '../chat-ref.types';
+import type { MessageSegment } from '../types';
 
 function NavLinkAnchor({ href, children }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   return <a href={href}>{children}</a>;
@@ -19,11 +21,15 @@ const renderEntityCard = (ref: ChatRef) => <div data-testid={`card-${ref.id}`}>{
 const renderRecordChip = ({ type, id }: { type: string; id: string; label: string }) =>
   type === 'script' ? <span data-testid={`chip-${type}-${id}`}>{id}</span> : null;
 
-function show(text: string) {
+function show(text: string, cards: Array<{ type: string; id: string }> = []) {
+  const content: MessageSegment[] = [
+    ...(cards.length > 0 ? [{ type: 'record_cards' as const, cards }] : []),
+    { type: 'text', text },
+  ];
   return render(
     <ChatMessageEnhanced
       role="assistant"
-      content={[{ type: 'text', text }]}
+      content={content}
       renderEntityCard={renderEntityCard}
       renderRecordChip={renderRecordChip}
       NavLinkAnchor={NavLinkAnchor}
@@ -38,17 +44,38 @@ describe('ChatMessageEnhanced — record links', () => {
     expect(screen.queryByTestId('chat-record-cards')).toBeNull();
   });
 
-  it('draws a linked record as a chip with its name in the sentence and its card under the answer', () => {
+  it('draws a linked record as a chip with its name in the sentence, and no card from the link', () => {
     show('The [Mac guide](record://onboarding_guide/mac-guide) covers it.');
     expect(within(screen.getByTestId('inline-chip')).getByText('Mac guide')).toBeTruthy();
-    const cards = screen.getByTestId('chat-record-cards');
-    expect(within(cards).getByTestId('card-mac-guide')).toBeTruthy();
+    expect(screen.queryByTestId('chat-record-cards')).toBeNull();
     expect(screen.queryByText(/record:\/\//)).toBeNull();
   });
 
-  it('draws one card per record however many times the answer links it', () => {
-    show('[Guide](record://onboarding_guide/mac-guide), again [the guide](record://onboarding_guide/mac-guide).');
+  it('draws the record-cards part above the text, titled by the name the text gives the record', () => {
+    const view = show('The [Mac guide](record://onboarding_guide/mac-guide) covers it.', [
+      { type: 'onboarding_guide', id: 'mac-guide' },
+    ]);
+    const cards = screen.getByTestId('chat-record-cards');
+    expect(within(cards).getByTestId('card-mac-guide').textContent).toBe('Mac guide');
+    // Above the answer: the cards come before the sentence in the document.
+    const text = view.container.textContent ?? '';
+    expect(text.indexOf('Mac guide')).toBeLessThan(text.indexOf('covers it'));
+    expect(
+      cards.compareDocumentPosition(screen.getByText(/covers it/)) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('draws one card per record however many times the part names it', () => {
+    show('Here it is.', [
+      { type: 'onboarding_guide', id: 'mac-guide' },
+      { type: 'onboarding_guide', id: 'mac-guide' },
+    ]);
     expect(within(screen.getByTestId('chat-record-cards')).getAllByTestId('card-mac-guide')).toHaveLength(1);
+  });
+
+  it('draws no card for a type the chat has none for, even in the part', () => {
+    show('Run it.', [{ type: 'script', id: '6aad91a3b776f95ad7491bd9' }]);
+    expect(screen.queryByTestId('chat-record-cards')).toBeNull();
   });
 
   it('draws no chip and no card for a record link quoted in code', () => {

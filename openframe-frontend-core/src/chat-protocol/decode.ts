@@ -40,6 +40,7 @@ import { FRAME_TERMINATOR, END_OF_LEADING, TRAILER_SENTINEL } from './frames';
 // decoder. `frameNum` comes from there too: the trailing usage frame's token
 // counts must pass the SAME typeof gate the leading `usage:start` frame's do.
 import { mapLeadingFrame, frameNum } from './leading-frames';
+import { recordCardsEvent } from './record-cards';
 
 export interface SseFrameDecoder {
   /** Feed raw response bytes; returns the events they produced. */
@@ -184,6 +185,9 @@ export function createSseFrameDecoder(): SseFrameDecoder {
         // object and simply fails the gate — no throw, no event.
         const meta: unknown = JSON.parse(raw);
         if (isFrameObject(meta) && meta.kind === 'usage' && (meta.stage === 'end' || meta.stage === 'display')) {
+          // Record cards chosen after the text started ride the trailer; they are the same part as a leading one.
+          const cards = recordCardsEvent(meta.record_cards);
+          if (cards) out.push(cards);
           // Token counts pass `frameNum`, the SAME gate the leading
           // `usage:start` frame's counts already pass. Un-gated, a wire value
           // of the wrong type (a string count from a server that stringifies

@@ -90,15 +90,18 @@ describe('ChatMessageEnhanced — override identity across a streamed turn', () 
     expect(view.container.textContent).toContain('token9');
   });
 
-  it('mounts the card of a linked record from the link alone, titled by the link (hydrate-by-id)', () => {
+  it('mounts the card of a shown record from its id alone, titled by the link (hydrate-by-id)', () => {
     // No refs frame exists: the renderer receives the minimal
-    // `{type, id, title: <link text>, url: null}` descriptor built from the
-    // link and is expected to self-fetch. It is drawn under the answer.
+    // `{type, id, title: <link text>, url: null}` descriptor and is expected
+    // to self-fetch. It is drawn above the answer.
     const seenRefs: Array<{ type: string; id: string; title: string }> = [];
     render(
       <ChatMessageEnhanced
         role="assistant"
-        content={[{ type: 'text', text: 'See [Hello](record://blog_post/abc) for more.' }]}
+        content={[
+          { type: 'record_cards', cards: [{ type: 'blog_post', id: 'abc' }] },
+          { type: 'text', text: 'See [Hello](record://blog_post/abc) for more.' },
+        ]}
         renderEntityCard={ref => {
           seenRefs.push({ type: ref.type, id: ref.id, title: ref.title });
           return <div data-testid="card">card:{ref.id}</div>;

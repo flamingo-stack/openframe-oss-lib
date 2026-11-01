@@ -170,7 +170,8 @@ export function buildDiscussAddendum(args: { tableId: string; id: string }): str
     `OPEN by naming the record with its record link (the \`record-link\` of its record header), then a mono-font ` +
     `id tag, no prose before it:\n` +
     `    [<its name>](<its record-link>) \`${args.tableId} · ${idTag}\`\n` +
-    `Copy the record-link exactly; its card appears under the answer.\n\n` +
+    `Copy the record-link exactly. Show the record as a card first: call show_records with its record-link before ` +
+    `you write.\n\n` +
     `SURFACE EVERY FIELD PRESENT in the retrieved record — the user already ` +
     `knows the title from the link and its card; the value of Ask is the BODY (description, ` +
     `status, vote counts, dates, linked URLs, …). Walk each non-empty field. ` +

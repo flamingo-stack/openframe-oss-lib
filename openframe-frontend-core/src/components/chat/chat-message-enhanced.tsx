@@ -59,7 +59,7 @@ function textOf(node: ReactNode): string {
   return '';
 }
 
-/** The records an answer links, once each, in the order it first links them, with the name it gave each. */
+/** The records an answer's text links, once each, in the order it first links them, with the name it gave each. */
 function linkedRecords(segments: MessageSegment[]): Array<RecordLink & { label: string }> {
   const byKey = new Map<string, RecordLink & { label: string }>();
   for (const segment of segments) {
@@ -180,9 +180,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     }, [refs]);
 
     /**
-     * The cards under the answer: one per record the answer LINKS (`[name](record://type/id)`), in the order it first
-     * links them, for every type the chat has a card for (a device or a script is a chip only). The server already
-     * checked each link against the records the turn loaded, so a card is never drawn for a record nobody offered.
+     * The answer's record cards: the message's `record_cards` part (the model's `show_records` call, checked by the
+     * server), drawn above the text, the way a tool's result is shown before the reply about it. Never read out of the
+     * text: a record the text names is a chip there. A card takes its title from the answer's own references, else
+     * from the name the text gives the record, and loads the rest itself.
      *
      * Each card's node is kept across renders (same `type:id`, same render function, same described ref) so a card
      * does not remount, re-fetch or close its open menu on every streamed token.
@@ -195,25 +196,30 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     );
     const recordCards = useMemo(() => {
       if (!renderEntityCard || isHuman) return [];
+      const shown = segments.flatMap(segment => (segment.type === 'record_cards' ? segment.cards : []));
+      if (shown.length === 0) return [];
+      const names = new Map(linkedRecords(segments).map(record => [`${record.type}:${record.id}`, record.label]));
       const cache = recordCardCache.current;
       const cards: Array<{ key: string; node: React.ReactNode }> = [];
-      for (const record of linkedRecords(segments)) {
+      for (const record of shown) {
+        // A type the chat draws no card for (a device, a script) stays a chip in the text.
         if (record.type !== 'video' && !chatCardLabel(record.type)) continue;
         const key = `${record.type}:${record.id}`;
         const described = refByKey.get(key);
+        const label = names.get(key) ?? '';
         let entry = cache.get(key);
-        if (!entry || entry.render !== renderEntityCard || entry.ref !== described || entry.label !== record.label) {
-          const cardRef: ChatRef = described ?? { type: record.type, id: record.id, title: record.label, url: null };
+        if (!entry || entry.render !== renderEntityCard || entry.ref !== described || entry.label !== label) {
+          const cardRef: ChatRef = described ?? { type: record.type, id: record.id, title: label, url: null };
           const rendered = renderEntityCard(cardRef);
-          // A block card (a video) draws its block here; its inline half is the chip in the sentence.
+          // A block card (a video) draws its block here.
           const node =
             React.isValidElement(rendered) && rendered.type === BlockCard
               ? (rendered.props as BlockCardProps).children
               : rendered;
-          entry = { render: renderEntityCard, ref: described, label: record.label, node };
+          entry = { render: renderEntityCard, ref: described, label, node };
           cache.set(key, entry);
         }
-        if (entry.node != null) cards.push({ key, node: entry.node });
+        if (entry.node != null && !cards.some(card => card.key === key)) cards.push({ key, node: entry.node });
       }
       return cards;
     }, [renderEntityCard, isHuman, segments, refByKey]);
@@ -484,16 +490,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                   } else if (segment.type === 'thinking') {
                     const isStreaming = index === segments.length - 1 && isTyping;
                     return <ThinkingDisplay key={index} text={segment.text} isStreaming={isStreaming} />;
+                  } else if (segment.type === 'record_cards') {
+                    // The message's one record-cards part, first in its segments: above the text.
+                    if (recordCards.length === 0) return null;
+                    return (
+                      <div key={index} className={CHAT_MESSAGE_SEGMENTS_CLASS} data-testid="chat-record-cards">
+                        {recordCards.map(card => (
+                          <div key={`r-${card.key}`}>{card.node}</div>
+                        ))}
+                      </div>
+                    );
                   }
                   return null;
                 })}
-                {recordCards.length > 0 && (
-                  <div className={CHAT_MESSAGE_SEGMENTS_CLASS} data-testid="chat-record-cards">
-                    {recordCards.map(card => (
-                      <div key={`r-${card.key}`}>{card.node}</div>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 

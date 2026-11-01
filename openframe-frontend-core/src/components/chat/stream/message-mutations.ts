@@ -15,10 +15,12 @@
  * Framework-free: no React, no timers.
  */
 
+import { uniqueCards } from '../../../chat-protocol/record-cards';
 import type {
   ApprovalBatchExecutionState,
   ChatApprovalStatus,
   MessageSegment,
+  RecordCard,
   ToolExecutionSegment,
   ToolExecutionData,
 } from '../types';
@@ -151,6 +153,18 @@ function withFirstKnownOccurredAt(existing: MessageSegment, incoming: MessageSeg
  * trailing fragments of the same type, mirroring the accumulator; block deltas
  * upsert by identity (see `upsertKey`) so a replayed emit stays idempotent.
  */
+/**
+ * A message's segments with `cards` added to its ONE `record_cards` segment,
+ * which is always the first: cards are drawn above the text, whenever in the
+ * turn they arrived. The same rule as the accumulator's `addRecordCards`.
+ */
+export function withRecordCards(segments: readonly MessageSegment[], cards: readonly RecordCard[]): MessageSegment[] {
+  const current = segments.find(segment => segment.type === 'record_cards');
+  const rest = segments.filter(segment => segment.type !== 'record_cards');
+  const merged = uniqueCards([...(current?.type === 'record_cards' ? current.cards : []), ...cards]);
+  return merged.length > 0 ? [{ type: 'record_cards', cards: merged }, ...rest] : rest;
+}
+
 export function appendToTrailingAssistant(
   prev: UnifiedChatMessage[],
   segments: MessageSegment[],
@@ -164,7 +178,10 @@ export function appendToTrailingAssistant(
   for (const seg of segments) {
     const tail = merged[merged.length - 1];
     const key = upsertKey(seg);
-    if (seg.type === 'text' && tail?.type === 'text') {
+    if (seg.type === 'record_cards') {
+      const next = withRecordCards(merged, seg.cards);
+      merged.splice(0, merged.length, ...next);
+    } else if (seg.type === 'text' && tail?.type === 'text') {
       merged[merged.length - 1] = { type: 'text', text: tail.text + seg.text };
     } else if (seg.type === 'thinking' && tail?.type === 'thinking') {
       merged[merged.length - 1] = { type: 'thinking', text: tail.text + seg.text };

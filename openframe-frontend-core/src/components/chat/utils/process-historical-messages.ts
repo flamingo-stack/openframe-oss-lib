@@ -34,6 +34,7 @@ import {
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
 import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+import { recordCardsEvent } from '../../../chat-protocol/record-cards';
 import {
   attachmentsEvent,
   mergeSourceMetadata,
@@ -132,6 +133,10 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
     // answer renders identically to the one the reader watched arrive.
     case MESSAGE_TYPE.ATTACHMENTS:
       return attachmentsEvent(data);
+
+    // The records the answer shows as cards, through the live chunk's decoder.
+    case MESSAGE_TYPE.RECORD_CARDS:
+      return recordCardsEvent(data);
 
     // The envelope `ATTACHMENTS` replaced (see `MESSAGE_TYPE.GUIDE`).
     case MESSAGE_TYPE.GUIDE:
@@ -407,6 +412,10 @@ function applyHistoryEvent(
     case 'ask':
       if (event.text) accumulator.appendText(event.text);
       accumulator.addAsk(event.question, event.options);
+      break;
+
+    case 'record-cards':
+      accumulator.addRecordCards(event.cards);
       break;
 
     case 'tool-execution':

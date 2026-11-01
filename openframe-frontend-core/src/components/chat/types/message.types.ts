@@ -20,6 +20,10 @@ export const MESSAGE_TYPE = {
    *  and stays only until every backend ships `ATTACHMENTS`. */
   ATTACHMENTS: 'ATTACHMENTS',
   GUIDE: 'GUIDE',
+  /** The records the answer shows as cards, chosen by the model's `show_records`
+   *  tool call and checked by the server: a part of the message of its own, drawn
+   *  above the answer text. A record named in the text is a chip, never a card. */
+  RECORD_CARDS: 'RECORD_CARDS',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
@@ -279,6 +283,20 @@ export type AskSegment = {
   options: AskOptionData[];
 };
 
+/** One record a {@link RecordCardsSegment} shows. */
+export interface RecordCard {
+  type: string;
+  id: string;
+}
+
+/** The records the answer shows as cards (the `RECORD_CARDS` part). Drawn above
+ *  the answer's text, the way a tool's result is shown before the reply that
+ *  talks about it; never derived from the text. */
+export type RecordCardsSegment = {
+  type: 'record_cards';
+  cards: RecordCard[];
+};
+
 export type ToolExecutionSegment = {
   type: 'tool_execution';
   data: ToolExecutionData;
@@ -403,6 +421,7 @@ export type MessageSegment =
   | TextSegment
   | ThinkingSegment
   | AskSegment
+  | RecordCardsSegment
   | ToolExecutionSegment
   | ApprovalRequestSegment
   | ApprovalBatchSegment
@@ -487,6 +506,13 @@ export interface AttachmentsMessageData extends MessageDataBase {
   type: 'ATTACHMENTS';
   sources?: unknown;
   videos?: unknown;
+  cards?: unknown;
+}
+
+/** Persisted `RECORD_CARDS` row (GraphQL `RecordCardsData`); the live chunk has
+ *  the same shape, so both go through `recordCardsEvent`. */
+export interface RecordCardsMessageData extends MessageDataBase {
+  type: 'RECORD_CARDS';
   cards?: unknown;
 }
 
@@ -639,6 +665,7 @@ export type MessageData =
   | ThinkingMessageData
   | AskMessageData
   | AttachmentsMessageData
+  | RecordCardsMessageData
   | SourceMetadataMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData

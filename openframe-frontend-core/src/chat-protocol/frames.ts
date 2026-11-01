@@ -19,6 +19,7 @@
  */
 
 import type { ToolType } from '../types/tool.types';
+import type { RecordCardsPart } from './record-cards';
 
 // =============================================================================
 // Sentinel constants
@@ -238,7 +239,8 @@ export type SseLeadingFrame =
   | ApprovalRequestFrame
   | ApprovalBatchFrame
   | DecisionResolvedFrame
-  | ToolExecutionFrame;
+  | ToolExecutionFrame
+  | RecordCardsPart;
 
 // =============================================================================
 // Trailing usage frame
@@ -275,4 +277,8 @@ export interface SseTrailingUsageFrame {
   /** Gated deep-debug payload (only present when the request carried
    *  the privileged debug secret). */
   debug?: Record<string, unknown>;
+  /** The answer's record cards, when the model chose them after its text had
+   *  started and no leading frame could carry them. Drawn above the text all
+   *  the same: where a card is drawn is the renderer's, not the wire's. */
+  record_cards?: RecordCardsPart;
 }

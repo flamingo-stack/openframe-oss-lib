@@ -20,6 +20,7 @@ import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import type { AskOptionData } from '../components/chat/types/message.types';
 import { ESCALATION_STATE, escalationResolvedStatus } from './events';
 import type { ApprovalToolCall, ChatStreamEvent } from './events';
+import { recordCardsEvent } from './record-cards';
 import { attachmentsEvent, sourceMetadataEvent } from './source-metadata';
 import { isRecord } from './wire-narrow';
 
@@ -126,6 +127,12 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
     // reducer — not this decoder — owns attaching it to the right turn.
     case MESSAGE_TYPE.ATTACHMENTS: {
       const event = attachmentsEvent(data);
+      return event ? { ...event, ...seq } : null;
+    }
+
+    // The records the answer shows as cards: a part of its own, drawn above the text.
+    case MESSAGE_TYPE.RECORD_CARDS: {
+      const event = recordCardsEvent(data);
       return event ? { ...event, ...seq } : null;
     }
 

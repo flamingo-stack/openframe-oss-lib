@@ -53,8 +53,12 @@ export function frameNum(value: unknown): number | undefined {
 export function mapLeadingFrame(meta: Record<string, unknown>, out: ChatStreamEvent[]): void {
   if (meta.status === 'thinking') {
     out.push({ type: 'status', phase: 'thinking' });
-  } else if (meta.type === MESSAGE_TYPE.EXECUTING_TOOL || meta.type === MESSAGE_TYPE.EXECUTED_TOOL) {
-    // A step of the turn, in the chunk shape a NATS tool run has, read by the NATS decoder itself.
+  } else if (
+    meta.type === MESSAGE_TYPE.EXECUTING_TOOL ||
+    meta.type === MESSAGE_TYPE.EXECUTED_TOOL ||
+    meta.type === MESSAGE_TYPE.RECORD_CARDS
+  ) {
+    // A part of the turn in the chunk shape Mingo sends (a tool step, the record cards), read by the NATS decoder itself.
     const event = decodeNatsChunk(meta);
     if (event) out.push(event);
   } else if (meta.kind === 'thinking-delta' && typeof meta.text === 'string') {

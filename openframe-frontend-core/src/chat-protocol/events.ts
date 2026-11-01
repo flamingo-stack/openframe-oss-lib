@@ -13,7 +13,7 @@
 // declarations of one wire contract. Type-only import from a React-free
 // module; `nats-decoder.ts` already depends on the same file for MESSAGE_TYPE.
 import type { ChatRef } from '../components/chat/chat-ref.types';
-import type { AskOptionData, ChatSource } from '../components/chat/types/message.types';
+import type { AskOptionData, ChatSource, RecordCard } from '../components/chat/types/message.types';
 // The wire-frame shapes these events carry through are defined ONCE in
 // `./frames.ts` — reuse them here rather than restating their fields.
 import type { ApprovalRequestField, DecisionResolvedFrame, UsageTelemetry } from './frames';
@@ -67,6 +67,14 @@ export interface AskEvent extends ChatStreamEventBase {
   text?: string;
   question: string;
   options: AskOptionData[];
+}
+
+/** The records the answer shows as cards (`RECORD_CARDS`): one event per part,
+ *  whole, never coalesced. The same event comes from the hub stream, a Mingo
+ *  chunk and a history row. */
+export interface RecordCardsEvent extends ChatStreamEventBase {
+  type: 'record-cards';
+  cards: RecordCard[];
 }
 
 export interface StatusEvent extends ChatStreamEventBase {
@@ -373,6 +381,7 @@ export type ChatStreamEvent =
   | TextDeltaEvent
   | ThinkingDeltaEvent
   | AskEvent
+  | RecordCardsEvent
   | StatusEvent
   | ToolExecutionEvent
   | ApprovalRequestEvent

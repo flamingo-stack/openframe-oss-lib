@@ -90,6 +90,7 @@ import {
   CONTENT_DEDUP_WINDOW,
   SYSTEM_DEDUP_WINDOW,
   appendToTrailingAssistant,
+  withRecordCards,
   applyToolExecutionToMessages,
   hasRecentMessage,
   mergeToolExecutionIfPresent,
@@ -1097,6 +1098,20 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         break;
       }
 
+      // The records the answer shows as cards: one segment, first in the message, whenever it arrived.
+      case 'record-cards': {
+        if (isInStream || !hasEverStreamed) {
+          const segments = accumulator.addRecordCards(event.cards);
+          emitSegments(segments);
+          applySegmentsToState(segments, withSeqMeta(undefined));
+          break;
+        }
+        const delta: MessageSegment[] = [{ type: 'record_cards', cards: event.cards }];
+        emitSegments(delta, { append: true });
+        applySegmentsToState(delta, withSeqMeta({ append: true }));
+        break;
+      }
+
       case 'tool-execution': {
         const segment: ToolExecutionSegment = { type: 'tool_execution', data: event.data };
         // A starting tool run means the agent's turn is in progress even
@@ -1580,6 +1595,16 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         if (!event.leading) setPhaseInternal('streaming');
         sseAppendText(event.text);
         break;
+      case 'record-cards': {
+        // Drawn above the answer: the one `record_cards` segment, first in the message (a leading frame or the trailer).
+        const last = messages[messages.length - 1];
+        if (!last || last.role !== 'assistant') break;
+        setMessagesInternal([
+          ...messages.slice(0, -1),
+          { ...last, segments: withRecordCards(last.segments ?? [], event.cards) },
+        ]);
+        break;
+      }
       case 'error':
         // Legacy parity: SSE tool errors surface as answer text.
         sseAppendText(`⚠️ ${event.title}`);
