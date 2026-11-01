@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -142,6 +142,16 @@ describe('route-styles: a finished build', () => {
     const page = (classes: string) =>
       `<html><head><style data-href="next-styles:x" data-precedence="next-styles">${routeStyles.PLACEHOLDER}</style></head><body class="${classes}"><script data-next-styles-full="/_next/static/next-styles/full-b1.css"></script></body></html>`;
     writeFileSync(join(root, '.next', 'server', 'app', 'index.html'), page('p-2'));
+    // A standalone server build's copy (`output: 'standalone'`, what a Docker image runs): its own `.next-styles/`
+    // and prerendered pages, filled with the rest. A dependency's files of the same name are not the app's.
+    const standalone = join(root, '.next', 'standalone');
+    mkdirSync(join(standalone, '.next-styles'), { recursive: true });
+    mkdirSync(join(standalone, '.next', 'server', 'app'), { recursive: true });
+    mkdirSync(join(standalone, 'node_modules', 'dep', '.next-styles'), { recursive: true });
+    writeFileSync(join(standalone, '.next-styles', 'build.json'), '{}');
+    writeFileSync(join(standalone, '.next-styles', 'manifest.json'), JSON.stringify({ version: 1, pending: true }));
+    writeFileSync(join(standalone, 'node_modules', 'dep', '.next-styles', 'build.json'), '{}');
+    writeFileSync(join(standalone, '.next', 'server', 'app', 'index.html'), page('p-2'));
     writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'a.html'), page('text-center'));
     writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'b.html'), page('underline'));
   });
@@ -165,6 +175,12 @@ describe('route-styles: a finished build', () => {
     expect(home).not.toContain(routeStyles.PLACEHOLDER);
     expect(home).toContain('.p-2');
     expect(home).toContain(`data-next-styles-full="${manifest.fullUrl}"`);
+    const copy = join(root, '.next', 'standalone');
+    const copied = JSON.parse(readFileSync(join(copy, '.next-styles', 'manifest.json'), 'utf8'));
+    expect(copied.pending).toBeUndefined();
+    expect(Object.keys(copied.routes).sort()).toEqual(['/', '/blog/[slug]']);
+    expect(readFileSync(join(copy, '.next', 'server', 'app', 'index.html'), 'utf8')).toContain('.p-2');
+    expect(existsSync(join(copy, 'node_modules', 'dep', '.next-styles', 'manifest.json'))).toBe(false);
     expect(
       readFileSync(join(root, '.next', 'static', 'next-styles', manifest.fullUrl.split('/').pop() as string), 'utf8'),
     ).toContain('.underline');
