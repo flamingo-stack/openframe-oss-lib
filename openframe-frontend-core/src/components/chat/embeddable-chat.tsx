@@ -1269,11 +1269,17 @@ function EmbeddableChatInner({
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null);
   // A quick action (a starter) puts its prompt into the composer to edit and send, the way support prompts that
-  // start a conversation work (AWS Cloudscape, "support prompts"): nothing is sent on the click.
+  // start a conversation work (AWS Cloudscape, "support prompts"): nothing is sent on the click. It never loses what
+  // the user typed: an empty composer, or one holding only the prompt a quick action put there, takes the new prompt;
+  // a draft of the user's own keeps its text and gets the prompt after it.
+  const insertedPromptRef = useRef<string | null>(null);
   const insertQuickAction = useCallback((prompt: string) => {
     const input = chatInputRef.current;
     if (!input) return;
-    input.setValue(prompt);
+    const draft = input.getValue().trim();
+    const next = draft === '' || draft === insertedPromptRef.current ? prompt : `${draft}\n\n${prompt}`;
+    insertedPromptRef.current = next;
+    input.setValue(next);
     input.focus();
   }, []);
 

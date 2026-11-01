@@ -29,6 +29,7 @@ const runtime: ChatRuntime = {
 };
 
 const PROMPT = 'Check my fleet for pending patches.';
+const OTHER_PROMPT = 'Run a quick disk scan.';
 
 function emptyState(sendMessage: (text: string) => Promise<void>): UnifiedChatState {
   const noop = () => {};
@@ -84,7 +85,12 @@ function renderChat({ onClick }: { onClick?: () => void } = {}) {
           defaultActiveMode="mingo"
           showInternalTrigger={false}
           mingoState={emptyState(sendMessage)}
-          mingoWelcome={{ quickActions: [{ id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick }] }}
+          mingoWelcome={{
+            quickActions: [
+              { id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick },
+              { id: 'qa-2', label: 'Disk scan', prompt: OTHER_PROMPT },
+            ],
+          }}
         />
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,
@@ -110,6 +116,28 @@ describe('EmbeddableChat quick actions', () => {
     await waitFor(() => expect(editor()).toHaveTextContent(PROMPT));
     expect(editor()).toHaveFocus();
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('replaces a prompt another quick action put there', async () => {
+    renderChat();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Patching' }));
+    await waitFor(() => expect(editor()).toHaveTextContent(PROMPT));
+    fireEvent.click(screen.getByRole('button', { name: 'Disk scan' }));
+
+    await waitFor(() => expect(editor()).toHaveTextContent(OTHER_PROMPT));
+    expect(editor()).not.toHaveTextContent(PROMPT);
+  });
+
+  it("keeps the user's own draft and adds the prompt after it", async () => {
+    renderChat();
+
+    fireEvent.input(editor(), { target: { textContent: 'My draft' } });
+    await waitFor(() => expect(editor()).toHaveTextContent('My draft'));
+    fireEvent.click(screen.getByRole('button', { name: 'Patching' }));
+
+    await waitFor(() => expect(editor()).toHaveTextContent(PROMPT));
+    expect(editor()).toHaveTextContent('My draft');
   });
 
   it("still runs the host's own click", async () => {
