@@ -50,7 +50,7 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
       className={url ? 'hover:bg-ods-bg-hover' : undefined}
       link={
         url
-          ? content => (
+          ? (content, anchor) => (
               <RecordNavWrap
                 href={url}
                 path={path}
@@ -60,6 +60,9 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
               >
                 <Link
                   href={url}
+                  aria-label={anchor.label}
+                  aria-hidden={anchor.hidden || undefined}
+                  tabIndex={anchor.hidden ? -1 : undefined}
                   className="text-inherit no-underline"
                   {...(isNewTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 >

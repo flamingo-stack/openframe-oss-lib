@@ -152,7 +152,7 @@ export {
 } from './utils/ask-ai-events';
 export { chatDayLabel } from './utils/chat-day-label';
 export * from './proxy-credentials-panel';
-export { InlineChip } from './inline-chip';
+export { InlineChip, type InlineChipAnchor } from './inline-chip';
 export {
   RecordActionsProvider,
   type RecordActionHandlers,

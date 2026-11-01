@@ -38,6 +38,13 @@ const INLINE_CHIP_ICON_CLASS =
 const INLINE_CHIP_TRAILING_CLASS =
   'ml-[var(--spacing-system-xsf)] border-l border-ods-border pl-[var(--spacing-system-xxs)] text-ods-text-secondary';
 
+/** How the chip asks for its link (`link`): `label` is the anchor's accessible name when the visible name is split
+ *  across two anchors; `hidden` marks the second anchor, which is a click target only (no tab stop, no name). */
+export interface InlineChipAnchor {
+  label?: string;
+  hidden?: boolean;
+}
+
 export function InlineChip({
   icon,
   label,
@@ -50,24 +57,69 @@ export function InlineChip({
   label: React.ReactNode;
   className?: string;
   loading?: boolean;
-  /** Wraps the icon and the name in the chip's link. */
-  link?: (content: React.ReactNode) => React.ReactNode;
+  /** Wraps part of the chip in the chip's link (`anchor` says which part, see `InlineChipAnchor`). */
+  link?: (content: React.ReactNode, anchor: InlineChipAnchor) => React.ReactNode;
   /** An action inside the same box, after the name (a record's "⋯" menu, a new-tab link). */
   trailing?: React.ReactNode;
 }): React.ReactElement {
   if (loading) {
     return <Tag as="span" variant="badge" icon={icon} label="" loading className="align-middle" />;
   }
+  const iconNode = icon ? <span className={INLINE_CHIP_ICON_CLASS}>{icon}</span> : null;
+  // A line must not break between the name and its action, or the "⋯" is left alone at the start of the next line.
+  // Browsers allow a break before an inline button whatever `white-space` says, so the name's LAST WORD and the action
+  // share one `nowrap` box; the rest of the name wraps freely. The last word keeps the link as a second anchor that is
+  // a click target only, and the first anchor carries the whole name as its accessible name.
+  const split = trailing && typeof label === 'string' ? splitLastWord(label) : null;
+  if (split) {
+    const wrap = (content: React.ReactNode, anchor: InlineChipAnchor) => (link ? link(content, anchor) : content);
+    return (
+      <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, className)}>
+        {split.head
+          ? wrap(
+              <>
+                {iconNode}
+                {split.head}
+              </>,
+              { label: label as string },
+            )
+          : null}
+        <span className="whitespace-nowrap">
+          {split.head
+            ? wrap(split.last, { hidden: true })
+            : wrap(
+                <>
+                  {iconNode}
+                  {split.last}
+                </>,
+                {},
+              )}
+          <span className={INLINE_CHIP_TRAILING_CLASS}>{trailing}</span>
+        </span>
+      </span>
+    );
+  }
   const content = (
     <>
-      {icon ? <span className={INLINE_CHIP_ICON_CLASS}>{icon}</span> : null}
+      {iconNode}
       {label}
     </>
   );
   return (
     <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, className)}>
-      {link ? link(content) : content}
-      {trailing ? <span className={INLINE_CHIP_TRAILING_CLASS}>{trailing}</span> : null}
+      {link ? link(content, {}) : content}
+      {trailing ? (
+        <span className="whitespace-nowrap">
+          <span className={INLINE_CHIP_TRAILING_CLASS}>{trailing}</span>
+        </span>
+      ) : null}
     </span>
   );
+}
+
+/** A name split before its last word (`head` keeps the space); a one-word name is all `last`. */
+function splitLastWord(name: string): { head: string; last: string } {
+  const trimmed = name.trimEnd();
+  const at = trimmed.search(/\S+$/);
+  return { head: trimmed.slice(0, at), last: trimmed.slice(at) };
 }

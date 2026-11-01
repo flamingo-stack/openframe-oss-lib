@@ -125,7 +125,7 @@ describe('ChatMessageEnhanced — a record chip opens its record', () => {
     );
     const link = await screen.findByRole('link', { name: 'Mac guide' });
     expect(link.getAttribute('href')).toBe('/onboarding-guides/install-on-mac');
-    fireEvent.click(within(link).getByText('Mac guide'));
+    fireEvent.click(link);
     expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ href: '/onboarding-guides/install-on-mac' }));
   });
 });
