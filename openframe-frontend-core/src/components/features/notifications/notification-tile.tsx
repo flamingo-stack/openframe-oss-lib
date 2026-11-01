@@ -6,13 +6,14 @@ import { ICON_SIZE } from '../../../styles/component-sizes';
 import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime } from '../../../utils/date-utils';
+import type { NotificationSeverity } from '../../../utils/notifications';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { dotColorByVariant, progressColorByVariant as toastProgressColorByVariant } from '../../ui/toaster';
-import type { Notification, NotificationSeverity, NotificationVariant } from './types';
+import type { Notification, NotificationVariant } from './types';
 
 /** Backend severity → tile color variant; overrides `notification.variant` when present. */
 const variantBySeverity: Record<NotificationSeverity, NotificationVariant> = {
