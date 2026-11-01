@@ -1,10 +1,12 @@
 package com.openframe.authz.service.auth;
 
 import com.openframe.data.document.oauth.MongoOAuth2Authorization;
+import com.openframe.data.document.oauth.RetiredRefreshToken;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
@@ -13,6 +15,9 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -36,7 +41,39 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
         log.debug("Saving authorization: {}", authorization.getId());
 
         MongoOAuth2Authorization entity = MongoAuthorizationMapper.toEntity(authorization);
+        entity.setRetiredRefreshTokens(retiredTokensAfterSaving(entity));
         repository.save(entity);
+    }
+
+    /**
+     * Rotation replaces the refresh token, and the client only learns the new one from a response it
+     * may never receive: a cancelled request or a dropped connection, while the server still finishes.
+     * Keeping the replaced token for a short window lets that client's next refresh recover the session
+     * instead of ending it. A list rather than one slot, so a retry that rotates again doesn't kill the
+     * token a concurrent request has just received.
+     */
+    private List<RetiredRefreshToken> retiredTokensAfterSaving(MongoOAuth2Authorization entity) {
+        MongoOAuth2Authorization stored = repository.findById(entity.getId()).orElse(null);
+        if (stored == null) {
+            return null;
+        }
+        Instant now = Instant.now();
+        List<RetiredRefreshToken> retired = new ArrayList<>();
+        if (stored.getRetiredRefreshTokens() != null) {
+            stored.getRetiredRefreshTokens().stream()
+                    .filter(token -> isWithinGrace(token, now))
+                    .filter(token -> !token.value().equals(entity.getRefreshTokenValue()))
+                    .forEach(retired::add);
+        }
+        String replaced = stored.getRefreshTokenValue();
+        if (replaced != null && !replaced.equals(entity.getRefreshTokenValue())) {
+            retired.add(new RetiredRefreshToken(replaced, now));
+        }
+        return retired.isEmpty() ? null : retired;
+    }
+
+    private boolean isWithinGrace(RetiredRefreshToken token, Instant now) {
+        return token.retiredAt().plusSeconds(refreshTokenGraceSeconds).isAfter(now);
     }
 
     @Override
@@ -101,10 +138,16 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
                     .or(() -> repository.findByRefreshTokenValue(token))
                     .or(() -> repository.findByAuthorizationCodeValue(token))
                     .or(() -> repository.findByState(token));
+            if (found.isEmpty()) {
+                return findByRetiredRefreshToken(token);
+            }
         } else if (OAuth2TokenType.ACCESS_TOKEN.equals(tokenType)) {
             found = repository.findByAccessTokenValue(token);
         } else if (OAuth2TokenType.REFRESH_TOKEN.equals(tokenType)) {
             found = repository.findByRefreshTokenValue(token);
+            if (found.isEmpty()) {
+                return findByRetiredRefreshToken(token);
+            }
         } else if (AUTH_CODE.equals(tokenType)) {
             found = repository.findByAuthorizationCodeValue(token);
         } else {
@@ -112,6 +155,28 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
         }
 
         return found.map(entity -> MongoAuthorizationMapper.toDomain(entity, registeredClientRepository))
+                .orElse(null);
+    }
+
+    /**
+     * The presented value goes onto the returned authorization because Spring's revocation looks the
+     * token up by value on it; the metadata stays the current token's, so a revoked session stays revoked.
+     */
+    private OAuth2Authorization findByRetiredRefreshToken(String token) {
+        Instant now = Instant.now();
+        return repository.findByRetiredRefreshTokensValue(token)
+                .filter(entity -> entity.getRetiredRefreshTokens().stream()
+                        .anyMatch(retired -> retired.value().equals(token) && isWithinGrace(retired, now)))
+                .map(entity -> {
+                    log.info("Accepted a rotated refresh token within the grace window: authorization {}", entity.getId());
+                    OAuth2Authorization authorization = MongoAuthorizationMapper.toDomain(entity, registeredClientRepository);
+                    OAuth2Authorization.Token<OAuth2RefreshToken> current = authorization.getRefreshToken();
+                    OAuth2RefreshToken presented = new OAuth2RefreshToken(
+                            token, current.getToken().getIssuedAt(), current.getToken().getExpiresAt());
+                    return OAuth2Authorization.from(authorization)
+                            .token(presented, metadata -> metadata.putAll(current.getMetadata()))
+                            .build();
+                })
                 .orElse(null);
     }
 }

@@ -19,7 +19,7 @@ import java.util.stream.Stream;
 @AllArgsConstructor
 @Document(collection = "oauth2_authorizations")
 @CompoundIndex(def = "{'registeredClientId': 1, 'principalName': 1}")
-@CompoundIndex(def = "{'retiredRefreshTokens.value': 1}", sparse = true)
+@CompoundIndex(name = "oauth2_authorizations_retired_refresh_token", def = "{'retiredRefreshTokens.value': 1}", sparse = true)
 public class MongoOAuth2Authorization implements TenantScoped {
     @Id
     private String id;
