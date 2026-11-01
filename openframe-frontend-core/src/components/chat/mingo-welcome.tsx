@@ -33,7 +33,7 @@ export interface MingoQuickAction {
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip. */
   variant?: 'primary' | 'outline';
   onClick?: () => void;
-  /** The full prompt the action asks: in `EmbeddableChat` a click puts it into the composer to edit and send. The
+  /** The full prompt the action asks: in `EmbeddableChat` a click sends it. The
    *  chip `label` is short. Omitted → falls back to `label`. */
   prompt?: string;
 }

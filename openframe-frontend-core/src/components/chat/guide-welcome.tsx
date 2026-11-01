@@ -20,7 +20,7 @@ export interface GuideQuickAction {
   id: string;
   /** Chip label. */
   label: string;
-  /** Prompt text seeded into the composer on click. Defaults to `label`. */
+  /** Prompt text sent on click. Defaults to `label`. */
   prompt?: string;
   /** Optional library-glyph name (resolved via the onboarding-icon registry). */
   iconName?: string | null;
@@ -50,7 +50,7 @@ export interface GuideWelcomeProps {
   /** Quick-action chips — caller-provided; there are no built-in defaults, so
    *  the set is omitted entirely unless the host supplies actions. The first
    *  ones fill the set's slots and the rest open from its "More" slot; a click
-   *  hands the action to `onQuickAction` (the chat puts its `prompt` into the composer). */
+   *  hands the action to `onQuickAction` (the chat sends its `prompt`). */
   quickActions?: ReadonlyArray<GuideQuickAction>;
   /** The host is still reading the chips (e.g. the quick actions of the page's
    *  topic): with none to show yet the wall draws its own loading form. A

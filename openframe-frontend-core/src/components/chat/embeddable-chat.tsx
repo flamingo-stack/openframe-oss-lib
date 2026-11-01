@@ -399,8 +399,8 @@ export interface EmbeddableChatProps {
    * extra `quickActions` chips.
    * Each field falls back to the built-in OpenFrame defaults, so the kit
    * stays platform-agnostic. `onStartGuideChat` and `hasExistingChats` are
-   * wired internally and are NOT overridable here. A quick action's click is wired internally too: it puts the
-   * action's prompt into the composer to edit and send, then calls the action's own `onClick` (e.g. analytics).
+   * wired internally and are NOT overridable here. A quick action's click is wired internally too: it sends the
+   * action's prompt at once, then calls the action's own `onClick` (e.g. analytics).
    */
   mingoWelcome?: Omit<MingoWelcomeProps, 'onStartGuideChat' | 'hasExistingChats'>;
 
@@ -1268,20 +1268,6 @@ function EmbeddableChatInner({
 
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null);
-  // A quick action (a starter) puts its prompt into the composer to edit and send, the way support prompts that
-  // start a conversation work (AWS Cloudscape, "support prompts"): nothing is sent on the click. It never loses what
-  // the user typed: an empty composer, or one holding only the prompt a quick action put there, takes the new prompt;
-  // a draft of the user's own keeps its text and gets the prompt after it.
-  const insertedPromptRef = useRef<string | null>(null);
-  const insertQuickAction = useCallback((prompt: string) => {
-    const input = chatInputRef.current;
-    if (!input) return;
-    const draft = input.getValue().trim();
-    const next = draft === '' || draft === insertedPromptRef.current ? prompt : `${draft}\n\n${prompt}`;
-    insertedPromptRef.current = next;
-    input.setValue(next);
-    input.focus();
-  }, []);
 
   // The slash-command registry (Guide onboarding cards) is loaded via
   // react-query below, after `activeMode` is resolved — gated on Guide mode and
@@ -2872,12 +2858,12 @@ function EmbeddableChatInner({
             // the new-user compose surface: greeting + grid + promo +
             // primary Guide chip.
             hasExistingChats={false}
-            // A quick action puts its prompt into the composer to edit and send (`insertQuickAction`), then runs
-            // the host's own click. Wired after the `{...mingoWelcome}` spread so nothing is sent from here.
+            // A quick action sends its prompt at once, then runs the host's own click. Wired after the
+            // `{...mingoWelcome}` spread so the chat, not the host, sends it.
             quickActions={mingoWelcome?.quickActions?.map(action => ({
               ...action,
               onClick: () => {
-                insertQuickAction(action.prompt ?? action.label);
+                handleSend(action.prompt ?? action.label);
                 action.onClick?.();
               },
             }))}
@@ -2918,8 +2904,8 @@ function EmbeddableChatInner({
                 ? guideSuggestedActions
                 : (guideWelcome?.quickActions ?? guideSuggestedActions)
             }
-            // A quick action puts its prompt into the composer to edit and send.
-            onQuickAction={action => insertQuickAction(action.prompt ?? action.label)}
+            // A quick action sends its prompt at once.
+            onQuickAction={action => handleSend(action.prompt ?? action.label)}
           >
             {/* Figma node 7363:205938 — single-column slash-command
                 list. No own scroll (GuideWelcome's region scrolls); the
