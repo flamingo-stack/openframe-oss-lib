@@ -68,8 +68,9 @@ function withInlineStyles(nextConfig) {
 
 /**
  * `withInlineStyles`, and per-route stylesheets when the build is `next-styles build` (`./route-styles.cjs`): the
- * server bundle carries `.next-styles/` (filled after the build) and knows its build, and the build records the
- * settings the route step reads. Any other build, and `next dev`, is `withInlineStyles` alone.
+ * build runs the route step as its build adapter (`./route-styles-adapter.cjs`, which wraps the adapter the build
+ * would have had: the config's own `adapterPath`, else the host's `NEXT_ADAPTER_PATH`), knows its build, and records
+ * the settings the route step reads. Any other build, and `next dev`, is `withInlineStyles` alone.
  */
 function withRouteStyles(nextConfig) {
   return async (phase, ...rest) => {
@@ -86,13 +87,18 @@ function withRouteStyles(nextConfig) {
       output: inline.output ?? null,
       assetPrefix: inline.assetPrefix ?? '',
       basePath: inline.basePath ?? '',
+      inner: inline.adapterPath ?? process.env.NEXT_ADAPTER_PATH ?? null,
+      options: JSON.parse(process.env.NEXT_STYLES_OPTIONS || '{}'),
     };
     writeFileSync(infoFile, `${JSON.stringify(info, null, 2)}\n`);
-    // Every route: the files are read at run time by `RouteStyles`, which no static trace can follow.
+    // Every route: the files are read at run time by `RouteStyles`, which no static trace can follow (the adapter
+    // adds the sheets it writes after the trace to the server functions it hands on).
     const includes = { ...inline.outputFileTracingIncludes };
     for (const route of ['/', '/*', '/*/**']) includes[route] = [...(includes[route] ?? []), `./${STYLES_DIR}/**/*`];
     return {
       ...inline,
+      // A path, never a require: the config must not reach the build tool (see `loadRouteStyles`).
+      adapterPath: join(__dirname, 'route-styles-adapter.cjs'),
       env: { ...inline.env, NEXT_STYLES_BUILD: buildId, NEXT_STYLES_FULL_URL: fullSheetUrl(info) },
       outputFileTracingIncludes: includes,
     };
