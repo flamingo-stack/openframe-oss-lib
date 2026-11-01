@@ -1517,13 +1517,22 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     setMessagesInternal(projectApprovalResolutionToMessages(messages, proposalId, event.status));
 
     // Step 2 — server-rendered receipt into the CURRENT message. No
-    // server-provided copy → don't fabricate a fallback. The receipt's
-    // record link hydrates via the card fetch path on its own —
-    // no ref stamping needed.
+    // server-provided copy → don't fabricate a fallback. Its record link is
+    // a chip; the executed record's card comes as the frame's own part.
     const receipt = typeof event.receiptText === 'string' ? event.receiptText : null;
     if (receipt === null) return;
     sseCurrentText = receipt + '\n\n';
     sseWriteTrailingText(sseCurrentText);
+    // The record the write acted on: the receipt's card, above it.
+    if (event.recordCards && event.recordCards.length > 0) {
+      const last = messages[messages.length - 1];
+      if (last && last.role === 'assistant') {
+        setMessagesInternal([
+          ...messages.slice(0, -1),
+          { ...last, segments: withRecordCards(last.segments ?? [], event.recordCards) },
+        ]);
+      }
+    }
   }
 
   function applySseMetadata(event: ChatMetadataEvent, sendIdx: number): void {

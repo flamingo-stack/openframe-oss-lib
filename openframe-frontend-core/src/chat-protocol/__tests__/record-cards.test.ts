@@ -60,6 +60,24 @@ describe('record cards wire part', () => {
   });
 });
 
+describe('record cards on a receipt', () => {
+  it("rides the decision frame as the executed record's card", () => {
+    const frame = {
+      kind: 'decision_resolved',
+      proposalId: 'p1',
+      ok: true,
+      action: 'approved',
+      willAutoContinue: false,
+      receiptText: 'Task created.',
+      record_cards: recordCardsPart([{ type: 'internal_task', id: 't1' }]),
+    };
+    const events = decodeAll([encodeLeadingFrame(frame as never), encodeEndOfLeading()]);
+    expect(events.find(e => e.type === 'approval-resolved')).toMatchObject({
+      recordCards: [{ type: 'internal_task', id: 't1' }],
+    });
+  });
+});
+
 describe('record cards in a message', () => {
   it('is one segment, first, whenever in the turn it arrived', () => {
     const accumulator = new MessageSegmentAccumulator();

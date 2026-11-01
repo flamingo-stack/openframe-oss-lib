@@ -12,6 +12,7 @@
 import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import type { ChatStreamEvent } from './events';
 import { decodeNatsChunk } from './nats-decoder';
+import { recordCardsEvent } from './record-cards';
 
 /**
  * Escape `<` so markdown renderers that pass HTML through (rehypeRaw)
@@ -73,6 +74,7 @@ export function mapLeadingFrame(meta: Record<string, unknown>, out: ChatStreamEv
       cache_creation_input_tokens: frameNum(meta.cache_creation_input_tokens),
     });
   } else if (meta.kind === 'decision_resolved' && typeof meta.action === 'string') {
+    const receiptCards = recordCardsEvent(meta.record_cards);
     const status = meta.action === 'rejected' ? 'rejected' : 'approved';
     const toolName = typeof meta.tool_name === 'string' ? meta.tool_name : undefined;
     const result = meta.result ?? null;
@@ -84,6 +86,7 @@ export function mapLeadingFrame(meta: Record<string, unknown>, out: ChatStreamEv
       ...(toolName ? { toolName } : {}),
       ...(result ? { result } : {}),
       ...(typeof meta.receiptText === 'string' ? { receiptText: meta.receiptText } : {}),
+      ...(receiptCards ? { recordCards: receiptCards.cards } : {}),
       requestId: typeof meta.proposalId === 'string' ? meta.proposalId : undefined,
     });
   } else if (meta.kind === 'approval_batch' && meta.batchId && Array.isArray(meta.proposals)) {

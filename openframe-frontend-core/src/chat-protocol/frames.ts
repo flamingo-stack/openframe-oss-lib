@@ -225,6 +225,9 @@ export interface DecisionResolvedFrame {
   /** Pre-rendered receipt copy from the source strategy's
    *  `receiptRenderer` — client renders verbatim. */
   receiptText?: string;
+  /** The record the write acted on, as the receipt's card part: drawn above
+   *  the receipt, like an answer's record cards. */
+  record_cards?: RecordCardsPart;
 }
 
 /** Every leading frame the emitter can produce. */

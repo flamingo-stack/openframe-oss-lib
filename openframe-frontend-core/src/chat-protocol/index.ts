@@ -29,6 +29,7 @@ export { isRecord, unwrapEnvelope } from './wire-narrow';
 export * from './record-link';
 // Record cards: the records an answer shows, a typed part drawn above its text (never read from the text).
 export * from './record-cards';
+export type { RecordCard } from '../components/chat/types/message.types';
 // The `[N]` citation chip grammar — written by the server, read and hidden by the renderer.
 export * from './citation-chip';
 export { escapeThinkingTags } from './leading-frames';

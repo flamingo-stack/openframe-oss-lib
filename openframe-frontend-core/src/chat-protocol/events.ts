@@ -144,6 +144,8 @@ export interface ApprovalResolvedEvent extends ChatStreamEventBase {
   approvalType?: string;
   resolvedByName?: string | null;
   receiptText?: string;
+  /** The record the write acted on, shown as the receipt's card (above it). */
+  recordCards?: RecordCard[];
   result?: DecisionResolvedFrame['result'];
   willAutoContinue?: boolean;
 }
