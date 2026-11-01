@@ -11,11 +11,10 @@
 
 import { useChatRuntime, useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
-import { cn } from '../../utils/cn';
 import { defaultTableIdForDocumentType, getSourceIconName } from '../../utils/source-icons';
 import { RecordNavWrap, recordMenuActions, recordMenuGroups, useRecordDestination } from './entity-cards/dispatch';
 import { InlineChip } from './inline-chip';
-import { RECORD_CHIP_LEAD_SEGMENT_CLASS, RecordChipActions, useRecordActions } from './record-actions';
+import { RecordChipMenu, useRecordActions } from './record-actions';
 import { resolveIcon } from './utils/icon-library';
 
 function iconFor(type: string) {
@@ -44,36 +43,33 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
   const handlers = useRecordActions();
   const url = finalChatRef.url;
   const menuGroups = recordMenuGroups(finalChatRef, recordMenuActions(finalChatRef, handlers, runtime));
-  const chip = (
+  return (
     <InlineChip
       icon={iconFor(type)}
       label={label}
-      className={cn(url && 'hover:bg-ods-bg-hover', menuGroups && RECORD_CHIP_LEAD_SEGMENT_CLASS)}
+      className={url ? 'hover:bg-ods-bg-hover' : undefined}
+      link={
+        url
+          ? content => (
+              <RecordNavWrap
+                href={url}
+                path={path}
+                targetPlatform={finalChatRef.targetPlatform ?? null}
+                isNewTab={isNewTab}
+                hostRoute={hostRoute}
+              >
+                <Link
+                  href={url}
+                  className="text-inherit no-underline"
+                  {...(isNewTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                >
+                  {content}
+                </Link>
+              </RecordNavWrap>
+            )
+          : undefined
+      }
+      trailing={menuGroups ? <RecordChipMenu menuGroups={menuGroups} label={finalChatRef.title || label} /> : undefined}
     />
-  );
-  const lead = url ? (
-    <RecordNavWrap
-      href={url}
-      path={path}
-      targetPlatform={finalChatRef.targetPlatform ?? null}
-      isNewTab={isNewTab}
-      hostRoute={hostRoute}
-    >
-      <Link
-        href={url}
-        className="flex min-w-0 no-underline"
-        {...(isNewTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-      >
-        {chip}
-      </Link>
-    </RecordNavWrap>
-  ) : (
-    chip
-  );
-  if (!menuGroups) return lead;
-  return (
-    <RecordChipActions menuGroups={menuGroups} label={finalChatRef.title || label}>
-      {lead}
-    </RecordChipActions>
   );
 }

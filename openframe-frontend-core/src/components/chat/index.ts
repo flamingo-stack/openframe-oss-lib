@@ -154,10 +154,9 @@ export { chatDayLabel } from './utils/chat-day-label';
 export * from './proxy-credentials-panel';
 export { InlineChip } from './inline-chip';
 export {
-  RECORD_CHIP_LEAD_SEGMENT_CLASS,
   RecordActionsProvider,
   type RecordActionHandlers,
-  RecordChipActions,
+  RecordChipMenu,
   RecordChipProvider,
   type RecordChipSubject,
   useRecordActions,

@@ -8,19 +8,18 @@
  * - `RecordActionsProvider`: the chat's own Ask and Display handlers (the ones its cards get), for every chip below it.
  * - `useRecordChipMenu`: the menu for a host's chip (the product's device or script chip), which the lib puts in
  *   context around each chip it asks the host for (`RecordChipProvider`).
- * - `RecordChipActions`: the chip with its "⋯" segment, the one look for the lib's chip and a host's.
+ * - `RecordChipMenu`: the chip's "⋯", in its `trailing` slot (`InlineChip`), the one look for the lib's chip and a
+ *   host's.
  */
 
 import type React from 'react';
 import { createContext, useContext } from 'react';
 import { useChatRuntime } from '../../contexts/chat-runtime-context';
-import { cn } from '../../utils/cn';
 import { Ellipsis01Icon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import type { ChatRef } from './chat-ref.types';
 import { recordMenuActions, recordMenuGroups } from './entity-cards/dispatch';
-import { InlineChip } from './inline-chip';
 
 export interface RecordActionHandlers {
   /** "Ask Mingo" about a record: asks in the open conversation. */
@@ -69,46 +68,33 @@ export function useRecordChipMenu({ href }: { href?: string | null }): ActionsMe
   return recordMenuGroups(ref, recordMenuActions(ref, handlers, runtime));
 }
 
-/** The chip's lead segment, when its "⋯" segment follows it: the two read as one chip with a seam. */
-export const RECORD_CHIP_LEAD_SEGMENT_CLASS = 'max-w-full rounded-r-none';
-const MENU_SEGMENT_CLASS = 'rounded-l-none border-l-0 hover:bg-ods-bg-hover hover:[&_svg]:text-ods-text-primary';
-
 /**
- * A record's chip followed by its "⋯" segment, which opens the record's menu. `children` is the lead segment (the
- * chip, usually inside its link), drawn with `RECORD_CHIP_LEAD_SEGMENT_CLASS`. The pair is no wider than what holds
- * it: the lead gives up its width first.
+ * A record chip's "⋯": the button that opens the record's menu, set in the chip's `trailing` slot (`InlineChip`), so
+ * the name and its actions are one box. `label` names the record for the button's accessible name.
  */
-export function RecordChipActions({
+export function RecordChipMenu({
   menuGroups,
   label,
-  children,
-  className,
 }: {
   menuGroups: ActionsMenuGroup[];
-  /** The record's name, for the menu button's accessible name. */
   label: string;
-  children: React.ReactNode;
-  className?: string;
 }): React.ReactElement {
   const ariaLabel = `Actions for ${label}`;
   return (
-    <span className={cn('inline-flex max-w-[min(16rem,100%)] align-middle', className)}>
-      <span className="flex min-w-0">{children}</span>
-      <ActionsMenuDropdown
-        groups={menuGroups}
-        triggerAriaLabel={ariaLabel}
-        onCloseAutoFocus={event => event.preventDefault()}
-        customTrigger={
-          <Button
-            variant="transparent"
-            type="button"
-            aria-label={ariaLabel}
-            className="!h-auto !min-h-0 !w-auto !min-w-0 shrink-0 !p-0 align-middle hover:bg-transparent"
-          >
-            <InlineChip label={<Ellipsis01Icon />} className={MENU_SEGMENT_CLASS} />
-          </Button>
-        }
-      />
-    </span>
+    <ActionsMenuDropdown
+      groups={menuGroups}
+      triggerAriaLabel={ariaLabel}
+      onCloseAutoFocus={event => event.preventDefault()}
+      customTrigger={
+        <Button
+          variant="transparent"
+          type="button"
+          aria-label={ariaLabel}
+          className="!h-auto !min-h-0 !w-auto !min-w-0 !p-0 align-[-0.2em] text-ods-text-secondary hover:bg-transparent hover:text-ods-text-primary"
+        >
+          <Ellipsis01Icon className="size-4" />
+        </Button>
+      }
+    />
   );
 }

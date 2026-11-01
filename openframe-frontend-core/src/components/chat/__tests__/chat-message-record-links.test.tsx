@@ -129,3 +129,14 @@ describe('ChatMessageEnhanced — a record chip opens its record', () => {
     expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ href: '/onboarding-guides/install-on-mac' }));
   });
 });
+
+describe('ChatMessageEnhanced — a chip shows its whole name', () => {
+  it('draws a long name whole, in a box that wraps with its line', () => {
+    const name = 'Install the OpenFrame Agent on macOS with Homebrew and confirm it reports in';
+    show(`Read [${name}](record://onboarding_guide/mac-guide) first.`);
+    const chip = screen.getByTestId('inline-chip');
+    expect(chip.textContent).toBe(name);
+    expect(chip.className).not.toMatch(/max-w-|truncate/);
+    expect(chip.className).toContain('[box-decoration-break:clone]');
+  });
+});

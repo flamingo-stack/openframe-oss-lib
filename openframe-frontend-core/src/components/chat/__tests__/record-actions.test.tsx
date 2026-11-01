@@ -12,7 +12,8 @@ import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-run
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import type { ChatRef } from '../chat-ref.types';
 import { recordMenuGroups, renderChatInlineEntityCard } from '../entity-cards/dispatch';
-import { RecordActionsProvider, RecordChipActions, useRecordChipMenu } from '../record-actions';
+import { InlineChip } from '../inline-chip';
+import { RecordActionsProvider, RecordChipMenu, useRecordChipMenu } from '../record-actions';
 
 class ResizeObserverStub {
   observe(): void {}
@@ -132,13 +133,12 @@ describe('a chip offers what its card offers', () => {
     const onDiscuss = vi.fn();
     function HostChip({ label }: { label: string }) {
       const menuGroups = useRecordChipMenu({ href: '/devices/m-1' });
-      const chip = <a href="/devices/m-1">{label}</a>;
-      return menuGroups ? (
-        <RecordChipActions menuGroups={menuGroups} label={label}>
-          {chip}
-        </RecordChipActions>
-      ) : (
-        chip
+      return (
+        <InlineChip
+          label={label}
+          link={content => <a href="/devices/m-1">{content}</a>}
+          trailing={menuGroups ? <RecordChipMenu menuGroups={menuGroups} label={label} /> : undefined}
+        />
       );
     }
     render(
