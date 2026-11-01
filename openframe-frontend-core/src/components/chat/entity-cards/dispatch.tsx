@@ -248,7 +248,7 @@ export interface ChatCardRenderOptions {
   /** Pre-computed new-tab decision for the inner anchor's `target`
    *  attribute. Required — always computed by `ChatCardLoader` via the
    *  same rule source chips use, so the rendered `<a target>` matches
-   *  whatever `ChatCardNavWrap` + `executeNavigation` decide at click
+   *  whatever `RecordNavWrap` + `executeNavigation` decide at click
    *  time. */
   isNewTab: boolean;
   /** Host-provided "Ask Mingo"/"Display" affordance for this card, resolved
@@ -264,7 +264,7 @@ export interface ChatCardRenderOptions {
 // it ONCE via `navLinkTarget` against the resolved `chatRef.url` and
 // threads it through `renderOpts`. Wrappers must NOT decide
 // themselves; the parent's decision is the single
-// source of truth for the rendered `<a target>` AND `ChatCardNavWrap`'s
+// source of truth for the rendered `<a target>` AND `RecordNavWrap`'s
 // close-on-nav gate.
 // =============================================================================
 
@@ -1895,11 +1895,11 @@ export function chatCardLabel(docType: string): string | undefined {
 }
 
 // =============================================================================
-// ChatCardNavWrap — click-capture interceptor that routes inner-anchor
+// RecordNavWrap — click-capture interceptor that routes inner-anchor
 // clicks through the chat runtime's nav handler.
 //
-// Single source of truth for click handling on EVERY inline card. The
-// card body provides its own `<a href={absolute}>` (per the
+// Single source of truth for click handling on EVERY inline card and on the
+// chip of a record link (`RecordChip`). The card body provides its own `<a href={absolute}>` (per the
 // pure-presentation contract) — this wrapper intercepts the primary
 // click via `onClickCapture` BEFORE the browser's default navigation
 // fires, and routes through `executeNavigation` to apply runtime nav
@@ -1911,7 +1911,7 @@ export function chatCardLabel(docType: string): string | undefined {
 // Same click model as source chips — chips use `<a onClick={executeNavigation}>`
 // directly; cards use `<span onClickCapture={→executeNavigation}>` outside
 // the card's own anchor. Both ultimately call `executeNavigation` with
-// the same `{href, targetPlatform}` resolved at `ChatCardLoader` via
+// the same `{href, targetPlatform}` resolved by `useRecordDestination` via
 // `resolveSourceRowCTA`. The unification:
 //   - Same URL composition (`resolveSourceRowCTA`)
 //   - Same navigation decision (`navLinkTarget`)
@@ -1920,7 +1920,7 @@ export function chatCardLabel(docType: string): string | undefined {
 // =============================================================================
 
 /**
- * ChatCardNavWrap — click-capture interceptor for inline cards.
+ * RecordNavWrap — click-capture interceptor for inline cards and record chips.
  *
  * `<span onClickCapture>` wrapping the card body. The card renders its
  * own `<a href target rel>` with the canonical pre-resolved href +
@@ -1937,7 +1937,7 @@ export function chatCardLabel(docType: string): string | undefined {
  * gate on `!isNewTab` computed from the same `decideNewTab` rule, so
  * the close decision is consistent across surfaces.
  */
-function ChatCardNavWrap({
+export function RecordNavWrap({
   href,
   path,
   targetPlatform,
@@ -2057,7 +2057,15 @@ function CardWithDisclosure({
  *
  * Eliminates the entire "chip works, inline card doesn't" class of bug.
  */
-export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCardLoaderProps) {
+/**
+ * Where a record opens, THE one answer for every surface that shows it: the card (`ChatCardLoader`) and the chip of a
+ * record link in a sentence (`RecordChip`). It reads the record's row through the card's own query (`useChatCardItem`,
+ * one TanStack entry per record, so a chip beside its card adds no request) and resolves the destination the source
+ * chip resolves (`resolveCardDestination`). `chatRef` is the ref as known; the answer carries the resolved url,
+ * platform and doc path, the row's title when the ref had none, the new-tab decision and whether the url is a route
+ * of the host's own.
+ */
+export function useRecordDestination(chatRef: ChatRef) {
   const runtime = useRequiredChatRuntime();
   const entry = CHAT_CARD_REGISTRY[chatRef.type];
   // Hook order MUST be stable across renders — call the data hook
@@ -2069,13 +2077,10 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
     fetchEntry?.contentRefType ?? '',
     fetchEntry ? chatRef.id : '',
   );
-  if (!entry) return null;
 
-  // THE card's destination, decided in one place (`resolveCardDestination`):
-  // the source chip's resolver with the row as far as it is known (the ref's
-  // fields, plus the fetched row's doc path when a bare `record://type/id`
-  // marker carried none), else the fetched row's own destination. Computed
-  // BEFORE `isNewTab` so the click wrapper sees the page the user will visit.
+  // THE destination, decided in one place (`resolveCardDestination`): the source chip's resolver with the row as far
+  // as it is known (the ref's fields, plus the fetched row's doc path when a bare `record://type/id` ref carried
+  // none), else the fetched row's own destination. Computed BEFORE `isNewTab` so the click sees the page it visits.
   const destination = resolveCardDestination({
     chatRef,
     item: fetchEntry ? item : undefined,
@@ -2092,23 +2097,19 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
     ...(destination.path ? { metadata: { ...(chatRef.metadata ?? {}), path: destination.path } } : {}),
   };
 
-  // Title enrichment, same synthetic-ref gap as the href above: a Mingo
-  // record link (`record://type/id`) produces `title: <id>` because the transport
-  // ships no ref metadata. Downstream consumers that read `ref.title` — most
-  // visibly the "Ask Mingo" prompt, which would otherwise send
-  // "Tell me more about 86ad3qvv5" — get the row's real title once it loads.
-  // A ref that already carries a distinct title (the SSE path) is untouched.
+  // Title enrichment, same synthetic-ref gap as the href above: a record link (`record://type/id`) produces
+  // `title: <id>` because the transport ships no ref metadata. Downstream consumers that read `ref.title` (most
+  // visibly the "Ask Mingo" prompt, which would otherwise send "Tell me more about 86ad3qvv5") get the row's real
+  // title once it loads. A ref that already carries a distinct title (the SSE path) is untouched.
   const fetchedTitle = fetchEntry && item ? readFetchedCardTitle(item) : null;
   const finalChatRef: ChatRef =
     fetchedTitle && (!hrefResolvedChatRef.title || hrefResolvedChatRef.title === hrefResolvedChatRef.id)
       ? { ...hrefResolvedChatRef, title: fetchedTitle }
       : hrefResolvedChatRef;
 
-  // Pre-compute new-tab decision ONCE here (the same rule chips use).
-  // Render branches that pass `target` / `rel` to their card pull this
-  // via `renderOpts.isNewTab` so the inner `<a>` agrees with the
-  // runtime nav decision in `ChatCardNavWrap` + `executeNavigation`.
-  // A url the host composed (`composed`, `hostOverride`) as a relative route of its own is the host's page.
+  // The new-tab decision, ONCE (the same rule chips use), so the rendered `<a target>` agrees with the runtime nav
+  // decision in `RecordNavWrap` + `executeNavigation`. A url the host composed (`composed`, `hostOverride`) as a
+  // relative route of its own is the host's page.
   const hostRoute =
     (destination.source === 'composed' || destination.source === 'hostOverride') &&
     !!finalChatRef.url &&
@@ -2116,6 +2117,14 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
   const isNewTab = finalChatRef.url
     ? navLinkTarget(runtime, finalChatRef.url, finalChatRef.targetPlatform, { hostRoute }).isNewTab
     : false;
+  const path = typeof finalChatRef.metadata?.path === 'string' ? finalChatRef.metadata.path : null;
+  return { entry, fetchEntry, item, isLoading, isError, isFetched, finalChatRef, hostRoute, isNewTab, path };
+}
+
+export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCardLoaderProps) {
+  const { entry, fetchEntry, item, isLoading, isError, isFetched, finalChatRef, hostRoute, isNewTab, path } =
+    useRecordDestination(chatRef);
+  if (!entry) return null;
 
   // Resolve the "Ask Mingo"/"Display" affordance ONCE — same precedence as the
   // legacy `ChatCardWithDiscuss` (displayAction + onDisplay → "Display",
@@ -2136,14 +2145,13 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
     discuss,
   };
 
-  // Wrap EVERY rendered card with ChatCardNavWrap so the inner anchor's
+  // Wrap EVERY rendered card with RecordNavWrap so the inner anchor's
   // primary click routes through the chat runtime (same handler as the
   // source chip). The card's `<a href={absolute}>` provides the visible
   // href for hover-preview / copy-link / modifier-click; the wrapper
   // intercepts the primary click and applies runtime nav rules.
-  const path = typeof finalChatRef.metadata?.path === 'string' ? finalChatRef.metadata.path : null;
   const navWrap = (children: ReactNode) => (
-    <ChatCardNavWrap
+    <RecordNavWrap
       href={finalChatRef.url ?? null}
       path={path}
       targetPlatform={finalChatRef.targetPlatform ?? null}
@@ -2151,7 +2159,7 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
       hostRoute={hostRoute}
     >
       {children}
-    </ChatCardNavWrap>
+    </RecordNavWrap>
   );
   // ONE render tail for both modes — bare-inline cards skip the discuss
   // wrapper; everything else gets the ChatCardWithDiscuss chrome. Kept

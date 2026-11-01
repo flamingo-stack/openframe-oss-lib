@@ -240,13 +240,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         a: ({ href, children, className: linkClassName, ...rest }: MdRenderProps<'a'>) => {
           // A record link (`[Patch script](record://script/<id>)`, `chat-protocol/record-link.ts`): the chip, inside
           // the sentence, showing the link's own text. The host draws its own chip for the type where it has one
-          // (`renderRecordChip`, given the name); otherwise the lib's.
+          // (`renderRecordChip`, given the name); otherwise the lib's, which opens the record where its card does.
           const record = parseRecordHref(href);
           if (record) {
             const label = textOf(children) || record.id;
             const hosted = renderRecordChip?.({ type: record.type, id: record.id, label });
             if (hosted != null) return <>{hosted}</>;
-            return <RecordChip type={record.type} label={label} />;
+            return <RecordChip type={record.type} id={record.id} label={label} />;
           }
           // The host's `NavLinkAnchor` draws the link (the lib's
           // `NavLinkAnchorViaRuntime`, or a host anchor over the same

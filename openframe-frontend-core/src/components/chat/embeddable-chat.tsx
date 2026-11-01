@@ -1728,7 +1728,7 @@ function EmbeddableChatInner({
   }, [setIsOpen]);
 
   // Stable panel-level handle for descendants (inline cards via
-  // `ChatCardNavWrap` and markdown-body links via
+  // `RecordNavWrap` and markdown-body links via
   // `NavLinkAnchorViaRuntime`) to close the panel after same-tab
   // navigation. Uses `handleNavigationClose` (not `handleClose`) so the
   // iOS scroll-restore cleanup effect at the bottom of this file sees

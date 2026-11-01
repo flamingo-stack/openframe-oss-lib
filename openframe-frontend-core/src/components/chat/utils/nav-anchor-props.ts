@@ -4,7 +4,7 @@
  *
  * After the navigation unification (ChatCardLoader pre-resolves
  * `chatRef.url` via `resolveSourceRowCTA` + `resolveHrefForRuntime`,
- * and `ChatCardNavWrap` handles every primary click via `onClickCapture`
+ * and `RecordNavWrap` handles every primary click via `onClickCapture`
  * → `executeNavigation`), the per-card wrapper only needs
  * `{href, target, rel}` on its inner `<a>` so modifier-click /
  * hover-preview / copy-link work natively.

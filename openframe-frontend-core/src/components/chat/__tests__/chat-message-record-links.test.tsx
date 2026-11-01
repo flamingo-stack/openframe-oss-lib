@@ -4,9 +4,11 @@
  * `record_cards` part and is drawn where that part sits in the message.
  */
 
-import { render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type React from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import type { ChatRef } from '../chat-ref.types';
 import type { MessageSegment } from '../types';
@@ -91,5 +93,39 @@ describe('ChatMessageEnhanced — record links', () => {
     show('Write `[Guide](record://onboarding_guide/mac-guide)` to link it.');
     expect(screen.queryByTestId('inline-chip')).toBeNull();
     expect(screen.queryByTestId('chat-record-cards')).toBeNull();
+  });
+});
+
+describe('ChatMessageEnhanced — a record chip opens its record', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("links the chip to the page the record's card opens, and routes a click through the runtime", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ items: [{ id: 'mac-guide', slug: 'install-on-mac' }] }))),
+    );
+    const navigate = vi.fn().mockReturnValue(true);
+    const runtime = {
+      endpoints: { chatStreamUrl: '/chat', buildListUrl: (type: string, ids: string[]) => `/api/${type}?ids=${ids}` },
+      navigation: { mode: 'host', navigate },
+      source: 'flamingo',
+      composeContentUrl: ({ slug }: { slug?: string | null }) => ({ href: `/onboarding-guides/${slug}` }),
+    } as unknown as ChatRuntime;
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ChatRuntimeContext.Provider value={runtime}>
+          <ChatMessageEnhanced
+            role="assistant"
+            content={[{ type: 'text', text: 'The [Mac guide](record://onboarding_guide/mac-guide) covers it.' }]}
+            renderEntityCard={renderEntityCard}
+            NavLinkAnchor={NavLinkAnchor}
+          />
+        </ChatRuntimeContext.Provider>
+      </QueryClientProvider>,
+    );
+    const link = await screen.findByRole('link', { name: 'Mac guide' });
+    expect(link.getAttribute('href')).toBe('/onboarding-guides/install-on-mac');
+    fireEvent.click(within(link).getByText('Mac guide'));
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ href: '/onboarding-guides/install-on-mac' }));
   });
 });
