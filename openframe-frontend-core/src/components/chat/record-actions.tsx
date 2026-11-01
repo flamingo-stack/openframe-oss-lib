@@ -13,12 +13,13 @@
 
 import type React from 'react';
 import { createContext, useContext } from 'react';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import type { ChatRef } from './chat-ref.types';
-import { recordDiscussAction, recordMenuGroups } from './entity-cards/dispatch';
+import { recordMenuActions, recordMenuGroups } from './entity-cards/dispatch';
 import { InlineChip } from './inline-chip';
 
 export interface RecordActionHandlers {
@@ -54,22 +55,18 @@ export function RecordChipProvider({ value, children }: { value: RecordChipSubje
 }
 
 /**
- * The "⋯" menu of the chip a host draws for a record link (the record's card menu, `recordMenuGroups`), given where
- * the chip opens the record (`href`) and whether this window opens tabs (`newTab`). `undefined` outside a message's
- * record link (a chip of an attached context item), so a chip there draws no menu.
+ * The "⋯" menu of the chip a host draws for a record link: the record's card menu (`recordMenuGroups` over
+ * `recordMenuActions`, the card's own builder), given where the chip opens the record (`href`). Whether the new-tab
+ * button is offered is the runtime's rule (`navigation.opensTabs`), the same for the card. `undefined` outside a
+ * message's record link (a chip of an attached context item), so a chip there draws no menu.
  */
-export function useRecordChipMenu({
-  href,
-  newTab = true,
-}: {
-  href?: string | null;
-  newTab?: boolean;
-}): ActionsMenuGroup[] | undefined {
+export function useRecordChipMenu({ href }: { href?: string | null }): ActionsMenuGroup[] | undefined {
   const record = useContext(RecordChipContext);
   const handlers = useRecordActions();
-  if (!record) return undefined;
+  const runtime = useChatRuntime();
+  if (!record || !runtime) return undefined;
   const ref: ChatRef = { type: record.type, id: record.id, title: record.label, url: href ?? null };
-  return recordMenuGroups(ref, recordDiscussAction(ref, handlers), { newTab });
+  return recordMenuGroups(ref, recordMenuActions(ref, handlers, runtime));
 }
 
 /** The chip's lead segment, when its "⋯" segment follows it: the two read as one chip with a seam. */

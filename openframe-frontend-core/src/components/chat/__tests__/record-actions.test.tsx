@@ -21,21 +21,28 @@ class ResizeObserverStub {
 }
 globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver;
 
-const runtime = {
-  endpoints: { chatStreamUrl: '/chat', buildListUrl: (type: string, ids: string[]) => `/api/${type}?ids=${ids}` },
-  navigation: { mode: 'host', navigate: vi.fn().mockReturnValue(true) },
-  source: 'flamingo',
-  composeContentUrl: ({ id }: { id?: string | null }) => ({ href: `/roadmap#${id}` }),
-} as unknown as ChatRuntime;
+const makeRuntime = (opensTabs?: boolean) =>
+  ({
+    endpoints: { chatStreamUrl: '/chat', buildListUrl: (type: string, ids: string[]) => `/api/${type}?ids=${ids}` },
+    navigation: {
+      mode: 'host',
+      navigate: vi.fn().mockReturnValue(true),
+      ...(opensTabs === undefined ? {} : { opensTabs }),
+    },
+    source: 'flamingo',
+    composeContentUrl: ({ id }: { id?: string | null }) => ({ href: `/roadmap#${id}` }),
+  }) as unknown as ChatRuntime;
+
+const runtime = makeRuntime();
 
 function NavLinkAnchor({ href, children }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   return <a href={href}>{children}</a>;
 }
 
-function inChat(node: React.ReactNode, onDiscuss: (ref: ChatRef) => void) {
+function inChat(node: React.ReactNode, onDiscuss: (ref: ChatRef) => void, chatRuntime: ChatRuntime = runtime) {
   return (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <ChatRuntimeContext.Provider value={runtime}>
+      <ChatRuntimeContext.Provider value={chatRuntime}>
         <RecordActionsProvider value={{ onDiscuss }}>{node}</RecordActionsProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>
@@ -65,8 +72,8 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("recordMenuGroups: one list of a record's actions", () => {
-  const rows = (ref: Pick<ChatRef, 'type' | 'id' | 'url'>, options?: { newTab?: boolean }) =>
-    recordMenuGroups(ref, { label: 'Ask Mingo', icon: null, run: () => {} }, options)?.[0]?.items ?? [];
+  const rows = (ref: Pick<ChatRef, 'type' | 'id' | 'url'>, newTab = true) =>
+    recordMenuGroups(ref, { discuss: { label: 'Ask Mingo', icon: null, run: () => {} }, newTab })?.[0]?.items ?? [];
 
   it('a roadmap item: Ask, its page with the new-tab button, and the task in ClickUp', () => {
     const items = rows({ type: 'roadmap_item', id: '86ad3qvv5', url: '/roadmap#86ad3qvv5' });
@@ -81,7 +88,7 @@ describe("recordMenuGroups: one list of a record's actions", () => {
   });
 
   it('a ticket reads in its own terms, and a window with no tabs gets no new-tab button', () => {
-    const items = rows({ type: 'hubspot_ticket', id: '9', url: '/tickets/9' }, { newTab: false });
+    const items = rows({ type: 'hubspot_ticket', id: '9', url: '/tickets/9' }, false);
     expect(items.map(item => item.label)).toEqual(['Ask Mingo', 'Open Ticket Details']);
     expect(items[1]).not.toHaveProperty('iconAction');
   });
@@ -149,5 +156,36 @@ describe('a chip offers what its card offers', () => {
     expect(await menuRows('Actions for MacBook')).toEqual(['Ask Mingo', 'Open Details']);
     fireEvent.click(screen.getByRole('menuitem', { name: /Ask Mingo/ }));
     expect(onDiscuss).toHaveBeenCalledWith(expect.objectContaining({ type: 'device', id: 'm-1', title: 'MacBook' }));
+  });
+
+  it('a window that opens no tabs: neither the card nor the chip offers a new tab', async () => {
+    const noTabs = makeRuntime(false);
+    const { unmount } = render(
+      inChat(
+        <ChatMessageEnhanced
+          role="assistant"
+          content={[{ type: 'text', text: 'See [Patch policies](record://roadmap_item/86ad3qvv5).' }]}
+          renderEntityCard={() => null}
+          NavLinkAnchor={NavLinkAnchor}
+        />,
+        vi.fn(),
+        noTabs,
+      ),
+    );
+    expect(await menuRows('Actions for Patch policies')).toEqual(['Ask Mingo', 'Open Details', 'Open in ClickUp']);
+    expect(screen.queryByRole('link', { name: 'Open in new tab' })).toBeNull();
+    unmount();
+    render(
+      inChat(
+        renderChatInlineEntityCard(
+          { type: 'roadmap_item', id: '86ad3qvv5', title: '', url: null },
+          { onDiscuss: vi.fn() },
+        ),
+        vi.fn(),
+        noTabs,
+      ),
+    );
+    expect(await menuRows('Roadmap actions')).toEqual(['Ask Mingo', 'Open Details', 'Open in ClickUp']);
+    expect(screen.queryByRole('link', { name: 'Open in new tab' })).toBeNull();
   });
 });

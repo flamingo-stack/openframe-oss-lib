@@ -225,6 +225,10 @@ export interface ChatRuntime {
      *  origin → new tab). The OpenFrame app wires it to ignore `targetPlatform` (its knowledge base tags every row
      *  with its own platform); the hub omits it. */
     decideNewTab?: (args: { href: string; targetPlatform?: string | null }) => boolean;
+    /** Whether this window can open a new tab at all (a phone app shell cannot; a narrow window should not). False
+     *  leaves the "Open in new tab" button out of every record's menu, a card's and a chip's alike
+     *  (`recordMenuActions`). Omitted, it opens tabs. */
+    opensTabs?: boolean;
   };
   /** Optional content-URL composer. Returns the platform-aware href +
    *  target-platform tuple for a content entity. Hub wires this to its

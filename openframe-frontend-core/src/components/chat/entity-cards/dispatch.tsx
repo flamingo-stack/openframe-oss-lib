@@ -31,7 +31,7 @@
 
 import type React from 'react';
 import type { ReactNode } from 'react';
-import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { type ChatRuntime, useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
@@ -255,7 +255,7 @@ export interface ChatCardRenderOptions {
    *  once by `ChatCardLoader`. Each wrapper threads it into its "⋯" menu via
    *  `recordMenuGroups`. Undefined when the host supplied no `onDiscuss`/
    *  `onDisplay` (then the menu shows only "Open in new tab"). */
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }
 
 // =============================================================================
@@ -301,12 +301,12 @@ function GitHubChatCard({
   chatRef,
   kind,
   isNewTab,
-  discuss,
+  actions,
 }: {
   chatRef: ChatRef;
   kind: GitHubActivityKind;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   // Reuse the card's own title parser so the display title + review state
   // read identically here and in the (legacy) GitHubActivityCard.
@@ -331,20 +331,27 @@ function GitHubChatCard({
       icon={githubKindIcon(kind)}
       status={status}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={recordMenuGroups(chatRef, discuss)}
+      menuGroups={recordMenuGroups(chatRef, actions)}
       menuAriaLabel="Activity actions"
     />
   );
 }
 
 /** The host-provided "Ask Mingo" / "Display" affordance, resolved once per
- *  card in `ChatCardLoader` and threaded through `renderOpts.discuss`. Mirrors
+ *  card in `ChatCardLoader` and threaded through `renderOpts.actions`. Mirrors
  *  the legacy `ChatCardWithDiscuss` source-row button, relocated into the "⋯"
  *  menu. */
 export interface CardDiscussAction {
   label: string;
   icon: React.ReactNode;
   run: () => void;
+}
+
+/** What a record's menu can do in this chat, the SAME for its card and its chip (`recordMenuActions`): the "Ask
+ *  Mingo"/"Display" row, and whether this window opens tabs (the runtime's `navigation.opensTabs`). */
+export interface RecordMenuActions {
+  discuss?: CardDiscussAction;
+  newTab: boolean;
 }
 
 /** External-app deep-link row for a card's "⋯" menu (e.g. "Open in ClickUp").
@@ -392,18 +399,16 @@ function recordMenuTerms(
 /**
  * A record's "⋯" menu (Figma `7740:55075`), THE one list of its actions, for its card and for its chip in a sentence:
  * the "Ask Mingo"/"Display" row (when the host supplied a handler), then "Open Details", whose row opens the record in
- * the same tab and whose trailing ↗ button opens it in a new tab (left out where `newTab` is false: a window that
- * opens no tabs), then the deep link into the record's own app (ClickUp), always in a new tab. Rows are in the
+ * the same tab and whose trailing ↗ button opens it in a new tab (left out where `actions.newTab` is false: a window
+ * that opens no tabs), then the deep link into the record's own app (ClickUp), always in a new tab. Rows are in the
  * record's own terms (`recordMenuTerms`). `undefined` when nothing applies, so no "⋯" is drawn. `ref.url` is the
  * resolved destination (`useRecordDestination`).
  */
 export function recordMenuGroups(
   ref: Pick<ChatRef, 'type' | 'id' | 'url'>,
-  discuss?: CardDiscussAction,
-  options: { newTab?: boolean } = {},
+  { discuss, newTab }: RecordMenuActions,
 ): ActionsMenuGroup[] | undefined {
   const { openDetails, externalLink } = recordMenuTerms(ref.type, ref.id);
-  const newTab = options.newTab ?? true;
   const items: ActionsMenuGroup['items'] = [];
   if (discuss) {
     items.push({
@@ -554,11 +559,11 @@ function fetchedFaqDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
 function HubspotTicketChatCard({
   chatRef,
   isNewTab,
-  discuss,
+  actions,
 }: {
   chatRef: ChatRef;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const status = typeof chatRef.metadata?.status === 'string' ? chatRef.metadata.status : undefined;
   const statusLabel = typeof chatRef.metadata?.statusLabel === 'string' ? chatRef.metadata.statusLabel : undefined;
@@ -570,7 +575,7 @@ function HubspotTicketChatCard({
       icon={<TagIcon size={24} />}
       status={statusText ? { label: statusText, variant: hubspotStatusToVariant(status) } : undefined}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={recordMenuGroups(chatRef, discuss)}
+      menuGroups={recordMenuGroups(chatRef, actions)}
       menuAriaLabel="Ticket actions"
     />
   );
@@ -585,11 +590,11 @@ function HubspotTicketChatCard({
 function FaqChatCard({
   chatRef,
   isNewTab,
-  discuss,
+  actions,
 }: {
   chatRef: ChatRef;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const section = typeof chatRef.metadata?.section === 'string' ? chatRef.metadata.section.trim() : undefined;
   const statusLabel = section && section.length > 0 ? section : 'FAQ';
@@ -600,7 +605,7 @@ function FaqChatCard({
       icon={<QuestionCircleIcon size={24} />}
       status={{ label: statusLabel, variant: 'grey' }}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={recordMenuGroups(chatRef, discuss)}
+      menuGroups={recordMenuGroups(chatRef, actions)}
       menuAriaLabel="FAQ actions"
     />
   );
@@ -609,11 +614,11 @@ function FaqChatCard({
 function SlackChatCard({
   chatRef,
   isNewTab,
-  discuss,
+  actions,
 }: {
   chatRef: ChatRef;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const channelName =
     typeof chatRef.metadata?.channelName === 'string' ? chatRef.metadata.channelName.trim() : undefined;
@@ -627,7 +632,7 @@ function SlackChatCard({
       description={chatRef.preview ?? undefined}
       icon={<SlackLogoGreyIcon size={24} />}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={recordMenuGroups(chatRef, discuss)}
+      menuGroups={recordMenuGroups(chatRef, actions)}
       menuAriaLabel="Message actions"
     />
   );
@@ -642,12 +647,12 @@ function GlyphChatCard({
   chatRef,
   icon,
   isNewTab,
-  discuss,
+  actions,
 }: {
   chatRef: ChatRef;
   icon: React.ReactNode;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   return (
     <MingoInfoCard
@@ -655,7 +660,7 @@ function GlyphChatCard({
       description={chatRef.preview ?? undefined}
       icon={icon}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={recordMenuGroups(chatRef, discuss)}
+      menuGroups={recordMenuGroups(chatRef, actions)}
       menuAriaLabel="Card actions"
     />
   );
@@ -674,12 +679,12 @@ function TrustCenterChatCard({
   item,
   chatRef,
   isNewTab,
-  discuss,
+  actions,
 }: {
   item: unknown;
   chatRef: ChatRef;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const raw = (item as { frameworks?: unknown } | undefined)?.frameworks;
   const frameworks: TrustCenterPublic['frameworks'] = Array.isArray(raw)
@@ -700,7 +705,7 @@ function TrustCenterChatCard({
       icon={<ShieldCheckIcon size={24} />}
       status={lead ? { label: lead.label, variant: TRUST_STATUS_TAG_VARIANT[lead.color] } : undefined}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={recordMenuGroups(chatRef, discuss)}
+      menuGroups={recordMenuGroups(chatRef, actions)}
       menuAriaLabel="Trust center actions"
     />
   );
@@ -709,11 +714,11 @@ function TrustCenterChatCard({
 function DataRoomDocChatCard({
   chatRef,
   isNewTab,
-  discuss,
+  actions,
 }: {
   chatRef: ChatRef;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   // Provenance label. NEVER fall back to "Data room" — that would
   // falsely label non-data-room content (openframe-docs, etc.) as
@@ -728,7 +733,7 @@ function DataRoomDocChatCard({
       icon={<FileContentIcon size={24} />}
       status={{ label: badgeText, variant: 'grey' }}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={recordMenuGroups(chatRef, discuss)}
+      menuGroups={recordMenuGroups(chatRef, actions)}
       menuAriaLabel="Document actions"
     />
   );
@@ -738,12 +743,12 @@ function GenericFinancialChatCard({
   chatRef,
   icon,
   isNewTab,
-  discuss,
+  actions,
 }: {
   chatRef: ChatRef;
   icon: React.ReactNode;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const subtitle = typeof chatRef.metadata?.subtitle === 'string' ? chatRef.metadata.subtitle : undefined;
   return (
@@ -752,7 +757,7 @@ function GenericFinancialChatCard({
       description={subtitle}
       icon={icon}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={recordMenuGroups(chatRef, discuss)}
+      menuGroups={recordMenuGroups(chatRef, actions)}
       menuAriaLabel="Document actions"
     />
   );
@@ -837,13 +842,13 @@ function ProductReleaseChatCard({
   chatRef,
   buildProps,
   isNewTab,
-  discuss,
+  actions,
 }: {
   item: ChatCardItem | undefined;
   chatRef: ChatRef;
   buildProps: NonNullable<ChatCardDispatchExtras['buildProductReleaseCardProps']>;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const releaseProps = buildProps(item);
   const status: MingoInfoCardStatus = item?.version
@@ -858,7 +863,7 @@ function ProductReleaseChatCard({
       status={status}
       chatRef={chatRef}
       isNewTab={isNewTab}
-      discuss={discuss}
+      actions={actions}
       menuAriaLabel="Release actions"
     />
   );
@@ -873,12 +878,12 @@ function CampaignChatCard({
   item,
   chatRef,
   isNewTab,
-  discuss,
+  actions,
 }: {
   item: ChatCardItem | undefined;
   chatRef: ChatRef;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   // Mirror CampaignCardAdmin's compact meta — "date · N goals · Marketing
   // campaign" — instead of a status pill (the original showed no status badge).
@@ -897,7 +902,7 @@ function CampaignChatCard({
       fallbackIcon={<Megaphone01Icon size={24} />}
       chatRef={chatRef}
       isNewTab={isNewTab}
-      discuss={discuss}
+      actions={actions}
       menuAriaLabel="Campaign actions"
     />
   );
@@ -918,7 +923,7 @@ function EntityMingoCard({
   chatRef,
   isNewTab,
   menuAriaLabel,
-  discuss,
+  actions,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -928,7 +933,7 @@ function EntityMingoCard({
   chatRef: ChatRef;
   isNewTab: boolean;
   menuAriaLabel: string;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   return (
     <MingoInfoCard
@@ -939,7 +944,7 @@ function EntityMingoCard({
       icon={fallbackIcon}
       status={status}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={recordMenuGroups(chatRef, discuss)}
+      menuGroups={recordMenuGroups(chatRef, actions)}
       menuAriaLabel={menuAriaLabel}
     />
   );
@@ -969,14 +974,14 @@ function BlogChatCard({
   isNewTab,
   ogPlaceholder,
   hasEmbeddedVideo,
-  discuss,
+  actions,
 }: {
   item: ChatCardItem | undefined;
   chatRef: ChatRef;
   isNewTab: boolean;
   ogPlaceholder?: string | null;
   hasEmbeddedVideo?: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const category = Array.isArray(item?.categories)
     ? (item.categories.find(c => c?.name)?.name ?? undefined)
@@ -998,7 +1003,7 @@ function BlogChatCard({
       status={status}
       chatRef={chatRef}
       isNewTab={isNewTab}
-      discuss={discuss}
+      actions={actions}
       menuAriaLabel="Article actions"
     />
   );
@@ -1010,13 +1015,13 @@ function CaseStudyChatCard({
   chatRef,
   isNewTab,
   ogPlaceholder,
-  discuss,
+  actions,
 }: {
   item: ChatCardItem | undefined;
   chatRef: ChatRef;
   isNewTab: boolean;
   ogPlaceholder?: string | null;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const meta = [item?.msp?.name, item?.user?.full_name].filter(Boolean).join(' · ');
   return (
@@ -1028,7 +1033,7 @@ function CaseStudyChatCard({
       status={{ label: 'Case study', variant: 'grey' }}
       chatRef={chatRef}
       isNewTab={isNewTab}
-      discuss={discuss}
+      actions={actions}
       menuAriaLabel="Case study actions"
     />
   );
@@ -1040,13 +1045,13 @@ function CustomerInterviewChatCard({
   chatRef,
   isNewTab,
   ogPlaceholder,
-  discuss,
+  actions,
 }: {
   item: ChatCardItem | undefined;
   chatRef: ChatRef;
   isNewTab: boolean;
   ogPlaceholder?: string | null;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const meta = [item?.user?.full_name, item?.msp?.name].filter(Boolean).join(' · ');
   return (
@@ -1060,7 +1065,7 @@ function CustomerInterviewChatCard({
       status={{ label: 'Interview', variant: 'grey' }}
       chatRef={chatRef}
       isNewTab={isNewTab}
-      discuss={discuss}
+      actions={actions}
       menuAriaLabel="Interview actions"
     />
   );
@@ -1075,12 +1080,12 @@ function DesignDocChatCard({
   item,
   chatRef,
   isNewTab,
-  discuss,
+  actions,
 }: {
   item: (ChatCardItem & { doc?: DesignDoc }) | undefined;
   chatRef: ChatRef;
   isNewTab: boolean;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const displayRef = fetchedItemDisplayRef(item, chatRef);
   const doc = item?.doc;
@@ -1100,7 +1105,7 @@ function DesignDocChatCard({
           : { label: 'Design doc', variant: 'grey' }
       }
       anchorProps={buildAnchorProps(displayRef.url, isNewTab, displayRef.targetPlatform)}
-      menuGroups={recordMenuGroups(displayRef, discuss)}
+      menuGroups={recordMenuGroups(displayRef, actions)}
       menuAriaLabel="Design doc actions"
     />
   );
@@ -1113,13 +1118,13 @@ function InvestorUpdateChatCard({
   chatRef,
   isNewTab,
   ogPlaceholder,
-  discuss,
+  actions,
 }: {
   item: ChatCardItem | undefined;
   chatRef: ChatRef;
   isNewTab: boolean;
   ogPlaceholder?: string | null;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const title = item?.title || `Update #${item?.update_number ?? '?'}`;
   return (
@@ -1138,7 +1143,7 @@ function InvestorUpdateChatCard({
       status={{ label: 'Investor update', variant: 'grey' }}
       chatRef={chatRef}
       isNewTab={isNewTab}
-      discuss={discuss}
+      actions={actions}
       menuAriaLabel="Update actions"
     />
   );
@@ -1151,13 +1156,13 @@ function OnboardingGuideChatCard({
   chatRef,
   isNewTab,
   ogPlaceholder,
-  discuss,
+  actions,
 }: {
   item: ChatCardItem | undefined;
   chatRef: ChatRef;
   isNewTab: boolean;
   ogPlaceholder?: string | null;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const cover =
     entityCover(item?.featured_image) ??
@@ -1172,7 +1177,7 @@ function OnboardingGuideChatCard({
       status={{ label: 'Guide', variant: 'grey' }}
       chatRef={chatRef}
       isNewTab={isNewTab}
-      discuss={discuss}
+      actions={actions}
       menuAriaLabel="Guide actions"
     />
   );
@@ -1187,7 +1192,7 @@ function ProgramChatCard({
   configKey,
   label,
   ogPlaceholder,
-  discuss,
+  actions,
 }: {
   item: ChatCardItem | undefined;
   chatRef: ChatRef;
@@ -1195,7 +1200,7 @@ function ProgramChatCard({
   configKey: 'podcast' | 'webinar' | 'event';
   label: string;
   ogPlaceholder?: string | null;
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const icon =
     configKey === 'webinar' ? (
@@ -1222,7 +1227,7 @@ function ProgramChatCard({
       status={{ label, variant: 'grey' }}
       chatRef={chatRef}
       isNewTab={isNewTab}
-      discuss={discuss}
+      actions={actions}
       menuAriaLabel={`${label} actions`}
     />
   );
@@ -1241,13 +1246,13 @@ function RoadmapChatCard({
   chatRef,
   isNewTab,
   cardType,
-  discuss,
+  actions,
 }: {
   item: ChatCardItem | undefined;
   chatRef: ChatRef;
   isNewTab: boolean;
   cardType: 'roadmap_item' | 'delivery_item' | 'internal_task';
-  discuss?: CardDiscussAction;
+  actions: RecordMenuActions;
 }) {
   const logoUrl = typeof item?.icon === 'string' && item.icon.startsWith('http') ? item.icon : undefined;
   const useTypeIcon = cardType === 'internal_task' || (!logoUrl && item?.customItemId != null);
@@ -1283,7 +1288,7 @@ function RoadmapChatCard({
       status={statusPill(item?.status)}
       chatRef={chatRef}
       isNewTab={isNewTab}
-      discuss={discuss}
+      actions={actions}
       menuAriaLabel="Roadmap actions"
     />
   );
@@ -1407,7 +1412,7 @@ function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
         chatRef={displayRef}
         icon={sourceGlyph(docType)}
         isNewTab={opts.isNewTab}
-        discuss={opts.discuss}
+        actions={opts.actions}
       />
     )),
   );
@@ -1522,11 +1527,11 @@ function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
           status={{ label: cfg.label, variant: 'grey' }}
           chatRef={displayRef}
           isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
+          actions={opts.actions}
           menuAriaLabel={`${cfg.label} actions`}
         />
       ) : (
-        <GlyphChatCard chatRef={displayRef} icon={glyph(displayRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+        <GlyphChatCard chatRef={displayRef} icon={glyph(displayRef)} isNewTab={opts.isNewTab} actions={opts.actions} />
       ),
     );
   });
@@ -1562,7 +1567,7 @@ function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
         chatRef={fetchedEmployeeEntryDisplayRef(item, chatRef)}
         icon={sourceGlyph(docType)}
         isNewTab={opts.isNewTab}
-        discuss={opts.discuss}
+        actions={opts.actions}
       />
     ),
   }));
@@ -1571,7 +1576,7 @@ function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
 function githubRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(GITHUB_CARD_CONFIGS, (cfg, docType) =>
     refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
-      <GitHubChatCard chatRef={displayRef} kind={cfg.kind} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+      <GitHubChatCard chatRef={displayRef} kind={cfg.kind} isNewTab={opts.isNewTab} actions={opts.actions} />
     )),
   );
 }
@@ -1611,7 +1616,7 @@ function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
         item={item}
         chatRef={chatRef}
         isNewTab={opts.isNewTab}
-        discuss={opts.discuss}
+        actions={opts.actions}
         configKey={cfg.configKey}
         label={cfg.configKey.charAt(0).toUpperCase() + cfg.configKey.slice(1)}
         ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
@@ -1662,7 +1667,7 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
         item={item}
         chatRef={chatRef}
         isNewTab={opts.isNewTab}
-        discuss={opts.discuss}
+        actions={opts.actions}
         cardType={cfg.cardType}
       />
     ),
@@ -1697,7 +1702,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   ...refGlyphRegistryEntries(),
   ...employeeEntryRegistryEntries(),
   slack_message: refHydratedEntry('slack_message', 'Slack message', (displayRef, opts) => (
-    <SlackChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    <SlackChatCard chatRef={displayRef} isNewTab={opts.isNewTab} actions={opts.actions} />
   )),
   // FAQ hydrates from its EXISTING public list API (`/api/faqs?ids=` —
   // also feeding related-content rails, so its base path must not move).
@@ -1711,7 +1716,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     fallbackHref: (item: ChatCardItem) => (item?.id != null ? `/faqs#${faqItemAnchor(item.id)}` : null),
     skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
-      <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+      <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} actions={opts.actions} />
     ),
   },
   // Trust center — ONE record (`record://trust_center/main`) from the public
@@ -1726,27 +1731,27 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     fallbackHref: () => TRUST_CENTER_PAGE_PATH,
     skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
-      <TrustCenterChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+      <TrustCenterChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} actions={opts.actions} />
     ),
   },
   hubspot_ticket: refHydratedEntry('hubspot_ticket', 'HubSpot ticket', (displayRef, opts) => (
-    <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab} actions={opts.actions} />
   )),
   hubspot_ticket_anon: refHydratedEntry('hubspot_ticket_anon', 'HubSpot ticket (anon)', (displayRef, opts) => (
-    <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab} actions={opts.actions} />
   )),
   // Self tickets hydrate via the session-scoped `GET /api/tickets?ids=`
   // (`selfScopeFilter` ACL) instead of the generic endpoint — the self
   // config's searchFilter is deliberately fail-closed there. Same
   // ChatRef item shape (`buildHubspotTicketSelfRef` SSOT), same preset.
   hubspot_ticket_self: refHydratedEntry('hubspot_ticket_self', 'HubSpot ticket (self)', (displayRef, opts) => (
-    <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    <HubspotTicketChatCard chatRef={displayRef} isNewTab={opts.isNewTab} actions={opts.actions} />
   )),
   data_room_doc: refHydratedEntry('data_room_doc', 'Data-room doc', (displayRef, opts) => (
-    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} actions={opts.actions} />
   )),
   markdown: refHydratedEntry('markdown', 'Doc page (markdown)', (displayRef, opts) => (
-    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} actions={opts.actions} />
   )),
   // Body-synthesized video ids (`shortVideoId` content hashes / YouTube
   // ids) have no backing table row to fetch — ref-only by nature.
@@ -1768,7 +1773,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         item={item}
         chatRef={chatRef}
         isNewTab={opts.isNewTab}
-        discuss={opts.discuss}
+        actions={opts.actions}
         ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
         hasEmbeddedVideo={chatRef.metadata?.hasEmbeddedVideo === true}
       />
@@ -1785,7 +1790,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         item={item}
         chatRef={chatRef}
         isNewTab={opts.isNewTab}
-        discuss={opts.discuss}
+        actions={opts.actions}
         ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
     ),
@@ -1798,7 +1803,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
     skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
-      <DesignDocChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+      <DesignDocChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} actions={opts.actions} />
     ),
   },
   customer_interview: {
@@ -1812,7 +1817,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         item={item}
         chatRef={chatRef}
         isNewTab={opts.isNewTab}
-        discuss={opts.discuss}
+        actions={opts.actions}
         ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
     ),
@@ -1837,7 +1842,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
           chatRef={chatRef}
           buildProps={builder}
           isNewTab={opts.isNewTab}
-          discuss={opts.discuss}
+          actions={opts.actions}
         />
       );
     },
@@ -1854,7 +1859,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         item={item}
         chatRef={chatRef}
         isNewTab={opts.isNewTab}
-        discuss={opts.discuss}
+        actions={opts.actions}
         ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
     ),
@@ -1872,7 +1877,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
         item={item}
         chatRef={chatRef}
         isNewTab={opts.isNewTab}
-        discuss={opts.discuss}
+        actions={opts.actions}
         ogPlaceholder={opts?.extras?.buildOgPlaceholderUrl?.(item?.title ?? '') ?? null}
       />
     ),
@@ -1886,7 +1891,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     // so the wrapper + isNewTab computation see the actual destination.
     fallbackHref: (item: ChatCardItem) => (item?.id ? `/admin/campaigns/${encodeURIComponent(String(item.id))}` : null),
     render: (item, chatRef, opts) => (
-      <CampaignChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+      <CampaignChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} actions={opts.actions} />
     ),
   },
   ...roadmapRegistryEntries(),
@@ -2026,6 +2031,19 @@ export function recordDiscussAction(
   };
 }
 
+/**
+ * A record's menu actions in this chat: its "Ask Mingo"/"Display" row and whether the window opens tabs. THE one
+ * builder, for the record's card (`ChatCardLoader`) and its chip (`RecordChip`, a host's chip through
+ * `useRecordChipMenu`), so the two always offer the same rows.
+ */
+export function recordMenuActions(
+  ref: ChatRef,
+  handlers: { onDiscuss?: (ref: ChatRef) => void; onDisplay?: (ref: ChatRef) => void },
+  runtime: Pick<ChatRuntime, 'navigation'>,
+): RecordMenuActions {
+  return { discuss: recordDiscussAction(ref, handlers), newTab: runtime.navigation.opensTabs !== false };
+}
+
 // =============================================================================
 // ChatCardLoader — fetch + skeleton + render for fetch-mode entries.
 // =============================================================================
@@ -2149,15 +2167,16 @@ export function useRecordDestination(chatRef: ChatRef) {
 export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCardLoaderProps) {
   const { entry, fetchEntry, item, isLoading, isError, isFetched, finalChatRef, hostRoute, isNewTab, path } =
     useRecordDestination(chatRef);
+  const runtime = useRequiredChatRuntime();
   if (!entry) return null;
 
   // The "Ask Mingo"/"Display" row of the card's "⋯" menu, the same action its chip offers (`recordDiscussAction`).
-  const discuss = recordDiscussAction(finalChatRef, { onDiscuss, onDisplay });
+  const actions = recordMenuActions(finalChatRef, { onDiscuss, onDisplay }, runtime);
 
   const renderOpts: ChatCardRenderOptions = {
     extras,
     isNewTab,
-    discuss,
+    actions,
   };
 
   // Wrap EVERY rendered card with RecordNavWrap so the inner anchor's

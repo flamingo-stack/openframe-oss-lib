@@ -9,11 +9,11 @@
  * record no page shows, it is drawn without a link, as `ChatMarkdownLink` draws a link it cannot route.
  */
 
-import { useChatRuntime } from '../../contexts/chat-runtime-context';
+import { useChatRuntime, useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { defaultTableIdForDocumentType, getSourceIconName } from '../../utils/source-icons';
-import { RecordNavWrap, recordDiscussAction, recordMenuGroups, useRecordDestination } from './entity-cards/dispatch';
+import { RecordNavWrap, recordMenuActions, recordMenuGroups, useRecordDestination } from './entity-cards/dispatch';
 import { InlineChip } from './inline-chip';
 import { RECORD_CHIP_LEAD_SEGMENT_CLASS, RecordChipActions, useRecordActions } from './record-actions';
 import { resolveIcon } from './utils/icon-library';
@@ -39,10 +39,11 @@ export function RecordChip(props: RecordChipProps) {
 }
 
 function LinkedRecordChip({ type, id, label }: RecordChipProps) {
+  const runtime = useRequiredChatRuntime();
   const { finalChatRef, hostRoute, isNewTab, path } = useRecordDestination({ type, id, title: label, url: null });
   const handlers = useRecordActions();
   const url = finalChatRef.url;
-  const menuGroups = recordMenuGroups(finalChatRef, recordDiscussAction(finalChatRef, handlers));
+  const menuGroups = recordMenuGroups(finalChatRef, recordMenuActions(finalChatRef, handlers, runtime));
   const chip = (
     <InlineChip
       icon={iconFor(type)}
