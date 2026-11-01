@@ -1,6 +1,6 @@
 /**
- * A quick action in the chat's empty state is a starter: a click puts its prompt into the
- * composer to edit and send, sends nothing, and still runs the host's own `onClick`.
+ * A quick action in the chat's empty state sends its prompt on the click, and still runs the
+ * host's own `onClick`.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -29,7 +29,6 @@ const runtime: ChatRuntime = {
 };
 
 const PROMPT = 'Check my fleet for pending patches.';
-const OTHER_PROMPT = 'Run a quick disk scan.';
 
 function emptyState(sendMessage: (text: string) => Promise<void>): UnifiedChatState {
   const noop = () => {};
@@ -73,7 +72,7 @@ function emptyState(sendMessage: (text: string) => Promise<void>): UnifiedChatSt
 }
 
 function renderChat({ onClick }: { onClick?: () => void } = {}) {
-  const sendMessage = vi.fn(() => Promise.resolve());
+  const sendMessage = vi.fn((_text: string) => Promise.resolve());
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
@@ -86,10 +85,7 @@ function renderChat({ onClick }: { onClick?: () => void } = {}) {
           showInternalTrigger={false}
           mingoState={emptyState(sendMessage)}
           mingoWelcome={{
-            quickActions: [
-              { id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick },
-              { id: 'qa-2', label: 'Disk scan', prompt: OTHER_PROMPT },
-            ],
+            quickActions: [{ id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick }],
           }}
         />
       </ChatRuntimeContext.Provider>
@@ -97,8 +93,6 @@ function renderChat({ onClick }: { onClick?: () => void } = {}) {
   );
   return { sendMessage };
 }
-
-const editor = () => screen.getByRole('textbox');
 
 describe('EmbeddableChat quick actions', () => {
   beforeEach(() => {
@@ -108,45 +102,22 @@ describe('EmbeddableChat quick actions', () => {
     vi.restoreAllMocks();
   });
 
-  it('puts the prompt into the composer, focused, and sends nothing', async () => {
+  it('sends the prompt at once', async () => {
     const { sendMessage } = renderChat();
 
     fireEvent.click(screen.getByRole('button', { name: 'Patching' }));
 
-    await waitFor(() => expect(editor()).toHaveTextContent(PROMPT));
-    expect(editor()).toHaveFocus();
-    expect(sendMessage).not.toHaveBeenCalled();
-  });
-
-  it('replaces a prompt another quick action put there', async () => {
-    renderChat();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Patching' }));
-    await waitFor(() => expect(editor()).toHaveTextContent(PROMPT));
-    fireEvent.click(screen.getByRole('button', { name: 'Disk scan' }));
-
-    await waitFor(() => expect(editor()).toHaveTextContent(OTHER_PROMPT));
-    expect(editor()).not.toHaveTextContent(PROMPT);
-  });
-
-  it("keeps the user's own draft and adds the prompt after it", async () => {
-    renderChat();
-
-    fireEvent.input(editor(), { target: { textContent: 'My draft' } });
-    await waitFor(() => expect(editor()).toHaveTextContent('My draft'));
-    fireEvent.click(screen.getByRole('button', { name: 'Patching' }));
-
-    await waitFor(() => expect(editor()).toHaveTextContent(PROMPT));
-    expect(editor()).toHaveTextContent('My draft');
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(sendMessage.mock.calls[0][0]).toBe(PROMPT);
   });
 
   it("still runs the host's own click", async () => {
     const onClick = vi.fn();
-    renderChat({ onClick });
+    const { sendMessage } = renderChat({ onClick });
 
     fireEvent.click(screen.getByRole('button', { name: 'Patching' }));
 
-    await waitFor(() => expect(editor()).toHaveTextContent(PROMPT));
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

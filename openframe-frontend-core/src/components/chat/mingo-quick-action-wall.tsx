@@ -51,8 +51,7 @@ export interface QuickActionSetProps {
  * whole). Loading draws the same slots, each the chip's own loading form. So the set is the same box loading,
  * loaded, with 1 action or 40, and opening "More" moves nothing.
  *
- * A click on a chip, or on a row of the "More" menu, calls its `onSelect` (the chat puts the action's prompt into the
- * composer to edit and send).
+ * A click on a chip, or on a row of the "More" menu, calls its `onSelect` (the chat sends the action's prompt).
  */
 export function QuickActionSet({
   chips,
