@@ -16,7 +16,6 @@ const DECISION_STYLES: Record<string, DecisionStyle> = {
   FALLBACK: { label: 'Not in policy', variant: 'warning' },
   SOFT_DENY: { label: 'Soft deny', variant: 'warning' },
   HARD_DENY: { label: 'Hard deny', variant: 'error' },
-  CLASSIFIER_FAILURE: { label: 'Review failed', variant: 'error' },
 };
 
 const LEVEL_LABELS: Record<string, string> = {
