@@ -8,9 +8,9 @@
  * the answer. A server that knows which records a turn loaded checks each link before it reaches the reader and turns
  * one it never offered into plain text (`unlinkUnknownRecords`).
  *
- * This replaced two grammars the model had to type into its text, `[card://type:id]` (a card) and `@marker:id`
- * (a chip). Those were not markdown, so markdown broke them (a code span, a link, emphasis), and they carried no name.
- * They are still READ for answers stored before this, by the lib's renderer only (`components/chat/inline-tokens.ts`).
+ * It replaced two private tokens a model typed into its text, one for a card and one for a chip. Those were not
+ * markdown, so markdown broke them (a code span, a link, emphasis), and they carried no name. Stored messages were
+ * rewritten to record links, and nothing reads the old tokens.
  *
  * Server-safe: no React, no browser APIs. Mirrored by the Java agent (openframe-saas-tenant), and pinned by
  * `__tests__/record-link.test.ts`.
@@ -52,6 +52,16 @@ export function parseRecordHref(href: unknown): RecordLink | null {
   const type = rest.slice(0, slash);
   if (!RECORD_TYPE.test(type)) return null;
   return { type, id: safeDecode(rest.slice(slash + 1)) };
+}
+
+/**
+ * A record link as markdown: `[label](record://type/id)`. The label is escaped so a bracket in a name cannot end the
+ * link early; an empty label falls back to the id. What a composer writes for a picked record and a server for a
+ * record it names.
+ */
+export function recordLinkMarkdown(record: RecordLink, label: string): string {
+  const text = label.trim() || record.id;
+  return `[${text.replace(/([\\[\]])/g, '\\$1')}](${recordHref(record.type, record.id)})`;
 }
 
 /** The key of a record, as the servers' lists of offered records hold it. */

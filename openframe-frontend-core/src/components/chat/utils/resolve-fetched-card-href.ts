@@ -7,12 +7,12 @@
  * The two chat transports deliver entity references differently:
  *
  *   - **SSE / guide transport** — the server ships a `refs` metadata frame, so
- *     each `[card://type:id]` marker expands into a FULL `ChatRef`
+ *     each record link (`record://type/id`) expands into a FULL `ChatRef`
  *     (`title` / `url` / `targetPlatform` / `sourceRepo`). `resolveSourceRowCTA`
  *     then routes that `externalUrl` through the host's `composeContentUrl`
  *     seam and the card is clickable.
  *   - **Mingo / NATS transport** (`messageData: [{ type: 'TEXT', text }]`)
- *     — the body carries bare `[card://type:id]` markers and NOTHING else.
+ *     — the body carries bare record links (`record://type/id`) and NOTHING else.
  *     `chat-message-enhanced.tsx` synthesizes a minimal `{ type, id, title: id,
  *     url: null }` ref so fetch-mode cards can still self-fetch their row, but
  *     `resolveSourceRowCTA` has no `externalUrl`, no `path` and no
@@ -75,7 +75,7 @@ export function readFetchedCardTitle(item: unknown): string | null {
  *
  * A doc card (`markdown`, `data_room_doc`) has no public url: its destination
  * is its viewer plus this path, the route `resolveSourceRowCTA` composes for a
- * source chip. A bare `[card://type:id]` marker carries no path, so the loader
+ * source chip. A bare record link (`record://type/id`) carries no path, so the loader
  * reads it from the row once it loads and resolves the card the way the chip
  * was resolved.
  */

@@ -184,7 +184,7 @@ export {
 } from './source-row-cta';
 
 // Post-fetch enrichment for the minimal ChatRef descriptor a
-// `[card://type:id]` marker produces (the wire ships no card metadata).
+// record link (`record://type/id`) produces (the wire ships no card metadata).
 export {
   resolveCardDestination,
   type CardDestination,

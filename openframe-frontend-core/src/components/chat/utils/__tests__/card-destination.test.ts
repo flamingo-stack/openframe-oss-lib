@@ -11,7 +11,7 @@ const HUB = 'https://www.flamingo.run';
 const compose = makeComposeContentUrl({ hostedTypes: new Set<string>(), contentOrigin: HUB });
 const ctx: SourceRowContext = { composeContentUrl: compose };
 
-/** What a `[card://type:id]` marker becomes before its row loads. */
+/** What a `[id](record://type/id)` marker becomes before its row loads. */
 const marker = (type: string, id: string): ChatRef => ({ type, id, title: id, url: null });
 
 /** Ref-only types: nothing exists server-side to fetch, so nothing to open. */

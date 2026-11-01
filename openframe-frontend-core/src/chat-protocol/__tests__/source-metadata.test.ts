@@ -28,7 +28,7 @@ describe('sourceMetadataEvent', () => {
       sources: [AGENT_GUIDE],
       videos: [
         {
-          ref: '[card://video:MdFJNoJeqZQ]',
+          recordLink: 'record://video/MdFJNoJeqZQ',
           id: 'MdFJNoJeqZQ',
           title: 'Install the OpenFrame agent on Windows',
           url: 'https://www.youtube.com/watch?v=MdFJNoJeqZQ',
@@ -37,7 +37,7 @@ describe('sourceMetadataEvent', () => {
       ],
       cards: [
         {
-          ref: '[card://onboarding_guide:88dd40cc-66f5-4175-be60-6f34b054a5f1]',
+          recordLink: 'record://onboarding_guide/88dd40cc-66f5-4175-be60-6f34b054a5f1',
           entityType: 'onboarding_guide',
           entityId: '88dd40cc-66f5-4175-be60-6f34b054a5f1',
         },
@@ -69,19 +69,21 @@ describe('sourceMetadataEvent', () => {
   });
 
   it('keeps a card whose source is missing, titled by its id', () => {
-    // Dropping it would leave the `[card://…]` marker in the answer text with
-    // nothing to expand — a visibly broken sentence beats a plain-looking card.
+    // Dropping it would leave the answer's record link with no card — a card
+    // titled by its id beats none.
     const event = sourceMetadataEvent({
-      cards: [{ ref: '[card://device:device-42]', entityType: 'device', entityId: 'device-42' }],
+      cards: [{ recordLink: 'record://device/device-42', entityType: 'device', entityId: 'device-42' }],
     });
     expect(event?.refs).toEqual([{ type: 'device', id: 'device-42', title: 'device-42', url: null }]);
   });
 
   it('accepts an id the backend accepts, even with punctuation in it', () => {
-    // The backend validates the id half as "anything but ] and newlines". A
-    // stricter rule here drops metadata for a marker already written into the body.
+    // A document id is a path; the record link carries it encoded and the
+    // decoder must give it back whole.
     const event = sourceMetadataEvent({
-      cards: [{ ref: '[card://markdown:docs/setup.v2.md]', entityType: 'markdown', entityId: 'docs/setup.v2.md' }],
+      cards: [
+        { recordLink: 'record://markdown/docs%2Fsetup.v2.md', entityType: 'markdown', entityId: 'docs/setup.v2.md' },
+      ],
     });
     expect(event?.refs?.[0]).toMatchObject({ type: 'markdown', id: 'docs/setup.v2.md' });
   });
@@ -165,12 +167,12 @@ describe('sourceMetadataEvent', () => {
 
   it('drops malformed video and card rows', () => {
     const event = sourceMetadataEvent({
-      videos: [{ ref: 'card://video:x' }, { id: 'no-ref' }, { ref: '[card://video:ok]' }],
+      videos: [{ recordLink: 'card://video:x' }, { id: 'no-record-link' }, { recordLink: 'record://video/ok' }],
       cards: [
-        // entityType disagrees with the parsed ref — the row was built wrongly.
-        { ref: '[card://faq:a]', entityType: 'blog_post', entityId: 'a' },
+        // entityType disagrees with the parsed record link — the row was built wrongly.
+        { recordLink: 'record://faq/a', entityType: 'blog_post', entityId: 'a' },
         // a card must not claim the video type: it would render without a player
-        { ref: '[card://video:b]', entityType: 'video', entityId: 'b' },
+        { recordLink: 'record://video/b', entityType: 'video', entityId: 'b' },
       ],
     });
     expect(event?.refs).toEqual([{ type: 'video', id: 'ok', title: 'ok', url: null }]);
@@ -179,8 +181,8 @@ describe('sourceMetadataEvent', () => {
   it('keeps the first ref per type:id', () => {
     const event = sourceMetadataEvent({
       videos: [
-        { ref: '[card://video:a]', title: 'First' },
-        { ref: '[card://video:a]', title: 'Second' },
+        { recordLink: 'record://video/a', title: 'First' },
+        { recordLink: 'record://video/a', title: 'Second' },
       ],
     });
     expect(event?.refs).toHaveLength(1);
@@ -191,7 +193,7 @@ describe('sourceMetadataEvent', () => {
     // `youtubeUrl` holding an ID is the lib's existing vocabulary — see the
     // note on `videoMetadata`. The card dispatcher reads exactly this key.
     const event = sourceMetadataEvent({
-      videos: [{ ref: '[card://video:MdFJNoJeqZQ]', url: 'https://youtu.be/MdFJNoJeqZQ' }],
+      videos: [{ recordLink: 'record://video/MdFJNoJeqZQ', url: 'https://youtu.be/MdFJNoJeqZQ' }],
     });
     expect(event?.refs?.[0].metadata).toEqual({ youtubeUrl: 'MdFJNoJeqZQ' });
   });
@@ -199,11 +201,11 @@ describe('sourceMetadataEvent', () => {
   it('routes a non-YouTube video URL to the plain player', () => {
     // Mux/HLS and direct mp4 are played as a video source, not an embed.
     const hls = sourceMetadataEvent({
-      videos: [{ ref: '[card://video:mux-9b]', url: 'https://stream.mux.com/install-agent.m3u8' }],
+      videos: [{ recordLink: 'record://video/mux-9b', url: 'https://stream.mux.com/install-agent.m3u8' }],
     });
     expect(hls?.refs?.[0].metadata).toEqual({ videoUrl: 'https://stream.mux.com/install-agent.m3u8' });
 
-    const mp4 = sourceMetadataEvent({ videos: [{ ref: '[card://video:v1]', url: 'https://cdn.test/a.mp4' }] });
+    const mp4 = sourceMetadataEvent({ videos: [{ recordLink: 'record://video/v1', url: 'https://cdn.test/a.mp4' }] });
     expect(mp4?.refs?.[0].metadata).toEqual({ videoUrl: 'https://cdn.test/a.mp4' });
   });
 
@@ -244,7 +246,7 @@ describe('attachmentsEvent', () => {
         { index: 1, name: 'Guide', documentType: 'onboarding_guide', externalUrl: '/onboarding-guides/x' },
         { index: 2, name: 'Guides', items: [{ id: 'a', documentType: 'onboarding_guide', name: 'A' }] },
       ],
-      videos: [{ ref: '[card://video:MdFJNoJeqZQ]', url: 'https://youtu.be/MdFJNoJeqZQ' }],
+      videos: [{ recordLink: 'record://video/MdFJNoJeqZQ', url: 'https://youtu.be/MdFJNoJeqZQ' }],
       cards: [],
     };
     const unset = { path: null, targetPlatform: null, id: null, sourceRepo: null };

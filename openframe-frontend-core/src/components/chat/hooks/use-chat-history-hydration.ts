@@ -8,7 +8,7 @@
  * The client persists ONLY the server-issued conversation id (see
  * `chat-conversation-storage.ts`); this hook turns that id back into rendered
  * history: message bubbles and the send counter. Inline entity cards need no
- * per-row metadata — they hydrate by id from the `[card://…]` markers in the
+ * per-row metadata — they hydrate by id from the record links in the
  * message content via the card fetch path.
  *
  * Failure semantics: a fetch/parse failure simply leaves the UI empty — the

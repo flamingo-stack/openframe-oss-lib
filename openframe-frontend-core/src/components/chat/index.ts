@@ -66,14 +66,7 @@ export * from './chat-list-empty-state';
 export * from './chat-top-navigation';
 export * from './onboarding-carousel';
 export type { ChatRef } from './chat-ref.types';
-export {
-  type ChatToken,
-  type ChatTokenKind,
-  parseTokenHref,
-  remarkCardLinks,
-  remarkMentionChips,
-  scanChatTokens,
-} from './inline-tokens';
+export { type DrawnRecordLink, recordLinksIn } from './record-links-in';
 
 // Card-supporting UI migrated from hub `components/shared/*` + `components/blog/*`
 export {

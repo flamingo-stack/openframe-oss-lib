@@ -429,7 +429,7 @@ function hubspotStatusToVariant(status: string | undefined): MingoInfoCardStatus
 }
 
 /**
- * Decode a SELF-DESCRIBING `[card://video:<id>]` marker id into playable
+ * Decode a SELF-DESCRIBING record link (`record://video/<id>`) id into playable
  * video metadata — the paired decoder for the hub's
  * `DERIVE_HANDLES_BY_KIND` id minting (keep in lockstep). Embedded
  * videos have no backing table row, so the marker id IS the payload;
@@ -1707,7 +1707,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
       <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
   },
-  // Trust center — ONE record (`[card://trust_center:main]`) from the public
+  // Trust center — ONE record (`record://trust_center/main`) from the public
   // projection route; `extractCardItems` turns its object payload into the
   // single matched row. Destination is the public page unless the host
   // re-homes the type (`composeContentUrl` override).
@@ -2073,7 +2073,7 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
 
   // THE card's destination, decided in one place (`resolveCardDestination`):
   // the source chip's resolver with the row as far as it is known (the ref's
-  // fields, plus the fetched row's doc path when a bare `[card://type:id]`
+  // fields, plus the fetched row's doc path when a bare `record://type/id`
   // marker carried none), else the fetched row's own destination. Computed
   // BEFORE `isNewTab` so the click wrapper sees the page the user will visit.
   const destination = resolveCardDestination({
@@ -2093,7 +2093,7 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
   };
 
   // Title enrichment, same synthetic-ref gap as the href above: a Mingo
-  // `[card://type:id]` marker produces `title: <id>` because the transport
+  // record link (`record://type/id`) produces `title: <id>` because the transport
   // ships no ref metadata. Downstream consumers that read `ref.title` — most
   // visibly the "Ask Mingo" prompt, which would otherwise send
   // "Tell me more about 86ad3qvv5" — get the row's real title once it loads.
@@ -2236,7 +2236,7 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
 // =============================================================================
 
 /**
- * Render the chat-inline card for a `[card://<type>:<id>]` marker.
+ * Render the chat-inline card for a record link (`record://<type>/<id>`).
  *
  * Single dispatch through `CHAT_CARD_REGISTRY`. The function mirrors the
  * hub's `renderChatInlineEntityCard` behavior:

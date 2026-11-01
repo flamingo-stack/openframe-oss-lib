@@ -32,9 +32,8 @@ import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { chatCardLabel } from './entity-cards/dispatch';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
-import { parseTokenHref, remarkCardLinks, remarkMentionChips, scanChatTokens } from './inline-tokens';
 import { RecordChip } from './record-chip';
-import { remarkStripCitations } from './remark-strip-citations';
+import { recordLinksIn } from './record-links-in';
 import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
 import { ThinkingDisplay } from './thinking-display';
@@ -65,9 +64,9 @@ function linkedRecords(segments: MessageSegment[]): Array<RecordLink & { label: 
   const byKey = new Map<string, RecordLink & { label: string }>();
   for (const segment of segments) {
     if (segment.type !== 'text' || !segment.text) continue;
-    for (const token of scanChatTokens(segment.text, ['record'])) {
-      const key = `${token.type}:${token.id}`;
-      if (!byKey.has(key)) byKey.set(key, { type: token.type, id: token.id, label: token.label || token.id });
+    for (const record of recordLinksIn(segment.text)) {
+      const key = `${record.type}:${record.id}`;
+      if (!byKey.has(key)) byKey.set(key, record);
     }
   }
   return [...byKey.values()];
@@ -125,7 +124,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       contextItems,
       resolveContextIcon,
       renderContextItem,
-      renderMention,
+      renderRecordChip,
       renderEntityCard,
       refs,
       onAskSelect,
@@ -148,89 +147,27 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       isHuman && selfAuthorType !== undefined && authorType !== 'system' && authorType !== selfAuthorType;
     const isUser = isHuman && !isOtherPerson;
 
-    // Inline-card rendering uses a HOST-PROVIDED `renderEntityCard` function
-    // (v6.1 §B.2.7 — DRY duplications #2). The OSS-lib stays data-agnostic:
-    // it doesn't know about entity types, slash commands, or app routing.
-    // The host (multi-platform-hub) returns whatever JSX it wants for each
-    // marker's descriptor — typically a self-fetching card that hydrates by
-    // id from the host's per-object APIs.
-    //
-    // The remark plugin runs whenever the host opts in with
-    // `renderEntityCard`, so we always strip raw markers from rendered text
-    // (Logic MED-4). When the host's `renderEntityCard` is unset OR returns
-    // null, the override falls back to the bare cardId. Never renders the
-    // literal `[card://...]` URL.
-    const hasMarkerSupport = !!renderEntityCard;
-
     const segments = useMemo(() => normalizeContent(content), [content]);
 
     const askRuns = useMemo(() => groupAskRuns(segments), [segments]);
 
-    // Inline `@marker:id` mentions: the composer commits these tokens when the
-    // user picks context via the `@`-flow, and the ASSISTANT routinely echoes
-    // the same `@device:machineId` token back in its reply. The lib detects the
-    // token and delegates rendering to the host's `renderMention` (mirror of
-    // `renderEntityCard`): the host returns a SELF-FETCHING chip per entity
-    // type. Enabled whenever the host opts in by supplying `renderMention`.
-    const hasMentionSupport = !!renderMention;
-
-    // Ids that appear as `@marker:id` in the body → rendered inline, so they are
-    // excluded from the chip strip below (no duplicate inline + strip).
-    const inlineMentionIds = useMemo(() => {
+    // Records the body links (`[name](record://type/id)`) are drawn inline, so they are left off the chip strip below.
+    const inlineRecordIds = useMemo(() => {
       const ids = new Set<string>();
       for (const seg of segments) {
         if (seg.type !== 'text' || !seg.text) continue;
-        // The same parse and walk as the body (`inline-tokens.ts`): an id counts as inline only when the body DRAWS
-        // it, so a mention in a code block never takes its item off the strip without showing it anywhere.
-        // A record link is always drawn (its own chip); a legacy mention only where the host draws mentions.
-        for (const token of scanChatTokens(seg.text, hasMentionSupport ? ['mention', 'record'] : ['record'])) {
-          ids.add(token.id);
-        }
+        for (const record of recordLinksIn(seg.text)) ids.add(record.id);
       }
       return ids;
-    }, [hasMentionSupport, segments]);
+    }, [segments]);
 
     // Chip strip = only context NOT already shown inline (e.g. `+`-added items).
     const stripContextItems = useMemo(
       () =>
-        inlineMentionIds.size > 0 && contextItems
-          ? contextItems.filter(it => !inlineMentionIds.has(it.id))
+        inlineRecordIds.size > 0 && contextItems
+          ? contextItems.filter(it => !inlineRecordIds.has(it.id))
           : contextItems,
-      [contextItems, inlineMentionIds],
-    );
-
-    // Markdown plugins per message: card markers (assistant) + mention tokens
-    // (user). Each is gated independently so neither fires without its data.
-    const cardRemarkPlugins = useMemo(
-      () => [
-        ...(hasMarkerSupport ? [remarkCardLinks, remarkStripCitations] : []),
-        ...(hasMentionSupport ? [remarkMentionChips] : []),
-      ],
-      [hasMarkerSupport, hasMentionSupport],
-    );
-
-    // Cross-render cache of rendered inline-card nodes, keyed by `type:id`.
-    // A fetch-mode card lives inside the assistant message, which re-renders on
-    // every stream chunk (and the whole list re-renders when a new message
-    // arrives). `renderEntityCard` produces a FRESH element each time, so React
-    // re-mounts the card — closing any open menu/popover and re-triggering its
-    // fetch. Caching the produced node by key and returning the SAME element
-    // reference lets React bail out of re-rendering that subtree, so the card
-    // (and its open menu) survives across chunks. Invalidated per key when the
-    // render fn identity changes.
-    const renderedCardNodeCache = useRef(
-      new Map<
-        string,
-        {
-          render: ((ref: ChatRef) => React.ReactNode) | undefined;
-          /** The descriptor the node was built from. Part of the cache identity
-           *  because metadata can arrive AFTER the marker was first rendered —
-           *  a card mounted from the bare `{type, id}` descriptor has to be
-           *  rebuilt once its real title and URL land. */
-          ref: ChatRef | undefined;
-          node: React.ReactNode;
-        }
-      >(),
+      [contextItems, inlineRecordIds],
     );
 
     /** The answer's own references, by `type:id`. What turns a bare marker into
@@ -241,185 +178,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       for (const described of refs ?? []) byKey.set(`${described.type}:${described.id}`, described);
       return byKey;
     }, [refs]);
-
-    /**
-     * Per-message rendering plan for `[card://type:id]` markers.
-     *
-     * Block-bearing markers SPLIT their containing text segment so the
-     * block payload (e.g. video player) renders AT THE MARKER POSITION
-     * in the text flow — not at the end of the segment, which causes
-     * the block to "appear high and drift down" while text streams in.
-     *
-     * Per-segment output is an array of parts:
-     *   - `{ kind: 'text' }` — substring of the segment text, rendered
-     *                         through `<SimpleMarkdownRenderer>`. Ends
-     *                         with the block marker so the inline pill
-     *                         lands at the right spot via the `<a>`
-     *                         override.
-     *   - `{ kind: 'block' }` — block payload, rendered as a sibling
-     *                         BELOW the preceding text chunk and above
-     *                         the next one.
-     *
-     * Inline-only markers (no `<BlockCard>` wrapper) do NOT split the
-     * segment; they're handled by the override at marker position via
-     * the shared `inlineByKey` map.
-     *
-     * Streaming behaviour: as a marker becomes complete in the streamed
-     * text, the regex matches, the segment splits at that point, and
-     * the block card lands right after the inline pill. Subsequent
-     * tokens render in the trailing chunk — block stays in position.
-     */
-    const renderingPlan = useMemo(() => {
-      if (!hasMarkerSupport) return null;
-      const render = renderEntityCard;
-      const inlineByKey = new Map<string, React.ReactNode>();
-      type SegmentPart = { kind: 'text'; text: string } | { kind: 'block'; key: string; node: React.ReactNode };
-      const partsBySegment = new Map<number, SegmentPart[]>();
-      const usedKeys = new Set<string>();
-      if (!render) return { inlineByKey, partsBySegment, usedKeys };
-      const cache = renderedCardNodeCache.current;
-      // Card keys already emitted as a hoisted block (`b-<key>`). The same
-      // marker can legitimately appear twice in one message (LLM references
-      // the same entity twice); we hoist the FIRST occurrence and skip the
-      // duplicates so two siblings never collide on the same React key.
-      const emittedBlockKeys = new Set<string>();
-      segments.forEach((segment, segIdx) => {
-        if (segment.type !== 'text') return;
-        const text = segment.text;
-        const parts: SegmentPart[] = [];
-        // Blocks of cards the text cannot be cut at (in a table, a heading, a quote): drawn after the segment.
-        const trailingBlocks: SegmentPart[] = [];
-        let cursor = 0;
-        // The markers the body DRAWS, found by the same parse and walk (`inline-tokens.ts`), each with the source
-        // range it replaced: cutting at that range never cuts through a code span or a link around the marker.
-        for (const token of scanChatTokens(text, ['card'])) {
-          const cardType = token.type;
-          const cardId = token.id;
-          const key = `${cardType}:${cardId}`;
-          const range = token.splittable ? token.range : null;
-          usedKeys.add(key);
-          // Reuse the cached node when the render fn didn't change —
-          // returning the SAME element reference across renders is what
-          // stops React from re-mounting the card (and closing its open
-          // menu / re-fetching) on every stream chunk. Also dedups the same
-          // key emitted twice within one message.
-          // The answer's metadata wins when it described this reference: it
-          // carries the title, URL and source the wire marker cannot.
-          const describedRef = refByKey.get(key);
-          let entry = cache.get(key);
-          if (!entry || entry.render !== render || entry.ref !== describedRef) {
-            // The marker is the ONLY data on the wire: cards hydrate by id
-            // from the host's per-object APIs, so a minimal {type, id}
-            // descriptor is all the renderer needs to mount the loader.
-            // For types with nothing to fetch the host's render() returns
-            // null and we fall through to the bare-cardId fallback in the
-            // `<a card://…>` override below.
-            //
-            // DESCRIPTOR DEFAULTS: `ChatRef.title` and `ChatRef.url` are
-            // non-optional in the type; a bare `{type, id}` cast would lie
-            // to consumers that read those fields. Default `title` to the
-            // cardId (so any host renderer that prints `ref.title` shows
-            // the id rather than `undefined`) and `url` to null (matches
-            // the no-link semantics fetch-mode cards rely on — they
-            // resolve their own URL after fetch).
-            const refForRender: ChatRef = describedRef ?? {
-              type: cardType,
-              id: cardId,
-              title: cardId,
-              url: null,
-            };
-            entry = { render, ref: describedRef, node: render(refForRender) };
-            cache.set(key, entry);
-          }
-          const rendered = entry.node;
-          if (React.isValidElement(rendered) && rendered.type === BlockCard) {
-            const cardProps = rendered.props as BlockCardProps;
-            // Hoist the block payload only on the FIRST occurrence of this key
-            // — a repeated marker still gets its inline pill (text + override
-            // below) but must not push a second `b-<key>` sibling.
-            const block: SegmentPart | null = emittedBlockKeys.has(key)
-              ? null
-              : { kind: 'block', key, node: cardProps.children };
-            if (block) emittedBlockKeys.add(key);
-            if (range) {
-              // Text chunk INCLUDING the marker — the inline pill renders
-              // at the marker position via the `<a>` override.
-              parts.push({ kind: 'text', text: text.slice(cursor, range[1]) });
-              if (block) parts.push(block);
-              cursor = range[1];
-            } else if (block) {
-              trailingBlocks.push(block);
-            }
-            inlineByKey.set(
-              key,
-              cardProps.inline != null ? (
-                cardProps.inline
-              ) : (
-                <span className="font-medium text-ods-text-primary">{cardId}</span>
-              ),
-            );
-          } else if (rendered != null) {
-            // Hoist fetch-mode entity cards (roadmap/blog/case-study/release/…)
-            // OUT of the markdown as stable-keyed block siblings — exactly like
-            // BlockCard. Rendered INSIDE `<SimpleMarkdownRenderer>` they remount
-            // on every streaming re-parse (react-markdown rebuilds its subtree
-            // token-by-token), which closes any open menu/popover and re-fires
-            // the card's fetch. As a sibling keyed by the card key (`b-<key>`)
-            // the card survives streaming: appending more text/markers only adds
-            // NEW siblings, existing cards keep their React instance.
-            //
-            // We EXCLUDE the marker from the surrounding text (cursor jumps past
-            // it) so no inline pill renders — the full card IS the content.
-            // Hoist only the FIRST occurrence; a duplicate marker is dropped
-            // entirely (no inline pill for hoisted cards) so we never push a
-            // second sibling colliding on the same `b-<key>` React key.
-            //
-            // Where the text cannot be cut at the marker (a table cell, a
-            // heading), the card is drawn IN PLACE by the `<a>` override.
-            if (!range) {
-              inlineByKey.set(key, rendered);
-              continue;
-            }
-            parts.push({ kind: 'text', text: text.slice(cursor, range[0]) });
-            if (!emittedBlockKeys.has(key)) {
-              emittedBlockKeys.add(key);
-              parts.push({ kind: 'block', key, node: rendered });
-            }
-            cursor = range[1];
-          }
-        }
-        // Trailing text after the last block marker (or the entire
-        // segment when no block markers fired).
-        if (cursor < text.length) {
-          parts.push({ kind: 'text', text: text.slice(cursor) });
-        }
-        parts.push(...trailingBlocks);
-        // Only register the split plan when at least one block marker
-        // fired — otherwise the segment renders as one SimpleMarkdown-
-        // Renderer call (existing behaviour preserved for the
-        // overwhelming majority of segments that have no block cards).
-        if (parts.some(p => p.kind === 'block')) {
-          partsBySegment.set(segIdx, parts);
-        }
-      });
-      return { inlineByKey, partsBySegment, usedKeys };
-    }, [hasMarkerSupport, renderEntityCard, refByKey, segments]);
-
-    // Drop cached nodes for markers no longer present so the cache can't grow
-    // unbounded as a long message's markers change. Deliberately an EFFECT,
-    // not part of the memo above: pruning is a mutation, and doing it in the
-    // render phase is non-idempotent (StrictMode's double-invoke, or a render
-    // React throws away, would evict nodes the committed tree still uses and
-    // remount the cards it was built to preserve).
-    useEffect(() => {
-      const cache = renderedCardNodeCache.current;
-      const usedKeys = renderingPlan?.usedKeys;
-      if (!usedKeys) return;
-      if (cache.size <= usedKeys.size) return;
-      for (const k of [...cache.keys()]) {
-        if (!usedKeys.has(k)) cache.delete(k);
-      }
-    }, [renderingPlan]);
 
     /**
      * The cards under the answer: one per record the answer LINKS (`[name](record://type/id)`), in the order it first
@@ -466,60 +224,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       for (const key of [...cache.keys()]) if (!shown.has(key)) cache.delete(key);
     }, [recordCards]);
 
-    // The plan is read through a REF inside the `<a>` override, not captured
-    // in the override's closure. `renderingPlan` is rebuilt on every text
-    // delta (its `segments` dep is a fresh array per delta), so depending on
-    // it here would give `cardComponentOverrides` a new identity every token
-    // — which re-creates the markdown engine's `components` memo and defeats
-    // its per-block `StreamingBlockRenderer` memoization for the WHOLE
-    // message, on every token. The ref keeps the override identity stable
-    // while still reading the current plan at call time.
-    const renderingPlanRef = useRef(renderingPlan);
-    renderingPlanRef.current = renderingPlan;
-
     const cardComponentOverrides = useMemo(() => {
       return {
-        // Override `<a>` to detect `card://` URLs emitted by `remarkCardLinks`.
-        // The render result was pre-computed in `renderingPlan` so block-level
-        // payloads (e.g. video player cards) can be hoisted out of the
-        // paragraph as siblings — the inline pill stays at the marker
-        // position. Other href schemes pass through unchanged.
+        // Override `<a>`: a record link becomes its chip; every other link goes through the host's navigation.
         a: ({ href, children, className: linkClassName, ...rest }: MdRenderProps<'a'>) => {
           // A record link (`[Patch script](record://script/<id>)`, `chat-protocol/record-link.ts`): the chip, inside
           // the sentence, showing the link's own text. The host draws its own chip for the type where it has one
-          // (`renderMention`, given the name); otherwise the lib's.
+          // (`renderRecordChip`, given the name); otherwise the lib's.
           const record = parseRecordHref(href);
           if (record) {
             const label = textOf(children) || record.id;
-            const hosted = renderMention?.({ marker: record.type, id: record.id, label });
+            const hosted = renderRecordChip?.({ type: record.type, id: record.id, label });
             if (hosted != null) return <>{hosted}</>;
             return <RecordChip type={record.type} label={label} />;
-          }
-          // LEGACY grammars, read for answers stored before record links.
-          // Inline entity mention `@marker:id`, emitted as a `mention://marker:id`
-          // link by `remarkMentionChips`. Delegate to the host's `renderMention`
-          // (mirror of the `card://` → `renderEntityCard` path): the host returns
-          // a self-fetching chip for that entity type. Null/unknown → raw token.
-          // Both hrefs are read by `parseTokenHref`: the FIRST colon splits type
-          // from id (an id may hold more), and the id is decoded (the HTML step
-          // percent-encodes a space or a non-ASCII character in it).
-          const mention = parseTokenHref('mention', href);
-          if (mention) {
-            const node = renderMention?.({ marker: mention.type, id: mention.id });
-            if (node != null) return <>{node}</>;
-            return <span className="text-ods-text-secondary opacity-60">{children}</span>;
-          }
-          const card = parseTokenHref('card', href);
-          if (card) {
-            const inline = renderingPlanRef.current?.inlineByKey.get(`${card.type}:${card.id}`);
-            if (inline != null) return inline;
-            // No rendered card for this marker (the host's renderer
-            // returned null — no card type registered for `cardType`, or
-            // the id resolved to nothing). Render the raw `cardId` as a
-            // dim span so the marker never LOOKS like a real card: a
-            // hallucinated id must stay visibly broken, never dressed up
-            // with borrowed data.
-            return <span className="text-ods-text-secondary opacity-60">{card.id}</span>;
           }
           // The host's `NavLinkAnchor` draws the link (the lib's
           // `NavLinkAnchorViaRuntime`, or a host anchor over the same
@@ -548,64 +265,23 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           );
         },
       };
-      // DEPS ARE DELIBERATELY MINIMAL — every one of them is stable across a
-      // streaming turn (booleans + host-stable fn/component identities, both
-      // enforced by this file's `memo` comparator). The rendering plan is
-      // read through a ref above precisely so it does NOT appear here.
-    }, [renderMention, NavLinkAnchor]);
+      // DEPS ARE DELIBERATELY MINIMAL: both are host-stable identities (enforced by this file's `memo` comparator), so
+      // the overrides keep one identity across a streaming turn and the markdown engine's block memoization holds.
+    }, [renderRecordChip, NavLinkAnchor]);
 
     /**
-     * Body of a markdown-bearing segment (`text` / `guide`).
-     *
-     * No block markers in this segment → a single SimpleMarkdownRenderer call
-     * (the vast majority of messages). Otherwise the text is split at each
-     * marker and block payloads are interleaved: each text chunk includes its
-     * trailing marker so the inline pill renders at the right position via the
-     * `<a>` override, and block payloads land AS SIBLINGS between text chunks —
-     * HTML-valid (block DOM never nests inside `<p>`) AND positionally correct
-     * (the block appears where the marker is in the flow, not at the segment's
-     * end). Stable React keys come from the card key (block) and chunk position
-     * (text); streaming token-by-token reuses the same React instances so
-     * `<Video>` doesn't remount mid-play.
-     *
-     * `isStreaming` opts the segment into the markdown engine's streaming path
-     * (atomic-block memoization + fence tail-completion + aria-live). Only the
-     * actively streaming segment gets it, and within a marker-split segment
-     * only the LAST text chunk — the earlier chunks are already final.
+     * Body of a markdown-bearing segment (`text` / `guide`). `isStreaming` opts the segment into the markdown engine's
+     * streaming path (atomic-block memoization, fence tail-completion, aria-live); only the actively streaming segment
+     * gets it.
      */
-    const renderSegmentBody = (segIndex: number, text: string, isStreaming: boolean) => {
-      const parts = renderingPlan?.partsBySegment.get(segIndex);
-      if (!parts || parts.length === 0) {
-        return (
-          <SimpleMarkdownRenderer
-            content={text}
-            textSize="compact"
-            additionalRemarkPlugins={cardRemarkPlugins}
-            componentOverrides={cardComponentOverrides}
-            streaming={isStreaming}
-          />
-        );
-      }
-      return parts.map((part, pIdx) => {
-        if (part.kind === 'text') {
-          return (
-            <SimpleMarkdownRenderer
-              key={`t-${pIdx}`}
-              content={part.text}
-              textSize="compact"
-              additionalRemarkPlugins={cardRemarkPlugins}
-              componentOverrides={cardComponentOverrides}
-              streaming={isStreaming && pIdx === parts.length - 1}
-            />
-          );
-        }
-        return (
-          <div key={`b-${part.key}`} className="my-3">
-            {part.node}
-          </div>
-        );
-      });
-    };
+    const renderSegmentBody = (text: string, isStreaming: boolean) => (
+      <SimpleMarkdownRenderer
+        content={text}
+        textSize="compact"
+        componentOverrides={cardComponentOverrides}
+        streaming={isStreaming}
+      />
+    );
 
     const isSystem = authorType === 'system';
 
@@ -726,7 +402,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       return (
                         <div key={index} className={CHAT_MESSAGE_USER_ROW_CLASS}>
                           <div className={CHAT_MESSAGE_USER_BUBBLE_CLASS}>
-                            {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                            {renderSegmentBody(segment.text, segmentIsStreaming)}
                           </div>
                         </div>
                       );
@@ -736,7 +412,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                         key={index}
                         className={cn(CHAT_MESSAGE_TEXT_CLASS, isError ? 'text-ods-error' : 'text-ods-text-primary')}
                       >
-                        {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                        {renderSegmentBody(segment.text, segmentIsStreaming)}
                       </div>
                     );
                   } else if (segment.type === 'ask') {
@@ -870,7 +546,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.renderContextItem === nextProps.renderContextItem &&
     // Host keeps this stable (module const / useCallback), so reference
     // equality holds across streaming chunks.
-    prevProps.renderMention === nextProps.renderMention &&
+    prevProps.renderRecordChip === nextProps.renderRecordChip &&
     prevProps.renderEntityCard === nextProps.renderEntityCard &&
     // Reference equality: the reducer sets this once per answer and the host
     // forwards the same array instance, so it holds across streaming chunks.

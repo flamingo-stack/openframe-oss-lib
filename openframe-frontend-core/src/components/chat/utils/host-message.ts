@@ -69,7 +69,7 @@ export function mapHostMessage(m: UnifiedChatMessage, options: HostMessageMapOpt
     // Forward attached context items so the user bubble renders its chips.
     ...(m.contextItems && m.contextItems.length > 0 ? { contextItems: m.contextItems } : {}),
     // Per-answer source metadata: the citation strip under the answer, and the
-    // descriptions the `[card://…]` markers in its body expand into.
+    // descriptions the record links in its body expand into.
     ...(m.sources && m.sources.length > 0 ? { sources: m.sources } : {}),
     ...(m.refs && m.refs.length > 0 ? { refs: m.refs } : {}),
   };

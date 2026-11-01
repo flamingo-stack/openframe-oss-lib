@@ -204,7 +204,7 @@ describe('createChatStreamReducer — SSE kernel', () => {
       requestId: 'prop-1',
       status: 'approved',
       ok: true,
-      receiptText: '✅ Approved — ticket created: [card://ticket:77]',
+      receiptText: '✅ Approved — ticket created: [77](record://ticket/77)',
     });
     r.endSseTurn();
 
@@ -214,10 +214,10 @@ describe('createChatStreamReducer — SSE kernel', () => {
     const [, sourceMsg, receiptMsg] = r.state.messages;
     const card = sourceMsg.segments?.find(s => s.type === 'approval_request');
     expect((card as { status?: string }).status).toBe('approved');
-    // The receipt's `[card://…]` marker hydrates by id via the card fetch
+    // The receipt's record link hydrates by id via the card fetch
     // path — no ref stamping.
     expect(receiptMsg.segments).toEqual([
-      { type: 'text', text: '✅ Approved — ticket created: [card://ticket:77]\n\n' },
+      { type: 'text', text: '✅ Approved — ticket created: [77](record://ticket/77)\n\n' },
     ]);
     expect(r.state.streamingPhase).toBe('idle');
   });

@@ -3,7 +3,7 @@
  *
  * A card and the source chip for the same row must land on the same page. The
  * chip always has its row (`externalUrl`, `path`); a card may arrive as a bare
- * `[card://type:id]` marker and learn the rest only when its row loads. So the
+ * record link (`record://type/id`) and learn the rest only when its row loads. So the
  * card asks the chip's resolver (`resolveSourceRowCTA`) with everything known
  * at that moment, the marker's fields first and the fetched row's `path` when
  * the marker had none, and falls back to the fetched row's own destination

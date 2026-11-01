@@ -7,7 +7,7 @@
  * `<ChatMessageEnhanced renderEntityCard={...} />`. v6.1 §B.2.6+§B.2.7.
  *
  * The metadata frame on the wire carries `refs: Record<\`<type>:<id>\`, ChatRef>`,
- * and `[card://<type>:<id>]` markers inside the assistant body expand into
+ * and record links (`record://<type>/<id>`) inside the assistant body expand into
  * whatever JSX the host returns.
  */
 export interface ChatRef {

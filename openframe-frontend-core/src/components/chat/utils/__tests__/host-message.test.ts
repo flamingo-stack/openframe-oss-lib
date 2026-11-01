@@ -20,7 +20,7 @@ function assistantRow(fields: Partial<UnifiedChatMessage> = {}): UnifiedChatMess
 
 describe('mapHostMessage', () => {
   it('carries an answer’s source metadata to the renderer', () => {
-    // Without this the citation strip never renders and each `[card://…]` in
+    // Without this the citation strip never renders and each record link in
     // the body falls back to being titled by its own id.
     const sources = [{ index: 1, name: 'Install the agent', path: 'docs/agent.md', documentType: 'markdown' }];
     const refs = [{ type: 'video', id: 'MdFJNoJeqZQ', title: 'Install the agent', url: null }];

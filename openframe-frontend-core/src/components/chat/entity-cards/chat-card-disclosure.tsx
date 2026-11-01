@@ -21,7 +21,7 @@
  *
  * Two shapes, one state:
  *   - `useChatCardDisclosure` for a card with a footer row (the action goes in the row, the panel below the card);
- *   - `ChatCardDisclosureRow` for content with no card of its own (a `[card://video:<id>]` marker): the same action on
+ *   - `ChatCardDisclosureRow` for content with no card of its own (a record link (`record://video/<id>`)): the same action on
  *     a row of its own.
  */
 

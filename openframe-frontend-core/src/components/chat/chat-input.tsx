@@ -14,6 +14,7 @@ import {
   type MouseEvent,
 } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { createRecordLinkScanner, parseRecordHref, recordLinkMarkdown } from '../../chat-protocol/record-link';
 import { cn } from '../../utils/cn';
 import { Send01Icon, StopCircleIcon } from '../icons-v2-generated';
 import { AvatarStack } from '../ui/avatar-stack';
@@ -28,12 +29,14 @@ import { CHAT_APPEARANCE } from './types/chat.types';
  *  dispatch parser. Keep all three in sync. */
 const SLASH_INPUT_TRIGGER = /^\/([a-z][a-z0-9-]*)?$/;
 
-/** A committed `@`-mention serializes into the draft text as `@<marker>:<id>`
- *  (id charset allows `+ / = . -` for base64 Relay global ids). The editor
- *  renders each such token as an inline chip; the serialized string keeps the
- *  literal token so the host's `@type:id` reconciliation + send payload are
- *  unchanged. */
-const MENTION_GLOBAL = /@[A-Za-z0-9_.+/=-]+:[A-Za-z0-9_.+/=-]+/g;
+/** A committed `@`-mention is a RECORD LINK in the draft text (`[MacBook Pro](record://device/<id>)`,
+ *  `chat-protocol/record-link.ts`), the one grammar a record is named by: the user's message carries the same link an
+ *  answer does. The editor renders each one as an inline chip; a chip's token is the record's href. */
+const mentionTextOf = (href: string, label: string): string => {
+  const record = parseRecordHref(href);
+  return record ? recordLinkMarkdown(record, label) : label;
+};
+
 /** The IN-PROGRESS trigger being typed — `@` + search string at the END of the
  *  draft, preceded by start-of-text or whitespace (so emails never fire). */
 const MENTION_TRIGGER_AT_END = /(^|\s)@([\w.-]*)$/;
@@ -43,14 +46,13 @@ type Segment = { kind: 'text'; text: string } | { kind: 'mention'; token: string
 function parseSegments(value: string, meta: Map<string, MentionMeta>): Segment[] {
   const segs: Segment[] = [];
   let last = 0;
-  MENTION_GLOBAL.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = MENTION_GLOBAL.exec(value)) !== null) {
-    if (m.index > last) segs.push({ kind: 'text', text: value.slice(last, m.index) });
-    const token = m[0].slice(1);
+  for (const m of value.matchAll(createRecordLinkScanner())) {
+    const at = m.index ?? 0;
+    if (at > last) segs.push({ kind: 'text', text: value.slice(last, at) });
+    const token = m[2];
     const info = meta.get(token);
-    segs.push({ kind: 'mention', token, label: info?.label ?? token.slice(token.indexOf(':') + 1), icon: info?.icon });
-    last = m.index + m[0].length;
+    segs.push({ kind: 'mention', token, label: info?.label ?? m[1].replace(/\\(.)/g, '$1'), icon: info?.icon });
+    last = at + m[0].length;
   }
   if (last < value.length) segs.push({ kind: 'text', text: value.slice(last) });
   return segs;
@@ -59,14 +61,14 @@ function parseSegments(value: string, meta: Map<string, MentionMeta>): Segment[]
 const isChip = (n: Node): n is HTMLElement => n.nodeType === 1 && (n as HTMLElement).dataset?.token !== undefined;
 
 /** Serialize the editor DOM back to the draft string: text nodes verbatim,
- *  mention chips → `@<token>`, browser-inserted `<br>` ignored (newlines live as
+ *  mention chips → their record link, browser-inserted `<br>` ignored (newlines live as
  *  literal `\n` text via `white-space: pre-wrap`). Chips are atomic
  *  (`contentEditable=false`) so we never descend into their inner markup. */
 function serialize(el: HTMLElement): string {
   let out = '';
   for (const node of Array.from(el.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) out += node.textContent ?? '';
-    else if (isChip(node)) out += `@${node.dataset.token}`;
+    else if (isChip(node)) out += mentionTextOf(node.dataset.token ?? '', node.dataset.label ?? '');
     else if ((node as HTMLElement).tagName === 'BR') continue;
     else out += node.textContent ?? '';
   }
@@ -83,6 +85,7 @@ function serialize(el: HTMLElement): string {
 function buildChipEl(token: string, label: string, icon?: ReactNode): HTMLElement {
   const span = document.createElement('span');
   span.dataset.token = token;
+  span.dataset.label = label;
   span.setAttribute('contenteditable', 'false');
   // Center the chip in its line box DETERMINISTICALLY (independent of font
   // metrics): `vertical-align: middle` references the text baseline + x-height,
@@ -190,10 +193,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   const [value, setValue] = useState('');
   // Whether the editor currently holds at least one committed mention chip —
   // it alone needs the tall line box (see the editor's className). Read from the
-  // DOM, NOT by testing the draft against `MENTION_GLOBAL`: that regex also
-  // matches ordinary typed text (`meet @3:00`, `@prod:us-east`), which would
-  // switch the editor to a 36px line box with no chip on screen. Chips are only
-  // ever created by `rebuildDom`, so the two writers below cover every path.
+  // DOM, NOT by testing the draft for a record link: a link the user typed or
+  // pasted by hand is text until `rebuildDom` makes it a chip, so the two
+  // writers below cover every path.
   const [hasChips, setHasChips] = useState(false);
   const [focused, setFocused] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
@@ -222,7 +224,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   }, [autoFocus, focusEditor]);
 
   // Surface every value change (typed or imperative) so the composer reconciles
-  // `@type:id` mention chips with the context items.
+  // its record-link mention chips with the context items.
   useEffect(() => {
     onValueChange?.(value);
   }, [value, onValueChange]);
@@ -335,14 +337,15 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
       },
       commitMention: (token: string, meta?: MentionMeta) => {
         // Multi-select: replace the trailing `@query` being typed with the
-        // committed `@<token> ` (+ trailing space → dismisses the trigger so the
+        // committed record link + a trailing space (dismisses the trigger so the
         // picker closes; also gives the caret a text node to land in after the
         // chip). Prior committed mentions stay — several chips coexist.
         if (meta) metaRef.current = new Map(metaRef.current).set(token, meta);
+        const text = mentionTextOf(token, meta?.label ?? '');
         const v = valueRef.current;
         const next = MENTION_TRIGGER_AT_END.test(v)
-          ? v.replace(MENTION_TRIGGER_AT_END, `$1@${token} `)
-          : `${v}${v.length > 0 && !v.endsWith(' ') ? ' ' : ''}@${token} `;
+          ? v.replace(MENTION_TRIGGER_AT_END, (_whole, lead: string) => `${lead}${text} `)
+          : `${v}${v.length > 0 && !v.endsWith(' ') ? ' ' : ''}${text} `;
         applyValue(next);
         requestAnimationFrame(() => focusEditor());
       },
@@ -510,10 +513,10 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
       const chip = target.closest<HTMLElement>('[data-token]');
       if (!chip || !target.closest('button')) return;
       e.preventDefault(); // keep editor focus; don't move the caret into the chip
-      const token = chip.dataset.token ?? '';
+      const text = mentionTextOf(chip.dataset.token ?? '', chip.dataset.label ?? '');
       const next = valueRef.current
-        .replace(`@${token} `, '')
-        .replace(`@${token}`, '')
+        .replace(`${text} `, '')
+        .replace(text, '')
         .replace(/[^\S\n]{2,}/g, ' ')
         .replace(/^[^\S\n]+/, '');
       applyValue(next);

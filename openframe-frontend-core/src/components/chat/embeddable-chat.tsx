@@ -41,6 +41,7 @@ import { isIOS } from '@react-aria/utils';
 import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { createRecordLinkScanner, recordHref } from '../../chat-protocol/record-link';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
@@ -435,23 +436,19 @@ export interface EmbeddableChatProps {
    */
   contextPicker?: ChatContextPickerConfig;
   /**
-   * Host renderer for inline AI mentions `@marker:id` (e.g. the assistant
-   * echoing `@device:<machineId>` in its reply). DIRECT MIRROR of
-   * `renderEntityCard` for the `[card://]` grammar: the lib detects the token,
-   * parses `{marker, id}`, and renders whatever the host returns — typically a
-   * SELF-FETCHING chip (each entity type has its own fetcher) that resolves its
-   * own display name by id. SEPARATE from `contextPicker`/`contextItems` (the
-   * USER's attachments). Keep the function identity stable (module const /
-   * `useCallback`) so the thread's streaming memo holds. Return null for a
-   * marker the host can't render → the lib falls back to the bare token.
+   * Host renderer for the chip of a record link (`[MacBook Pro](record://device/<id>)`) in a message, the user's or
+   * the assistant's: given the record and the name the link shows, return the host's chip for that type (typically a
+   * self-fetching one with a link to the record). SEPARATE from `contextPicker`/`contextItems` (the USER's
+   * attachments). Keep the function identity stable (module const / `useCallback`) so the thread's streaming memo
+   * holds. Return null for a type the host has no chip for → the lib draws its own.
    */
-  renderMention?: (reference: { marker: string; id: string; label?: string }) => React.ReactNode;
+  renderRecordChip?: (record: { type: string; id: string; label: string }) => React.ReactNode;
   /**
    * Host renderer that REPLACES the default label-only context chip on a sent
    * user bubble with a self-fetching entity chip — so a user's manually
    * attached context (`contextItems`) renders IDENTICALLY to an inline
-   * `@marker:id` mention (same live name resolution + link). Mirror of
-   * `renderMention`, for the attached-chip strip instead of inline tokens.
+   * record link (same live name resolution + link). Mirror of
+   * `renderRecordChip`, for the attached-chip strip instead of inline links.
    * Return null for an item the host can't render → the lib falls back to the
    * label pill. Keep the identity stable (module const / `useCallback`).
    */
@@ -636,20 +633,21 @@ export interface EmbeddableChatProps {
 const formatRelativePath = (p: string): string => p.replace(/^\/+/, '').replace(/\/+$/, '');
 
 /**
- * The committed `@`-mention text token, derived from a `type:id` identity key.
- * The TYPE is replaced with its backend mention MARKER (`markerByType`, e.g.
- * `KB_ARTICLE → 'kb'`), falling back to a lowercased type when the host didn't
- * declare one (`@device:…`, not `@DEVICE:…`); the `id` is left verbatim. The
- * structured context items keep the original (upper) entity-kind for the wire
- * enum, so this only affects the inline draft token. `[A-Za-z…]` in the input
- * regex matches either case, so commit/strip/detect stay symmetric.
+ * The committed `@`-mention's token: the href of its record link (`record://device/<id>`), derived from a `type:id`
+ * identity key. The TYPE is replaced with its backend MARKER (`markerByType`, e.g. `KB_ARTICLE → 'kb'`), falling back
+ * to a lowercased type when the host didn't declare one; the `id` is left verbatim. The structured context items keep
+ * the original (upper) entity-kind for the wire enum, so this only affects the draft's link.
  */
 const mentionTokenOf = (key: string, markerByType: Map<string, string>): string => {
   const ci = key.indexOf(':');
   const type = ci === -1 ? key : key.slice(0, ci);
   const id = ci === -1 ? '' : key.slice(ci + 1);
-  return `${markerByType.get(type) ?? type.toLowerCase()}:${id}`;
+  return recordHref(markerByType.get(type) ?? type.toLowerCase(), id);
 };
+
+/** The draft without the record link whose href is `href` (whatever name it shows). */
+const withoutRecordLink = (value: string, href: string): string =>
+  value.replace(createRecordLinkScanner(), (whole, _label: string, linked: string) => (linked === href ? '' : whole));
 
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
@@ -1085,7 +1083,7 @@ export interface EmbeddableChatHandle {
    * A new chat with the composer PREFILLED and nothing sent: the host has a
    * suggested message (e.g. "Fix with Mingo" on an incident) and the user
    * decides whether to send it. `mentions` are attached as context items up
-   * front, each committed as an inline `@marker:id` chip exactly as if picked
+   * front, each committed as an inline record-link chip exactly as if picked
    * from the `@` picker, and `text` follows them in the draft.
    */
   prefillDraft: (draft: ChatPrefillDraft) => void;
@@ -1146,7 +1144,7 @@ function EmbeddableChatInner({
   historyPageSize,
   guideWelcome,
   contextPicker,
-  renderMention,
+  renderRecordChip,
   renderContextItem,
   guidePendingPrompt,
   onGuidePromptConsumed,
@@ -1559,7 +1557,7 @@ function EmbeddableChatInner({
     mentionActiveRef.current = mentionQuery !== null;
   }, [mentionQuery]);
   // Keys (`"<type>:<id>"`) of context items that were committed via `@` and so
-  // have a `@type:id` token in the draft text. MULTI-mention: several coexist.
+  // have a record link in the draft text. MULTI-mention: several coexist.
   // Source of truth = the input text — deleting a token's chip drops its item.
   const mentionKeysRef = useRef<Set<string>>(new Set());
 
@@ -1615,9 +1613,9 @@ function EmbeddableChatInner({
     if (createdDialogId != null) onDialogCreatedRef.current?.(createdDialogId);
   }, [createdDialogId]);
 
-  // Map each entity type to its backend mention marker (host-declared on the
-  // entity type). Drives the committed `@marker:id` token; missing markers fall
-  // back to a lowercased type inside `mentionTokenOf`.
+  // Map each entity type to its backend marker (host-declared on the entity
+  // type): the type of the committed record link; missing markers fall back to
+  // a lowercased type inside `mentionTokenOf`.
   const mentionMarkerByType = useMemo(() => {
     const m = new Map<string, string>();
     for (const t of contextPicker?.entityTypes ?? []) if (t.marker) m.set(t.type, t.marker);
@@ -1638,7 +1636,7 @@ function EmbeddableChatInner({
   const toggleContextItem = useCallback(
     (item: ChatContextItem) => {
       const key = `${item.type}:${item.id}`;
-      // `@`-mention flow → MULTI-select: commit a `@type:id` chip into the draft
+      // `@`-mention flow → MULTI-select: commit a record-link chip into the draft
       // (prior mentions left in place) so each picked entity stays visible inline
       // AND rides out in the context. The `+` flow (mention inactive) is the same
       // multi-select on the chip strip.
@@ -1669,14 +1667,13 @@ function EmbeddableChatInner({
     (item: ChatContextItem) => {
       const key = `${item.type}:${item.id}`;
       setContextItems(prev => prev.filter(p => `${p.type}:${p.id}` !== key));
-      // Removing a mention-backed chip must also strip its `@type:id` token from
+      // Removing a mention-backed chip must also strip its record link from
       // the draft, keeping text and context in lockstep (the inverse of deleting
       // the chip in the input, which drops the item via `handleContextValueChange`).
       if (mentionKeysRef.current.has(key)) {
         mentionKeysRef.current.delete(key);
         const cur = chatInputRef.current?.getValue() ?? '';
-        const next = cur
-          .replace(`@${mentionTokenOf(key, mentionMarkerByType)}`, '')
+        const next = withoutRecordLink(cur, mentionTokenOf(key, mentionMarkerByType))
           .replace(/\s{2,}/g, ' ')
           .trimStart();
         chatInputRef.current?.setValue(next);
@@ -1685,13 +1682,13 @@ function EmbeddableChatInner({
     [mentionMarkerByType],
   );
 
-  // Draft → context reconciliation: when the user deletes a `@type:id` chip from
+  // Draft → context reconciliation: when the user deletes a mention chip from
   // the input, drop the matching mention item. Checks EVERY token-backed key
   // (multi-mention). `+`-added items have no token in the text and are untouched.
   const handleContextValueChange = useCallback(
     (value: string) => {
       for (const key of Array.from(mentionKeysRef.current)) {
-        if (!value.includes(`@${mentionTokenOf(key, mentionMarkerByType)}`)) {
+        if (!value.includes(`(${mentionTokenOf(key, mentionMarkerByType)})`)) {
           mentionKeysRef.current.delete(key);
           setContextItems(prev => prev.filter(p => `${p.type}:${p.id}` !== key));
         }
@@ -1725,10 +1722,9 @@ function EmbeddableChatInner({
     setContextPickerOpen(query !== null);
   }, []);
 
-  // `renderMention` is HOST-provided (see the prop doc): the per-type renderer
-  // for inline AI mentions `@marker:id` (mirror of `renderEntityCard`). The lib
-  // forwards it verbatim to the message list and calls it from the `mention://`
-  // override; the host returns a self-fetching chip.
+  // `renderRecordChip` is HOST-provided (see the prop doc): the per-type chip
+  // of a record link. The lib forwards it verbatim to the message list and calls
+  // it from the `<a>` override; the host returns a self-fetching chip.
 
   const handleClose = useCallback(() => setIsOpen(false), [setIsOpen]);
   // What the header close controls call; absent on a panel that cannot close.
@@ -2823,7 +2819,7 @@ function EmbeddableChatInner({
               renderEntityCard={renderEntityCard}
               resolveContextIcon={resolveContextIcon}
               renderContextItem={renderContextItem}
-              renderMention={renderMention}
+              renderRecordChip={renderRecordChip}
               renderAfterMessage={renderMessageSources}
               // Gated on `chatLoading` for the same reason the composer
               // is: no second send while a turn is in flight. Passive

@@ -33,8 +33,8 @@
 import type { ChatRef } from '../components/chat/chat-ref.types';
 import type { ChatSource } from '../components/chat/types/message.types';
 import { UNSAFE_URL_CHARS } from '../utils/url-safety';
-import { CARD_REFERENCE } from './card-marker';
 import type { SourcesEvent } from './events';
+import { parseRecordHref } from './record-link';
 import { isRecord } from './wire-narrow';
 
 /** YouTube ids are exactly 11 chars of the URL-safe alphabet. */
@@ -215,15 +215,15 @@ function videoMetadata(value: unknown, url: string | null): Record<string, strin
   return metadata;
 }
 
-/** Video references. `ref` must parse AND be of type `video` — a mistyped row
+/** Video references. `recordLink` must parse AND be of type `video` — a mistyped row
  *  would otherwise render through the entity-card path with no player. */
 function videos(value: unknown): ChatRef[] {
   if (!Array.isArray(value)) return [];
   return value.filter(isRecord).flatMap(video => {
-    const match = typeof video.ref === 'string' ? CARD_REFERENCE.exec(video.ref) : null;
-    if (!match || match[1] !== 'video') return [];
+    const record = parseRecordHref(video.recordLink);
+    if (!record || record.type !== 'video') return [];
 
-    const id = match[2];
+    const id = record.id;
     const url = httpsUrl(video.url) ?? null;
     const sourceRepo = text(video.sourceRepo);
     const metadata = videoMetadata(video.metadata, url);
@@ -249,21 +249,21 @@ function videos(value: unknown): ChatRef[] {
  * id as the title, which is ugly but honest, and better than dropping a card
  * the answer text explicitly points at.
  *
- * `entityType`/`entityId` are cross-checked against the parsed `ref` because
- * they are three statements of the same fact, and a disagreement means the row
- * was assembled wrongly upstream.
+ * `entityType`/`entityId` are cross-checked against the parsed `recordLink`
+ * because they state the same fact twice, and a disagreement means the row was
+ * assembled wrongly upstream.
  */
 function cards(value: unknown, decodedSources: ChatSource[]): ChatRef[] {
   if (!Array.isArray(value)) return [];
   return value.filter(isRecord).flatMap(card => {
-    const match = typeof card.ref === 'string' ? CARD_REFERENCE.exec(card.ref) : null;
+    const record = parseRecordHref(card.recordLink);
     // `video` is handled by `videos()`; a card claiming that type would render
     // the wrong component.
-    if (!match || match[1] === 'video') return [];
+    if (!record || record.type === 'video') return [];
 
     const type = text(card.entityType);
     const id = text(card.entityId);
-    if (!type || !id || type !== match[1] || id !== match[2]) return [];
+    if (!type || !id || type !== record.type || id !== record.id) return [];
 
     const source = decodedSources.find(candidate => candidate.id === id && candidate.documentType === type);
     return [

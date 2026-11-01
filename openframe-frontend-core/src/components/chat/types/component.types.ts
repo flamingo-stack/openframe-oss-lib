@@ -174,28 +174,23 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   /**
    * Host renderer that REPLACES the default label-only context chip for an
    * attached item with a self-fetching entity chip — so a user's manually
-   * attached context renders IDENTICALLY to an inline `@marker:id` mention
-   * (same live name resolution, same link). Mirror of `renderMention`, but for
-   * the `contextItems` strip instead of inline tokens. Return `null` for an
+   * attached context renders IDENTICALLY to an inline record link
+   * (same live name resolution, same link). Mirror of `renderRecordChip`, but
+   * for the `contextItems` strip instead of inline links. Return `null` for an
    * item the host can't render → the lib falls back to the label pill. Keep the
    * function identity stable (module const / `useCallback`) so the message memo
    * holds across streaming chunks.
    */
   renderContextItem?: (item: ChatContextItem) => ReactNode;
   /**
-   * Host renderer for a record the answer names inline: a record link
-   * `[Patch script](record://script/<id>)` (`chat-protocol/record-link.ts`; `label` is the link's text, the name the
-   * answer gave it) and, in answers stored before record links, the LEGACY token `@marker:id` (no label). The lib
-   * finds the link or the token, parses `{marker, id}`, and renders whatever
-   * node the host returns — typically a SELF-FETCHING chip (each entity type
-   * has its own fetcher) that resolves its own display name by id. The lib
-   * stays data-agnostic: it knows nothing about entity types or how to fetch
-   * them. Return null/undefined for a marker the host can't render → the lib
-   * falls back to the bare token text. SEPARATE from `contextItems` (the user's
-   * own attachments). Keep the function identity stable (e.g. a module const or
-   * `useCallback`) so the message memo holds across streaming chunks.
+   * Host renderer for the chip of a record link in a message (`[Patch script](record://script/<id>)`,
+   * `chat-protocol/record-link.ts`): given the record's type and id and `label`, the name the link shows, return the
+   * host's chip for that type, typically a SELF-FETCHING one with a link to the record. The lib stays data-agnostic:
+   * it knows nothing about entity types or how to fetch them. Return null/undefined for a type the host has no chip
+   * for → the lib draws its own (`RecordChip`). SEPARATE from `contextItems` (the user's own attachments). Keep the
+   * function identity stable (e.g. a module const or `useCallback`) so the message memo holds across streaming chunks.
    */
-  renderMention?: (reference: { marker: string; id: string; label?: string }) => ReactNode;
+  renderRecordChip?: (record: { type: string; id: string; label: string }) => ReactNode;
   /**
    * Host-provided renderer for inline entity cards (v6.1 §B.2.7 — DRY
    * duplications #2). The OSS-lib delegates all entity-specific rendering
@@ -209,7 +204,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   renderEntityCard?: (reference: ChatRef) => ReactNode;
   /**
    * References this answer's metadata described, used to expand the
-   * `[card://type:id]` markers in its body.
+   * record links (`record://type/id`) in its body.
    *
    * A marker on the wire carries only a type and an id, so without these a card
    * has to be hydrated by id through a per-entity API — which the host may not
@@ -235,7 +230,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * cross-origin) — duplicated logic, kept for back-compat with hosts
    * that haven't migrated to the prop yet.
    *
-   * `card://` markers are still intercepted by the override BEFORE this
+   * record links are still intercepted by the override BEFORE this
    * component runs, so the host need not handle them.
    *
    * Implementations MAY declare additional optional props (e.g.
@@ -340,10 +335,9 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  entity chip (so attached context renders like an inline mention).
    *  Forwarded verbatim to every message's ChatMessageEnhanced. */
   renderContextItem?: (item: ChatContextItem) => ReactNode;
-  /** Host renderer for inline AI mentions `@marker:id` (mirror of
-   *  `renderEntityCard`). Forwarded verbatim to every message's
-   *  ChatMessageEnhanced; returns a self-fetching chip per entity type. */
-  renderMention?: (reference: { marker: string; id: string; label?: string }) => ReactNode;
+  /** Host renderer for the chip of a record link. Forwarded verbatim to every
+   *  message's ChatMessageEnhanced; returns a self-fetching chip per type. */
+  renderRecordChip?: (record: { type: string; id: string; label: string }) => ReactNode;
   /** Host-provided renderer for inline entity cards. Forwarded verbatim
    *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
   renderEntityCard?: (reference: ChatRef) => ReactNode;

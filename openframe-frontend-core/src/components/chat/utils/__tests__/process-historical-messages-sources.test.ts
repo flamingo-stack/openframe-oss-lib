@@ -33,7 +33,9 @@ const metadataRow = (id: string, createdAt: string): HistoricalMessage => ({
       type: 'ATTACHMENTS',
       sources: [SOURCE],
       videos: [],
-      cards: [{ ref: '[card://onboarding_guide:88dd40cc]', entityType: 'onboarding_guide', entityId: '88dd40cc' }],
+      cards: [
+        { recordLink: 'record://onboarding_guide/88dd40cc', entityType: 'onboarding_guide', entityId: '88dd40cc' },
+      ],
     },
   ],
 });

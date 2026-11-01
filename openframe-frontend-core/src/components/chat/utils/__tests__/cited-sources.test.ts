@@ -81,7 +81,7 @@ describe('splitCitedSources — code is not prose', () => {
 
 // CU-17tkuw61kfy: an answer showed three guide cards and two doc cards, cited the guides as `[1]` (a docs page), and
 // the strip read "OpenFrame Docs (2 records)". An answer with cards cites what its cards show.
-describe('splitCitedSources, an answer with cards', () => {
+describe('splitCitedSources, an answer with record links', () => {
   const doc = (index: number, path: string): ChatSource => ({
     index,
     id: path,
@@ -100,12 +100,12 @@ describe('splitCitedSources, an answer with cards', () => {
   };
   const all = [doc(1, 'cli/quick-start.md'), doc(2, 'cli/first-steps.md'), doc(3, 'cli/prerequisites.md'), guides];
 
-  it('cites the records its cards show, whatever numbers it wrote, and counts only those', () => {
+  it('cites the records it links, whatever numbers it wrote, and counts only those', () => {
     const answer = [
-      '[card://onboarding_guide:b]',
-      '[card://onboarding_guide:a]',
-      '[card://markdown:cli/quick-start.md]',
-      '[card://markdown:cli/prerequisites.md]',
+      '[b](record://onboarding_guide/b)',
+      '[a](record://onboarding_guide/a)',
+      '[cli/quick-start.md](record://markdown/cli%2Fquick-start.md)',
+      '[cli/prerequisites.md](record://markdown/cli%2Fprerequisites.md)',
       'Go to Devices [1]. Install the CLI [1][2].',
     ].join('\n\n');
     const { cited, uncited } = splitCitedSources(all, answer);
@@ -116,13 +116,16 @@ describe('splitCitedSources, an answer with cards', () => {
     expect(uncited.flatMap(s => s.items?.map(i => i.id) ?? [s.id])).toEqual(['cli/first-steps.md', 'c', 'd']);
   });
 
-  it('ignores a card whose record was not retrieved, and a card inside code', () => {
-    const { cited } = splitCitedSources(all, '`[card://markdown:cli/first-steps.md]`\n\n[card://onboarding_guide:zzz]');
+  it('ignores a link whose record was not retrieved, and a link inside code', () => {
+    const { cited } = splitCitedSources(
+      all,
+      '`[cli/first-steps.md](record://markdown/cli%2Ffirst-steps.md)`\n\n[zzz](record://onboarding_guide/zzz)',
+    );
     expect(cited).toEqual([]);
   });
 
-  it('falls back to its numbers when none of its cards shows a retrieved record', () => {
-    const { cited } = splitCitedSources(all, '[card://onboarding_guide:zzz]\n\nSee the quick start [1].');
+  it('falls back to its numbers when none of its links names a retrieved record', () => {
+    const { cited } = splitCitedSources(all, '[zzz](record://onboarding_guide/zzz)\n\nSee the quick start [1].');
     expect(cited.flatMap(s => s.items?.map(i => i.id) ?? [s.id])).toEqual(['cli/quick-start.md']);
   });
 });

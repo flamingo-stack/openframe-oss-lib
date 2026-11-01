@@ -15,7 +15,7 @@
  *   - mount-time history hydrates from `GET <chatStreamUrl>/history` and
  *     materializes THROUGH THE REDUCER (messages + send counter — same
  *     fan-out lookup as live turns; inline cards hydrate by id from the
- *     `[card://…]` markers in the content, no per-row refs);
+ *     record links in the content, no per-row refs);
  *   - stale keys — other proxy-auth identities AND the retired v1
  *     full-history blobs — are swept on mount; a leftover v1 blob neither
  *     crashes the adapter nor resurrects its messages.
@@ -165,7 +165,7 @@ function wireTurn(conversationId: string, answer: string): Array<string> {
 
 /** Server transcript fixture — 2 turns. Turn #0's assistant row still
  *  carries a legacy `chat_refs` column (old transcripts persist it): the
- *  client must IGNORE it — cards hydrate by id from the `[card://…]`
+ *  client must IGNORE it — cards hydrate by id from the record link
  *  marker in the content. */
 const HISTORY_PAYLOAD = {
   data: {
@@ -179,7 +179,7 @@ const HISTORY_PAYLOAD = {
       {
         seq: 2,
         role: 'assistant',
-        content: '✅ Approved — ticket created: [card://ticket:77]',
+        content: '✅ Approved — ticket created: [77](record://ticket/77)',
         created_at: '2026-07-19T09:00:12.000Z',
         chat_refs: {
           'ticket:77': {
@@ -377,11 +377,11 @@ describe('server-history hydration (materializes through the reducer)', () => {
     expect(String(historyCall[0])).toContain('conversationId=conv-h1');
 
     // Full hydrated projection — messages, roles, hidden flags. The legacy
-    // `chat_refs` column on the transcript row is IGNORED: the `[card://…]`
+    // `chat_refs` column on the transcript row is IGNORED: the record link
     // marker in the content is the only card channel (hydrate-by-id).
     expect(result.current.messages).toMatchSnapshot();
     const assistants = result.current.messages.filter(m => m.role === 'assistant');
-    expect(assistants[0].content).toContain('[card://ticket:77]');
+    expect(assistants[0].content).toContain('[77](record://ticket/77)');
 
     // A live send continues the SAME conversation: newest-message-only body
     // with the stored id, and its sources key at the continued send index.

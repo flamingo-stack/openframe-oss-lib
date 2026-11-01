@@ -243,7 +243,7 @@ export interface UnifiedChatMessage {
   sources?: ChatSource[];
   /**
    * Entity references this answer's metadata described — videos and cards.
-   * Data for the `[card://type:id]` markers in the body, not a render list:
+   * Data for the record links (`record://type/id`) in the body, not a render list:
    * only markers actually present in the text are rendered.
    */
   refs?: ChatRef[];

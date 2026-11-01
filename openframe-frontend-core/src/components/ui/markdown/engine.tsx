@@ -18,7 +18,7 @@
  *   → remark: remarkGfm, remarkBreaks, ...additionalRemarkPlugins
  *   → rehype: rehypeRaw → rehypeSanitize(schema) → rehypeStripUnsafe
  *       → rehypeLabelBareFences → rehypeHighlight (not on the streaming tail)
- *   → urlTransform: cardAwareUrlTransform
+ *   → urlTransform: recordAwareUrlTransform
  *   → components: buildBaseComponents(...) spread-last componentOverrides
  */
 
@@ -43,7 +43,7 @@ import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type He
 import {
   buildEffectiveTagSet,
   buildSanitizeSchema,
-  cardAwareUrlTransform,
+  recordAwareUrlTransform,
   escapeUnknownHtmlTags,
   rehypeStripUnsafe,
 } from './sanitize';
@@ -247,7 +247,7 @@ const StreamingBlockRenderer = memo(function StreamingBlockRendererImpl({
     <ReactMarkdown
       remarkPlugins={remarkPlugins}
       rehypePlugins={rehypePlugins}
-      urlTransform={cardAwareUrlTransform}
+      urlTransform={recordAwareUrlTransform}
       components={components}
     >
       {text}
@@ -398,7 +398,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
             <ReactMarkdown
               remarkPlugins={remarkPlugins}
               rehypePlugins={i === streamingBlocks.length - 1 ? liveRehypePlugins : rehypePlugins}
-              urlTransform={cardAwareUrlTransform}
+              urlTransform={recordAwareUrlTransform}
               components={components}
             >
               {block.text}
@@ -411,7 +411,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     <ReactMarkdown
       remarkPlugins={remarkPlugins}
       rehypePlugins={rehypePlugins}
-      urlTransform={cardAwareUrlTransform}
+      urlTransform={recordAwareUrlTransform}
       components={components}
     >
       {processedContent}

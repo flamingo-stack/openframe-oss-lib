@@ -181,7 +181,7 @@ export const PendingApprovalSegment: Story = {
 };
 
 /**
- * `[card://]` markers inside a `guide` segment resolve exactly as they do in a
+ * Record links inside a `guide` segment resolve exactly as they do in a
  * text segment — the host's `renderEntityCard` node is hoisted out of the
  * markdown as a sibling block, and an unknown id degrades to the bare id.
  * Regression guard: the guide body used to skip the marker plan entirely.
@@ -211,11 +211,11 @@ export const GuideWithEntityCards: Story = {
     content: [
       {
         type: 'text',
-        text: "Here's how to create a monitoring policy (check) in OpenFrame:\n\n[card://onboarding_guide:first-check]\n\nStep-by-step:\n\n1. Go to Monitoring → Policies → Add Policy\n2. Write your osquery SQL query\n3. Save the policy",
+        text: "Here's how to create a monitoring policy (check) in OpenFrame:\n\n[first-check](record://onboarding_guide/first-check)\n\nStep-by-step:\n\n1. Go to Monitoring → Policies → Add Policy\n2. Write your osquery SQL query\n3. Save the policy",
       },
       {
         type: 'text',
-        text: 'A second text segment renders its own marker identically:\n\n[card://onboarding_guide:add-devices]',
+        text: 'A second text segment renders its own marker identically:\n\n[add-devices](record://onboarding_guide/add-devices)',
       },
     ] satisfies MessageSegment[],
   },

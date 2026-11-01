@@ -1,7 +1,8 @@
-import { type CardReference, extractCardReferences } from '../../../chat-protocol/card-marker';
 import { citedSourceNumbers } from '../../../chat-protocol/citation-chip';
+import type { RecordLink } from '../../../chat-protocol/record-link';
 import { canonicalContentRefType } from '../../../utils/list-url';
 import { groupSourcesByTable } from '../../../utils/source-grouping';
+import { recordLinksIn } from '../record-links-in';
 import type { ChatSource } from '../types/message.types';
 
 /** How many retrieved sources to show when the answer cited none of them. */
@@ -53,13 +54,10 @@ function withoutCode(content: string): string {
 export function splitCitedSources(sources: ChatSource[] | undefined, content: string): CitedSources {
   if (!sources || sources.length === 0) return { cited: [], uncited: [] };
 
-  // An answer with cards cites what its cards show. The reader sees the cards and not the `[N]` numbers (the
-  // renderer hides those beside cards, `remarkStripCitations`), and the numbers a model writes can name another
-  // record than the card beside them: guide cards cited as `[1]`, a docs page (CU-17tkuw61kfy). So the strip is
-  // built from the cards, and its count is the cards'.
-  // An answer whose cards show no retrieved record (a card from an earlier turn) falls back to its numbers.
-  const byCards = splitByCards(sources, extractCardReferences(withoutCode(content)));
-  if (byCards.cited.length > 0) return byCards;
+  // An answer that links records cites the records it links: those are what it names, and their cards are under it.
+  // An answer whose links name no retrieved record (a record from an earlier turn) falls back to its numbers.
+  const byLinks = splitByRecords(sources, recordLinksIn(content));
+  if (byLinks.cited.length > 0) return byLinks;
 
   const firstMentionAt = new Map(citedSourceNumbers(withoutCode(content)).map((index, order) => [index, order]));
 
@@ -86,16 +84,16 @@ function recordsOf(source: ChatSource): ChatSource[] {
   }));
 }
 
-/** The card key of a record, in the canonical vocabulary the card markers use. A document is keyed by its id, or
+/** The key of a record, in the canonical vocabulary record links use. A document is keyed by its id, or
  *  by its path when it carries no id (doc rows are keyed by path). */
 function recordKey(record: ChatSource): string | null {
   const id = record.id || record.path;
   return record.documentType && id ? `${canonicalContentRefType(record.documentType)}:${id}` : null;
 }
 
-/** Cited = the records the answer's cards show, in card order; uncited = every other record. Both halves are then
- *  grouped by table, so a table's chip counts exactly its carded records. */
-function splitByCards(sources: ChatSource[], cards: CardReference[]): CitedSources {
+/** Cited = the records the answer links, in link order; uncited = every other record. Both halves are then grouped
+ *  by table, so a table's chip counts exactly its linked records. */
+function splitByRecords(sources: ChatSource[], links: RecordLink[]): CitedSources {
   const records = sources.flatMap(recordsOf);
   const byKey = new Map<string, ChatSource>();
   for (const record of records) {
@@ -103,8 +101,8 @@ function splitByCards(sources: ChatSource[], cards: CardReference[]): CitedSourc
     if (key && !byKey.has(key)) byKey.set(key, record);
   }
   const cited: ChatSource[] = [];
-  for (const card of cards) {
-    const record = byKey.get(`${canonicalContentRefType(card.type)}:${card.id}`);
+  for (const link of links) {
+    const record = byKey.get(`${canonicalContentRefType(link.type)}:${link.id}`);
     if (record && !cited.includes(record)) cited.push(record);
   }
   const uncited = records.filter(record => !cited.includes(record));

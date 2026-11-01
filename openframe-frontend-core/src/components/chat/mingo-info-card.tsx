@@ -114,7 +114,7 @@ export interface MingoInfoCardAnchorProps {
 // =============================================================================
 // Span-only markup
 //
-// This card renders inline inside chat message paragraphs (the `[card://]`
+// This card renders inline inside chat message paragraphs (the record-link
 // marker is replaced in-place, landing the card inside a `<p>`). To stay
 // valid there, EVERY element is phrasing content — `<span>` / `<a>` / `<img>`
 // / `<button>` only, never `<div>`. Layout comes from `display` utilities, so

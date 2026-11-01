@@ -8,7 +8,7 @@ exports[`server-history hydration (materializes through the reducer) > rebuilds 
     "role": "user",
   },
   {
-    "content": "✅ Approved — ticket created: [card://ticket:77]",
+    "content": "✅ Approved — ticket created: [77](record://ticket/77)",
     "id": "hydrated-2",
     "role": "assistant",
   },

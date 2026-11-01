@@ -757,7 +757,7 @@ export interface Message {
   /**
    * Entity references this answer's metadata described — videos and cards.
    *
-   * Presence here does NOT mean "render it": only the `[card://type:id]`
+   * Presence here does NOT mean "render it": only the `record://type/id`
    * markers actually written into the answer text are rendered, and these
    * supply the data those markers expand with. The metadata frame routinely
    * describes more than the model chose to cite.

@@ -310,7 +310,7 @@ export function useChat({
               updatedSegments.push({ type: 'text', text: currentTextSegment });
             }
             currentAssistantSegmentsRef.current = updatedSegments;
-            // The receipt's `[card://<type>:<id>]` marker resolves via the
+            // The receipt's record link (`record://<type>/<id>`) resolves via the
             // card fetch path (hydrate-by-id) — no ref stamping needed.
             updateLastAssistantMessage(updatedSegments);
           } else if (segment.type === 'tool_execution') {

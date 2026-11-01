@@ -161,7 +161,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       renderEntityCard,
       resolveContextIcon,
       renderContextItem,
-      renderMention,
+      renderRecordChip,
       renderAfterMessage,
       onAskSelect,
       NavLinkAnchor,
@@ -1070,7 +1070,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                         contextItems={message.contextItems}
                         resolveContextIcon={resolveContextIcon}
                         renderContextItem={renderContextItem}
-                        renderMention={renderMention}
+                        renderRecordChip={renderRecordChip}
                         renderEntityCard={renderEntityCard}
                         refs={message.refs}
                         onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}

@@ -83,7 +83,6 @@ import { unified } from 'unified';
 import { isBlankLine } from '../../../utils/markdown-fences';
 import { scanHeadings } from '../../../utils/markdown-heading-id';
 import { extractSections } from '../../../utils/markdown-section-extractor';
-import { remarkCardLinks, remarkMentionChips } from '../../chat/inline-tokens';
 import { SimpleMarkdownRenderer, RichMarkdownRenderer } from '../markdown';
 import {
   __buildCloserHaystackForTest,
@@ -725,9 +724,8 @@ const RICH_ONLY_FIXTURES: Record<string, string> = {
 };
 
 const CHAT_FIXTURES: Record<string, string> = {
-  'card-marker': 'Here is the record: [card://blog:hello-world] inline.',
-  'mention-chip': 'Check @device:router-9 status.',
-  'card-and-mention-mixed': 'See [card://vendor:acme] and @ticket:T-100 together.',
+  'record-link': 'Here is the record: [Hello world](record://blog/hello-world) inline.',
+  'record-links-mixed': 'See [Acme](record://vendor/acme) and [T-100](record://ticket/T-100) together.',
 };
 
 const SECTION_IDS = [
@@ -838,14 +836,8 @@ describe('SimpleMarkdownRenderer golden parity', () => {
   });
 
   for (const [name, md] of Object.entries(CHAT_FIXTURES)) {
-    it(`renders chat fixture with card/mention plugins: ${name}`, async () => {
-      const container = await renderStable(
-        <SimpleMarkdownRenderer
-          content={md}
-          textSize="compact"
-          additionalRemarkPlugins={[remarkCardLinks, remarkMentionChips]}
-        />,
-      );
+    it(`renders chat fixture: ${name}`, async () => {
+      const container = await renderStable(<SimpleMarkdownRenderer content={md} textSize="compact" />);
       expect(normalize(container.innerHTML)).toMatchSnapshot();
     });
   }

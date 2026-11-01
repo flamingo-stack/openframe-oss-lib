@@ -25,7 +25,7 @@ export interface BlockCardProps {
  * markdown paragraph.
  *
  * The chat renderer (`chat-message-enhanced.tsx`) does a pre-scan of
- * each `text` segment's `[card://type:id]` markers, calls
+ * each `text` segment's record links (`record://type/id`), calls
  * `renderEntityCard(ref)` for each, and detects `<BlockCard>` by React
  * element type identity. When detected:
  *   1. `inline` is placed AT the marker position inside the `<p>` —

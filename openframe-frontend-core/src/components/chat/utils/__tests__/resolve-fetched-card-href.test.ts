@@ -26,7 +26,7 @@ const compose = makeComposeContentUrl({
 
 describe('resolveFetchedCardHref — Mingo cards with no ref metadata', () => {
   it('override type deep-links on the MARKER id, not the fetched row id', () => {
-    // The `[card://roadmap_item:86ad3qvv5]` id is the ClickUp task id the
+    // The `[86ad3qvv5](record://roadmap_item/86ad3qvv5)` id is the ClickUp task id the
     // roadmap list filters by; the fetched row carries its own db id.
     expect(
       resolveFetchedCardHref({

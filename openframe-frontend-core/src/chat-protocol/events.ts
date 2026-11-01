@@ -220,7 +220,7 @@ export interface TicketEventEvent extends ChatStreamEventBase {
 
 /**
  * Per-answer source metadata — the documents an answer cited, plus the video
- * and entity-card references its `[card://type:id]` markers expand with.
+ * and entity-card references its record links (`record://type/id`) expand with.
  *
  * Unlike `ChatMetadataEvent`, this one is DECODED, not passthrough: the payload
  * comes from a remote MCP server's tool output rather than from our own

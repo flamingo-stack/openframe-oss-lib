@@ -75,7 +75,7 @@ export interface ComposeContentUrlInput {
   identifier: string;
   /** Preferred path segment for HOSTED types when there is no `externalUrl`
    *  to recover the slug from — the Mingo/NATS transport ships bare
-   *  `[card://type:id]` markers with no ref metadata, so a fetch-mode card
+   *  record links (`record://type/id`) with no ref metadata, so a fetch-mode card
    *  knows the row's slug only AFTER it loads the row. `identifier` must stay
    *  the primary key (that is what `overrides` deep-link on), hence a separate
    *  field rather than overloading it. Ignored for non-hosted types. */

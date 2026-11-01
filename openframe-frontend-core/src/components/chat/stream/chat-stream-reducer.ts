@@ -1503,7 +1503,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
 
     // Step 2 — server-rendered receipt into the CURRENT message. No
     // server-provided copy → don't fabricate a fallback. The receipt's
-    // `[card://…]` marker hydrates via the card fetch path on its own —
+    // record link hydrates via the card fetch path on its own —
     // no ref stamping needed.
     const receipt = typeof event.receiptText === 'string' ? event.receiptText : null;
     if (receipt === null) return;
