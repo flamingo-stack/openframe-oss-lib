@@ -32,6 +32,7 @@ import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { chatCardLabel } from './entity-cards/dispatch';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
+import { RecordChipProvider } from './record-actions';
 import { RecordChip } from './record-chip';
 import { recordLinksIn } from './record-links-in';
 import { SuggestionsDisplay } from './suggestions-display';
@@ -245,7 +246,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           if (record) {
             const label = textOf(children) || record.id;
             const hosted = renderRecordChip?.({ type: record.type, id: record.id, label });
-            if (hosted != null) return <>{hosted}</>;
+            // In its record's context, so the host's chip can offer the record's menu (`useRecordChipMenu`).
+            if (hosted != null)
+              return (
+                <RecordChipProvider value={{ type: record.type, id: record.id, label }}>{hosted}</RecordChipProvider>
+              );
             return <RecordChip type={record.type} id={record.id} label={label} />;
           }
           // The host's `NavLinkAnchor` draws the link (the lib's

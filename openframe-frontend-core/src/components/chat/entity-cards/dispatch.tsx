@@ -253,7 +253,7 @@ export interface ChatCardRenderOptions {
   isNewTab: boolean;
   /** Host-provided "Ask Mingo"/"Display" affordance for this card, resolved
    *  once by `ChatCardLoader`. Each wrapper threads it into its "⋯" menu via
-   *  `cardMenuGroups`. Undefined when the host supplied no `onDiscuss`/
+   *  `recordMenuGroups`. Undefined when the host supplied no `onDiscuss`/
    *  `onDisplay` (then the menu shows only "Open in new tab"). */
   discuss?: CardDiscussAction;
 }
@@ -331,7 +331,7 @@ function GitHubChatCard({
       icon={githubKindIcon(kind)}
       status={status}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuGroups={recordMenuGroups(chatRef, discuss)}
       menuAriaLabel="Activity actions"
     />
   );
@@ -356,25 +356,54 @@ export interface CardExternalLink {
   href: string;
 }
 
-/** Overflow-menu groups for a card (Figma `7740:55075`): the optional "Ask
- *  Mingo"/"Display" item (when the host supplied a handler) followed by "Open
- *  Details" — whose main row navigates to the card (same tab) and whose trailing
- *  ↗ side-button opens it in a new tab — then the optional external-app
- *  deep-link row (new tab). Returns `undefined` when none applies so the "⋯"
- *  button is omitted entirely. The href is already absolute (ChatCardLoader
- *  pre-resolves it). */
-function cardMenuGroups(
-  href: string | null | undefined,
+/** The ClickUp row of a record that IS a ClickUp task. */
+const OPEN_IN_CLICKUP = { label: 'Open in ClickUp', icon: <ClickupLogoIcon size={20} /> };
+
+/**
+ * What a record's "⋯" menu says in its own terms, by type: the "Open Details" row's label and icon, and the deep link
+ * into the record's own app. ONE table for every surface that offers the menu, the record's card and its chip in a
+ * sentence (`recordMenuGroups`), so the two can never offer different actions.
+ */
+function recordMenuTerms(
+  type: string,
+  id: string,
+): { openDetails?: { label: string; icon: React.ReactNode }; externalLink?: CardExternalLink } {
+  switch (type) {
+    case 'hubspot_ticket':
+    case 'hubspot_ticket_anon':
+    case 'hubspot_ticket_self':
+      return { openDetails: { label: 'Open Ticket Details', icon: <TagIcon size={20} /> } };
+    case TRUST_CENTER_DOCUMENT_TYPE:
+      return { openDetails: { label: 'View trust center', icon: <ShieldCheckIcon size={20} /> } };
+    // A task's own url IS its ClickUp deep link (its mapper resolves no public page): the details row is the ClickUp row.
+    case 'internal_task':
+      return { openDetails: OPEN_IN_CLICKUP };
+    // A mirrored ClickUp task whose id IS the ClickUp task id: its page, then the task in ClickUp.
+    case 'roadmap_item':
+    case 'delivery_item': {
+      const href = clickupTaskUrl(id);
+      return href ? { externalLink: { ...OPEN_IN_CLICKUP, href } } : {};
+    }
+    default:
+      return {};
+  }
+}
+
+/**
+ * A record's "⋯" menu (Figma `7740:55075`), THE one list of its actions, for its card and for its chip in a sentence:
+ * the "Ask Mingo"/"Display" row (when the host supplied a handler), then "Open Details", whose row opens the record in
+ * the same tab and whose trailing ↗ button opens it in a new tab (left out where `newTab` is false: a window that
+ * opens no tabs), then the deep link into the record's own app (ClickUp), always in a new tab. Rows are in the
+ * record's own terms (`recordMenuTerms`). `undefined` when nothing applies, so no "⋯" is drawn. `ref.url` is the
+ * resolved destination (`useRecordDestination`).
+ */
+export function recordMenuGroups(
+  ref: Pick<ChatRef, 'type' | 'id' | 'url'>,
   discuss?: CardDiscussAction,
-  /** Per-entity override for the "Open Details" row — e.g. HubSpot tickets use
-   *  `{ label: 'Open Ticket Details', icon: <HubSpot logo> }` so the row reads
-   *  in the entity's own terms and mirrors the card's leading icon. Defaults to
-   *  a generic "Open Details" + eye glyph. */
-  openDetails?: { label: string; icon: React.ReactNode },
-  /** Optional trailing deep-link into the entity's own third-party app
-   *  (ClickUp task, …). Rendered after "Open Details", always new-tab. */
-  externalLink?: CardExternalLink,
-) {
+  options: { newTab?: boolean } = {},
+): ActionsMenuGroup[] | undefined {
+  const { openDetails, externalLink } = recordMenuTerms(ref.type, ref.id);
+  const newTab = options.newTab ?? true;
   const items: ActionsMenuGroup['items'] = [];
   if (discuss) {
     items.push({
@@ -384,20 +413,24 @@ function cardMenuGroups(
       onClick: discuss.run,
     });
   }
-  if (href) {
+  if (ref.url) {
     items.push({
       id: 'open-details',
       label: openDetails?.label ?? 'Open Details',
       icon: openDetails?.icon ?? <EyeIcon size={20} />,
       // Main row → open the entity (same tab, soft Link nav).
-      href,
+      href: ref.url,
       // Trailing 40px ↗ side-button → open in a new tab.
-      iconAction: {
-        icon: <ArrowRightUpIcon size={20} />,
-        'aria-label': 'Open in new tab',
-        href,
-        openInNewTab: true,
-      },
+      ...(newTab
+        ? {
+            iconAction: {
+              icon: <ArrowRightUpIcon size={20} />,
+              'aria-label': 'Open in new tab',
+              href: ref.url,
+              openInNewTab: true,
+            },
+          }
+        : {}),
     });
   }
   if (externalLink) {
@@ -537,10 +570,7 @@ function HubspotTicketChatCard({
       icon={<TagIcon size={24} />}
       status={statusText ? { label: statusText, variant: hubspotStatusToVariant(status) } : undefined}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss, {
-        label: 'Open Ticket Details',
-        icon: <TagIcon size={20} />,
-      })}
+      menuGroups={recordMenuGroups(chatRef, discuss)}
       menuAriaLabel="Ticket actions"
     />
   );
@@ -570,7 +600,7 @@ function FaqChatCard({
       icon={<QuestionCircleIcon size={24} />}
       status={{ label: statusLabel, variant: 'grey' }}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuGroups={recordMenuGroups(chatRef, discuss)}
       menuAriaLabel="FAQ actions"
     />
   );
@@ -597,7 +627,7 @@ function SlackChatCard({
       description={chatRef.preview ?? undefined}
       icon={<SlackLogoGreyIcon size={24} />}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuGroups={recordMenuGroups(chatRef, discuss)}
       menuAriaLabel="Message actions"
     />
   );
@@ -625,7 +655,7 @@ function GlyphChatCard({
       description={chatRef.preview ?? undefined}
       icon={icon}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuGroups={recordMenuGroups(chatRef, discuss)}
       menuAriaLabel="Card actions"
     />
   );
@@ -670,10 +700,7 @@ function TrustCenterChatCard({
       icon={<ShieldCheckIcon size={24} />}
       status={lead ? { label: lead.label, variant: TRUST_STATUS_TAG_VARIANT[lead.color] } : undefined}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss, {
-        label: 'View trust center',
-        icon: <ShieldCheckIcon size={20} />,
-      })}
+      menuGroups={recordMenuGroups(chatRef, discuss)}
       menuAriaLabel="Trust center actions"
     />
   );
@@ -701,7 +728,7 @@ function DataRoomDocChatCard({
       icon={<FileContentIcon size={24} />}
       status={{ label: badgeText, variant: 'grey' }}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuGroups={recordMenuGroups(chatRef, discuss)}
       menuAriaLabel="Document actions"
     />
   );
@@ -725,7 +752,7 @@ function GenericFinancialChatCard({
       description={subtitle}
       icon={icon}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss)}
+      menuGroups={recordMenuGroups(chatRef, discuss)}
       menuAriaLabel="Document actions"
     />
   );
@@ -892,8 +919,6 @@ function EntityMingoCard({
   isNewTab,
   menuAriaLabel,
   discuss,
-  openDetails,
-  externalLink,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -904,10 +929,6 @@ function EntityMingoCard({
   isNewTab: boolean;
   menuAriaLabel: string;
   discuss?: CardDiscussAction;
-  /** See `cardMenuGroups` — per-entity "Open Details" row override. */
-  openDetails?: { label: string; icon: React.ReactNode };
-  /** See `cardMenuGroups` — trailing third-party-app deep-link row. */
-  externalLink?: CardExternalLink;
 }) {
   return (
     <MingoInfoCard
@@ -918,7 +939,7 @@ function EntityMingoCard({
       icon={fallbackIcon}
       status={status}
       anchorProps={buildAnchorProps(chatRef.url, isNewTab, chatRef.targetPlatform)}
-      menuGroups={cardMenuGroups(chatRef.url, discuss, openDetails, externalLink)}
+      menuGroups={recordMenuGroups(chatRef, discuss)}
       menuAriaLabel={menuAriaLabel}
     />
   );
@@ -1079,7 +1100,7 @@ function DesignDocChatCard({
           : { label: 'Design doc', variant: 'grey' }
       }
       anchorProps={buildAnchorProps(displayRef.url, isNewTab, displayRef.targetPlatform)}
-      menuGroups={cardMenuGroups(displayRef.url, discuss)}
+      menuGroups={recordMenuGroups(displayRef, discuss)}
       menuAriaLabel="Design doc actions"
     />
   );
@@ -1254,14 +1275,6 @@ function RoadmapChatCard({
   ) : (
     defaultIcon
   );
-  // Every card here is a mirrored ClickUp task whose ref id IS the ClickUp
-  // task id, so the "⋯" menu deep-links into ClickUp. internal_task's card
-  // URL already IS that deep link (its mapper resolves no public
-  // destination) — there we relabel the existing "Open Details" row instead
-  // of adding a duplicate second ClickUp row.
-  const clickupHref = clickupTaskUrl(chatRef.id);
-  const clickupIcon = <ClickupLogoIcon size={20} />;
-  const cardUrlIsClickup = cardType === 'internal_task';
   return (
     <EntityMingoCard
       title={item?.title ?? ''}
@@ -1272,12 +1285,6 @@ function RoadmapChatCard({
       isNewTab={isNewTab}
       discuss={discuss}
       menuAriaLabel="Roadmap actions"
-      openDetails={cardUrlIsClickup ? { label: 'Open in ClickUp', icon: clickupIcon } : undefined}
-      externalLink={
-        !cardUrlIsClickup && clickupHref
-          ? { label: 'Open in ClickUp', icon: clickupIcon, href: clickupHref }
-          : undefined
-      }
     />
   );
 }
@@ -2001,6 +2008,24 @@ export function RecordNavWrap({
   );
 }
 
+/**
+ * A record's "Ask Mingo" (or "Display", for a type whose card displays its document) action, the same for its card
+ * and its chip: `onDisplay` where the type displays and the host can, else `onDiscuss`, else none.
+ */
+export function recordDiscussAction(
+  ref: ChatRef,
+  handlers: { onDiscuss?: (ref: ChatRef) => void; onDisplay?: (ref: ChatRef) => void },
+): CardDiscussAction | undefined {
+  const useDisplay = !!CHAT_CARD_REGISTRY[ref.type]?.displayAction && !!handlers.onDisplay;
+  const run = useDisplay ? handlers.onDisplay : handlers.onDiscuss;
+  if (!run) return undefined;
+  return {
+    label: useDisplay ? 'Display' : 'Ask Mingo',
+    icon: useDisplay ? <FileContentIcon size={20} /> : <AgentMark agent="mingo" className="size-5" />,
+    run: () => run(ref),
+  };
+}
+
 // =============================================================================
 // ChatCardLoader — fetch + skeleton + render for fetch-mode entries.
 // =============================================================================
@@ -2126,18 +2151,8 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
     useRecordDestination(chatRef);
   if (!entry) return null;
 
-  // Resolve the "Ask Mingo"/"Display" affordance ONCE — same precedence as the
-  // legacy `ChatCardWithDiscuss` (displayAction + onDisplay → "Display",
-  // otherwise onDiscuss → "Ask Mingo"). Threaded into each card's "⋯" menu.
-  const useDisplay = !!entry.displayAction && !!onDisplay;
-  const discussFn = useDisplay ? onDisplay : onDiscuss;
-  const discuss: CardDiscussAction | undefined = discussFn
-    ? {
-        label: useDisplay ? 'Display' : 'Ask Mingo',
-        icon: useDisplay ? <FileContentIcon size={20} /> : <AgentMark agent="mingo" className="size-5" />,
-        run: () => discussFn(finalChatRef),
-      }
-    : undefined;
+  // The "Ask Mingo"/"Display" row of the card's "⋯" menu, the same action its chip offers (`recordDiscussAction`).
+  const discuss = recordDiscussAction(finalChatRef, { onDiscuss, onDisplay });
 
   const renderOpts: ChatCardRenderOptions = {
     extras,

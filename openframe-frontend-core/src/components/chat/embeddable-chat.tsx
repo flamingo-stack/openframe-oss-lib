@@ -101,6 +101,7 @@ import { MINGO_ONBOARDING_SKELETON_ROWS, MingoOnboardingCard } from './mingo-onb
 import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
+import { RecordActionsProvider } from './record-actions';
 import { SourceActionButton } from './source-action-button';
 import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
@@ -1715,6 +1716,9 @@ function EmbeddableChatInner({
     [askAbout, displayRef, extras],
   );
 
+  // The same Ask and Display a card gets, for every record chip in the thread (`RecordActionsProvider`).
+  const recordActions = useMemo(() => ({ onDiscuss: askAbout, onDisplay: displayRef }), [askAbout, displayRef]);
+
   // Stable assistant-icon element. `<ChatMessageList>` forwards this prop to
   // every assistant `<ChatMessageEnhanced>`, whose memo compares it BY
   // REFERENCE. Created inline in JSX it was a fresh element on every render,
@@ -2712,73 +2716,75 @@ function EmbeddableChatInner({
                 box (e.g. the Mingo hero demo): `fill` top-anchors and clips
                 the loading rows so they read as "the whole panel is
                 loading" and never scroll. */}
-            <ChatMessageList
-              messages={messages}
-              isLoading={messagesInitialLoading}
-              fill={previewMode}
-              // v2 thread: names without the colon, 24px
-              // faces, 16px between messages (shared with fae v2).
-              appearance={appearance}
-              isTyping={chatLoading}
-              // Sticky footer for approvals the host lifted out of the
-              // thread — see the prop's docblock.
-              pendingApprovals={pendingApprovals}
-              // Real drawer: the library's smart follow. Passive in-page
-              // demo (previewMode): deterministic hard pin instead — a
-              // scripted assistant-only stream from a cold mount never
-              // satisfies the library's "at bottom" gate, so the reply
-              // landed below the fold. `pinBottom` snaps to bottom on
-              // every frame; identical mechanism to the Fae demo box, so
-              // both surfaces behave 1:1.
-              autoScroll={!previewMode}
-              pinBottom={previewMode}
-              // Passive in-page demos (previewMode) let the surrounding
-              // page scroll over the thread; the real drawer keeps
-              // containment (deck slide-scroll fix).
-              overscrollContain={!previewMode}
-              assistantType="mingo"
-              assistantIcon={mingoAssistantIcon}
-              renderEntityCard={renderEntityCard}
-              resolveContextIcon={resolveContextIcon}
-              renderContextItem={renderContextItem}
-              renderRecordChip={renderRecordChip}
-              renderAfterMessage={renderMessageSources}
-              // Gated on `chatLoading` for the same reason the composer
-              // is: no second send while a turn is in flight. Passive
-              // demo hosts (previewMode) stay read-only.
-              onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
-              NavLinkAnchor={NavLinkAnchorViaRuntime}
-              // Real Mingo drawer: hide the message-list scrollbar
-              // (scroll stays functional). Scoped here via `className`
-              // instead of `ChatMessageList` itself, so other list
-              // consumers (host chat, tickets) keep their thin bar.
-              //
-              // `previewMode` (the passive in-page demo) instead:
-              //  • KEEP the default thin scrollbar — the "elevator" —
-              //    so the Mingo demo's scroll controls match the Fae
-              //    demo box (which renders the default ChatMessageList
-              //    scrollbar) 1:1.
-              //  • Re-enable pointer events on the scroller: previewMode
-              //    puts `pointer-events-none` on the whole panel (line
-              //    ~1981) so the demo doesn't trap clicks, but that also
-              //    killed wheel/touch scroll on the thread (the Mingo
-              //    embed couldn't scroll while the Fae box could). Only
-              //    the scroller re-enables; composer + chrome stay inert.
-              className={
-                previewMode
-                  ? 'pointer-events-auto flex-1'
-                  : 'flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-              }
-              // No inner `px`/`pb`: the panel wrapper already pads with
-              // `p-[var(--spacing-system-m)]`. The default content class
-              // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
-              // double-inset the thread; `pb-0` overrides via twMerge.
-              contentClassName={cn('max-w-none pb-0', splitMode && threadContentClassName)}
-              fullWidth
-              hasNextPage={hasMoreMessages}
-              isFetchingNextPage={isMessagesLoading}
-              onLoadMore={loadMoreMessages}
-            />
+            <RecordActionsProvider value={recordActions}>
+              <ChatMessageList
+                messages={messages}
+                isLoading={messagesInitialLoading}
+                fill={previewMode}
+                // v2 thread: names without the colon, 24px
+                // faces, 16px between messages (shared with fae v2).
+                appearance={appearance}
+                isTyping={chatLoading}
+                // Sticky footer for approvals the host lifted out of the
+                // thread — see the prop's docblock.
+                pendingApprovals={pendingApprovals}
+                // Real drawer: the library's smart follow. Passive in-page
+                // demo (previewMode): deterministic hard pin instead — a
+                // scripted assistant-only stream from a cold mount never
+                // satisfies the library's "at bottom" gate, so the reply
+                // landed below the fold. `pinBottom` snaps to bottom on
+                // every frame; identical mechanism to the Fae demo box, so
+                // both surfaces behave 1:1.
+                autoScroll={!previewMode}
+                pinBottom={previewMode}
+                // Passive in-page demos (previewMode) let the surrounding
+                // page scroll over the thread; the real drawer keeps
+                // containment (deck slide-scroll fix).
+                overscrollContain={!previewMode}
+                assistantType="mingo"
+                assistantIcon={mingoAssistantIcon}
+                renderEntityCard={renderEntityCard}
+                resolveContextIcon={resolveContextIcon}
+                renderContextItem={renderContextItem}
+                renderRecordChip={renderRecordChip}
+                renderAfterMessage={renderMessageSources}
+                // Gated on `chatLoading` for the same reason the composer
+                // is: no second send while a turn is in flight. Passive
+                // demo hosts (previewMode) stay read-only.
+                onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
+                NavLinkAnchor={NavLinkAnchorViaRuntime}
+                // Real Mingo drawer: hide the message-list scrollbar
+                // (scroll stays functional). Scoped here via `className`
+                // instead of `ChatMessageList` itself, so other list
+                // consumers (host chat, tickets) keep their thin bar.
+                //
+                // `previewMode` (the passive in-page demo) instead:
+                //  • KEEP the default thin scrollbar — the "elevator" —
+                //    so the Mingo demo's scroll controls match the Fae
+                //    demo box (which renders the default ChatMessageList
+                //    scrollbar) 1:1.
+                //  • Re-enable pointer events on the scroller: previewMode
+                //    puts `pointer-events-none` on the whole panel (line
+                //    ~1981) so the demo doesn't trap clicks, but that also
+                //    killed wheel/touch scroll on the thread (the Mingo
+                //    embed couldn't scroll while the Fae box could). Only
+                //    the scroller re-enables; composer + chrome stay inert.
+                className={
+                  previewMode
+                    ? 'pointer-events-auto flex-1'
+                    : 'flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                }
+                // No inner `px`/`pb`: the panel wrapper already pads with
+                // `p-[var(--spacing-system-m)]`. The default content class
+                // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
+                // double-inset the thread; `pb-0` overrides via twMerge.
+                contentClassName={cn('max-w-none pb-0', splitMode && threadContentClassName)}
+                fullWidth
+                hasNextPage={hasMoreMessages}
+                isFetchingNextPage={isMessagesLoading}
+                onLoadMore={loadMoreMessages}
+              />
+            </RecordActionsProvider>
           </div>
         ) : activeMode === 'mingo' ? (
           /* Figma node 7532:222444 — default (Mingo-mode) empty state:

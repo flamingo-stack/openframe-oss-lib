@@ -11,9 +11,11 @@
 
 import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
+import { cn } from '../../utils/cn';
 import { defaultTableIdForDocumentType, getSourceIconName } from '../../utils/source-icons';
-import { RecordNavWrap, useRecordDestination } from './entity-cards/dispatch';
+import { RecordNavWrap, recordDiscussAction, recordMenuGroups, useRecordDestination } from './entity-cards/dispatch';
 import { InlineChip } from './inline-chip';
+import { RECORD_CHIP_LEAD_SEGMENT_CLASS, RecordChipActions, useRecordActions } from './record-actions';
 import { resolveIcon } from './utils/icon-library';
 
 function iconFor(type: string) {
@@ -38,10 +40,17 @@ export function RecordChip(props: RecordChipProps) {
 
 function LinkedRecordChip({ type, id, label }: RecordChipProps) {
   const { finalChatRef, hostRoute, isNewTab, path } = useRecordDestination({ type, id, title: label, url: null });
+  const handlers = useRecordActions();
   const url = finalChatRef.url;
-  const chip = <InlineChip icon={iconFor(type)} label={label} className={url ? 'hover:bg-ods-bg-hover' : undefined} />;
-  if (!url) return chip;
-  return (
+  const menuGroups = recordMenuGroups(finalChatRef, recordDiscussAction(finalChatRef, handlers));
+  const chip = (
+    <InlineChip
+      icon={iconFor(type)}
+      label={label}
+      className={cn(url && 'hover:bg-ods-bg-hover', menuGroups && RECORD_CHIP_LEAD_SEGMENT_CLASS)}
+    />
+  );
+  const lead = url ? (
     <RecordNavWrap
       href={url}
       path={path}
@@ -49,9 +58,21 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
       isNewTab={isNewTab}
       hostRoute={hostRoute}
     >
-      <Link href={url} className="no-underline" {...(isNewTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+      <Link
+        href={url}
+        className="flex min-w-0 no-underline"
+        {...(isNewTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      >
         {chip}
       </Link>
     </RecordNavWrap>
+  ) : (
+    chip
+  );
+  if (!menuGroups) return lead;
+  return (
+    <RecordChipActions menuGroups={menuGroups} label={finalChatRef.title || label}>
+      {lead}
+    </RecordChipActions>
   );
 }
