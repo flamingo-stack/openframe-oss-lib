@@ -44,6 +44,14 @@ const STYLES_DIR = '.next-styles';
 const BUILD_INFO = 'build.json';
 
 /**
+ * The complete sheet's address for a build (`{ buildId, assetPrefix, basePath }`). Named by the build, so the browser
+ * bundle knows it too: a page Next draws only in the browser (a 404 is served as an empty error shell, then rendered
+ * from its data) has no route sheet from the server and loads this one itself.
+ */
+const fullSheetUrl = ({ buildId, assetPrefix, basePath }) =>
+  `${(assetPrefix || basePath || '').replace(/\/$/, '')}/_next/static/next-styles/full-${buildId}.css`;
+
+/**
  * The route-sheet build (`./route-styles.cjs`), loaded only by the `build` command. The app's next.config imports
  * this file and Turbopack traces what it imports (`join(__dirname, …)` included): reaching the build tool pulled
  * Next's own server, sharp's native libraries and esbuild into the trace and failed the build (Next 16.3).
@@ -74,24 +82,22 @@ function withRouteStyles(nextConfig) {
     const infoFile = join(root, STYLES_DIR, BUILD_INFO);
     // One id per build: the server checks the sheets it reads were written for it.
     const buildId = existsSync(infoFile) ? JSON.parse(readFileSync(infoFile, 'utf8')).buildId : crypto.randomUUID();
-    writeFileSync(
-      infoFile,
-      `${JSON.stringify(
-        {
-          buildId,
-          distDir: inline.distDir ?? '.next',
-          output: inline.output ?? null,
-          assetPrefix: inline.assetPrefix ?? '',
-          basePath: inline.basePath ?? '',
-        },
-        null,
-        2,
-      )}\n`,
-    );
+    const info = {
+      buildId,
+      distDir: inline.distDir ?? '.next',
+      output: inline.output ?? null,
+      assetPrefix: inline.assetPrefix ?? '',
+      basePath: inline.basePath ?? '',
+    };
+    writeFileSync(infoFile, `${JSON.stringify(info, null, 2)}\n`);
     // Every route: the files are read at run time by `RouteStyles`, which no static trace can follow.
     const includes = { ...inline.outputFileTracingIncludes };
     for (const route of ['/', '/*', '/*/**']) includes[route] = [...(includes[route] ?? []), `./${STYLES_DIR}/**/*`];
-    return { ...inline, env: { ...inline.env, NEXT_STYLES_BUILD: buildId }, outputFileTracingIncludes: includes };
+    return {
+      ...inline,
+      env: { ...inline.env, NEXT_STYLES_BUILD: buildId, NEXT_STYLES_FULL_URL: fullSheetUrl(info) },
+      outputFileTracingIncludes: includes,
+    };
   };
 }
 
@@ -245,4 +251,12 @@ async function buildCommand(argv) {
   });
 }
 
-module.exports = { STYLES_DIR, BUILD_INFO, withInlineStyles, withRouteStyles, measureStylesheet, resolveImports };
+module.exports = {
+  STYLES_DIR,
+  BUILD_INFO,
+  fullSheetUrl,
+  withInlineStyles,
+  withRouteStyles,
+  measureStylesheet,
+  resolveImports,
+};

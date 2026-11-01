@@ -38,13 +38,12 @@ const { join, relative, resolve } = require('node:path');
 const { brotliCompressSync, constants } = require('node:zlib');
 
 /** Where the build's route sheets live, relative to the app's directory; traced into the server bundle. */
-const { STYLES_DIR, BUILD_INFO } = require('./next-styles.cjs');
+const { STYLES_DIR, BUILD_INFO, fullSheetUrl } = require('./next-styles.cjs');
 const MANIFEST = 'manifest.json';
 /** The mark the package's stylesheet carries before `@tailwind components`: the utilities start there. */
 const UTILITIES_MARK = '/*! next-styles:utilities */';
-/** What a prerendered page's route `<style>` holds until this step fills it, and its complete sheet's address. */
+/** What a prerendered page's route `<style>` holds until this step fills it. */
 const PLACEHOLDER = '/*next-styles:route*/';
-const FULL_URL_PLACEHOLDER = '/_next/static/next-styles/__pending__.css';
 /** What a page that carries the complete sheet (`RouteStyles complete`) holds until this step fills it. */
 const COMPLETE_PLACEHOLDER = '/*next-styles:complete*/';
 const DEFAULT_BUDGET = 15 * 1024;
@@ -183,15 +182,9 @@ function standaloneCopies(root, info, marker) {
   return filesUnder(standalone, marker).map(file => file.slice(0, -marker.length));
 }
 
-/** `html` with its placeholders filled: the route's rules `css`, the complete sheet `full` and its address `fullUrl`. */
-function fillPlaceholder(html, { css, full, fullUrl }) {
-  return html
-    .split(PLACEHOLDER)
-    .join(css)
-    .split(COMPLETE_PLACEHOLDER)
-    .join(full)
-    .split(FULL_URL_PLACEHOLDER)
-    .join(fullUrl);
+/** `html` with its placeholders filled: the route's rules `css` and the complete sheet `full`. */
+function fillPlaceholder(html, { css, full }) {
+  return html.split(PLACEHOLDER).join(css).split(COMPLETE_PLACEHOLDER).join(full);
 }
 
 /** A free TCP port on this machine. */
@@ -306,7 +299,8 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
   const routeSheet = await stylesheetBuilder({ root, input, config });
   const fullSheet = fullConfig === config ? routeSheet : await stylesheetBuilder({ root, input, config: fullConfig });
   const full = await fullSheet(null);
-  const fullFile = `full-${hash(full)}.css`;
+  const fullUrl = fullSheetUrl(info);
+  const fullFile = fullUrl.split('/').pop();
 
   const routes = {};
   const sheets = new Map();
@@ -334,7 +328,6 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
       : join(resolve(root, info.distDir), 'static');
   fs.mkdirSync(join(staticDir, 'next-styles'), { recursive: true });
   fs.writeFileSync(join(staticDir, 'next-styles', fullFile), full);
-  const fullUrl = `${(info.assetPrefix || info.basePath || '').replace(/\/$/, '')}/_next/static/next-styles/${fullFile}`;
   const manifest = { version: 1, buildId: info.buildId, full: fullFile, fullUrl, routes };
   for (const dir of targets) fs.writeFileSync(join(dir, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -352,7 +345,7 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
       if (!fs.existsSync(file)) continue;
       const html = fs.readFileSync(file, 'utf8');
       if (html.includes(PLACEHOLDER) || html.includes(COMPLETE_PLACEHOLDER)) {
-        fs.writeFileSync(file, fillPlaceholder(html, { css, full, fullUrl }));
+        fs.writeFileSync(file, fillPlaceholder(html, { css, full }));
       }
     }
   }
@@ -416,7 +409,6 @@ module.exports = {
   BUILD_INFO,
   UTILITIES_MARK,
   PLACEHOLDER,
-  FULL_URL_PLACEHOLDER,
   COMPLETE_PLACEHOLDER,
   DEFAULT_BUDGET,
   renderedClasses,

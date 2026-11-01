@@ -8,7 +8,6 @@ const require = createRequire(import.meta.url);
 const routeStyles = require('../../scripts/route-styles.cjs') as {
   UTILITIES_MARK: string;
   PLACEHOLDER: string;
-  FULL_URL_PLACEHOLDER: string;
   renderedClasses: (html: string) => Set<string>;
   stylesheetBuilder: (options: {
     root: string;
@@ -23,8 +22,9 @@ const routeStyles = require('../../scripts/route-styles.cjs') as {
     budget?: number;
   }) => Promise<{ fullUrl: string; routes: Record<string, { file: string; pages: number }> }>;
 };
-const { withRouteStyles } = require('../../scripts/next-styles.cjs') as {
+const { withRouteStyles, fullSheetUrl } = require('../../scripts/next-styles.cjs') as {
   withRouteStyles: (config: object) => (phase: string) => Promise<Record<string, unknown>>;
+  fullSheetUrl: (info: { buildId: string; assetPrefix?: string; basePath?: string }) => string;
 };
 const { withRouteStylesTailwind } = require('../../scripts/style-sources.cjs') as {
   withRouteStylesTailwind: <T extends object>(config: T) => T;
@@ -134,7 +134,7 @@ describe('route-styles: a finished build', () => {
       }),
     );
     const page = (classes: string) =>
-      `<html><head><style data-href="next-styles:x" data-precedence="next-styles">${routeStyles.PLACEHOLDER}</style></head><body class="${classes}"><script data-next-styles-full="${routeStyles.FULL_URL_PLACEHOLDER}"></script></body></html>`;
+      `<html><head><style data-href="next-styles:x" data-precedence="next-styles">${routeStyles.PLACEHOLDER}</style></head><body class="${classes}"><script data-next-styles-full="/_next/static/next-styles/full-b1.css"></script></body></html>`;
     writeFileSync(join(root, '.next', 'server', 'app', 'index.html'), page('p-2'));
     writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'a.html'), page('text-center'));
     writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'b.html'), page('underline'));
@@ -171,6 +171,11 @@ describe('next-styles: the route-styles config wrappers', () => {
     expect(withRouteStylesTailwind(tailwind)).toBe(tailwind);
     const next = await withRouteStyles({ distDir: 'dist' })('phase-production-build');
     expect(next).toEqual({ distDir: 'dist', experimental: { inlineCss: true } });
+  });
+
+  it('name the complete sheet by the build, so the browser bundle knows its address', () => {
+    expect(fullSheetUrl({ buildId: 'b1' })).toBe('/_next/static/next-styles/full-b1.css');
+    expect(fullSheetUrl({ buildId: 'b1', basePath: '/help/' })).toBe('/help/_next/static/next-styles/full-b1.css');
   });
 
   it('under next-styles build, build the root sheet with no utilities', () => {

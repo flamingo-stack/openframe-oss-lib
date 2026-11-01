@@ -5,11 +5,16 @@
  * same `<style>` empty, under the same `href`: React finds the server's copy in the head by its `href` and keeps it,
  * and after a client navigation the complete sheet holds every rule. The loader starts the complete sheet when the HTML reaches it,
  * without blocking paint, and appends it after every other stylesheet so its rules are the last copy of each.
+ *
+ * A page the server did not render (Next answers a 404 with an empty error shell and draws it from its data in the
+ * browser) has neither the rules nor the loader: the effect then loads the complete sheet itself, from the address
+ * the build wrote into the bundle.
  */
 import { usePathname } from 'next/navigation';
-import { createElement, Fragment } from 'react';
+import { createElement, Fragment, useEffect } from 'react';
 
 const REGISTRY = Symbol.for('flamingo.next-styles');
+const FULL_URL = process.env.NEXT_STYLES_FULL_URL || '';
 /** Appends the complete sheet named by its own `<script data-next-styles-full>` once, at low priority. */
 const LOADER =
   "(function(s){var h=s&&s.getAttribute('data-next-styles-full');" +
@@ -17,8 +22,20 @@ const LOADER =
   "var l=document.createElement('link');l.rel='stylesheet';l.href=h;l.fetchPriority='low';" +
   "l.setAttribute('data-next-styles-full','');document.head.appendChild(l)})(document.currentScript)";
 
+/** The complete sheet, once, unless the server wrote this page's rules (its loader then started the sheet already). */
+function loadCompleteSheet(build) {
+  if (!FULL_URL || document.querySelector('link[data-next-styles-full]')) return;
+  if (document.querySelector(`style[data-href="next-styles:${build}"]`)?.textContent) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = FULL_URL;
+  link.setAttribute('data-next-styles-full', '');
+  document.head.appendChild(link);
+}
+
 export function RouteStyle({ build, complete }) {
   const pathname = usePathname();
+  useEffect(() => loadCompleteSheet(build), [build]);
   let entry;
   if (typeof window === 'undefined') {
     const resolve = globalThis[REGISTRY]?.get(build);

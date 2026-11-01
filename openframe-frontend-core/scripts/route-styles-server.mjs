@@ -22,11 +22,11 @@ const STYLES_DIR = '.next-styles';
 /** Filled into prerendered pages by `next-styles build` (the same strings as `route-styles.cjs`). */
 const PLACEHOLDER = '/*next-styles:route*/';
 const COMPLETE_PLACEHOLDER = '/*next-styles:complete*/';
-const FULL_URL_PLACEHOLDER = '/_next/static/next-styles/__pending__.css';
 const REGISTRY = Symbol.for('flamingo.next-styles');
 
-/** The build these rules belong to: written by `withRouteStyles` into the server bundle at build time. */
+/** The build these rules belong to, and its complete sheet: written by `withRouteStyles` into the bundles. */
 const BUILD = process.env.NEXT_STYLES_BUILD || '';
+const FULL_URL = process.env.NEXT_STYLES_FULL_URL || '';
 
 /** `/blog/[slug]` → a RegExp for its paths; `[...x]` takes one or more segments, `[[...x]]` none or more. */
 function routePattern(route) {
@@ -56,7 +56,7 @@ function normalize(pathname) {
 
 /**
  * The build's resolver, `(pathname, complete) → { css, fullUrl }`, read once per process. While the build
- * prerenders, it answers placeholders the build fills in afterwards.
+ * prerenders, it answers placeholders for the rules, which the build fills in afterwards.
  */
 function createResolver() {
   // Read at run time from the server's own directory (traced in by `withRouteStyles`), never followed by the
@@ -71,7 +71,7 @@ function createResolver() {
   const manifest = JSON.parse(readFileSync(file, 'utf8'));
   if (manifest.pending) {
     return (_pathname, complete) =>
-      complete ? { css: COMPLETE_PLACEHOLDER, fullUrl: null } : { css: PLACEHOLDER, fullUrl: FULL_URL_PLACEHOLDER };
+      complete ? { css: COMPLETE_PLACEHOLDER, fullUrl: null } : { css: PLACEHOLDER, fullUrl: FULL_URL };
   }
   if (manifest.buildId !== BUILD) {
     throw new Error(`next-styles: ${file} belongs to build ${manifest.buildId}, this server to ${BUILD}`);
