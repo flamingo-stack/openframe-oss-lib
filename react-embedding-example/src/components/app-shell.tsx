@@ -17,7 +17,7 @@ const NAV = [
   { to: '/onboarding-guides', label: 'Onboarding' },
   { to: DOCS_BASE_ROUTE, label: 'Knowledge Hub' },
   { to: '/roadmap', label: 'Roadmap' },
-  { to: '/delivery', label: 'Delivery' },
+  { to: '/bug-fixes-and-enhancements', label: 'Delivery' },
   { to: '/releases', label: 'Releases' },
   { to: '/authors', label: 'Authors' },
   { to: '/faqs', label: 'FAQ' },

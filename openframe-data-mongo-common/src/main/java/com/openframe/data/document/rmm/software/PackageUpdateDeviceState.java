@@ -55,6 +55,8 @@ public class PackageUpdateDeviceState implements TenantScoped {
     private String installedVersion;
     private String availableVersion;
 
+    private int retries;
+
     private Instant createdAt;
     private Instant updatedAt;
 

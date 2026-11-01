@@ -36,7 +36,7 @@ export function AppRoutes() {
         <Route path="onboarding-guides/:slug" element={<OnboardingDetailPage />} />
         <Route path="debug" element={<DebugPage />} />
         <Route path="roadmap" element={<RoadmapPage />} />
-        <Route path="delivery" element={<DeliveryPage />} />
+        <Route path="bug-fixes-and-enhancements" element={<DeliveryPage />} />
         <Route path="releases" element={<ReleasesPage />} />
         <Route path="releases/:slug" element={<ReleaseDetailRoute />} />
         <Route path="authors" element={<AuthorsPage />} />

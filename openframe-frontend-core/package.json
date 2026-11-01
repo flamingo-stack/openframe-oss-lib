@@ -43,6 +43,11 @@
       "require": "./dist/build/next-styles.cjs",
       "default": "./dist/build/next-styles.cjs"
     },
+    "./route-styles": {
+      "types": "./dist/build/route-styles.d.ts",
+      "import": "./dist/build/route-styles-server.mjs",
+      "default": "./dist/build/route-styles-server.mjs"
+    },
     "./dist/*.js": {
       "import": "./dist/*.js",
       "default": "./dist/*.js"
@@ -281,11 +286,23 @@
       "require": "./dist/utils/form-rescue.cjs",
       "default": "./dist/utils/form-rescue.js"
     },
+    "./utils/page-topics": {
+      "types": "./dist/utils/page-topics.d.ts",
+      "import": "./dist/utils/page-topics.js",
+      "require": "./dist/utils/page-topics.cjs",
+      "default": "./dist/utils/page-topics.js"
+    },
     "./utils/mobile-app": {
       "types": "./dist/utils/mobile-app.d.ts",
       "import": "./dist/utils/mobile-app.js",
       "require": "./dist/utils/mobile-app.cjs",
       "default": "./dist/utils/mobile-app.js"
+    },
+    "./utils/notifications": {
+      "types": "./dist/utils/notifications.d.ts",
+      "import": "./dist/utils/notifications.js",
+      "require": "./dist/utils/notifications.cjs",
+      "default": "./dist/utils/notifications.js"
     },
     "./utils/platform-identity": {
       "types": "./dist/utils/platform-identity.d.ts",

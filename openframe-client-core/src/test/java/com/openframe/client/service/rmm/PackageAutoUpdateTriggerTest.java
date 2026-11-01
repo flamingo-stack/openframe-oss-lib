@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
@@ -14,6 +15,7 @@ import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
+import com.openframe.data.nats.packageupdate.PackageAutoUpdateRetryWithdrawal;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -24,10 +26,12 @@ import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
 import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
 import com.openframe.data.service.rmm.software.WingetPackageManagerHandler;
+import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -60,12 +65,13 @@ class PackageAutoUpdateTriggerTest {
     private final ScriptRepository scriptRepository = mock(ScriptRepository.class);
     private final SoftwareActionResultRepository actionResultRepository = mock(SoftwareActionResultRepository.class);
     private final PackageUpdateDispatchService dispatchService = mock(PackageUpdateDispatchService.class);
+    private final DeliveryTracker deliveryTracker = mock(DeliveryTracker.class);
     private final TenantIdProvider tenantIdProvider = mock(TenantIdProvider.class);
 
     private final PackageAutoUpdateTrigger trigger = new PackageAutoUpdateTrigger(policyRepository, catalogVersions,
             eligibility,
             new PackageManagerRegistry(List.of(new BrewPackageManagerHandler(), new WingetPackageManagerHandler())),
-            scriptRepository, actionResultRepository, dispatchService, tenantIdProvider);
+            scriptRepository, actionResultRepository, dispatchService, new PackageAutoUpdateRetryWithdrawal(deliveryTracker), tenantIdProvider);
 
     @BeforeEach
     void setUp() {
@@ -166,6 +172,35 @@ class PackageAutoUpdateTriggerTest {
 
         verify(dispatchService, never()).dispatchAutoUpdate(any(), any(), any());
         verify(policyRepository, never()).markOrdered(any(), any());
+    }
+
+    @Test
+    @DisplayName("a retry waiting for an older version is withdrawn before the new order, so it cannot replace it on the agent")
+    void newVersion_withdrawsAWaitingRetry() {
+        PackageAutoUpdatePolicy waitingRetry = chrome("p1", "m1", "151", WAIT);
+        waitingRetry.setRetryRequestId("req-old");
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(waitingRetry, chrome("p2", "m2", "151", WAIT)));
+        when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of("m1", "m2"));
+
+        trigger.run();
+
+        InOrder order = inOrder(deliveryTracker, dispatchService);
+        order.verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-old"), eq("m1"), any());
+        order.verify(dispatchService).dispatchAutoUpdate(any(), any(), any());
+        verify(deliveryTracker, times(1)).cancel(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("a device not ordered in this pass keeps its waiting retry")
+    void ineligibleDevice_keepsItsRetry() {
+        PackageAutoUpdatePolicy waitingRetry = chrome("p1", "m1", "151", WAIT);
+        waitingRetry.setRetryRequestId("req-old");
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(waitingRetry));
+        when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of());
+
+        trigger.run();
+
+        verifyNoInteractions(deliveryTracker);
     }
 
     @Test

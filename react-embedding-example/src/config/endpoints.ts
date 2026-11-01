@@ -35,6 +35,8 @@ export const EP = {
   // The questions an "ask" surface offers (the FAQ's card): `?count&topic&exclude`.
   // `topic` is the surface's topic, any FAQ topic the hub knows.
   askPrompts: `${CONTENT}/faqs/questions`,
+  // The FAQ list: every <FaqSection> without a base of its own, and the shared pages' own FAQ blocks.
+  faqs: `${CONTENT}/faqs`,
   docsSearch: `${CONTENT}/docs/search`,
   // doc sources (knowledge-base mounts <DocsHubPage> against these)
   docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,
