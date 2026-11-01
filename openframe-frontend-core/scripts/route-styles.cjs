@@ -127,13 +127,15 @@ async function stylesheetBuilder({ root, input, config }) {
   };
 }
 
-/** Every file under `dir` whose name ends with `suffix`. */
+/** Every file under `dir` whose path ends with `suffix` (a name, `.html`, or a path such as `.next-styles/build.json`). */
 function filesUnder(dir, suffix, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) filesUnder(path, suffix, out);
-    else if (entry.name.endsWith(suffix)) out.push(path);
+    // A standalone build copies its dependencies under node_modules: no page or marker of the app is there.
+    if (entry.isDirectory()) {
+      if (entry.name !== 'node_modules') filesUnder(path, suffix, out);
+    } else if (path.endsWith(suffix)) out.push(path);
   }
   return out;
 }
