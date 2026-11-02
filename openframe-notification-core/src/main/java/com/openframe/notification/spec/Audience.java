@@ -1,5 +1,7 @@
 package com.openframe.notification.spec;
 
+import com.openframe.data.document.user.UserRole;
+
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -14,21 +16,20 @@ public final class Audience {
 
     final Set<String> userIds;
     final Set<String> machineIds;
-    final boolean allActiveAdmins;
-    final boolean allActiveOwners;
+    // Effective roles (an owner is an admin too): the resolver widens them with UserRole.grantedFor.
+    final Set<UserRole> activeRoles;
     final Set<String> excludedUserIds;
 
     private Audience(Set<String> userIds, Set<String> machineIds,
-                     boolean allActiveAdmins, boolean allActiveOwners, Set<String> excludedUserIds) {
+                     Set<UserRole> activeRoles, Set<String> excludedUserIds) {
         this.userIds = userIds;
         this.machineIds = machineIds;
-        this.allActiveAdmins = allActiveAdmins;
-        this.allActiveOwners = allActiveOwners;
+        this.activeRoles = activeRoles;
         this.excludedUserIds = excludedUserIds;
     }
 
     public static Audience none() {
-        return new Audience(Set.of(), Set.of(), false, false, Set.of());
+        return new Audience(Set.of(), Set.of(), Set.of(), Set.of());
     }
 
     public static Audience users(String... ids) {
@@ -38,7 +39,7 @@ public final class Audience {
 
     public static Audience users(Collection<String> ids) {
         Set<String> sanitized = sanitize(ids);
-        return new Audience(sanitized, Set.of(), false, false, Set.of());
+        return new Audience(sanitized, Set.of(), Set.of(), Set.of());
     }
 
     public static Audience machines(String... ids) {
@@ -48,22 +49,23 @@ public final class Audience {
 
     public static Audience machines(Collection<String> ids) {
         Set<String> sanitized = sanitize(ids);
-        return new Audience(Set.of(), sanitized, false, false, Set.of());
+        return new Audience(Set.of(), sanitized, Set.of(), Set.of());
+    }
+
+    /** Every active user who is effectively this role: ADMIN reaches the owners too, OWNER only them. */
+    public static Audience allActive(UserRole role) {
+        Set<UserRole> roles = Set.of(role);
+        return new Audience(Set.of(), Set.of(), roles, Set.of());
     }
 
     public static Audience allActiveAdmins() {
-        return new Audience(Set.of(), Set.of(), true, false, Set.of());
-    }
-
-    // Owners only — allActiveAdmins() already includes them, so the two never need combining.
-    public static Audience allActiveOwners() {
-        return new Audience(Set.of(), Set.of(), false, true, Set.of());
+        return allActive(UserRole.ADMIN);
     }
 
     public Audience andUsers(Collection<String> ids) {
         Set<String> sanitized = sanitize(ids);
         Set<String> merged = union(userIds, sanitized);
-        return new Audience(merged, machineIds, allActiveAdmins, allActiveOwners, excludedUserIds);
+        return new Audience(merged, machineIds, activeRoles, excludedUserIds);
     }
 
     public Audience andMachines(String... ids) {
@@ -74,7 +76,7 @@ public final class Audience {
     public Audience andMachines(Collection<String> ids) {
         Set<String> sanitized = sanitize(ids);
         Set<String> merged = union(machineIds, sanitized);
-        return new Audience(userIds, merged, allActiveAdmins, allActiveOwners, excludedUserIds);
+        return new Audience(userIds, merged, activeRoles, excludedUserIds);
     }
 
     // Two-phase: cuts the id from the explicit set now AND from whatever a marker resolves to later.
@@ -86,7 +88,7 @@ public final class Audience {
         kept.remove(userId);
         Set<String> keptCopy = Set.copyOf(kept);
         Set<String> excluded = union(excludedUserIds, Set.of(userId));
-        return new Audience(keptCopy, machineIds, allActiveAdmins, allActiveOwners, excluded);
+        return new Audience(keptCopy, machineIds, activeRoles, excluded);
     }
 
     private static Set<String> sanitize(Collection<String> ids) {

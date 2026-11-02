@@ -15,20 +15,16 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AudienceResolver {
 
-    private static final List<UserRole> ADMIN_ROLES = List.of(UserRole.ADMIN, UserRole.OWNER);
-    private static final List<UserRole> OWNER_ROLES = List.of(UserRole.OWNER);
-
     private final UserRepository userRepository;
 
     public Recipients resolve(Audience declared) {
         Set<String> users = new LinkedHashSet<>(declared.userIds);
-        if (declared.allActiveAdmins) {
-            Set<String> admins = resolveActive(ADMIN_ROLES);
-            users.addAll(admins);
-        }
-        if (declared.allActiveOwners) {
-            Set<String> owners = resolveActive(OWNER_ROLES);
-            users.addAll(owners);
+        if (!declared.activeRoles.isEmpty()) {
+            Set<UserRole> granted = UserRole.grantedFor(declared.activeRoles);
+            // A List, not the EnumSet: the callers' tests stub the repository with anyList().
+            List<UserRole> grantedList = List.copyOf(granted);
+            Set<String> byRole = resolveActive(grantedList);
+            users.addAll(byRole);
         }
         users.removeAll(declared.excludedUserIds);
         return Recipients.of(users, declared.machineIds);
