@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,7 +26,19 @@ const routeStyles = require('../../scripts/route-styles.cjs') as {
     config: string;
     fullConfig: string;
     budget?: number;
-  }) => Promise<{ fullUrl: string; routes: Record<string, { file: string; pages: number }> }>;
+  }) => Promise<{ fullUrl: string; over: string[]; routes: Record<string, { file: string; pages: number }> }>;
+};
+type Output = { id: string; runtime: string; assets: Record<string, string>; assetsHashes: Record<string, string> };
+const adapter = require('../../scripts/route-styles-adapter.cjs') as {
+  name: string;
+  onBuildComplete: (ctx: {
+    projectDir: string;
+    repoRoot: string;
+    config: { basePath?: string; outputHashSalt?: string };
+    outputs: Record<'appPages' | 'appRoutes' | 'pages' | 'pagesApi', Output[]> & {
+      staticFiles: { type: string; id: string; pathname: string; filePath: string }[];
+    };
+  }) => Promise<void>;
 };
 const { withRouteStyles, fullSheetUrl } = require('../../scripts/next-styles.cjs') as {
   withRouteStyles: (config: object) => (phase: string) => Promise<Record<string, unknown>>;
@@ -142,16 +154,9 @@ describe('route-styles: a finished build', () => {
     const page = (classes: string) =>
       `<html><head><style data-href="next-styles:x" data-precedence="next-styles">${routeStyles.PLACEHOLDER}</style></head><body class="${classes}"><script data-next-styles-full="/_next/static/next-styles/full-b1.css"></script></body></html>`;
     writeFileSync(join(root, '.next', 'server', 'app', 'index.html'), page('p-2'));
-    // A standalone server build's copy (`output: 'standalone'`, what a Docker image runs): its own `.next-styles/`
-    // and prerendered pages, filled with the rest. A dependency's files of the same name are not the app's.
-    const standalone = join(root, '.next', 'standalone');
-    mkdirSync(join(standalone, '.next-styles'), { recursive: true });
-    mkdirSync(join(standalone, '.next', 'server', 'app'), { recursive: true });
-    mkdirSync(join(standalone, 'node_modules', 'dep', '.next-styles'), { recursive: true });
-    writeFileSync(join(standalone, '.next-styles', 'build.json'), '{}');
-    writeFileSync(join(standalone, '.next-styles', 'manifest.json'), JSON.stringify({ version: 1, pending: true }));
-    writeFileSync(join(standalone, 'node_modules', 'dep', '.next-styles', 'build.json'), '{}');
-    writeFileSync(join(standalone, '.next', 'server', 'app', 'index.html'), page('p-2'));
+    // The static 404 Next copies from the app's not-found page: no prerender entry names it.
+    mkdirSync(join(root, '.next', 'server', 'pages'), { recursive: true });
+    writeFileSync(join(root, '.next', 'server', 'pages', '404.html'), page('underline'));
     writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'a.html'), page('text-center'));
     writeFileSync(join(root, '.next', 'server', 'app', 'blog', 'b.html'), page('underline'));
   });
@@ -165,7 +170,10 @@ describe('route-styles: a finished build', () => {
       config: 'tailwind.config.cjs',
       fullConfig: 'tailwind.config.cjs',
     });
-    expect(Object.keys(manifest.routes).sort()).toEqual(['/', '/blog/[slug]']);
+    expect(Object.keys(manifest.routes).sort()).toEqual(['/', '/_not-found', '/blog/[slug]']);
+    const notFound = readFileSync(join(root, '.next', 'server', 'pages', '404.html'), 'utf8');
+    expect(notFound).not.toContain(routeStyles.PLACEHOLDER);
+    expect(notFound).toContain('.underline');
     expect(manifest.routes['/blog/[slug]'].pages).toBe(2);
     const blogSheet = readFileSync(join(root, '.next-styles', 'sheets', manifest.routes['/blog/[slug]'].file), 'utf8');
     expect(blogSheet).toContain('.text-center');
@@ -175,15 +183,95 @@ describe('route-styles: a finished build', () => {
     expect(home).not.toContain(routeStyles.PLACEHOLDER);
     expect(home).toContain('.p-2');
     expect(home).toContain(`data-next-styles-full="${manifest.fullUrl}"`);
-    const copy = join(root, '.next', 'standalone');
-    const copied = JSON.parse(readFileSync(join(copy, '.next-styles', 'manifest.json'), 'utf8'));
-    expect(copied.pending).toBeUndefined();
-    expect(Object.keys(copied.routes).sort()).toEqual(['/', '/blog/[slug]']);
-    expect(readFileSync(join(copy, '.next', 'server', 'app', 'index.html'), 'utf8')).toContain('.p-2');
-    expect(existsSync(join(copy, 'node_modules', 'dep', '.next-styles', 'manifest.json'))).toBe(false);
+    expect(manifest.over).toEqual([]);
     expect(
       readFileSync(join(root, '.next', 'static', 'next-styles', manifest.fullUrl.split('/').pop() as string), 'utf8'),
     ).toContain('.underline');
+  });
+});
+
+describe('route-styles: the build adapter', () => {
+  let root: string;
+  const node = (id: string, hashed: boolean): Output => ({
+    id,
+    runtime: 'nodejs',
+    assets: { 'app/page.js': '/x/app/page.js' },
+    assetsHashes: hashed ? { 'app/page.js': 'h' } : {},
+  });
+
+  beforeAll(() => {
+    root = mkdtempSync(join(tmpdir(), 'route-styles-adapter-'));
+    mkdirSync(join(root, 'app'), { recursive: true });
+    mkdirSync(join(root, '.next', 'server', 'app'), { recursive: true });
+    mkdirSync(join(root, '.next', 'static'), { recursive: true });
+    mkdirSync(join(root, '.next-styles'), { recursive: true });
+    writeFileSync(join(root, 'app', 'page.tsx'), 'export default () => <p className="p-2" />');
+    writeFileSync(join(root, 'app', 'globals.css'), `${routeStyles.UTILITIES_MARK}\n@tailwind utilities;\n`);
+    writeFileSync(join(root, 'tailwind.config.cjs'), 'module.exports = { content: [] }');
+    writeFileSync(
+      join(root, 'postcss.config.cjs'),
+      `module.exports = { plugins: { ${JSON.stringify(require.resolve('tailwindcss'))}: {} } }`,
+    );
+    writeFileSync(
+      join(root, '.next', 'prerender-manifest.json'),
+      JSON.stringify({ routes: { '/': { srcRoute: '/' } } }),
+    );
+    writeFileSync(
+      join(root, '.next', 'server', 'app', 'index.html'),
+      `<html><head><style>${routeStyles.PLACEHOLDER}</style></head><body class="p-2"></body></html>`,
+    );
+    // The adapter the host would have run: it records what it was handed.
+    writeFileSync(
+      join(root, 'host-adapter.cjs'),
+      'module.exports = { name: "host", onBuildComplete: ctx => { globalThis.handedOn = JSON.parse(JSON.stringify(ctx.outputs)) } }',
+    );
+    writeFileSync(
+      join(root, '.next-styles', 'build.json'),
+      JSON.stringify({
+        buildId: 'b2',
+        distDir: '.next',
+        output: null,
+        inner: join(root, 'host-adapter.cjs'),
+        options: { input: 'app/globals.css', config: 'tailwind.config.cjs', fullConfig: 'tailwind.config.cjs' },
+      }),
+    );
+  });
+
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('fills the pages, then hands the host adapter outputs that carry what it wrote', async () => {
+    const edge = { ...node('edge', false), runtime: 'edge' };
+    await adapter.onBuildComplete({
+      projectDir: root,
+      repoRoot: root,
+      config: {},
+      outputs: {
+        appPages: [node('turbopack', true), edge],
+        appRoutes: [node('webpack', false)],
+        pages: [],
+        pagesApi: [],
+        staticFiles: [],
+      },
+    });
+    expect(readFileSync(join(root, '.next', 'server', 'app', 'index.html'), 'utf8')).toContain('.p-2');
+    const handed = (globalThis as { handedOn?: Record<string, Output[]> }).handedOn as Record<string, Output[]>;
+    const [turbopack, edgeOutput] = handed.appPages;
+    const [webpack] = handed.appRoutes;
+    expect(turbopack.assets['.next-styles/manifest.json']).toBe(join(root, '.next-styles', 'manifest.json'));
+    expect(Object.keys(turbopack.assets).some(key => key.startsWith('.next-styles/sheets/route-'))).toBe(true);
+    expect(turbopack.assetsHashes['.next-styles/manifest.json']).toMatch(/^[0-9a-f]{64}$/);
+    expect(webpack.assets['.next-styles/manifest.json']).toBeDefined();
+    expect(webpack.assetsHashes).toEqual({});
+    expect(edgeOutput.assets).toEqual({ 'app/page.js': '/x/app/page.js' });
+    expect(handed.staticFiles).toEqual([
+      {
+        type: 'STATIC_FILE',
+        id: 'static/next-styles/full-b2.css',
+        pathname: '/_next/static/next-styles/full-b2.css',
+        filePath: join(root, '.next', 'static', 'next-styles', 'full-b2.css'),
+        immutableHash: undefined,
+      },
+    ]);
   });
 });
 
@@ -245,7 +333,7 @@ describe('RouteStyles: the rules a page gets on the server', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('matches the page path to its route, a static route before a dynamic one, and the complete sheet otherwise', async () => {
+  it('matches the page path to its route, a static route before a dynamic one, the home page by either name, and the complete sheet otherwise', async () => {
     const { RouteStyles } = await import('../../scripts/route-styles-server.mjs');
     const element = RouteStyles({}) as { props: { build: string } };
     expect(element.props.build).toBe('b2');
@@ -257,6 +345,8 @@ describe('RouteStyles: the rules a page gets on the server', () => {
     )[Symbol.for('flamingo.next-styles')].get('b2');
     if (!resolve) throw new Error('RouteStyles registered no resolver');
     expect(resolve('/', false).css).toBe('.home{}');
+    // A home page Vercel regenerates renders as its `index` function: the path it sees is `/index`.
+    expect(resolve('/index', false).css).toBe('.home{}');
     expect(resolve('/blog/', false).css).toBe('.blog{}');
     expect(resolve('/blog/a-post', false)).toEqual({ css: '.post{}', fullUrl: '/_next/static/next-styles/full.css' });
     expect(resolve('/docs/a/b', false).css).toBe('.docs{}');

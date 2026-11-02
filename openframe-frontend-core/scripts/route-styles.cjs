@@ -19,7 +19,9 @@
  *      per route with the app's own Tailwind config, PostCSS plugins and stylesheet. It writes them where the
  *      server reads them (`.next-styles/`, traced into the server bundle) and fills each prerendered page's
  *      placeholder. A page rendered later (on its first request, or again after `revalidate`) reads its route's
- *      sheet when it renders.
+ *      sheet when it renders. It runs inside `next build`, as a build adapter (`./route-styles-adapter.cjs`), once
+ *      every page is prerendered and before anything is packaged: on Vercel, whose own adapter packages the build
+ *      when `next build` ends, a step run after it reached no deployment.
  *   3. The complete sheet, built the same way from the full config, is a static file the page loads after its
  *      first paint, for what the page renders later (a menu opened, a panel loaded, a page navigated to).
  *
@@ -127,22 +129,21 @@ async function stylesheetBuilder({ root, input, config }) {
   };
 }
 
-/** Every file under `dir` whose path ends with `suffix` (a name, `.html`, or a path such as `.next-styles/build.json`). */
+/** Every file under `dir` whose name ends with `suffix`. */
 function filesUnder(dir, suffix, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
-    // A standalone build copies its dependencies under node_modules: no page or marker of the app is there.
-    if (entry.isDirectory()) {
-      if (entry.name !== 'node_modules') filesUnder(path, suffix, out);
-    } else if (path.endsWith(suffix)) out.push(path);
+    if (entry.isDirectory()) filesUnder(path, suffix, out);
+    else if (entry.name.endsWith(suffix)) out.push(path);
   }
   return out;
 }
 
 /**
  * The prerendered pages of the build, each with the route it belongs to: `{ file, route }`. A server build keeps
- * them under `<distDir>/server/app` (and the standalone copy), a static export writes them into `distDir`.
+ * them under `<distDir>/server/app` (its static 404 under `<distDir>/server/pages`), a static export writes them
+ * into `distDir`.
  * The route of a page is the prerender manifest's `srcRoute` (`/blog/[slug]` for `/blog/x`).
  */
 function prerenderedPages(root, info) {
@@ -151,6 +152,9 @@ function prerenderedPages(root, info) {
   const routes = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manifestFile, 'utf8')).routes : {};
   const routeOf = new Map();
   for (const [path, entry] of Object.entries(routes)) routeOf.set(path, entry.srcRoute ?? path);
+  // Next copies the app's not-found page to the static 404 (`server/pages/404.html`, `404.html` in an export),
+  // which no prerender entry names: the host serves it for every missing address.
+  if (!routeOf.has('/404')) routeOf.set('/404', '/_not-found');
   const pathOfFile = (base, file) => {
     const rel = relative(base, file)
       .split('\\')
@@ -159,7 +163,8 @@ function prerenderedPages(root, info) {
     const path = `/${rel}`.replace(/\/index$/, '') || '/';
     return path === '' ? '/' : path;
   };
-  const bases = info.output === 'export' ? [distDir] : [join(distDir, 'server', 'app')];
+  const bases =
+    info.output === 'export' ? [distDir] : [join(distDir, 'server', 'app'), join(distDir, 'server', 'pages')];
   const pages = [];
   for (const base of bases) {
     for (const file of filesUnder(base, '.html')) {
@@ -171,12 +176,6 @@ function prerenderedPages(root, info) {
     }
   }
   return pages;
-}
-
-/** The standalone copies of a server build's files (`<distDir>/standalone/...`), found by the copy of `marker`. */
-function standaloneCopies(root, info, marker) {
-  const standalone = resolve(root, info.distDir, 'standalone');
-  return filesUnder(standalone, marker).map(file => file.slice(0, -marker.length));
 }
 
 /** `html` with its placeholders filled: the route's rules `css` and the complete sheet `full`. */
@@ -272,8 +271,8 @@ async function crawlRoutes(root, routes, { concurrency = 4, timeoutMs = 60_000 }
 }
 
 /**
- * The route sheets of a finished build: built, written, filled into the prerendered pages and checked against
- * `budget` (brotli bytes per route). Resolves to the report; sets a failing exit code over the budget.
+ * The route sheets of a build whose pages are prerendered: built, written, filled into the prerendered pages and
+ * checked against `budget` (brotli bytes per route). Resolves to the manifest and `over`, the routes over budget.
  */
 async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFAULT_BUDGET, crawl = true }) {
   const stylesDir = join(root, STYLES_DIR);
@@ -309,16 +308,10 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
   }
   for (const page of [...pages, ...crawled]) routes[page.route].pages += 1;
 
-  // The server reads these (traced into its bundle by `withRouteStyles`); the complete sheet is also a static file.
-  const targets = [
-    stylesDir,
-    ...standaloneCopies(root, info, join(STYLES_DIR, BUILD_INFO)).map(dir => join(dir, STYLES_DIR)),
-  ];
-  for (const dir of targets) {
-    fs.mkdirSync(join(dir, 'sheets'), { recursive: true });
-    for (const [file, css] of sheets) fs.writeFileSync(join(dir, 'sheets', file), css);
-    fs.writeFileSync(join(dir, 'sheets', fullFile), full);
-  }
+  // The server reads these (added to every server function by the adapter); the complete sheet is also a static file.
+  fs.mkdirSync(join(stylesDir, 'sheets'), { recursive: true });
+  for (const [file, css] of sheets) fs.writeFileSync(join(stylesDir, 'sheets', file), css);
+  fs.writeFileSync(join(stylesDir, 'sheets', fullFile), full);
   const staticDir =
     info.output === 'export'
       ? join(resolve(root, info.distDir), '_next', 'static')
@@ -326,24 +319,12 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
   fs.mkdirSync(join(staticDir, 'next-styles'), { recursive: true });
   fs.writeFileSync(join(staticDir, 'next-styles', fullFile), full);
   const manifest = { version: 1, buildId: info.buildId, full: fullFile, fullUrl, routes };
-  for (const dir of targets) fs.writeFileSync(join(dir, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
+  fs.writeFileSync(join(stylesDir, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
 
-  // Fill every prerendered page, the standalone copies included (the server answers those directly).
-  const copies = standaloneCopies(root, info, join(STYLES_DIR, BUILD_INFO)).map(dir =>
-    join(dir, relative(root, resolve(root, info.distDir)), 'server', 'app'),
-  );
   for (const page of pages) {
-    const css = sheets.get(routes[page.route].file);
-    const files = [
-      page.file,
-      ...copies.map(dir => join(dir, relative(join(resolve(root, info.distDir), 'server', 'app'), page.file))),
-    ];
-    for (const file of files) {
-      if (!fs.existsSync(file)) continue;
-      const html = fs.readFileSync(file, 'utf8');
-      if (html.includes(PLACEHOLDER) || html.includes(COMPLETE_PLACEHOLDER)) {
-        fs.writeFileSync(file, fillPlaceholder(html, { css, full }));
-      }
+    const html = fs.readFileSync(page.file, 'utf8');
+    if (html.includes(PLACEHOLDER) || html.includes(COMPLETE_PLACEHOLDER)) {
+      fs.writeFileSync(page.file, fillPlaceholder(html, { css: sheets.get(routes[page.route].file), full }));
     }
   }
 
@@ -352,7 +333,7 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
     console.log(
       `[next-styles] complete sheet for ${missed.length} route(s) that answered no page: ${missed.join(', ')}`,
     );
-  const over = Object.entries(routes).filter(([, sheet]) => sheet.brotli > budget);
+  const over = Object.keys(routes).filter(route => routes[route].brotli > budget);
   console.log(
     `[next-styles] complete sheet ${kb(Buffer.byteLength(full))} raw, ${kb(brotli(full))} brotli (after paint)`,
   );
@@ -366,9 +347,25 @@ async function writeRouteStyles({ root, input, config, fullConfig, budget = DEFA
       `[next-styles] FAIL: ${over.length} route sheet(s) over ${kb(budget)} brotli. A route's sheet is what its page renders ` +
         'before it is interactive: render less on the first screen (load the rest when it opens), or raise the budget with the reason.',
     );
-    process.exitCode = 1;
   }
-  return manifest;
+  return { ...manifest, over };
+}
+
+/**
+ * The `.next-styles/` copies of a standalone build (`output: 'standalone'`, what a Docker image runs). Next copies
+ * the files a trace names, and the trace ran before the route step wrote its sheets, so each copy is replaced by
+ * the finished folder. The pages in the copy are the filled ones (the adapter ran before Next copied them).
+ */
+function standaloneStyleDirs(root, info, dir = resolve(root, info.distDir, 'standalone'), out = []) {
+  if (!fs.existsSync(dir)) return out;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    // A standalone build copies its dependencies under node_modules: no folder of the app is there.
+    if (!entry.isDirectory() || entry.name === 'node_modules') continue;
+    const path = join(dir, entry.name);
+    if (entry.name === STYLES_DIR && fs.existsSync(join(path, BUILD_INFO))) out.push(path);
+    else standaloneStyleDirs(root, info, path, out);
+  }
+  return out;
 }
 
 /** Runs `command args` in `root` with `env` added, resolving on exit 0. */
@@ -383,8 +380,9 @@ function run(command, args, { root, env }) {
 }
 
 /**
- * `next build` with per-route sheets: prepares `.next-styles/`, runs the build with `NEXT_STYLES=routes`, then
- * writes the route sheets. `nextArgs` are passed to `next build`.
+ * `next build` with per-route sheets: prepares `.next-styles/` and runs the build with `NEXT_STYLES=routes` and the
+ * route step's `options` (`withRouteStyles` hands both to the adapter, which writes the sheets). `nextArgs` are
+ * passed to `next build`.
  */
 async function buildWithRouteStyles({ root, nextArgs = [], ...options }) {
   const stylesDir = join(root, STYLES_DIR);
@@ -393,11 +391,21 @@ async function buildWithRouteStyles({ root, nextArgs = [], ...options }) {
   // The server bundle traces these files when it is built, so they exist before it is (filled after it).
   fs.writeFileSync(join(stylesDir, MANIFEST), `${JSON.stringify({ version: 1, pending: true })}\n`);
   const nextBin = require.resolve('next/dist/bin/next', { paths: [root] });
-  await run(process.execPath, [nextBin, 'build', ...nextArgs], { root, env: { NEXT_STYLES: 'routes' } });
+  await run(process.execPath, [nextBin, 'build', ...nextArgs], {
+    root,
+    env: { NEXT_STYLES: 'routes', NEXT_STYLES_OPTIONS: JSON.stringify(options) },
+  });
   if (!fs.existsSync(join(stylesDir, BUILD_INFO))) {
     throw new Error('next-styles: the build did not record its settings: wrap next.config with withRouteStyles');
   }
-  return writeRouteStyles({ root, ...options });
+  const manifest = JSON.parse(fs.readFileSync(join(stylesDir, MANIFEST), 'utf8'));
+  if (manifest.pending) throw new Error('next-styles: the build ran without its route step (the build adapter)');
+  const info = JSON.parse(fs.readFileSync(join(stylesDir, BUILD_INFO), 'utf8'));
+  for (const copy of standaloneStyleDirs(root, info)) {
+    fs.rmSync(copy, { recursive: true, force: true });
+    fs.cpSync(stylesDir, copy, { recursive: true });
+  }
+  return manifest;
 }
 
 module.exports = {

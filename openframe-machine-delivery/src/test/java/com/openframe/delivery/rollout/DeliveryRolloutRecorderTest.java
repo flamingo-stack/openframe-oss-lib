@@ -22,7 +22,11 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,5 +83,69 @@ class DeliveryRolloutRecorderTest {
         assertThat(rollout.getStartedAt()).isNotNull();
         assertThat(rollout.getPayloadJson()).contains("1.5.11");
         verify(metrics).recordRolloutStarted(DeliveryType.CLIENT_UPDATE);
+    }
+    @Test
+    void record_sameBodyWhileTheRolloutRuns_repeatIgnoredNothingRestarted() {
+        // setup
+        when(tenants.getTenantId()).thenReturn(TENANT_ID);
+        recorder.record(request);
+        verify(repository).save(rolloutCaptor.capture());
+        MachineDeliveryRollout running = rolloutCaptor.getValue();
+        when(repository.findById(running.getId())).thenReturn(Optional.of(running));
+        TestPayload again = new TestPayload();
+        again.setValue("1.5.11");
+        again.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UPDATE, TARGET_ID, "d-rollout-retry"));
+        DeliveryRequest<TestPayload> retry = request.toBuilder().payload(again).build();
+
+        // execution
+        recorder.record(retry);
+
+        // verifications
+        verify(repository, times(1)).save(any());
+        verify(sequences, times(1)).next();
+        verify(metrics, times(1)).recordRolloutStarted(DeliveryType.CLIENT_UPDATE);
+    }
+
+    @Test
+    void record_anotherBodyWhileTheRolloutRuns_newOrderTakesTheRolloutOver() {
+        // setup
+        when(tenants.getTenantId()).thenReturn(TENANT_ID);
+        when(sequences.next()).thenReturn(SEQUENCE, SEQUENCE + 1);
+        recorder.record(request);
+        verify(repository).save(rolloutCaptor.capture());
+        MachineDeliveryRollout running = rolloutCaptor.getValue();
+        when(repository.findById(running.getId())).thenReturn(Optional.of(running));
+        TestPayload newer = new TestPayload();
+        newer.setValue("1.5.12");
+        newer.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UPDATE, TARGET_ID, "d-rollout-2"));
+
+        // execution
+        recorder.record(request.toBuilder().payload(newer).build());
+
+        // verifications
+        verify(repository, times(2)).save(rolloutCaptor.capture());
+        MachineDeliveryRollout replaced = rolloutCaptor.getValue();
+        assertThat(replaced.getSequence()).isEqualTo(SEQUENCE + 1);
+        assertThat(replaced.getBodyHash()).isNotEqualTo(running.getBodyHash());
+        assertThat(replaced.getPayloadJson()).contains("1.5.12");
+    }
+
+    @Test
+    void record_sameBodyAfterTheRolloutFinished_newRollout() {
+        // setup
+        when(tenants.getTenantId()).thenReturn(TENANT_ID);
+        when(sequences.next()).thenReturn(SEQUENCE, SEQUENCE + 1);
+        recorder.record(request);
+        verify(repository).save(rolloutCaptor.capture());
+        MachineDeliveryRollout finished = rolloutCaptor.getValue();
+        finished.setStatus(DeliveryRolloutStatus.DONE);
+        when(repository.findById(finished.getId())).thenReturn(Optional.of(finished));
+
+        // execution
+        recorder.record(request);
+
+        // verifications
+        verify(repository, times(2)).save(any());
+        verify(metrics, times(2)).recordRolloutStarted(DeliveryType.CLIENT_UPDATE);
     }
 }
