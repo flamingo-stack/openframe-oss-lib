@@ -145,7 +145,7 @@ describe('createChatStreamReducer — implicit approve-on-execution transport ga
     expect((card as { status?: string }).status).toBe('approved');
   });
 
-  it("transport 'sse': tool-execution events are ignored — a pending card stays pending", () => {
+  it("transport 'sse': a tool-execution event draws its row and never approves a pending card", () => {
     const r = createChatStreamReducer({ transport: 'sse' });
     r.beginSseSend({ text: 'open a ticket', assistantName: 'Mingo AI' });
     r.apply({
@@ -155,29 +155,32 @@ describe('createChatStreamReducer — implicit approve-on-execution transport ga
       command: 'Create ticket',
       fields: [{ label: 'Subject', value: 'Printer down' }],
     });
-    const before = r.state.messages;
     r.apply(executing());
-    // Ignored entirely: same references, card untouched.
-    expect(r.state.messages).toBe(before);
     const trailing = r.state.messages[r.state.messages.length - 1];
+    expect(trailing.segments?.some(s => s.type === 'tool_execution')).toBe(true);
     const card = trailing.segments?.find(s => s.type === 'approval_request');
     expect((card as { status?: string }).status).toBe('pending');
   });
 });
 
 describe('createChatStreamReducer — SSE kernel', () => {
-  it('accumulates text cumulatively, keeps one thinking segment at the front, escapes tags', () => {
+  it('stores thinking in order, the way a NATS turn does, and keeps answer text after it its own segment', () => {
     const r = createChatStreamReducer({ transport: 'sse' });
     r.beginSseSend({ text: 'q', assistantName: 'Mingo AI' });
     r.apply({ type: 'thinking-delta', text: 'checking <docs>… ' });
+    r.apply({ type: 'thinking-delta', text: 'found it.' });
     r.apply({ type: 'turn-start' });
     r.apply({ type: 'text-delta', text: 'Answer ' });
-    r.apply({ type: 'thinking-delta', text: 'found it.' });
     r.apply({ type: 'text-delta', text: 'body.' });
+    r.apply({ type: 'thinking-delta', text: 'one more check.' });
+    r.apply({ type: 'text-delta', text: 'Done.' });
     const trailing = r.state.messages[r.state.messages.length - 1];
+    // The text is stored as written: `<` is escaped where thinking is drawn (`ThinkingDisplay`), for both transports.
     expect(trailing.segments).toEqual([
-      { type: 'thinking', text: 'checking &lt;docs>… found it.' },
+      { type: 'thinking', text: 'checking <docs>… found it.' },
       { type: 'text', text: 'Answer body.' },
+      { type: 'thinking', text: 'one more check.' },
+      { type: 'text', text: 'Done.' },
     ]);
     expect(r.state.streamingPhase).toBe('streaming');
   });

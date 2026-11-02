@@ -51,7 +51,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
         aria-selected={selected}
         disabled={disabled}
         onClick={onClick}
-        className={cn('content-md:h-16', className)}
+        className={className}
       >
         {icon && (
           <span

@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenFrame &bull; Sign In</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- The design system's fonts (openframe-frontend-core's fonts.css, packaged by this module's build):
+         self-hosted, the same files every OpenFrame app loads. The body font is fetched at once. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin th:href="@{/fonts/dm-sans-latin-500-normal.woff2}">
+    <link rel="stylesheet" th:href="@{/fonts.css}">
     <style>
         :root {
             --color-bg: #161616;

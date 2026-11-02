@@ -1,6 +1,8 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.CreateSoftwareScheduleInput;
+import com.openframe.api.dto.rmm.software.PackageUpdateSettingsInput;
+import com.openframe.api.dto.rmm.software.SoftwareAutoUpdateInput;
 import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.UpdateSoftwareScheduleInput;
@@ -16,6 +18,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.repository.rmm.SoftwareScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
@@ -263,6 +266,75 @@ class SoftwareScheduleServiceTest {
         when(targetResolver.resolveMachineIds(existing)).thenReturn(List.of("m-7", "m-8"));
 
         assertThat(service.getMachineIds(SCHEDULE_ID)).containsExactly("m-7", "m-8");
+    }
+
+    @Test
+    @DisplayName("create UPDATE: the update settings and auto-update are stored and returned, a forced install keeps no deadline")
+    void createUpdateStoresAndReturnsSettings() {
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, "Nightly Slack", UNIQUE_STATUSES))
+                .thenReturn(false);
+        createInput.setAction(SoftwareAction.UPDATE);
+        createInput.setUpdateSettings(settingsInput(PackageUpdateMode.FORCE, 3_600L, 60));
+        SoftwareAutoUpdateInput autoUpdate = new SoftwareAutoUpdateInput();
+        autoUpdate.setEnabled(true);
+        createInput.setAutoUpdate(autoUpdate);
+
+        SoftwareScheduleResponse response = service.create(createInput, ACTOR);
+
+        ArgumentCaptor<SoftwareSchedule> captor = ArgumentCaptor.forClass(SoftwareSchedule.class);
+        verify(scheduleRepository).save(captor.capture());
+        SoftwareSchedule saved = captor.getValue();
+        assertThat(saved.getUpdateSettings().getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(saved.getUpdateSettings().getDeadlineSeconds()).isNull();
+        assertThat(saved.getUpdateSettings().getCountdownSeconds()).isEqualTo(60);
+        assertThat(saved.getAutoUpdate().isEnabled()).isTrue();
+        assertThat(saved.getAutoUpdate().getSettings()).isNull();
+        assertThat(response.getUpdateSettings()).isEqualTo(saved.getUpdateSettings());
+        assertThat(response.getAutoUpdate()).isEqualTo(saved.getAutoUpdate());
+    }
+
+    @Test
+    @DisplayName("create INSTALL with update settings: rejected before anything is saved")
+    void createInstallWithUpdateSettingsRejected() {
+        when(scheduleRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, "Nightly Slack", UNIQUE_STATUSES))
+                .thenReturn(false);
+        createInput.setUpdateSettings(settingsInput(PackageUpdateMode.WAIT, null, 300));
+
+        assertThatThrownBy(() -> service.create(createInput, ACTOR))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("updateSettings");
+        verify(scheduleRepository, never()).save(any(SoftwareSchedule.class));
+    }
+
+    @Test
+    @DisplayName("update UPDATE without settings: the full replacement resets them to the screen's defaults, auto-update off")
+    void updateWithoutSettingsResetsToDefaults() {
+        SoftwareSchedule existing = existingActive();
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
+        when(scheduleRepository.existsByTenantIdAndNameAndIdNotAndStatusIn(
+                eq(TENANT_ID), anyString(), eq(SCHEDULE_ID), eq(UNIQUE_STATUSES))).thenReturn(false);
+        UpdateSoftwareScheduleInput input = new UpdateSoftwareScheduleInput();
+        input.setId(SCHEDULE_ID);
+        input.setName("Nightly Slack");
+        input.setAction(SoftwareAction.UPDATE);
+        input.setPackages(List.of(pkg(PackageManagerType.WINGET, "vscode", null)));
+        input.setStartAt(Instant.parse("2026-09-16T03:30:00Z"));
+
+        SoftwareScheduleResponse response = service.update(input, ACTOR);
+
+        assertThat(existing.getUpdateSettings().getMode()).isEqualTo(PackageUpdateMode.WAIT);
+        assertThat(existing.getUpdateSettings().getDeadlineSeconds()).isEqualTo(604_800L);
+        assertThat(existing.getUpdateSettings().getCountdownSeconds()).isEqualTo(300);
+        assertThat(existing.getAutoUpdate().isEnabled()).isFalse();
+        assertThat(response.getUpdateSettings()).isEqualTo(existing.getUpdateSettings());
+    }
+
+    private static PackageUpdateSettingsInput settingsInput(PackageUpdateMode mode, Long deadlineSeconds, int countdownSeconds) {
+        PackageUpdateSettingsInput input = new PackageUpdateSettingsInput();
+        input.setMode(mode);
+        input.setDeadlineSeconds(deadlineSeconds);
+        input.setCountdownSeconds(countdownSeconds);
+        return input;
     }
 
     private static SoftwareSchedule existingActive() {

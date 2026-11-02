@@ -94,11 +94,10 @@ impl From<PermissionError> for DirectoryError {
 pub fn get_app_support_directory() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
-        let program_data =
-            std::env::var_os("ProgramData").expect("ProgramData environment variable not found");
-        let mut path = PathBuf::from(program_data);
-        path.push("OpenFrame");
-        path
+        std::env::var_os("ProgramData")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("C:\\ProgramData"))
+            .join("OpenFrame")
     }
 
     #[cfg(target_os = "macos")]
@@ -136,12 +135,7 @@ pub fn get_logs_directory() -> PathBuf {
     // If no override, use platform-specific defaults
     #[cfg(target_os = "windows")]
     {
-        let program_data =
-            std::env::var_os("ProgramData").expect("ProgramData environment variable not found");
-        let mut path = PathBuf::from(program_data);
-        path.push("OpenFrame");
-        path.push("logs");
-        path
+        get_app_support_directory().join("logs")
     }
 
     #[cfg(target_os = "macos")]
@@ -159,12 +153,7 @@ pub fn get_logs_directory() -> PathBuf {
 pub fn get_secured_directory() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
-        let program_data =
-            std::env::var_os("ProgramData").expect("ProgramData environment variable not found");
-        let mut path = PathBuf::from(program_data);
-        path.push("OpenFrame");
-        path.push("secured");
-        path
+        get_app_support_directory().join("secured")
     }
 
     #[cfg(target_os = "macos")]
@@ -175,6 +164,29 @@ pub fn get_secured_directory() -> PathBuf {
     #[cfg(target_os = "linux")]
     {
         PathBuf::from("/var/lib/openframe/secured")
+    }
+}
+
+/// Returns the Windows install root, %ProgramFiles%\OpenFrame (the binary is in `bin`)
+#[cfg(target_os = "windows")]
+pub fn get_install_directory() -> PathBuf {
+    let program_files =
+        std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
+    PathBuf::from(program_files).join("OpenFrame")
+}
+
+/// Returns where the self-update stages the new binary and the updater script.
+/// On Windows it is under Program Files\OpenFrame, which our published AV exclusions
+/// cover: script-blocking tools deny PowerShell reading scripts from SystemTemp.
+pub fn get_update_staging_directory() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        get_install_directory().join("update")
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::env::temp_dir()
     }
 }
 

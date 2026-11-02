@@ -1,6 +1,22 @@
 // Shared style atoms for `Button` and `SplitButton`. Extracted to keep a single
 // source of truth for surface colors, outline borders, and split-divider colors.
 
+import { INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from '../input-styles';
+
+/**
+ * The slot that holds a LABELLED button's leading / trailing icon. On an outline button the icon is the secondary tone
+ * beside the primary label (the disabled tone while the button is disabled), as every outline action draws it; on the
+ * other surfaces it takes the label's colour. The slot only sets the colour a `currentColor` glyph inherits: an icon
+ * that names its own colour (a class or `color` on the icon) keeps it. An icon-only button's glyph is its content and
+ * keeps the button's text colour, so it does not take this slot's tone.
+ */
+export function buttonIconSlotClass(variant: string | null | undefined, disabled?: boolean): string {
+  if (variant !== 'outline') return 'inline-flex items-center';
+  return disabled
+    ? 'inline-flex items-center text-ods-text-disabled'
+    : 'inline-flex items-center text-ods-text-secondary';
+}
+
 // Each variant pairs `disabled:` (real `<button disabled>`) with `aria-disabled:`
 // (used for `<Link aria-disabled>` since anchors don't support `:disabled`).
 export const buttonSurfaceClasses = {
@@ -195,7 +211,8 @@ export const BUTTON_KIND_CLASS = {
   // and states, the value on the left.
   field: [
     'flex w-full items-center gap-[var(--spacing-system-xsf)] border px-[var(--spacing-system-sf)] text-left',
-    'h-11 rounded-[6px] md:h-12',
+    INPUT_HEIGHT_CLASS,
+    INPUT_RADIUS_CLASS,
     'border-ods-border bg-ods-card text-ods-text-primary text-h4 transition-colors duration-200',
     'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
     // Open: the accent border, held under the cursor (a hover must not read as closing it).

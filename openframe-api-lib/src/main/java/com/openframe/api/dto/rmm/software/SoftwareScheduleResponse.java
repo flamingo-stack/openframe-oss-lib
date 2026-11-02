@@ -7,7 +7,9 @@ import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdate;
 import lombok.Builder;
 import lombok.Data;
 
@@ -23,6 +25,8 @@ public class SoftwareScheduleResponse {
     private String description;
     private SoftwareAction action;
     private List<SoftwareSchedulePackage> packages;
+    private PackageUpdateSettings updateSettings;
+    private SoftwareAutoUpdate autoUpdate;
     private ScheduleDeviceSelectionMode selectionMode;
     private ScheduleDeviceCriteria deviceCriteria;
     private ScheduleScriptTrigger trigger;

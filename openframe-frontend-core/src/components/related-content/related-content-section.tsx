@@ -50,6 +50,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import {
@@ -65,7 +66,7 @@ import { pageCount } from '../../utils/search-params';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 // Type-only — erased at build, no runtime dependency on the dispatch module.
 import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
-import { decideNewTab } from '../chat/utils/decide-new-tab';
+import { navLinkTarget, newTabAnchorAttrs } from '../chat/utils/nav-anchor-props';
 import { accentSentenceMarks } from '../layout/page-heading';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
@@ -87,8 +88,8 @@ import {
 
 /** Render-prop component injection for the navigation decision — keeps hook
  *  calls legal (hooks live INSIDE the injected component; `CardForType`
- *  itself calls zero hooks). The hub injects a `useNavLink`-backed provider;
- *  the default is hook-free (pure `decideNewTab`). MUST be defined at module
+ *  itself calls zero hooks). The hub injects a `useNavLinkViaRuntime`-backed provider;
+ *  the default reads THE navigation decision (`navLinkTarget`). MUST be defined at module
  *  scope by hosts — an inline arrow would remount every card each render. */
 export interface CardLinkProviderProps {
   href: string | null;
@@ -97,18 +98,17 @@ export interface CardLinkProviderProps {
 }
 export type CardLinkProvider = React.ComponentType<CardLinkProviderProps>;
 
-/** Default link provider for standalone embeds: relative/-same-origin hrefs
- *  stay same-tab, cross-origin pops a new tab (pure `decideNewTab` with no
- *  platform context — `currentSource: ''` falls through to the origin
- *  check). No router integration, no hooks. */
+/** Default link provider: THE navigation decision (`navLinkTarget`) for the chat runtime the rail is mounted in
+ *  (none: the href as given, same tab), as the anchor's href and target/rel. */
 function DefaultLinkPropsProvider({
   href,
   targetPlatform,
   children,
 }: CardLinkProviderProps): React.ReactElement | null {
+  const runtime = useChatRuntime();
   if (!href) return children(null);
-  const newTab = decideNewTab({ href, targetPlatform, currentSource: '' });
-  return children(newTab ? { href, target: '_blank', rel: 'noopener noreferrer' } : { href });
+  const target = navLinkTarget(runtime, href, targetPlatform);
+  return children({ href: target.href, ...newTabAnchorAttrs(target.isNewTab, target.href, targetPlatform) });
 }
 
 /** Default href resolution: trust the ref's stored url/targetPlatform as the
@@ -601,7 +601,7 @@ export interface RelatedContentSectionProps {
   /** Hub injects its registry-driven entity-list-api builder; default = the
    *  lib's `buildListUrl(type, ids, apiBaseUrl)`. */
   buildListUrl?: (type: string, ids: string[]) => string | null;
-  /** Hub injects a `useNavLink`-backed render-prop provider; default = pure
+  /** Hub injects a `useNavLinkViaRuntime`-backed render-prop provider; default = pure
    *  anchor via `decideNewTab`. MUST be a module-scope component. */
   LinkProvider?: CardLinkProvider;
   /** Renderer pair for the admin-only `marketing_campaign` type. Absent →

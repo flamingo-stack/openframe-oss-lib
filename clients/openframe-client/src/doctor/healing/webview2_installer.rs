@@ -155,9 +155,9 @@ const SIGNATURE_CHECK_SCRIPT: &str =
 /// Rejects the download unless it carries a valid Microsoft Authenticode signature.
 #[cfg(windows)]
 async fn verify_microsoft_signature(path: &std::path::Path) -> anyhow::Result<()> {
-    use anyhow::{anyhow, bail, Context};
+    use anyhow::{bail, Context};
 
-    let powershell = crate::platform::get_powershell_path().map_err(|e| anyhow!(e))?;
+    let powershell = crate::platform::get_powershell_path();
     let script = SIGNATURE_CHECK_SCRIPT.replace("{path}", &path.display().to_string());
 
     let output = tokio::time::timeout(

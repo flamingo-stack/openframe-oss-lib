@@ -7,7 +7,7 @@
  *     lists its platforms; it does not hide them behind tabs, so nothing moves
  *     when a visitor looks for another system). In a card the installer is THE
  *     action (the other architecture is a quieter button) and each package
- *     manager is one line under it, with its copy button.
+ *     manager is one row under it, with its copy button.
  *   - The mobile app: the store badges, and the install QR code beside them. The
  *     code and the address it encodes are the server's (`mobile.install`): the
  *     website's install link, which the server answers with a redirect to the
@@ -54,7 +54,7 @@ import {
 import { cn } from '../../utils/cn';
 import { formatUrlForDisplay } from '../../utils/format';
 import { DESKTOP_OSES, type DesktopOs } from '../../utils/visitor-os';
-import { FaqSection, pageFaqProps, type PageFaqSlot } from '../faq/faq-section';
+import { SharedPageFaq } from '../faq/faq-section';
 import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
 import { WindowsLogoGreyIcon } from '../icons-v2-generated/brand-logos/windows-logo-grey-icon';
@@ -99,12 +99,6 @@ export interface DownloadAppsPageProps {
   openAppHref?: (download: AppDownload) => string | null | undefined;
   /** The closing card, under the mobile app: using OpenFrame without installing anything. Default: none. */
   web?: DownloadAppsWebOption;
-  /**
-   * The page's own FAQ block: the topic the page is about (stated by the host,
-   * never read from its address) and where the host serves the FAQs. Rendered
-   * after the page's content, inside its container. Absent: no FAQ block.
-   */
-  faq?: PageFaqSlot;
 }
 
 /** The "no install" card: the host's words and its own button (the page holds no signup link). */
@@ -117,7 +111,7 @@ export interface DownloadAppsWebOption {
 
 const SECTIONS_CLASS = 'flex flex-col gap-[var(--spacing-system-xlf)]';
 const SECTION_CLASS = 'flex flex-col gap-[var(--spacing-system-lf)]';
-const CARDS_GRID_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-2';
+const CARDS_GRID_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-lf)] content-lg:grid-cols-2';
 /** One card takes the row; two or more share it. */
 const cardsGridClass = (cards: number) => (cards > 1 ? CARDS_GRID_CLASS : 'grid grid-cols-1');
 const CARD_CLASS =
@@ -189,7 +183,7 @@ function installerLabel(download: AppDownload, siblings: number): string {
   return siblings > 1 && architecture ? `${label} (${architecture})` : label;
 }
 
-/** One system's card: its logo and name, its installers side by side, then each package manager as one line. */
+/** One system's card: its logo and name, its installers side by side, then each package manager as one row. */
 function SystemCard({
   system,
   onDownloadAction,
@@ -249,8 +243,7 @@ function SystemCard({
                 key={row.id}
                 title={row.label ?? undefined}
                 command={row.command}
-                maxLines={1}
-                commandClassName="text-ods-accent"
+                commandClassName="break-words text-ods-accent"
                 copyAriaLabel={`Copy the ${row.label ?? 'install'} command`}
                 onCopy={() => {
                   void copy(row.command as string);
@@ -373,7 +366,6 @@ export function DownloadAppsPage({
   onDownloadAction,
   openAppHref,
   web,
-  faq,
 }: DownloadAppsPageProps) {
   const { data, isLoading, error, reload } = useDownloads({ endpoint, initialData });
   // In a page's loading state the answer is read: the page draws its sections' skeletons, never nothing.
@@ -462,7 +454,7 @@ export function DownloadAppsPage({
         {body}
         {web && <WebCard web={web} />}
       </div>
-      {faq && <FaqSection {...pageFaqProps(faq)} />}
+      <SharedPageFaq />
     </DownloadAppsChrome>
   );
 }
