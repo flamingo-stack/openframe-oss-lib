@@ -333,7 +333,7 @@ describe('RouteStyles: the rules a page gets on the server', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('matches the page path to its route, a static route before a dynamic one, and the complete sheet otherwise', async () => {
+  it('matches the page path to its route, a static route before a dynamic one, the home page by either name, and the complete sheet otherwise', async () => {
     const { RouteStyles } = await import('../../scripts/route-styles-server.mjs');
     const element = RouteStyles({}) as { props: { build: string } };
     expect(element.props.build).toBe('b2');
@@ -345,6 +345,8 @@ describe('RouteStyles: the rules a page gets on the server', () => {
     )[Symbol.for('flamingo.next-styles')].get('b2');
     if (!resolve) throw new Error('RouteStyles registered no resolver');
     expect(resolve('/', false).css).toBe('.home{}');
+    // A home page Vercel regenerates renders as its `index` function: the path it sees is `/index`.
+    expect(resolve('/index', false).css).toBe('.home{}');
     expect(resolve('/blog/', false).css).toBe('.blog{}');
     expect(resolve('/blog/a-post', false)).toEqual({ css: '.post{}', fullUrl: '/_next/static/next-styles/full.css' });
     expect(resolve('/docs/a/b', false).css).toBe('.docs{}');
