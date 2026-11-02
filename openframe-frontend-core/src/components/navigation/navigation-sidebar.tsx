@@ -1,13 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent, ReactNode } from 'react';
+import type { CSSProperties, MouseEvent, ReactNode, RefObject } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { useLocalStorage } from '../../hooks/ui/use-local-storage';
 import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query';
+import { useResizablePanelSize } from '../../hooks/ui/use-resizable-panel-size';
 import type { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
+import { PanelResizeGrip, PanelResizeHandle } from '../ui/panel-resize-handle';
 import { NAVIGATION_SIDEBAR_ATTRIBUTE } from './app-layout-context';
 import {
   NavigationSidebarGroupedEntries,
@@ -24,6 +26,12 @@ const MINIMIZED_WIDTH = 56; // 3.5rem = 56px
 const EXPANDED_WIDTH = 224; // 14rem = 224px — the default; a grouped config may set its own
 /** The narrowest custom `expandedWidth`: the rows read 140px and up as expanded. */
 const MIN_CUSTOM_EXPANDED_WIDTH = 141;
+/**
+ * Px of its row a resizable sidebar leaves to the content beside it
+ * (`NavigationSidebarResizeConfig.minContentWidth`): the `content-md`
+ * breakpoint, under which page content lays out for a phone.
+ */
+const DEFAULT_MIN_CONTENT_WIDTH = 720;
 const STORAGE_KEY = 'of.navigationSidebar.minimized';
 
 /**
@@ -146,6 +154,27 @@ const SIDEBAR_TABLET_WIDTH = {
   customOverlay: 'md:w-[var(--of-navigation-sidebar-expanded-width)]',
 } as const;
 
+/**
+ * The width of the sidebar's row — its parent, the room it shares with the
+ * content — for the resize clamp. 0 until measured, and when there is nothing to
+ * measure (not resizable, no parent, the server).
+ */
+function useRowWidth(asideRef: RefObject<HTMLElement | null>, enabled: boolean): number {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const row = enabled ? asideRef.current?.parentElement : null;
+    if (!row) return undefined;
+    const update = () => setWidth(row.clientWidth);
+    update();
+    // An environment without ResizeObserver (jsdom in a consumer's tests) measures once.
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(update);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [asideRef, enabled]);
+  return width;
+}
+
 /** A click the browser will resolve itself — new tab, new window, middle button. */
 export const isModifiedClick = (event?: MouseEvent): boolean =>
   !!event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0);
@@ -255,18 +284,74 @@ export function NavigationSidebar({
 
   // A grouped config's own expanded width (`expandedWidth`); `null` = the
   // default 224px through the literal classes, exactly as before.
-  const customExpandedWidth =
+  const configExpandedWidth =
     config.variant === 'grouped' && config.expandedWidth !== undefined
       ? Math.max(config.expandedWidth, MIN_CUSTOM_EXPANDED_WIDTH)
       : null;
-  const expandedWidth = customExpandedWidth ?? EXPANDED_WIDTH;
+
+  // `config.resizable`: the expanded width is the user's — dragged or stepped on
+  // the handle below, kept under the config's storage key — and the config width
+  // is where it starts. Clamped to the config's bounds and to the row, so the
+  // content beside the rail keeps `minContentWidth`. Not resizable: the config
+  // width, and the hook reads and writes nothing.
+  const resize = config.resizable;
+  const asideRef = useRef<HTMLElement>(null);
+  const rowWidth = useRowWidth(asideRef, resize !== undefined);
+  const resizeMinWidth = Math.max(resize?.minWidth ?? MIN_CUSTOM_EXPANDED_WIDTH, MIN_CUSTOM_EXPANDED_WIDTH);
+  const {
+    size: chosenExpandedWidth,
+    setSize: setChosenExpandedWidth,
+    resetSize: resetChosenExpandedWidth,
+    clampSize: clampExpandedWidth,
+  } = useResizablePanelSize({
+    enabled: resize !== undefined,
+    minSize: resizeMinWidth,
+    maxSize: resize?.maxWidth ?? Number.POSITIVE_INFINITY,
+    defaultSize: configExpandedWidth ?? EXPANDED_WIDTH,
+    available: rowWidth,
+    reserve: resize?.minContentWidth ?? DEFAULT_MIN_CONTENT_WIDTH,
+    storageKey: resize?.storageKey,
+  });
+
+  // The desktop width — what the effect below publishes. The chosen width may
+  // be used here as soon as it is known: an effect never runs into the SSR HTML.
+  const expandedWidth = resize !== undefined ? chosenExpandedWidth : (configExpandedWidth ?? EXPANDED_WIDTH);
+  // The width in the MARKUP — the inline custom property on the rail and its
+  // tablet slot, which the tablet overlay opens to and the desktop rule falls
+  // back on, and the handle's `aria-valuenow`: the chosen width only once
+  // hydrated. The server could not read it, and a first client render that
+  // differs is a hydration mismatch, which React reports and leaves in the DOM.
+  // Until then the config width stands, as for a sidebar that is not resizable;
+  // on desktop the seeded width shows throughout, so nothing moves.
+  const markupExpandedWidth = hydrated ? chosenExpandedWidth : (configExpandedWidth ?? EXPANDED_WIDTH);
+  const customExpandedWidth = resize !== undefined ? markupExpandedWidth : configExpandedWidth;
   const expandedWidthStyle =
     customExpandedWidth === null ? undefined : ({ [EXPANDED_WIDTH_VAR]: `${customExpandedWidth}px` } as CSSProperties);
 
+  // A drag moves the rail's own width property on every pointer move and marks
+  // the rail (`data-resizing`, read by a class on it) so its width transition
+  // does not trail the pointer; the choice is committed once, on release, which
+  // also lifts the mark. Neither write concerns hydration: both run on the
+  // client only, once the user has the handle.
+  const dragExpandedWidth = useCallback((next: number) => {
+    const aside = asideRef.current;
+    if (!aside) return;
+    aside.setAttribute('data-resizing', '');
+    aside.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, `${Math.round(next)}px`);
+  }, []);
+  const commitExpandedWidth = useCallback(
+    (next: number) => {
+      asideRef.current?.removeAttribute('data-resizing');
+      setChosenExpandedWidth(next);
+    },
+    [setChosenExpandedWidth],
+  );
+
   // A new expanded width (the host swapped configs — e.g. a placeholder for
-  // the grouped tree) is a different sidebar, not a toggle: it snaps instead of
-  // animating. The transition is dropped in the same commit that moves the
-  // width and comes back a frame later (the effect below).
+  // the grouped tree; a resize committed, stepped or reset on the handle) is a
+  // different sidebar, not a toggle: it snaps instead of animating. The
+  // transition is dropped in the same commit that moves the width and comes
+  // back a frame later (the effect below).
   const [widthFor, setWidthFor] = useState(expandedWidth);
   if (widthFor !== expandedWidth) {
     setWidthFor(expandedWidth);
@@ -447,7 +532,6 @@ export function NavigationSidebar({
   // On the rail, not on `<html>` where the seed sits: the rail is its only reader,
   // and an inherited custom property on the root made WebKit restyle the whole
   // document on every toggle. Its own value overrides the inherited seed.
-  const asideRef = useRef<HTMLElement>(null);
   useIsomorphicLayoutEffect(() => {
     asideRef.current?.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth);
   }, [sidebarWidth]);
@@ -555,6 +639,9 @@ export function NavigationSidebar({
               ? SIDEBAR_TABLET_WIDTH.overlay
               : SIDEBAR_TABLET_WIDTH.customOverlay,
           transitionsEnabled && widthTransition,
+          // A drag on the resize handle in progress: the width follows the
+          // pointer, with no transition trailing it (`dragExpandedWidth`).
+          'data-[resizing]:transition-none',
           // Snaps where its width moves the content: the desktop rail, and the
           // tablet overlay too when it pushes (its slot above snaps with it).
           !animateWidth && (pushOnTablet ? 'transition-none' : 'lg:transition-none'),
@@ -632,6 +719,28 @@ export function NavigationSidebar({
           onToggle={handleToggle}
           compact={grouped}
         />
+
+        {/* The resize handle (`config.resizable`), astride the rail's right edge —
+            the grip the Mingo chat drawer had — on desktop while expanded: the
+            56px rail has nothing to resize, and below `lg` the width is the
+            tablet's. The 24px track straddles the border, half of it over the
+            content's edge; the grip marks the border as draggable. */}
+        {resize !== undefined && !minimized && (
+          <PanelResizeHandle
+            side="left"
+            variant="inLayout"
+            size={markupExpandedWidth}
+            minSize={resizeMinWidth}
+            maxSize={clampExpandedWidth(Number.POSITIVE_INFINITY)}
+            clampSize={clampExpandedWidth}
+            onSize={commitExpandedWidth}
+            onDrag={dragExpandedWidth}
+            onReset={resetChosenExpandedWidth}
+            ariaLabel="Resize navigation sidebar"
+            className="inset-y-0 hidden w-6 -translate-x-1/2 justify-center pl-0 lg:flex"
+            grip={<PanelResizeGrip />}
+          />
+        )}
       </aside>
     </>
   );
