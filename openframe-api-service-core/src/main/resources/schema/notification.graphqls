@@ -17,6 +17,7 @@ enum NotificationEntityType {
     TICKET
     DIALOG
     INSIGHT
+    DEVICE
 }
 
 
@@ -79,6 +80,17 @@ input NotificationFilterInput {
     types: [String!]
     "Only these severities; omitted or empty does not narrow."
     severities: [NotificationSeverity!]
+    "Only the caller's notifications about this entity; combines (AND) with the other filters. Omitted does not narrow."
+    entity: NotificationEntityFilterInput
+}
+
+"""
+One entity's notifications. id is the raw stored id: Machine.machineId for DEVICE, the ticket, dialog or
+insight id otherwise — the same value markNotificationsReadForEntity takes.
+"""
+input NotificationEntityFilterInput {
+    type: NotificationEntityType!
+    id: ID!
 }
 
 type NotificationConnection {
