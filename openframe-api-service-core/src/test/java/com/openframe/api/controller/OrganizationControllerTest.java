@@ -1,5 +1,6 @@
 package com.openframe.api.controller;
 
+import com.openframe.api.dto.organization.OrganizationResponse;
 import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.api.service.organization.OrganizationCommandService;
 import com.openframe.core.exception.BaseGlobalExceptionHandler;
@@ -25,6 +26,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -49,6 +51,34 @@ class OrganizationControllerTest {
                 .standaloneSetup(new OrganizationController(organizationService, organizationCommandService, organizationMapper))
                 .setControllerAdvice(new BaseGlobalExceptionHandler())
                 .build();
+    }
+
+    @Test
+    void updateIs200AndReachesTheDomain() throws Exception {
+        Organization updated = new Organization();
+        OrganizationResponse response = OrganizationResponse.builder().organizationId(ORG_ID).name("Acme").build();
+        when(organizationService.getOrganizationByOrganizationId(ORG_ID)).thenReturn(Optional.of(new Organization()));
+        when(organizationCommandService.updateOrganization(eq(ORG_ID), any())).thenReturn(updated);
+        when(organizationMapper.toResponse(updated)).thenReturn(response);
+
+        mockMvc.perform(put("/organizations/" + ORG_ID)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Acme\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organizationId").value(ORG_ID))
+                .andExpect(jsonPath("$.name").value("Acme"));
+    }
+
+    @Test
+    void updateOfUnknownOrganizationIs404WithTheNotFoundCodeAndNothingIsUpdated() throws Exception {
+        when(organizationService.getOrganizationByOrganizationId("missing")).thenReturn(Optional.empty());
+
+        mockMvc.perform(put("/organizations/missing")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Acme\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ORGANIZATION_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Organization not found with id: missing"));
+
+        verifyNoInteractions(organizationCommandService);
     }
 
     @Test
