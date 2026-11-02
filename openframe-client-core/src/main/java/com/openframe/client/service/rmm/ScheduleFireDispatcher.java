@@ -20,7 +20,6 @@ import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.util.ScriptScheduleBatch;
-import com.openframe.delivery.track.DeliveryTracker;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
@@ -57,9 +56,6 @@ public class ScheduleFireDispatcher {
     private final MachineRepository machineRepository;
     private final DeviceOnlineDispatchRepository dispatchRepository;
     private final ScriptDeliveryRetryStore retryStore;
-    private final DeliveryTracker deliveryTracker;
-
-    private static final String SUPERSEDED = "superseded by the schedule's next fire";
 
     public void dispatch(ScheduleScript schedule, Instant now) {
         List<String> targets = targetResolver.resolveTargetMachineIds(schedule);
@@ -180,10 +176,6 @@ public class ScheduleFireDispatcher {
             return;
         }
 
-        if (rule.isWaiting()) {
-            withdrawEarlierFires(schedule, machineIds);
-        }
-
         // One executionId for the whole fire, shared across every script and machine.
         Fire fire = new Fire(schedule, UUID.randomUUID().toString(), scripts, machineIds, now, rule);
         saveHeader(fire);
@@ -203,36 +195,6 @@ public class ScheduleFireDispatcher {
                 .filter(s -> s.getStatus() == ScriptStatus.ACTIVE)
                 .collect(Collectors.toMap(Script::getId, Function.identity(), (a, b) -> a));
         return scriptIds.stream().distinct().map(byId::get).filter(Objects::nonNull).toList();
-    }
-
-    // the fires a machine missed while offline were one catch-up on the reconnect sentinel (one per schedule and
-    // machine); on the engine each fire is a batch of its own, so a machine still offline and waiting for an earlier
-    // fire of this schedule gets this one instead of both
-    private void withdrawEarlierFires(ScheduleScript schedule, List<String> machineIds) {
-        String tenantId = schedule.getTenantId();
-        List<ScriptExecution> waiting = scriptExecutionRepository.findByTenantIdAndScheduleIdAndStatus(
-                tenantId, schedule.getId(), ExecutionStatus.QUEUED);
-        Set<String> targets = new HashSet<>(machineIds);
-        Set<String> heldMachines = waiting.stream()
-                .map(ScriptExecution::getMachineId)
-                .filter(targets::contains)
-                .filter(this::isHeldOnRoute)
-                .collect(Collectors.toSet());
-        if (heldMachines.isEmpty()) {
-            return;
-        }
-        Set<String> online = onlineTargets(tenantId, List.copyOf(heldMachines));
-        Set<DeliveryKey> superseded = waiting.stream()
-                .filter(leaf -> heldMachines.contains(leaf.getMachineId()) && !online.contains(leaf.getMachineId()))
-                .map(leaf -> new DeliveryKey(leaf.getExecutionId(), leaf.getMachineId()))
-                .collect(Collectors.toSet());
-        superseded.forEach(key -> deliveryTracker.cancel(DeliveryType.SCRIPT_SCHEDULE, key.executionId(), key.machineId(), SUPERSEDED));
-        if (!superseded.isEmpty()) {
-            log.info("Earlier fires withdrawn for machines still offline: scheduleId={} deliveries={}", schedule.getId(), superseded.size());
-        }
-    }
-
-    private record DeliveryKey(String executionId, String machineId) {
     }
 
     private void saveHeader(Fire fire) {
