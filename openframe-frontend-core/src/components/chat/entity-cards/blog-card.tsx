@@ -265,7 +265,7 @@ function LoadedBlogCard({
               alt={post.title}
               fill
               priority={priority}
-              className={cn('object-cover object-center', 'duration-400 transition-all ease-out', 'hover:scale-[1.02]')}
+              className={cn('object-cover object-center', 'transition-all ease-out', 'hover:scale-[1.02]')}
               sizes={IMAGE_SLOT.card}
               unoptimized
               onError={onImageError}

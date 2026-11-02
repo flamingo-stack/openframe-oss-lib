@@ -37,6 +37,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
     private static final String SCRIPT_EXECUTIONS = "script_executions";
     private static final List<String> TERMINAL = List.of(ExecutionStatus.SUCCESS.name(), ExecutionStatus.FAILED.name());
     private static final List<String> IN_PROGRESS = List.of(ExecutionStatus.QUEUED.name(), ExecutionStatus.RUNNING.name());
+    private static final List<String> FINISHED = List.of(SoftwareActionStatus.COMPLETED.name(), SoftwareActionStatus.FAILED.name());
     private static final String DEFAULT_SORT = "dispatchedAt";
     private static final Set<String> SORTABLE = Set.of("dispatchedAt", "status", "packageName", "totalMachineCount");
 
@@ -152,6 +153,8 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                         .append("hasInProgress", new Document("$max", cond(inArr("$status", IN_PROGRESS), 1, 0)))
                         .append("failed", new Document("$max",
                                 cond(new Document("$eq", Arrays.asList("$status", ExecutionStatus.FAILED.name())), 1, 0)))
+                        .append("firstDispatchedAt", new Document("$min", "$dispatchedAt"))
+                        .append("lastFinishedAt", new Document("$max", "$finishedAt"))
                         .append("execCount", new Document("$sum", 1))));
         return new Document("$lookup", new Document("from", SCRIPT_EXECUTIONS)
                 .append("let", new Document("eid", "$executionId").append("tid", "$tenantId"))
@@ -177,6 +180,10 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .append("respondedMachineCount", cond(hasLeaves, responded, 0))
                 .append("waitingMachineCount", cond(hasLeaves, waiting, 0))
                 .append("status", cond(hasLeaves, liveStatus, "$status"))));
+        // a schedule's row is written before it fires and never updated, so its dispatch time comes from the devices
+        stages.add(ctx -> new Document("$addFields", new Document()
+                .append("dispatchedAt", new Document("$ifNull", Arrays.asList("$dispatchedAt", "$_exec.firstDispatchedAt")))
+                .append("finishedAt", cond(inArr("$status", FINISHED), "$_exec.lastFinishedAt", null))));
         return stages;
     }
 
@@ -205,6 +212,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .append("bundleId", 1)
                 .append("scheduleId", 1)
                 .append("dispatchedAt", 1)
+                .append("finishedAt", 1)
                 .append("totalMachineCount", 1)
                 .append("respondedMachineCount", 1)
                 .append("waitingMachineCount", 1)
@@ -249,6 +257,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .respondedMachineCount(intValue(doc.get("respondedMachineCount")))
                 .waitingMachineCount(intValue(doc.get("waitingMachineCount")))
                 .dispatchedAt(instantOrNull(doc.get("dispatchedAt")))
+                .finishedAt(instantOrNull(doc.get("finishedAt")))
                 .initiatedBy(doc.getString("initiatedBy"))
                 .bundleId(doc.getString("bundleId"))
                 .scheduleId(doc.getString("scheduleId"))

@@ -26,6 +26,10 @@ public class PackageUpdateDeliverySeed implements DeliverySeed {
         return requestId + DEADLINE_SUFFIX;
     }
 
+    public static boolean isDeadlineTarget(String targetId) {
+        return targetId.endsWith(DEADLINE_SUFFIX);
+    }
+
     @Override
     public DeliveryType getType() {
         return DeliveryType.PACKAGE_UPDATE;

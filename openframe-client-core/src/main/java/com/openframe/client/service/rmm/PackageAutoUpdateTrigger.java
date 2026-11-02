@@ -14,6 +14,7 @@ import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
+import com.openframe.data.nats.packageupdate.PackageAutoUpdateRetryWithdrawal;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -53,6 +54,7 @@ public class PackageAutoUpdateTrigger {
     private final ScriptRepository scriptRepository;
     private final SoftwareActionResultRepository actionResultRepository;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
+    private final PackageAutoUpdateRetryWithdrawal retryWithdrawal;
     private final TenantIdProvider tenantIdProvider;
 
     public void run() {
@@ -89,6 +91,8 @@ public class PackageAutoUpdateTrigger {
             return;
         }
         Script script = updateScript(tenantId, pkg.manager());
+        // a retry still waiting would replace this order on the agent
+        due.forEach(policy -> retryWithdrawal.withdraw(policy, "a newer version is ordered"));
 
         String executionId = SoftwareExecutionId.forAutoUpdate(tenantId, pkg.manager(), pkg.name(), version);
         recordJob(tenantId, executionId, pkg, version, machineIds(due));

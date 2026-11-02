@@ -87,7 +87,9 @@ class CustomMachineDeliveryRepositoryImplTest {
         assertThat(queryCaptor.getValue().getQueryObject().toString()).contains(ID).contains("$or").contains("sequence");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("$set")
-                .contains("tenantId=" + TENANT_ID);
+                .contains("tenantId=" + TENANT_ID)
+                .contains("$unset")
+                .contains("payloadJson");
     }
 
     @Test
@@ -334,7 +336,6 @@ class CustomMachineDeliveryRepositoryImplTest {
                 .from(DeliveryStatus.UNACKED)
                 .dispatchedAt(now)
                 .dispatchId(DISPATCH_ID)
-                .payloadJson(PAYLOAD_JSON)
                 .publishedAt(now)
                 .dueAt(now)
                 .build();
@@ -352,7 +353,7 @@ class CustomMachineDeliveryRepositoryImplTest {
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("dispatchId=" + DISPATCH_ID)
                 .contains("attempts=1")
-                .contains("payloadJson")
+                .doesNotContain("payloadJson")
                 .contains("dueAt");
     }
 }

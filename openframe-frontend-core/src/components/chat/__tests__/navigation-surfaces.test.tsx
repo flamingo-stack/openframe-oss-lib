@@ -62,7 +62,9 @@ describe('announcement bar CTA', () => {
       </Providers>,
     );
     fireEvent.click(screen.getByRole('button', { name: /Read more/ }));
-    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ href: expect.stringMatching(/\/releases\/1-2$/) }));
+    expect(navigate).toHaveBeenCalledWith(
+      expect.objectContaining({ href: expect.stringMatching(/\/releases\/1-2$/) as unknown }),
+    );
     expect(openExternal).not.toHaveBeenCalled();
   });
 
@@ -89,7 +91,7 @@ describe('ticket alerts button', () => {
     );
     fireEvent.click(screen.getByRole('button'));
     expect(navigate).toHaveBeenCalledWith(
-      expect.objectContaining({ href: expect.stringContaining('/help-center/tickets?ticket=t-9') }),
+      expect.objectContaining({ href: expect.stringContaining('/help-center/tickets?ticket=t-9') as unknown }),
     );
   });
 });
@@ -103,7 +105,9 @@ describe('contact form redirect', () => {
       wrapper: ({ children }) => <Providers mode="embed">{children}</Providers>,
     });
     act(() => result.current.setIsSuccess(true));
-    act(() => vi.advanceTimersByTime(1500));
+    act(() => {
+      vi.advanceTimersByTime(1500);
+    });
     expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ href: '/thank-you' }));
     expect(openExternal).not.toHaveBeenCalled();
   });

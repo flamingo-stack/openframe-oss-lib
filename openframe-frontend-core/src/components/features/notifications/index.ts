@@ -3,6 +3,7 @@ export type { NotificationsProviderProps, NotificationsActions } from './notific
 export { NotificationDrawer } from './notification-drawer';
 export type { NotificationDrawerProps } from './notification-drawer';
 export { NotificationTile } from './notification-tile';
+export { notificationCategoryIcon } from './notification-category-icon';
 export type { NotificationTileProps } from './notification-tile';
 export { NotificationPopups } from './notification-popups';
 export type { NotificationPopupsProps, NotificationPopupsPosition } from './notification-popups';
@@ -20,9 +21,9 @@ export {
 export type {
   Notification,
   NotificationVariant,
-  NotificationSeverity,
   AddNotificationInput,
   ApprovalNotificationMeta,
   ApprovalToolCallMeta,
   RenderNotificationTile,
 } from './types';
+export type { NotificationCategory, NotificationSeverity } from '../../../utils/notifications';

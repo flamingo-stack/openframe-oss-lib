@@ -37,6 +37,8 @@ public class PackageAutoUpdatePolicy implements TenantScoped {
     private boolean enabled;
     private PackageUpdateSettings settings;
     private String lastVersion;
+    // the request of a retry waiting in the delivery engine, so turning the policy off or a newer version can withdraw it
+    private String retryRequestId;
 
     private String createdBy;
     private Instant createdAt;
