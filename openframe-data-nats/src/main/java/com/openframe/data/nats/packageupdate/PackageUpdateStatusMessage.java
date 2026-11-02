@@ -60,7 +60,8 @@ public class PackageUpdateStatusMessage {
 
         public enum Reason {
             APP_RUNNING,
-            MANAGER_BUSY
+            MANAGER_BUSY,
+            NO_USER_SESSION
         }
 
         public enum Phase {
@@ -111,7 +112,9 @@ public class PackageUpdateStatusMessage {
             CLOSE_FAILED,
             TIMEOUT,
             NOT_SUPPORTED,
-            SUPERSEDED
+            SUPERSEDED,
+            NOT_INSTALLED,
+            NOT_UPGRADABLE
         }
     }
 }

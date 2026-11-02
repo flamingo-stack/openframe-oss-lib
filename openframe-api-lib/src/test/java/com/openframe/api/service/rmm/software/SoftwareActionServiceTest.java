@@ -67,6 +67,8 @@ class SoftwareActionServiceTest {
         SoftwareActionSummary autoUpdate = summary("exec-1", PackageManagerType.BREW, "slack",
                 SoftwareAction.UPDATE, SoftwareActionStatus.FAILED, 7, 4);
         autoUpdate.setKind(SoftwareActionKind.AUTO_UPDATE);
+        Instant finishedAt = Instant.parse("2026-10-29T00:08:00Z");
+        autoUpdate.setFinishedAt(finishedAt);
         when(aggregationRepository.findPage(eq(TENANT), any(), any(), eq("dispatchedAt"), eq(Sort.Direction.DESC), eq(0), eq(25)))
                 .thenReturn(List.of(autoUpdate));
 
@@ -81,6 +83,7 @@ class SoftwareActionServiceTest {
         assertThat(row.getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
         assertThat(row.getTotalMachineCount()).isEqualTo(7);
         assertThat(row.getRespondedMachineCount()).isEqualTo(4);
+        assertThat(row.getFinishedAt()).isEqualTo(finishedAt);
     }
 
     @Test

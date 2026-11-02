@@ -9,7 +9,7 @@ vi.mock('../embeddable-chat', async () => {
   const { forwardRef, useEffect } = await import('react');
   const { chatListensForAskAiOpens } = await import('../utils/ask-ai-events');
   return {
-    EmbeddableChat: forwardRef<unknown, { baseRoute?: string }>(function Chat({ baseRoute }, _ref) {
+    EmbeddableChat: forwardRef<unknown, { emptyStateGreeting?: string }>(function Chat({ emptyStateGreeting }, _ref) {
       useEffect(() => {
         const onOpen = (event: Event) => heard.push({ type: event.type, detail: (event as CustomEvent).detail });
         window.addEventListener('ask-ai:open', onOpen);
@@ -20,7 +20,7 @@ vi.mock('../embeddable-chat', async () => {
         };
       }, []);
       useEffect(() => chatListensForAskAiOpens(), []);
-      return <div data-testid="chat">{baseRoute}</div>;
+      return <div data-testid="chat">{emptyStateGreeting}</div>;
     }),
   };
 });
@@ -48,7 +48,7 @@ describe('EmbeddableChat, loaded on its own', () => {
   });
 
   it('loads nothing until the visitor shows they want the chat', async () => {
-    render(<EmbeddableChat baseRoute="/knowledge-base" />);
+    render(<EmbeddableChat emptyStateGreeting="Hello" />);
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 50));
     });
@@ -56,9 +56,9 @@ describe('EmbeddableChat, loaded on its own', () => {
   });
 
   it('is the one chat: on intent the barrel draws the chat itself, with the props it was given', async () => {
-    render(<EmbeddableChat baseRoute="/knowledge-base" />);
+    render(<EmbeddableChat emptyStateGreeting="Hello" />);
     pointAtATrigger();
-    expect((await screen.findByTestId('chat')).textContent).toBe('/knowledge-base');
+    expect((await screen.findByTestId('chat')).textContent).toBe('Hello');
   });
 
   it('loads at once when an open is sent', async () => {

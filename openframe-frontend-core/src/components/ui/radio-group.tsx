@@ -244,8 +244,7 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                       )
                     : cn(
                         'rounded-[6px] border bg-ods-card p-[var(--spacing-system-sf)]',
-                        interactive &&
-                          'has-[[data-state=checked]]:bg-[var(--ods-system-greys-soft-grey)]/30 has-[[data-state=checked]]:border-ods-accent/40',
+                        interactive && 'has-[[data-state=checked]]:border-ods-accent/40',
                         error ? 'border-ods-error' : 'border-ods-border',
                       ),
                   // Disabled matches a disabled field: flat `ods-bg` fill and

@@ -6,7 +6,7 @@ import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openfr
 import { OpenframeTextIcon } from '../components/icons-v2-generated/logos/openframe-text-icon';
 import { HeaderButton } from '../components/navigation/header-button';
 import { SiteHeader, type SiteHeaderProps } from '../components/navigation/site-header';
-import { SocialIconRow } from '../components/social-icon-row';
+import { SocialIconRow, siteNavSocialLinks } from '../components/social-icon-row';
 import { Button } from '../components/ui/button';
 import { adminNav, simpleNav, siteNav } from './site-nav-fixtures';
 
@@ -65,7 +65,7 @@ export const SiteWithMegaMenus: Story = {
     pathname: '/case-studies',
     mingo: { source: 'flamingo' },
     withMobile: true,
-    social: <SocialIconRow compact />,
+    social: <SocialIconRow compact links={siteNavSocialLinks(siteNav.brand.social)} />,
   },
 };
 
@@ -76,7 +76,7 @@ export const SimplePlatformWithBadges: Story = {
     pathname: '/events',
     withMobile: true,
     badges: { messages: 3, requests: 12 },
-    social: <SocialIconRow compact />,
+    social: <SocialIconRow compact links={siteNavSocialLinks(siteNav.brand.social)} />,
     cta: <Button onClick={fn()}>Join the waitlist</Button>,
   },
 };

@@ -225,7 +225,7 @@ interface ButtonProps
   openInNewTab?: boolean;
   prefetch?: boolean;
   /**
-   * Pre-resolved anchor bundle (from `useNavLink({ href, targetPlatform })`).
+   * Pre-resolved anchor bundle (from `useNavLinkViaRuntime({ href, targetPlatform })`).
    * When set, renders the Button as `<Link>` with `href` / `target` / `rel`
    * / `onClick` spread from this object. Lets callers thread the unified
    * nav decision directly without `<Button asChild><a {...linkProps}/>`
@@ -364,7 +364,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
       );
     }
 
-    // `linkProps` (the pre-resolved bundle from `useNavLink({ href, targetPlatform })`)
+    // `linkProps` (the pre-resolved bundle from `useNavLinkViaRuntime({ href, targetPlatform })`)
     // wins over the legacy `href` + `openInNewTab` props so callers can thread
     // the unified nav decision directly. Either path produces the same `<Link>`.
     const splitAnchor =

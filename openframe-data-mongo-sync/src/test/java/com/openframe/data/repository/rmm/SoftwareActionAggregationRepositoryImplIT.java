@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SoftwareActionAggregationRepositoryImplIT extends BaseMongoIntegrationTest {
 
     private static final String TENANT = "tenant-1";
+    private static final Instant T0 = Instant.parse("2026-10-28T23:30:00Z");
 
     @Autowired private MongoTemplate mongoTemplate;
     @Autowired private SoftwareActionAggregationRepository repository;
@@ -173,6 +174,68 @@ class SoftwareActionAggregationRepositoryImplIT extends BaseMongoIntegrationTest
                 .containsEntry("INSTALL", 1).containsEntry("UPDATE", 2).containsEntry("AUTO_UPDATE", 1);
     }
 
+    @Test
+    @DisplayName("finishedAt: the last device's finish once every device is done, null until then")
+    void finishedAtIsTheLastDevicesFinish() {
+        action("exec-done", 2, SoftwareActionStatus.IN_PROGRESS);
+        timedLeaf("exec-done", "m1", ExecutionStatus.SUCCESS, T0, T0.plusSeconds(60));
+        timedLeaf("exec-done", "m2", ExecutionStatus.FAILED, T0, T0.plusSeconds(120));
+
+        action("exec-running", 2, SoftwareActionStatus.IN_PROGRESS);
+        timedLeaf("exec-running", "m1", ExecutionStatus.SUCCESS, T0, T0.plusSeconds(60));
+        leaf("exec-running", "m2", ExecutionStatus.RUNNING);
+
+        action("exec-waiting", 2, SoftwareActionStatus.IN_PROGRESS);
+        timedLeaf("exec-waiting", "m1", ExecutionStatus.SUCCESS, T0, T0.plusSeconds(60));
+        waitingLeaf("exec-waiting", "m2");
+
+        action("exec-no-leaves", 1, SoftwareActionStatus.IN_PROGRESS);
+
+        Map<String, SoftwareActionSummary> byExec = allRows();
+        assertThat(byExec.get("exec-done").getFinishedAt()).isEqualTo(T0.plusSeconds(120));
+        assertThat(byExec.get("exec-running").getFinishedAt()).isNull();
+        assertThat(byExec.get("exec-waiting").getFinishedAt()).isNull();
+        assertThat(byExec.get("exec-no-leaves").getFinishedAt()).isNull();
+        assertThat(repository.findByExecutionId(TENANT, "exec-done").orElseThrow().getFinishedAt())
+                .isEqualTo(T0.plusSeconds(120));
+    }
+
+    @Test
+    @DisplayName("dispatchedAt: a fired schedule's row takes the first device's dispatch and sorts by it; a NOW row keeps its own")
+    void dispatchedAtOfAFiredSchedule() {
+        firedScheduleRow("exec-sched");
+        timedLeaf("exec-sched", "m1", ExecutionStatus.SUCCESS, T0.plusSeconds(600), T0.plusSeconds(700));
+        timedLeaf("exec-sched", "m2", ExecutionStatus.SUCCESS, T0.plusSeconds(300), T0.plusSeconds(400));
+
+        nowRow("exec-older", T0);
+        timedLeaf("exec-older", "m1", ExecutionStatus.SUCCESS, T0.plusSeconds(5), T0.plusSeconds(10));
+
+        nowRow("exec-newer", T0.plusSeconds(900));
+
+        assertThat(repository.findByExecutionId(TENANT, "exec-sched").orElseThrow().getDispatchedAt())
+                .isEqualTo(T0.plusSeconds(300));
+        assertThat(repository.findByExecutionId(TENANT, "exec-older").orElseThrow().getDispatchedAt()).isEqualTo(T0);
+        assertThat(repository.findPage(TENANT, null, null, "dispatchedAt", Sort.Direction.DESC, 0, 50))
+                .extracting(SoftwareActionSummary::getExecutionId)
+                .containsExactly("exec-newer", "exec-sched", "exec-older");
+    }
+
+    private void firedScheduleRow(String executionId) {
+        mongoTemplate.save(SoftwareActionResult.builder()
+                .id(executionId).tenantId(TENANT).executionId(executionId)
+                .action(SoftwareAction.UPDATE).packageManager(PackageManagerType.BREW).packageName("slack")
+                .status(SoftwareActionStatus.SCHEDULED).totalMachineCount(2)
+                .scheduleId("schedule-1").scheduledAt(T0).build());
+    }
+
+    private void nowRow(String executionId, Instant dispatchedAt) {
+        mongoTemplate.save(SoftwareActionResult.builder()
+                .id(executionId).tenantId(TENANT).executionId(executionId)
+                .action(SoftwareAction.UPDATE).packageManager(PackageManagerType.BREW).packageName("slack")
+                .status(SoftwareActionStatus.IN_PROGRESS).totalMachineCount(1)
+                .dispatchedAt(dispatchedAt).build());
+    }
+
     private void kindRow(String executionId, SoftwareAction action, SoftwareActionKind kind) {
         mongoTemplate.save(SoftwareActionResult.builder()
                 .id(executionId).tenantId(TENANT).executionId(executionId)
@@ -197,6 +260,22 @@ class SoftwareActionAggregationRepositoryImplIT extends BaseMongoIntegrationTest
                 .status(status)
                 .totalMachineCount(totalMachineCount)
                 .dispatchedAt(Instant.now())
+                .initiatedBy("user-1")
+                .build());
+    }
+
+    private void timedLeaf(String executionId, String machineId, ExecutionStatus status, Instant dispatchedAt, Instant finishedAt) {
+        mongoTemplate.save(ScriptExecution.builder()
+                .tenantId(TENANT)
+                .executionId(executionId)
+                .scriptId("script-1")
+                .machineId(machineId)
+                .status(status)
+                .softwareAction(SoftwareAction.UPDATE)
+                .packageManager(PackageManagerType.BREW)
+                .packageName("slack")
+                .dispatchedAt(dispatchedAt)
+                .finishedAt(finishedAt)
                 .initiatedBy("user-1")
                 .build());
     }

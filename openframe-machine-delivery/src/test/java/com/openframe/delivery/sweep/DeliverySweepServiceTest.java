@@ -13,6 +13,7 @@ import com.openframe.data.repository.delivery.RerunPublication;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.PolicyOverride;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
+import com.openframe.delivery.dispatch.DeliveryPayloadStore;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryTestPolicies;
@@ -34,6 +35,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.List;
 import java.util.Set;
 
@@ -67,6 +69,8 @@ class DeliverySweepServiceTest {
     private static final String PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\"}";
     private static final String CORRUPT_JSON = "not-json";
     private static final String OLD_DISPATCH_ID = "d-0";
+    private static final String PAYLOAD_ID = "tenant-1:TOOL_INSTALLATION:abc";
+    private static final int SEQUENCE = 7;
     private static final String RERUN_PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\",\"delivery\":{\"type\":\"TOOL_INSTALLATION\",\"targetId\":\"fleetmdm-agent\",\"dispatchId\":\"d-0\"}}";
     private static final long TWO_DAYS_SECONDS = 172_800L;
     private static final long TEN_SECONDS = 10L;
@@ -77,6 +81,7 @@ class DeliverySweepServiceTest {
     private static final int NO_ATTEMPTS = 0;
 
     @Mock private MachineDeliveryRepository repository;
+    @Mock private DeliveryPayloadStore payloads;
     @Mock private MachineOnlineStatus machineOnlineStatus;
     @Mock private DeliverySpecRegistry registry;
     @Mock private DeliveryCloser closer;
@@ -99,7 +104,7 @@ class DeliverySweepServiceTest {
         dispatchedAt = Instant.now().minusSeconds(ACK_THRESHOLD * 2);
         delivery = row(MACHINE_ID, PAYLOAD_JSON);
         properties = DeliveryTestPolicies.properties();
-        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, publisher, new DeliveryPayloadJson(new JsonMapper()), new RetryBackoff());
+        service = new DeliverySweepService(repository, payloads, machineOnlineStatus, registry, properties, closer, metrics, publisher, new DeliveryPayloadJson(new JsonMapper()), new RetryBackoff());
     }
 
     @Test
@@ -166,6 +171,52 @@ class DeliverySweepServiceTest {
         verify(metrics, never()).recordRowError();
         verify(metrics, never()).recordRetried(DeliveryType.TOOL_INSTALLATION);
         verifyNoInteractions(closer);
+    }
+
+    @Test
+    void retryPending_rowPointingAtAStoredBody_bodyReadAndTheRowsDeliveryBlockStamped() {
+        // setup
+        delivery.setPayloadJson(null);
+        delivery.setPayloadId(PAYLOAD_ID);
+        delivery.setDispatchId(OLD_DISPATCH_ID);
+        delivery.setSequence(SEQUENCE);
+        when(payloads.find(PAYLOAD_ID)).thenReturn(Optional.of(PAYLOAD_JSON));
+        stubDue(delivery);
+        stubMachineOnline();
+        stubSpec();
+        when(repository.markRepublished(any(), any(), any(), any(Integer.class), any())).thenReturn(true);
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(publisher).publish(eq(SUBJECT), payloadCaptor.capture());
+        TestPayload published = payloadCaptor.getValue();
+        assertThat(published.getValue()).isEqualTo(TARGET_ID);
+        assertThat(published.getDelivery().getType()).isEqualTo(DeliveryType.TOOL_INSTALLATION);
+        assertThat(published.getDelivery().getTargetId()).isEqualTo(TARGET_ID);
+        assertThat(published.getDelivery().getDispatchId()).isEqualTo(OLD_DISPATCH_ID);
+        assertThat(published.getDelivery().getSequence()).isEqualTo(SEQUENCE);
+    }
+
+    @Test
+    void retryPending_storedBodyGone_errorCountedAndRowPostponed() {
+        // setup
+        delivery.setPayloadJson(null);
+        delivery.setPayloadId(PAYLOAD_ID);
+        when(payloads.find(PAYLOAD_ID)).thenReturn(Optional.empty());
+        stubDue(delivery);
+        stubMachineOnline();
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.getPayloadClass()).thenReturn(TestPayload.class);
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verifyNoInteractions(publisher);
+        verify(repository).postponeAfterError(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class));
+        verify(metrics).recordRowError();
     }
 
     @Test
@@ -411,7 +462,6 @@ class DeliverySweepServiceTest {
         assertThat(publication.getFrom()).isEqualTo(DeliveryStatus.UNACKED);
         assertThat(publication.getDispatchedAt()).isEqualTo(dispatchedAt);
         assertThat(publication.getDispatchId()).isEqualTo(dispatchId);
-        assertThat(publication.getPayloadJson()).contains(dispatchId);
         assertThat(publication.getDueAt()).isAfter(publication.getPublishedAt());
         verify(repository, never()).markRepublished(any(), any(), any(), any(Integer.class), any());
         verify(metrics).recordRerunPublished(DeliveryType.TOOL_INSTALLATION);

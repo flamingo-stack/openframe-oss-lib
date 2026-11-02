@@ -5,6 +5,8 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
+import com.openframe.data.nats.rmm.model.MachinePackageManagersMessage;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriter;
@@ -19,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -68,7 +71,7 @@ class MachinePackageManagersServiceTest {
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
 
         // execution
-        service.apply(MACHINE_ID, Map.of("BREW", MISSING));
+        service.apply(MACHINE_ID, report(Map.of("BREW", MISSING)));
 
         // verifications
         verifyNoInteractions(machineWriter, bootstrapService);
@@ -82,7 +85,7 @@ class MachinePackageManagersServiceTest {
         stubMachine();
 
         // execution
-        service.apply(MACHINE_ID, Map.of("BREW", MISSING));
+        service.apply(MACHINE_ID, report(Map.of("BREW", MISSING)));
 
         // verifications
         verifyNoInteractions(machineWriter, bootstrapService);
@@ -94,7 +97,7 @@ class MachinePackageManagersServiceTest {
         stubMachine();
 
         // execution
-        service.apply(MACHINE_ID, Map.of("BREW", UNSUPPORTED, "WINGET", UNSUPPORTED, "CHOCO", MISSING));
+        service.apply(MACHINE_ID, report(Map.of("BREW", UNSUPPORTED, "WINGET", UNSUPPORTED, "CHOCO", MISSING)));
 
         // verifications
         verify(machineWriter).update(eq(MACHINE_ID), updateCaptor.capture());
@@ -112,7 +115,7 @@ class MachinePackageManagersServiceTest {
         stubMachine();
 
         // execution
-        service.apply(MACHINE_ID, Map.of("BREW", PRESENT, "WINGET", UNSUPPORTED, "CHOCO", UNSUPPORTED));
+        service.apply(MACHINE_ID, report(Map.of("BREW", PRESENT, "WINGET", UNSUPPORTED, "CHOCO", UNSUPPORTED)));
 
         // verifications
         verify(machineWriter, never()).update(eq(MACHINE_ID), any(MachineUpdate.class));
@@ -124,7 +127,7 @@ class MachinePackageManagersServiceTest {
         stubMachine();
 
         // execution
-        service.apply(MACHINE_ID, Map.of("BREW", MISSING, "WINGET", UNSUPPORTED, "CHOCO", UNSUPPORTED));
+        service.apply(MACHINE_ID, report(Map.of("BREW", MISSING, "WINGET", UNSUPPORTED, "CHOCO", UNSUPPORTED)));
 
         // verifications
         verify(bootstrapService).dispatchInstall(MACHINE_ID, BREW);
@@ -139,7 +142,7 @@ class MachinePackageManagersServiceTest {
         stubMachine();
 
         // execution
-        service.apply(MACHINE_ID, Map.of("CHOCO", MISSING));
+        service.apply(MACHINE_ID, report(Map.of("CHOCO", MISSING)));
 
         // verifications
         verify(bootstrapService, never()).dispatchInstall(MACHINE_ID, CHOCO);
@@ -152,7 +155,7 @@ class MachinePackageManagersServiceTest {
         stubMachine();
 
         // execution
-        service.apply(MACHINE_ID, Map.of("CHOCO", MISSING));
+        service.apply(MACHINE_ID, report(Map.of("CHOCO", MISSING)));
 
         // verifications
         verify(bootstrapService).dispatchInstall(MACHINE_ID, CHOCO);
@@ -165,7 +168,7 @@ class MachinePackageManagersServiceTest {
         stubMachine();
 
         // execution
-        service.apply(MACHINE_ID, Map.of("BREW", state));
+        service.apply(MACHINE_ID, report(Map.of("BREW", state)));
 
         // verifications
         verify(bootstrapService, never()).dispatchInstall(MACHINE_ID, BREW);
@@ -180,7 +183,7 @@ class MachinePackageManagersServiceTest {
         reported.put("BREW", PRESENT);
 
         // execution
-        service.apply(MACHINE_ID, reported);
+        service.apply(MACHINE_ID, report(reported));
 
         // verifications
         verify(machineWriter).update(eq(MACHINE_ID), updateCaptor.capture());
@@ -199,7 +202,7 @@ class MachinePackageManagersServiceTest {
         reported.put("WINGET", UNSUPPORTED);
 
         // execution
-        service.apply(MACHINE_ID, reported);
+        service.apply(MACHINE_ID, report(reported));
 
         // verifications
         verify(machineWriter).update(eq(MACHINE_ID), updateCaptor.capture());
@@ -208,7 +211,65 @@ class MachinePackageManagersServiceTest {
         assertThat(applied.getPackageManagers()).containsOnly(entry(WINGET, UNSUPPORTED));
     }
 
+    @Test
+    void apply_missingDependency_bootstrappedWithItsOwnScript() {
+        // setup
+        stubMachine();
+
+        // execution
+        service.apply(MACHINE_ID, report(Map.of("WINGET", PRESENT), dependency("WINGET_CLIENT_MODULE", MISSING)));
+
+        // verifications
+        verify(bootstrapService).dispatchInstall(MACHINE_ID, WINGET, SystemScriptCode.INSTALL_WINGET_CLIENT_MODULE);
+        verify(bootstrapService, never()).dispatchInstall(MACHINE_ID, WINGET);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PackageManagerState.class, names = {"PRESENT", "UNSUPPORTED", "UNKNOWN"})
+    void apply_nonMissingDependency_notBootstrapped(PackageManagerState state) {
+        // setup
+        stubMachine();
+
+        // execution
+        service.apply(MACHINE_ID, report(Map.of("WINGET", PRESENT), dependency("WINGET_CLIENT_MODULE", state)));
+
+        // verifications
+        verify(bootstrapService, never()).dispatchInstall(eq(MACHINE_ID), any(), any());
+    }
+
+    @Test
+    void apply_unknownDependency_skipped() {
+        // setup
+        stubMachine();
+
+        // execution
+        service.apply(MACHINE_ID, report(Map.of("WINGET", PRESENT), dependency("WINGET_SOURCE_CACHE", MISSING)));
+
+        // verifications
+        verify(bootstrapService, never()).dispatchInstall(eq(MACHINE_ID), any(), any());
+    }
+
     private void stubMachine() {
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
+    }
+
+    private static MachinePackageManagersMessage report(Map<String, PackageManagerState> packageManagers) {
+        MachinePackageManagersMessage report = new MachinePackageManagersMessage();
+        report.setPackageManagers(packageManagers);
+        return report;
+    }
+
+    private static MachinePackageManagersMessage report(Map<String, PackageManagerState> packageManagers,
+                                                        MachinePackageManagersMessage.Dependency dependency) {
+        MachinePackageManagersMessage report = report(packageManagers);
+        report.setDependencies(List.of(dependency));
+        return report;
+    }
+
+    private static MachinePackageManagersMessage.Dependency dependency(String name, PackageManagerState state) {
+        MachinePackageManagersMessage.Dependency dependency = new MachinePackageManagersMessage.Dependency();
+        dependency.setName(name);
+        dependency.setState(state);
+        return dependency;
     }
 }

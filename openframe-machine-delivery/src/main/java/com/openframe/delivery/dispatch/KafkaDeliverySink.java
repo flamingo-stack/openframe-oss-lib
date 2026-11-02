@@ -7,7 +7,7 @@ import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRequest;
-import com.openframe.kafka.producer.OssTenantKafkaProducer;
+import com.openframe.kafka.producer.MessageProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -17,7 +17,7 @@ public class KafkaDeliverySink implements DeliverySink {
 
     public static final String SINK = "kafka";
 
-    private final OssTenantKafkaProducer producer;
+    private final MessageProducer producer;
     private final ObjectMapper objectMapper;
     private final DeliveryMetrics metrics;
     private final String topic;
@@ -31,7 +31,7 @@ public class KafkaDeliverySink implements DeliverySink {
         JsonNode command = objectMapper.valueToTree(payload);
         DeliveryDispatchMessage message = new DeliveryDispatchMessage(audience, machineId, command, request.getDueAt());
         try {
-            producer.sendAndAwait(topic, keyOf(request), message);
+            producer.sendAndAwaitMessage(topic, message, keyOf(request));
         } catch (RuntimeException kafkaDown) {
             metrics.recordDispatchFailed(type);
             throw kafkaDown;

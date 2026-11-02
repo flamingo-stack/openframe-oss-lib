@@ -16,7 +16,6 @@ public class RerunPublication {
     Set<DeliveryStatus> from;
     Instant dispatchedAt;
     String dispatchId;
-    String payloadJson;
     Instant publishedAt;
     Instant dueAt;
 }

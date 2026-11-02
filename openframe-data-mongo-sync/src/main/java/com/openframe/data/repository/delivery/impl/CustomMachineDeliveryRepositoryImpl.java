@@ -94,6 +94,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         Document document = new Document();
         mongoTemplate.getConverter().write(delivery, document);
         Update update = new Update().set(FIELD_TENANT_ID, tenantId())
+                .unset(FIELD_PAYLOAD_JSON)
                 .unset(FIELD_ACKED_AT)
                 .unset(FIELD_FINISHED_AT)
                 .unset(FIELD_FAILURE)
@@ -204,7 +205,6 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         Update update = new Update()
                 .set(FIELD_DISPATCH_ID, publication.getDispatchId())
                 .set(FIELD_DISPATCHED_AT, publication.getPublishedAt())
-                .set(FIELD_PAYLOAD_JSON, publication.getPayloadJson())
                 .set(FIELD_ATTEMPTS, 1)
                 .set(FIELD_DUE_AT, publication.getDueAt());
         return updateOne(notYetPublished, update);

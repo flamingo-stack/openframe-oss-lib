@@ -1,6 +1,7 @@
 package com.openframe.data.service.rmm.software;
 
 import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.repository.device.MachineRepository;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import static com.openframe.data.service.machine.AgentVersion.isAtLeast;
 import static java.util.stream.Collectors.toSet;
@@ -29,11 +31,20 @@ public class PackageUpdateEligibilityService {
     private final MachineRepository machineRepository;
 
     public Set<String> eligibleMachines(SoftwareAction action, Collection<String> machineIds) {
+        return eligible(action, machineIds, machine -> true);
+    }
+
+    public Set<String> eligibleConnectedMachines(SoftwareAction action, Collection<String> machineIds) {
+        return eligible(action, machineIds, machine -> DeviceStatus.CONNECTED.contains(machine.getStatus()));
+    }
+
+    private Set<String> eligible(SoftwareAction action, Collection<String> machineIds, Predicate<Machine> admitted) {
         ClientFeatureFlag flag = machineIds.isEmpty() ? null : enabledFlag(action);
         if (flag == null) {
             return Set.of();
         }
         return machineRepository.findByMachineIdIn(machineIds).stream()
+                .filter(admitted)
                 .filter(m -> isAtLeast(m.getAgentVersion(), flag.getMinVersion()))
                 .map(Machine::getMachineId)
                 .collect(toSet());

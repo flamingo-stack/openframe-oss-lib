@@ -32,6 +32,8 @@ export interface ImageUploaderProps {
   hint?: ReactNode | null;
   /** Field label rendered above the component (via FieldWrapper). */
   fieldLabel?: string;
+  /** Scale of `fieldLabel`, as on the other field controls (`FieldWrapper`'s `labelVariant`). */
+  labelVariant?: 'default' | 'large';
   /** Disables interaction. */
   disabled?: boolean;
   /** Show loading state — disables interaction and renders a spinner overlay. */
@@ -91,6 +93,7 @@ export function ImageUploader({
   description = '(Click Here or Drag and Drop)',
   hint,
   fieldLabel,
+  labelVariant,
   disabled = false,
   loading = false,
   error,
@@ -167,7 +170,7 @@ export function ImageUploader({
   const isActionState = dragActive || (pressed && !hasImage);
 
   return (
-    <FieldWrapper label={fieldLabel} error={displayError} className={className}>
+    <FieldWrapper label={fieldLabel} labelVariant={labelVariant} error={displayError} className={className}>
       <input
         ref={inputRef}
         type="file"

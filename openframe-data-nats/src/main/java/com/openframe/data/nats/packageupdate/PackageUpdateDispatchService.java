@@ -42,14 +42,23 @@ public class PackageUpdateDispatchService {
                 DEFAULT_FORCE_COUNTDOWN_SECONDS, null);
     }
 
-    // Bundles and schedules saved before Update Settings existed carry none and keep the old behaviour.
     public void dispatchAdminUpdate(RunningExecutionRows execution, BrewPackageType brewPackageType,
                                     PackageUpdateSettings settings) {
+        dispatchWith(execution, brewPackageType, PackageUpdateSource.ADMIN, settings);
+    }
+
+    public void dispatchAutoUpdate(RunningExecutionRows execution, BrewPackageType brewPackageType,
+                                   PackageUpdateSettings settings) {
+        dispatchWith(execution, brewPackageType, PackageUpdateSource.AUTO, settings);
+    }
+
+    // Bundles, schedules and policies saved before Update Settings existed carry none and keep the old behaviour.
+    private void dispatchWith(RunningExecutionRows execution, BrewPackageType brewPackageType, PackageUpdateSource source, PackageUpdateSettings settings) {
         if (settings == null) {
-            dispatchAdminUpdateNow(execution, brewPackageType);
+            dispatch(execution, brewPackageType, source, PackageUpdateMode.WAIT, DEFAULT_FORCE_COUNTDOWN_SECONDS, null);
             return;
         }
-        dispatch(execution, brewPackageType, PackageUpdateSource.ADMIN, settings.getMode(),
+        dispatch(execution, brewPackageType, source, settings.getMode(),
                 settings.getCountdownSeconds(), settings.getDeadlineSeconds());
     }
 

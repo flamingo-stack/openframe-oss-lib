@@ -15,7 +15,6 @@ export interface DevicesFilterToolbarProps {
   tags: TagSearchOption<string>[];
   onTagRemove: (value: string) => void;
   onClearAll: () => void;
-  onSubmit: (value: string) => void;
 
   /** Open the Device Tags modal. */
   onOpenFilterModal: () => void;
@@ -60,7 +59,6 @@ export function DevicesFilterToolbar({
   tags,
   onTagRemove,
   onClearAll,
-  onSubmit,
   onOpenFilterModal,
   isFilterModalOpen,
   onCloseFilterModal,
@@ -92,7 +90,6 @@ export function DevicesFilterToolbar({
             onSearchChange={onSearchChange}
             onTagRemove={onTagRemove}
             onClearAll={onClearAll}
-            onSubmit={onSubmit}
             placeholder={searchPlaceholder}
             addMorePlaceholder="Add More..."
           />

@@ -2,7 +2,6 @@
 
 import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
-import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
@@ -16,6 +15,7 @@ import { ApprovalRequestMessage } from './approval-request-message';
 import { AskDisplay } from './ask-display';
 import { ChatAppearanceContext, useChatAppearance } from './chat-appearance-context';
 import { ChatContextChipStrip } from './chat-context-picker';
+import { ChatMarkdownLink } from './chat-markdown-link';
 import {
   CHAT_MESSAGE_FACE_PX,
   CHAT_MESSAGE_HEADER_CLASS,
@@ -31,7 +31,6 @@ import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
-import { InlineAppLinkChip } from './inline-app-link-chip';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
@@ -43,7 +42,6 @@ import { TicketEventMessage } from './ticket-event-message';
 import { ToolExecutionDisplay } from './tool-execution-display';
 import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
-import { computeIsNewTab } from './utils/nav-anchor-props';
 
 /** Inline `@marker:id` mention token in the message body (sibling of the
  *  `[card://]` grammar) — used to filter out items rendered inline from the
@@ -409,9 +407,6 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const renderingPlanRef = useRef(renderingPlan);
     renderingPlanRef.current = renderingPlan;
 
-    // The runtime decides whether a link stays in this app (`computeIsNewTab`); null outside a chat runtime, where
-    // every link stays a plain link.
-    const chatRuntime = useChatRuntime();
     const cardComponentOverrides = useMemo(() => {
       if (!hasMarkerSupport && !hasMentionSupport) return undefined;
       return {
@@ -452,14 +447,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               return <span className="text-ods-text-secondary opacity-60">{cardId}</span>;
             }
           }
-          // Unified click rule — delegated to the host's `NavLinkAnchor`
-          // component. The host wraps its own `useNavLink` hook so EVERY
-          // clickable surface (source chips, inline cards, search rows,
-          // action cards, chat-markdown links) shares the same routing
-          // decision: modifier-clicks pass through, cross-origin → new
-          // tab, in-page doc-tree path → soft swap, same-origin → soft
-          // RSC nav. Single mental model across the app, single source
-          // of truth in the hub.
+          // The host's `NavLinkAnchor` draws the link (the lib's
+          // `NavLinkAnchorViaRuntime`, or a host anchor over the same
+          // `useNavLinkViaRuntime`), so every clickable surface (source chips,
+          // inline cards, search rows, markdown links) follows the one
+          // navigation decision (`navLinkTarget`) and executor.
           //
           // Anchor-only links (`#section`) bypass NavLinkAnchor — the
           // host's router would treat them as navigation, but the user
@@ -467,30 +459,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           //
           // When the host has NOT supplied `NavLinkAnchor` (e.g. the
           // flamingo hero-demo with mock content), fall back to a plain
-          // `<a href>`. No cross-origin sniffing here — the OSS-lib does
-          // not own routing decisions; the host does.
-          // A link that stays in this app is drawn as an inline box, the skin of the host's entity mentions, still
-          // routed through the host's `NavLinkAnchor`. Whether it stays is the runtime's ONE new-tab rule
-          // (`computeIsNewTab`, the decision the chat's cards and source chips make): a link it keeps in this window
-          // is a place in the app; one it sends to a new tab (another site, a hub page from an embedded chat, a
-          // `mailto:`) stays a plain link.
-          if (
-            typeof href === 'string' &&
-            !href.startsWith('#') &&
-            chatRuntime &&
-            !computeIsNewTab(chatRuntime, href, null)
-          ) {
-            return (
-              <InlineAppLinkChip href={href} anchor={NavLinkAnchor}>
-                {children}
-              </InlineAppLinkChip>
-            );
-          }
+          // `<a href>`.
           if (typeof href === 'string' && NavLinkAnchor && !href.startsWith('#')) {
             return (
-              <NavLinkAnchor href={href} className={linkClassName} {...rest}>
+              <ChatMarkdownLink anchor={NavLinkAnchor} href={href} className={linkClassName} {...rest}>
                 {children}
-              </NavLinkAnchor>
+              </ChatMarkdownLink>
             );
           }
           return (
@@ -504,7 +478,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       // streaming turn (booleans + host-stable fn/component identities, both
       // enforced by this file's `memo` comparator). The rendering plan is
       // read through a ref above precisely so it does NOT appear here.
-    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor, chatRuntime]);
+    }, [hasMarkerSupport, hasMentionSupport, renderMention, NavLinkAnchor]);
 
     /**
      * Body of a markdown-bearing segment (`text` / `guide`).

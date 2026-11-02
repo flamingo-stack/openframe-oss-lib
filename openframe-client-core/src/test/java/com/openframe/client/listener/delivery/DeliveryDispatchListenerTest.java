@@ -6,7 +6,9 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 import com.openframe.client.service.delivery.LocalDeliverySink;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.ProcessedCommand;
 import com.openframe.data.nats.model.ToolInstallationMessage;
+import com.openframe.data.repository.delivery.ProcessedCommandRepository;
 import com.openframe.delivery.dispatch.DeliveryDispatchMessage;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
@@ -27,8 +29,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
@@ -43,8 +50,10 @@ class DeliveryDispatchListenerTest {
     @Mock private LocalDeliverySink sink;
     @Mock private DeliveryMetrics metrics;
     @Mock private DeliverySpec<DeliverySeed, DeliveryPayload> spec;
+    @Mock private ProcessedCommandRepository processedCommandRepository;
 
     @Captor private ArgumentCaptor<DeliveryRequest<DeliveryPayload>> requestCaptor;
+    @Captor private ArgumentCaptor<ProcessedCommand> processedCommandCaptor;
 
     private final ObjectMapper objectMapper = new JsonMapper();
 
@@ -53,7 +62,7 @@ class DeliveryDispatchListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new DeliveryDispatchListener(registry, sink, objectMapper, metrics);
+        listener = new DeliveryDispatchListener(registry, sink, objectMapper, metrics, processedCommandRepository);
         ToolInstallationMessage message = new ToolInstallationMessage();
         message.setToolAgentId(TARGET_ID);
         message.setDelivery(new DeliveryRef(DeliveryType.TOOL_INSTALLATION, TARGET_ID, DISPATCH_ID));
@@ -63,6 +72,7 @@ class DeliveryDispatchListenerTest {
     @Test
     void onDispatch_commandForEveryMachine_requestForEveryMachineHandedToSink() {
         // setup
+        when(processedCommandRepository.existsById(DISPATCH_ID)).thenReturn(false);
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         doReturn(ToolInstallationMessage.class).when(spec).getPayloadClass();
 
@@ -91,6 +101,7 @@ class DeliveryDispatchListenerTest {
     @Test
     void onDispatch_command_requestRebuiltFromDeliveryBlockAndHandedToSink() {
         // setup
+        when(processedCommandRepository.existsById(DISPATCH_ID)).thenReturn(false);
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         doReturn(ToolInstallationMessage.class).when(spec).getPayloadClass();
 
@@ -109,9 +120,49 @@ class DeliveryDispatchListenerTest {
     }
 
     @Test
+    void onDispatch_commandHandled_idSavedWithTheMomentOfHandling() {
+        when(processedCommandRepository.existsById(DISPATCH_ID)).thenReturn(false);
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        doReturn(ToolInstallationMessage.class).when(spec).getPayloadClass();
+        Instant before = Instant.now();
+
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.MACHINE, MACHINE_ID, command));
+
+        Instant after = Instant.now();
+        verify(processedCommandRepository).save(processedCommandCaptor.capture());
+        assertThat(processedCommandCaptor.getValue().getDispatchId()).isEqualTo(DISPATCH_ID);
+        assertThat(processedCommandCaptor.getValue().getHandledAt()).isBetween(before, after);
+    }
+
+    @Test
+    void onDispatch_commandAlreadyHandled_skippedAndCountedAsDuplicate() {
+        when(processedCommandRepository.existsById(DISPATCH_ID)).thenReturn(true);
+
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.MACHINE, MACHINE_ID, command));
+
+        verify(metrics).recordDispatchDuplicate(DeliveryType.TOOL_INSTALLATION);
+        verify(processedCommandRepository, never()).save(any());
+        verifyNoInteractions(sink, registry);
+    }
+
+    @Test
+    void onDispatch_sinkFails_commandNotMarkedHandled() {
+        when(processedCommandRepository.existsById(DISPATCH_ID)).thenReturn(false);
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        doReturn(ToolInstallationMessage.class).when(spec).getPayloadClass();
+        doThrow(new IllegalStateException("mongo away")).when(sink).accept(any());
+
+        assertThatThrownBy(() -> listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.MACHINE, MACHINE_ID, command)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("mongo away");
+        verify(processedCommandRepository, never()).save(any());
+    }
+
+    @Test
     void onDispatch_scheduledCommand_momentCarriedIntoTheRequest() {
         // setup
         Instant dueAt = Instant.parse("2026-11-01T10:00:00Z");
+        when(processedCommandRepository.existsById(DISPATCH_ID)).thenReturn(false);
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         doReturn(ToolInstallationMessage.class).when(spec).getPayloadClass();
 

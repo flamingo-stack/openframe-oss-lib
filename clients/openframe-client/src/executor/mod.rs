@@ -12,9 +12,9 @@ pub(crate) use unix::console_user_present;
 #[cfg(unix)]
 pub use unix::execute_script;
 #[cfg(windows)]
-pub(crate) use windows::console_user_present;
-#[cfg(windows)]
 pub use windows::execute_script;
+#[cfg(windows)]
+pub(crate) use windows::{cannot_elevate, console_user_present};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Privilege {
