@@ -1,18 +1,12 @@
 package com.openframe.client.service.agentregistration.transformer;
 
-import com.openframe.data.document.tool.IntegratedTool;
+import com.openframe.client.service.agentregistration.fleet.FleetHostFactsWriter;
+import com.openframe.client.service.agentregistration.fleet.FleetMdmClients;
 import com.openframe.data.document.tool.ToolType;
-import com.openframe.data.document.tool.ToolUrl;
-import com.openframe.data.document.tool.ToolUrlType;
-import com.openframe.data.service.IntegratedToolService;
-import com.openframe.data.service.ToolUrlService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
-import com.openframe.sdk.fleetmdm.FleetTenantHeader;
 import com.openframe.sdk.fleetmdm.model.Host;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
@@ -27,21 +21,8 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @Slf4j
 public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
 
-    private static final String TOOL_ID = "fleetmdm-server";
-
-    private final IntegratedToolService integratedToolService;
-    private final ToolUrlService toolUrlService;
-
-    @Value("${TENANT_ID:}")
-    private String tenantId;
-
-    @Value("${openframe.fleet.multi-tenancy.enabled:false}")
-    private boolean fleetMultiTenancyEnabled;
-
-    @PostConstruct
-    void validateTenantConfig() {
-        FleetTenantHeader.validate(fleetMultiTenancyEnabled, tenantId);
-    }
+    private final FleetMdmClients fleetMdmClients;
+    private final FleetHostFactsWriter fleetHostFactsWriter;
 
     @Override
     public ToolType getToolType() {
@@ -59,16 +40,7 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
         }
 
         try {
-            IntegratedTool integratedTool = integratedToolService.getToolByKey(TOOL_ID)
-                    .orElseThrow(() -> new IllegalStateException("Found no tool with id " + TOOL_ID));
-            
-            ToolUrl toolUrl = toolUrlService.getUrlByToolType(integratedTool, ToolUrlType.API)
-                    .orElseThrow(() -> new IllegalStateException("Found no api url for tool with id " + TOOL_ID));
-
-            String apiUrl = toolUrl.getUrl() + ":" + toolUrl.getPort();
-            String apiToken = integratedTool.getCredentials().getApiKey().getKey();
-
-            FleetMdmClient fleetClient = new FleetMdmClient(apiUrl, apiToken, tenantId);
+            FleetMdmClient fleetClient = fleetMdmClients.client();
 
             List<Host> hosts = fleetClient.searchHosts(agentToolId, 0, 2);
             
@@ -99,7 +71,17 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
     private String processMatchingHost(String machineId, String agentToolId, Host host) {
         String transformedAgentToolId = String.valueOf(host.getId());
         log.info("Transformed Fleet MDM agent tool ID, machineId={}, uuid={}, host_id={}", machineId, agentToolId, transformedAgentToolId);
+        fillHostFacts(machineId, host);
         return transformedAgentToolId;
+    }
+
+    // The facts come for free with the lookup; failing to store them must never fail the tool connection
+    private void fillHostFacts(String machineId, Host host) {
+        try {
+            fleetHostFactsWriter.fill(machineId, host);
+        } catch (Exception e) {
+            log.warn("Failed to fill Fleet host facts, machineId={}, host_id={}", machineId, host.getId(), e);
+        }
     }
 
     private String processNoMatchingHost(String machineId, String agentToolId, boolean lastAttempt) {

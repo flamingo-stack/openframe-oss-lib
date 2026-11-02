@@ -16,6 +16,9 @@ import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
+import com.openframe.data.service.machine.MachineUpdate;
+import com.openframe.data.service.machine.MachineWriteResult;
+import com.openframe.data.service.machine.MachineWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +27,7 @@ import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -43,6 +47,9 @@ class AgentRegistrationServiceTest {
 
     @Mock
     private MachineRepository machineRepository;
+
+    @Mock
+    private MachineWriter machineWriter;
 
     @Mock
     private RegistrationTagAssignmentService registrationTagAssignmentService;
@@ -101,6 +108,7 @@ class AgentRegistrationServiceTest {
         agentRegistrationService = new AgentRegistrationService(
                 oauthClientRepository,
                 machineRepository,
+                machineWriter,
                 organizationIdResolver,
                 agentRegistrationSecretValidator,
                 clientSecretValidator,
@@ -178,6 +186,7 @@ class AgentRegistrationServiceTest {
         verify(oauthClientRepository).existsByMachineId(MACHINE_ID);
         verify(oauthClientRepository, never()).save(any());
         verify(machineRepository, never()).save(any());
+        verifyNoInteractions(machineWriter);
     }
 
     @Test
@@ -231,7 +240,7 @@ class AgentRegistrationServiceTest {
         existingMachine.setAgentVersion("0.9.0");
         existingMachine.setOrganizationId("old-org");
         when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingClient));
-        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingMachine));
+        stubWriterOver(existingMachine);
         when(organizationIdResolver.resolve("org-1")).thenReturn("new-org");
 
         AgentRegistrationResponse response =
@@ -247,9 +256,9 @@ class AgentRegistrationServiceTest {
         inOrder.verify(agentRegistrationSecretValidator).validate(INITIAL_KEY);
         inOrder.verify(clientSecretValidator).validate(existingClient, CLIENT_SECRET);
 
-        // existing machine row is overwritten with request data (same id), not recreated
-        verify(machineRepository).save(machineCaptor.capture());
-        Machine savedMachine = machineCaptor.getValue();
+        // existing machine row is overwritten with request data (same id), field by field, not recreated or saved whole
+        verify(machineRepository, never()).save(any());
+        Machine savedMachine = writtenOver(existingMachine);
         assertEquals(MACHINE_ID, savedMachine.getMachineId());
         assertEquals("test-hostname", savedMachine.getHostname());
         assertEquals(OsType.WINDOWS, savedMachine.getOsType());
@@ -267,7 +276,8 @@ class AgentRegistrationServiceTest {
         // setup is re-run
         verify(registrationTagAssignmentService).assignTags(eq(MACHINE_ID), any());
         verify(agentRegistrationToolInstallationService).process(MACHINE_ID);
-        verify(agentRegistrationProcessor).postProcessAgentRegistration(existingMachine, request);
+        verify(agentRegistrationProcessor).postProcessAgentRegistration(machineCaptor.capture(), eq(request));
+        assertEquals("new-org", machineCaptor.getValue().getOrganizationId());
         verify(installedAgentService).addInstalledAgent(MACHINE_ID, "openframe-client", "1.0.0", false);
 
         // nothing is re-created
@@ -290,6 +300,7 @@ class AgentRegistrationServiceTest {
         verify(clientSecretValidator, never()).validate(any(), any());
         verify(machineRepository, never()).findByMachineId(any());
         verify(machineRepository, never()).save(any());
+        verifyNoInteractions(machineWriter);
         verify(oauthClientRepository, never()).save(any());
     }
 
@@ -308,6 +319,7 @@ class AgentRegistrationServiceTest {
         verify(clientSecretValidator, never()).validate(any(), any());
         verify(machineRepository, never()).findByMachineId(any());
         verify(machineRepository, never()).save(any());
+        verifyNoInteractions(machineWriter);
     }
 
     @Test
@@ -326,6 +338,7 @@ class AgentRegistrationServiceTest {
         verify(agentRegistrationSecretValidator).validate(INITIAL_KEY);
         verify(machineRepository, never()).findByMachineId(any());
         verify(machineRepository, never()).save(any());
+        verifyNoInteractions(machineWriter);
         verify(oauthClientRepository, never()).save(any());
     }
 
@@ -339,5 +352,125 @@ class AgentRegistrationServiceTest {
         request.setOsType("WINDOWS");   // agent contract: exact OsType enum name
         request.setAgentVersion("1.0.0");
         return request;
+    }
+
+    @Test
+    void registerAgent_WithHardwareFacts_CopiesThemOntoTheNewMachine() {
+        stubNewMachineRegistration();
+        request.setSerialNumber("C02XG2JHJG5H");
+        request.setManufacturer("Apple Inc.");
+        request.setModel("MacBookPro18,3");
+
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        verify(machineRepository).save(machineCaptor.capture());
+        Machine savedMachine = machineCaptor.getValue();
+        assertEquals("C02XG2JHJG5H", savedMachine.getSerialNumber());
+        assertEquals("Apple Inc.", savedMachine.getManufacturer());
+        assertEquals("MacBookPro18,3", savedMachine.getModel());
+        assertEquals("test-os-uuid", savedMachine.getOsUuid());
+    }
+
+    @Test
+    void registerAgent_WithBlankHardwareFacts_LeavesThemUnset() {
+        stubNewMachineRegistration();
+        request.setSerialNumber("  ");
+        request.setManufacturer("");
+        request.setModel(null);
+        request.setOsUuid(" ");
+
+        agentRegistrationService.register(INITIAL_KEY, request);
+
+        verify(machineRepository).save(machineCaptor.capture());
+        Machine savedMachine = machineCaptor.getValue();
+        assertNull(savedMachine.getSerialNumber());
+        assertNull(savedMachine.getManufacturer());
+        assertNull(savedMachine.getModel());
+        assertNull(savedMachine.getOsUuid());
+    }
+
+    @Test
+    void reinstall_WithHardwareFacts_OverwritesTheStoredOnes() {
+        stubReinstallOf(machineWithHardwareFacts());
+        request.setSerialNumber("NEW-SERIAL");
+        request.setManufacturer("Dell Inc.");
+        request.setModel("Latitude 7440");
+        request.setOsUuid("new-os-uuid");
+
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        Machine savedMachine = writtenOver(machineWithHardwareFacts());
+        assertEquals("NEW-SERIAL", savedMachine.getSerialNumber());
+        assertEquals("Dell Inc.", savedMachine.getManufacturer());
+        assertEquals("Latitude 7440", savedMachine.getModel());
+        assertEquals("new-os-uuid", savedMachine.getOsUuid());
+    }
+
+    @Test
+    void reinstall_WithoutHardwareFacts_KeepsTheStoredOnes() {
+        stubReinstallOf(machineWithHardwareFacts());
+        request.setSerialNumber(" ");
+        request.setOsUuid(null);
+
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        Machine savedMachine = writtenOver(machineWithHardwareFacts());
+        assertEquals("OLD-SERIAL", savedMachine.getSerialNumber());
+        assertEquals("LENOVO", savedMachine.getManufacturer());
+        assertEquals("ThinkPad T14", savedMachine.getModel());
+        assertEquals("old-os-uuid", savedMachine.getOsUuid());
+    }
+
+    private void stubNewMachineRegistration() {
+        when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
+        when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
+        when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
+        when(organizationIdResolver.resolve(any())).thenReturn(ORGANIZATION_ID);
+        when(passwordEncoder.encode(CLIENT_SECRET)).thenReturn("encoded-secret");
+        when(oauthClientRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+        when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+    }
+
+    private void stubReinstallOf(Machine existingMachine) {
+        OAuthClient existingClient = new OAuthClient();
+        existingClient.setMachineId(MACHINE_ID);
+        existingClient.setClientId("agent_" + MACHINE_ID);
+        when(oauthClientRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(existingClient));
+        stubWriterOver(existingMachine);
+        when(organizationIdResolver.resolve("org-1")).thenReturn("new-org");
+    }
+
+    private void stubWriterOver(Machine existingMachine) {
+        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenAnswer(invocation -> {
+            Machine after = copyOf(existingMachine);
+            invocation.getArgument(1, MachineUpdate.class).applyTo(after);
+            return Optional.of(new MachineWriteResult(existingMachine, after));
+        });
+    }
+
+    private Machine writtenOver(Machine existingMachine) {
+        ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
+        verify(machineWriter).update(eq(MACHINE_ID), update.capture());
+        assertFalse(update.getValue().paths().stream().anyMatch(path -> path.startsWith("directory")),
+                "a reinstall never writes the directory summary");
+        Machine after = copyOf(existingMachine);
+        update.getValue().applyTo(after);
+        return after;
+    }
+
+    private static Machine copyOf(Machine source) {
+        Machine copy = new Machine();
+        BeanUtils.copyProperties(source, copy);
+        return copy;
+    }
+
+    private static Machine machineWithHardwareFacts() {
+        Machine machine = new Machine();
+        machine.setMachineId(MACHINE_ID);
+        machine.setSerialNumber("OLD-SERIAL");
+        machine.setManufacturer("LENOVO");
+        machine.setModel("ThinkPad T14");
+        machine.setOsUuid("old-os-uuid");
+        return machine;
     }
 }

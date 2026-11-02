@@ -8,6 +8,8 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
@@ -119,5 +121,20 @@ class DeviceDataFetcherTest {
 
         assertThat(result).isSameAs(mapped);
         verify(mapper).toEnrollment(machine, connections);
+    }
+
+    @Test
+    @DisplayName("directory fields: resolved through the mapper, so a null never reaches the non-null schema fields")
+    void directoryFields_resolvedThroughTheMapper() {
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        when(dfe.getSource()).thenReturn(machine);
+        when(mapper.toDirectorySources(machine)).thenReturn(List.of(DirectorySource.MICROSOFT_365));
+        when(mapper.toDirectoryUserLink(machine)).thenReturn(DirectoryUserLink.PRIMARY);
+        when(mapper.toDirectoryUserIds(machine)).thenReturn(List.of("acc-1"));
+
+        assertThat(fetcher.directorySources(dfe)).containsExactly(DirectorySource.MICROSOFT_365);
+        assertThat(fetcher.directoryUserLink(dfe)).isEqualTo(DirectoryUserLink.PRIMARY);
+        assertThat(fetcher.directoryUserIds(dfe)).containsExactly("acc-1");
     }
 }
