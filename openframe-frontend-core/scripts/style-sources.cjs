@@ -259,4 +259,17 @@ if (require.main === module) {
   );
 }
 
-module.exports = { appStyleSources, routePaths, servedRouteFiles, LAZY_STYLED };
+/**
+ * The Tailwind config of the stylesheet the root layout imports, for `next-styles build`: under it that sheet is
+ * built with no utilities (its tokens, preflight and the app's own rules), because each route's utilities arrive
+ * in a sheet of their own. Anywhere else (`next dev`, any other build, the route step itself) it is `config`.
+ *
+ * It lives here, beside `appStyleSources`, because Turbopack traces what a Tailwind config imports: imported from
+ * `next-styles` it pulled esbuild's package into the trace and failed the build.
+ */
+function withRouteStylesTailwind(config) {
+  if (process.env.NEXT_STYLES !== 'routes') return config;
+  return { ...config, content: [{ raw: '', extension: 'html' }], safelist: [] };
+}
+
+module.exports = { appStyleSources, routePaths, servedRouteFiles, LAZY_STYLED, withRouteStylesTailwind };
