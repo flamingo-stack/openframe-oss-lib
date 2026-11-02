@@ -64,12 +64,15 @@ public class ScriptExecutionWatchdogService {
         row.setFinishedAt(now);
         row.setTimedOut(Boolean.TRUE);
         row.setError(STUCK_ERROR_MESSAGE_FORMAT.formatted(thresholdSeconds));
-        log.info("Reaping stuck Execution: executionId={} machineId={} dispatchedAt={} thresholdSeconds={}",
-                row.getExecutionId(), row.getMachineId(), row.getDispatchedAt(), thresholdSeconds);
+        log.info("Reaping stuck Execution: executionId={} machineId={} runningSince={} thresholdSeconds={}",
+                row.getExecutionId(), row.getMachineId(), row.getStatusChangedAt(), thresholdSeconds);
     }
 
+    // the clock starts when the agent took the batch (the leaf went RUNNING), not at the fire: a batch waits in the
+    // delivery engine for a machine that is offline, so dispatchedAt may be long before the agent ever saw it
     private boolean isStuck(ScriptExecution row, Instant now) {
-        return row.getDispatchedAt() != null && row.getDispatchedAt().isBefore(now.minusSeconds(thresholdSecondsFor(row)));
+        Instant runningSince = row.getStatusChangedAt();
+        return runningSince != null && runningSince.isBefore(now.minusSeconds(thresholdSecondsFor(row)));
     }
 
     private long thresholdSecondsFor(ScriptExecution row) {
