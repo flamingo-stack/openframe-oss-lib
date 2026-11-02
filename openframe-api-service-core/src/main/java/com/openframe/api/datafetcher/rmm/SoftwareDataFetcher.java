@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
@@ -12,13 +13,18 @@ import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilters;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.rmm.software.SoftwareInventoryService;
+import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 
 @DgsComponent
@@ -66,16 +72,16 @@ public class SoftwareDataFetcher {
             @InputArgument String softwareId, @InputArgument SoftwareOnDeviceFilterInput filter,
             @InputArgument Integer first, @InputArgument String after,
             @InputArgument Integer last, @InputArgument String before,
-            @InputArgument String search, @InputArgument Object sort) {
+            @InputArgument String search, @InputArgument SortInput sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
         Integer perPage = first != null ? first : last;
         return PageCursors.toConnection(
-                softwareInventoryService.listDevicesForSoftware(softwareId, filter, search, page, perPage));
+                softwareInventoryService.listDevicesForSoftware(softwareId, filter, search, page, perPage, sort));
     }
 
     @DgsQuery
     public CountedGenericConnection<GenericEdge<SoftwareVulnerabilityResponse>> softwareVulnerabilities(
-            @InputArgument String softwareId, @InputArgument Object filter,
+            @InputArgument String softwareId, @InputArgument SoftwareVulnerabilityFilterInput filter,
             @InputArgument Integer first, @InputArgument String after,
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
@@ -84,7 +90,7 @@ public class SoftwareDataFetcher {
         String sortField = sort == null ? null : sort.getField();
         boolean asc = sort != null && sort.getDirection() == SortDirection.ASC;
         return PageCursors.toConnection(softwareInventoryService.listVulnerabilitiesForSoftware(
-                softwareId, search, page, perPage, sortField, asc));
+                softwareId, filter, search, page, perPage, sortField, asc));
     }
 
     @DgsQuery
@@ -102,5 +108,15 @@ public class SoftwareDataFetcher {
     public SoftwareOnDeviceFilters softwareDeviceFilters(@InputArgument String softwareId,
                                                          @InputArgument Object filter, @InputArgument String search) {
         return softwareInventoryService.getSoftwareDeviceFilters(softwareId, search);
+    }
+
+    @DgsMutation
+    public SoftwareResponse turnOffSoftwareAutoUpdate(@InputArgument String softwareId) {
+        return softwareInventoryService.turnOffAutoUpdate(softwareId, getCurrentUserId());
+    }
+
+    private String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 }

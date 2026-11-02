@@ -32,7 +32,13 @@ const media: ProgramMedia[] = [
 describe('ProgramCard gallery inside a whole-card link', () => {
   it('opens the gallery without following the card link', () => {
     render(
-      <ProgramCard config={DEFAULT_PROGRAM_CONFIGS.event} item={item} media={media} href="/events/e1" wholeCardClickable />,
+      <ProgramCard
+        config={DEFAULT_PROGRAM_CONFIGS.event}
+        item={item}
+        media={media}
+        href="/events/e1"
+        wholeCardClickable
+      />,
     );
     const thumb = screen.getByAltText('Miami meetup photo 1');
     const event = new MouseEvent('click', { bubbles: true, cancelable: true });

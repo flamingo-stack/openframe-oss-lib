@@ -49,15 +49,13 @@ export interface FaqDocumentPageProps {
   jsonLd?: FaqSchemaOptions;
   /** Base URL `FaqSection` appends `/api/faqs` to (reverse-proxy embedders). */
   apiBaseUrl?: string;
-  /** What the page is about (forwarded to `FaqSection`): its FAQs and its ask card are the ones written for the topic. */
-  topic?: string;
   /** Optional entity scoping forwarded to `FaqSection`. */
   entityType?: string;
   entityId?: number | string;
   /** Minimum FAQ count before the section renders (forwarded to `FaqSection`). */
   minResults?: number;
   /** The "ask the assistant" card beside the questions (forwarded to `FaqSection`): `false` switches it off, an
-   *  object states its topic, wording and the chat it opens. */
+   *  object states its wording and the chat it opens; its topic is the page's (`usePageTopic`). */
   ask?: FaqSectionProps['ask'];
   /** The FAQ's loading state, group by group (forwarded to `FaqSection`). */
   skeletonShape?: FaqSectionProps['skeletonShape'];
@@ -76,7 +74,6 @@ export function FaqDocumentPage({
   entityType,
   entityId,
   minResults,
-  topic,
   ask,
   skeletonShape,
   skeletonNav,
@@ -106,7 +103,6 @@ export function FaqDocumentPage({
         entityType={entityType}
         entityId={entityId}
         minResults={minResults}
-        topic={topic}
         ask={ask}
         skeletonShape={skeletonShape}
         skeletonNav={skeletonNav}

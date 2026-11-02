@@ -86,19 +86,26 @@ describe('AskDisplay', () => {
     expect(screen.queryByLabelText('Next question')).not.toBeInTheDocument();
   });
 
-  it('pages through a run of cards, one question at a time', () => {
-    render(<AskDisplay cards={[card('First?'), card('Second?')]} onSelect={vi.fn()} />);
+  it('pages through a run of cards, one question at a time, and loops at both ends', () => {
+    render(<AskDisplay cards={[card('First?'), card('Second?'), card('Third?')]} onSelect={vi.fn()} />);
 
-    expect(screen.getByText('1 of 2')).toBeInTheDocument();
+    expect(screen.getByText('1 of 3')).toBeInTheDocument();
     expect(screen.getByText('First?')).toBeInTheDocument();
     expect(screen.queryByText('Second?')).not.toBeInTheDocument();
-    // At the first page there is nowhere back to go.
-    expect(screen.getByLabelText('Previous question')).toBeDisabled();
+    expect(screen.getByLabelText('Previous question')).toBeEnabled();
+
+    // Back from the first question is the last one.
+    fireEvent.click(screen.getByLabelText('Previous question'));
+    expect(screen.getByText('3 of 3')).toBeInTheDocument();
+    expect(screen.getByText('Third?')).toBeInTheDocument();
+    expect(screen.getByLabelText('Next question')).toBeEnabled();
+
+    // Next from the last question is the first one.
+    fireEvent.click(screen.getByLabelText('Next question'));
+    expect(screen.getByText('1 of 3')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Next question'));
-
-    expect(screen.getByText('2 of 2')).toBeInTheDocument();
+    expect(screen.getByText('2 of 3')).toBeInTheDocument();
     expect(screen.getByText('Second?')).toBeInTheDocument();
-    expect(screen.getByLabelText('Next question')).toBeDisabled();
   });
 });

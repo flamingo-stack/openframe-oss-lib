@@ -11,6 +11,7 @@ import { type ScheduleFormData, SCHEDULE_OFFLINE_BEHAVIOR_OPTIONS } from './sche
 import { ScheduleIntervalInput } from './schedule-interval-input';
 import {
   DURATION_UNIT_OPTIONS,
+  DURATION_UNIT_VALUES,
   type DurationUnit,
   isEventTrigger,
   isRetryOnReconnect,
@@ -77,7 +78,15 @@ function ReconnectWindowFields({
       {/* Switching to minutes drags the interval up to the floor with it: "1 Day"
           would otherwise read "1 Minute", a value the user never typed and the
           form cannot save. Coarser units clear the floor by construction. */}
-      <Select value={unit} onValueChange={(next: DurationUnit) => onUnitChange(next)} disabled={disabled}>
+      <Select
+        value={unit}
+        onValueChange={value => {
+          // Radix hands over a plain string; only an option's value is taken.
+          const next = DURATION_UNIT_VALUES.find(option => option === value);
+          if (next) onUnitChange(next);
+        }}
+        disabled={disabled}
+      >
         <SelectTrigger className={controlWidth} aria-label="Stop retry after unit">
           <SelectValue />
         </SelectTrigger>

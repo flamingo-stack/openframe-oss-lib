@@ -63,6 +63,7 @@ enum NotificationCategory {
     INSIGHTS
     MINGO
     INTEGRATIONS
+    BILLING
     GENERIC
 }
 

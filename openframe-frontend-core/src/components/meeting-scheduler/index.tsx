@@ -48,18 +48,20 @@ import { BOOKING_IN_FLIGHT_MESSAGE, useMeetingBooking } from '../../hooks/use-me
 import { useToast } from '../../hooks/use-toast';
 import {
   blocksNativeBooking,
+  bookingContextFields,
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
   type MeetingHost,
+  type SchedulingLink,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { FORM_RESCUE_ATTEMPT_FIELD, type FormRescueDefinition } from '../../utils/form-rescue';
-import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
+import { formatDurationCompact, formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
 import { LoadingRegion } from '../loading/loading-region';
-import { Alert, AlertDescription, Button } from '../ui';
-import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
+import { Alert, AlertDescription, Button, ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui';
+import { LOADING_NOOP, LoadingWhen, useLoadingScope } from '../ui/loading-scope';
 import { BookingForm, DEFAULT_SUBMIT_LABEL, type BookingFieldRow, type BookingFormProps } from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel } from './context-panel';
@@ -156,10 +158,20 @@ export interface HubSpotMeetingSchedulerProps {
    * so a Server Component can pass it across the RSC boundary where a component
    * cannot. `answers` are what the page took outside the form (a choice made
    * higher up the page), written into questions the visitor has not answered.
+   * `context` is what the page learned outside the link's questions, shown in the
+   * form and sent with the booking (`BookingContext`); `contextSlot` is the space the
+   * form keeps for it from its first paint.
    */
   detailsFormProps?: Pick<
     BookingFormProps,
-    'fieldRows' | 'optionalFields' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'answers'
+    | 'fieldRows'
+    | 'optionalFields'
+    | 'consent'
+    | 'fieldCopy'
+    | 'deniedEmailDomains'
+    | 'answers'
+    | 'context'
+    | 'contextSlot'
   >;
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
@@ -1174,6 +1186,8 @@ export function HubSpotMeetingScheduler({
                       // copies frozen at that point can be stale.
                       durationMs,
                       timezone,
+                      // Live too: the page's context can change while the visitor is on the calendar.
+                      ...bookingContextFields(detailsFormProps?.context),
                     }).finally(() => {
                       inFlightRef.current = false;
                     });
@@ -1200,6 +1214,87 @@ export function HubSpotMeetingScheduler({
   );
 }
 
+export interface MeetingSchedulerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  /** The window's heading, e.g. "Book an Onboarding Call". */
+  title: string;
+  /** The link to book (from the host's `/api/meetings` directory); `null` while it is read or when there is none. */
+  link: SchedulingLink | null;
+  /** The host is still reading `link`: the scheduler draws its own loading state in its place. */
+  loading?: boolean;
+  /** Endpoints prefix, as on `HubSpotMeetingScheduler`. */
+  apiBaseUrl?: string;
+  /** Fires after a confirmed booking, once the booked toast is up; the window closes itself. */
+  onBooked?: (booking: BookingConfirmation) => void;
+  /** The line shown in place of the scheduler when there is no link to book. */
+  emptyMessage?: string;
+  className?: string;
+}
+
+/**
+ * The whole booking window: a 600px `ModalV2` with the title, the scheduler in
+ * its modal layout, and a booked toast. The window closes on a confirmed
+ * booking, and on a phone's Cancel (the scheduler's host exit).
+ *
+ * The host passes the link it resolved, not a meeting id: the same read
+ * usually decides whether the entry point is offered at all, so the window
+ * takes its answer rather than reading the directory again. While it is read
+ * the scheduler draws its loading state in the same tree, so nothing remounts
+ * when the link lands.
+ */
+export function MeetingSchedulerModal({
+  isOpen,
+  onClose,
+  title,
+  link,
+  loading = false,
+  apiBaseUrl = '',
+  onBooked,
+  emptyMessage = 'No calls can be booked right now.',
+  className,
+}: MeetingSchedulerModalProps) {
+  const { toast } = useToast();
+
+  return (
+    <ModalV2 isOpen={isOpen} onClose={onClose} className={cn('md:max-w-[600px]', className)}>
+      <ModalV2Header>
+        <ModalV2Title>{title}</ModalV2Title>
+      </ModalV2Header>
+      {/* The window scrolls as a whole on a phone (the scheduler's footer rides
+          with the card); without this slot the body has no scroll box at all. */}
+      <ModalV2Content className="flex flex-col">
+        {link || loading ? (
+          <LoadingWhen loading={!link}>
+            <HubSpotMeetingScheduler
+              layout="modal"
+              meetingId={link?.id ?? ''}
+              apiBaseUrl={apiBaseUrl}
+              hosts={link?.hosts}
+              fallbackUrl={link?.link}
+              onBack={onClose}
+              onBooked={booking => {
+                const when = formatDateWithTimezone(booking.startTimeMs, VIEWER_TIMEZONE, 'weekdayDateTimeZoned', {
+                  viewerLocale: true,
+                });
+                toast({
+                  title: 'Call booked',
+                  description: `${booking.title} - ${when}. Check your email for the invite.`,
+                  variant: 'success',
+                });
+                onBooked?.(booking);
+                onClose();
+              }}
+            />
+          </LoadingWhen>
+        ) : (
+          <p className="text-ods-text-secondary text-h4">{emptyMessage}</p>
+        )}
+      </ModalV2Content>
+    </ModalV2>
+  );
+}
+
 // The override surface: a host builds its `detailsForm` by re-rendering
 // `BookingForm` with `fieldRows`, so it needs both from this entry point (the
 // package exports `./components/meeting-scheduler`, not the file beneath it).
@@ -1213,10 +1308,18 @@ export {
   type BookingFormConsent,
 } from './booking-form';
 
+export { BookingContextSummary } from './booking-context-summary';
+
 export {
   MeetingSchedulerDirectory,
   MEETING_DIRECTORY_PAGE_SIZE,
   type MeetingSchedulerDirectoryProps,
 } from './directory';
 export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost };
-export type { SchedulingLink, SchedulingLinksPayload, DeniedEmailDomains } from '../../schemas/meeting-booking-schema';
+export type {
+  SchedulingLink,
+  SchedulingLinksPayload,
+  DeniedEmailDomains,
+  BookingContext,
+  BookingContextSlot,
+} from '../../schemas/meeting-booking-schema';

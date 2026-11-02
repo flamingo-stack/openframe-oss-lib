@@ -78,6 +78,21 @@ class HubspotApiEmailServiceTest {
                 .hasMessageEndingWith(" body=");
     }
 
+    @Test
+    void send_hubspotAccepts_postsSingleSendWithTemplateRecipientSubjectAndProperties() {
+        hubspotAnswers(200, ACCEPTED);
+
+        send(service -> service.send("paused-template", TO, "Auto top-up is paused",
+                Map.of("resumes_at", "Nov 20, 2026, 12:00 UTC", "spend_limit_usd", "100")));
+
+        assertThat(requests).containsExactly(new HubspotRequest("POST", "/marketing/v4/email/single-send",
+                "Bearer hs-token", "application/json", Map.of(
+                        "emailId", "paused-template",
+                        "message", Map.of("to", TO, "from", FROM, "subject", "Auto top-up is paused"),
+                        "customProperties", Map.of("resumes_at", "Nov 20, 2026, 12:00 UTC",
+                                "spend_limit_usd", "100"))));
+    }
+
     private void send(Consumer<HubspotApiEmailService> call) {
         new ApplicationContextRunner()
                 .withPropertyValues(

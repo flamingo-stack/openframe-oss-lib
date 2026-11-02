@@ -69,6 +69,16 @@ class DeliveryPropertiesBindingTest {
         assertThatThrownBy(() -> bind(config)).hasRootCauseInstanceOf(BindValidationException.class);
     }
 
+    @Test
+    void bind_defaultsWithoutMaxRuns_rejected() {
+        // setup
+        Map<String, String> config = fullDefaults();
+        config.remove(PREFIX + ".defaults.max-runs");
+
+        // execution + verifications
+        assertThatThrownBy(() -> bind(config)).hasRootCauseInstanceOf(BindValidationException.class);
+    }
+
     private static DeliveryProperties bind(Map<String, String> config) {
         Binder binder = new Binder(new MapConfigurationPropertySource(config));
         SpringValidatorAdapter validator = new SpringValidatorAdapter(Validation.buildDefaultValidatorFactory().getValidator());
@@ -89,6 +99,8 @@ class DeliveryPropertiesBindingTest {
         config.put(PREFIX + ".defaults.reconnect-window-seconds", "86400");
         config.put(PREFIX + ".defaults.result-timeout-seconds", "600");
         config.put(PREFIX + ".defaults.ttl-seconds", "604800");
+        config.put(PREFIX + ".defaults.max-runs", "1");
+        config.put(PREFIX + ".defaults.rerun-after-seconds", "10800");
         return config;
     }
 }

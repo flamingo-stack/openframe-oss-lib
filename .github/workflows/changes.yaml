@@ -3,9 +3,6 @@ name: Detect Changes
 on:
   workflow_call:
     outputs:
-      node_matrix:
-        description: "Node packages matrix"
-        value: ${{ jobs.collect.outputs.node_matrix }}
       changes:
         description: "JSON object mapping each component key to true/false"
         value: ${{ jobs.collect.outputs.changes }}
@@ -15,7 +12,6 @@ jobs:
     name: Changes and Matrix
     runs-on: ubuntu-latest
     outputs:
-      node_matrix: ${{ steps.define.outputs.node_matrix }}
       changes: ${{ steps.changes.outputs.changes }}
     steps:
       - uses: actions/checkout@v4
@@ -24,13 +20,6 @@ jobs:
         id: define
         run: |
           set -euo pipefail
-
-          node_matrix=$(jq -nc '[
-              {
-                "name": "openframe-frontend-core",
-                "path": "openframe-frontend-core"
-              }
-            ]')
 
           filters=$(jq -nc '{
               "java": [
@@ -46,6 +35,7 @@ jobs:
                 "openframe-data-cassandra/**",
                 "openframe-data-device-aspect/**",
                 "openframe-data-kafka/**",
+                "openframe-data-loki/**",
                 "openframe-data-mongo-common/**",
                 "openframe-data-mongo-sync/**",
                 "openframe-data-mongo-reactive/**",
@@ -61,11 +51,12 @@ jobs:
                 "openframe-graphql-node/**",
                 "openframe-graphql-relay/**",
                 "openframe-idp-configuration/**",
+                "openframe-machine-delivery/**",
                 "openframe-management-service-core/**",
                 "openframe-notification-core/**",
                 "openframe-notification-mail/**",
-                "openframe-notification-push/**",
                 "openframe-pinot-initializer/**",
+                "openframe-presence/**",
                 "openframe-security-core/**",
                 "openframe-security-oauth/**",
                 "openframe-stream-service-core/**",
@@ -80,16 +71,22 @@ jobs:
               "rust": [
                 "clients/**",
                 ".github/steps/rust-setup/**"
+              ],
+              "cargo": [
+                "clients/**/Cargo.lock"
+              ],
+              "trivy": [
+                ".trivyignore",
+                "trivy.yaml",
+                ".github/steps/trivy/**"
               ]
             }')
 
           keys=$(jq -nc --argjson f "$filters" '$f | keys')
 
-          [ "$(jq 'length' <<< "$node_matrix")" -gt 0 ] || { echo "node_matrix is empty" >&2; exit 1; }
           [ "$(jq 'length' <<< "$keys")" -gt 0 ] || { echo "no change filters" >&2; exit 1; }
 
           {
-            echo "node_matrix=$node_matrix"
             echo "filters=$filters"
             echo "keys=$keys"
           } >> "$GITHUB_OUTPUT"

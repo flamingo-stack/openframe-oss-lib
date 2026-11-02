@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import { fileMediaType, IMAGE_FILE_ACCEPT } from '../../utils/media-type';
 import { ImagePlusIcon } from '../icons-v2-generated/audio-and-visual/image-plus-icon';
@@ -31,6 +32,8 @@ export interface ImageUploaderProps {
   hint?: ReactNode | null;
   /** Field label rendered above the component (via FieldWrapper). */
   fieldLabel?: string;
+  /** Scale of `fieldLabel`, as on the other field controls (`FieldWrapper`'s `labelVariant`). */
+  labelVariant?: 'default' | 'large';
   /** Disables interaction. */
   disabled?: boolean;
   /** Show loading state — disables interaction and renders a spinner overlay. */
@@ -90,6 +93,7 @@ export function ImageUploader({
   description = '(Click Here or Drag and Drop)',
   hint,
   fieldLabel,
+  labelVariant,
   disabled = false,
   loading = false,
   error,
@@ -166,7 +170,7 @@ export function ImageUploader({
   const isActionState = dragActive || (pressed && !hasImage);
 
   return (
-    <FieldWrapper label={fieldLabel} error={displayError} className={className}>
+    <FieldWrapper label={fieldLabel} labelVariant={labelVariant} error={displayError} className={className}>
       <input
         ref={inputRef}
         type="file"
@@ -216,7 +220,7 @@ export function ImageUploader({
                   src={resolvedValue}
                   alt={alt}
                   fill
-                  sizes="100vw"
+                  sizes={IMAGE_SLOT.full}
                   // `useAuthedImageSrc` yields a `blob:` URL under bearer-token
                   // hosts, which no image optimizer can fetch.
                   unoptimized

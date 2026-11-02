@@ -93,6 +93,27 @@ class wins at any content width, and nothing says so. A class that stacks them
 (`md:content-max-md:`) is the deliberate form and is allowed. The rule reads one string at a time:
 classes split across `cn()` arguments are not compared.
 
+## Dead classes
+
+`base` carries `flamingo/no-dead-class` from `./dead-classes.js`: a class in a class string must be one
+Tailwind generates with the ODS preset, or one a stylesheet defines. Tailwind drops an unknown class
+without a word, so `bg-ods-background` (the token is `bg-ods-bg`), `text-body-sm`, `prose` (there is no
+typography plugin), `md:w-full!` (the `!` goes first) and `duration-[180ms]` (ambiguous beside
+tailwindcss-animate's `duration-*`; write `[transition-duration:180ms]`) all shipped and styled nothing.
+
+The rule asks Tailwind itself (`getClassOrder` on the preset, the lookup the official Prettier plugin
+uses), so it cannot disagree with the build. It reads class strings only (`className`, `class`, the
+arguments of `cn` / `clsx` / `cva` / `twMerge`, and bindings named `…Class` / `…_CLASS`) and judges only
+tokens shaped like a Tailwind utility, so a hook class or a variant name is left alone. This package's
+own stylesheets (`src/styles`) count as defined; an app adds its own:
+
+```js
+{ rules: { 'flamingo/no-dead-class': ['error', { css: ['app/globals.css'], allow: ['m-btn'] }] } }
+```
+
+`css` are files or directories (relative to where ESLint runs) whose `.class` selectors count as
+defined; `allow` names classes defined where no file can be read from (an email's inline `<style>`).
+
 ## Why not ESLint 10
 
 ESLint 10 is out, and `eslint@9` is marked deprecated on npm. It still does not work here:

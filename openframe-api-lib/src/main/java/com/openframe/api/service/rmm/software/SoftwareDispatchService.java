@@ -30,9 +30,15 @@ public class SoftwareDispatchService {
     public String dispatch(ScriptResponse script, List<String> machineIds, List<String> args, String initiatedBy,
                            ExecutionSource source, PackageManagerType packageManager, String packageName,
                            SoftwareAction action) {
-        deviceService.verifyDispatchable(machineIds);
-
         String executionId = UUID.randomUUID().toString();
+        dispatch(executionId, script, machineIds, args, initiatedBy, source, packageManager, packageName, action);
+        return executionId;
+    }
+
+    public void dispatch(String executionId, ScriptResponse script, List<String> machineIds, List<String> args,
+                         String initiatedBy, ExecutionSource source, PackageManagerType packageManager,
+                         String packageName, SoftwareAction action) {
+        deviceService.verifyDispatchable(machineIds);
 
         scriptExecutionService.createSoftwareBatch(executionId, script.getId(), machineIds,
                 script.getPrivilegeLevel(), script.getDefaultTimeoutSeconds(), initiatedBy, source,
@@ -54,6 +60,5 @@ public class SoftwareDispatchService {
 
         log.info("Dispatched software execution executionId={} scriptId={} machines={} shell={} privilegeLevel={}",
                 executionId, script.getId(), machineIds.size(), script.getShell(), script.getPrivilegeLevel());
-        return executionId;
     }
 }

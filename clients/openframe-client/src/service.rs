@@ -675,10 +675,7 @@ impl Service {
 
         #[cfg(target_os = "windows")]
         {
-            let program_files =
-                std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
-            PathBuf::from(program_files)
-                .join("OpenFrame")
+            crate::platform::directories::get_install_directory()
                 .join("bin")
                 .join("openframe-client.exe")
         }
@@ -775,8 +772,7 @@ impl Service {
     /// Remove a directory from the Windows system PATH.
     /// Preserves the original registry value type (REG_EXPAND_SZ).
     #[cfg(target_os = "windows")]
-    #[allow(dead_code)] // retained for windows PATH cleanup; not currently called
-    fn remove_from_windows_path(dir: &std::path::Path) -> Result<()> {
+    pub(crate) fn remove_from_windows_path(dir: &std::path::Path) -> Result<()> {
         use winreg::enums::*;
         use winreg::RegKey;
 

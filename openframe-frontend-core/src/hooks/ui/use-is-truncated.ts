@@ -52,6 +52,8 @@ export function useIsTruncated<T extends HTMLElement>(value: unknown, options?: 
       );
     };
     check();
+    // An environment without ResizeObserver (jsdom in a consumer's tests) measures once.
+    if (typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(check);
     observer.observe(element);
     return () => observer.disconnect();

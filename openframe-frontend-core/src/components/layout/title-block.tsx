@@ -90,7 +90,11 @@
 import type React from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { cn } from '../../utils/cn';
-import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import {
+  type TextLinesByBreakpoint,
+  TextLinesByBreakpointSkeleton,
+  UnifiedSkeleton,
+} from '../loading/unified-skeleton';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
 import { EntityImage } from '../ui/entity-image';
 import { FloatingTooltip } from '../ui/floating-tooltip';
@@ -165,17 +169,12 @@ export interface TitleBlockProps {
    *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
   titleWrap?: boolean;
   /**
-   * With `titleWrap`: the lines a typical title of the page takes per breakpoint, drawn by the loading title (a
-   * record's title is read; a long one growing past them is a settle). Absent: one bar.
+   * The lines a typical title of the page takes per breakpoint, drawn by the loading title (a record's title is read; a
+   * long one growing past them is a settle). Absent: one bar. Without `titleWrap` the loaded title wraps where the
+   * window is narrow, so the lines follow the viewport step (`phone` below `md`): a caller states `md: 1, lg: 1` and
+   * the phone count it measured.
    */
-  titleSkeletonLines?: TitleSkeletonLines;
-}
-
-/** Lines a wrapping title's skeleton draws: on a phone, from `content-md`, from `content-lg`. */
-export interface TitleSkeletonLines {
-  phone: number;
-  md: number;
-  lg: number;
+  titleSkeletonLines?: TextLinesByBreakpoint;
 }
 
 /**
@@ -250,26 +249,24 @@ export function TitleBlock({
     subtitleLoading ? null : subtitle,
   );
   const titleNode =
-    titleLoading && titleWrap && titleSkeletonLines ? (
+    titleLoading && titleSkeletonLines && titleWrap ? (
+      <TextLinesByBreakpointSkeleton as="span" lines={titleSkeletonLines} />
+    ) : titleLoading && titleSkeletonLines ? (
+      // An unclamped title wraps where the WINDOW is narrow (a phone), not where a docked panel narrows the content:
+      // its loading lines follow the viewport step, the phone count below `md` and the `md` count above it.
       <>
-        <TextLineSkeleton
-          type="inherit"
-          as="span"
-          lines={titleSkeletonLines.phone}
-          className="w-full content-md:hidden"
-        />
-        <TextLineSkeleton
-          type="inherit"
-          as="span"
-          lines={titleSkeletonLines.md}
-          className="hidden w-full content-md:flex content-lg:hidden"
-        />
-        <TextLineSkeleton
-          type="inherit"
-          as="span"
-          lines={titleSkeletonLines.lg}
-          className="hidden w-full content-lg:flex"
-        />
+        <span className="contents md:hidden">
+          <TextLinesByBreakpointSkeleton
+            as="span"
+            lines={{ phone: titleSkeletonLines.phone, md: titleSkeletonLines.phone, lg: titleSkeletonLines.phone }}
+          />
+        </span>
+        <span className="hidden md:contents">
+          <TextLinesByBreakpointSkeleton
+            as="span"
+            lines={{ phone: titleSkeletonLines.md, md: titleSkeletonLines.md, lg: titleSkeletonLines.lg }}
+          />
+        </span>
       </>
     ) : titleLoading ? (
       <UnifiedSkeleton

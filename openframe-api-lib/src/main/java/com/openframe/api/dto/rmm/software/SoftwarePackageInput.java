@@ -17,4 +17,5 @@ public class SoftwarePackageInput {
 
     private BrewPackageType brewPackageType;
     private String version;
+    private String softwareId;
 }

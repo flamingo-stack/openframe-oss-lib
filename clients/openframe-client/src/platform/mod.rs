@@ -1,3 +1,4 @@
+pub mod app_close;
 pub mod binary_writer;
 pub mod console;
 pub mod detached_process;
@@ -10,6 +11,7 @@ pub mod lock_recovery;
 pub mod machine_info_persistence;
 pub mod orphan_reaper;
 pub mod permissions;
+pub mod process_snapshot;
 pub mod process_tree;
 pub mod system_service;
 pub mod tool_updater;

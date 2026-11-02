@@ -5,6 +5,7 @@ import { type ComponentRef, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Checkbox } from './checkbox';
+import { INPUT_MIN_HEIGHT_CLASS } from './input-styles';
 import { Label } from './label';
 import { loadingItemProps, useLoadingScope } from './loading-scope';
 import { RequiredMark } from './required-mark';
@@ -85,7 +86,8 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
             // Trailing content stacks full-width below the text on mobile.
             trailing && 'flex-wrap content-md:flex-nowrap',
             'p-[var(--spacing-system-sf)]',
-            !description && 'min-h-[44px] content-md:min-h-[48px]',
+            // A field's height: the block sits in rows of inputs and choice buttons (`SelectButton`).
+            !description && INPUT_MIN_HEIGHT_CLASS,
             description && 'min-h-[60px] content-md:min-h-[64px]',
             'bg-ods-card ring-ods-border',
             'cursor-pointer transition-colors duration-200',

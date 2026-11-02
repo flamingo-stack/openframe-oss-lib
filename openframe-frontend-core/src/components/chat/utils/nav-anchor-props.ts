@@ -5,7 +5,7 @@
  * After the navigation unification (ChatCardLoader pre-resolves
  * `chatRef.url` via `resolveSourceRowCTA` + `resolveHrefForRuntime`,
  * and `ChatCardNavWrap` handles every primary click via `onClickCapture`
- * → `handleChatNavClick`), the per-card wrapper only needs
+ * → `executeNavigation`), the per-card wrapper only needs
  * `{href, target, rel}` on its inner `<a>` so modifier-click /
  * hover-preview / copy-link work natively.
  *
@@ -28,7 +28,9 @@
  */
 
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
+import { resolveHrefForRuntime } from './chat-nav-resolution';
 import { decideNewTab as libDecideNewTab } from './decide-new-tab';
+import { isRelativeHref, newTabRel, type NewTabRel } from './new-tab-rel';
 
 /** An ABSOLUTE `http(s)` URL on the current page's origin. Relative hrefs return
  *  false (in embed mode they're hub-relative, not in-app), as do cross-origin
@@ -62,20 +64,64 @@ export function computeIsNewTab(
   );
 }
 
+/** A caller's explicit tab for a link (an admin preview always opens a new tab); absent = the rule decides. */
+export type NavOpenIn = 'new-tab' | 'same-tab';
+
+/** Where a chat link goes: its href as the runtime resolves it, and whether it opens in a new tab. */
+export interface NavLinkTarget {
+  href: string;
+  isNewTab: boolean;
+}
+
+/**
+ * THE navigation decision for every link the lib renders or follows: the href resolved for the runtime
+ * (`resolveHrefForRuntime`) and the new-tab rule on that resolved href (`computeIsNewTab`). Anchors
+ * (`useNavLinkTarget` / `useNavLinkViaRuntime`), cards, chips, search results and the click executor
+ * (`executeNavigation`) all read it; nothing else calls `computeIsNewTab` or `decideNewTab` (a test fails if it does).
+ * Without a runtime there is no embed or host rule to apply: the href as given, decided by the lib's default rule
+ * (the caller's `openIn`, else another origin opens a new tab).
+ *
+ * `hostRoute`: the host's `composeContentUrl` returned this href as a RELATIVE route of its own (a type it serves
+ * in-app). It is the host's page, not the hub's, so it is never resolved against the hub's origin and stays in this
+ * tab in any mode (in embed mode a relative href is otherwise taken as hub-relative), unless the caller asks for a new
+ * tab itself (`openIn: 'new-tab'`).
+ *
+ * `openIn`: the caller names the tab itself (an admin preview always opens a new one). The embed rule still comes
+ * first: an embedded guest never navigates its host page to the hub.
+ */
+export function navLinkTarget(
+  runtime: ChatRuntime | null | undefined,
+  href: string,
+  targetPlatform?: string | null,
+  { hostRoute = false, openIn }: { hostRoute?: boolean; openIn?: NavOpenIn } = {},
+): NavLinkTarget {
+  if (!runtime) return { href, isNewTab: libDecideNewTab({ href, openIn, currentSource: '' }) };
+  if (hostRoute && isRelativeHref(href)) return { href, isNewTab: openIn === 'new-tab' };
+  const resolved = resolveHrefForRuntime(href, runtime);
+  const isNewTab =
+    runtime.navigation.mode !== 'embed' && openIn
+      ? openIn === 'new-tab'
+      : computeIsNewTab(runtime, resolved, targetPlatform ?? null);
+  return { href: resolved, isNewTab };
+}
+
 /**
  * Returns the `target` + `rel` attribute pair for an inner `<a>` based
  * on the new-tab decision. Spread directly into JSX:
  *   <a href={href} {...newTabAnchorAttrs(isNewTab)} />
  *
- * Single helper so chat anchors stay consistent — new-tab links always
- * pair `_blank` with `noopener noreferrer` (defense against window.opener
- * tab-nabbing) and same-tab links don't render either attribute.
+ * Single helper so anchors stay consistent: a new-tab link pairs `_blank` with the one referrer rule
+ * (`newTabRel`: `noopener` always, `noreferrer` for a third party) and a same-tab link renders neither.
  */
-export function newTabAnchorAttrs(isNewTab: boolean): {
+export function newTabAnchorAttrs(
+  isNewTab: boolean,
+  href?: string | null,
+  targetPlatform?: string | null,
+): {
   target?: '_blank';
-  rel?: 'noopener' | 'noopener noreferrer';
+  rel?: NewTabRel;
 } {
-  return isNewTab ? { target: '_blank' as const, rel: 'noopener noreferrer' as const } : {};
+  return isNewTab ? { target: '_blank' as const, rel: newTabRel(href, targetPlatform) } : {};
 }
 
 /**
@@ -91,6 +137,7 @@ export function newTabAnchorAttrs(isNewTab: boolean): {
 export function buildAnchorProps(
   href: string | null | undefined,
   isNewTab: boolean,
-): { href: string; target?: '_blank'; rel?: 'noopener' | 'noopener noreferrer' } | undefined {
-  return href ? { href, ...newTabAnchorAttrs(isNewTab) } : undefined;
+  targetPlatform?: string | null,
+): { href: string; target?: '_blank'; rel?: NewTabRel } | undefined {
+  return href ? { href, ...newTabAnchorAttrs(isNewTab, href, targetPlatform) } : undefined;
 }

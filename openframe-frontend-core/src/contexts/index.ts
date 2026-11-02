@@ -38,5 +38,6 @@ export {
   type AssistantOpenRequest,
   type AssistantRuntime,
 } from './assistant-runtime-context';
+export { PageTopicsProvider, usePageTopic, usePageTopicStamp } from './page-topics-context';
 
 export { useOuterOrDefault } from './use-outer-or-default';

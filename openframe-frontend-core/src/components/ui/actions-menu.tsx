@@ -33,7 +33,12 @@ export interface ActionsMenuItem {
   icon?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-  type?: 'item' | 'checkbox' | 'submenu' | 'separator';
+  /**
+   * `checkbox`: one of many options, a box, the menu stays open. `radio`: one
+   * option of a set (a choice, not a toggle) — a check on the chosen one, the
+   * menu closes on a pick.
+   */
+  type?: 'item' | 'checkbox' | 'radio' | 'submenu' | 'separator';
   checked?: boolean;
   /**
    * Keep the dropdown open after this item is clicked instead of closing it
@@ -81,6 +86,11 @@ interface MenuItemProps {
   onItemClick?: (item: ActionsMenuItem) => void;
 }
 
+// A row's glyphs, the leading one and the trailing action's: 16px, 24px from md (the menu
+// follows the window), whatever size the caller drew them at. The slot alone sized the box,
+// so an `h-6 w-6` glyph squeezed to 16x24 below md and a `size={24}` one overflowed it.
+const ROW_GLYPH_CLASSES = '[&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6';
+
 const ROW_CLASSES =
   'flex flex-1 min-w-0 items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] cursor-pointer transition-colors bg-ods-bg outline-none';
 const WRAPPER_CLASSES = 'relative flex items-stretch border-b border-ods-border last:border-b-0';
@@ -114,7 +124,7 @@ const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ acti
         openInNewTab={action.openInNewTab}
         aria-label={action['aria-label']}
         disabled={action.disabled}
-        className={cn('h-auto self-stretch', action.openInNewTab && 'max-md:hidden')}
+        className={cn(ROW_GLYPH_CLASSES, action.openInNewTab && 'max-md:hidden')}
         onClick={handleClick}
       >
         {action.icon}
@@ -180,7 +190,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
     ROW_CLASSES,
     item.disabled
       ? 'pointer-events-none cursor-not-allowed text-ods-text-secondary opacity-60'
-      : 'text-ods-text-primary hover:bg-ods-bg-hover',
+      : 'text-ods-text-primary hover:bg-ods-bg-hover focus-visible:bg-ods-bg-hover',
   );
 
   const subTriggerClasses = cn(itemClasses, 'focus:bg-ods-bg-hover data-[state=open]:bg-ods-bg-active');
@@ -193,6 +203,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
         <div
           className={cn(
             'flex h-4 w-4 flex-shrink-0 items-center justify-center md:h-6 md:w-6',
+            ROW_GLYPH_CLASSES,
             item.danger && 'text-ods-error',
             item.disabled && 'opacity-50',
           )}
@@ -209,6 +220,10 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
       >
         {item.label}
       </span>
+
+      {item.type === 'radio' && item.checked && (
+        <Check className="h-4 w-4 shrink-0 text-ods-accent md:h-6 md:w-6" strokeWidth={3} aria-hidden="true" />
+      )}
 
       {item.type === 'checkbox' && (
         <div
@@ -276,7 +291,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
   return (
     <div className={WRAPPER_CLASSES}>
       <div
-        role="menuitem"
+        role={item.type === 'radio' ? 'menuitemradio' : 'menuitem'}
+        aria-checked={item.type === 'radio' ? !!item.checked : undefined}
         tabIndex={item.disabled ? -1 : 0}
         aria-disabled={item.disabled}
         className={itemClasses}
@@ -288,6 +304,20 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
       {item.iconAction && <SecondaryAction action={item.iconAction} />}
     </div>
   );
+};
+
+/** The rows a keyboard moves between in an open menu: every enabled `menuitem` (plain, radio, submenu trigger). */
+function menuRows(content: HTMLElement | null): HTMLElement[] {
+  if (!content) return [];
+  return [...content.querySelectorAll<HTMLElement>('[role^="menuitem"]:not([aria-disabled="true"])')];
+}
+
+/** The menu-button keys (WAI-ARIA APG, "Menu Button"): ↓/↑ move between rows (wrapping), Home/End jump to the ends. */
+const MENU_ROW_KEYS: Record<string, (index: number, count: number) => number> = {
+  ArrowDown: (index, count) => (index + 1) % count,
+  ArrowUp: (index, count) => (index - 1 + count) % count,
+  Home: () => 0,
+  End: (_index, count) => count - 1,
 };
 
 const GroupSeparator: React.FC = () => <div className="h-[3px] w-full bg-ods-bg-surface" />;
@@ -391,6 +421,14 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
   //     momentum and the ~1px settle after opening don't close the menu the
   //     user is reaching for.
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+  // On open, focus goes to the first row (WAI-ARIA APG, "Menu Button"). The rows are not Radix items, so Radix only
+  // focuses the menu itself; one frame later, once it has, the first row takes focus.
+  React.useEffect(() => {
+    if (!open) return undefined;
+    const frame = requestAnimationFrame(() => menuRows(contentRef.current)[0]?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
   React.useEffect(() => {
     if (!open) return undefined;
     if (typeof document === 'undefined') return undefined;
@@ -445,9 +483,21 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
         {triggerNode}
       </DropdownMenuTrigger>
       <DropdownMenuContent
+        ref={contentRef}
         align={align}
         side={side}
         sideOffset={sideOffset}
+        // The rows are this menu's own, not Radix items, so Radix does not move between them: the menu-button
+        // pattern's keys are done here, and the first row takes focus on open (the effect above).
+        onKeyDown={event => {
+          const move = MENU_ROW_KEYS[event.key];
+          if (!move) return;
+          const rows = menuRows(contentRef.current);
+          if (rows.length === 0) return;
+          event.preventDefault();
+          const current = rows.indexOf(document.activeElement as HTMLElement);
+          rows[move(Math.max(current, 0), rows.length)]?.focus();
+        }}
         onCloseAutoFocus={onCloseAutoFocus}
         className={cn('overflow-visible border-0 bg-transparent p-0 shadow-none', contentClassName)}
       >

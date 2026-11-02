@@ -3,7 +3,7 @@
  * viewport, account for sticky chrome, survive layout shifts" helper.
  *
  * One shared implementation so every caller (the ticket drawer expand, the
- * hub's `useUnifiedNav` / `use-nav-link` hash scroll, doc-tree, delivery
+ * the lib's navigation executor hash scroll, doc-tree, delivery
  * `?focus=`, sticky-section-nav, …) inherits the SAME cancellation-proof
  * motion.
  *

@@ -32,6 +32,8 @@ export * from './ask-prompts';
 export * from './assistant-ask-prompts';
 export * from './quick-action-marquee';
 export * from './quick-action-wall';
+export * from './mingo-quick-action-wall';
+export * from './mingo-edge-light';
 export * from './chat-ticket-list';
 export * from './chat-typing-indicator';
 export * from './tool-execution-display';
@@ -43,8 +45,10 @@ export * from './msp-organization-card';
 export * from './guide-mode-banner';
 export * from './mingo-chat-history';
 export * from './mingo-archive-list';
+export * from './composer-sheet';
 export * from './mingo-chat-header';
 export * from './mingo-chat-rail';
+export { MingoChatSearchModal, type MingoChatSearchModalProps } from './mingo-chat-history-section';
 export * from './mingo-history-rail';
 export * from './mingo-chat-modals';
 export * from './chat-header-search-field';
@@ -54,6 +58,7 @@ export * from './chat-context-picker';
 export * from './chat-context-memory-bar';
 export * from './context-items-list';
 export * from './chat-archive-page';
+export { ChatListLoadError, type MingoDialogStatus, type MingoHistoryScope } from './mingo-chat-list-shared';
 export * from './model-display';
 export * from './chat-sidebar';
 export * from './chat-nav-sidebar';
@@ -70,6 +75,8 @@ export {
   type NavLinkAnchorViaRuntimeProps,
   type NavLinkViaRuntimeInput,
   type NavLinkViaRuntimeProps,
+  type NavigateViaRuntimeInput,
+  useNavigateViaRuntime,
   useNavLinkViaRuntime,
 } from './nav-link-anchor-via-runtime';
 export { SourceActionButton, type SourceActionButtonProps, type SourceActionDensity } from './source-action-button';
@@ -107,7 +114,8 @@ export * from './utils';
 // once when something asks for it (an open event, `open` or `defaultOpen`). A
 // chat that starts closed costs a page nothing: it used to load on every page
 // once the browser was idle, about 650 KB of script most visitors never opened.
-// An open sent before it has loaded is held and delivered (`ask-ai-events`).
+// An open sent before it has loaded is held and delivered (`ask-ai-events`). The host's own stylesheet
+// for it loads at the same moment (`loadStyles`), so a page does not block on the chat's classes.
 export type { ChatPrefillDraft, EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
 const LoadedEmbeddableChat = lazy(() =>
   import('./embeddable-chat').then(module => ({ default: module.EmbeddableChat })),
@@ -116,6 +124,10 @@ export const EmbeddableChat = forwardRef<EmbeddableChatHandle, EmbeddableChatPro
   const [loadRequested, setLoadRequested] = useState(false);
   const load = loadRequested || Boolean(props.open) || Boolean(props.defaultOpen);
   useEffect(() => holdAskAiOpens(), []);
+  const { loadStyles } = props;
+  useEffect(() => {
+    if (load) loadStyles?.();
+  }, [load, loadStyles]);
   useEffect(() => {
     if (load) return undefined;
     const start = () => setLoadRequested(true);
@@ -139,4 +151,6 @@ export {
   ASK_AI_OPEN_WITH_REF_EVENT,
   ASK_AI_TRIGGER_ATTRIBUTE,
 } from './utils/ask-ai-events';
+export { chatDayLabel } from './utils/chat-day-label';
 export * from './proxy-credentials-panel';
+export { InlineChip } from './inline-chip';

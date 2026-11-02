@@ -3,6 +3,7 @@
 import { createContext, type MouseEvent, type ReactNode, useContext } from 'react';
 import Image from '../../embed-shims/next-image';
 import Link from '../../embed-shims/next-link';
+import { AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { Ellipsis01Icon } from '../icons-v2-generated';
@@ -42,7 +43,7 @@ export function MingoInfoCardActionProvider({
 }
 
 /** The trailing cell's footprint (a `cell` Button), shared by the "⋯" trigger and a host's action. */
-const TRAILING_CELL_LAYOUT = 'w-[56px] self-stretch md:w-[68px]';
+const TRAILING_CELL_LAYOUT = 'w-[56px] md:w-[68px]';
 
 /** A coloured status pill rendered to the right of the title/description. */
 export interface MingoInfoCardStatus {
@@ -137,8 +138,8 @@ function CardMedia({ imageSrc, imageAlt, icon }: Pick<MingoInfoCardProps, 'image
           src={imageSrc}
           alt={imageAlt || ''}
           className="relative block size-10 rounded-sm border border-ods-border object-cover"
-          width={40}
-          height={40}
+          width={AVATAR_SIZE_PX.md}
+          height={AVATAR_SIZE_PX.md}
           unoptimized
           onError={e => {
             const img = e.currentTarget;

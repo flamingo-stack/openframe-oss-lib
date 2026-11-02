@@ -41,13 +41,16 @@ export default defineConfig([
       // `./utils/humanity-signals` without pulling the full utils barrel.
       'utils/humanity-signals': 'src/utils/humanity-signals.ts',
       'utils/form-rescue': 'src/utils/form-rescue.ts',
+      'utils/page-topics': 'src/utils/page-topics.ts',
       'utils/mobile-app': 'src/utils/mobile-app.ts',
+      'utils/notifications': 'src/utils/notifications.ts',
       // JSX-free leaves, each with its own `exports` subpath so hub SCRIPTS and
       // `server-only` modules import them without React or the utils barrel.
       'utils/platform-identity': 'src/utils/platform-identity.ts',
       'utils/search-params': 'src/utils/search-params.ts',
       'utils/ods-spacing': 'src/utils/ods-spacing.ts',
       'utils/csv': 'src/utils/csv.ts',
+      'utils/clickup-drop-down': 'src/utils/clickup-drop-down.ts',
       'utils/common': 'src/utils/common.ts',
       'utils/social-platforms': 'src/utils/social-platforms.ts',
       // Bite element identity — pure + isomorphic (no React, no browser
@@ -88,6 +91,9 @@ export default defineConfig([
       // (proxy.ts) + cors.ts can import `hostOf`/`expandWwwApex`/`isPreviewEnv`
       // without pulling the full utils barrel into the Edge bundle.
       'platform-domains': 'src/platform-domains.ts',
+      // The image-size table: import-free, so a host's config (`next.config.mjs`) derives its image settings from it.
+      // Keyed by its source path: the ESM and declaration builds mirror `src/`, so every format lands beside the others.
+      'styles/image-sizes': 'src/styles/image-sizes.ts',
       // Product-screen keys and labels: no React and no loaders, so the hub
       // validates a stored key and fills a picker on the server.
       'components/product-demo/screen-keys': 'src/components/product-demo/screen-keys.ts',

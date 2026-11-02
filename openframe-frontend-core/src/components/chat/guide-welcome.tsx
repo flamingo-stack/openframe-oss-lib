@@ -7,8 +7,8 @@ import { EntityIcon } from '../icon-display';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
+import { QuickActionSet } from './mingo-quick-action-wall';
 import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip';
-import { QuickActionWall } from './quick-action-wall';
 
 // =============================================================================
 // Types
@@ -20,7 +20,7 @@ export interface GuideQuickAction {
   id: string;
   /** Chip label. */
   label: string;
-  /** Prompt text seeded into the composer on click. Defaults to `label`. */
+  /** Prompt text sent on click. Defaults to `label`. */
   prompt?: string;
   /** Optional library-glyph name (resolved via the onboarding-icon registry). */
   iconName?: string | null;
@@ -48,22 +48,21 @@ export interface GuideWelcomeProps {
    *  `subtitle` is present. A loading scope draws the skeleton too. */
   subtitleLoading?: boolean;
   /** Quick-action chips — caller-provided; there are no built-in defaults, so
-   *  the chip row is omitted entirely unless the host supplies actions. ALL
-   *  chips render in a wrapping row (no "⋯" overflow collapse) so every action
-   *  is directly hoverable — hover/focus previews the action's full `prompt` in
-   *  the composer; click sends it. */
+   *  the set is omitted entirely unless the host supplies actions. The first
+   *  ones fill the set's slots and the rest open from its "More" slot; a click
+   *  hands the action to `onQuickAction` (the chat sends its `prompt`). */
   quickActions?: ReadonlyArray<GuideQuickAction>;
+  /** The host is still reading the chips (e.g. the quick actions of the page's
+   *  topic): with none to show yet the wall draws its own loading form. A
+   *  loading scope draws it too. */
+  quickActionsLoading?: boolean;
+  /** Print the page's topic (`PageTopicLabel`, the label the FAQ block prints
+   *  under its heading) above the chips, so whoever edits quick actions sees
+   *  which topic's chips the page asked for. Default: the host's choice
+   *  (`PageTopicsProvider showTopic`), else off. */
+  showTopic?: boolean;
   /** Fired when a quick-action chip is activated (click). */
   onQuickAction?: (action: GuideQuickAction) => void;
-  /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
-   *  action's full `prompt` in the composer input. */
-  onQuickActionHover?: (action: GuideQuickAction) => void;
-  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
-  onQuickActionHoverEnd?: () => void;
-  /** Agent this empty state belongs to — forwarded to the quick-action
-   *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
-   *  brick stack at 2 rows. Unset (host/guide mode) keeps the full `rows` cap. */
-  agentSlug?: string;
   /** Slash-command onboarding list — rendered inside the shared scroll region
    *  below the greeting (so greeting + list scroll together, with edge fades). */
   children?: ReactNode;
@@ -85,8 +84,7 @@ const DEFAULT_TITLE = 'Guide Mode Chat';
  *
  * Guide-mode chat empty state: a centred greeting and the slash-command
  * onboarding list share one scroll region (with top/bottom fade affordances),
- * and a pinned quick-action chip row sits above the composer. The first few
- * quick actions render as chips; the remainder collapse under a "⋯" menu.
+ * and the pinned quick-action set sits above the composer.
  *
  * Mirrors `MingoWelcome` (the default-mode empty state) — content is
  * configurable with OpenFrame defaults.
@@ -97,10 +95,9 @@ export function GuideWelcome({
   subtitle,
   subtitleLoading = false,
   quickActions = [],
+  quickActionsLoading = false,
+  showTopic: showTopicProp,
   onQuickAction,
-  onQuickActionHover,
-  onQuickActionHoverEnd,
-  agentSlug,
   children,
   className,
 }: GuideWelcomeProps) {
@@ -109,13 +106,13 @@ export function GuideWelcome({
   // direction. (Same behaviour as MingoWelcome.)
   const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>();
   // ONE switch for the greeting (read data): a loading scope, or the host still fetching it with none to show yet.
-  const subtitleIsLoading = useLoadingScope() || (subtitleLoading && !subtitle);
+  const inLoadingScope = useLoadingScope();
+  const subtitleIsLoading = inLoadingScope || (subtitleLoading && !subtitle);
+  // The same switch for the chips (read data): the wall draws its loading form while there are none to show yet.
+  const chipsAreLoading = inLoadingScope || (quickActionsLoading && quickActions.length === 0);
 
-  // Map to the shared {@link QuickActionChip} shape consumed by the unified
-  // `QuickActionWall` — the SAME chip wall the website hero + deck render, so
-  // the chat's quick actions read as "the work the agent does". Every chip
-  // stays interactive (clone copies included); `onHoverStart`/`onHoverEnd` drive
-  // the composer prompt preview and `onSelect` sends.
+  // Map to the shared {@link QuickActionChip} shape the chat's {@link QuickActionSet} draws (the set Mingo's empty
+  // state and the OpenFrame dock draw too). `onSelect` hands the action to the host.
   const chipItems = useMemo(
     () =>
       quickActions.map(action => ({
@@ -133,10 +130,8 @@ export function GuideWelcome({
           accent: action.accent ?? accentFromIdentityIcon(icon) ?? 'cyan',
         },
         onSelect: () => onQuickAction?.(action),
-        onHoverStart: () => onQuickActionHover?.(action),
-        onHoverEnd: () => onQuickActionHoverEnd?.(),
       })),
-    [quickActions, icon, onQuickAction, onQuickActionHover, onQuickActionHoverEnd],
+    [quickActions, icon, onQuickAction],
   );
 
   return (
@@ -192,27 +187,11 @@ export function GuideWelcome({
         <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
       </div>
 
-      {/* Pinned quick-action wall above the composer — the shared
-          {@link QuickActionWall} in BRICK mode (the SAME "wall of the work
-          agents do" the website hero renders): up to 4 stacked row marquees,
-          chips packed edge-to-edge, drifting under left/right edge fades so a
-          long agent action set gets "reach" without squeezing the composer.
-          Chips stay directly hoverable — hover/focus previews the action's full
-          prompt in the composer, click sends it — and `pauseOnHover` freezes
-          the hovered row so a moving chip never dodges a click. */}
-      {quickActions.length > 0 && (
-        <QuickActionWall
-          chips={chipItems}
-          agentSlug={agentSlug}
-          rows={4}
-          pauseOnHover
-          dragScroll
-          fade={['left', 'right']}
-          fadeSize={{ left: 32 }}
-          fadeColor="var(--color-bg)"
-          copyGap="var(--spacing-system-xxs)"
-          className="max-h-44 shrink-0"
-        />
+      {/* The quick actions, pinned above the composer: the static {@link QuickActionSet} (fixed slots, its height
+          set by the width alone, "More" for the rest). A click hands the action to `onQuickAction`. The set prints
+          the page's topic over itself. */}
+      {(quickActions.length > 0 || chipsAreLoading) && (
+        <QuickActionSet chips={chipItems} loading={chipsAreLoading} showTopic={showTopicProp} />
       )}
     </div>
   );

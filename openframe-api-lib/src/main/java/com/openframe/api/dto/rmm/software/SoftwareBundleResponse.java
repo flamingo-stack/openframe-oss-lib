@@ -1,6 +1,8 @@
 package com.openframe.api.dto.rmm.software;
 
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdate;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwareBundleStatus;
@@ -20,6 +22,8 @@ public class SoftwareBundleResponse {
     private SoftwareBundleStatus status;
     private List<String> machineIds;
     private List<SoftwareBundlePackage> packages;
+    private PackageUpdateSettings updateSettings;
+    private SoftwareAutoUpdate autoUpdate;
     private Instant startAt;
     private String scheduleId;
     private String createdBy;

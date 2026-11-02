@@ -46,9 +46,10 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import type { TextLinesByBreakpoint } from '../loading/unified-skeleton';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
 import type { PageActionButton } from '../ui/page-actions';
-import { TitleBlock, type TitleSkeletonLines } from './title-block';
+import { TitleBlock } from './title-block';
 
 export interface PageLayoutProps {
   children: React.ReactNode;
@@ -84,8 +85,8 @@ export interface PageLayoutProps {
    *  ellipsis clamp (forwarded to `TitleBlock`). For content detail pages whose h1 is CMS
    *  data of arbitrary length. Additive + default-preserving. */
   titleWrap?: boolean;
-  /** With `titleWrap`, the loading title's lines per breakpoint (forwarded to `TitleBlock`). */
-  titleSkeletonLines?: TitleSkeletonLines;
+  /** The loading title's lines per breakpoint (forwarded to `TitleBlock`). */
+  titleSkeletonLines?: TextLinesByBreakpoint;
 }
 
 /**

@@ -21,7 +21,7 @@ import type { ComponentType } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { cn } from '../../../utils/cn';
-import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
+import { SharedPageFaq } from '../../faq/faq-section';
 import { LoadingRegion } from '../../loading/loading-region';
 import { PageShell, PageLayout } from '../../ui';
 import { DataSyncLine } from '../../ui/data-attribution';
@@ -68,18 +68,11 @@ export interface LegalDocumentPageProps {
   backButton?: { label?: string; href?: string } | false;
   /**
    * The hub's list of legal documents (`GET /api/legal`). Given it, the page
-   * takes the document's title and FAQ topic from the list, so a host passes
+   * takes the document's title from the list, so a host passes
    * only the type and its endpoints and states nothing per document; the title
    * then names the document even when its text fails to load.
    */
   documentsEndpoint?: string;
-  /**
-   * The page's own FAQ block: the topic the page is about and where the host
-   * serves the FAQs. Rendered after the page's content, inside its container.
-   * Without a `topic`, the topic is the one the list (`documentsEndpoint`)
-   * gives the document. Absent, or no topic known: no FAQ block.
-   */
-  faq?: PageFaqSlot | Omit<PageFaqSlot, 'topic'>;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container — only the padding box renders,
    *  avoiding a nested `<main>`. */
@@ -133,7 +126,6 @@ export function LegalDocumentPage({
   MarkdownRenderer = RichMarkdownRenderer,
   documentsEndpoint,
   backButton,
-  faq,
   shell = true,
 }: LegalDocumentPageProps) {
   const router = useRouter();
@@ -155,8 +147,6 @@ export function LegalDocumentPage({
   const { documents } = useLegalDocuments({ apiEndpoint: documentsEndpoint, enabled: Boolean(documentsEndpoint) });
   const listed = documents.find(doc => doc.docType === docType);
   const title = titleProp ?? data?.title ?? listed?.title ?? 'Legal document';
-  const faqTopic = faq && 'topic' in faq ? faq.topic : listed?.faqTopic;
-  const faqSlot = faq && faqTopic ? { ...faq, topic: faqTopic } : null;
   const errorTitle = errorTitleProp ?? `Unable to load ${title}`;
   const emptyStateMessage = emptyStateMessageProp ?? `${title} is not available at this time.`;
 
@@ -221,7 +211,7 @@ export function LegalDocumentPage({
           </div>
         </div>
       </div>
-      {faqSlot && <FaqSection {...pageFaqProps(faqSlot)} />}
+      <SharedPageFaq />
     </PageLayout>
   );
 

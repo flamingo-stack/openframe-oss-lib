@@ -21,33 +21,24 @@ export function DotsLoaderIcon({
       className={className}
       {...props}
     >
-      <circle cx={4} cy={12} r={3}>
-        <animate
-          attributeName="r"
-          dur="0.75s"
-          values="3;.2;3"
-          repeatCount="indefinite"
-          begin="0s"
-        />
-      </circle>
-      <circle cx={12} cy={12} r={3}>
-        <animate
-          attributeName="r"
-          dur="0.75s"
-          values="3;.2;3"
-          repeatCount="indefinite"
-          begin="0.15s"
-        />
-      </circle>
-      <circle cx={20} cy={12} r={3}>
-        <animate
-          attributeName="r"
-          dur="0.75s"
-          values="3;.2;3"
-          repeatCount="indefinite"
-          begin="0.3s"
-        />
-      </circle>
+      <circle
+        cx={4}
+        cy={12}
+        r={3}
+        className="dots-loader_svg__ods-dots-loader-dot"
+      />
+      <circle
+        cx={12}
+        cy={12}
+        r={3}
+        className="dots-loader_svg__ods-dots-loader-dot"
+      />
+      <circle
+        cx={20}
+        cy={12}
+        r={3}
+        className="dots-loader_svg__ods-dots-loader-dot"
+      />
     </svg>
   );
 }
