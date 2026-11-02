@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,8 @@ import static java.util.stream.Collectors.toSet;
 @RequiredArgsConstructor
 public class ScheduleDeliveryRefresher {
 
+    private static final String NOTHING_LEFT_TO_RUN = "no runnable script left in the batch";
+
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptScheduleRepository scheduleRepository;
     private final ScriptRepository scriptRepository;
@@ -56,6 +59,20 @@ public class ScheduleDeliveryRefresher {
         String tenantId = tenantIdProvider.getTenantId();
         List<ScriptExecution> queued = queuedLeavesOf(tenantId, scheduleId);
         refresh(tenantId, queued);
+    }
+
+    // the script is gone: the batches still waiting carry what is left of the fire, a batch with nothing left is
+    // withdrawn, and the script's own leaves close here with the reason, the agent will never run them
+    public void retireScript(String scriptId, String reason) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<ScriptExecution> queued = scriptExecutionRepository.findByTenantIdAndScriptIdAndStatus(tenantId, scriptId, ExecutionStatus.QUEUED);
+        refresh(tenantId, queued);
+        Instant now = Instant.now();
+        queued.forEach(leaf -> markFailed(leaf, now, reason));
+        if (!queued.isEmpty()) {
+            scriptExecutionRepository.saveAll(queued);
+            log.info("Leaves of a retired script closed: scriptId={} leaves={} reason={}", scriptId, queued.size(), reason);
+        }
     }
 
     public void cancelForSchedule(String scheduleId, String reason) {
@@ -90,7 +107,7 @@ public class ScheduleDeliveryRefresher {
         }
         List<Script> scripts = runnableScriptsOf(tenantId, executionId, schedule.get());
         if (scripts.isEmpty()) {
-            log.debug("Waiting batches kept, no runnable script left: executionId={}", executionId);
+            cancel(queuedLeaves, NOTHING_LEFT_TO_RUN);
             return;
         }
         List<ScriptScheduleExecutionItem> items = ScriptScheduleBatch.items(scripts, schedule.get().getScriptCustomParams());
@@ -140,6 +157,13 @@ public class ScheduleDeliveryRefresher {
         if (!waiting.isEmpty()) {
             log.info("Waiting batches withdrawn: deliveries={} reason={}", waiting.size(), reason);
         }
+    }
+
+    private static void markFailed(ScriptExecution leaf, Instant now, String reason) {
+        leaf.setStatus(ExecutionStatus.FAILED);
+        leaf.setStatusChangedAt(now);
+        leaf.setFinishedAt(now);
+        leaf.setError(reason);
     }
 
     private static boolean isActive(ScheduleScript schedule) {

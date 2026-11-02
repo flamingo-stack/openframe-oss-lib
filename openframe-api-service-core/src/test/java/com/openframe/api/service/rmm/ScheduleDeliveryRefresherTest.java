@@ -153,6 +153,47 @@ class ScheduleDeliveryRefresherTest {
         verify(deliveryTracker, never()).cancel(any(), any(), eq(MACHINE_1), any());
     }
 
+    @Test
+    @DisplayName("retireScript: the batch goes on without the script, the script's own waiting leaves close with the reason")
+    void retireScript_otherScriptsLeft_batchRebuiltWithoutItAndItsLeavesClosed() {
+        ScriptExecution leafA = queued(EXECUTION_ID, MACHINE_1, SCRIPT_A);
+        when(scriptExecutionRepository.findByTenantIdAndScriptIdAndStatus(TENANT_ID, SCRIPT_A, ExecutionStatus.QUEUED)).thenReturn(List.of(leafA));
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(List.of(leafA, queued(EXECUTION_ID, MACHINE_1, SCRIPT_B)));
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule(ScriptStatus.ACTIVE, List.of(SCRIPT_A, SCRIPT_B))));
+        Script deleted = script(SCRIPT_A, "echo a");
+        deleted.setStatus(ScriptStatus.DELETED);
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any())).thenReturn(List.of(deleted, script(SCRIPT_B, "echo b")));
+        when(deliveryRefresher.refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), messageCaptor.capture())).thenReturn(true);
+
+        refresher.retireScript(SCRIPT_A, REASON);
+
+        assertThat(messageCaptor.getValue().getScripts()).extracting(ScriptScheduleExecutionItem::getScriptId).containsExactly(SCRIPT_B);
+        assertThat(leafA.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(leafA.getError()).isEqualTo(REASON);
+        verify(scriptExecutionRepository).saveAll(List.of(leafA));
+        verifyNoInteractions(deliveryTracker);
+    }
+
+    @Test
+    @DisplayName("retireScript: it was the only script of the batch, the waiting rows are withdrawn and the leaves close")
+    void retireScript_nothingLeft_rowsWithdrawnAndLeavesClosed() {
+        ScriptExecution leaf = queued(EXECUTION_ID, MACHINE_1, SCRIPT_A);
+        when(scriptExecutionRepository.findByTenantIdAndScriptIdAndStatus(TENANT_ID, SCRIPT_A, ExecutionStatus.QUEUED)).thenReturn(List.of(leaf));
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID)).thenReturn(List.of(leaf));
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule(ScriptStatus.ACTIVE, List.of(SCRIPT_A))));
+        Script deleted = script(SCRIPT_A, "echo a");
+        deleted.setStatus(ScriptStatus.DELETED);
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any())).thenReturn(List.of(deleted));
+
+        refresher.retireScript(SCRIPT_A, REASON);
+
+        verify(deliveryTracker).cancel(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), anyString());
+        verifyNoInteractions(deliveryRefresher);
+        assertThat(leaf.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(leaf.getError()).isEqualTo(REASON);
+    }
+
     private static ScriptExecution queued(String executionId, String machineId, String scriptId) {
         return ScriptExecution.builder()
                 .tenantId(TENANT_ID)

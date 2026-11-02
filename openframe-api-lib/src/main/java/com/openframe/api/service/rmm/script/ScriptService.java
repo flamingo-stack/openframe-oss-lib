@@ -40,6 +40,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ScriptService {
 
+    private static final String SCRIPT_DELETED = "Script was deleted before the agent received it";
+    private static final String SCRIPT_ARCHIVED = "Script was archived before the agent received it";
     private static final List<ScriptStatus> NAME_UNIQUE_STATUSES =
             List.of(ScriptStatus.ACTIVE, ScriptStatus.ARCHIVED);
 
@@ -218,6 +220,7 @@ public class ScriptService {
         existing.setStatus(ScriptStatus.DELETED);
         existing.setStatusChangedAt(Instant.now());
         scriptRepository.save(existing);
+        deliveryRefresher.retireScript(id, SCRIPT_DELETED);
         log.info("Soft-deleted script id={} tenantId={}", id, tenantId);
         return existing.getId();
     }
@@ -243,6 +246,9 @@ public class ScriptService {
         existing.setStatus(target);
         existing.setStatusChangedAt(Instant.now());
         Script saved = scriptRepository.save(existing);
+        if (target == ScriptStatus.ARCHIVED) {
+            deliveryRefresher.retireScript(id, SCRIPT_ARCHIVED);
+        }
         log.info("Script id={} tenantId={} status changed to {}", id, tenantId, target);
         return scriptMapper.toResponse(saved);
     }
