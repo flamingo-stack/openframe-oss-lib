@@ -9,6 +9,7 @@ export * from './use-header-height';
 export * from './use-sticky-toolbar';
 export * from './use-horizontal-scrollbar';
 export * from './use-image-edge-color';
+export * from './use-clipped-label-tooltip';
 export * from './use-is-truncated';
 export * from './use-isomorphic-layout-effect';
 export * from './use-keyboard-collision-padding';
