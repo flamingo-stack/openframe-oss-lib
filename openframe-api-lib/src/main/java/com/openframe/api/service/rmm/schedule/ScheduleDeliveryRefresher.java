@@ -136,15 +136,16 @@ public class ScheduleDeliveryRefresher {
                         offlineBehavior, reconnectWindowSeconds))
                 .collect(toSet());
         List<ScriptExecution> leavesOfTheFire = scriptExecutionRepository.findByTenantIdAndExecutionId(tenantId, executionId);
-        alignLeaves(leavesOfTheFire, replaced, scripts, first);
+        alignLeaves(leavesOfTheFire, replaced, scripts);
         log.info("Waiting batches refreshed: executionId={} machines={} replaced={}", executionId, waitingMachines.size(), replaced.size());
     }
 
     // the leaves of a machine whose waiting body was replaced are the batch it will get: a script that left the batch
     // closes, a script that joined it gets a leaf (or its closed leaf back, the fire holds one leaf per script and
-    // machine), the rest keep the script's privilege and timeout as they are now (the result watchdog reads the leaf)
-    private void alignLeaves(List<ScriptExecution> leavesOfTheFire, Set<String> replacedMachines, List<Script> scripts,
-                             ScriptExecution sample) {
+    // machine), the rest keep the script's privilege and timeout as they are now (the result watchdog reads the leaf).
+    // A machine whose body stayed (the agent took it, or it is on the route before the engine) keeps its leaves: they
+    // are the batch the agent runs
+    private void alignLeaves(List<ScriptExecution> leavesOfTheFire, Set<String> replacedMachines, List<Script> scripts) {
         Instant now = Instant.now();
         Map<String, Script> byId = scripts.stream().collect(toMap(Script::getId, Function.identity(), (first, second) -> first));
         List<ScriptExecution> changed = new ArrayList<>();
@@ -152,6 +153,7 @@ public class ScheduleDeliveryRefresher {
             Map<String, ScriptExecution> byScript = leavesOfTheFire.stream()
                     .filter(leaf -> machineId.equals(leaf.getMachineId()))
                     .collect(toMap(ScriptExecution::getScriptId, Function.identity(), (first, second) -> first));
+            ScriptExecution own = byScript.values().iterator().next();
             byScript.values().stream()
                     .filter(leaf -> isQueued(leaf) && !byId.containsKey(leaf.getScriptId()))
                     .forEach(leaf -> {
@@ -161,7 +163,7 @@ public class ScheduleDeliveryRefresher {
             for (Script script : scripts) {
                 ScriptExecution leaf = byScript.get(script.getId());
                 if (leaf == null) {
-                    changed.add(newLeaf(sample, machineId, script, now));
+                    changed.add(newLeaf(own, machineId, script, now));
                 } else if (!isQueued(leaf)) {
                     reopen(leaf, script, now);
                     changed.add(leaf);
@@ -175,19 +177,20 @@ public class ScheduleDeliveryRefresher {
         }
     }
 
-    private static ScriptExecution newLeaf(ScriptExecution sample, String machineId, Script script, Instant now) {
+    // a sibling of the machine's own leaves: same fire, same machine, the fire's dispatch time
+    private static ScriptExecution newLeaf(ScriptExecution own, String machineId, Script script, Instant now) {
         return ScriptExecution.builder()
-                .tenantId(sample.getTenantId())
-                .executionId(sample.getExecutionId())
-                .scheduleId(sample.getScheduleId())
+                .tenantId(own.getTenantId())
+                .executionId(own.getExecutionId())
+                .scheduleId(own.getScheduleId())
                 .machineId(machineId)
                 .scriptId(script.getId())
                 .privilegeLevel(script.getPrivilegeLevel())
                 .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                .initiatedBy(sample.getInitiatedBy())
+                .initiatedBy(own.getInitiatedBy())
                 .source(ExecutionSource.SCHEDULED)
                 .status(ExecutionStatus.QUEUED)
-                .dispatchedAt(sample.getDispatchedAt())
+                .dispatchedAt(own.getDispatchedAt())
                 .statusChangedAt(now)
                 .build();
     }

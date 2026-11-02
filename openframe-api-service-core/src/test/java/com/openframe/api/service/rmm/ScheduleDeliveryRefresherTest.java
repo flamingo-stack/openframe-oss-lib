@@ -29,6 +29,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -226,6 +227,7 @@ class ScheduleDeliveryRefresherTest {
     @DisplayName("refreshForSchedule: a script added to the schedule joins the waiting batch: the body carries it and the machine gets a QUEUED leaf for it under the same fire")
     void refreshForSchedule_scriptAdded_bodyAndLeafFollow() {
         ScriptExecution leafA = queued(EXECUTION_ID, MACHINE_1, SCRIPT_A);
+        leafA.setDispatchedAt(Instant.parse("2026-11-02T18:28:00Z"));
         when(scriptExecutionRepository.findByTenantIdAndScheduleIdAndStatus(TENANT_ID, SCHEDULE_ID, ExecutionStatus.QUEUED)).thenReturn(List.of(leafA));
         when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID)).thenReturn(List.of(leafA));
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule(ScriptStatus.ACTIVE, List.of(SCRIPT_A, SCRIPT_B))));
@@ -244,6 +246,7 @@ class ScheduleDeliveryRefresherTest {
         assertThat(leafB.getStatus()).isEqualTo(ExecutionStatus.QUEUED);
         assertThat(leafB.getInitiatedBy()).isEqualTo(OWNER);
         assertThat(leafB.getTimeoutSeconds()).isEqualTo(60);
+        assertThat(leafB.getDispatchedAt()).isEqualTo(leafA.getDispatchedAt());
     }
 
     @Test
