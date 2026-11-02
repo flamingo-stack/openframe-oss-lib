@@ -27,16 +27,19 @@ struct DependencyReport {
 pub struct PackageManagerReportPublisher {
     nats_publisher: NatsMessagePublisher,
     config_service: AgentConfigurationService,
+    report_dependencies: bool,
 }
 
 impl PackageManagerReportPublisher {
     pub fn new(
         nats_publisher: NatsMessagePublisher,
         config_service: AgentConfigurationService,
+        report_dependencies: bool,
     ) -> Self {
         Self {
             nats_publisher,
             config_service,
+            report_dependencies,
         }
     }
 
@@ -54,7 +57,8 @@ impl PackageManagerReportPublisher {
         let dependencies: Vec<DependencyReport> = Dependency::ALL
             .iter()
             .filter(|dependency| {
-                package_managers.get(&dependency.manager()) == Some(&ManagerState::Present)
+                self.report_dependencies
+                    && package_managers.get(&dependency.manager()) == Some(&ManagerState::Present)
             })
             .map(|dependency| DependencyReport {
                 manager: dependency.manager(),
