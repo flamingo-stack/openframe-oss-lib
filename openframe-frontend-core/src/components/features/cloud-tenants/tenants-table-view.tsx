@@ -61,7 +61,7 @@ export type TenantsTableFilterColumn = (typeof TENANTS_TABLE_FILTER_COLUMNS)[num
 
 /** Each column's funnel: what it offers, what is ticked. The host narrows the rows; the view only draws. */
 export interface TenantsTableFilters {
-  /** A column with no options has no funnel. */
+  /** A column the host leaves out has no funnel; one with no options draws its bare label. */
   options: Partial<Record<TenantsTableFilterColumn, DataTableFilterOption[]>>;
   selections: Readonly<Record<TenantsTableFilterColumn, readonly string[]>>;
   onChange: (next: Record<TenantsTableFilterColumn, string[]>) => void;
@@ -115,10 +115,13 @@ export function TenantsTableView({
   const filterOptions = filters?.options;
   const filtersPending = filters?.pending ?? false;
   const columns = useMemo<ColumnDef<TenantRow>[]>(() => {
-    /** A column's funnel, while the host offers one. */
+    /**
+     * A column's funnel, while the host offers one. Declared with no options too: below lg only a filtered column keeps
+     * its header, and the column filter draws the bare label when there is nothing to choose.
+     */
     const funnel = (id: TenantsTableFilterColumn) => {
       const options = filterOptions?.[id];
-      return options && (options.length > 0 || filtersPending) ? { filter: { options, pending: filtersPending } } : {};
+      return options ? { filter: { options, pending: filtersPending } } : {};
     };
     return [
       {

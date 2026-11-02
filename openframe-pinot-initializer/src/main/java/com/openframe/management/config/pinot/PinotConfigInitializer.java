@@ -273,11 +273,13 @@ public class PinotConfigInitializer {
     private boolean columnsChange(String schemaConfig) {
         try {
             JsonNode desired = objectMapper.readTree(schemaConfig);
-            String url = String.format("http://%s/schemas/%s", pinotControllerUrl, desired.get("schemaName").asString());
+            String schemaName = desired.get("schemaName").asString();
+            String url = String.format("http://%s/schemas/%s", pinotControllerUrl, schemaName);
             ResponseEntity<String> response =
                     restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(createHeaders()), String.class);
-            boolean changed = !columns(objectMapper.readTree(response.getBody())).equals(columns(desired));
-            log.info("Pinot schema {}: columns {}", desired.get("schemaName").asString(), changed ? "changed" : "unchanged");
+            JsonNode stored = objectMapper.readTree(response.getBody());
+            boolean changed = !columns(stored).equals(columns(desired));
+            log.info("Pinot schema {}: columns {}", schemaName, changed ? "changed" : "unchanged");
             return changed;
         } catch (HttpClientErrorException.NotFound e) {
             return false;

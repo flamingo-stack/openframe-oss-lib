@@ -421,6 +421,28 @@ class AgentRegistrationServiceTest {
         assertEquals("old-os-uuid", savedMachine.getOsUuid());
     }
 
+    @Test
+    void reinstall_WithUserId_RecordsWhoInstalledTheAgent() {
+        stubReinstallOf(machineWithHardwareFacts());
+        request.setUserId("new-user");
+
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        Machine savedMachine = writtenOver(machineWithHardwareFacts());
+        assertEquals("new-user", savedMachine.getUserId());
+    }
+
+    @Test
+    void reinstall_WithoutUserId_KeepsTheStoredOne() {
+        stubReinstallOf(machineWithHardwareFacts());
+        request.setUserId(" ");
+
+        agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request);
+
+        Machine savedMachine = writtenOver(machineWithHardwareFacts());
+        assertEquals("old-user", savedMachine.getUserId());
+    }
+
     private void stubNewMachineRegistration() {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
@@ -471,6 +493,7 @@ class AgentRegistrationServiceTest {
         machine.setManufacturer("LENOVO");
         machine.setModel("ThinkPad T14");
         machine.setOsUuid("old-os-uuid");
+        machine.setUserId("old-user");
         return machine;
     }
 }

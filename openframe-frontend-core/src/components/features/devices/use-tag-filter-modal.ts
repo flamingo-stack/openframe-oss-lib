@@ -79,6 +79,9 @@ export function useTagFilterModal({
     pendingFiltersRef.current = columnFilters;
   }, []);
 
+  // Only a host that draws the directory columns has the USER and SOURCES groups: another's list params stay untouched
+  const hasDirectoryGroups = useMemo(() => columns.some(column => column.key === 'user'), [columns]);
+
   // Step 2: combine with buffered filters and flush (called second by FilterModal)
   const handleTagsChange = useCallback(
     (newTags: string[]) => {
@@ -87,15 +90,14 @@ export function useTagFilterModal({
         statuses: cf.status || [],
         osTypes: cf.os || [],
         organizationIds: cf.organization || [],
-        // Only a host that draws the directory columns has these groups: another's list params stay untouched.
-        ...(cf.user && { userLinks: cf.user }),
-        ...(cf.sources && { directorySources: cf.sources }),
+        // FilterModal drops a group with nothing ticked, so a missing group clears its param
+        ...(hasDirectoryGroups && { userLinks: cf.user || [], directorySources: cf.sources || [] }),
         tags: newTags.filter(isCompleteTag),
       });
       pendingFiltersRef.current = {};
       onApplied();
     },
-    [setParams, onApplied],
+    [setParams, onApplied, hasDirectoryGroups],
   );
 
   return {

@@ -44,17 +44,10 @@ public interface CustomMachineRepository {
      */
     void updateLastSeen(String machineId, Instant lastSeen);
 
-    /**
-     * Stamps {@code hostFactsCheckedAt}, leaving every other field untouched. Bypasses {@code save} and
-     * {@code MachineWriter} for the same reason as {@link #updateLastSeen}: the marker is not part of the Pinot payload.
-     */
+    // Bypasses save and MachineWriter like updateLastSeen: the marker is not part of the Pinot payload
     void markHostFactsChecked(String machineId, Instant checkedAt);
 
-    /**
-     * The machines the Fleet host facts backfill is due to try: not pending deletion, deleted or archived, missing at
-     * least one of {@code MachineFields.FLEET_HOST_FACTS}, and never checked or checked before {@code checkedBefore}.
-     * Never checked first, then the oldest check, at most {@code limit}.
-     */
+    // Live machines missing a Fleet host fact, never checked or checked before checkedBefore: never checked first
     List<Machine> findDueForFleetHostFacts(String tenantId, Instant checkedBefore, int limit);
 
     boolean isSortableField(String field);

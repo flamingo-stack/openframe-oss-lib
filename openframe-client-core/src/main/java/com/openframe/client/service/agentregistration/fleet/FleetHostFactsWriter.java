@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
 import java.util.Set;
 
 import static com.openframe.data.service.machine.MachineFields.COMPUTER_NAME;
@@ -33,12 +32,9 @@ public class FleetHostFactsWriter {
     private final MachineWriter machineWriter;
 
     public void fill(String machineId, Host host) {
-        Optional<Machine> machine = machineRepository.findByMachineId(machineId);
-        if (machine.isEmpty()) {
-            log.warn("Machine not found, Fleet host facts not filled: machineId={}", machineId);
-            return;
-        }
-        fill(machine.get(), host);
+        machineRepository.findByMachineId(machineId).ifPresentOrElse(
+                machine -> fill(machine, host),
+                () -> log.warn("Machine not found, Fleet host facts not filled: machineId={}", machineId));
     }
 
     public void fill(Machine machine, Host host) {

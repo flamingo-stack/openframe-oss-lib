@@ -17,7 +17,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.Optional;
 
 import static com.openframe.data.document.device.DeviceStatus.OFFLINE;
 import static com.openframe.data.document.device.DeviceStatus.ONLINE;
@@ -94,17 +93,23 @@ public class MachineStatusService {
         }
         // The transition only lands while the status is still the one it was decided from, so an uninstall or a
         // status change that landed since the read is not overwritten
-        Optional<Machine> written = machineWriter
-                .update(machine.getMachineId(), Criteria.where(STATUS.path()).is(previousStatus), update)
-                .map(MachineWriteResult::after);
-        if (written.isEmpty()) {
-            // The status is no longer this event's to change, but the device was still heard from: its presence lands
-            log.info("Status of machineId={} changed since it was read, {} -> {} not applied, presence recorded",
-                    machine.getMachineId(), previousStatus, newStatus);
-            touchPresence(machine, telemetry, eventTimestamp);
-            return;
-        }
-        Machine updated = written.get();
+        machineWriter.update(machine.getMachineId(), Criteria.where(STATUS.path()).is(previousStatus), update)
+                .map(MachineWriteResult::after)
+                .ifPresentOrElse(
+                        updated -> announceTransition(updated, previousStatus, newStatus, firstConnect, eventTimestamp),
+                        () -> recordPresenceOnly(machine, previousStatus, newStatus, telemetry, eventTimestamp));
+    }
+
+    // The status is no longer this event's to change, but the device was still heard from: its presence lands
+    private void recordPresenceOnly(Machine machine, DeviceStatus previousStatus, DeviceStatus newStatus,
+                                    TelemetryStatus telemetry, Instant eventTimestamp) {
+        log.info("Status of machineId={} changed since it was read, {} -> {} not applied, presence recorded",
+                machine.getMachineId(), previousStatus, newStatus);
+        touchPresence(machine, telemetry, eventTimestamp);
+    }
+
+    private void announceTransition(Machine updated, DeviceStatus previousStatus, DeviceStatus newStatus,
+                                    boolean firstConnect, Instant eventTimestamp) {
         log.debug("Updated machineId={} to status={} at {}", updated.getMachineId(), newStatus, eventTimestamp);
 
         if (firstConnect) {
@@ -138,8 +143,8 @@ public class MachineStatusService {
     }
 
     // Field-level: a whole-document save would overwrite what other writers set on the machine since it was read
-    private Optional<Machine> write(String machineId, MachineUpdate update) {
-        return machineWriter.update(machineId, update).map(MachineWriteResult::after);
+    private void write(String machineId, MachineUpdate update) {
+        machineWriter.update(machineId, update);
     }
 
     private void logStaleEvent(Machine machine, Instant eventTimestamp) {
