@@ -770,7 +770,12 @@ async function renderStable(ui: React.ReactElement): Promise<HTMLElement> {
 
 function normalize(html: string): string {
   // The mermaid <style> block is a constant — collapse whitespace only.
-  return html.replace(/\s+\n/g, '\n');
+  // parse5 8.1 escapes `<` and `>` inside attribute values (8.0 did not), so a Tailwind `[&>*]:mb-0` class would
+  // snapshot differently on each; the snapshots are about the renderer, not the serializer, so tags are read back
+  // unescaped.
+  return html
+    .replace(/<[a-zA-Z][^>]*>/g, tag => tag.replace(/&gt;/g, '>').replace(/&lt;/g, '<'))
+    .replace(/\s+\n/g, '\n');
 }
 
 // ---------------------------------------------------------------------------
