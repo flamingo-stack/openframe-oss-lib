@@ -80,7 +80,7 @@ public class MachinePackageManagersListener extends AbstractJetStreamPushListene
             }
 
             log.debug("Processing package-managers report: machineId={} packageManagers={}", machineId, packageManagers);
-            packageManagersService.apply(machineId, packageManagers);
+            packageManagersService.apply(machineId, report);
 
             message.ack();
         } catch (JacksonException | IllegalArgumentException permanentlyBad) {
