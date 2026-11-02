@@ -46,6 +46,14 @@ async fn reported_version(binary: &Path, limit: Duration) -> Option<Version> {
         return None;
     }
 
+    // a scan still holding the freshly written exe would make the start fail and skip the check
+    #[cfg(windows)]
+    crate::platform::binary_writer::wait_until_executable_unlocked(
+        binary,
+        Duration::from_secs(crate::config::service_stop::EXEC_UNLOCK_WAIT_SECS),
+    )
+    .await;
+
     let mut cmd = Command::new(binary);
     cmd.arg("--version")
         .stdin(Stdio::null())
@@ -119,7 +127,12 @@ async fn reported_version(binary: &Path, limit: Duration) -> Option<Version> {
 /// Reads the `openframe-client <version>` line clap prints for `--version`.
 fn parse_reported_version(output: &str) -> Option<Version> {
     let line = output.lines().map(str::trim).find(|l| !l.is_empty())?;
-    version_comparator::parse_version(line.split_whitespace().last()?)
+    let (name, version) = line.split_once(char::is_whitespace)?;
+    // lib builds before the explicit name printed `openframe-agent-lib 0.1.0`, which is no client version
+    if name != "openframe-client" {
+        return None;
+    }
+    version_comparator::parse_version(version.trim())
 }
 
 #[cfg(test)]

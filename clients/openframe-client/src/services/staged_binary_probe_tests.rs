@@ -17,6 +17,7 @@ fn the_version_is_read_from_the_first_line_clap_prints() {
         Some(v("1.5.107+b2"))
     );
     assert_eq!(parse_reported_version("openframe-client dev"), None);
+    assert_eq!(parse_reported_version("openframe-agent-lib 0.1.0"), None);
     assert_eq!(
         parse_reported_version("warning: something\nopenframe-client 1.5.107"),
         None
@@ -27,11 +28,15 @@ fn the_version_is_read_from_the_first_line_clap_prints() {
 async fn a_binary_that_cannot_be_run_does_not_block_the_update() {
     let dir = tempfile::tempdir().unwrap();
     let missing = dir.path().join("openframe-client");
+    let not_a_binary = dir.path().join("openframe-update-staged");
+    std::fs::write(&not_a_binary, b"not an executable format").unwrap();
 
-    assert_eq!(reported_version(&missing, LIMIT).await, None);
-    verify_staged_version(&missing, &v("1.5.107"), LIMIT)
-        .await
-        .unwrap();
+    for binary in [missing, not_a_binary] {
+        assert_eq!(reported_version(&binary, LIMIT).await, None);
+        verify_staged_version(&binary, &v("1.5.107"), LIMIT)
+            .await
+            .unwrap();
+    }
 }
 
 #[cfg(unix)]

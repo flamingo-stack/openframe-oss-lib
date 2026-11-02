@@ -50,7 +50,7 @@ pub const ALLOW_DOWNGRADE: bool = false;
 pub const UPDATER_TRANSCRIPTS_KEPT: usize = 5;
 /// Minimum age before a temp update leftover is swept (a live updater's files are younger).
 pub const TEMP_LEFTOVER_MIN_AGE_SECS: u64 = 3600;
-/// How long the staged binary may take to answer `--version` (a first-run antivirus scan included).
+/// How long the started staged binary may take to answer `--version`; an antivirus scan inside the process start is not counted.
 pub const STAGED_VERSION_PROBE_TIMEOUT_SECS: u64 = 30;
 
 // NATS message settings
