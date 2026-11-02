@@ -37,6 +37,7 @@ const base: SoftwareActionFormProps = {
   initialValues: { timeReference: 'SERVER' },
   renderPackageSearch: () => <span>package field</span>,
   renderDevicePicker: () => <span>device picker</span>,
+  showUpdateSettings: true,
 };
 
 describe('SoftwareUpdateSettingsFields', () => {
@@ -95,9 +96,10 @@ describe('SoftwareActionForm update settings', () => {
     expect(onSubmit.mock.calls[0][0].updateSettings).toBeUndefined();
   });
 
-  it('showUpdateSettings={false} hides them and submits none', () => {
+  it('a host that does not ask for them gets none and submits none', () => {
     const onSubmit = vi.fn<(values: SoftwareActionFormValues) => void>();
-    render(<SoftwareActionForm {...base} showUpdateSettings={false} onSubmit={onSubmit} />);
+    const { showUpdateSettings: _, ...withoutSettings } = base;
+    render(<SoftwareActionForm {...withoutSettings} onSubmit={onSubmit} />);
     expect(screen.queryByRole('heading', { name: 'Update Settings' })).toBeNull();
     fireEvent.click(submitButton('Run Update'));
     expect(onSubmit.mock.calls[0][0].updateSettings).toBeUndefined();

@@ -54,7 +54,7 @@ export const EmptyInstall: Story = {
 
 /** Update Software as it opens: "Update Settings" with the server's defaults between the timing and the devices. */
 export const EmptyUpdate: Story = {
-  args: { ...EmptyInstall.args, action: 'UPDATE' },
+  args: { ...EmptyInstall.args, action: 'UPDATE', showUpdateSettings: true },
 };
 
 /** "Update Settings" on its own, auto-updates set separately (design 1034:8173). */

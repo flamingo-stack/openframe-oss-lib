@@ -70,8 +70,8 @@ export interface SoftwareActionFormProps<TRef extends string = string> {
    */
   runModeLayout?: 'stacked' | 'inline';
   /**
-   * UPDATE only: the "Update Settings" block under the timing. Default true; a picture of the form that has to
-   * reach the devices passes false, and the values then carry no `updateSettings`.
+   * UPDATE only: the "Update Settings" block under the timing. Default false, so a host that does not send the
+   * settings yet never shows choices that go nowhere; the host that submits `updateSettings` passes true.
    */
   showUpdateSettings?: boolean;
   /** The "Device Selection" heading over the picker. Default true; a host that titles the picker itself passes false. */
@@ -103,7 +103,7 @@ export function SoftwareActionForm<TRef extends string = string>({
   renderDevicePicker,
   addRows = true,
   runModeLayout = 'stacked',
-  showUpdateSettings = true,
+  showUpdateSettings = false,
   showDeviceHeading = true,
   className = 'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
 }: SoftwareActionFormProps<TRef>) {
