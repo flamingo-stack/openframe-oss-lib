@@ -95,6 +95,11 @@ public class HubspotApiEmailService implements EmailService {
         send(downloadLinkEmailId, toEmail, "Your OpenFrame download link", Map.of("download_id", downloadId), "Download link");
     }
 
+    @Override
+    public void send(String templateId, String toEmail, String subject, Map<String, Object> properties) {
+        send(templateId, toEmail, subject, properties, "Templated (" + templateId + ")");
+    }
+
     private void sendWithTemplate(String emailTemplateId, String toEmail, String subject, String link, String debugContext) {
         send(emailTemplateId, toEmail, subject, Map.of("link", link), debugContext);
     }
