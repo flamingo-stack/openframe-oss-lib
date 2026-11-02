@@ -7,7 +7,7 @@ import { Ellipsis01Icon } from '../icons-v2-generated';
 import { PageTopicLabel } from '../page-topic-label';
 import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { Button } from '../ui/button';
-import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import type { MingoQuickAction } from './mingo-welcome';
 import {
   QuickActionChipButton,
@@ -25,6 +25,9 @@ import { WALL_SKELETON_LABEL_CH } from './quick-action-wall';
  * ChatGPT, Claude, Gemini, Copilot), so four slots, the last one "More" when there are more actions.
  */
 export const QUICK_ACTION_SET_SLOTS = 4;
+
+/** The set loads as every one of its slots. */
+const QUICK_ACTION_SKELETON_COUNT = QUICK_ACTION_SET_SLOTS;
 
 export interface QuickActionSetProps {
   /** The actions, in the order to show them (the host puts the page topic's own first). */
@@ -86,16 +89,15 @@ export function QuickActionSet({
       {showTopic && <PageTopicLabel className="text-right" />}
       <div className="grid grid-cols-1 gap-[var(--spacing-system-xs)] @[18rem]:grid-cols-2 @[48rem]:grid-cols-4">
         {loading ? (
-          <LoadingItems count={QUICK_ACTION_SET_SLOTS}>
+          <LoadingItems count={QUICK_ACTION_SKELETON_COUNT}>
             {i => (
-              <Slot>
+              <Slot data-loading-item>
                 <QuickActionChipButton
                   loading
                   fill
                   label=""
                   icon
                   labelCh={WALL_SKELETON_LABEL_CH[i % WALL_SKELETON_LABEL_CH.length]}
-                  data-loading-item
                 />
               </Slot>
             )}
@@ -103,8 +105,8 @@ export function QuickActionSet({
         ) : (
           <>
             {shown.map(chip => (
-              <Slot key={chip.id}>
-                <QuickActionChipFromData chip={chip} defaultTheme={theme} fill data-loading-item />
+              <Slot key={chip.id} data-loading-item>
+                <QuickActionChipFromData chip={chip} defaultTheme={theme} fill />
               </Slot>
             ))}
             {overflows && (
@@ -146,9 +148,18 @@ export function QuickActionSet({
 
 /** One cell of the set's grid: whatever it holds (a chip, its loading form, "More", or an unused slot's unseen box)
  *  fills it. */
-function Slot({ unused = false, children }: { unused?: boolean; children: ReactNode }) {
+function Slot({
+  unused = false,
+  children,
+  ...rest
+}: {
+  unused?: boolean;
+  children: ReactNode;
+  'data-loading-item'?: boolean;
+}) {
   return (
     <div
+      {...loadingItemProps(rest)}
       data-testid="quick-action-slot"
       aria-hidden={unused || undefined}
       className={cn('min-w-0', unused && 'invisible')}
