@@ -6,12 +6,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   APPROVAL_CANCELLED,
+  approvalRequestIdOf,
   approvalStatusOf,
   parseCitations,
   parseStoredParts,
   storablePartsOf,
   textOfParts,
   type ChatCitation,
+  type ChatMessage,
   type ChatPart,
   type ChatToolPart,
 } from '../chat-message';
@@ -303,5 +305,29 @@ describe('parseCitations', () => {
 
   it('never stores what a citation quoted', () => {
     expect(parseCitations([{ source, endIndex: 4, citedText: 'a whole record' }])).toEqual([{ source, endIndex: 4 }]);
+  });
+});
+
+describe('approvalRequestIdOf', () => {
+  const row = (id: string, batchId?: string): ChatToolPart => ({
+    type: 'dynamic-tool',
+    toolName: 'run',
+    toolCallId: id,
+    state: 'approval-requested',
+    input: {},
+    approval: { id, ...(batchId ? { descriptor: { batchId } } : {}) },
+  });
+  const messages: ChatMessage[] = [
+    { id: 'a1', role: 'assistant', parts: [row('single')] },
+    { id: 'a2', role: 'assistant', parts: [row('x1', 'batch-1'), row('x2', 'batch-1')] },
+  ];
+
+  it("a row of a batch answers by the batch's id", () => {
+    expect(approvalRequestIdOf(messages, 'x2')).toBe('batch-1');
+  });
+
+  it('a row in no batch is its own request, and so is an id no card holds', () => {
+    expect(approvalRequestIdOf(messages, 'single')).toBe('single');
+    expect(approvalRequestIdOf(messages, 'batch-1')).toBe('batch-1');
   });
 });

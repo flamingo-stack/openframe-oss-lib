@@ -353,6 +353,19 @@ export function approvalBatchIdOf(part: ChatToolPart): string | undefined {
   return approval?.descriptor?.batchId ?? part.toolMetadata?.batchId;
 }
 
+/**
+ * The id the backend knows an approval by: one request can hold a batch of calls, and a card's button names the row. A
+ * row that is in no batch is its own request.
+ */
+export function approvalRequestIdOf(messages: readonly ChatMessage[], id: string): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    for (const part of messages[i].parts) {
+      if (isToolPart(part) && 'approval' in part && part.approval?.id === id) return approvalBatchIdOf(part) ?? id;
+    }
+  }
+  return id;
+}
+
 /** A citation's source, from the source part it names. */
 export function citationSourceOfPart(part: ChatSourcePart): ChatCitationSource {
   if (part.type === 'source-url') {

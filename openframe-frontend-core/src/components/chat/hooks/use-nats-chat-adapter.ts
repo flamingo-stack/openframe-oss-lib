@@ -44,7 +44,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { approvalBatchIdOf, isToolPart, type ChatMessage } from '../../../chat-protocol/chat-message';
+import { approvalRequestIdOf } from '../../../chat-protocol/chat-message';
 import { createMingoDecoder, type MingoDecoder } from '../../../chat-protocol/message-decoder';
 import type { ChatRef } from '../chat-ref.types';
 import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
@@ -292,19 +292,6 @@ const DRAFT_DIALOG_KEY = '__draft__';
 
 /** Without a host's list, the tier an end user's own approval has. */
 const DEFAULT_DISPLAY_APPROVAL_TYPES: readonly string[] = ['CLIENT'];
-
-/**
- * The id the backend knows an approval by: one request can hold a batch of calls, and a card's button names the row. A
- * row that is in no batch is its own request.
- */
-function approvalRequestIdOf(messages: readonly ChatMessage[], id: string): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    for (const part of messages[i].parts) {
-      if (isToolPart(part) && 'approval' in part && part.approval?.id === id) return approvalBatchIdOf(part) ?? id;
-    }
-  }
-  return id;
-}
 
 export function useNatsChatAdapter(
   config: UseNatsChatAdapterConfig,
