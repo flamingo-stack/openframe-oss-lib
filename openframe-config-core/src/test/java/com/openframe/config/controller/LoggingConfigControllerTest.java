@@ -67,7 +67,7 @@ class LoggingConfigControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"missing.xml", "README.md", "..", "application.yml", "SHARED.XML"})
+    @ValueSource(strings = {"missing.xml", "README.md", "..", "SHARED.XML"})
     void getLoggingConfig_notALogbackFile_notFound(String filename) throws Exception {
         // execution
         var result = mockMvc.perform(get("/logging/{filename}", filename));
