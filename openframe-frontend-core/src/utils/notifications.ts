@@ -39,6 +39,7 @@ export const NOTIFICATION_CATEGORIES = [
   'INSIGHTS',
   'MINGO',
   'INTEGRATIONS',
+  'BILLING',
   'GENERIC',
 ] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
@@ -56,6 +57,7 @@ export const NOTIFICATION_CATEGORY_LABELS: Readonly<Record<NotificationCategory,
   INSIGHTS: 'Insights',
   MINGO: 'Mingo',
   INTEGRATIONS: 'Integrations',
+  BILLING: 'Billing',
   GENERIC: 'General',
 };
 
