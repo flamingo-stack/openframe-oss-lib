@@ -17,4 +17,5 @@ public class SoftwareSchedulePackage {
     private String packageName;
     /** Brew-only sub-type (CASK/FORMULA); null for managers that do not distinguish. */
     private BrewPackageType brewPackageType;
+    private String softwareId;
 }

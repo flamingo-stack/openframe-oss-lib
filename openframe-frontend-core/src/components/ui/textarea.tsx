@@ -166,7 +166,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
         // span children (the two icon wrappers): the nodes inside them are
         // rendered verbatim so callers can pass an interactive trigger and own
         // its styling, and a descendant rule would overwrite exactly that.
-        'has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled',
+        '[&>span]:has-[:disabled]:text-ods-text-disabled [&_svg]:has-[:disabled]:text-ods-text-disabled',
         !hideBorder && isInvalid && cn('border-ods-error hover:border-ods-error', accentBorderError),
         hideBorder && 'bg-transparent',
       )}

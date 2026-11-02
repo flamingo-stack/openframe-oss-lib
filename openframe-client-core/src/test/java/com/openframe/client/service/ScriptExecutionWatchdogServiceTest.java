@@ -51,16 +51,30 @@ class ScriptExecutionWatchdogServiceTest {
     }
 
     @Test
+    @DisplayName("a leaf dispatched long ago but taken by the agent just now is not stuck: the clock starts at the ack, the batch waited in the engine")
+    void leafThatWaitedInTheEngine_clockStartsWhenTheAgentTookIt() {
+        ScriptExecution waited = takenAfterWaiting(3600, 30);
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
+                .thenReturn(List.of(waited));
+
+        service.markStuckExecutionsAsFailed();
+
+        verify(repository, never()).saveAll(any());
+        assertThat(waited.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+    }
+
+    @Test
     @DisplayName("coarse pre-filter queries RUNNING rows older than min(grace, fallback) — the smallest possible per-row threshold, so nothing stuck is missed")
     void coarsePreFilter_usesMinThresholdFloorAndRunningStatus() {
-        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.RUNNING), any()))
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.RUNNING), any()))
                 .thenReturn(List.of());
         Instant approxNow = Instant.now();
 
         service.markStuckExecutionsAsFailed();
 
         ArgumentCaptor<Instant> captor = ArgumentCaptor.forClass(Instant.class);
-        verify(repository).findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.RUNNING), captor.capture());
+        verify(repository).findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(
+                eq(ExecutionStatus.RUNNING), captor.capture());
         // floor = min(120, 600) = 120s before now
         assertThat(captor.getValue()).isBetween(approxNow.minusSeconds(125), approxNow.minusSeconds(115));
         verify(repository, never()).saveAll(any());
@@ -69,7 +83,7 @@ class ScriptExecutionWatchdogServiceTest {
     @Test
     @DisplayName("reaps a row that has outlived its own timeout + grace (timeout 60s + 120s grace = 180s; age 200s)")
     void reapsRowPastTimeoutPlusGrace() {
-        when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
                 .thenReturn(List.of(running(60, 200)));
 
         service.markStuckExecutionsAsFailed();
@@ -82,7 +96,7 @@ class ScriptExecutionWatchdogServiceTest {
     @Test
     @DisplayName("does NOT reap a legitimately long-running script even when it is older than the fixed fallback (timeout 3600s; age 700s > 600 fallback but < 3720 threshold)")
     void doesNotReapLongRunningScript() {
-        when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
                 .thenReturn(List.of(running(3600, 700)));
 
         service.markStuckExecutionsAsFailed();
@@ -93,7 +107,7 @@ class ScriptExecutionWatchdogServiceTest {
     @Test
     @DisplayName("does NOT reap within the grace window (timeout 60s + 120s grace = 180s; age 150s)")
     void doesNotReapWithinGrace() {
-        when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
                 .thenReturn(List.of(running(60, 150)));
 
         service.markStuckExecutionsAsFailed();
@@ -106,7 +120,7 @@ class ScriptExecutionWatchdogServiceTest {
     void nullTimeout_usesFixedFallback() {
         ScriptExecution stuck = running(null, 700);
         ScriptExecution fresh = running(null, 500);
-        when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
                 .thenReturn(List.of(stuck, fresh));
 
         service.markStuckExecutionsAsFailed();
@@ -121,7 +135,7 @@ class ScriptExecutionWatchdogServiceTest {
     void reapsOnlyStuckSubset_andStampsRow() {
         ScriptExecution stuck = running(60, 200);     // threshold 180 < 200 → stuck
         ScriptExecution notStuck = running(600, 200);  // threshold 720 > 200 → fine
-        when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
                 .thenReturn(List.of(stuck, notStuck));
 
         service.markStuckExecutionsAsFailed();
@@ -140,7 +154,8 @@ class ScriptExecutionWatchdogServiceTest {
     @Test
     @DisplayName("no candidates → nothing saved")
     void noCandidates_noSave() {
-        when(repository.findByStatusAndDispatchedAtBefore(any(), any())).thenReturn(List.of());
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
+                .thenReturn(List.of());
 
         service.markStuckExecutionsAsFailed();
 
@@ -153,7 +168,7 @@ class ScriptExecutionWatchdogServiceTest {
         ScriptExecution fireLeafA = scheduleLeaf("t-1", "sch-1", "exec-1", "m-1", 200);
         ScriptExecution fireLeafB = scheduleLeaf("t-1", "sch-1", "exec-1", "m-2", 200);
         ScriptExecution adhoc = running(60, 200);
-        when(repository.findByStatusAndDispatchedAtBefore(any(), any()))
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
                 .thenReturn(List.of(fireLeafA, fireLeafB, adhoc));
 
         service.markStuckExecutionsAsFailed();
@@ -168,7 +183,8 @@ class ScriptExecutionWatchdogServiceTest {
     @Test
     @DisplayName("no stuck rows → no header finalize attempts")
     void noStuck_noHeaderFinalize() {
-        when(repository.findByStatusAndDispatchedAtBefore(any(), any())).thenReturn(List.of());
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
+                .thenReturn(List.of());
 
         service.markStuckExecutionsAsFailed();
 
@@ -186,6 +202,7 @@ class ScriptExecutionWatchdogServiceTest {
                 .status(ExecutionStatus.RUNNING)
                 .timeoutSeconds(60)
                 .dispatchedAt(Instant.now().minusSeconds(ageSeconds))
+                .statusChangedAt(Instant.now().minusSeconds(ageSeconds))
                 .build();
     }
 
@@ -197,6 +214,20 @@ class ScriptExecutionWatchdogServiceTest {
                 .status(ExecutionStatus.RUNNING)
                 .timeoutSeconds(timeoutSeconds)
                 .dispatchedAt(Instant.now().minusSeconds(ageSeconds))
+                .statusChangedAt(Instant.now().minusSeconds(ageSeconds))
+                .build();
+    }
+
+    // dispatched at the fire, taken by the agent only now: the batch waited in the delivery engine for the machine
+    private static ScriptExecution takenAfterWaiting(long dispatchedAgoSeconds, long runningAgoSeconds) {
+        return ScriptExecution.builder()
+                .id("doc-waited-" + dispatchedAgoSeconds)
+                .executionId("exec-waited-" + dispatchedAgoSeconds)
+                .machineId("m-1")
+                .status(ExecutionStatus.RUNNING)
+                .timeoutSeconds(60)
+                .dispatchedAt(Instant.now().minusSeconds(dispatchedAgoSeconds))
+                .statusChangedAt(Instant.now().minusSeconds(runningAgoSeconds))
                 .build();
     }
 

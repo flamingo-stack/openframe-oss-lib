@@ -11,7 +11,8 @@
 import { Video } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
-import { MEDIA_ASPECT } from '../../../styles/component-sizes';
+import { AVATAR_SIZE_PX, MEDIA_ASPECT } from '../../../styles/component-sizes';
+import { IMAGE_SLOT, fixedImageSlot } from '../../../styles/image-sizes';
 import type { CustomerInterview } from '../../../types/customer-interview';
 import { cn } from '../../../utils/cn';
 import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
@@ -170,7 +171,7 @@ function LoadedCustomerInterviewCard({
               alt={interview.title}
               className="object-contain"
               fill
-              sizes="56px"
+              sizes={fixedImageSlot('tile')}
               unoptimized
               onError={hideOnError}
             />
@@ -235,7 +236,7 @@ function LoadedCustomerInterviewCard({
                 alt={interview.title}
                 className="object-cover"
                 fill
-                sizes="(max-width: 768px) 100vw, 50vw"
+                sizes={IMAGE_SLOT.card}
                 unoptimized
                 onError={hideOnError}
               />
@@ -272,8 +273,8 @@ function LoadedCustomerInterviewCard({
                   src={interview.user.avatar_url}
                   alt={interview.user?.full_name || 'Customer'}
                   className="h-12 w-12 rounded-full border border-ods-border bg-ods-bg object-cover"
-                  width={48}
-                  height={48}
+                  width={AVATAR_SIZE_PX.lg}
+                  height={AVATAR_SIZE_PX.lg}
                   unoptimized
                 />
               ) : (
@@ -292,8 +293,8 @@ function LoadedCustomerInterviewCard({
                     src={interview.msp.icon_url}
                     alt={interview.msp.name || 'MSP'}
                     className="h-full w-full object-cover"
-                    width={24}
-                    height={24}
+                    width={AVATAR_SIZE_PX.xs}
+                    height={AVATAR_SIZE_PX.xs}
                     unoptimized
                   />
                 </div>

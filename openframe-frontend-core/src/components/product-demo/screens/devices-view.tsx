@@ -1,6 +1,7 @@
 'use client';
 
 import { DevicesPanelView, type DeviceFilters, type DeviceRow, IDLE_DEVICES_TOOLBAR } from '../../features/devices';
+import { DEMO_FLEET_SEARCH_ROWS } from '../fixtures/shared';
 
 /** What the Devices page shows for a search: the query in the field and the rows that answer it. */
 export const DEVICES_SEARCH_QUERY = 'Windows';
@@ -52,6 +53,8 @@ export function DevicesScreenView({
         hideColumns={compact ? HIDDEN_WHEN_COMPACT : undefined}
         loading={loading}
         loadingRegion={false}
+        // The page is the search's answer: its rows, loading and loaded (never the product's page size).
+        pageSize={DEMO_FLEET_SEARCH_ROWS}
       />
     </div>
   );

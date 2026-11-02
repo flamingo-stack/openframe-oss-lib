@@ -11,6 +11,8 @@
  * proxy config through (typically from `ChatRuntime.endpoints.imageProxyUrlPrefix`).
  */
 
+import { hostMatches } from './social-platforms';
+
 export type GetProxiedImageUrlOptions = {
   /**
    * URL prefix for the image proxy (`<prefix>?url=<encoded>`). When unset,
@@ -21,8 +23,9 @@ export type GetProxiedImageUrlOptions = {
   /**
    * Domains that should bypass the proxy (e.g. own-CDN hosts whose
    * `Content-Type` is reliable and that already serve CORS-permitting
-   * headers). Matched as `imageUrl.includes(domain)` so subdomains
-   * inherit. Default: `[]`.
+   * headers). Matched against the URL's host, exact or a subdomain of it
+   * (`hostMatches`), so a domain named anywhere else in the URL does not
+   * count. A `host:port` entry matches that port. Default: `[]`.
    */
   skipDomains?: string[];
   /**
@@ -33,6 +36,15 @@ export type GetProxiedImageUrlOptions = {
    */
   directHttps?: boolean;
 };
+
+/** The URL's `host` (with a non-default port, unlike `hostOf`), null when it does not parse. */
+function urlHost(url: string): string | null {
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Resolve an external image URL through (or around) the image proxy.
@@ -78,10 +90,9 @@ export function getProxiedImageUrl(imageUrl: string | null, options?: GetProxied
   }
 
   // (5) Skip-list match.
-  for (const domain of skipDomains) {
-    if (imageUrl.includes(domain)) {
-      return imageUrl;
-    }
+  const host = urlHost(imageUrl);
+  if (skipDomains.some(domain => hostMatches(host, domain))) {
+    return imageUrl;
   }
 
   // (6) Proxy.

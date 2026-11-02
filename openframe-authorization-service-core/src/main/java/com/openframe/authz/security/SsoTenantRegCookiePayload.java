@@ -1,6 +1,6 @@
 package com.openframe.authz.security;
 
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 
 public record SsoTenantRegCookiePayload(
         String s,
@@ -10,7 +10,7 @@ public record SsoTenantRegCookiePayload(
         String provider,
         String redirectTo,
         boolean authMobile,
-        RegistrationAttribution attribution,
+        Touchpoint attribution,
         long iat,
         long exp
 ) implements SsoCookiePayload {

@@ -20,7 +20,6 @@
 
 import { isCrossOriginUrl } from './is-cross-origin-url';
 
-export type NavSurface = 'useNavLink' | 'useUnifiedNav';
 export type RuntimeMode = 'host' | 'embed';
 
 export interface DecideNewTabInput {
@@ -28,8 +27,6 @@ export interface DecideNewTabInput {
   targetPlatform?: string | null;
   openIn?: 'new-tab' | 'same-tab';
   alwaysNewTab?: boolean;
-  /** Caller tag — labels the decision in any external trace logging. */
-  surface?: NavSurface;
   /** Optional chat-runtime mode. When omitted OR set to `'host'`,
    *  behavior is byte-equivalent to the legacy logic. Only `'embed'`
    *  triggers the new priority-1 branch that forces new-tab. */

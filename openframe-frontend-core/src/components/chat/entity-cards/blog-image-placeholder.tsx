@@ -1,6 +1,7 @@
 'use client';
 
 import Image from '../../../embed-shims/next-image';
+import { IMAGE_SLOT } from '../../../styles/image-sizes';
 
 interface BlogImagePlaceholderProps {
   /** Cover-image URL. The hub passes a `useOgPlaceholderUrl({ title, siteName })`
@@ -36,7 +37,7 @@ export function BlogImagePlaceholder({ imageUrl, title, className = '' }: BlogIm
         alt={`Cover image for ${title}`}
         className="object-contain"
         fill
-        sizes="(max-width: 768px) 100vw, 50vw"
+        sizes={IMAGE_SLOT.card}
         unoptimized
         loading="lazy"
         onError={e => {

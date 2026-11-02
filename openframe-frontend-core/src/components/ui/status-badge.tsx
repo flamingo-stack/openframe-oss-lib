@@ -103,7 +103,9 @@ export interface StatusBadgeProps
 
 /**
  * A badge while its text is read: one skeleton box with the badge's own padding and type step, its content one line
- * of that step (`box-content`: the padding adds to the line, as it does around the badge's text).
+ * of that step (`box-content`: the padding adds to the line, as it does around the badge's text). `align-top`: an
+ * empty inline box's baseline is its bottom edge, so on its own line it would add the line's descent below it (5 to
+ * 7px taller than the badge with its text).
  */
 function StatusBadgeSkeleton({ variant, className }: { variant?: 'card' | 'button' | null; className?: string }) {
   return (
@@ -111,7 +113,7 @@ function StatusBadgeSkeleton({ variant, className }: { variant?: 'card' | 'butto
       as="span"
       className={cn(
         statusBadgeVariants({ variant, colorScheme: null }),
-        'box-content h-[1lh] w-12 border-transparent',
+        'box-content h-[1lh] w-12 border-transparent align-top',
         className,
       )}
     />

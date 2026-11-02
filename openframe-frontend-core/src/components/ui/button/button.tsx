@@ -10,6 +10,7 @@ import {
   BUTTON_KIND_CLASS,
   BUTTON_SIZE_CLASS,
   type ButtonKind,
+  buttonIconSlotClass,
   buttonSurfaceClasses,
   outlineBorderClasses,
   splitDividerColorClasses,
@@ -52,6 +53,7 @@ const buttonVariants = cva(
         chip: '',
         card: '',
         cell: '',
+        stepper: '',
       },
       size: BUTTON_SIZE_CLASS,
       // Label typography axis (Figma 133-740). `bold` is the classic h3-bold
@@ -223,7 +225,7 @@ interface ButtonProps
   openInNewTab?: boolean;
   prefetch?: boolean;
   /**
-   * Pre-resolved anchor bundle (from `useNavLink({ href, targetPlatform })`).
+   * Pre-resolved anchor bundle (from `useNavLinkViaRuntime({ href, targetPlatform })`).
    * When set, renders the Button as `<Link>` with `href` / `target` / `rel`
    * / `onClick` spread from this object. Lets callers thread the unified
    * nav decision directly without `<Button asChild><a {...linkProps}/>`
@@ -296,6 +298,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
 ) {
   const isDisabled = disabled || loading;
   const kind = variant && variant in BUTTON_KIND_CLASS ? (variant as ButtonKind) : null;
+  // Beside a label the icon takes the surface's icon tone; without one it is the content and keeps the text colour.
+  const labelIconClass = buttonIconSlotClass(children ? variant : null, isDisabled);
 
   // splitIcon is only supported for default/small sizes. With other sizes
   // (icon, small-legacy) we silently fall back to the normal layout.
@@ -312,9 +316,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
       <>
         <span className={cn('contents', loading && 'invisible')}>
           <span className={mainSlotClass}>
-            {leftIcon && <span className="inline-flex items-center">{leftIcon}</span>}
+            {leftIcon && <span className={labelIconClass}>{leftIcon}</span>}
             {children}
-            {rightIcon && <span className="inline-flex items-center">{rightIcon}</span>}
+            {rightIcon && <span className={labelIconClass}>{rightIcon}</span>}
           </span>
           <span aria-hidden="true" className={iconSlotClass}>
             {splitIcon}
@@ -360,7 +364,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
       );
     }
 
-    // `linkProps` (the pre-resolved bundle from `useNavLink({ href, targetPlatform })`)
+    // `linkProps` (the pre-resolved bundle from `useNavLinkViaRuntime({ href, targetPlatform })`)
     // wins over the legacy `href` + `openInNewTab` props so callers can thread
     // the unified nav decision directly. Either path produces the same `<Link>`.
     const splitAnchor =
@@ -421,9 +425,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
   const content = (
     <>
       <span className={cn('contents', loading && 'invisible')}>
-        {leftIcon && <span className="inline-flex items-center">{leftIcon}</span>}
+        {leftIcon && <span className={labelIconClass}>{leftIcon}</span>}
         {children}
-        {rightIcon && <span className="inline-flex items-center">{rightIcon}</span>}
+        {rightIcon && <span className={labelIconClass}>{rightIcon}</span>}
       </span>
       {loading && (
         <span className="absolute inset-0 inline-flex items-center justify-center text-ods-text-primary">

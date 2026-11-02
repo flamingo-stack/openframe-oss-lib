@@ -2,8 +2,8 @@ package com.openframe.data.loki.config;
 
 import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.client.LokiQueryException;
-import com.openframe.data.loki.toolevent.ToolEventLog;
-import com.openframe.data.loki.toolevent.ToolEventLogRepository;
+import com.openframe.data.loki.toolevent.LokiLogEvent;
+import com.openframe.data.loki.toolevent.LokiLogEventRepository;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -52,13 +52,13 @@ class LokiConfigTest {
     }
 
     @Test
-    void toolEventLogRepository_lokiEnabled_savesThroughTheClientOnTheConfiguredUrl() {
+    void lokiLogEventRepository_lokiEnabled_savesThroughTheClientOnTheConfiguredUrl() {
         loki.createContext("/loki/api/v1/push", exchange -> {
             received.add(new String(exchange.getRequestBody().readAllBytes(), UTF_8));
             answerSaved(exchange);
         });
 
-        enabledContext().run(context -> context.getBean(ToolEventLogRepository.class).save(event()));
+        enabledContext().run(context -> context.getBean(LokiLogEventRepository.class).save(event()));
 
         assertThat(received)
                 .singleElement()
@@ -74,7 +74,7 @@ class LokiConfigTest {
         });
 
         enabledContext().withPropertyValues("openframe.loki.max-query-bytes-read=5GB")
-                .run(context -> context.getBean(ToolEventLogRepository.class)
+                .run(context -> context.getBean(LokiLogEventRepository.class)
                         .find("tenant-a", "FLEET", TIMESTAMP, "evt-1"));
 
         assertThat(received).containsExactly("{\"maxQueryBytesRead\":\"5GB\"}");
@@ -89,19 +89,19 @@ class LokiConfigTest {
 
         enabledContext().withBean(RestClient.Builder.class,
                         () -> RestClient.builder().defaultHeader("X-From-Boot-Builder", "yes"))
-                .run(context -> context.getBean(ToolEventLogRepository.class).save(event()));
+                .run(context -> context.getBean(LokiLogEventRepository.class).save(event()));
 
         assertThat(received).containsExactly("yes");
     }
 
     @Test
     @Timeout(value = 5, threadMode = SEPARATE_THREAD)
-    void toolEventLogRepository_lokiSlowerThanTheToolEventReadTimeout_failsTheLookup() {
+    void lokiLogEventRepository_lokiSlowerThanTheToolEventReadTimeout_failsTheLookup() {
         loki.createContext("/loki/api/v1/query_range", exchange -> awaitRelease());
 
         enabledContext().withPropertyValues("openframe.loki.tool-event-read-timeout=200ms",
                         "openframe.loki.read-timeout=1m", "openframe.loki.connect-timeout=1m")
-                .run(context -> assertThatThrownBy(() -> context.getBean(ToolEventLogRepository.class)
+                .run(context -> assertThatThrownBy(() -> context.getBean(LokiLogEventRepository.class)
                         .find("tenant-a", "FLEET", TIMESTAMP, "evt-1"))
                         .isExactlyInstanceOf(LokiQueryException.class)
                         .hasMessageStartingWith("Loki query failed: ")
@@ -113,7 +113,7 @@ class LokiConfigTest {
         contextRunner.withPropertyValues("openframe.loki.enabled=false", "openframe.loki.url=http://loki.test")
                 .run(context -> assertThat(context)
                         .doesNotHaveBean(LokiClient.class)
-                        .doesNotHaveBean(ToolEventLogRepository.class));
+                        .doesNotHaveBean(LokiLogEventRepository.class));
     }
 
     @Test
@@ -121,7 +121,7 @@ class LokiConfigTest {
         contextRunner.withPropertyValues("openframe.loki.url=http://loki.test")
                 .run(context -> assertThat(context)
                         .doesNotHaveBean(LokiClient.class)
-                        .doesNotHaveBean(ToolEventLogRepository.class));
+                        .doesNotHaveBean(LokiLogEventRepository.class));
     }
 
     @Test
@@ -168,8 +168,8 @@ class LokiConfigTest {
         exchange.close();
     }
 
-    private static ToolEventLog event() {
-        return ToolEventLog.builder()
+    private static LokiLogEvent event() {
+        return LokiLogEvent.builder()
                 .tenantId("tenant-a")
                 .toolType("FLEET")
                 .eventType("LOGIN")

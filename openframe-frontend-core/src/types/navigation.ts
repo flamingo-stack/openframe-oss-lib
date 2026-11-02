@@ -116,6 +116,35 @@ export interface SlidingSidebarConfig {
 }
 
 /**
+ * `NavigationSidebarConfig.resizable`: the user drags the expanded sidebar's
+ * right edge on desktop (`lg` and up). The 56px rail is not resizable, nor are
+ * the tablet overlay and the burger menu; the overlay opens to the chosen width.
+ */
+export interface NavigationSidebarResizeConfig {
+  /**
+   * Narrowest expanded width, in px. Raised to 141px when lower: the rows read
+   * 140px and up as expanded (`@[140px]/of-nav-sidebar`).
+   */
+  minWidth: number;
+  /** Widest expanded width, in px. Also kept to the room there is (`minContentWidth`). */
+  maxWidth: number;
+  /**
+   * Px of the row the content beside the sidebar always keeps, so a wide sidebar
+   * cannot crowd the page out of a narrow desktop window. Default 720, the lib's
+   * `content-md` breakpoint.
+   */
+  minContentWidth?: number;
+  /**
+   * `localStorage` key for the width the user chose: `{ size }` under
+   * `<storageKey>:chosen` (see `useResizablePanelSize`). Only a drag or a key
+   * press on the handle writes it, never the default or a clamped width; a double
+   * click removes it. Omit to keep the choice for the mount only. A host that seeds
+   * `NAVIGATION_SIDEBAR_WIDTH_VAR` before first paint reads the same entry.
+   */
+  storageKey?: string;
+}
+
+/**
  * Configuration for the navigation sidebar component
  */
 export interface NavigationSidebarConfig {
@@ -168,7 +197,139 @@ export interface NavigationSidebarConfig {
   onNavigate?: (path: string) => void;
   onToggleMinimized?: () => void;
   className?: string;
+  /**
+   * How the entries are drawn. `'flat'` (the default) is the original sidebar:
+   * every entry a 56px row, `children` ignored. `'grouped'` draws entries that
+   * carry `children` as groups — the parent row, and while the group is open a
+   * bordered card holding the parent and its children (one level only) — with
+   * 44px rows and a label-only active pill. Only one group is open at a time:
+   * the one holding the active entry. The mobile burger menu follows the same
+   * switch.
+   */
+  variant?: 'flat' | 'grouped';
+  /**
+   * The current location, pathname plus query string (`/monitoring?tab=policies`).
+   * Lets the sidebar resolve the active entry itself — through `match`, or an
+   * entry's own `path` — for entries that do not set `isActive`. Without it only
+   * `isActive` marks an entry, as before.
+   */
+  currentPath?: string;
+  /**
+   * Host content right below the navigation tree (the chat history), in the
+   * flow at its full height: the sidebar body scrolls the tree and the section
+   * as one, so the section must not scroll on its own.
+   * A node is hidden in the collapsed rail (it stays mounted); a function is
+   * called with the sidebar's own `minimized` state and decides for itself.
+   * Rendered in the mobile burger menu too, with `minimized: false`.
+   */
+  sectionSlot?: NavigationSidebarSlot;
+  /**
+   * The expanded sidebar's width in px (grouped variant; default 224). Applied
+   * to the desktop sidebar, the tablet overlay and its push slot, and written to
+   * `NAVIGATION_SIDEBAR_WIDTH_VAR` while expanded — so a host's pre-paint seed
+   * must write the same number (`'<expandedWidth>px'`, or `'56px'` when the
+   * stored preference is minimized). The 56px rail does not change. A width at
+   * or below 140px is raised to 141px: the rows switch to their expanded layout
+   * at 140px. The flat variant ignores it; the mobile burger menu keeps its own
+   * width.
+   */
+  expandedWidth?: number;
+  /**
+   * Host content pinned above the "Hide Menu" toggle (the account row). A node
+   * renders as-is in both widths; a function receives `minimized` and adapts
+   * (e.g. `AccountPopover`'s `collapsed`). Rendered at the bottom of the mobile
+   * burger menu too, with `minimized: false`.
+   */
+  footerSlot?: NavigationSidebarSlot;
+  /**
+   * Controlled desktop collapse. When set, it replaces the persisted preference
+   * (`localStorage`): the host owns the value and seeds
+   * `NAVIGATION_SIDEBAR_WIDTH_VAR` to match it before first paint. The tablet
+   * overlay stays the sidebar's own transient state, but a CHANGE of this value
+   * opens (`false`) or closes (`true`) it too, so a host can reveal the sidebar
+   * from anywhere (⌘K) on every width. Omitted: uncontrolled, as before.
+   */
+  collapsed?: boolean;
+  /**
+   * Called with the next desktop collapse state when the user toggles it on
+   * desktop (not for the tablet overlay). Pair with `collapsed`.
+   */
+  onCollapsedChange?: (collapsed: boolean) => void;
+  /**
+   * A reveal command: every CHANGE of this number (not its first value) shows
+   * the expanded sidebar at the current width — on tablet it opens the overlay
+   * (even when `collapsed` is already `false`, where a change of `collapsed`
+   * cannot), on desktop it expands a collapsed sidebar through
+   * `onCollapsedChange(false)` (controlled) or the stored preference
+   * (uncontrolled). Below md it does nothing: there the sidebar is the burger
+   * menu (`AppLayout` `mobileMenuOpen`). E.g. ⌘K bumps it before focusing the
+   * chat search in `sectionSlot`.
+   */
+  revealSignal?: number;
+  /**
+   * Let the user resize the expanded sidebar on desktop: a drag handle astride
+   * its right edge (the grip the Mingo chat drawer had), arrow keys, Home and
+   * End on it, a double click back to the default. The default stays
+   * `expandedWidth` (grouped) or 224px (flat); both variants. Omitted: the fixed
+   * widths, as before.
+   */
+  resizable?: NavigationSidebarResizeConfig;
 }
+
+/** What a slot render function is told about the place it is drawn in. */
+export interface NavigationSidebarSlotState {
+  minimized: boolean;
+  /**
+   * `true` in the mobile burger menu. The menu stays mounted at every width
+   * (hidden from md up), so content that must exist once — a popover over state
+   * its sidebar copy shares — renders only where this is `false`.
+   */
+  inDrawer: boolean;
+}
+
+/**
+ * A sidebar slot: a node, or a render function of the sidebar's own state (the
+ * host cannot derive `minimized` — it comes from a persisted preference, the
+ * tablet breakpoint and any open overlay).
+ */
+export type NavigationSidebarSlot = React.ReactNode | ((state: NavigationSidebarSlotState) => React.ReactNode);
+
+/** The location a `NavigationSidebarItem.match` function is asked about. */
+export interface NavigationSidebarLocation {
+  /** Without its trailing slash (`/` stays `/`). */
+  pathname: string;
+  searchParams: URLSearchParams;
+}
+
+/**
+ * One declarative match rule. `path` is a segment-aware prefix: `/scripts`
+ * matches `/scripts` and `/scripts/details`, never `/scriptsx`.
+ */
+export interface NavigationSidebarMatchRule {
+  path: string;
+  /** Only the pathname itself, not the pages below it. */
+  exact?: boolean;
+  /**
+   * Required query values: a string must be equal, `null` must be absent, an
+   * array accepts any of its values (`{ tab: ['queries', null] }` = the queries
+   * tab, or no tab at all).
+   */
+  query?: Record<string, string | null | ReadonlyArray<string | null>>;
+}
+
+/**
+ * When an entry is the current page. A string is a rule written as a URL —
+ * `'/monitoring?tab=policies'` = the `/monitoring` prefix with `tab=policies`.
+ * Several rules match if any does. When several entries match, the most
+ * specific rule wins (more path segments, then more query constraints), so
+ * `/scripts` and `/scripts/schedules` need no `exclude`. A function is the host
+ * deciding outright and outranks every rule.
+ */
+export type NavigationSidebarMatch =
+  | string
+  | NavigationSidebarMatchRule
+  | ReadonlyArray<string | NavigationSidebarMatchRule>
+  | ((location: NavigationSidebarLocation) => boolean);
 
 /**
  * Navigation sidebar item interface
@@ -187,8 +348,24 @@ export interface NavigationSidebarItem {
    * themselves, and the accessible name becomes "Devices (Beta)".
    */
   badge?: string;
+  /**
+   * The host's own answer to "is this the current page". When set (`true` or
+   * `false`) it wins over `match`; leave it out to let `match` / `path` decide
+   * against `NavigationSidebarConfig.currentPath`.
+   */
   isActive?: boolean;
+  /**
+   * When this entry is the current page, checked against
+   * `NavigationSidebarConfig.currentPath` for entries without `isActive`.
+   * Omitted: the entry's own `path` (its query included) is the rule.
+   */
+  match?: NavigationSidebarMatch;
   onClick?: () => void;
+  /**
+   * The group's entries (grouped variant only; one level). The flat variant
+   * ignores them. A parent's click only opens and folds the group, so a parent
+   * needs no `path`.
+   */
   children?: NavigationSidebarItem[];
   section?: 'primary' | 'secondary'; // To separate top and bottom sections
 }

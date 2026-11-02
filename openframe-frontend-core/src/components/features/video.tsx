@@ -43,6 +43,7 @@ import {
 } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useNearViewport } from '../../hooks/use-near-viewport';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
@@ -117,7 +118,15 @@ const PosterBox = forwardRef<
       style={fill ? { width: '100%', height: '100%' } : undefined}
     >
       {poster ? (
-        <Image src={poster} alt="" fill sizes="100vw" priority={priority} unoptimized className="object-cover" />
+        <Image
+          src={poster}
+          alt=""
+          fill
+          sizes={IMAGE_SLOT.full}
+          priority={priority}
+          unoptimized
+          className="object-cover"
+        />
       ) : null}
     </div>
   );

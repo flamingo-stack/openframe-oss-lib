@@ -134,7 +134,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
         // an adornment, which is passed verbatim precisely so it can own its
         // colour (a `Tag` there went invisible against its own fill).
         props.disabled && '!cursor-not-allowed bg-ods-bg',
-        'has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled',
+        '[&>span]:has-[:disabled]:text-ods-text-disabled [&_svg]:has-[:disabled]:text-ods-text-disabled',
         // Invalid
         isInvalid && invalidBorderClasses[variantIsInvalid ? errorVariant : 'error'],
         className,

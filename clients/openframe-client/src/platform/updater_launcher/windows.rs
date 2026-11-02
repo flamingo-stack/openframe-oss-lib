@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
 use tokio::process::{Child, Command};
@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use super::{LaunchedUpdater, UpdaterParams};
 use crate::config::update_config::BOOT_MARKER_WAIT_SECS;
+use crate::platform::directories::get_update_staging_directory;
 use crate::platform::get_powershell_path;
 use crate::platform::update_scripts::UPDATE_SCRIPT_WINDOWS;
 
@@ -15,9 +16,12 @@ use crate::platform::update_scripts::UPDATE_SCRIPT_WINDOWS;
 pub async fn launch_updater(params: UpdaterParams) -> Result<LaunchedUpdater> {
     info!("Launching Windows PowerShell updater");
 
-    // Save PowerShell script to temp file
-    let script_path =
-        std::env::temp_dir().join(format!("openframe-updater-{}.ps1", Uuid::new_v4()));
+    // Next to the staged binary; a reserve rollback stages nothing, so create the dir here too
+    let staging_dir = get_update_staging_directory();
+    tokio::fs::create_dir_all(&staging_dir)
+        .await
+        .context("Failed to create update staging directory")?;
+    let script_path = staging_dir.join(format!("openframe-updater-{}.ps1", Uuid::new_v4()));
 
     // UTF-8 BOM: without it Windows PowerShell 5.1 reads the file as ANSI, and
     // any multi-byte character can decode into a smart quote that breaks parsing.
@@ -27,7 +31,7 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<LaunchedUpdater> {
 
     info!("PowerShell script saved to: {}", script_path.display());
 
-    let ps_path = get_powershell_path().map_err(|e| anyhow!(e))?;
+    let ps_path = get_powershell_path();
     info!("Using PowerShell: {}", ps_path);
 
     // Catches parse errors and anything printed before Start-Transcript; pruned with the transcripts.

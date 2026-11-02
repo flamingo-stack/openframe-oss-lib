@@ -10,7 +10,7 @@ import { CheckboxBlock } from '../../../ui/checkbox-block';
 import { DatePickerInputSimple } from '../../../ui/date-picker';
 import { Label } from '../../../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
-import type { ScheduleTimeReference } from './schedule-enums';
+import { SCHEDULE_TIME_REFERENCE, type ScheduleTimeReference } from './schedule-enums';
 import {
   SCHEDULE_TIME_REFERENCE_OPTIONS,
   type ScheduleFormData,
@@ -20,7 +20,7 @@ import {
 import { ScheduleIntervalInput } from './schedule-interval-input';
 import {
   DURATION_UNIT_OPTIONS,
-  type DurationUnit,
+  DURATION_UNIT_VALUES,
   earliestScheduleDay,
   getTimeSlotOptions,
   isEventTrigger,
@@ -374,7 +374,11 @@ export function ScheduleTimingFields({
                 render={({ field }) => (
                   <Select
                     value={field.value}
-                    onValueChange={(next: ScheduleTimeReference) => handleTimeReferenceChange(field.onChange, next)}
+                    // Radix hands over a plain string; only an option's value is taken.
+                    onValueChange={value => {
+                      const next = Object.values(SCHEDULE_TIME_REFERENCE).find(reference => reference === value);
+                      if (next) handleTimeReferenceChange(field.onChange, next);
+                    }}
                     disabled={fieldsDisabled}
                   >
                     {/* No placeholder: the field always holds one of the two
@@ -455,7 +459,9 @@ export function ScheduleTimingFields({
                     // value the user never typed and the form cannot save. The
                     // other direction needs nothing — every coarser unit is
                     // already a whole number of slots at any interval.
-                    onValueChange={(next: DurationUnit) => {
+                    onValueChange={value => {
+                      const next = DURATION_UNIT_VALUES.find(unit => unit === value);
+                      if (!next) return;
                       field.onChange(next);
                       const snapped = snapRepeatInterval(getValues('repeatInterval'), next);
                       if (snapped !== getValues('repeatInterval')) setValue('repeatInterval', snapped);

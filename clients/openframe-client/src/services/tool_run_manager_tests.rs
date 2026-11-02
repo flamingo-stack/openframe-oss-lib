@@ -123,17 +123,10 @@ fn a_standard_record_is_not_launchable() {
 
 #[cfg(any(windows, target_os = "macos"))]
 #[test]
-fn chat_gets_first_run_flag_while_pending() {
+fn chat_always_launches_in_background() {
     use super::gui_launch_flag;
-    use crate::models::{FirstRunState, CHAT_TOOL_AGENT_ID};
+    use crate::models::CHAT_TOOL_AGENT_ID;
 
-    assert_eq!(
-        gui_launch_flag(CHAT_TOOL_AGENT_ID, FirstRunState::Pending),
-        Some("--first-run")
-    );
-    assert_eq!(
-        gui_launch_flag(CHAT_TOOL_AGENT_ID, FirstRunState::Done),
-        Some("--background")
-    );
-    assert_eq!(gui_launch_flag("other-tool", FirstRunState::Done), None);
+    assert_eq!(gui_launch_flag(CHAT_TOOL_AGENT_ID), Some("--background"));
+    assert_eq!(gui_launch_flag("other-tool"), None);
 }

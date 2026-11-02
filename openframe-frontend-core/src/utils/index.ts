@@ -71,6 +71,7 @@ export { SEO_DESCRIPTION_MAX_LENGTH } from './seo-description';
 // consumers (e.g. company-hub deck) don't ship their own copies of the marks.
 export * from './brand-marks';
 export * from './design-doc-readiness';
+export * from './clickup-drop-down';
 export * from './platform-config';
 export * from './os-platforms';
 export * from './access-code-client';
@@ -102,7 +103,7 @@ export {
 // Dynamic icon registry — single source of truth lives at
 // components/chat/utils/icon-registry. Re-exported here so existing
 // `@flamingo-stack/openframe-frontend-core/utils` callers (hub admin
-// social-account screens) keep working without changing their import path.
+// distribution-channel screens) keep working without changing their import path.
 export {
   getDynamicIcon,
   type DynamicIconSize,
@@ -342,7 +343,7 @@ export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scro
 
 // Same-page hash navigation — owns pushState + synthetic hashchange +
 // anchoring-proof scroll. Pair of `scrollElementIntoView`. Used by the
-// hub's `useUnifiedNav` + chat-runtime `navigate`, AND by every
+// `useNavigateViaRuntime` + chat-runtime `navigate`, AND by every
 // embeddable surface that drives state off the URL hash.
 export {
   ACTIVE_ANCHOR_ATTRIBUTE,
@@ -377,6 +378,14 @@ export { buildListUrl, canonicalContentRefType } from './list-url';
 // zero drift across page + chat + future consumers.
 export { faqSectionSlug, faqItemAnchor, parseFaqHash } from './faq-anchor';
 export type { FaqHashTarget } from './faq-anchor';
+export {
+  deepestTopic,
+  isPagePathTopic,
+  pageTopicFor,
+  type PageTopicOptions,
+  topicCandidates,
+  topicMatchesPath,
+} from './page-topics';
 
 // Content-ref group registry (labels/order/layout per rail type) + list-API
 // response normalizers + the shared suggestion-fetch URL composer — all

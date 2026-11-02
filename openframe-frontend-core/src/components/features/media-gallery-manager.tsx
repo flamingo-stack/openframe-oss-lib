@@ -4,6 +4,7 @@ import { Upload, Image as ImageIcon, Video as VideoIcon, Trash2, Loader2, GripVe
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import {
   fileContentKey,
@@ -15,7 +16,6 @@ import {
   type PublishableMediaType,
 } from '../../utils/media-type';
 import { Button, Card, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui';
-
 import { Video } from './video';
 
 export interface MediaItem {
@@ -368,7 +368,7 @@ export function MediaGalleryManager({
                       alt={item.title || 'Media'}
                       fill
                       className="object-cover"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      sizes={IMAGE_SLOT.card}
                     />
                   )}
                 </div>

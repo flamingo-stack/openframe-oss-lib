@@ -35,14 +35,21 @@ class CommandDataFetcherTest {
     private CommandDataFetcher dataFetcher;
 
     @Test
-    @DisplayName("runCommand forwards to the dispatch service and returns its response")
+    @DisplayName("runCommand stamps the authenticated user's id as initiatedBy and forwards to the dispatch service")
     void runCommand() {
-        RunCommandInput input = new RunCommandInput();
-        DispatchResponse response = DispatchResponse.builder().executionId("exec-1").build();
-        when(commandDispatchService.runCommand(input)).thenReturn(response);
+        Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1").build();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(jwt, null));
+        try {
+            RunCommandInput input = new RunCommandInput();
+            DispatchResponse response = DispatchResponse.builder().executionId("exec-1").build();
+            when(commandDispatchService.runCommand(eq(input), eq("user-1"))).thenReturn(response);
 
-        assertThat(dataFetcher.runCommand(input)).isSameAs(response);
-        verify(commandDispatchService).runCommand(input);
+            assertThat(dataFetcher.runCommand(input)).isSameAs(response);
+            verify(commandDispatchService).runCommand(eq(input), eq("user-1"));
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test

@@ -33,13 +33,27 @@ class CommandExecutionServiceTest {
     private CommandExecutionRepository commandExecutionRepository;
     @Mock
     private TenantIdProvider tenantIdProvider;
+    @Mock
+    private TestRunPolicy testRunPolicy;
 
     private CommandExecutionService service;
 
     @BeforeEach
     void setUp() {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
-        service = new CommandExecutionService(commandExecutionRepository, tenantIdProvider);
+        service = new CommandExecutionService(commandExecutionRepository, tenantIdProvider, testRunPolicy);
+    }
+
+    @Test
+    @DisplayName("createBatch: a test run marks every row, so history and logs leave them out")
+    void createBatch_marksEveryRowOfATestRun() {
+        when(testRunPolicy.isTestRun()).thenReturn(true);
+        when(commandExecutionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        List<CommandExecution> rows = service.createBatch(EXECUTION_ID, "uptime", ScriptShell.BASH,
+                List.of("m-1", "m-2"), PrivilegeLevel.ADMIN, 30, "alice");
+
+        assertThat(rows).hasSize(2).allMatch(CommandExecution::isTestRun);
     }
 
     @Test
@@ -66,6 +80,7 @@ class CommandExecutionServiceTest {
             assertThat(r.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
             assertThat(r.getDispatchedAt()).isNotNull();
             assertThat(r.getStatusChangedAt()).isEqualTo(r.getDispatchedAt());
+            assertThat(r.isTestRun()).isFalse();
         });
         assertThat(rows).extracting(CommandExecution::getMachineId).containsExactlyInAnyOrder("m-1", "m-2");
     }

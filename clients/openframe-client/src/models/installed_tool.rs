@@ -71,14 +71,6 @@ pub enum ToolRecordState {
     Installed,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum FirstRunState {
-    Pending,
-    #[default]
-    Done,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct InstalledTool {
     pub tool_agent_id: String,
@@ -95,8 +87,6 @@ pub struct InstalledTool {
     pub assets: Vec<InstalledAsset>,
     #[serde(default)]
     pub state: ToolRecordState,
-    #[serde(default)]
-    pub first_run: FirstRunState,
 }
 
 #[cfg(test)]

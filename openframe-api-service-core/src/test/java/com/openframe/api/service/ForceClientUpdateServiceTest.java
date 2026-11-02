@@ -5,14 +5,11 @@ import com.openframe.api.dto.force.response.ForceClientUpdateResponse;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponseItem;
 import com.openframe.api.dto.update.ForceClientUpdateRequest;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
-import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.nats.delivery.ClientUpdateDeliverySeed;
-import com.openframe.data.nats.publisher.OpenFrameClientUpdatePublisher;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.delivery.config.DeliveryProperties;
-import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import com.openframe.delivery.spec.DeliveryAudience;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +26,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,10 +36,8 @@ class ForceClientUpdateServiceTest {
     private static final String OTHER_MACHINE_ID = "mach-43";
 
     @Mock private OpenFrameClientConfigurationRepository clientConfigurationRepository;
-    @Mock private OpenFrameClientUpdatePublisher clientUpdatePublisher;
     @Mock private MachineRepository machineRepository;
-    @Mock private DeliveryProperties deliveryProperties;
-    @Mock private DeliveryDispatcher deliveryDispatcher;
+    @Mock private DeliveryRouter deliveryRouter;
     @Captor private ArgumentCaptor<ClientUpdateDeliverySeed> seedCaptor;
     @InjectMocks private ForceClientUpdateService service;
 
@@ -59,48 +53,45 @@ class ForceClientUpdateServiceTest {
     }
 
     @Test
-    void process_typeOff_broadcastAsBefore() {
+    void process_routeCarriesIt_updateSentToThatMachine() {
         // setup
-        when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UPDATE)).thenReturn(false);
+        when(deliveryRouter.dispatch(any())).thenReturn(true);
 
         // execution
         ForceClientUpdateResponse response = service.process(request);
 
         // verifications
-        verify(clientUpdatePublisher).send(configuration);
-        verify(deliveryDispatcher, never()).dispatch(any());
-        assertThat(response.getItems()).extracting(ForceClientUpdateResponseItem::getStatus).containsExactly(ForceAgentStatus.PROCESSED);
-    }
-
-    @Test
-    void process_typeOnTheEngine_updateHandedToThatMachine() {
-        // setup
-        when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UPDATE)).thenReturn(true);
-
-        // execution
-        ForceClientUpdateResponse response = service.process(request);
-
-        // verifications
-        verify(deliveryDispatcher).dispatch(seedCaptor.capture());
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
         ClientUpdateDeliverySeed seed = seedCaptor.getValue();
         assertThat(seed.getAudience()).isEqualTo(DeliveryAudience.MACHINE);
         assertThat(seed.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(seed.getConfiguration()).isSameAs(configuration);
-        verify(clientUpdatePublisher, never()).send(any());
         assertThat(response.getItems()).extracting(ForceClientUpdateResponseItem::getStatus).containsExactly(ForceAgentStatus.PROCESSED);
     }
 
     @Test
-    void processAll_typeOnTheEngine_oneHandOffForEveryMachineAndEveryMachineListed() {
+    void process_noRouteReachesTheMachine_reportedFailed() {
         // setup
-        when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UPDATE)).thenReturn(true);
+        when(deliveryRouter.dispatch(any())).thenReturn(false);
+
+        // execution
+        ForceClientUpdateResponse response = service.process(request);
+
+        // verifications
+        assertThat(response.getItems()).extracting(ForceClientUpdateResponseItem::getStatus).containsExactly(ForceAgentStatus.FAILED);
+    }
+
+    @Test
+    void processAll_oneHandOffForEveryMachineAndEveryMachineListed() {
+        // setup
+        when(deliveryRouter.dispatch(any())).thenReturn(true);
         when(machineRepository.findAll()).thenReturn(List.of(machine(MACHINE_ID), machine(OTHER_MACHINE_ID)));
 
         // execution
         ForceClientUpdateResponse response = service.processAll();
 
         // verifications
-        verify(deliveryDispatcher).dispatch(seedCaptor.capture());
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
         ClientUpdateDeliverySeed seed = seedCaptor.getValue();
         assertThat(seed.getAudience()).isEqualTo(DeliveryAudience.EVERY_MACHINE);
         assertThat(seed.getMachineId()).isNull();
@@ -111,9 +102,8 @@ class ForceClientUpdateServiceTest {
     @Test
     void processAll_handOffFails_everyMachineReportedFailed() {
         // setup
-        when(deliveryProperties.isEnabled(DeliveryType.CLIENT_UPDATE)).thenReturn(true);
         when(machineRepository.findAll()).thenReturn(List.of(machine(MACHINE_ID)));
-        doThrow(new IllegalStateException("kafka down")).when(deliveryDispatcher).dispatch(any());
+        doThrow(new IllegalStateException("kafka down")).when(deliveryRouter).dispatch(any());
 
         // execution
         ForceClientUpdateResponse response = service.processAll();

@@ -4,6 +4,7 @@ import { AlertTriangle, Eye, Package, Sparkles, TrendingUp, Wrench } from 'lucid
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { IMAGE_SLOT, fixedImageSlot } from '../../../styles/image-sizes';
 import { cn } from '../../../utils/cn';
 import {
   CONTENT_CARD_FRAME_CLASS,
@@ -62,7 +63,7 @@ export type ProductReleaseCardSize = 'lg' | 'sm';
 
 /**
  * Minimal structural `<Link>` prop bundle the consumer composes (typically
- * via the hub's `useNavLink` hook — single source of truth for click
+ * via `useNavLinkViaRuntime` — single source of truth for click
  * routing). Kept structural here so the OSS lib has zero hub coupling;
  * the consumer's `NavLinkProps` is type-compatible by shape.
  *
@@ -96,7 +97,7 @@ export interface LoadedProductReleaseCardProps {
    */
   onClick?: () => void;
   /**
-   * `<Link>` prop bundle from the consumer's `useNavLink` (or equivalent).
+   * `<Link>` prop bundle from the consumer's `useNavLinkViaRuntime` (or equivalent).
    * When provided, the card's outer element renders as a real anchor so
    * routing (cross-origin → new tab, same-origin → soft RSC nav,
    * modifier-click → browser default) is owned by the hook — the card
@@ -271,7 +272,7 @@ function LoadedProductReleaseCard({
                   src={coverImage}
                   alt={title}
                   fill
-                  sizes="(max-width: 768px) 100vw, 256px"
+                  sizes={IMAGE_SLOT.aside}
                   className="object-cover"
                   unoptimized
                 />
@@ -432,7 +433,7 @@ function LoadedProductReleaseCard({
   // cannot reuse `InteractiveCard` (a `<div>`).
   //
   // - When `anchorProps` is set, render as a real `<Link>` so the consumer's
-  //   click hook (`useNavLink`) owns routing identically to every other
+  //   click hook (`useNavLinkViaRuntime`) owns routing identically to every other
   //   entity card — cross-origin → new tab, same-origin → soft RSC nav.
   // - Else fall back to legacy `<span role="button">` behavior driven by
   //   `onClick` (kept for the public `/releases` page caller).
@@ -479,7 +480,14 @@ function LoadedProductReleaseCard({
             actually supplied (matches the catalog variant's overlay rule). */}
         <span className="relative flex aspect-square h-14 w-14 shrink-0 items-center justify-center self-start overflow-hidden rounded-md bg-ods-bg text-ods-accent">
           {coverImage ? (
-            <Image src={coverImage} alt={title} fill sizes="56px" className="object-contain" unoptimized />
+            <Image
+              src={coverImage}
+              alt={title}
+              fill
+              sizes={fixedImageSlot('tile')}
+              className="object-contain"
+              unoptimized
+            />
           ) : (
             <Package className="h-5 w-5" />
           )}
@@ -520,7 +528,7 @@ function LoadedProductReleaseCard({
         </span>
       </>
     );
-    // Anchor variant — consumer's `useNavLink` (or equivalent) owns the
+    // Anchor variant — consumer's `useNavLinkViaRuntime` (or equivalent) owns the
     // click decision; the card just spreads the prop bundle and renders
     // a real `<Link>` so cmd/ctrl-click new-tab + middle-click work without
     // any extra JS. This is the SAME pattern BlogCard / CaseStudyCard /

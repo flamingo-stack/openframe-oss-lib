@@ -1,6 +1,6 @@
 'use client';
 
-import { type CSSProperties, type ReactNode, useId } from 'react';
+import { type ComponentProps, type CSSProperties, type ReactNode, useId } from 'react';
 import { cn } from '../../utils/cn';
 import { isOwnClick } from '../../utils/own-click';
 import { useAgentTint } from '../agent-identity';
@@ -10,7 +10,7 @@ import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { BUTTON_ICON_SM_SIZE, Button } from '../ui/button/button';
+import { Button } from '../ui/button/button';
 import { InertWhileLoading, useLoadingScope } from '../ui/loading-scope';
 import { Tag } from '../ui/tag';
 
@@ -50,12 +50,14 @@ const OUTCOME_CHECK_CLASS = 'flex shrink-0 items-center';
 const OUTCOME_CHECK_STYLE = { height: '1lh' } as const;
 /** The request's quote: two lines at least, cut at two. Read by the card and its skeleton. */
 const REQUEST_TEXT_CLASS = 'm-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3';
-/** The request clears the corner toggle when the card is pickable: the toggle's width plus a gap. */
-const REQUEST_CLEAR_TOGGLE_STYLE = {
-  paddingRight: `calc(${BUTTON_ICON_SM_SIZE} + var(--spacing-system-xsf))`,
-} as const;
-/** The selection toggle's place, in the card's corner. */
-const SELECTION_TOGGLE_CLASS = 'absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] z-10';
+/**
+ * A pickable card's first row: the asker's turn, then the selection toggle in its own column at the row's end. The
+ * toggle is part of the layout, never drawn over it (the selectable-card practice of Carbon, Salt and PatternFly: the
+ * mark always visible, in a place of its own), so the asker's name and time make room for it instead of running under it.
+ */
+const REQUESTER_ROW_CLASS = 'flex items-start gap-[var(--spacing-system-xsf)]';
+const REQUESTER_TURN_CLASS = 'min-w-0 flex-1';
+const SELECTION_TOGGLE_CLASS = 'shrink-0';
 /** The context's label ("Today"): copy the page states, drawn for real in both forms. */
 const CONTEXT_LABEL_CLASS = 'text-ods-text-secondary text-h6';
 /** The speakers' avatar corner as the skeleton draws it. */
@@ -186,36 +188,35 @@ export function ConversationCard({
         })
       }
     >
-      {selection && (
-        // The toggle is a regular boxed Button in the card's corner, named by the
-        // request; a click anywhere on the card toggles it too (a pointer
-        // convenience: the Button is the control keyboards and screen readers use).
-        <Button
-          type="button"
-          variant={selection.pressed ? 'accent' : 'outline'}
-          size="icon-sm"
-          aria-pressed={selection.pressed}
-          aria-labelledby={requestId}
-          onClick={event => {
-            event.stopPropagation();
-            selection.onToggle();
-          }}
-          className={SELECTION_TOGGLE_CLASS}
-        >
-          {selection.pressed ? <CheckIcon /> : <PlusIcon />}
-        </Button>
-      )}
       {/* Every part keeps at least its number of lines, so cards in a row or a carousel line up part by part. */}
-      <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>
-        <p
-          id={requestId}
-          className={REQUEST_TEXT_CLASS}
-          style={selection ? REQUEST_CLEAR_TOGGLE_STYLE : undefined}
-          title={request}
+      <RequesterRow
+        selection={
+          // A regular boxed Button, named by the request; a click anywhere on the card toggles it too (a pointer
+          // convenience: the Button is the control keyboards and screen readers use).
+          selection && (
+            <SelectionToggle
+              pressed={selection.pressed}
+              aria-labelledby={requestId}
+              onClick={event => {
+                event.stopPropagation();
+                selection.onToggle();
+              }}
+            />
+          )
+        }
+      >
+        <ChatTurn
+          avatar={requester.avatar}
+          name={requester.name}
+          meta={requester.meta}
+          time={requester.time}
+          className={selection ? REQUESTER_TURN_CLASS : undefined}
         >
-          &ldquo;{request}&rdquo;
-        </p>
-      </ChatTurn>
+          <p id={requestId} className={REQUEST_TEXT_CLASS} title={request}>
+            &ldquo;{request}&rdquo;
+          </p>
+        </ChatTurn>
+      </RequesterRow>
       {context && (
         <div className={CONTEXT_BLOCK_CLASS}>
           <span className={CONTEXT_LABEL_CLASS}>{context.label}</span>
@@ -304,34 +305,28 @@ function ConversationCardSkeleton({
   const outcomeLines = partLines(lines?.outcome);
   return (
     <LoadingRegion label={label} announce={announce} className={cn(CARD_FRAME_CLASS, className)}>
-      {selection && (
-        <InertWhileLoading className="contents">
-          <Button
-            type="button"
-            variant={selection.pressed ? 'accent' : 'outline'}
-            size="icon-sm"
-            aria-pressed={selection.pressed}
-            className={SELECTION_TOGGLE_CLASS}
-          >
-            {selection.pressed ? <CheckIcon /> : <PlusIcon />}
-          </Button>
-        </InertWhileLoading>
-      )}
-      <ChatTurn
-        loading
-        name=""
-        skeleton={{
-          avatarPx,
-          avatarShape: SKELETON_AVATAR_SHAPE,
-          meta: requesterMeta,
-          time: requesterTime,
-          body: (
-            <div style={selection ? REQUEST_CLEAR_TOGGLE_STYLE : undefined}>
-              <TextLineSkeleton lines={2} type="h3" />
-            </div>
-          ),
-        }}
-      />
+      <RequesterRow
+        selection={
+          selection && (
+            <InertWhileLoading className="contents">
+              <SelectionToggle pressed={selection.pressed} />
+            </InertWhileLoading>
+          )
+        }
+      >
+        <ChatTurn
+          loading
+          name=""
+          className={selection ? REQUESTER_TURN_CLASS : undefined}
+          skeleton={{
+            avatarPx,
+            avatarShape: SKELETON_AVATAR_SHAPE,
+            meta: requesterMeta,
+            time: requesterTime,
+            body: <TextLineSkeleton lines={2} type="h3" />,
+          }}
+        />
+      </RequesterRow>
       {context && (
         <div className={CONTEXT_BLOCK_CLASS}>
           {typeof context === 'string' ? (
@@ -375,5 +370,35 @@ function ConversationCardSkeleton({
         </div>
       )}
     </LoadingRegion>
+  );
+}
+
+/** The asker's turn, and the selection toggle at the row's end when the card is pickable (`REQUESTER_ROW_CLASS`). */
+function RequesterRow({ selection, children }: { selection?: ReactNode; children: ReactNode }) {
+  if (!selection) return <>{children}</>;
+  return (
+    <div className={REQUESTER_ROW_CLASS}>
+      {children}
+      {selection}
+    </div>
+  );
+}
+
+/** The selection toggle: ONE element for the card and its skeleton, a "+" until picked and a check once picked. */
+function SelectionToggle({
+  pressed,
+  ...props
+}: { pressed: boolean } & Pick<ComponentProps<typeof Button>, 'onClick' | 'aria-labelledby'>) {
+  return (
+    <Button
+      type="button"
+      variant={pressed ? 'accent' : 'outline'}
+      size="icon-sm"
+      aria-pressed={pressed}
+      className={SELECTION_TOGGLE_CLASS}
+      {...props}
+    >
+      {pressed ? <CheckIcon /> : <PlusIcon />}
+    </Button>
   );
 }

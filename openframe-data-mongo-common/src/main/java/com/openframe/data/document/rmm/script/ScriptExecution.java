@@ -66,7 +66,10 @@ public class ScriptExecution implements TenantScoped {
     private String softwareBundleId;
     private String softwareScheduleId;
 
+    private String packageUpdateRequestId;
+
     private ExecutionStatus status;
+    private Boolean waiting;
 
     private Instant dispatchedAt;
     private Instant statusChangedAt;
@@ -79,4 +82,6 @@ public class ScriptExecution implements TenantScoped {
     private String stderr;
     private Boolean stderrTruncated;
     private String error;
+
+    private boolean testRun;
 }

@@ -13,6 +13,7 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.api.mapper.ScriptSecretSealer;
+import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.core.crypto.service.EncryptionService;
@@ -70,6 +71,7 @@ class ScheduleScriptServiceTest {
     private TenantIdProvider tenantIdProvider;
     private ScheduleDeviceLocalDispatchRepository deviceLocalDispatchRepository;
     private DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
+    private ScheduleDeliveryRefresher deliveryRefresher;
     private ScheduleScriptService scheduleService;
 
     private CreateScriptScheduleInput createInput;
@@ -83,11 +85,12 @@ class ScheduleScriptServiceTest {
         onlineDeviceDispatchRepository = mock(DeviceOnlineDispatchRepository.class);
         EncryptionService encryptionService =
                 new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
+        deliveryRefresher = mock(ScheduleDeliveryRefresher.class);
         scheduleService = new ScheduleScriptService(scheduleRepository,
                 new ScriptScheduleMapper(encryptionService, new StaticListableBeanFactory(
                         Map.of("sealer", new ScriptSecretSealer(encryptionService)))
                         .getBeanProvider(ScriptSecretSealer.class)),
-                scriptService, tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository);
+                scriptService, tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository, deliveryRefresher);
 
         createInput = new CreateScriptScheduleInput();
         createInput.setName("Nightly Maintenance");
@@ -496,6 +499,7 @@ class ScheduleScriptServiceTest {
         assertThat(existing.getName()).isEqualTo("Renamed");
         assertThat(result.getName()).isEqualTo("Renamed");
         verify(scheduleRepository).save(existing);
+        verify(deliveryRefresher).refreshForSchedule(SCHEDULE_ID);
     }
 
     @Test
@@ -541,6 +545,7 @@ class ScheduleScriptServiceTest {
         assertThat(active.getStatus()).isEqualTo(ScriptStatus.DELETED);
         assertThat(active.getStatusChangedAt()).isNotNull();
         verify(scheduleRepository).save(active);
+        verify(deliveryRefresher).cancelForSchedule(SCHEDULE_ID, "schedule deleted");
     }
 
     @Test
@@ -564,6 +569,7 @@ class ScheduleScriptServiceTest {
         assertThat(active.getStatus()).isEqualTo(ScriptStatus.ARCHIVED);
         assertThat(active.getStatusChangedAt()).isNotNull();
         verify(scheduleRepository).save(active);
+        verify(deliveryRefresher).cancelForSchedule(SCHEDULE_ID, "schedule archived");
     }
 
     @Test

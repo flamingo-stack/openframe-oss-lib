@@ -489,10 +489,10 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
             </div>
             {/* Action Buttons */}
             <div className="mt-4 flex shrink-0 gap-3">
-              <Button variant="outline" onClick={handleReset} size="default" className="md:w-full!">
+              <Button variant="outline" onClick={handleReset} size="default">
                 Reset
               </Button>
-              <Button variant="accent" onClick={handleApply} size="default" className="md:w-full!">
+              <Button variant="accent" onClick={handleApply} size="default">
                 Apply
               </Button>
             </div>

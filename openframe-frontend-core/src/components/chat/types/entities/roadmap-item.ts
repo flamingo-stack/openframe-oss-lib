@@ -32,6 +32,14 @@ export interface RoadmapItem {
   downvotes: number;
   quarter: string;
   clickupUrl: string;
+  /** The team the item belongs to (the ClickUp `Team` field), when the reader states it. */
+  team?: string | null;
+  /**
+   * Whether the item is on the public roadmap (the ClickUp `Public` checkbox). Stated only by a reader that also
+   * serves team-only items (an internal hub); the public roadmap serves public items only and leaves it out. When it
+   * is stated, the card says which it is, so a team-only plan is never read as announced.
+   */
+  isPublic?: boolean;
   /** ClickUp canonical task-type taxonomy ID (1008=Bug, 1009=Request,
    *  1010=Feature, …). Drives the type-specific icon rendered in the
    *  chat's compact card for the internal-tasks variant — see

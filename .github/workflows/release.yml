@@ -156,7 +156,7 @@ jobs:
         with:
           node-version: '22'
 
-      # Same bundled-npm bug as in test.yml's test-node.
+      # Same bundled-npm bug as in test.yml's build-node.
       - name: Upgrade npm
         run: npm install -g npm@11.9.0
 

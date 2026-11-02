@@ -1,6 +1,6 @@
 package com.openframe.authz.service.sso;
 
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.dto.SsoTenantRegistrationInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
@@ -84,9 +84,15 @@ public class SsoTenantRegistrationService {
         );
     }
 
-    private RegistrationAttribution boundedAttribution(RegistrationAttribution attribution) {
+    private Touchpoint boundedAttribution(Touchpoint attribution) {
         if (attribution == null || attribution.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
             return attribution;
+        }
+        Touchpoint withoutUrls = attribution.toBuilder().referrer(null).landingUrl(null).build();
+        if (withoutUrls.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
+            log.warn("Attribution too large for the SSO cookie ({} chars) — dropping its referrer and landing URL",
+                    attribution.totalLength());
+            return withoutUrls;
         }
         log.warn("Attribution too large for the SSO cookie ({} chars) — dropping it", attribution.totalLength());
         return null;

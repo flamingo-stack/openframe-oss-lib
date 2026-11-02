@@ -22,16 +22,4 @@ export interface DataRoomDocCardItem {
    *  the badge label via `SOURCE_LABELS_BY_TABLE`. Falls back to "Data room"
    *  when missing. */
   sourceRepo?: string | null;
-  /** Chat shell's base route (e.g. `/data-room`, `/knowledge-base`). Threaded
-   *  from `renderChatInlineEntityCard` → `renderCompactEntityCard` →
-   *  `DataRoomDocChatCard` so the shared `resolveSourceRowCTA` helper can
-   *  compose the destination URL identically to the SourceChip path. */
-  baseRoute?: string;
-  /** Cross-platform target for the card click (e.g. `'flamingo'` to open the
-   *  link on www.flamingo.cx). When set, the resolver composes an absolute
-   *  cross-origin URL; the click handler routes through a plain `<a>` so the
-   *  link opens in a new tab. Without this, product-hub clicks on
-   *  `/knowledge-base/<path>` get redirected to `/` by the middleware
-   *  because the route is not in the platform's `allowedRoutes`. */
-  chipBasePlatform?: string;
 }

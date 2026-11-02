@@ -10,4 +10,5 @@ public class SoftwareActionDeviceFilterInput {
 
     private List<SoftwareActionStatus> statuses;
     private List<String> organizationIds;
+    private List<String> deviceTagIds;
 }

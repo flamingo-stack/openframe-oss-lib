@@ -1,5 +1,6 @@
 package com.openframe.api.controller;
 
+import com.openframe.api.service.tenant.SuperUserResolver;
 import com.openframe.security.authentication.AuthPrincipal;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -15,22 +16,22 @@ class MeControllerTest {
 
     @Test
     void reportsSuperUserWhenTokenTenantIsTheSuperTenant() {
-        assertThat(isSuperUser(new MeController(SUPER_TENANT_ID), SUPER_TENANT_ID)).isTrue();
+        assertThat(isSuperUser(new MeController(new SuperUserResolver(SUPER_TENANT_ID)), SUPER_TENANT_ID)).isTrue();
     }
 
     @Test
     void reportsRegularUserForAnyOtherTenant() {
-        assertThat(isSuperUser(new MeController(SUPER_TENANT_ID), "6f7639b7-f3a9-45d5-bb16-4b7c3c599a78")).isFalse();
+        assertThat(isSuperUser(new MeController(new SuperUserResolver(SUPER_TENANT_ID)), "6f7639b7-f3a9-45d5-bb16-4b7c3c599a78")).isFalse();
     }
 
     @Test
     void reportsRegularUserWhenNoSuperTenantIsConfigured() {
-        assertThat(isSuperUser(new MeController(""), SUPER_TENANT_ID)).isFalse();
+        assertThat(isSuperUser(new MeController(new SuperUserResolver("")), SUPER_TENANT_ID)).isFalse();
     }
 
     @Test
     void returnsUnauthorizedWithoutPrincipal() {
-        assertThat(new MeController(SUPER_TENANT_ID).getCurrentUser(null).getStatusCode().value()).isEqualTo(401);
+        assertThat(new MeController(new SuperUserResolver(SUPER_TENANT_ID)).getCurrentUser(null).getStatusCode().value()).isEqualTo(401);
     }
 
     @SuppressWarnings("unchecked")

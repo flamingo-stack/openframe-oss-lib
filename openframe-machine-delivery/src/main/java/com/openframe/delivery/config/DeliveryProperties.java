@@ -5,6 +5,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Getter;
@@ -118,6 +119,22 @@ public class DeliveryProperties {
         // false unless a type sets it: re-published by the sweep's fast pass (sweep.fast-interval) instead of waiting
         // for the regular one, for a type a human waits on, whose ack-threshold is seconds
         private boolean fastSweep;
+
+        // 1 = one run; more = EXHAUSTED, TIMEOUT, ERROR or an agent failure re-runs the row as a new dispatch, OFFLINE never
+        @Min(1)
+        private int maxRuns;
+
+        // the wait between a run's end and the next run's publish
+        @Positive
+        private long rerunAfterSeconds;
+
+        // empty = every agent; else the first client version (dotted numbers) the engine delivers the type to, an
+        // older or unknown one takes the legacy subject the router keeps for the type
+        private String minAgentVersion = "";
+
+        public boolean hasRunsLeft(int reruns) {
+            return reruns + 1 < maxRuns;
+        }
     }
 
     // the wait before a re-publish: ack-threshold × multiplier^attempt, never above max-interval, then spread by
@@ -152,6 +169,9 @@ public class DeliveryProperties {
         private Long resultTimeoutSeconds;
         private Long ttlSeconds;
         private Boolean fastSweep;
+        private Integer maxRuns;
+        private Long rerunAfterSeconds;
+        private String minAgentVersion;
 
         Policy mergeOver(Policy base) {
             Policy merged = new Policy();
@@ -163,6 +183,9 @@ public class DeliveryProperties {
             merged.setResultTimeoutSeconds(requireNonNullElse(resultTimeoutSeconds, base.getResultTimeoutSeconds()));
             merged.setTtlSeconds(requireNonNullElse(ttlSeconds, base.getTtlSeconds()));
             merged.setFastSweep(requireNonNullElse(fastSweep, base.isFastSweep()));
+            merged.setMaxRuns(requireNonNullElse(maxRuns, base.getMaxRuns()));
+            merged.setRerunAfterSeconds(requireNonNullElse(rerunAfterSeconds, base.getRerunAfterSeconds()));
+            merged.setMinAgentVersion(requireNonNullElse(minAgentVersion, base.getMinAgentVersion()));
             return merged;
         }
     }

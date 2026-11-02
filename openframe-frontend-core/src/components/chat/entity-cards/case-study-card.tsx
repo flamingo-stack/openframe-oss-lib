@@ -21,7 +21,8 @@
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
-import { ICON_SIZE, MEDIA_ASPECT } from '../../../styles/component-sizes';
+import { AVATAR_SIZE_PX, ICON_SIZE, MEDIA_ASPECT } from '../../../styles/component-sizes';
+import { IMAGE_SLOT, fixedImageSlot } from '../../../styles/image-sizes';
 import type { CaseStudyCardData, CaseStudyMetric } from '../../../types/case-study';
 import { cn } from '../../../utils/cn';
 import { sortBitesByFeaturedAtDesc } from '../../features/video-bites-shared';
@@ -134,8 +135,8 @@ function CaseStudyPersonRow({ study }: { study: CaseStudyCardData }) {
               src={study.user.avatar_url}
               alt={study.user?.full_name || 'User'}
               className="h-12 w-12 rounded-full border border-ods-border bg-ods-bg object-cover"
-              width={48}
-              height={48}
+              width={AVATAR_SIZE_PX.lg}
+              height={AVATAR_SIZE_PX.lg}
               unoptimized
             />
           ) : (
@@ -151,8 +152,8 @@ function CaseStudyPersonRow({ study }: { study: CaseStudyCardData }) {
                 src={study.msp.icon_url}
                 alt={study.msp.name || 'MSP'}
                 className="h-full w-full object-cover"
-                width={24}
-                height={24}
+                width={AVATAR_SIZE_PX.xs}
+                height={AVATAR_SIZE_PX.xs}
                 unoptimized
               />
             </div>
@@ -319,7 +320,7 @@ function LoadedCaseStudyCard({
               alt={`${study.msp?.name || study.title} cover`}
               className="object-contain"
               fill
-              sizes="56px"
+              sizes={fixedImageSlot('tile')}
               unoptimized
               onError={hideOnError}
             />
@@ -374,7 +375,7 @@ function LoadedCaseStudyCard({
               active={hovered}
               playerMounted={mediaMounted}
               fit="cover"
-              posterSizes="360px"
+              posterSizes={IMAGE_SLOT.panel}
             />
           ) : (
             <>
@@ -384,7 +385,7 @@ function LoadedCaseStudyCard({
                   alt=""
                   className="object-cover"
                   fill
-                  sizes="360px"
+                  sizes={IMAGE_SLOT.panel}
                   unoptimized
                   onError={hideOnError}
                 />
@@ -476,7 +477,7 @@ function LoadedCaseStudyCard({
               src={coverImage}
               alt={study.msp?.name || study.title}
               className="h-full w-full object-cover"
-              sizes="(min-width: 1545px) 515px, (min-width: 1280px) 33vw, (min-width: 800px) 50vw, 100vw"
+              sizes={IMAGE_SLOT.card}
               fill
               unoptimized
               onError={hideOnError}

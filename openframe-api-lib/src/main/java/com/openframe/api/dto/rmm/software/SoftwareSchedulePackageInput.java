@@ -16,4 +16,5 @@ public class SoftwareSchedulePackageInput {
     private String packageName;
 
     private BrewPackageType brewPackageType;
+    private String softwareId;
 }

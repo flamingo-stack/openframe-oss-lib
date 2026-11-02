@@ -377,3 +377,133 @@ describe('URL_ATTRS covers hast PROPERTY keys, not attribute names', () => {
     expect(props.dataKind).toBe('artifact');
   });
 });
+
+/**
+ * The CSS spellings of a third-party load that jsdom cannot show: its style
+ * parser discards `image-set(…)` and an escaped `url`, which a browser applies.
+ * So they are asserted on the tree `rehypeStripUnsafe` returns.
+ */
+describe('rehypeStripUnsafe — CSS resource loads on untrusted content', () => {
+  const styleAfter = (style: string, options?: { allowRemoteMedia?: boolean }): unknown => {
+    const tree = {
+      type: 'root',
+      children: [{ type: 'element', tagName: 'div', properties: { style }, children: [] }],
+    };
+    const out = (rehypeStripUnsafe(options) as (t: unknown) => { children: { properties: Record<string, unknown> }[] })(
+      tree,
+    );
+    return out.children[0].properties.style;
+  };
+
+  const LOADS: Record<string, string> = {
+    'url()': 'background:url(https://attacker.example/x)',
+    'escaped url': 'background:u\\72 l(https://attacker.example/x)',
+    'image-set': "background-image:image-set('https://attacker.example/x' 1x)",
+    'prefixed image-set': "background-image:-webkit-image-set('https://attacker.example/x' 1x)",
+    'image-set split by a comment': "background-image:image/**/-set('https://attacker.example/x' 1x)",
+  };
+
+  for (const [name, decl] of Object.entries(LOADS)) {
+    it(`drops ${name}, keeps the rest`, () => {
+      expect(styleAfter(`color:red;${decl}`)).toBe('color:red');
+      expect(styleAfter(decl)).toBeUndefined();
+    });
+  }
+
+  it('keeps them where remote media is allowed (authored content)', () => {
+    expect(styleAfter(LOADS['url()'], { allowRemoteMedia: true })).toBe(LOADS['url()']);
+  });
+
+  it('keeps an in-document url(#id) reference', () => {
+    expect(styleAfter("fill:url(#g);stroke:url('#h')")).toBe("fill:url(#g);stroke:url('#h')");
+  });
+});
+
+describe('rehypeStripUnsafe — media against a native shell\u2019s origins', () => {
+  const capacitor = { pageUrl: 'capacitor://localhost/knowledge-base/', allowedOrigins: ['https://acme.openframe.ai'] };
+  const imgProps = (src: string): Record<string, unknown> => {
+    const tree = {
+      type: 'root',
+      children: [{ type: 'element', tagName: 'img', properties: { src, alt: 'x' }, children: [] }],
+    };
+    const out = (
+      rehypeStripUnsafe({ appOrigins: capacitor }) as (t: unknown) => {
+        children: { properties: Record<string, unknown> }[];
+      }
+    )(tree);
+    return out.children[0].properties;
+  };
+
+  it('keeps the gateway\u2019s and the bundle\u2019s images', () => {
+    expect(imgProps('https://acme.openframe.ai/knowledge-base/images/1').src).toBe(
+      'https://acme.openframe.ai/knowledge-base/images/1',
+    );
+    expect(imgProps('/assets/logo.svg').src).toBe('/assets/logo.svg');
+  });
+
+  it('moves a third-party image to its stand-in, absolute', () => {
+    expect(imgProps('https://attacker.example/x.png')).toEqual({
+      alt: 'x',
+      dataBlockedSrc: 'https://attacker.example/x.png',
+    });
+  });
+
+  it('drops a protocol-relative image outright: on capacitor:// it names no http(s) host', () => {
+    expect(imgProps('//attacker.example/x.png')).toEqual({ alt: 'x' });
+  });
+});
+
+describe('rehypeStripUnsafe — CSS and SVG edge spellings', () => {
+  const run = (tagName: string, properties: Record<string, unknown>, options?: { allowRemoteMedia?: boolean }) => {
+    const tree = { type: 'root', children: [{ type: 'element', tagName, properties, children: [] }] };
+    const out = (rehypeStripUnsafe(options) as (t: unknown) => { children: { properties: Record<string, unknown> }[] })(
+      tree,
+    );
+    return out.children[0].properties;
+  };
+
+  it.each([
+    ['upper-case URL(', 'background:URL(https://attacker.example/x)'],
+    ['url with spaces and quotes', 'background:url(  "https://attacker.example/x"  )'],
+    ['a local reference first, then a remote one', 'fill:url(#a), url(https://attacker.example/x)'],
+    ['cross-fade', 'background:-webkit-cross-fade(url(https://attacker.example/a), url(#b), 50%)'],
+    ['src()', "background:src('https://attacker.example/x')"],
+  ])('drops %s', (_name, decl) => {
+    expect(run('div', { style: `color:red;${decl}` }).style).toBe('color:red');
+  });
+
+  // An unterminated comment runs to the end of the value, so nothing after it survives, the URL included.
+  it('cuts the value at an unterminated comment', () => {
+    expect(run('div', { style: 'color:red;background:u/* never closed rl(https://attacker.example/x)' }).style).toBe(
+      'color:red;background:u',
+    );
+  });
+
+  it('keeps fonts, colours and in-document references, and drops the comments themselves', () => {
+    expect(run('div', { style: "font-family:'DM Sans';color:#fff/* note */;fill:url( '#g' )" }).style).toBe(
+      "font-family:'DM Sans';color:#fff;fill:url( '#g' )",
+    );
+  });
+
+  it.each([
+    ['fill', 'URL(https://attacker.example/p.svg#p)'],
+    ['stroke', 'u/**/rl(https://attacker.example/p.svg#p)'],
+    ['markerEnd', "url('https://attacker.example/m.svg#m')"],
+    ['clipPath', 'url(//attacker.example/c.svg#c)'],
+  ])('drops a remote SVG %s', (attr, value) => {
+    expect(run('rect', { [attr]: value })[attr]).toBeUndefined();
+  });
+
+  it('keeps an SVG paint server in the same document', () => {
+    expect(run('rect', { fill: 'url(#gradient)', stroke: 'red' })).toEqual({ fill: 'url(#gradient)', stroke: 'red' });
+  });
+
+  it('leaves all of it alone where remote media is allowed, except the comments', () => {
+    expect(run('rect', { fill: 'url(https://cdn.example.com/p.svg#p)' }, { allowRemoteMedia: true }).fill).toBe(
+      'url(https://cdn.example.com/p.svg#p)',
+    );
+    expect(
+      run('div', { style: 'background:u/**/rl(https://cdn.example.com/x)' }, { allowRemoteMedia: true }).style,
+    ).toBe('background:url(https://cdn.example.com/x)');
+  });
+});

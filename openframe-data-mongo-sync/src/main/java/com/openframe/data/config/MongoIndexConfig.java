@@ -72,6 +72,13 @@ public class MongoIndexConfig implements SmartLifecycle {
                                     .unique()
                                     .named("sso_identities_provider_subject_unique"));
 
+        // Every unknown refresh token ends in this lookup. Same name and options as the
+        // @CompoundIndex on MongoOAuth2Authorization, so the two stay idempotent.
+        mongoTemplate.indexOps("oauth2_authorizations")
+            .ensureIndex(new Index().on("retiredRefreshTokens.value", Sort.Direction.ASC)
+                                    .sparse()
+                                    .named("oauth2_authorizations_retired_refresh_token"));
+
         mongoTemplate.indexOps("application_events")
             .ensureIndex(new Index().on("userId", Sort.Direction.ASC)
                                   .on("timestamp", Sort.Direction.DESC));

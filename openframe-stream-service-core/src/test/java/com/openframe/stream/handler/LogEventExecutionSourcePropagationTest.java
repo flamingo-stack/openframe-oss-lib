@@ -1,20 +1,22 @@
 package com.openframe.stream.handler;
 
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
+import com.openframe.data.cassandra.model.CassandraLogEvent;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
-import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
+import com.openframe.data.cassandra.repository.CassandraLogEventRepository;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.IntegratedToolEvent;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
+import com.openframe.stream.config.ToolEventProperties;
+import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mapstruct.factory.Mappers;
 import org.mockito.Captor;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -32,18 +34,19 @@ class LogEventExecutionSourcePropagationTest {
     private static final String MACHINE_ID = "6d925893-702a-4223-b62f-2f80b927cbaa";
     private static final String ADMIN_ID = "admin-7";
 
-    @Mock private UnifiedLogEventRepository repository;
+    @Mock private CassandraLogEventRepository repository;
     @Mock private OssTenantRetryingKafkaProducer producer;
 
-    @Captor private ArgumentCaptor<UnifiedLogEvent> logEventCaptor;
+    @Captor private ArgumentCaptor<CassandraLogEvent> logEventCaptor;
     @Captor private ArgumentCaptor<IntegratedToolEvent> toolEventCaptor;
 
     @Test
     @DisplayName("Cassandra sink: executionSource, scriptCreationSource and the initiator reach unified_logs")
     void cassandraHandler_writesRunOriginFields() {
         // setup
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
+        CassandraLogEventHandler handler = new CassandraLogEventHandler(
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
+                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
 
         // execution
         handler.handle(message(), enriched("AI_ASSISTANT", "MANUAL"));
@@ -51,7 +54,7 @@ class LogEventExecutionSourcePropagationTest {
         // verifications
         verify(repository).save(logEventCaptor.capture());
         assertThat(logEventCaptor.getValue())
-                .extracting(UnifiedLogEvent::getExecutionSource, UnifiedLogEvent::getScriptCreationSource, UnifiedLogEvent::getUserId)
+                .extracting(CassandraLogEvent::getExecutionSource, CassandraLogEvent::getScriptCreationSource, CassandraLogEvent::getUserId)
                 .containsExactly("AI_ASSISTANT", "MANUAL", ADMIN_ID);
     }
 
@@ -59,8 +62,9 @@ class LogEventExecutionSourcePropagationTest {
     @DisplayName("Cassandra sink: a non-script event leaves both origin fields null")
     void cassandraHandler_noOrigin_writesNulls() {
         // setup
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
+        CassandraLogEventHandler handler = new CassandraLogEventHandler(
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
+                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
 
         // execution
         handler.handle(message(), enriched(null, null));
@@ -68,7 +72,7 @@ class LogEventExecutionSourcePropagationTest {
         // verifications
         verify(repository).save(logEventCaptor.capture());
         assertThat(logEventCaptor.getValue())
-                .extracting(UnifiedLogEvent::getExecutionSource, UnifiedLogEvent::getScriptCreationSource)
+                .extracting(CassandraLogEvent::getExecutionSource, CassandraLogEvent::getScriptCreationSource)
                 .containsExactly(null, null);
     }
 
@@ -77,7 +81,7 @@ class LogEventExecutionSourcePropagationTest {
     void kafkaHandler_publishesRunOriginFields() {
         // setup
         TenantDebeziumKafkaMessageHandler handler = new TenantDebeziumKafkaMessageHandler(
-                producer, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
+                producer, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(), Mappers.getMapper(LogEventMapper.class));
 
         // execution
         handler.handle(message(), enriched("SCHEDULED", "AI_ASSISTANT"));

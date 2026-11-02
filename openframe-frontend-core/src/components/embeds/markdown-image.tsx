@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
 import { useRichMarkdownRuntime } from './rich-markdown-runtime';
@@ -83,7 +84,7 @@ export function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
       alt={alt ?? 'No image available'}
       width={DISPLAY_W}
       height={Math.round(DISPLAY_W / ratio)}
-      sizes="(max-width: 768px) 100vw, 768px"
+      sizes={IMAGE_SLOT.column}
       loading="lazy"
       // `object-contain` → SupabaseOptimizedImage uses `resize=contain` (no crop).
       // `w-full` (not `w-auto`) gives the img a definite width so it lays out + lazy-loads

@@ -8,9 +8,18 @@
  * (`fixtures/loading-standard-review.mjs`); an opt-out lifts only the rule it names on its line; and the lib's `src/`
  * breaks no rule.
  */
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { analyzeProject, CONFIGS, formatFindings, Project, RULES } from '../loading-standard/engine.mjs';
+import {
+  analyzeProject,
+  CONFIGS,
+  formatFindings,
+  loadTypeScript,
+  Project,
+  RULES,
+} from '../loading-standard/engine.mjs';
 import { RULE_EXAMPLES } from '../loading-standard/rule-examples.mjs';
 import { REVIEW_FIXTURES, REVIEW_FIXTURES_R6 } from './fixtures/loading-standard-review.mjs';
 
@@ -20,10 +29,13 @@ const VIRTUAL = '/virtual/src';
 type Finding = { rule: string; file: string; line: number; message: string };
 
 /** Every finding of a virtual source tree (paths relative to its `src/`), under the frontend config (page code too). */
-function findingsOf(files: Record<string, string>): Finding[] {
+function findingsOf(
+  files: Record<string, string>,
+  config: Parameters<typeof analyzeProject>[1] = CONFIGS.frontend,
+): Finding[] {
   const sources = new Map(Object.entries(files).map(([rel, text]) => [`${VIRTUAL}/${rel}`, text]));
   const project = new Project({ trees: [{ dir: VIRTUAL, report: true, sources }] });
-  return analyzeProject(project, CONFIGS.frontend);
+  return analyzeProject(project, config);
 }
 
 /** The whole-src scan's limit: the parse took over 5 s (vitest's default) on a GitHub runner. */
@@ -40,6 +52,31 @@ describe('loading-standard engine: one failing and one passing example per rule'
     const { rule } = example;
     expect(findingsOf(example.fail).map(f => f.rule)).toContain(rule);
     expect(findingsOf(example.pass).filter(f => f.rule === rule)).toEqual([]);
+  });
+});
+
+describe('loading-standard engine: skeleton primitives', () => {
+  /** A component that switches on the scope and draws `bars` as its loading form. */
+  const switching = (bars: string) => ({
+    'components/title/title.tsx': `export function Title({ title }: { title: string }) {
+  return useLoadingScope() ? ${bars} : <h2>{title}</h2>;
+}
+`,
+  });
+
+  it('takes the per-breakpoint text bars as a primitive (a wrapping title draws them on its own switch)', () => {
+    const findings = findingsOf(switching('<TextLinesByBreakpointSkeleton lines={{ phone: 2, md: 1, lg: 1 }} />'));
+    expect(findings.filter(f => f.rule === 'NO_SCOPE_SWITCH')).toEqual([]);
+  });
+
+  it('still refuses a skeleton with no component of its own that is not a primitive', () => {
+    // Declared in a module of its own with no `HeadingBars` beside it: the shape the per-breakpoint bars have.
+    const findings = findingsOf({
+      'components/bars/bars.tsx': 'export function HeadingBarsSkeleton() { return <i />; }\n',
+      'components/title/title.tsx': `import { HeadingBarsSkeleton } from '../bars/bars';
+${switching('<HeadingBarsSkeleton />')['components/title/title.tsx']}`,
+    });
+    expect(findings.map(f => f.rule)).toContain('NO_SCOPE_SWITCH');
   });
 });
 
@@ -120,6 +157,66 @@ describe('loading-standard engine: opt-outs', () => {
         'export function X() {\n  // loading-standard-ok(SPINNER):\n  // loading-standard-ok(SPINNER): too far\n  const a = 1;\n  return <div className="animate-spin" />;\n}\n',
     });
     expect(findings.map(f => `${f.line} ${f.rule}`).sort()).toEqual(['2 OPT_OUT', '3 OPT_OUT', '5 SPINNER']);
+  });
+});
+
+describe('loading-standard engine: the hub config and a host boundary', () => {
+  const page = (root: string) => ({
+    'app/x/page.tsx': `export default function Page() { return ${root}; }\n`,
+  });
+  const boundaryRules = (root: string) =>
+    findingsOf(page(root), CONFIGS.hub)
+      .filter(f => f.rule === 'PAGE_BOUNDARY')
+      .map(f => f.rule);
+
+  it('flags a whole-page StreamedSection, and one told cached={false}', () => {
+    expect(boundaryRules('<StreamedSection read={r} render={d} placeholder={p} />')).toEqual(['PAGE_BOUNDARY']);
+    expect(boundaryRules('<StreamedSection cached={false} read={r} render={d} placeholder={p} />')).toEqual([
+      'PAGE_BOUNDARY',
+    ]);
+  });
+
+  it('passes a cached StreamedSection, bare or through a value', () => {
+    expect(boundaryRules('<StreamedSection cached read={r} render={d} placeholder={p} />')).toEqual([]);
+    expect(boundaryRules('<StreamedSection cached={isCached} read={r} render={d} placeholder={p} />')).toEqual([]);
+  });
+
+  it('runs only the boundary rules on the hub', () => {
+    expect(CONFIGS.hub.rules.sort()).toEqual([
+      'BOUNDARY_OWNER',
+      'HAND_PAIR',
+      'PAGE_BOUNDARY',
+      'RAW_SUSPENSE',
+      'SUSPENSE_FALLBACK',
+    ]);
+  });
+});
+
+describe('loading-standard engine: the compiler it reads with', () => {
+  /** A folder whose `typescript` is a stub with no compiler API (a TypeScript 7 nested beside the engine). */
+  function stubFolder(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'ts-stub-'));
+    mkdirSync(join(dir, 'node_modules', 'typescript'), { recursive: true });
+    writeFileSync(
+      join(dir, 'node_modules', 'typescript', 'package.json'),
+      '{"name":"typescript","version":"7.0.2","main":"index.js"}',
+    );
+    writeFileSync(join(dir, 'node_modules', 'typescript', 'index.js'), 'module.exports = { version: "7.0.2" };');
+    writeFileSync(join(dir, 'package.json'), '{"name":"stub"}');
+    return dir;
+  }
+
+  it('skips a TypeScript with no compiler API and takes the next place', () => {
+    const stub = join(stubFolder(), 'package.json');
+    const ts = loadTypeScript([stub, join(SRC, '..', 'package.json')]) as { createSourceFile?: unknown };
+    expect(typeof ts.createSourceFile).toBe('function');
+  });
+
+  it('says what it tried when no place has a compiler API', () => {
+    const stub = join(stubFolder(), 'package.json');
+    expect(() => {
+      loadTypeScript([stub]);
+    }).toThrow(/typescript 7\.0\.2 has no compiler API/);
   });
 });
 

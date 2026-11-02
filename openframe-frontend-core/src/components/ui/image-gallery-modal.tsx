@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
 import { Button } from './button';
 import { Modal } from './modal';
 
@@ -35,12 +36,13 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
   // the modal opens/closes or the gallery length changes, instead of on every
   // arrow press.
   const imageCount = images.length;
+  // The arrows (and the arrow keys) loop: back from the first image is the last, next from the last is the first.
   const goToPreviousImage = useCallback(() => {
-    setSelectedImageIndex(i => (i > 0 ? i - 1 : i));
-  }, []);
+    setSelectedImageIndex(i => (i > 0 ? i - 1 : imageCount - 1));
+  }, [imageCount]);
 
   const goToNextImage = useCallback(() => {
-    setSelectedImageIndex(i => (i < imageCount - 1 ? i + 1 : i));
+    setSelectedImageIndex(i => (i < imageCount - 1 ? i + 1 : 0));
   }, [imageCount]);
 
   // `onClose` is a prop and is almost always written inline; through a ref the
@@ -86,28 +88,30 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
         {/* Navigation Buttons */}
         {images.length > 1 && (
           <>
-            {selectedImageIndex > 0 && (
+            {
               <div className="absolute left-4 top-1/2 z-[10000] -translate-y-1/2">
                 <Button
                   variant="transparent"
                   size="small-legacy"
+                  aria-label="Previous image"
                   onClick={goToPreviousImage}
                   className="rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
                   leftIcon={<ChevronLeft className="h-6 w-6" />}
                 />
               </div>
-            )}
-            {selectedImageIndex < images.length - 1 && (
+            }
+            {
               <div className="absolute right-4 top-1/2 z-[10000] -translate-y-1/2">
                 <Button
                   variant="transparent"
                   size="small-legacy"
+                  aria-label="Next image"
                   onClick={goToNextImage}
                   className="rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
                   leftIcon={<ChevronRight className="h-6 w-6" />}
                 />
               </div>
-            )}
+            }
           </>
         )}
 
@@ -119,7 +123,7 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
               alt={`Screenshot ${selectedImageIndex + 1}`}
               fill
               className="object-contain"
-              sizes="90vw"
+              sizes={IMAGE_SLOT.full}
               priority={true}
               unoptimized
               onError={e => {

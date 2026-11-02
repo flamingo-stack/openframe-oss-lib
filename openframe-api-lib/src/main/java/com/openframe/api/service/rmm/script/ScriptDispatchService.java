@@ -7,6 +7,7 @@ import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.mapper.ScriptEnvVarMapper;
+import com.openframe.api.mapper.ScriptSecretSealer;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
@@ -21,13 +22,16 @@ import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
+import com.openframe.data.nats.delivery.ScheduleOfflineRule;
+import com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -57,7 +61,7 @@ public class ScriptDispatchService {
 
     private final ScriptService scriptService;
     private final ScriptNatsPublisher scriptNatsPublisher;
-    private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private final DeliveryRouter deliveryRouter;
     private final DeviceService deviceService;
     private final ScriptExecutionService scriptExecutionService;
     private final ScheduleScriptService scheduleScriptService;
@@ -65,6 +69,7 @@ public class ScriptDispatchService {
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTimeoutValidator timeoutValidator;
+    private final ObjectProvider<ScriptSecretSealer> secretSealer;
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
@@ -219,25 +224,40 @@ public class ScriptDispatchService {
                             .privilegeLevel(script.getPrivilegeLevel())
                             .args(ScriptArgsTokenizer.tokenize(effectiveArgs))
                             .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                            .envVars(effectiveEnv)
+                            .envVars(sealed(effectiveEnv))
                             .build();
                 })
                 .toList();
 
         // 4. Fan out: ONE message per machine (vs. the old N-per-machine). subject:
         //    machine.{machineId}.script-schedule-execution.
-        machineIds.forEach(machineId -> scriptScheduleNatsPublisher.publish(machineId,
-                ScriptScheduleExecutionMessage.builder()
-                        .executionId(executionId)
-                        .scheduleId(scheduleId)
-                        .machineId(machineId)
-                        .initiatedBy(initiatedBy)
-                        .scripts(scheduledScripts)
-                        .build()));
+        machineIds.forEach(machineId -> {
+            ScriptScheduleExecutionMessage message = ScriptScheduleExecutionMessage.builder()
+                    .executionId(executionId)
+                    .scheduleId(scheduleId)
+                    .initiatedBy(initiatedBy)
+                    .scripts(scheduledScripts)
+                    .build();
+            ScriptScheduleDeliverySeed seed = seed(schedule, machineId, message);
+            deliveryRouter.dispatch(seed);
+        });
 
         log.info("Dispatched schedule run scheduleId={} executionId={} scripts={} machines={}",
                 scheduleId, executionId, runnableScripts.size(), machineIds.size());
         return DispatchResponse.builder().executionId(executionId).build();
+    }
+
+    // the delivery engine stores the batch: its secrets stay encrypted until the wire form
+    private List<ScriptEnvVar> sealed(List<ScriptEnvVar> envVars) {
+        ScriptSecretSealer sealer = secretSealer.getIfAvailable();
+        return sealer == null ? envVars : sealer.seal(envVars);
+    }
+
+    // the schedule's own rule for a machine that is not online travels with the batch
+    private static ScriptScheduleDeliverySeed seed(ScriptScheduleResponse schedule, String machineId,
+                                                   ScriptScheduleExecutionMessage message) {
+        ScheduleOfflineRule rule = ScheduleOfflineRule.of(schedule.getTrigger(), schedule.getOfflineBehavior(), schedule.getReconnectWindowSeconds());
+        return ScriptScheduleDeliverySeed.withRule(machineId, message, rule);
     }
 
     private DispatchResponse dispatchBatch(String executionId, ScriptResponse script, List<String> machineIds,

@@ -67,18 +67,21 @@ class PackageManagerBootstrapServiceTest {
     }
 
     private Script givenSeededScript() {
+        return givenSeededScript(SystemScriptCode.INSTALL_WINGET, PrivilegeLevel.USER);
+    }
+
+    private Script givenSeededScript(SystemScriptCode code, PrivilegeLevel privilegeLevel) {
         Script script = Script.builder()
                 .id(SCRIPT_ID)
                 .tenantId(TENANT_ID)
-                .name(SystemScriptCode.INSTALL_WINGET.canonicalName())
-                .scriptBody("winget bootstrap body")
+                .name(code.canonicalName())
+                .scriptBody(code.canonicalName() + " body")
                 .shell(ScriptShell.POWERSHELL)
-                .privilegeLevel(PrivilegeLevel.USER)
+                .privilegeLevel(privilegeLevel)
                 .defaultTimeoutSeconds(1800)
                 .type(ScriptType.SYSTEM)
                 .build();
-        when(scriptRepository.findByTenantIdAndNameAndType(
-                TENANT_ID, SystemScriptCode.INSTALL_WINGET.canonicalName(), ScriptType.SYSTEM))
+        when(scriptRepository.findByTenantIdAndNameAndType(TENANT_ID, code.canonicalName(), ScriptType.SYSTEM))
                 .thenReturn(Optional.of(script));
         return script;
     }
@@ -119,10 +122,32 @@ class PackageManagerBootstrapServiceTest {
         ArgumentCaptor<ScriptMessage> message = ArgumentCaptor.forClass(ScriptMessage.class);
         verify(scriptBootstrapNatsPublisher).publishBootstrapScript(anyString(), message.capture());
         assertThat(message.getValue().getMachineId()).isEqualTo(MACHINE_ID);
-        assertThat(message.getValue().getCode()).isEqualTo("winget bootstrap body");
+        assertThat(message.getValue().getCode()).isEqualTo("__system__install-winget body");
         assertThat(message.getValue().getShell()).isEqualTo(ScriptShell.POWERSHELL);
         assertThat(message.getValue().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.USER);
         assertThat(message.getValue().getExecutionId()).isEqualTo(row.getValue().getExecutionId());
+    }
+
+    @Test
+    @DisplayName("a manager dependency: its own system script goes out under the manager's name")
+    void dispatchesDependencyScriptUnderItsManager() {
+        givenMachine(DeviceStatus.ONLINE);
+        givenSeededScript(SystemScriptCode.INSTALL_WINGET_CLIENT_MODULE, PrivilegeLevel.ADMIN);
+        when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
+                any(), any(), any(), any())).thenReturn(Optional.empty());
+
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET, SystemScriptCode.INSTALL_WINGET_CLIENT_MODULE);
+
+        ArgumentCaptor<ScriptExecution> row = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(row.capture());
+        assertThat(row.getValue().getScriptId()).isEqualTo(SCRIPT_ID);
+        assertThat(row.getValue().getPackageManager()).isEqualTo(PackageManagerType.WINGET);
+        assertThat(row.getValue().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
+
+        ArgumentCaptor<ScriptMessage> message = ArgumentCaptor.forClass(ScriptMessage.class);
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(anyString(), message.capture());
+        assertThat(message.getValue().getCode()).isEqualTo("__system__install-winget-client-module body");
+        assertThat(message.getValue().getPrivilegeLevel()).isEqualTo(PrivilegeLevel.ADMIN);
     }
 
     @Test

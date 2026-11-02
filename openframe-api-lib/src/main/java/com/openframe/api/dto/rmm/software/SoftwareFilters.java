@@ -13,6 +13,10 @@ public class SoftwareFilters {
     private List<SoftwareFilterOption> versionStatuses;
     private List<SoftwareFilterOption> severities;
 
+    // non-null in the schema; the tenant-wide facet stays empty until the read model backs it
+    @Builder.Default
+    private List<SoftwareFilterOption> autoUpdateStatuses = List.of();
+
     public static SoftwareFilters empty() {
         return SoftwareFilters.builder()
                 .sources(List.of())
