@@ -143,6 +143,26 @@ class PackageUpdateWireFormatTest {
     }
 
     @Test
+    void status_waiting_noUserSession_parses() {
+        PackageUpdateStatusMessage msg = mapper.readValue("""
+                {"state":"WAITING","waiting":{"reason":"NO_USER_SESSION","phase":"PROMPT"}}""",
+                PackageUpdateStatusMessage.class);
+
+        assertThat(msg.getWaiting().getReason()).isEqualTo(PackageUpdateStatusMessage.Waiting.Reason.NO_USER_SESSION);
+    }
+
+    @Test
+    void status_failed_agentPackageReasons_parse() {
+        PackageUpdateStatusMessage notInstalled = mapper.readValue("""
+                {"state":"FAILED","failed":{"reason":"NOT_INSTALLED"}}""", PackageUpdateStatusMessage.class);
+        PackageUpdateStatusMessage notUpgradable = mapper.readValue("""
+                {"state":"FAILED","failed":{"reason":"NOT_UPGRADABLE"}}""", PackageUpdateStatusMessage.class);
+
+        assertThat(notInstalled.getFailed().getReason()).isEqualTo(PackageUpdateStatusMessage.Failed.Reason.NOT_INSTALLED);
+        assertThat(notUpgradable.getFailed().getReason()).isEqualTo(PackageUpdateStatusMessage.Failed.Reason.NOT_UPGRADABLE);
+    }
+
+    @Test
     void status_failed_wingetHresultExitCode_parsesWithoutOverflow() {
         PackageUpdateStatusMessage msg = mapper.readValue("""
                 {"state":"FAILED","failed":{"reason":"MANAGER_ERROR","exitCode":2316632081}}""",
