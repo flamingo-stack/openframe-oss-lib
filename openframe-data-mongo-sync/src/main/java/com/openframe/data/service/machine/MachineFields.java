@@ -43,6 +43,9 @@ public final class MachineFields {
     public static final MachineField<String> MANUFACTURER = field("manufacturer", Machine::setManufacturer);
     public static final MachineField<String> OS_UUID = field("osUuid", Machine::setOsUuid);
     public static final MachineField<String> COMPUTER_NAME = field("computerName", Machine::setComputerName);
+    // The facts the Fleet host facts backfill looks for: a machine missing any of them is due a Fleet read
+    public static final List<MachineField<String>> FLEET_HOST_FACTS =
+            List.of(SERIAL_NUMBER, MODEL, MANUFACTURER, OS_UUID, COMPUTER_NAME);
 
     // Directory summary: written only by an external directory integration
     public static final MachineField<List<DirectorySource>> DIRECTORY_SOURCES =

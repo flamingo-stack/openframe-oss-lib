@@ -40,6 +40,7 @@ import java.util.stream.Collector;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static com.openframe.data.service.machine.MachineFields.FLEET_HOST_FACTS;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toMap;
 import static org.springframework.util.CollectionUtils.isEmpty;
@@ -84,6 +85,8 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final int UNKNOWN_STATUS_RANK = 0;
 
     private static final String TENANT_ID_FIELD = "tenantId";
+    private static final List<DeviceStatus> RETIRED_STATUSES =
+            List.of(DeviceStatus.PENDING_DELETION, DeviceStatus.DELETED, DeviceStatus.ARCHIVED);
 
     private final MongoTemplate mongoTemplate;
 
@@ -741,6 +744,33 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     public void markHostFactsChecked(String machineId, Instant checkedAt) {
         Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
         mongoTemplate.updateFirst(query, new Update().set(HOST_FACTS_CHECKED_AT_FIELD, checkedAt), Machine.class);
+    }
+
+    // No index serves "any fact blank": the filter runs server side over the tenant's machines, once per backfill run
+    @Override
+    public List<Machine> findDueForFleetHostFacts(String tenantId, Instant checkedBefore, int limit) {
+        Assert.hasText(tenantId, "tenantId must not be blank");
+        Assert.notNull(checkedBefore, "checkedBefore must not be null");
+        Assert.isTrue(limit > 0, "limit must be positive");
+        Criteria missingAnyFact = new Criteria().orOperator(FLEET_HOST_FACTS.stream()
+                .map(fact -> blank(fact.path()))
+                .toArray(Criteria[]::new));
+        Criteria due = new Criteria().orOperator(
+                Criteria.where(HOST_FACTS_CHECKED_AT_FIELD).is(null),
+                Criteria.where(HOST_FACTS_CHECKED_AT_FIELD).lt(checkedBefore));
+        Query query = new Query(new Criteria().andOperator(
+                Criteria.where(TENANT_ID_FIELD).is(tenantId),
+                Criteria.where(STATUS_FIELD).nin(RETIRED_STATUSES),
+                missingAnyFact,
+                due))
+                .with(Sort.by(Sort.Direction.ASC, HOST_FACTS_CHECKED_AT_FIELD, MACHINE_ID_FIELD))
+                .limit(limit);
+        return mongoTemplate.find(query, Machine.class);
+    }
+
+    // Blank as the Fleet host facts writer's guard reads it: absent, null or empty
+    private static Criteria blank(String path) {
+        return new Criteria().orOperator(Criteria.where(path).is(null), Criteria.where(path).is(""));
     }
 
     @Override
