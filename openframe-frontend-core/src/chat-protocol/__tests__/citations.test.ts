@@ -266,6 +266,32 @@ describe('textWithCitationChips', () => {
       expect(drawn(marked('One.^\n\nTwo.^', 'a', 'a'))).toBe(`One. ${chip(1)}\n\nTwo. ${chip(1)}`);
     });
 
+    it('a soft-wrapped line is the same paragraph', () => {
+      expect(drawn(marked('One line^\nsame paragraph.^', 'a', 'a'))).toBe(`One line ${chip(1)}\nsame paragraph.`);
+      expect(drawn(marked('> One line^\n> same quote.^', 'a', 'a'))).toBe(`> One line ${chip(1)}\n> same quote.`);
+    });
+
+    it('a list item`s wrapped line belongs to it, and the next item is its own', () => {
+      expect(drawn(marked('- One^\n  wrapped.^\n- Two.^', 'a', 'a', 'a'))).toBe(
+        `- One ${chip(1)}\n  wrapped.\n- Two. ${chip(1)}`,
+      );
+      expect(drawn(marked('1. One.^\n2) Two.^', 'a', 'a'))).toBe(`1. One. ${chip(1)}\n2) Two. ${chip(1)}`);
+    });
+
+    it('a table row is its own, with or without a leading pipe', () => {
+      expect(drawn(marked('| a^ | b |\n|---|---|\n| c^ | d |', 'a', 'a'))).toBe(
+        `| a ${chip(1)} | b |\n|---|---|\n| c ${chip(1)} | d |`,
+      );
+      expect(drawn(marked('a^ | b\n--|--\nc^ | d', 'a', 'a'))).toBe(`a ${chip(1)} | b\n--|--\nc ${chip(1)} | d`);
+    });
+
+    it('a heading is its own, and so is what follows a fence', () => {
+      expect(drawn(marked('# Title^\nText.^', 'a', 'a'))).toBe(`# Title ${chip(1)}\nText. ${chip(1)}`);
+      expect(drawn(marked('Before.^\n```\ncode\n```\nAfter.^', 'a', 'a'))).toBe(
+        `Before. ${chip(1)}\n\`\`\`\ncode\n\`\`\`\nAfter. ${chip(1)}`,
+      );
+    });
+
     it('two sources at one place both draw, in number order', () => {
       expect(drawn(marked('One.^^', 'a', 'b'))).toBe(`One. ${chip(1)} ${chip(2)}`);
     });

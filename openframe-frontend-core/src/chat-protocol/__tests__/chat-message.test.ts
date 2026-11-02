@@ -284,6 +284,46 @@ describe('parseStoredParts', () => {
   });
 });
 
+describe('the package`s entry', () => {
+  it('publishes no test data', async () => {
+    const entry = await import('../index');
+    expect(entry).not.toHaveProperty('ANSWER_STREAM');
+    expect(entry).not.toHaveProperty('RECORD_URI_VECTORS');
+    expect(entry).not.toHaveProperty('FIXTURE_PROPOSAL_ID');
+  });
+});
+
+describe('a stored row`s record URIs read in their one spelling', () => {
+  const unencoded = 'record://markdown/docs/a.md';
+  const canonical = 'record://markdown/docs%2Fa.md';
+
+  it('a source part, and a citation`s source', () => {
+    expect(
+      parseStoredParts([
+        { type: 'source-url', sourceId: unencoded, url: 'https://a.test' },
+        { type: 'source-document', sourceId: unencoded, mediaType: 'text/plain', title: 'A' },
+        {
+          type: 'text',
+          text: 'Cited.',
+          citations: [
+            { source: { type: 'source', sourceType: 'url', id: unencoded, url: 'https://a.test' }, endIndex: 6 },
+          ],
+        },
+      ]),
+    ).toEqual([
+      { type: 'source-url', sourceId: canonical, url: 'https://a.test' },
+      { type: 'source-document', sourceId: canonical, mediaType: 'text/plain', title: 'A' },
+      {
+        type: 'text',
+        text: 'Cited.',
+        citations: [
+          { source: { type: 'source', sourceType: 'url', id: canonical, url: 'https://a.test' }, endIndex: 6 },
+        ],
+      },
+    ]);
+  });
+});
+
 describe('parseCitations', () => {
   it('drops a malformed citation and keeps the rest', () => {
     const good = { source, startIndex: 0, endIndex: 3 };

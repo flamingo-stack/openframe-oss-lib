@@ -7,7 +7,7 @@
  *   - SSE (Guide mode) — talks to the hub backend
  *   - NATS (Mingo mode) — talks to the OpenFrame backend
  *
- * The public `useChat({ mode })` hook picks one based on `mode.transport` and
+ * The public `useUnifiedChat` hook picks one based on the mode's `transport` and
  * returns this shape regardless. Consumers (MingoChat shell, advanced custom
  * embedders) work against this contract and never see which transport is live.
  *
@@ -145,12 +145,12 @@ export type StreamingPhase = 'idle' | 'thinking' | 'streaming';
 // ─── Usage breakdown (SSE-only telemetry) ────────────────────────────────────
 
 /**
- * Cross-call token-usage breakdown extracted from the SSE trailing usage
- * frame. Surfaces sub-call costs for the Haiku rewriter/classifier/summarizer
+ * Cross-call token-usage breakdown extracted from the `finish` chunk's usage.
+ * Surfaces sub-call costs for the Haiku rewriter/classifier/summarizer
  * pipeline plus the routing decision for the main answer.
  *
  * Lives on `UnifiedChatState.currentUsageBreakdown` as `null` until the
- * server's trailing usage frame lands. Always `null` in Mingo mode — NATS
+ * server's `finish` chunk lands. Always `null` in Mingo mode — NATS
  * agent doesn't surface this telemetry.
  */
 export interface UnifiedUsageBreakdown {
@@ -276,7 +276,7 @@ export interface UnifiedChatState {
    * Provider key recognised by `<ModelDisplay>` for icon selection.
    * Values: 'anthropic' | 'openai' | 'google' (case-insensitive).
    * Null in Mingo mode and during the brief window before the server's
-   * `message_start` frame arrives.
+   * first `message-metadata` chunk arrives.
    */
   currentProvider: string | null;
 
@@ -286,7 +286,7 @@ export interface UnifiedChatState {
   /** Model's context-window cap in tokens. Null in Mingo. */
   currentContextWindowMaxTokens: number | null;
 
-  /** Input tokens for the current turn (from `message_start`). Null in Mingo. */
+  /** Input tokens for the current turn (from the first usage chunk). Null in Mingo. */
   currentInputTokens: number | null;
 
   /** Output tokens for the current turn (only known after stream end). */
@@ -297,7 +297,7 @@ export interface UnifiedChatState {
 
   /**
    * Cross-call token-usage breakdown (Haiku rewriter/classifier/summarizer
-   * + routed-answer telemetry). Null until the SSE trailing usage frame
+   * + routed-answer telemetry). Null until the `finish` chunk's usage
    * arrives. Always null in Mingo mode.
    */
   currentUsageBreakdown: UnifiedUsageBreakdown | null;
@@ -423,7 +423,7 @@ export interface UnifiedChatState {
   /** Cumulative token usage for the active Mingo dialog. Null in Guide
    *  mode or when the backend hasn't reported usage yet. Per-turn
    *  metadata (`currentInputTokens` etc.) is orthogonal — that fires on
-   *  every SSE `message_start`, while this hydrates from the dialog
+   *  every SSE usage chunk, while this hydrates from the dialog
    *  fetch + live `TOKEN_USAGE` events. */
   dialogTokenUsage: DialogTokenUsage | null;
 

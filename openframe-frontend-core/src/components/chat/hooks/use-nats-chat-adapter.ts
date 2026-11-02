@@ -4,7 +4,7 @@
  * useNatsChatAdapter: the NATS/Mingo-mode transport adapter for the
  * unified chat surface. Companion of `useSseChatAdapter` (Guide mode);
  * both implement the same `UnifiedChatState` contract so the public
- * `useChat({ mode })` can dispatch between them with zero shell-side
+ * `useUnifiedChat` can dispatch between them with zero shell-side
  * branching.
  *
  * Composition layers (in order from low to high):
@@ -259,10 +259,10 @@ export interface UseNatsChatAdapterConfig {
 
   /**
    * Baseline model display for the composer's `<ModelDisplay>` — used as the
-   * empty-state fallback before any streaming `metadata` frame arrives (e.g.
+   * empty-state fallback before any `message-metadata` chunk arrives (e.g.
    * a brand-new chat). The host typically sources these from its AI-config
-   * endpoint. Live `metadata` frames refine them per-turn. NATS-only; SSE
-   * (guide) derives its own model from the stream.
+   * endpoint. Live `message-metadata` chunks refine them per-turn. NATS-only;
+   * SSE (guide) derives its own model from the stream.
    */
   modelProvider?: string | null;
   modelLabel?: string | null;
@@ -910,8 +910,8 @@ export function useNatsChatAdapter(
       clearMessages,
       discussRef,
       // Model badge + token usage for the composer's `<ModelDisplay>`.
-      // Model: live `metadata` frame → config baseline (host AI-config).
-      // Tokens: live `token_usage` frame / dialog snapshot (`dialogTokenUsage`).
+      // Model: live `message-metadata` chunk → config baseline (host AI-config).
+      // Tokens: live `data-token-usage` chunk / dialog snapshot (`dialogTokenUsage`).
       // contextWindow uses the dialog's `contextSize` (the "X / Y" denominator,
       // matching the /mingo page). cacheHitRate/breakdown are SSE-only → null.
       currentProvider: liveModel?.provider ?? modelProvider ?? null,

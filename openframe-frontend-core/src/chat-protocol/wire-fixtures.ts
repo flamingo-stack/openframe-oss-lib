@@ -1,11 +1,13 @@
 /**
  * The wire, as data: one fixture per shape the chat protocol states. The conformance test runs them through the real
- * `ai@7.0.159`, this package's tests run them through its own reader and accumulator, and the hub's tests import them
- * from here, so a shape has one spelling across every suite.
+ * `ai@7.0.159`, and this package's tests run them through its own reader and accumulator, so a shape has one spelling
+ * across every suite. Test data: no entry of this package exports it. The Java agent's `RecordKey` holds the same URI
+ * vectors in a resource of its own.
  *
  * Pure data. Server-safe: no React, no browser APIs.
  */
 
+import type { WireCommandOverride } from '../components/chat/utils/slash-dispatch-utils';
 import type { ChatMessage, ChatPart } from './chat-message';
 import type { UiChunk } from './ui-chunks';
 
@@ -116,7 +118,7 @@ export const HISTORY_RESPONSE: { conversationId: string; found: boolean; message
 // =============================================================================
 
 /** `POST /api/docs/chat`: the last message, the standard's `id`, and extra fields in the transport's `body` option. */
-export const CHAT_REQUEST_BODY: { id: string; messages: ChatMessage[]; commandOverride: string } = {
+export const CHAT_REQUEST_BODY: { id: string; messages: ChatMessage[]; commandOverride: WireCommandOverride } = {
   id: FIXTURE_CONVERSATION_ID,
   messages: [
     {
@@ -133,7 +135,7 @@ export const CHAT_REQUEST_BODY: { id: string; messages: ChatMessage[]; commandOv
       ],
     },
   ],
-  commandOverride: '/webinars',
+  commandOverride: { entityIdFilter: { tableId: 'webinars', id: '1' } },
 };
 
 // =============================================================================

@@ -235,6 +235,28 @@ function insideTableCell(text: string, position: number): number {
   return at;
 }
 
+const LIST_ITEM_LINE = /^[ \t]*(?:>[ \t]*)*(?:[-*+][ \t]|\d{1,9}[.)][ \t])/;
+/** A heading or a table row (a row needs no leading pipe): one line, and it ends there. */
+const ONE_LINE_BLOCK = /^[ \t]*(?:>[ \t]*)*#{1,6}[ \t]|\|/;
+const BLANK_LINE_OF_QUOTE = /^[ \t>]*$/;
+
+/**
+ * Where the paragraph a position is in starts: at the blank line, fence or one-line block above it, so a soft-wrapped line
+ * is the same paragraph. A list item is its own, and its wrapped lines belong to it.
+ */
+function paragraphStartOf(text: string, position: number): number {
+  let start = lineStartOf(text, position);
+  while (start > 0) {
+    const line = text.slice(start, lineEndOf(text, start));
+    if (LIST_ITEM_LINE.test(line) || ONE_LINE_BLOCK.test(line)) return start;
+    const previous = lineStartOf(text, start - 1);
+    const above = text.slice(previous, start - 1);
+    if (BLANK_LINE_OF_QUOTE.test(above) || FENCE_OPEN.test(above) || ONE_LINE_BLOCK.test(above)) return start;
+    start = previous;
+  }
+  return start;
+}
+
 interface ChipPlace {
   position: number;
   /** After a fence, on a line of its own. */
@@ -259,8 +281,8 @@ function chipPlace(text: string, ranges: readonly ProtectedRange[], endIndex: nu
 
 /**
  * The part's markdown with its citation chips in it, for drawing only: ` [n](#citation-n)` at each citation's `endIndex`,
- * before trailing whitespace, moved past any code span, fence or link it would land in. Each source once per line: a
- * paragraph is a line here, because a list item or a table row is its own.
+ * before trailing whitespace, moved past any code span, fence or link it would land in. Each source once per paragraph,
+ * and a list item or a table row is a paragraph of its own.
  */
 export function textWithCitationChips(part: ChatTextPart, numbers: ReadonlyMap<string, number>): string {
   if (!part.citations || part.citations.length === 0) return part.text;
@@ -279,7 +301,7 @@ export function textWithCitationChips(part: ChatTextPart, numbers: ReadonlyMap<s
   const seen = new Set<string>();
   const inserts = new Map<number, { block: boolean; numbers: number[] }>();
   for (const place of places) {
-    const key = `${lineStartOf(text, place.position)}:${place.source}`;
+    const key = `${paragraphStartOf(text, place.position)}:${place.source}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const insert = inserts.get(place.position);

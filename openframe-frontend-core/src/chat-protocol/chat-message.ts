@@ -21,7 +21,7 @@ import type {
   TicketEventData,
 } from '../components/chat/types/message.types';
 import type { ChatProgress } from './progress';
-import { normalizeRecordUris } from './record-link';
+import { normalizeRecordUris, normalizeSourceId } from './record-link';
 import { isRecord } from './wire-narrow';
 
 // =============================================================================
@@ -523,14 +523,20 @@ function citationSourceOf(raw: unknown): ChatCitationSource | null {
   if (!isRecord(raw) || typeof raw.id !== 'string') return null;
   if (raw.sourceType === 'url' && typeof raw.url === 'string') {
     const title = optionalString(raw.title);
-    return { type: 'source', sourceType: 'url', id: raw.id, url: raw.url, ...(title ? { title } : {}) };
+    return {
+      type: 'source',
+      sourceType: 'url',
+      id: normalizeSourceId(raw.id),
+      url: raw.url,
+      ...(title ? { title } : {}),
+    };
   }
   if (raw.sourceType === 'document' && typeof raw.mediaType === 'string' && typeof raw.title === 'string') {
     const filename = optionalString(raw.filename);
     return {
       type: 'source',
       sourceType: 'document',
-      id: raw.id,
+      id: normalizeSourceId(raw.id),
       mediaType: raw.mediaType,
       title: raw.title,
       ...(filename ? { filename } : {}),
@@ -574,14 +580,19 @@ export function parseStoredPart(raw: unknown): ChatPart | null {
     case 'source-url': {
       if (typeof raw.sourceId !== 'string' || typeof raw.url !== 'string') return null;
       const title = optionalString(raw.title);
-      return { type: 'source-url', sourceId: raw.sourceId, url: raw.url, ...(title ? { title } : {}) };
+      return {
+        type: 'source-url',
+        sourceId: normalizeSourceId(raw.sourceId),
+        url: raw.url,
+        ...(title ? { title } : {}),
+      };
     }
     case 'source-document': {
       if (typeof raw.sourceId !== 'string' || typeof raw.title !== 'string') return null;
       const filename = optionalString(raw.filename);
       return {
         type: 'source-document',
-        sourceId: raw.sourceId,
+        sourceId: normalizeSourceId(raw.sourceId),
         mediaType: optionalString(raw.mediaType) ?? 'text/plain',
         title: raw.title,
         ...(filename ? { filename } : {}),

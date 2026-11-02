@@ -88,7 +88,7 @@ export interface ChatComposerProps {
   /** `@`-trigger callback forwarded to the input. */
   onMentionQueryChange?: (query: string | null) => void;
   /** Fires on every draft value change — threaded to `ChatInput.onValueChange`
-   *  so the host can keep `@type:id` mention tokens in sync with context chips. */
+   *  so the host can keep record links in sync with context chips. */
   onValueChange?: (value: string) => void;
   /** Non-destructive ghost preview shown in the empty composer (e.g. a hovered
    *  quick-action's full prompt). Forwarded to `ChatInput.previewText`. */

@@ -76,8 +76,8 @@ interface UploadUrlResponse {
 
 interface UseChatAttachmentsApi {
   attachments: StagedAttachment[];
-  /** All staged files in 'ready' state, projected to the wire
-   *  `ChatAttachment` shape — pass to `sendMessage`'s `pendingAttachments`. */
+  /** All staged files in 'ready' state, projected to the
+   *  `ChatAttachment` shape — pass to `sendMessage`'s `attachments`, each sent as a `file` part. */
   readyAttachments: ChatAttachment[];
   /** True iff any attachment is mid-upload — Send button reads this
    *  to disable itself. */

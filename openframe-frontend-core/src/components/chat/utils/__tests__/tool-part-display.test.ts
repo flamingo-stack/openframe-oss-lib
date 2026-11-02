@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatToolPart } from '../../../../chat-protocol/chat-message';
-import { APPROVAL_CANCELLED } from '../../../../chat-protocol/chat-message';
+import { applyChunkToMessages, createWireState } from '../../../../chat-protocol/apply-chunk';
+import type { ChatMessage, ChatToolPart } from '../../../../chat-protocol/chat-message';
+import { APPROVAL_CANCELLED, isToolPart } from '../../../../chat-protocol/chat-message';
+import { createOldFrameDecoder } from '../../../../chat-protocol/old-wire';
+import type { UiChunk } from '../../../../chat-protocol/ui-chunks';
 import {
   approvalBatchViewOf,
   approvalRequestDataOf,
@@ -130,6 +133,107 @@ describe('approvalBatchViewOf', () => {
     ]);
     expect(view.status).toBe('cancelled');
     expect(view.resolvedByName).toBe('Roman');
+  });
+});
+
+describe('a batch tells its rows apart by what each touches', () => {
+  const fields = (name: string, task: string) => [
+    { label: 'Task', value: task },
+    { label: 'Name', value: name },
+  ];
+  const toolRows = (chunks: readonly UiChunk[]): ChatToolPart[] => {
+    const wire = createWireState();
+    const messages = chunks.reduce<ChatMessage[]>((held, chunk) => applyChunkToMessages(held, chunk, wire), []);
+    return messages.flatMap(message => message.parts.filter(isToolPart));
+  };
+  const proposals = [
+    { proposalId: 'p1', toolName: 'delete_clickup_task', title: 'Delete task', fields: fields('Fix login', '86a') },
+    { proposalId: 'p2', toolName: 'delete_clickup_task', title: 'Delete task', fields: fields('Fix logout', '86b') },
+  ];
+
+  it('from an old hub`s batch frame, which sends no arguments', () => {
+    const decoder = createOldFrameDecoder();
+    const frame = `${JSON.stringify({ kind: 'approval_batch', batchId: 'batch:p1', proposals })}\0`;
+    const { toolCalls } = approvalBatchViewOf(
+      toolRows([...decoder.push(new TextEncoder().encode(frame)), ...decoder.end()]),
+    ).data;
+    expect(toolCalls.map(call => call.toolTitle)).toEqual(['Delete task: Fix login', 'Delete task: Fix logout']);
+    expect(toolCalls[0].toolCallArguments).toEqual({ Task: '86a', Name: 'Fix login' });
+  });
+
+  it('from the UI stream, its labelled fields over its raw input', () => {
+    const { toolCalls } = approvalBatchViewOf(
+      toolRows(
+        proposals.flatMap((proposal): UiChunk[] => [
+          {
+            type: 'tool-input-available',
+            toolCallId: proposal.proposalId,
+            toolName: proposal.toolName,
+            input: { task_id: proposal.proposalId },
+            dynamic: true,
+            title: proposal.title,
+          },
+          {
+            type: 'tool-approval-request',
+            approvalId: proposal.proposalId,
+            toolCallId: proposal.proposalId,
+            approvalDescriptor: { fields: proposal.fields, batchId: 'batch:p1' },
+          },
+        ]),
+      ),
+    ).data;
+    expect(toolCalls.map(call => call.toolTitle)).toEqual(['Delete task: Fix login', 'Delete task: Fix logout']);
+    expect(toolCalls[1].toolCallArguments).toEqual({ Task: '86b', Name: 'Fix logout' });
+  });
+
+  it('by a name first, a subject or a title, and its first field when it has none of them', () => {
+    const titleOf = (labelled: Array<{ label: string; value: string }>) =>
+      approvalBatchViewOf([
+        {
+          ...base,
+          title: 'Close',
+          state: 'approval-requested',
+          approval: { id: 'c1', descriptor: { fields: labelled } },
+        },
+      ]).data.toolCalls[0].toolTitle;
+    expect(
+      titleOf([
+        { label: 'Ticket', value: '48' },
+        { label: 'SUBJECT', value: 'Agent offline' },
+      ]),
+    ).toBe('Close: Agent offline');
+    expect(titleOf([{ label: 'Ticket', value: '48' }])).toBe('Close: 48');
+    expect(titleOf([{ label: '', value: 'nothing' }])).toBe('Close');
+  });
+
+  it('the tool`s name when the row has no title of its own', () => {
+    const [call] = approvalBatchViewOf([
+      {
+        ...base,
+        state: 'approval-requested',
+        approval: { id: 'c1', descriptor: { fields: [{ label: 'Name', value: 'Fix login' }] } },
+      },
+    ]).data.toolCalls;
+    expect(call.toolTitle).toBe('run_script: Fix login');
+  });
+
+  it('a row with no fields, as Mingo sends it, draws its own title and arguments', () => {
+    const [call] = approvalBatchViewOf([
+      { ...base, title: 'Run it', state: 'approval-requested', approval: gate('c1') },
+    ]).data.toolCalls;
+    expect(call.toolTitle).toBe('Run it');
+    expect(call.toolCallArguments).toEqual({ cmd: 'ls' });
+  });
+
+  it('a row keeps saying it once it has answered', () => {
+    const answered: ChatToolPart = {
+      ...base,
+      title: 'Delete task',
+      state: 'output-available',
+      output: {},
+      approval: { id: 'c1', approved: true, descriptor: { fields: fields('Fix login', '86a'), batchId } },
+    };
+    expect(approvalBatchViewOf([answered]).data.toolCalls[0].toolTitle).toBe('Delete task: Fix login');
   });
 });
 

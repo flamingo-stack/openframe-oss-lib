@@ -27,5 +27,3 @@ export * from './record-link';
 export * from './record-cards';
 // The `[N]` grammar: what a stream removes from a model's text.
 export * from './citation-chip';
-// The wire's fixtures, so the hub's conformance tests pin what this package pins.
-export * from './wire-fixtures';

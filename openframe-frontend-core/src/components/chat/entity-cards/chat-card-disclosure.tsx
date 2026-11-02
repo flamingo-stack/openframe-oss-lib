@@ -65,7 +65,7 @@ interface ChatCardDisclosureSpec {
   icon: React.ComponentType<{ className?: string }>;
   /** This kind's content on a fetched record, as the ref its `render` draws; null when the record has none. */
   fromItem: (item: ChatCardDisclosureSource | undefined, chatRef: ChatRef) => ChatRef | null;
-  /** The content, for the ref `fromItem` produced (or a ref that describes it on its own, e.g. a video marker). */
+  /** The content, for the ref `fromItem` produced (or a ref that describes it on its own, e.g. a video's record URI). */
   render: (chatRef: ChatRef) => ReactNode;
 }
 

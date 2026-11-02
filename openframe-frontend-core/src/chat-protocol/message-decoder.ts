@@ -38,7 +38,7 @@ import {
   oldStoredRowToParts,
   oldVideoParts,
 } from './old-wire';
-import { normalizeRecordUris, parseRecordHref } from './record-link';
+import { normalizeRecordUris, normalizeSourceId, parseRecordHref } from './record-link';
 import { createUiChunkDecoder, drainChunks, type ChatStreamEntry, type UiChunk } from './ui-chunks';
 import { isRecord } from './wire-narrow';
 
@@ -154,8 +154,9 @@ function askOptionsOf(raw: unknown): Array<{ label: string; description?: string
 
 /** A source row in the new names, or null when it is in the old ones. GraphQL answers an unset field with null. */
 function newSourcePart(row: Record<string, unknown>): ChatSourcePart | null {
-  const sourceId = nonEmpty(row.sourceId);
-  if (!sourceId) return null;
+  const named = nonEmpty(row.sourceId);
+  if (!named) return null;
+  const sourceId = normalizeSourceId(named);
   const title = nonEmpty(row.title);
   const url = nonEmpty(row.url);
   if (url && row.type !== 'source-document') {
@@ -218,8 +219,10 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       const part = newSourcePart(row);
       if (part) parts.push(part);
     }
-    // TODO(CU-17tkuw61kfy): a row in the old names, and the old video rows.
+    // TODO(CU-17tkuw61kfy): a row in the old names, and the old video rows. An old row read through the tenant's normaliser
+    // answers its sources in the new names and its text as it was, so its `[card://t:i]` takes its name from these too.
     parts.push(...sources.register(rows.filter(row => !nonEmpty(row.sourceId))), ...oldVideoParts(data.videos));
+    sources.remember(parts);
     return parts;
   }
 

@@ -72,6 +72,12 @@ export function normalizeRecordUri(href: unknown): string | null {
   return collection ? collectionHref(collection.type) : null;
 }
 
+/** A source's id in its one spelling: what every reader of a source or a citation keys on. Anything but a record URI (the
+ *  standard's id is any string) stays as it came. */
+export function normalizeSourceId(id: string): string {
+  return normalizeRecordUri(id) ?? id;
+}
+
 /** The record an href names, or null when it is not a record href. The id is decoded; an id the model left unencoded
  *  (`docs/setup.md`) reads the same, because the type ends at the FIRST slash. */
 export function parseRecordHref(href: unknown): RecordLink | null {

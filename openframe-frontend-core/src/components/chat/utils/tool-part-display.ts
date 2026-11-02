@@ -20,6 +20,7 @@ import type {
   ApprovalBatchData,
   ApprovalBatchExecutionState,
   ApprovalRequestData,
+  PendingToolCallData,
   ToolExecutionData,
 } from '../types/message.types';
 import { approvalDisplaysInline } from './approval-display';
@@ -140,6 +141,35 @@ export interface ApprovalBatchView {
   resolvedByName?: string | null;
 }
 
+/** The field a person knows a record by. A label for an id ("Task", "Ticket") names a row only when there is no other. */
+const RECORD_NAME_FIELD = /^(title|subject|name)$/i;
+
+/**
+ * One row of a batch's card. A batch usually runs one tool ("Delete task" twice), so what tells its rows apart is the
+ * record each touches, from the fields the server wrote for the card: the row's title says it, and expanding the row
+ * shows those fields. A row with no fields (Mingo's) draws its own title and arguments.
+ */
+function batchRowOf(part: ChatToolPart): PendingToolCallData {
+  const approval = 'approval' in part ? part.approval : undefined;
+  const fields = (approval?.descriptor?.fields ?? []).filter(field => field.label && field.value);
+  const name = fields.find(field => RECORD_NAME_FIELD.test(field.label)) ?? fields[0];
+  const title = name ? `${part.title ?? part.toolName}: ${name.value}` : part.title;
+  const explanation = part.toolMetadata?.toolExplanation ?? approval?.requestReason;
+  return {
+    toolExecutionRequestId: part.toolCallId,
+    toolName: part.toolName,
+    requiresApproval: !!approval,
+    approvalType: approval?.descriptor?.approvalType ?? null,
+    toolCallArguments:
+      fields.length > 0
+        ? Object.fromEntries(fields.map(field => [field.label, field.value]))
+        : (argsOf(part.input) ?? null),
+    ...(title !== undefined ? { toolTitle: title } : {}),
+    ...(explanation !== undefined ? { toolExplanation: explanation } : {}),
+    ...(part.toolMetadata?.integratedToolType !== undefined ? { toolType: part.toolMetadata.integratedToolType } : {}),
+  };
+}
+
 /** The one card a run of parts with one `batchId` draws. Its status is its gates': a row with none follows them. */
 export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBatchView {
   const statuses = parts.flatMap(part => {
@@ -166,22 +196,7 @@ export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBat
       approvalRequestId: approvalBatchIdOf(parts[0]) ?? parts[0].toolCallId,
       approvalType: descriptor?.approvalType ?? '',
       executions,
-      toolCalls: parts.map(part => {
-        const approval = 'approval' in part ? part.approval : undefined;
-        const explanation = part.toolMetadata?.toolExplanation ?? approval?.requestReason;
-        return {
-          toolExecutionRequestId: part.toolCallId,
-          toolName: part.toolName,
-          requiresApproval: !!approval,
-          approvalType: approval?.descriptor?.approvalType ?? null,
-          toolCallArguments: argsOf(part.input) ?? null,
-          ...(part.title !== undefined ? { toolTitle: part.title } : {}),
-          ...(explanation !== undefined ? { toolExplanation: explanation } : {}),
-          ...(part.toolMetadata?.integratedToolType !== undefined
-            ? { toolType: part.toolMetadata.integratedToolType }
-            : {}),
-        };
-      }),
+      toolCalls: parts.map(batchRowOf),
     },
   };
 }

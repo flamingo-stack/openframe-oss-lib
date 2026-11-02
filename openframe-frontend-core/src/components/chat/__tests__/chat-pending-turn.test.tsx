@@ -275,7 +275,7 @@ describe('a single card that was approved, while its tool runs', () => {
     expect(screen.queryAllByRole('status')).toHaveLength(0);
   });
 
-  it('not once the tool has answered', () => {
+  describe('once the tool has answered, and the turn goes on', () => {
     const done: ChatPart = {
       type: 'dynamic-tool',
       toolName: 'update_ticket',
@@ -285,8 +285,34 @@ describe('a single card that was approved, while its tool runs', () => {
       output: {},
       approval: { id: 'p1', approved: true },
     };
-    render(<ChatMessageList dialogId="d" messages={answered([done])} isTyping />);
-    expect(screen.queryAllByRole('status')).toHaveLength(0);
+
+    it('the footer says so: no row does until what follows comes', () => {
+      render(<ChatMessageList dialogId="d" messages={answered([done])} isTyping />);
+      expect(screen.queryAllByRole('status')).toHaveLength(1);
+    });
+
+    it('a tool that failed leaves the same gap', () => {
+      const failed: ChatPart = {
+        type: 'dynamic-tool',
+        toolName: 'update_ticket',
+        toolCallId: 'p1',
+        state: 'output-error',
+        input: {},
+        errorText: 'No.',
+      };
+      render(<ChatMessageList dialogId="d" messages={answered([failed])} isTyping />);
+      expect(screen.queryAllByRole('status')).toHaveLength(1);
+    });
+
+    it('not once the turn is over', () => {
+      render(<ChatMessageList dialogId="d" messages={answered([done])} />);
+      expect(screen.queryAllByRole('status')).toHaveLength(0);
+    });
+
+    it('not once text follows it', () => {
+      render(<ChatMessageList dialogId="d" messages={answered([done, { type: 'text', text: 'Closed.' }])} isTyping />);
+      expect(screen.queryAllByRole('status')).toHaveLength(0);
+    });
   });
 });
 

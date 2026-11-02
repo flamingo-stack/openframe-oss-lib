@@ -139,17 +139,14 @@ function holdsOnlyCardsOfAnotherTier(
 }
 
 /**
- * A single card that was approved, and its tool has not answered yet. Unlike a batch's row it has no icon of its own, and
- * the turn's stage rows sit at the top of the message, above the card, so nothing else says the turn is working.
+ * The last part of a turn still working, when it does not say so. A single card that was approved and whose tool has not
+ * answered: unlike a batch's row it has no icon of its own, and the turn's stage rows sit at the top of the message, above
+ * the card. A tool that has answered: its row is done, and what follows it has not come yet.
  */
-function isCardAwaitingItsOutcome(part: ChatPart | undefined): boolean {
-  return (
-    !!part &&
-    isToolPart(part) &&
-    part.state === 'approval-responded' &&
-    part.approval.approved &&
-    approvalBatchIdOf(part) === undefined
-  );
+function leavesTurnUnsaid(part: ChatPart | undefined): boolean {
+  if (!part || !isToolPart(part)) return false;
+  if (part.state === 'output-available' || part.state === 'output-error' || part.state === 'output-denied') return true;
+  return part.state === 'approval-responded' && part.approval.approved && approvalBatchIdOf(part) === undefined;
 }
 
 /** Async-growth watcher installed by the top-anchor effect for the 2s
@@ -778,7 +775,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     }, [messages, dialogId, scrollRef]);
 
     // ---- Per-message scrollAnchor (server-driven) --------------------
-    // Server emits `scrollAnchor: 'top'` on the metadata leading frame
+    // Server emits `scrollAnchor: 'top'` on the `message-metadata` chunk
     // for display-action answers; default tail behaviour is preserved
     // for every other path that omits the field.
     //
@@ -807,7 +804,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // Lazy-init: seed ONLY messages whose content is populated. Persisted
     // reload has full bodies → all ids seeded → no scroll-replay on cold
     // paint. A fresh turn's empty assistant placeholder (appended by
-    // useChat before streaming) is intentionally excluded so the top-
+    // the adapter before streaming) is intentionally excluded so the top-
     // anchor effect can fire when its body lands.
     const scrolledIdsRef = useRef<Set<string> | null>(null);
     if (scrolledIdsRef.current === null) {
@@ -826,7 +823,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       if (overlayOpenRef.current) return;
       const last = messages[messages.length - 1];
       if (!last || last.role !== 'assistant' || last.metadata?.scrollAnchor !== SCROLL_ANCHOR.TOP) return;
-      // Metadata frame arrives BEFORE body. Wait for content so we don't
+      // Message metadata arrives BEFORE body. Wait for content so we don't
       // snap an empty bubble and burn the one-shot.
       if (!hasVisibleText(last.parts)) return;
       // Seeded during render above, so this is never null by the time a layout
@@ -1006,9 +1003,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // stays put while messages stream and grow — no jitter from the
     // last-message height changing under it.
     //
-    // Shown only while the turn has drawn nothing of its own: once its first
-    // row lands (a stage, a tool, thinking or text), that row says what the
-    // turn is doing, and a second indicator under it only repeats it.
+    // Shown only while the turn has drawn nothing that says it is working:
+    // once a row lands (a stage, a running tool, thinking or text), that row
+    // says what the turn is doing, and a second indicator under it only
+    // repeats it. A tool that has answered says nothing of the kind.
     // Hidden too when the agent is PAUSED waiting on the user: the
     // last message's last part is a pending approval (inline), or
     // there are escalated pending approvals shown in the sticky bar.
@@ -1022,7 +1020,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     const turnHasDrawn = lastMessage?.role === 'assistant' && !hasDrawnNothing(lastMessage);
     const showStreamingLoader =
       isTyping &&
-      (!turnHasDrawn || isCardAwaitingItsOutcome(lastPart)) &&
+      (!turnHasDrawn || leavesTurnUnsaid(lastPart)) &&
       !isPausedOnApproval &&
       !(pendingApprovals && pendingApprovals.length > 0);
 

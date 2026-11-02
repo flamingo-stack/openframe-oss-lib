@@ -104,6 +104,8 @@ interface NumberedSource {
 interface OldSourceIndex {
   /** The parts of these rows, recording their numbers. The first row to claim a number keeps it. */
   register(rows: unknown): ChatSourcePart[];
+  /** Parts that reached the message another way: what they call a record names its tokens too. */
+  remember(parts: readonly ChatSourcePart[]): void;
   numbered(number: number): NumberedSource | undefined;
   /** The title a source part gave this record. */
   labelOf(uri: string): string | undefined;
@@ -113,7 +115,7 @@ export function createOldSourceIndex(): OldSourceIndex {
   const numbers = new Map<number, NumberedSource>();
   const labels = new Map<string, string>();
 
-  function remember(part: ChatSourcePart): void {
+  function rememberLabel(part: ChatSourcePart): void {
     if (part.title && !labels.has(part.sourceId)) labels.set(part.sourceId, part.title);
   }
 
@@ -124,7 +126,7 @@ export function createOldSourceIndex(): OldSourceIndex {
       for (const row of rows.filter(isRecord)) {
         const items = Array.isArray(row.items) ? row.items.filter(isRecord) : [];
         const rowParts = (items.length > 0 ? items : [row]).flatMap(item => oldSourcePart(item) ?? []);
-        rowParts.forEach(remember);
+        rowParts.forEach(rememberLabel);
         parts.push(...rowParts);
         const { index } = row;
         if (typeof index !== 'number' || numbers.has(index) || rowParts.length === 0) continue;
@@ -145,6 +147,7 @@ export function createOldSourceIndex(): OldSourceIndex {
       }
       return parts;
     },
+    remember: parts => parts.forEach(rememberLabel),
     numbered: number => numbers.get(number),
     labelOf: uri => labels.get(uri),
   };

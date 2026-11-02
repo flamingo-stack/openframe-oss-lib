@@ -17,6 +17,7 @@ import {
   type UIMessageChunk,
 } from 'ai';
 import { describe, expect, it } from 'vitest';
+import { parseWireCommandOverride } from '../../components/chat/utils/slash-dispatch-utils';
 import { applyChunk, applyChunkToMessages, createWireState } from '../apply-chunk';
 import {
   approvalStatusOf,
@@ -234,6 +235,10 @@ describe('validateUIMessages', () => {
 
   it('accepts the chat request', async () => {
     await expect(validate(CHAT_REQUEST_BODY.messages)).resolves.toEqual(CHAT_REQUEST_BODY.messages);
+  });
+
+  it('the chat request`s extra field is one a server takes', () => {
+    expect(parseWireCommandOverride(CHAT_REQUEST_BODY.commandOverride)).toEqual(CHAT_REQUEST_BODY.commandOverride);
   });
 
   it('accepts the approval request', async () => {

@@ -136,6 +136,8 @@ export interface ComposedContentUrl {
    *
    * Optional and absent by default, so a hand-written composer (the hub's
    * cross-platform one) keeps the pre-existing "row url wins" behavior.
+   *
+   * TODO(CU-17tkuw61kfy): only `pickFetchedCardHref` reads it, for an old hub's rows; it goes at the cleanup.
    */
   hostOverride?: boolean;
 }
@@ -264,7 +266,7 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
     const origin = owner ? getPlatformProductionUrl(owner) : opts.contentOrigin;
     // The hub's public detail routes are SLUG-based, so the `slug` hint wins
     // over `identifier` here too — a Mingo fetch-mode card knows the row's slug
-    // but its `identifier` is the marker's primary key, which would 404.
+    // but its `identifier` is the record's primary key, which would 404.
     return {
       href: `${origin.replace(/\/+$/, '')}/${seg}/${slugHint?.trim() || identifier}`,
       // Report the owner so `decideNewTab` can compare it against the current

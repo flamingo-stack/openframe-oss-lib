@@ -49,6 +49,41 @@ const userRow = (id: string, createdAt: string): HistoricalMessage => ({
 
 const sourcesOf = (message: ChatMessage) => message.parts.filter(isSourcePart);
 
+describe('processHistoricalMessages — an old token names its record by its source', () => {
+  const OLD_NAMES = {
+    index: 1,
+    name: SOURCE.title,
+    documentType: 'onboarding_guide',
+    id: '88dd40cc',
+    externalUrl: SOURCE.url,
+  };
+  const text = 'See [card://onboarding_guide:88dd40cc] for details.';
+  const named = `See [${SOURCE.title}](record://onboarding_guide/88dd40cc) for details.`;
+
+  it('a source in the old names', () => {
+    const { messages } = processHistoricalMessages([
+      metadataRow('m', '2026-01-01T00:00:00Z', [OLD_NAMES]),
+      answerRow('a', '2026-01-01T00:00:01Z', text),
+    ]);
+    expect(textOfParts(messages[0].parts)).toBe(named);
+  });
+
+  it('a source in the new names, which is what the tenant`s read normaliser answers', () => {
+    const { messages } = processHistoricalMessages([
+      metadataRow('m', '2026-01-01T00:00:00Z', [SOURCE_PART]),
+      answerRow('a', '2026-01-01T00:00:01Z', text),
+    ]);
+    expect(textOfParts(messages[0].parts)).toBe(named);
+  });
+
+  it('a record no source names keeps its id, for its chip to name', () => {
+    const { messages } = processHistoricalMessages([
+      answerRow('a', '2026-01-01T00:00:01Z', 'Done [card://internal_task:86ak] now.'),
+    ]);
+    expect(textOfParts(messages[0].parts)).toBe('Done [86ak](record://internal_task/86ak) now.');
+  });
+});
+
 describe('processHistoricalMessages — source metadata', () => {
   it('attaches a metadata row to the answer it precedes', () => {
     const { messages } = processHistoricalMessages([

@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { applyChunk, applyChunkToMessages, createWireState } from '../apply-chunk';
 import {
   approvalStatusOf,
+  isSourcePart,
   storablePartsOf,
   textOfParts,
   type ChatCitation,
@@ -14,6 +15,7 @@ import {
   type ChatPart,
   type ChatToolPart,
 } from '../chat-message';
+import { citationNumbers } from '../citations';
 import type { UiChunk } from '../ui-chunks';
 import { createUiMessageWriter } from '../ui-writer';
 import {
@@ -117,6 +119,61 @@ describe('text', () => {
         { type: 'text-end', id: 't1' },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('a record URI enters in its one spelling', () => {
+  const unencoded = 'record://markdown/docs/a.md';
+  const canonical = 'record://markdown/docs%2Fa.md';
+
+  it('two spellings of a record are one source part, and a citation names it', () => {
+    const parts = accumulate([
+      { type: 'source-url', sourceId: unencoded, url: 'https://a.test', title: 'A' },
+      { type: 'source-url', sourceId: canonical, url: 'https://a.test', title: 'Second' },
+      { type: 'text-start', id: 't1' },
+      { type: 'text-delta', id: 't1', delta: 'Cited.' },
+      {
+        type: 'text-end',
+        id: 't1',
+        citations: [
+          { source: { type: 'source', sourceType: 'url', id: unencoded, url: 'https://a.test' }, endIndex: 6 },
+        ],
+      },
+    ]);
+    expect(parts.filter(isSourcePart).map(part => part.sourceId)).toEqual([canonical]);
+    expect([...citationNumbers(parts).keys()]).toEqual([canonical]);
+    expect(storablePartsOf(parts).filter(isSourcePart)).toHaveLength(1);
+  });
+
+  it('a citation whose source the message lacks adds it, in that spelling', () => {
+    const parts = accumulate([
+      { type: 'text-start', id: 't1' },
+      { type: 'text-delta', id: 't1', delta: 'Cited.' },
+      {
+        type: 'text-end',
+        id: 't1',
+        citations: [
+          {
+            source: { type: 'source', sourceType: 'document', id: unencoded, mediaType: 'text/plain', title: 'A' },
+            endIndex: 6,
+          },
+        ],
+      },
+    ]);
+    expect(parts.filter(isSourcePart).map(part => part.sourceId)).toEqual([canonical]);
+  });
+
+  it('a source id that is no record URI stays as it came', () => {
+    expect(accumulate([{ type: 'source-url', sourceId: 's-1', url: 'https://a.test' }])).toEqual([
+      { type: 'source-url', sourceId: 's-1', url: 'https://a.test' },
+    ]);
+  });
+
+  it('a card too, and what names no record is no card', () => {
+    expect(
+      accumulate([{ type: 'data-record-cards', data: { records: [unencoded, canonical, 'record://markdown'] } }]),
+    ).toEqual([{ type: 'data-record-cards', data: { records: [canonical] } }]);
+    expect(accumulate([{ type: 'data-record-cards', data: { records: ['record://markdown'] } }])).toEqual([]);
   });
 });
 

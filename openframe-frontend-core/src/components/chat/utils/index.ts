@@ -71,7 +71,7 @@ export { decideNewTab, type DecideNewTabInput, type RuntimeMode } from './decide
 // `@flamingo-stack/openframe-frontend-core/utils`.
 
 // Pure content helpers
-export { SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from './scroll-anchor';
+export { SCROLL_ANCHOR_WIRE_KEY } from './scroll-anchor';
 export { SCROLL_ANCHOR, type ScrollAnchor } from '../types/message.types';
 export {
   AUTO_CONTINUATION_DIRECTIVE_PREFIX,

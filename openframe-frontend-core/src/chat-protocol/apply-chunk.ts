@@ -8,6 +8,8 @@
  *     chunk that carries them; in the parts the text stays one part.
  *   - A source chunk inserts at the head of the body, unique by `sourceId`. A reasoning chunk goes before the first
  *     text part. Neither ever splits text.
+ *   - A record URI enters in its one spelling (a source, a citation's source, a card), so everything that later compares
+ *     two of them compares strings.
  *   - A `data-*` chunk with an existing `id` replaces (its fields over the part's: a resolution names no text). A
  *     transient one goes to the handler.
  *   - A `tool-*` chunk whose call the parts do not hold is ignored, and a tool part never moves back from a later state
@@ -42,6 +44,7 @@ import {
   type ChatToolMetadata,
   type ChatToolPart,
 } from './chat-message';
+import { normalizeRecordUris, normalizeSourceId } from './record-link';
 import type { ChatProgressChunk, UiChunk, UiDataPartChunk, UiTransientChunk } from './ui-chunks';
 import { isRecord } from './wire-narrow';
 
@@ -139,15 +142,21 @@ function closeStreaming(parts: ChatPart[]): ChatPart[] {
 // =============================================================================
 
 function insertSource(parts: ChatPart[], source: ChatSourcePart): ChatPart[] {
-  if (parts.some(part => isSourcePart(part) && part.sourceId === source.sourceId)) return parts;
+  const sourceId = normalizeSourceId(source.sourceId);
+  if (parts.some(part => isSourcePart(part) && part.sourceId === sourceId)) return parts;
   const firstBody = parts.findIndex(part => !isSourcePart(part));
-  return insertAt(parts, firstBody === -1 ? parts.length : firstBody, source);
+  return insertAt(parts, firstBody === -1 ? parts.length : firstBody, { ...source, sourceId });
+}
+
+function withNormalizedSource(citation: ChatCitation): ChatCitation {
+  const id = normalizeSourceId(citation.source.id);
+  return id === citation.source.id ? citation : { ...citation, source: { ...citation.source, id } };
 }
 
 /** Citations on a wire part, as offsets into the stored part. One past the part's end is dropped: its range is a lie. */
 function rebasedCitations(citations: readonly ChatCitation[], offset: number, length: number): ChatCitation[] {
   return citations
-    .map(citation => rebaseCitation(citation, offset))
+    .map(citation => rebaseCitation(withNormalizedSource(citation), offset))
     .filter(citation => (citation.startIndex ?? 0) <= length && (citation.endIndex ?? 0) <= length);
 }
 
@@ -264,7 +273,11 @@ function openCompactionIndex(parts: readonly ChatPart[]): number {
   return -1;
 }
 
-function applyData(parts: ChatPart[], chunk: UiDataPartChunk): ChatPart[] {
+function applyData(parts: ChatPart[], received: UiDataPartChunk): ChatPart[] {
+  const chunk =
+    received.type === 'data-record-cards'
+      ? { ...received, data: { records: normalizeRecordUris(received.data.records) } }
+      : received;
   if (chunk.type === 'data-record-cards' && chunk.data.records.length === 0) return parts;
   // A completion finds the row its start drew, whoever decoded that start: a hydrated one has another id.
   if (chunk.type === 'data-context-compaction' && chunk.data.status === 'completed') {

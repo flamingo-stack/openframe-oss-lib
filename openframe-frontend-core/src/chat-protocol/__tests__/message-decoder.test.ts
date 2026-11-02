@@ -1116,6 +1116,16 @@ describe('createMingoDecoder: the table', () => {
     ]);
   });
 
+  it('a source row in the new names enters in its one spelling', () => {
+    const { chunks } = createMingoDecoder().decode({
+      type: 'ATTACHMENTS',
+      sources: [{ type: 'source-url', sourceId: 'record://markdown/docs/a.md', url: 'https://a.test', title: 'A' }],
+    });
+    expect(chunks).toEqual([
+      { type: 'source-url', sourceId: 'record://markdown/docs%2Fa.md', url: 'https://a.test', title: 'A' },
+    ]);
+  });
+
   describe('a tool row with no run id', () => {
     const executing = (title: string): unknown => ({
       type: 'EXECUTING_TOOL',

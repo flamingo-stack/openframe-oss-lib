@@ -44,8 +44,8 @@ export type MessageType = (typeof MESSAGE_TYPE)[keyof typeof MESSAGE_TYPE];
 
 // ========== Scroll Anchor (per-message render hint) ==========
 
-/** Per-message viewport-positioning hint sent on the per-turn metadata
- *  leading frame at the START of every assistant response. The chat
+/** Per-message viewport-positioning hint sent on the per-turn
+ *  `message-metadata` chunk at the START of every assistant response. The chat
  *  message-list reads it to override the default `use-stick-to-bottom`
  *  tail behaviour for a single message. Field is OPTIONAL — when omitted
  *  (or set to `'bottom'`) the chat tails as today. Only `'top'` opts in

@@ -164,6 +164,44 @@ describe('ChatMessageEnhanced — a record chip opens its record', () => {
   });
 });
 
+describe('ChatMessageEnhanced — a chip that knows only its id', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const runtime = {
+    endpoints: { chatStreamUrl: '/chat', buildListUrl: (type: string, ids: string[]) => `/api/${type}?ids=${ids}` },
+    navigation: { mode: 'host', navigate: vi.fn().mockReturnValue(true) },
+    source: 'flamingo',
+    composeContentUrl: ({ slug }: { slug?: string | null }) => ({ href: `/onboarding-guides/${slug}` }),
+  } as unknown as ChatRuntime;
+  const answer = (text: string) => (
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <ChatRuntimeContext.Provider value={runtime}>
+        <ChatMessageEnhanced role="assistant" parts={[{ type: 'text', text }]} NavLinkAnchor={NavLinkAnchor} />
+      </ChatRuntimeContext.Provider>
+    </QueryClientProvider>
+  );
+  const answersRow = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ items: [{ id: 'mac-guide', slug: 'mac', title: 'Install on a Mac' }] })),
+        ),
+      ),
+    );
+
+  it('shows the name its row answers', async () => {
+    answersRow();
+    render(answer('See [mac-guide](record://onboarding_guide/mac-guide) now.'));
+    expect(await screen.findByRole('link', { name: 'Install on a Mac' })).toBeTruthy();
+  });
+
+  it('a name the answer gave stays', async () => {
+    answersRow();
+    render(answer('See [Mac guide](record://onboarding_guide/mac-guide) now.'));
+    expect(await screen.findByRole('link', { name: 'Mac guide' })).toBeTruthy();
+  });
+});
+
 describe('ChatMessageEnhanced — a chip shows its whole name', () => {
   it('draws a long name whole, in a box that wraps with its line', () => {
     const name = 'Install the OpenFrame Agent on macOS with Homebrew and confirm it reports in';
@@ -210,7 +248,22 @@ describe('ChatMessageEnhanced — citations', () => {
     expect(chip.parentElement?.textContent).toBe('Priced per device. [1] Second sentence.');
   });
 
-  it('draws a plain number for a source with no url, and outside a chat runtime', () => {
+  it('draws the same chip while the message is still streaming', () => {
+    render(
+      <ChatRuntimeContext.Provider value={runtime}>
+        <ChatMessageEnhanced role="assistant" parts={[source, citedText()]} NavLinkAnchor={NavLinkAnchor} isTyping />
+      </ChatRuntimeContext.Provider>,
+    );
+    expect(screen.getByRole('link', { name: '[1]' }).getAttribute('href')).toBe(source.url);
+  });
+
+  it('draws a plain number outside a chat runtime: nothing to route it through', () => {
+    render(<ChatMessageEnhanced role="assistant" parts={[source, citedText()]} NavLinkAnchor={NavLinkAnchor} />);
+    expect(screen.queryByRole('link', { name: '[1]' })).toBeNull();
+    expect(screen.getByText('[1]').tagName).toBe('SPAN');
+  });
+
+  it('draws a plain number for a source with no url', () => {
     const collection = {
       type: 'source-document' as const,
       sourceId: 'record://blog_post',

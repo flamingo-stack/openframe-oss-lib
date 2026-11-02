@@ -2,8 +2,8 @@
 
 /**
  * useSseChatAdapter: the SSE/Guide-mode transport adapter for the unified chat surface. One of two `UnifiedChatState`
- * implementations; its NATS counterpart is `useNatsChatAdapter` (Mingo mode). The public `useChat({ mode })` dispatches
- * between them based on `mode.transport`.
+ * implementations; its NATS counterpart is `useNatsChatAdapter` (Mingo mode). The public `useUnifiedChat` dispatches
+ * between them based on the mode's `transport`.
  *
  * The adapter owns no parser and no message merge. Raw response bytes flow
  *
@@ -162,11 +162,11 @@ function isWireRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/** The trailing usage's `breakdown` is an OPAQUE wire blob; these readers hand back values that match
+/** The `breakdown` on the `finish` chunk's usage is an OPAQUE wire blob; these readers hand back values that match
  *  `UnifiedUsageBreakdown`. */
 function readTokenPair(value: unknown): { input: number; output: number } | undefined {
   if (!isWireRecord(value) || typeof value.input !== 'number') return undefined;
-  // A frame that omitted `output` must not put `undefined` into a `number` field and NaN any downstream sum.
+  // A pair that omitted `output` must not put `undefined` into a `number` field and NaN any downstream sum.
   return { input: value.input, output: typeof value.output === 'number' ? value.output : 0 };
 }
 
@@ -917,12 +917,12 @@ export function useSseChatAdapter(
     currentContextWindowMaxTokens: state.liveModel?.contextWindowMaxTokens ?? null,
     /** Input tokens (known after the stream's first usage; null until). */
     currentInputTokens: usage?.inputTokens ?? null,
-    /** Output tokens (known only after the turn's trailing usage). */
+    /** Output tokens (known only after the `finish` chunk's usage). */
     currentOutputTokens: usage?.outputTokens ?? null,
     /** Cache hit % (read / total-input × 100). null during streaming. */
     currentCacheHitRatePct: usage?.hit_rate_pct ?? null,
     /** Cross-call usage breakdown (Haiku rewriter/classifier/summarizer
-     *  token counts). null until the trailing usage lands. */
+     *  token counts). null until the `finish` chunk's usage lands. */
     currentUsageBreakdown: usageBreakdown,
     // ─── Dialog management ───────────────────────────────────────────────
     // With `chatConversationsUrl` the server transcript store IS the dialog

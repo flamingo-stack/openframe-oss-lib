@@ -288,7 +288,7 @@ export {
   buildAutoContinuationDirective,
   type BuildAutoContinuationOptions,
 } from '../components/chat/utils/auto-continuation-directive';
-export { SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from '../components/chat/utils/scroll-anchor';
+export { SCROLL_ANCHOR_WIRE_KEY } from '../components/chat/utils/scroll-anchor';
 export { SCROLL_ANCHOR, type ScrollAnchor } from '../components/chat/types/message.types';
 export {
   type WireCommandOverride,

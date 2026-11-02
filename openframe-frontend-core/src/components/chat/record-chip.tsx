@@ -47,7 +47,8 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
   return (
     <InlineChip
       icon={iconFor(type)}
-      label={label}
+      // A link that knows no name but the id (an old receipt's token) shows the name its row answers.
+      label={finalChatRef.title || label}
       link={
         url
           ? (content, anchor) => (
