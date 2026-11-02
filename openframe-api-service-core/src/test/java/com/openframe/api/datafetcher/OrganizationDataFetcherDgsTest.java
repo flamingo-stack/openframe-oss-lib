@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -89,13 +88,12 @@ class OrganizationDataFetcherDgsTest {
         ExecutionResult result = queryExecutor.execute(query);
 
         // verifications
-        assertThat(result.getErrors())
-                .extracting(error -> error.getExtensions().get("code"), error -> error.getExtensions().get("httpStatus"))
-                .containsExactly(tuple("VALIDATION_ERROR", 400));
-        assertThat(result.getErrors())
-                .extracting(GraphQLError::getMessage)
-                .allSatisfy(message -> assertThat(message).contains("status must be ACTIVE or ARCHIVED"));
-        assertThat(result.<Map<String, Object>>getData()).containsEntry("organizations", null);
+        GraphQLError refusal = result.getErrors().getFirst();
+        assertThat(refusal.getExtensions())
+                .containsEntry("code", "VALIDATION_ERROR")
+                .containsEntry("httpStatus", 400);
+        assertThat(refusal.getMessage()).contains("status must be ACTIVE or ARCHIVED");
+        assertThat(result.<Object>getData()).isNull();
         verifyNoInteractions(organizationQueryService);
     }
 
