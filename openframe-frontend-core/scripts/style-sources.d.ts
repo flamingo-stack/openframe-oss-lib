@@ -13,3 +13,6 @@ export function appStyleSources(options: AppStyleSourcesOptions): string[];
 
 /** The root sheet's Tailwind config: no utilities under `next-styles build` (each route brings its own). */
 export function withRouteStylesTailwind<T extends object>(config: T): T;
+
+/** Where a config wrapped by {@link withRouteStylesTailwind} keeps the app's own (the complete sheet's). */
+export const APP_TAILWIND_CONFIG: unique symbol;
