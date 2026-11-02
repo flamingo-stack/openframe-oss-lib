@@ -64,8 +64,7 @@ function createState(): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
   };
@@ -116,7 +115,14 @@ describe('EmbeddableChat inline shell', () => {
 
   it('v2: the v2 header over a conversation', () => {
     const state = createState();
-    state.messages = [{ id: 'm-1', role: 'user', content: 'hello', timestamp: new Date('2026-01-01T00:00:00Z') }];
+    state.messages = [
+      {
+        id: 'm-1',
+        role: 'user',
+        metadata: { createdAt: new Date('2026-01-01T00:00:00Z').toISOString() },
+        parts: [{ type: 'text', text: 'hello' }],
+      },
+    ];
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <ChatRuntimeContext.Provider value={runtime}>

@@ -16,6 +16,7 @@ import { RecordNavWrap, recordMenuActions, recordMenuGroups, useRecordDestinatio
 import { InlineChip } from './inline-chip';
 import { RecordChipMenu, useRecordActions } from './record-actions';
 import { resolveIcon } from './utils/icon-library';
+import { newTabAnchorAttrs } from './utils/nav-anchor-props';
 
 function iconFor(type: string) {
   const tableId = defaultTableIdForDocumentType(type);
@@ -63,7 +64,7 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
                   aria-hidden={anchor.hidden || undefined}
                   tabIndex={anchor.hidden ? -1 : undefined}
                   className="text-inherit no-underline"
-                  {...(isNewTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                  {...newTabAnchorAttrs(isNewTab, url, finalChatRef.targetPlatform)}
                 >
                   {content}
                 </Link>

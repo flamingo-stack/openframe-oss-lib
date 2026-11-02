@@ -15,10 +15,11 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
   embedAuthedFetch: vi.fn(() => new Promise(() => {})),
 }));
 
+import type { ChatMessage } from '../../../chat-protocol/chat-message';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
 import type { DialogItem } from '../types/component.types';
-import type { UnifiedChatMessage, UnifiedChatState } from '../types/unified-chat-state.types';
+import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   source: 'openframe',
@@ -37,7 +38,9 @@ const runtime: ChatRuntime = {
 const READ_ONLY_BANNER = 'Unarchive the chat to continue';
 
 /** The history a reloaded conversation comes back with. */
-const HISTORY: UnifiedChatMessage[] = [{ id: 'm-1', role: 'user', content: 'How do I install the agent?' }];
+const HISTORY: ChatMessage[] = [
+  { id: 'm-1', role: 'user', parts: [{ type: 'text', text: 'How do I install the agent?' }] },
+];
 
 /**
  * A host whose open conversation came from a link: it is NOT in `dialogs`, and
@@ -53,7 +56,7 @@ function Host({
 }: {
   activeDialogId: string;
   activeDialog: DialogItem;
-  messages?: UnifiedChatMessage[];
+  messages?: ChatMessage[];
   onUnarchive?: (id: string) => void;
 }) {
   const [record, setRecord] = useState(activeDialog);
@@ -91,8 +94,7 @@ function Host({
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
     dialogCapabilities: {

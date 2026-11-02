@@ -65,8 +65,7 @@ function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
     ...overrides,
@@ -74,8 +73,18 @@ function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
 }
 
 const THREAD: UnifiedChatState['messages'] = [
-  { id: 'm-1', role: 'user', content: 'hello', timestamp: new Date('2026-01-01T00:00:00Z') },
-  { id: 'm-2', role: 'assistant', content: 'Working on it', timestamp: new Date('2026-01-01T00:00:01Z') },
+  {
+    id: 'm-1',
+    role: 'user',
+    metadata: { createdAt: new Date('2026-01-01T00:00:00Z').toISOString() },
+    parts: [{ type: 'text', text: 'hello' }],
+  },
+  {
+    id: 'm-2',
+    role: 'assistant',
+    metadata: { createdAt: new Date('2026-01-01T00:00:01Z').toISOString() },
+    parts: [{ type: 'text', text: 'Working on it' }],
+  },
 ];
 
 function renderAnswering(messages: UnifiedChatState['messages']) {

@@ -38,7 +38,16 @@ function Host({ initialDialogId }: { initialDialogId: string | null }) {
   const noop = () => {};
   const asyncNoop = async () => {};
   const state: UnifiedChatState = {
-    messages: activeDialogId ? [{ id: 'm-1', role: 'user', content: 'hello', timestamp: new Date(0) }] : [],
+    messages: activeDialogId
+      ? [
+          {
+            id: 'm-1',
+            role: 'user',
+            metadata: { createdAt: new Date(0).toISOString() },
+            parts: [{ type: 'text', text: 'hello' }],
+          },
+        ]
+      : [],
     isLoading: false,
     streamingPhase: 'idle',
     sendMessage: asyncNoop,
@@ -71,8 +80,7 @@ function Host({ initialDialogId }: { initialDialogId: string | null }) {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
     dialogCapabilities: {

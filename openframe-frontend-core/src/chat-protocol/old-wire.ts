@@ -94,7 +94,7 @@ interface NumberedSource {
 }
 
 /** What one turn's old source rows say: their parts, and what each `[N]` of its text names. */
-export interface OldSourceIndex {
+interface OldSourceIndex {
   /** The parts of these rows, recording their numbers. The first row to claim a number keeps it. */
   register(rows: unknown): ChatSourcePart[];
   numbered(number: number): NumberedSource | undefined;
@@ -178,8 +178,7 @@ export function oldVideoParts(rows: unknown): ChatSourcePart[] {
 // Tokens in a text
 // =============================================================================
 
-export type OldTextOp =
-  { kind: 'text'; text: string } | { kind: 'cite'; numbers: number[] } | { kind: 'card'; uri: string };
+type OldTextOp = { kind: 'text'; text: string } | { kind: 'cite'; numbers: number[] } | { kind: 'card'; uri: string };
 
 const CARD_OPEN = '[card://';
 const CARD = /\[card:\/\/([a-zA-Z0-9_-]+):([^\]\r\n)]+)[\])]/y;
@@ -201,7 +200,7 @@ const SPECIAL = /[\\`[@(\n]/g;
  *   - `@marker:id` is a record link, its label the token itself until the host's chip resolves a name;
  *   - `[N]` standing apart from a word is removed, with the spaces before it, and reported at that place.
  */
-export function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
+function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
   push(slice: string): OldTextOp[];
   flush(): OldTextOp[];
 } {

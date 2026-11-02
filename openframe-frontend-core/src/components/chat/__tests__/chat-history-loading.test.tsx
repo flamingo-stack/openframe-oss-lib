@@ -101,8 +101,8 @@ describe('chat parts switch themselves', () => {
     const { container: loaded } = render(
       <ChatMessageList
         messages={[
-          { id: '1', role: 'user', content: 'Hi', timestamp: new Date() },
-          { id: '2', role: 'assistant', content: 'Hello', timestamp: new Date() },
+          { id: '1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] },
+          { id: '2', role: 'assistant', parts: [{ type: 'text', text: 'Hello' }] },
         ]}
       />,
     );

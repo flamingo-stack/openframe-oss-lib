@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type React from 'react';
 
+import type { ChatPart } from '../chat-protocol/chat-message';
 import { ChatMessageEnhanced } from '../components/chat/chat-message-enhanced';
 import { ChatTypingIndicator } from '../components/chat/chat-typing-indicator';
-import type { MessageSegment } from '../components/chat/types';
+import { approvalPart, textPart } from './__fixtures__/chat-messages';
 
 /**
  * `<ChatMessageEnhanced>` — THE chat message renderer used by
@@ -38,7 +39,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Single chat message row — avatar + colored author name + timestamp header, plus the full segment renderer (text/thinking/tool/approval/error/compaction). Used by ChatMessageList in both the admin (Mingo) and client (Fae) chats.',
+          'Single chat message row — avatar + colored author name + timestamp header, plus the full part renderer (text/reasoning/tool/approval/error/compaction). Used by ChatMessageList in both the admin (Mingo) and client (Fae) chats.',
       },
     },
   },
@@ -53,7 +54,7 @@ export const AssistantFae: Story = {
   args: {
     role: 'assistant',
     name: 'Fae',
-    content: 'Good morning! How can I help you today?',
+    parts: textPart('Good morning! How can I help you today?'),
     timestamp: at247(),
   },
 };
@@ -64,7 +65,7 @@ export const AssistantMingo: Story = {
     role: 'assistant',
     name: 'Mingo',
     assistantType: 'mingo',
-    content: "I've pulled the device list for Acme Corp — 3 endpoints are offline.",
+    parts: textPart("I've pulled the device list for Acme Corp — 3 endpoints are offline."),
     timestamp: at247(),
   },
 };
@@ -74,7 +75,7 @@ export const UserMessage: Story = {
   args: {
     role: 'user',
     name: 'John Smith',
-    content: 'hey can u install slack on my mac',
+    parts: textPart('hey can u install slack on my mac'),
     timestamp: at247(),
   },
 };
@@ -85,110 +86,97 @@ export const UserMessage: Story = {
  * renders it while the reply streams in).
  */
 export const FaeConversationTyping: Story = {
-  args: { role: 'assistant', content: '' },
+  args: { role: 'assistant', parts: [] },
   render: () => (
     <div className="flex flex-col">
       <ChatMessageEnhanced
         role="assistant"
         name="Fae"
-        content="Good morning! How can I help you today?"
+        parts={textPart('Good morning! How can I help you today?')}
         timestamp={at247()}
       />
       <ChatMessageEnhanced
         role="user"
         name="John Smith"
-        content="hey can u install slack on my mac"
+        parts={textPart('hey can u install slack on my mac')}
         timestamp={at247()}
       />
-      <ChatMessageEnhanced role="assistant" name="Fae" content="" isTyping timestamp={at247()} />
+      <ChatMessageEnhanced role="assistant" name="Fae" parts={[]} isTyping timestamp={at247()} />
       <ChatTypingIndicator size="sm" />
     </div>
   ),
 };
 
-const approvedSegments: MessageSegment[] = [
+const approvedParts: ChatPart[] = [
   { type: 'text', text: 'On it! Just need your quick approval here.' },
-  {
-    type: 'approval_request',
-    data: {
-      command: 'brew install --cask slack',
-      requestId: 'req-1',
-      approvalType: 'CLIENT',
-      explanation: 'Install Slack via Homebrew Cask on macOS',
-    },
+  approvalPart({
+    id: 'req-1',
+    command: 'brew install --cask slack',
+    approvalType: 'CLIENT',
+    explanation: 'Install Slack via Homebrew Cask on macOS',
     status: 'approved',
     resolvedByName: 'John Smith',
-  },
+  }),
 ];
 
 /**
- * Fae flow, step 2 — the reply carries an `approval_request` segment
+ * Fae flow, step 2 — the reply carries a tool part in an approval state,
  * rendered as the CLIENT card with the resolved "APPROVED BY JOHN SMITH"
  * pill (`approvalVariant="client"`), then Fae keeps typing.
  */
 export const FaeConversationApproved: Story = {
-  args: { role: 'assistant', content: '' },
+  args: { role: 'assistant', parts: [] },
   render: () => (
     <div className="flex flex-col">
       <ChatMessageEnhanced
         role="assistant"
         name="Fae"
-        content="Good morning! How can I help you today?"
+        parts={textPart('Good morning! How can I help you today?')}
         timestamp={at247()}
       />
       <ChatMessageEnhanced
         role="user"
         name="John Smith"
-        content="hey can u install slack on my mac"
+        parts={textPart('hey can u install slack on my mac')}
         timestamp={at247()}
       />
       <ChatMessageEnhanced
         role="assistant"
         name="Fae"
-        content={approvedSegments}
+        parts={approvedParts}
         approvalVariant="client"
         timestamp={at247()}
       />
-      <ChatMessageEnhanced role="assistant" name="Fae" content="" isTyping timestamp={at247()} />
+      <ChatMessageEnhanced role="assistant" name="Fae" parts={[]} isTyping timestamp={at247()} />
       <ChatTypingIndicator size="sm" />
     </div>
   ),
 };
 
 /** Pending approval inside a message — Approve/Reject buttons (client card). */
-export const PendingApprovalSegment: Story = {
+export const PendingApprovalPart: Story = {
   args: {
     role: 'assistant',
     name: 'Fae',
     approvalVariant: 'client',
     timestamp: at247(),
-    content: [
+    actions: { approve: () => {}, reject: () => {} },
+    parts: [
       { type: 'text', text: 'On it! Just need your quick approval here.' },
-      {
-        type: 'approval_request',
-        data: {
-          command: 'brew install --cask slack',
-          requestId: 'req-2',
-          approvalType: 'CLIENT',
-          explanation: 'Install Slack via Homebrew Cask on macOS',
-        },
-        status: 'pending',
-        onApprove: () => {},
-        onReject: () => {},
-      },
-    ] satisfies MessageSegment[],
+      approvalPart({
+        id: 'req-2',
+        command: 'brew install --cask slack',
+        approvalType: 'CLIENT',
+        explanation: 'Install Slack via Homebrew Cask on macOS',
+      }),
+    ],
   },
 };
 
 /**
- * Record links inside a `guide` segment resolve exactly as they do in a
- * text segment — the host's `renderEntityCard` node is hoisted out of the
- * markdown as a sibling block, and an unknown id degrades to the bare id.
- * Regression guard: the guide body used to skip the marker plan entirely.
- *
- * The marker is the ONLY data channel: `renderEntityCard` receives a minimal
- * `{type, id}` descriptor and hydrates by id (here from a story-local map;
- * in production from the host's per-object APIs).
+ * A `data-record-cards` part draws its cards where it sits: `renderEntityCard` receives a minimal `{type, id}` descriptor
+ * and hydrates by id (here from a story-local map; in production from the host's per-object APIs). A record link in the
+ * text is a chip.
  */
 const GUIDE_TITLES_BY_ID: Record<string, string> = {
   'first-check': 'Create Your First Monitoring Check',
@@ -208,50 +196,48 @@ export const GuideWithEntityCards: Story = {
           <span className="text-ods-text-secondary text-h5">Guide</span>
         </div>
       ) : null,
-    content: [
+    parts: [
+      { type: 'text', text: "Here's how to create a monitoring policy (check) in OpenFrame:" },
+      { type: 'data-record-cards', data: { records: ['record://onboarding_guide/first-check'] } },
       {
         type: 'text',
-        text: "Here's how to create a monitoring policy (check) in OpenFrame:\n\n[first-check](record://onboarding_guide/first-check)\n\nStep-by-step:\n\n1. Go to Monitoring → Policies → Add Policy\n2. Write your osquery SQL query\n3. Save the policy",
+        text: 'Step-by-step:\n\n1. Go to Monitoring → Policies → Add Policy\n2. Write your osquery SQL query\n3. Save the policy\n\nThen read [Add devices](record://onboarding_guide/add-devices).',
       },
-      {
-        type: 'text',
-        text: 'A second text segment renders its own marker identically:\n\n[add-devices](record://onboarding_guide/add-devices)',
-      },
-    ] satisfies MessageSegment[],
+    ],
   },
 };
 
-/** Every remaining segment type in one message — thinking, tool execution, context compaction, error. */
-export const AllSegmentTypes: Story = {
+/** Every remaining part type in one message: reasoning, tool execution, context compaction, error. */
+export const AllPartTypes: Story = {
   args: {
     role: 'assistant',
     name: 'Fae',
     timestamp: at247(),
-    content: [
+    parts: [
       {
-        type: 'thinking',
+        type: 'reasoning',
         text: 'The user wants Slack installed. Homebrew is present on the endpoint, so `brew install --cask slack` is the cleanest path.',
       },
       { type: 'text', text: 'Installing Slack now.' },
       {
-        type: 'tool_execution',
+        type: 'dynamic-tool',
+        toolName: 'run_script',
+        toolCallId: 'run-1',
+        title: 'Install Slack via Homebrew Cask',
+        state: 'output-available',
+        input: { command: 'brew install --cask slack' },
+        output: '🍺  slack was successfully installed!',
+        toolMetadata: { integratedToolType: 'OPENFRAME_RMM' },
+      },
+      { type: 'data-context-compaction', data: { status: 'completed' } },
+      {
+        type: 'data-error',
         data: {
-          type: 'EXECUTED_TOOL',
-          integratedToolType: 'OPENFRAME_RMM',
-          toolFunction: 'run_script',
-          toolTitle: 'Install Slack via Homebrew Cask',
-          parameters: { command: 'brew install --cask slack' },
-          result: '🍺  slack was successfully installed!',
-          success: true,
+          title: 'Notification delivery failed',
+          details: 'Slack webhook returned 429 — the completion ping was skipped. The install itself succeeded.',
         },
       },
-      { type: 'context_compaction', status: 'completed' },
-      {
-        type: 'error',
-        title: 'Notification delivery failed',
-        details: 'Slack webhook returned 429 — the completion ping was skipped. The install itself succeeded.',
-      },
       { type: 'text', text: 'Done — Slack is installed and ready to use.' },
-    ] satisfies MessageSegment[],
+    ],
   },
 };

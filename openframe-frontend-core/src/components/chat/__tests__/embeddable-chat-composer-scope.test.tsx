@@ -67,8 +67,8 @@ const runtime: ChatRuntime = {
 const MESSAGE: UnifiedChatState['messages'][number] = {
   id: 'm-1',
   role: 'user',
-  content: 'hello',
-  timestamp: new Date('2026-01-01T00:00:00Z'),
+  metadata: { createdAt: '2026-01-01T00:00:00.000Z' },
+  parts: [{ type: 'text', text: 'hello' }],
 };
 
 /** The injected-state path (`mingoState`): the panel renders this object and
@@ -110,8 +110,7 @@ function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
     ...overrides,

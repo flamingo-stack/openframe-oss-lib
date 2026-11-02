@@ -13,9 +13,10 @@ import type {
 import type { SlashCommandSummary } from '../components/chat/hooks/use-slash-commands';
 import type { MingoQuickAction } from '../components/chat/mingo-welcome';
 import type { DialogItem } from '../components/chat/types/component.types';
-import type { UnifiedChatState, UnifiedChatMessage } from '../components/chat/types/unified-chat-state.types';
+import type { UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import { BracketCurlyIcon, Rocket01Icon, SearchIcon } from '../components/icons-v2-generated';
 import { ChatRuntimeContext, type ChatRuntime } from '../contexts/chat-runtime-context';
+import { type StoryRow, storyMessage, textPart } from './__fixtures__/chat-messages';
 
 // =============================================================================
 // Stub commands endpoint — module-level constant referenced both by the
@@ -800,13 +801,13 @@ const TS_247 = new Date(2024, 0, 1, 14, 47, 0);
 const RUN_SCRIPT_TITLE =
   '`run_script` -- PowerShell: `Get-LocalUser | Where-Object { $_.PasswordRequired -eq $false -or $_.PasswordLastSet -lt (Get-Date).AddDays(-90) }`';
 
-const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
+const SCRIPTED_MESSAGES_ROWS: StoryRow[] = [
   {
     id: 'm1',
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo', // cyan name (Figma flamingo-colors/cyan)
-    content: 'How can I help?',
+    parts: textPart('How can I help?'),
     timestamp: TS_247,
   },
   {
@@ -815,7 +816,7 @@ const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
     name: 'Roman Smith',
     authorType: 'admin', // yellow name (Figma open-colors/yellow)
     avatar: ROMAN_AVATAR,
-    content: 'Check machines with weak password',
+    parts: textPart('Check machines with weak password'),
     timestamp: TS_247,
   },
   {
@@ -823,22 +824,21 @@ const SCRIPTED_MESSAGES: UnifiedChatMessage[] = [
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo',
-    content: '', // body lives entirely in `segments`
     timestamp: TS_247,
-    segments: [
+    parts: [
       {
-        type: 'tool_execution',
-        data: {
-          type: 'EXECUTING_TOOL', // → DotsLoader status + collapsed command block
-          integratedToolType: 'OPENFRAME',
-          toolFunction: 'run_script',
-          toolTitle: RUN_SCRIPT_TITLE,
-          parameters: {},
-        },
+        type: 'dynamic-tool',
+        toolName: 'run_script',
+        toolCallId: 'run-1',
+        title: RUN_SCRIPT_TITLE,
+        state: 'input-available', // → DotsLoader status + collapsed command block
+        input: {},
+        toolMetadata: { integratedToolType: 'OPENFRAME' },
       },
     ],
   },
 ];
+const SCRIPTED_MESSAGES = SCRIPTED_MESSAGES_ROWS.map(storyMessage);
 
 /**
  * Fully-stubbed `UnifiedChatState` factory. This is the "inject a static Mingo
@@ -884,8 +884,7 @@ function createScriptedMingoState(): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
   };

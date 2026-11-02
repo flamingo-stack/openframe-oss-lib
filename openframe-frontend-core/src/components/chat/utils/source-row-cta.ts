@@ -21,19 +21,13 @@
 import { FileText } from 'lucide-react';
 import type React from 'react';
 import type { ComposeContentUrl } from '../../../utils/content-href';
+import { sanitizeDocPath as sanitizePath } from '../../../utils/doc-path';
 import { canonicalContentRefType } from '../../../utils/list-url';
 import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
 import { getSourceIconName } from '../../../utils/source-icons';
 import type { ChatRef } from '../chat-ref.types';
 import { safeHref } from './compact-card-classes';
 import { resolveIcon } from './icon-library';
-
-/** Path sanitization — keep alphanumerics, slash, dash, dot, underscore;
- *  strip everything else. Defends against a hostile mapper returning a
- *  path with `..` traversal or query-string injection. */
-function sanitizePath(path: string): string {
-  return (path || '').replace(/[^a-zA-Z0-9/_\-.]/g, '');
-}
 
 export interface SourceRowInput {
   /** RagTableConfig.id (e.g. 'blog-posts', 'financial-cap-table'). Drives

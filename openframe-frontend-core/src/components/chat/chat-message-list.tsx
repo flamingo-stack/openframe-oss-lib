@@ -11,6 +11,13 @@ import {
   forwardRef,
 } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
+import {
+  type ChatMessage,
+  type ChatPart,
+  approvalStatusOf,
+  isSourcePart,
+  isToolPart,
+} from '../../chat-protocol/chat-message';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon, Arrow02DownIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
@@ -29,7 +36,6 @@ import { CyclingPhrase } from './cycling-phrase';
 import type { ChatMessageListProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
 import { SCROLL_ANCHOR } from './types/message.types';
-import type { MessageContent } from './types/message.types';
 
 // Flamingo-themed cycling words shown next to the streaming indicator
 // (Claude-Code-style activity hint). Mix of classic AI verbs, flamingo
@@ -102,14 +108,18 @@ const MEDIA_SETTLE_EVENTS = ['load', 'error', 'loadedmetadata'] as const;
  * — pass them directly as `ref={scrollRef}` / `ref={contentRef}`.
  */
 
-/** Whether a `Message.content` (string OR `MessageSegment[]`) carries
- *  visible text. The top-anchor effect uses this to skip the metadata-
- *  only commit (empty assistant bubble) and wait until the body chunk
- *  has landed in the DOM. */
-function hasNonEmptyContent(content: MessageContent): boolean {
-  if (typeof content === 'string') return content.length > 0;
-  if (!Array.isArray(content)) return false;
-  return content.some(s => s.type === 'text' && s.text.length > 0);
+/** Whether a message carries visible text. The top-anchor effect uses this to
+ *  skip the metadata-only commit (empty assistant bubble) and wait until the
+ *  body chunk has landed in the DOM. */
+function hasVisibleText(parts: readonly ChatPart[]): boolean {
+  return parts.some(part => part.type === 'text' && part.text.length > 0);
+}
+
+/** A turn that has drawn nothing of its own yet: no stage, and no part but sources (which the body does not draw) and
+ *  empty text. */
+function hasDrawnNothing(message: ChatMessage): boolean {
+  if ((message.metadata?.progress?.length ?? 0) > 0) return false;
+  return message.parts.every(part => isSourcePart(part) || (part.type === 'text' && part.text.length === 0));
 }
 
 /** Async-growth watcher installed by the top-anchor effect for the 2s
@@ -163,7 +173,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       renderContextItem,
       renderRecordChip,
       renderAfterMessage,
-      onAskSelect,
+      actions,
+      displayApprovalTypes,
       NavLinkAnchor,
       ...props
     },
@@ -196,10 +207,11 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // free (each one is followed by the reply it produced).
     const lastUserMessageIndex = useMemo(() => {
       for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role === 'user') return i;
+        if (messages[i].role !== 'assistant') return i;
       }
       return -1;
     }, [messages]);
+    const actionsWithoutAsk = useMemo(() => (actions ? { ...actions, selectAsk: undefined } : undefined), [actions]);
 
     // ---- Overlay guard: don't move the ground under an open menu -------
     // A ⋯ menu inside a bubble stays anchored to its trigger. While a reply
@@ -353,7 +365,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // viewport position.
         const prevLastIdx = prevLastId ? messages.findIndex(m => m.id === prevLastId) : -1;
         const newSlice = prevLastIdx >= 0 ? messages.slice(prevLastIdx + 1) : messages.slice(prevCount);
-        const hasNewUser = newSlice.some(m => m.role === 'user');
+        const hasNewUser = newSlice.some(m => m.role !== 'assistant');
         // An open overlay suppresses even this one: `ignoreEscapes` would yank
         // the thread out from under it — and with it the follow intent, which
         // would re-assert the jump on every later resize. A user who just sent
@@ -769,7 +781,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // anchor effect can fire when its body lands.
     const scrolledIdsRef = useRef<Set<string> | null>(null);
     if (scrolledIdsRef.current === null) {
-      scrolledIdsRef.current = new Set(messages.filter(m => hasNonEmptyContent(m.content)).map(m => m.id));
+      scrolledIdsRef.current = new Set(messages.filter(m => hasVisibleText(m.parts)).map(m => m.id));
     }
 
     // Active async-growth watcher. Stored in a ref (NOT in the effect's
@@ -783,10 +795,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // Top-anchored display turns also move the ground — same guard.
       if (overlayOpenRef.current) return;
       const last = messages[messages.length - 1];
-      if (!last || last.role !== 'assistant' || last.scrollAnchor !== SCROLL_ANCHOR.TOP) return;
+      if (!last || last.role !== 'assistant' || last.metadata?.scrollAnchor !== SCROLL_ANCHOR.TOP) return;
       // Metadata frame arrives BEFORE body. Wait for content so we don't
       // snap an empty bubble and burn the one-shot.
-      if (!hasNonEmptyContent(last.content)) return;
+      if (!hasVisibleText(last.parts)) return;
       // Seeded during render above, so this is never null by the time a layout
       // effect runs — but a guard-and-return costs nothing and fits the chain.
       const seen = scrolledIdsRef.current;
@@ -968,22 +980,16 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // row lands (a stage, a tool, thinking or text), that row says what the
     // turn is doing, and a second indicator under it only repeats it.
     // Hidden too when the agent is PAUSED waiting on the user: the
-    // last message's last segment is a pending approval (inline), or
+    // last message's last part is a pending approval (inline), or
     // there are escalated pending approvals shown in the sticky bar.
     const lastMessage = messages[messages.length - 1];
-    const lastSegments = Array.isArray(lastMessage?.content) ? lastMessage.content : null;
-    const lastSegment = lastSegments?.[lastSegments.length - 1];
+    const lastPart = lastMessage?.parts[lastMessage.parts.length - 1];
     const isPausedOnApproval =
-      !!lastSegment &&
-      (lastSegment.type === 'approval_request' ||
-        lastSegment.type === 'approval_batch' ||
-        lastSegment.type === 'escalation_offer') &&
-      (lastSegment.status === undefined || lastSegment.status === 'pending');
-    const turnHasDrawn =
-      lastMessage?.role === 'assistant' &&
-      (lastSegments
-        ? lastSegments.length > 0
-        : typeof lastMessage.content === 'string' && lastMessage.content.length > 0);
+      !!lastPart &&
+      (lastPart.type === 'data-escalation-offer'
+        ? lastPart.data.status === 'pending'
+        : isToolPart(lastPart) && approvalStatusOf(lastPart) === 'pending');
+    const turnHasDrawn = lastMessage?.role === 'assistant' && !hasDrawnNothing(lastMessage);
     const showStreamingLoader =
       isTyping && !turnHasDrawn && !isPausedOnApproval && !(pendingApprovals && pendingApprovals.length > 0);
 
@@ -1034,8 +1040,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     // injects after an approval card) are part of the API
                     // conversation history but never render. Skipping here
                     // keeps the visible thread coherent — see
-                    // `Message.hidden` doc-comment in message.types.ts.
-                    if (message.hidden) return null;
+                    // `metadata.hidden` in chat-message.ts.
+                    if (message.metadata?.hidden) return null;
                     // ONE OWNER for the pending turn. Both send paths mint an empty
                     // assistant placeholder (the accumulation target — it MUST stay
                     // in state) and flip the phase to 'thinking'. Rendering it here
@@ -1049,40 +1055,42 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     // until it carries something visible — removed from the live
                     // region, not merely hidden. Mirrors `endSseTurn`, which prunes
                     // an empty trailing assistant AFTER a turn; this closes the same
-                    // window BEFORE the first token. Any non-text segment (tool
-                    // execution, approval card, thinking) counts as visible.
+                    // window BEFORE the first token. Any non-text part (tool
+                    // execution, approval card, thinking) counts as visible, and so does a stage.
                     const isEmptyPendingTurn =
                       index === messages.length - 1 &&
                       isTyping &&
                       message.role === 'assistant' &&
-                      !hasNonEmptyContent(message.content) &&
-                      (!Array.isArray(message.content) || message.content.every(s => s.type === 'text'));
+                      hasDrawnNothing(message);
                     if (isEmptyPendingTurn) return null;
                     const ownedContent = renderAfterMessage?.(message, index);
+                    const { metadata } = message;
                     const row = (
                       <ChatMessageEnhanced
                         key={message.id}
                         ref={getRegisterMessageEl(message.id)}
                         role={message.role}
-                        name={message.name}
-                        content={message.content}
-                        timestamp={message.timestamp}
+                        name={metadata?.author?.name}
+                        parts={message.parts}
+                        timestamp={metadata?.createdAt ? new Date(metadata.createdAt) : undefined}
                         isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                        avatar={showAvatars ? message.avatar : null}
+                        avatar={showAvatars ? metadata?.author?.avatar : null}
                         showAvatar={showAvatars}
-                        assistantType={message.assistantType || assistantType}
+                        assistantType={metadata?.author?.assistantType || assistantType}
                         approvalVariant={approvalVariant}
-                        authorType={message.authorType}
+                        authorType={metadata?.author?.authorType}
                         selfAuthorType={selfAuthorType}
                         nameEveryTurn={nameEveryTurn}
                         assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
-                        contextItems={message.contextItems}
+                        contextItems={metadata?.contextItems}
                         resolveContextIcon={resolveContextIcon}
                         renderContextItem={renderContextItem}
                         renderRecordChip={renderRecordChip}
                         renderEntityCard={renderEntityCard}
-                        refs={message.refs}
-                        onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
+                        actions={index > lastUserMessageIndex ? actions : actionsWithoutAsk}
+                        displayApprovalTypes={displayApprovalTypes}
+                        progress={metadata?.progress}
+                        interrupted={metadata?.finishReason === 'interrupted'}
                         NavLinkAnchor={NavLinkAnchor}
                         // One message of a read thread (the height gate counts them); the wrapper carries it instead
                         // when the row has content of its own below it.
@@ -1179,7 +1187,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 <ChatMessageEnhanced
                   role="assistant"
                   name={assistantType === 'mingo' ? 'Mingo' : 'Fae'}
-                  content={pendingApprovals}
+                  parts={pendingApprovals}
+                  actions={actions}
                   timestamp={new Date()}
                   showAvatar={showAvatars}
                   assistantType={assistantType}

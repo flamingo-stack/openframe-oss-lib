@@ -29,16 +29,17 @@
  *
  * ## Result hrefs go through the content-href seam
  *
- * A row's href is NOT the RAG `externalUrl` verbatim any more: when the
+ * A row's href is NOT the server's `url` verbatim: when the
  * host wires `runtime.composeContentUrl` (or passes `composeContentUrl`
  * here), the row is re-resolved through it — the SAME seam the catalog
  * cards and the chat entity cards use. So a host that serves onboarding
  * guides at `/help-center/onboarding-guides/<slug>` gets that path from
  * the dropdown too, instead of bouncing the user to the canonical hub
- * URL. Unwired hosts keep the verbatim-`externalUrl` behavior.
+ * URL. Unwired hosts use the url as given.
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { docSearchFieldsOf } from '../../../chat-protocol/message-decoder';
 import { useChatRuntime } from '../../../contexts/chat-runtime-context';
 import { useDebounce } from '../../../hooks/ui/use-debounce';
 import type { ComposeContentUrl } from '../../../utils/content-href';
@@ -122,23 +123,17 @@ function toDocSearchResults(payload: unknown): DocSearchResult[] | null {
   const rows: DocSearchResult[] = [];
   for (const entry of payload.data) {
     if (!isRecord(entry)) continue;
+    const { sourceId, title, url } = docSearchFieldsOf(entry);
+    if (!title) continue;
     const path = readString(entry, 'path');
-    const name = readString(entry, 'name');
-    const type = entry.type;
-    if (path === undefined || name === undefined) continue;
-
-    const targetPlatform = entry.targetPlatform;
     rows.push({
-      path,
-      name,
-      type: type === 'folder' ? 'folder' : 'file',
+      sourceId,
+      title,
+      ...(url ? { url } : {}),
+      type: entry.type === 'folder' ? 'folder' : 'file',
       snippet: readString(entry, 'snippet') ?? '',
       matchType: entry.matchType === 'title' ? 'title' : 'content',
-      documentType: readString(entry, 'documentType'),
-      externalUrl: readString(entry, 'externalUrl'),
-      targetPlatform: typeof targetPlatform === 'string' ? targetPlatform : null,
-      sourceRepo: readString(entry, 'sourceRepo'),
-      entityId: readString(entry, 'entityId'),
+      ...(path ? { path } : {}),
     });
   }
   return rows;

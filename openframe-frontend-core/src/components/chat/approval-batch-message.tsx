@@ -15,10 +15,11 @@ import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
 import type {
+  ApprovalBatchData,
   ApprovalBlockVariant,
   AssistantType,
   ApprovalBatchExecutionState,
-  ApprovalBatchSegment,
+  ChatApprovalStatus,
   PendingToolCallData,
 } from './types';
 import { COMMAND_BODY_ARG_KEYS, getCommandText } from './utils/tool-call-helpers';
@@ -26,8 +27,8 @@ import { COMMAND_BODY_ARG_KEYS, getCommandText } from './utils/tool-call-helpers
 export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement> {
   /** The batch. `null` is a batch still being read (a list's loading row): the block draws its own loading form, as
    *  it does in a loading scope. */
-  data: ApprovalBatchSegment['data'] | null;
-  status?: ApprovalBatchSegment['status'];
+  data: ApprovalBatchData | null;
+  status?: ChatApprovalStatus;
   onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>;
   onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>;
   /**
@@ -70,7 +71,7 @@ export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS);
 
 export interface ApprovalStatusTagProps {
-  status: ApprovalBatchSegment['status'];
+  status?: ChatApprovalStatus;
   resolvedByName?: string | null;
   inlineResolver?: boolean;
 }
@@ -116,7 +117,7 @@ function ExecutionStatusIcon({
   batchStatus,
   execution,
 }: {
-  batchStatus: ApprovalBatchSegment['status'];
+  batchStatus?: ChatApprovalStatus;
   execution: ApprovalBatchExecutionState | undefined;
 }) {
   if (batchStatus !== 'approved') return null;
@@ -130,7 +131,7 @@ interface ToolCallRowProps {
   call: PendingToolCallData;
   expanded: boolean;
   onToggle: () => void;
-  batchStatus: ApprovalBatchSegment['status'];
+  batchStatus?: ChatApprovalStatus;
   execution: ApprovalBatchExecutionState | undefined;
   showExecutionStatus: boolean;
 }

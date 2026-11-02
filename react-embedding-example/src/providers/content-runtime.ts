@@ -19,6 +19,7 @@ import { EP, HUB_PUBLIC_ORIGIN } from '../config/endpoints'
 // doc card or chip opens there, by the same rule as every hosted type.
 const HOSTED_TYPES = new Set(['onboarding_guide', 'product_release', 'markdown'])
 const SUFFIXES = { ...DEFAULT_CONTENT_SUFFIXES, markdown: DOCS_BASE_ROUTE.replace(/^\/+/, '') }
+const SLUG_IS_IDENTIFIER = new Set(['markdown'])
 
 // The embedder is platform-agnostic: it does NOT set `source` (the lib types it as
 // optional). The chat wire resolves source server-side from the proxied hub's
@@ -95,6 +96,8 @@ export function buildChatRuntime(navigate: ChatRuntime['navigation']['navigate']
       hostedTypes: HOSTED_TYPES,
       contentOrigin: HUB_PUBLIC_ORIGIN,
       suffixes: SUFFIXES,
+      // A doc's record id is its tree path, which the url's last segment would lose.
+      slugIsIdentifier: SLUG_IS_IDENTIFIER,
       // List-filter types deep-link into their EXISTING list route with `?search=<id>`
       // — the param `DevSectionView` writes and `RoadmapView` / `DeliveryLists` read.
       // (Verified against the live hub: /api/roadmap + /api/delivery match the task id

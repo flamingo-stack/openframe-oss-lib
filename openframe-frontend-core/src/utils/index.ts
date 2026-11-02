@@ -222,16 +222,15 @@ export {
 // instead of src/components/chat/utils/ so server-side hub callers like
 // doc-chat-utils can use them without tripping the 'use client' boundary)
 export { SOURCE_ICON_NAMES, getSourceIconName, SOURCE_LABELS_BY_TABLE, getSourceLabel } from './source-icons';
-// Grouped source chips: the one rule + the one constructor, for the hub
-// (server) and the chat strip (client) alike.
+// Grouped source chips: the one rule, for the hub (server) and the chat strip (client) alike.
 export {
   DOC_TABLE_TYPES,
   groupsByTable,
   recordCountLabel,
-  buildGroupedSource,
   groupSourcesByTable,
   formatCitationIndices,
-  type GroupedSourceRow,
+  type SourceGroup,
+  type SourceRow,
 } from './source-grouping';
 
 // Embed-surface auth — generic across chat AND ticket center (and any

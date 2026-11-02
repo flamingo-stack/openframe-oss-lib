@@ -5,9 +5,10 @@ import { fn } from 'storybook/test';
 
 import { EmbeddableChat, type EmbeddableChatHandle } from '../components/chat/embeddable-chat';
 import { QuickActionChipButton } from '../components/chat/quick-action-chip';
-import type { UnifiedChatMessage, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
+import type { UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import { PackageCheckIcon } from '../components/icons-v2-generated';
 import { type ChatRuntime, ChatRuntimeContext } from '../contexts/chat-runtime-context';
+import { type StoryRow, storyMessage, textPart } from './__fixtures__/chat-messages';
 
 const RUNTIME: ChatRuntime = {
   endpoints: {
@@ -31,13 +32,13 @@ const DIALOG = {
   timestamp: AT,
   owner: { name: 'Roman Smith' },
 };
-const MESSAGES: UnifiedChatMessage[] = [
+const MESSAGES_ROWS: StoryRow[] = [
   {
     id: 'm1',
     role: 'user',
     name: 'Roman Smith',
     authorType: 'admin',
-    content: 'why is osqueryd.exe cert expiring in 3 days?',
+    parts: textPart('why is osqueryd.exe cert expiring in 3 days?'),
     timestamp: AT,
   },
   {
@@ -45,11 +46,13 @@ const MESSAGES: UnifiedChatMessage[] = [
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo',
-    content:
+    parts: textPart(
       "The renewal job ran ~6 hours ago but didn't complete. If it's not renewed before then, the agent will fail signature validation and stop reporting.\n\nWant me to trigger a manual renewal?",
+    ),
     timestamp: AT,
   },
 ];
+const MESSAGES = MESSAGES_ROWS.map(storyMessage);
 
 /** A static Mingo thread through the `mingoState` injection path: no transport. */
 function createState(conversation: boolean): UnifiedChatState {
@@ -87,8 +90,7 @@ function createState(conversation: boolean): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
   };

@@ -40,6 +40,7 @@ import { usePreventScroll } from '@react-aria/overlays';
 import { isIOS } from '@react-aria/utils';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import type { ChatMessage, ChatToolPart } from '../../chat-protocol/chat-message';
 import { createRecordLinkScanner, recordHref } from '../../chat-protocol/record-link';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
@@ -103,16 +104,13 @@ import { RecordActionsProvider } from './record-actions';
 import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
-import type { MessageSegment, Message } from './types/message.types';
 import type {
   ChatDialogCapabilities,
   UnifiedChatState,
   UnifiedSendMessageOptions,
 } from './types/unified-chat-state.types';
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
-import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { chatDayLabel } from './utils/chat-day-label';
-import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
 
@@ -247,10 +245,9 @@ export interface EmbeddableChatProps {
    * render the same request twice) must hand them back here — otherwise the
    * card exists in the reducer, is stripped on the way to the view, and is
    * displayed nowhere at all. `ChatMessageList` renders them with the same
-   * component the inline path uses, so the approve/reject handlers stamped on
-   * the segments keep working.
+   * component the inline path uses, and they reach the same `actions`.
    */
-  pendingApprovals?: MessageSegment[];
+  pendingApprovals?: ChatToolPart[];
 
   /**
    * Dialog-management capabilities for injected Mingo mode (`mingoState`).
@@ -919,7 +916,6 @@ function EmbeddableChatInner({
   // endpoint returns BOTH the auth tier and the resolved user, so the
   // displayed name always matches who the server thinks the user is.
   const { attachmentsEnabled, user: identityUser } = useChatIdentity();
-  const viewUrlPrefix = runtime.endpoints.attachmentViewUrlPrefix;
 
   // Dev-only warning when only one of `open` / `onOpenChange` is set.
   useEffect(() => {
@@ -1138,6 +1134,8 @@ function EmbeddableChatInner({
 
   const {
     messages: rawMessages,
+    actions: chatActions,
+    displayApprovalTypes,
     isLoading: chatLoading,
     sendMessage: sendMessageRaw,
     discussRef,
@@ -1518,24 +1516,6 @@ function EmbeddableChatInner({
     [effectiveAssistantIcon],
   );
 
-  // Stable per-message timestamps. The memoized `<ChatMessageEnhanced>`
-  // compares `timestamp.getTime()`, so we must NOT stamp `new Date()` fresh
-  // on each render: a moving clock makes every message's timestamp differ
-  // between renders, defeating memoization and forcing the WHOLE list (and
-  // every open menu/card inside it) to re-render on every realtime chunk.
-  // Prefer the host's real timestamp; otherwise stamp once per id and reuse
-  // it (keeps the displayed time stable and lets memoization hold even when
-  // the host omits a timestamp).
-  //
-  // Held as an instance-lifetime map from `useState`'s lazy initialiser, not a
-  // ref: a ref read during render is untracked, and `useRef(new Map())`
-  // additionally allocated a throwaway map on every single render. Filling it
-  // inside the memo below is safe even if React discards that render attempt —
-  // the value cached for an id is an arbitrary "now" either way, so an entry
-  // left behind by a discarded attempt is exactly as correct as the one the
-  // retry would have written.
-  const [timestampCache] = useState(() => new Map<string, Date>());
-
   // GUIDE MODE ONLY. Guide-mode user bubbles carry no host-supplied name/avatar
   // (the SSE adapter emits bare `{ role, content }`), so fall back to the
   // server-resolved identity (`useChatIdentity`): full name (first + last, or
@@ -1557,14 +1537,28 @@ function EmbeddableChatInner({
       : undefined;
   const guideUserAvatar = activeMode === 'guide' ? identityUser?.avatarUrl?.trim() || undefined : undefined;
 
-  // Map the host's rows → the lib's Message type. The mapping itself lives in
-  // `mapHostMessage`, which is where its pass-through list is pinned by tests.
-  const hostMessages: Message[] = useMemo(() => {
-    const options = { userName: guideUserName, userAvatar: guideUserAvatar, timestampCache };
-    const mapped = rawMessages.map(m => mapHostMessage(m, options));
-    pruneTimestampCache(timestampCache, new Set(rawMessages.map(m => m.id)));
-    return mapped;
-  }, [rawMessages, guideUserName, guideUserAvatar, timestampCache]);
+  // The role's default name and avatar, under whatever a row says itself. A message's `parts` keep their identity, so a
+  // new object here re-renders no row whose parts and names did not change.
+  const hostMessages = useMemo(
+    () =>
+      rawMessages.map(message => {
+        const author = message.metadata?.author;
+        const isAssistant = message.role === 'assistant';
+        return {
+          ...message,
+          metadata: {
+            ...message.metadata,
+            author: {
+              ...author,
+              name: author?.name ?? (isAssistant ? 'Mingo' : (guideUserName ?? 'You')),
+              avatar: author?.avatar ?? (message.role === 'user' ? (guideUserAvatar ?? null) : null),
+              ...(isAssistant ? { assistantType: 'mingo' as const } : {}),
+            },
+          },
+        };
+      }),
+    [rawMessages, guideUserName, guideUserAvatar],
+  );
 
   // "What to ask?" exchanges (`whatToAsk`) are the panel's own, shown in the
   // thread beside the host's messages; a new chat holding one reads as a
@@ -1590,20 +1584,12 @@ function EmbeddableChatInner({
       // stale ref call still lands here — refused at the seam, not by luck.
       if (composerLock) return;
       noteWhatToAskSend();
-      // Append chat-attachment markdown lines to the user's bubble.
-      let augmentedText = text;
-      if (readyAttachments.length > 0) {
-        const markdown = readyAttachments
-          .map(att => formatChatAttachmentMarkdownForBubble(att, viewUrlPrefix))
-          .join('');
-        augmentedText = `${text}${markdown}`;
-      }
       // The unified `sendMessage` delegates to the ACTIVE adapter: the SSE one
       // settles its own failures into an error row, but the Mingo/NATS one
       // rejects on a failed publish. There is no composer promise for that
       // rejection to surface through, so log it here the way the NATS
       // adapter's `discussRef` does rather than leave it unhandled.
-      void sendMessage(augmentedText, {
+      void sendMessage(text, {
         ...(readyAttachments.length > 0 ? { attachments: readyAttachments } : {}),
         ...(contextItems.length > 0 ? { contextItems } : {}),
       }).catch((err: unknown) => {
@@ -1617,19 +1603,18 @@ function EmbeddableChatInner({
         setContextItems([]);
       }
     },
-    [composerLock, noteWhatToAskSend, sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
+    [composerLock, noteWhatToAskSend, sendMessage, readyAttachments, clearAttachments, contextItems],
   );
 
   /**
    * Picking an option on a clarification card — deliberately NOT `handleSend`.
    *
-   * `handleSend` belongs to the composer: it appends the staged attachments'
-   * markdown to the text, ships the staged context items, and then clears both.
-   * Routing an ask click through it would (a) send `label + attachment markdown`
-   * where the backend's classifier expects the label VERBATIM to resolve which
-   * reading was picked, and (b) consume a draft's attachments/context into a
-   * one-word answer the user never attached them to. So the label goes out on
-   * its own and whatever is staged in the composer stays staged.
+   * `handleSend` belongs to the composer: it ships the staged attachments and
+   * context items, and then clears both. Routing an ask click through it would
+   * consume a draft's attachments/context into a one-word answer the user never
+   * attached them to. So the label goes out on its own, VERBATIM (the backend's
+   * classifier resolves which reading was picked from it), and whatever is
+   * staged in the composer stays staged.
    */
   const handleAskSelect = useCallback(
     (label: string) => {
@@ -1640,6 +1625,13 @@ function EmbeddableChatInner({
       });
     },
     [sendMessage],
+  );
+
+  // What the thread's cards do. An ask card is gated on `chatLoading` for the same reason the composer is: no second
+  // send while a turn is in flight. Passive demo hosts (previewMode) stay read-only.
+  const messageActions = useMemo(
+    () => ({ ...chatActions, selectAsk: chatLoading || previewMode ? undefined : handleAskSelect }),
+    [chatActions, chatLoading, previewMode, handleAskSelect],
   );
 
   // Admin "try-asking chips" → GUIDE-mode quick-action chips only (Mingo mode
@@ -1872,7 +1864,7 @@ function EmbeddableChatInner({
    * is no longer a Guide-mode-only affordance either.
    */
   const renderMessageSources = useCallback(
-    (message: Message, index: number) => {
+    (message: ChatMessage, index: number) => {
       if (message.role !== 'assistant') return null;
       // Suppressed only on the answer still being written: the citation markers
       // the order is derived from arrive WITH the text, so a strip rendered
@@ -2123,7 +2115,7 @@ function EmbeddableChatInner({
     activeDialogStatus === 'working' ||
     activeDialogStatus === 'approval' ||
     (pendingApprovals?.length ?? 0) > 0 ||
-    awaitsDecision(hostMessages);
+    awaitsDecision(hostMessages, displayApprovalTypes);
 
   // "What to ask Mingo?" with `whatToAsk`: every click opens a new chat with
   // the exchange - never the open conversation, whatever its state, and not
@@ -2525,10 +2517,8 @@ function EmbeddableChatInner({
                 renderContextItem={renderContextItem}
                 renderRecordChip={renderRecordChip}
                 renderAfterMessage={renderMessageSources}
-                // Gated on `chatLoading` for the same reason the composer
-                // is: no second send while a turn is in flight. Passive
-                // demo hosts (previewMode) stay read-only.
-                onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
+                actions={messageActions}
+                displayApprovalTypes={displayApprovalTypes}
                 NavLinkAnchor={NavLinkAnchorViaRuntime}
                 // Real Mingo drawer: hide the message-list scrollbar
                 // (scroll stays functional). Scoped here via `className`

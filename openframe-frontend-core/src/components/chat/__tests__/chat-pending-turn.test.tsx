@@ -19,8 +19,8 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { ChatMessage, ChatPart } from '../../../chat-protocol/chat-message';
 import { createChatStreamReducer } from '../stream/chat-stream-reducer';
-import type { Message } from '../types/message.types';
 import {
   AUTO_CONTINUATION_DIRECTIVE_PREFIX,
   buildAutoContinuationDirective,
@@ -51,23 +51,22 @@ vi.mock('use-stick-to-bottom', () => ({
 // Row stub that renders the author label the way the real component does
 // (`Name:`), so "labeled row with no body" is directly assertable.
 vi.mock('../chat-message-enhanced', () => ({
-  ChatMessageEnhanced: ({ name, content }: { name?: string; content: unknown }) => (
+  ChatMessageEnhanced: ({ name, parts }: { name?: string; parts: ChatPart[] }) => (
     <div data-testid="row">
       <span data-testid="row-name">{name ?? ''}</span>
-      <span data-testid="row-body">
-        {typeof content === 'string'
-          ? content
-          : Array.isArray(content)
-            ? content
-                .map(s => (s && (s as { type?: string }).type === 'text' ? (s as { text: string }).text : '[seg]'))
-                .join('')
-            : ''}
-      </span>
+      <span data-testid="row-body">{parts.map(part => (part.type === 'text' ? part.text : '[part]')).join('')}</span>
     </div>
   ),
 }));
 
 import { ChatMessageList } from '../chat-message-list';
+
+const row = (id: string, role: ChatMessage['role'], name: string, text: string): ChatMessage => ({
+  id,
+  role,
+  metadata: { author: { name } },
+  parts: [{ type: 'text', text }],
+});
 
 class ObserverStub {
   observe() {}
@@ -126,10 +125,10 @@ describe('hidden rows that carry text', () => {
 
   it('never renders — the raw directive text must not reach the transcript', () => {
     const directive = buildAutoContinuationDirective('create_ticket', { ticketId: '42' });
-    const messages: Message[] = [
-      { id: 'u1', role: 'user', name: 'Michael Assraf', content: 'my laptop is dead' },
-      { id: 'h1', role: 'user', name: 'Michael Assraf', content: directive, hidden: true },
-      { id: 'a1', role: 'assistant', name: 'Mingo', content: 'Opened a ticket.' },
+    const messages: ChatMessage[] = [
+      row('u1', 'user', 'Michael Assraf', 'my laptop is dead'),
+      { ...row('h1', 'user', 'Michael Assraf', directive), metadata: { hidden: true } },
+      row('a1', 'assistant', 'Mingo', 'Opened a ticket.'),
     ];
     const { container } = render(<ChatMessageList dialogId="d" messages={messages} />);
 
@@ -141,12 +140,10 @@ describe('hidden rows that carry text', () => {
 // ─── Render-level contracts ────────────────────────────────────────────────
 
 describe('a thinking turn has exactly ONE pending affordance', () => {
-  const pending: Message[] = [
-    { id: 'u1', role: 'user', name: 'Michael Assraf', content: 'what is broken?' },
-    // `Message` carries its body in `content` — there is no `segments` field
-    // on it (that is `UnifiedChatMessage`), and the render path never reads
-    // one. An empty `content` IS the empty pending turn.
-    { id: 'a1', role: 'assistant', name: 'Mingo', content: '' },
+  const pending: ChatMessage[] = [
+    row('u1', 'user', 'Michael Assraf', 'what is broken?'),
+    // Parts of nothing the body draws ARE the empty pending turn.
+    { id: 'a1', role: 'assistant', metadata: { author: { name: 'Mingo' } }, parts: [] },
   ];
 
   it('does not render the empty labeled assistant row while typing', () => {
@@ -161,39 +158,60 @@ describe('a thinking turn has exactly ONE pending affordance', () => {
   });
 
   it('renders the assistant row as soon as it carries text', () => {
-    const withText: Message[] = [
-      pending[0],
-      { id: 'a1', role: 'assistant', name: 'Mingo', content: [{ type: 'text', text: 'Chec' }] },
-    ];
+    const withText: ChatMessage[] = [pending[0], row('a1', 'assistant', 'Mingo', 'Chec')];
     render(<ChatMessageList dialogId="d" messages={withText} isTyping />);
     expect(names()).toEqual(['Michael Assraf', 'Mingo']);
   });
 
-  it('renders the assistant row when it carries a NON-text segment (tool call)', () => {
-    const withTool: Message[] = [
+  it('does not take a turn of sources alone for one that has drawn something', () => {
+    const withSources: ChatMessage[] = [
       pending[0],
       {
         id: 'a1',
         role: 'assistant',
-        name: 'Mingo',
-        // The REAL `ToolExecutionSegment` shape — `{ type, data }`, not flat
-        // fields. The previous fixture put `toolExecutionRequestId` / `status`
-        // at the top level and needed an `as` cast to compile at all (the cast
-        // was the tell: the two types did not overlap). It passed only because
-        // the empty-pending-turn predicate looks at segment TYPE; the moment it
-        // inspected `data`, this test would have kept passing while the real
-        // path broke.
-        content: [
+        metadata: { author: { name: 'Mingo' } },
+        parts: [{ type: 'source-url', sourceId: 'record://blog_post/1', url: 'https://x.test/a', title: 'A' }],
+      },
+    ];
+    render(<ChatMessageList dialogId="d" messages={withSources} isTyping />);
+    expect(names()).toEqual(['Michael Assraf']);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+  });
+
+  it('renders the assistant row when it carries a stage of the turn', () => {
+    const withStage: ChatMessage[] = [
+      pending[0],
+      {
+        id: 'a1',
+        role: 'assistant',
+        metadata: {
+          author: { name: 'Mingo' },
+          progress: [{ id: 't:searching', stage: 'searching', count: 3, state: 'running' }],
+        },
+        parts: [],
+      },
+    ];
+    render(<ChatMessageList dialogId="d" messages={withStage} isTyping />);
+    expect(names()).toEqual(['Michael Assraf', 'Mingo']);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('renders the assistant row when it carries a NON-text part (tool call)', () => {
+    const withTool: ChatMessage[] = [
+      pending[0],
+      {
+        id: 'a1',
+        role: 'assistant',
+        metadata: { author: { name: 'Mingo' } },
+        parts: [
           {
-            type: 'tool_execution',
-            data: {
-              type: 'EXECUTING_TOOL',
-              integratedToolType: 'SHELL',
-              toolFunction: 'run_command',
-              toolTitle: 'Run command',
-              parameters: { cmd: 'ls' },
-              toolExecutionRequestId: 'e1',
-            },
+            type: 'dynamic-tool',
+            toolName: 'run_command',
+            toolCallId: 'e1',
+            title: 'Run command',
+            state: 'input-available',
+            input: { cmd: 'ls' },
+            toolMetadata: { integratedToolType: 'SHELL' },
           },
         ],
       },
@@ -208,13 +226,18 @@ describe('a thinking turn has exactly ONE pending affordance', () => {
   });
 });
 
-describe('the SYSTEM name-only row is a legitimate label-without-body', () => {
-  it('still renders', () => {
-    const messages: Message[] = [
-      { id: 'u1', role: 'user', name: 'Michael Assraf', content: 'hi' },
-      { id: 's1', role: 'user', name: 'Technician joined', content: '', authorType: 'system' },
+describe('a system line is a row of its own', () => {
+  it('still renders, with its words in the body', () => {
+    const messages: ChatMessage[] = [
+      row('u1', 'user', 'Michael Assraf', 'hi'),
+      {
+        id: 's1',
+        role: 'system',
+        metadata: { author: { authorType: 'system' } },
+        parts: [{ type: 'text', text: 'Technician joined' }],
+      },
     ];
     render(<ChatMessageList dialogId="d" messages={messages} isTyping />);
-    expect(names()).toContain('Technician joined');
+    expect(bodies()).toContain('Technician joined');
   });
 });

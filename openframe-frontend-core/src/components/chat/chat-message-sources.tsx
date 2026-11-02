@@ -1,31 +1,33 @@
 'use client';
 
 /**
- * The sources an answer was given: one chip per source (open it, or ask about it), cited sources first and the rest
- * behind an expander. THE strip under every answer, in the chat and in a host's transcript viewer
- * (`ChatMessageSources` with `messageFromStoredRow`), so a saved answer shows the sources the live one did. Its own
+ * The sources an answer was given: one chip per table (open a record, or ask about it), cited sources first and the
+ * rest behind an expander. THE strip under every answer, in the chat and in a host's transcript viewer
+ * (`ChatMessageSources` with `messageOfStoredRow`), so a saved answer shows the sources the live one did. Its own
  * module so a transcript viewer draws it without loading the whole chat.
  */
 
 import { MessageSquare } from 'lucide-react';
 import type React from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import type { ChatMessage } from '../../chat-protocol/chat-message';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
-import { formatCitationIndices } from '../../utils/source-grouping';
+import { formatCitationIndices, type SourceGroup } from '../../utils/source-grouping';
 import { Button } from '../ui/button';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
 import { loadingItemProps } from '../ui/loading-scope';
 import type { ChatRef } from './chat-ref.types';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { SourceActionButton } from './source-action-button';
-import type { ChatSource, Message } from './types/message.types';
 import { chatChipClass } from './utils/chip-styles';
-import { FALLBACK_TOP_RETRIEVED, groupedRowLabels, splitCitedSources } from './utils/cited-sources';
-import { flattenAssistantContent } from './utils/flatten-assistant-content';
+import {
+  FALLBACK_TOP_RETRIEVED,
+  groupedRowLabels,
+  sourceRowInputOf,
+  sourceTitleOf,
+  splitCitedSources,
+} from './utils/cited-sources';
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
-
-/** Tiny inline replacement for hub's `formatRelativePath`. */
-const formatRelativePath = (p: string): string => p.replace(/^\/+/, '').replace(/\/+$/, '');
 
 /**
  * Source chip — TWO affordances per the hub original:
@@ -34,51 +36,32 @@ const formatRelativePath = (p: string): string => p.replace(/^\/+/, '').replace(
  *     `onDiscuss(ref)` to drill into THIS row via `entityIdFilter`.
  */
 function SourceChip(props: {
-  src: ChatSource;
+  group: SourceGroup;
   onDiscuss?: (ref: ChatRef) => void;
   /** The strip's list-item marker, carried by the chip's frame like its loading form's. */
   'data-loading-item'?: boolean;
 }) {
-  const { src, onDiscuss } = props;
+  const { group, onDiscuss } = props;
   const marks = loadingItemProps(props);
   const runtime = useRequiredChatRuntime();
-  // Single CTA resolver — same icon, same href chain, same ChatRef
-  // synthesis the inline card and search-result paths use.
-  const cta = resolveSourceRowCTA(
-    {
-      sourceRepo: src.sourceRepo,
-      documentType: src.documentType,
-      id: src.id,
-      title: src.name,
-      externalUrl: src.externalUrl,
-      targetPlatform: src.targetPlatform ?? null,
-      path: src.path,
-    },
-    sourceRowCtxFromRuntime(runtime),
-  );
+  const ctx = sourceRowCtxFromRuntime(runtime);
+  const [first] = group.rows;
+  // Single CTA resolver: same icon, same href chain, same ChatRef synthesis the inline card and search-result paths use.
+  const firstInput = sourceRowInputOf(first);
+  const cta = resolveSourceRowCTA(firstInput, ctx);
   const Icon = cta.icon;
   const icon = <Icon className="h-3.5 w-3.5" />;
   const chipClass = chatChipClass({ tone: 'secondary' });
+  const numbers = group.rows.flatMap(row => (row.number === undefined ? [] : [row.number]));
+  // A number exists only for a citation: a chip of records nobody cited prints none.
+  const numbered = (label: string) => (numbers.length > 0 ? `[${formatCitationIndices(numbers)}] ${label}` : label);
 
-  // Grouped source — hover/click reveals a dropdown with Open + Ask per row.
-  if (src.items && src.items.length > 0) {
-    // A server-grouped chip answers to one number; a client-built one answers
-    // to every number its rows were cited by.
-    const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
-    const rowLabels = groupedRowLabels(src.items);
-    const dropdownItems: HoverDropdownItem[] = src.items.map((item, i) => {
-      const itemCta = resolveSourceRowCTA(
-        {
-          sourceRepo: src.sourceRepo,
-          documentType: item.documentType,
-          id: item.id,
-          title: item.name,
-          externalUrl: item.externalUrl,
-          targetPlatform: item.targetPlatform ?? null,
-          path: item.path,
-        },
-        sourceRowCtxFromRuntime(runtime),
-      );
+  // A table's chip: hover/click reveals a dropdown with Open + Ask per row.
+  if (group.tableId) {
+    const rowLabels = groupedRowLabels(group.rows);
+    const dropdownItems: HoverDropdownItem[] = group.rows.map((row, i) => {
+      const input = sourceRowInputOf(row);
+      const itemCta = resolveSourceRowCTA(input, ctx);
       const ItemIcon = itemCta.icon;
       // Read out of the CTA before the `onClick` closure below is built: a
       // property narrowing does not survive into a callback (the property
@@ -90,19 +73,17 @@ function SourceChip(props: {
         icon: <ItemIcon className="h-3.5 w-3.5" />,
         href: itemCta.href ?? undefined,
         targetPlatform: itemCta.targetPlatform,
-        path: item.path ?? null,
+        path: input.path ?? null,
         secondaryAction:
           onDiscuss && itemCta.askable && itemChatRef
             ? {
                 icon: <MessageSquare />,
-                label: `Ask about ${item.name}`,
+                label: `Ask about ${sourceTitleOf(row)}`,
                 onClick: () => onDiscuss(itemChatRef),
               }
             : undefined,
       };
     });
-
-    const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
 
     return (
       <span className="inline-flex" {...marks}>
@@ -121,24 +102,18 @@ function SourceChip(props: {
         >
           <span className={`${chipClass} cursor-pointer`}>
             {icon}
-            <span className="max-w-[160px] truncate">
-              [{groupIndices}] {src.name}
-            </span>
+            <span className="max-w-[160px] truncate">{numbered(group.label)}</span>
           </span>
         </HoverDropdown>
       </span>
     );
   }
 
-  // Single-row chip helpers — wrap whatever clickable element each branch
-  // produces with the trailing Ask `SourceActionButton`.
-  const displayName = src.name || formatRelativePath(src.path);
-  const chipBody = (label: string) => (
+  // A row of no table: wrap whatever clickable element each branch produces with the trailing Ask `SourceActionButton`.
+  const chipBody = (
     <>
       {icon}
-      <span className="max-w-[160px] truncate">
-        [{src.index}] {label}
-      </span>
+      <span className="max-w-[160px] truncate">{numbered(group.label)}</span>
     </>
   );
   const wrapChip = (clickable: React.ReactNode) => (
@@ -151,42 +126,41 @@ function SourceChip(props: {
   // A chip that opens something is THE chat link (`NavLinkAnchorViaRuntime`): the one navigation decision, the one
   // click executor, and the panel closing on a same-tab navigation, exactly as markdown links and cards.
   if (cta.href) {
-    const isEntity = !!src.externalUrl;
     return wrapChip(
       <NavLinkAnchorViaRuntime
         href={cta.href}
-        path={isEntity ? null : src.path}
+        path={firstInput.path ?? null}
         targetPlatform={cta.targetPlatform ?? null}
         className={chipClass}
-        title={isEntity ? undefined : displayName}
+        title={firstInput.externalUrl ? undefined : group.label}
       >
-        {chipBody(isEntity ? src.name : displayName)}
+        {chipBody}
       </NavLinkAnchorViaRuntime>,
     );
   }
 
-  // No openable destination — static label + Ask affordance only.
+  // No openable destination: static label + Ask affordance only.
   return wrapChip(
-    <span className={`${chipClass} cursor-default`} title={displayName}>
-      {chipBody(displayName)}
+    <span className={`${chipClass} cursor-default`} title={group.label}>
+      {chipBody}
     </span>,
   );
 }
 
 /**
  * The sources strip under an answer: the sources it cited first, the rest behind an expander. THE one strip for every
- * surface that draws an answer, the chat and a host's transcript viewer (with `messageFromStoredRow`), so a saved
+ * surface that draws an answer, the chat and a host's transcript viewer (with `messageOfStoredRow`), so a saved
  * answer shows the sources the live one did.
  */
 export function ChatMessageSources({
   message,
   onDiscuss,
 }: {
-  message: Message;
+  message: ChatMessage;
   onDiscuss?: (ref: ChatRef) => void;
 }): React.ReactElement | null {
+  const { cited, uncited } = useMemo(() => splitCitedSources(message.parts), [message.parts]);
   if (message.role !== 'assistant') return null;
-  const { cited, uncited } = splitCitedSources(message.sources, flattenAssistantContent(message.content));
   if (cited.length === 0 && uncited.length === 0) return null;
   return (
     <div className="pb-2">
@@ -204,8 +178,8 @@ function SourceChips({
   uncited,
   onDiscuss,
 }: {
-  cited: ChatSource[];
-  uncited: ChatSource[];
+  cited: SourceGroup[];
+  uncited: SourceGroup[];
   onDiscuss?: (ref: ChatRef) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -217,26 +191,26 @@ function SourceChips({
       <div className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
         <span className="uppercase text-ods-text-muted text-h6">Top retrieved sources</span>
         <div className="flex flex-wrap gap-1.5">
-          {fallback.map(src => (
-            <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
+          {fallback.map(group => (
+            <SourceChip data-loading-item key={group.key} group={group} onDiscuss={onDiscuss} />
           ))}
         </div>
       </div>
     );
   }
 
-  const hiddenCount = uncited.length;
+  const hiddenCount = uncited.reduce((count, group) => count + group.rows.length, 0);
   const hasOverflow = hiddenCount > 0;
 
   return (
     <div className="mt-2 flex flex-col gap-1.5 border-t border-ods-border pt-2">
       <span className="uppercase text-ods-text-muted text-h6">Sources</span>
       <div className={`flex flex-wrap gap-1.5 ${expanded ? 'max-h-[200px] overflow-y-auto overscroll-contain' : ''}`}>
-        {cited.map(src => (
-          <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />
+        {cited.map(group => (
+          <SourceChip data-loading-item key={group.key} group={group} onDiscuss={onDiscuss} />
         ))}
         {expanded &&
-          uncited.map(src => <SourceChip data-loading-item key={src.index} src={src} onDiscuss={onDiscuss} />)}
+          uncited.map(group => <SourceChip data-loading-item key={group.key} group={group} onDiscuss={onDiscuss} />)}
         {hasOverflow && (
           <Button
             variant="link"

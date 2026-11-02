@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { SOURCE_LABELS_BY_TABLE } from '../../../../utils/source-icons';
+import { defaultDocumentTypeForTableId, SOURCE_LABELS_BY_TABLE } from '../../../../utils/source-icons';
 import { mapDocSearchResults } from '../map-doc-search-results';
 import type { DocSearchResult } from '../types';
 
@@ -19,15 +19,12 @@ const FOLDED_TABLES = [
   'financial-cash-flow',
 ];
 
-const row = (sourceRepo: string, n: number): DocSearchResult => ({
-  path: `${sourceRepo}/${n}`,
-  name: `Row ${n}`,
+const row = (tableId: string, n: number): DocSearchResult => ({
+  sourceId: `record://${defaultDocumentTypeForTableId(tableId)}/${n}`,
+  title: `Row ${n}`,
   snippet: '',
   type: 'file',
   matchType: 'content',
-  documentType: 'cap_table',
-  sourceRepo,
-  entityId: `${n}`,
 });
 
 describe('mapDocSearchResults', () => {
@@ -43,5 +40,36 @@ describe('mapDocSearchResults', () => {
   it('leaves every other table as one row per result', () => {
     const results = mapDocSearchResults([row('blog-posts', 1), row('blog-posts', 2)]);
     expect(results.map(result => result.title)).toEqual(['Row 1', 'Row 2']);
+  });
+
+  it('carries a row’s url and record URI, and a doc’s tree path, for the action to read', () => {
+    const [doc] = mapDocSearchResults([
+      {
+        sourceId: 'record://markdown/guides%2Finstall.md',
+        title: 'Install',
+        url: 'https://hub.openframe.ai/knowledge-base/guides/install.md',
+        snippet: 'How to install',
+        type: 'file',
+        matchType: 'title',
+      },
+    ]);
+    expect(doc).toMatchObject({
+      id: 'record://markdown/guides%2Finstall.md',
+      title: 'Install',
+      description: 'How to install',
+      path: 'guides/install.md',
+      metadata: {
+        url: 'https://hub.openframe.ai/knowledge-base/guides/install.md',
+        sourceId: 'record://markdown/guides%2Finstall.md',
+      },
+    });
+  });
+
+  // TODO(CU-17tkuw61kfy): the old hub's doc rows have no url, and open by the tree path.
+  it('keeps the tree path an old hub sends', () => {
+    const [doc] = mapDocSearchResults([
+      { sourceId: null, title: 'Doc', path: 'legal/doc.pdf', snippet: '', type: 'file', matchType: 'content' },
+    ]);
+    expect(doc).toMatchObject({ id: 'legal/doc.pdf', path: 'legal/doc.pdf' });
   });
 });

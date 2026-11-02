@@ -16,10 +16,11 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
   embedAuthedFetch: vi.fn(() => new Promise(() => {})),
 }));
 
+import type { ChatMessage } from '../../../chat-protocol/chat-message';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
 import type { WhatToAskContent } from '../hooks/use-what-to-ask';
-import type { UnifiedChatMessage, UnifiedChatState } from '../types/unified-chat-state.types';
+import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   endpoints: {
@@ -41,7 +42,12 @@ const WHAT_TO_ASK: WhatToAskContent = {
   note: 'A note under the chips.',
 };
 
-const HELLO: UnifiedChatMessage = { id: 'm-1', role: 'user', content: 'hello', timestamp: new Date(0) };
+const HELLO: ChatMessage = {
+  id: 'm-1',
+  role: 'user',
+  metadata: { createdAt: new Date(0).toISOString() },
+  parts: [{ type: 'text', text: 'hello' }],
+};
 
 /** A host that owns the dialogs; a send from a new chat creates `d-new`. */
 function Host({
@@ -58,7 +64,7 @@ function Host({
   onReset?: () => void;
   onSend?: (text: string) => void;
   /** What the open chat `d-1` holds. */
-  openChat?: UnifiedChatMessage[];
+  openChat?: ChatMessage[];
   /** A turn is running in the open chat. */
   busy?: boolean;
   whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
@@ -67,7 +73,7 @@ function Host({
   handleRef?: Ref<EmbeddableChatHandle>;
 }) {
   const [activeDialogId, setActiveDialogId] = useState<string | null>(initialDialogId);
-  const [sent, setSent] = useState<UnifiedChatMessage[]>([]);
+  const [sent, setSent] = useState<ChatMessage[]>([]);
   const noop = () => {};
   const asyncNoop = async () => {};
   const state: UnifiedChatState = {
@@ -76,7 +82,7 @@ function Host({
     streamingPhase: 'idle',
     sendMessage: text => {
       onSend?.(text);
-      setSent([{ id: 'sent', role: 'user', content: text, timestamp: new Date() }]);
+      setSent([{ id: 'sent', role: 'user', parts: [{ type: 'text', text: text }] }]);
       setActiveDialogId(current => current ?? 'd-new');
       return Promise.resolve();
     },
@@ -106,8 +112,7 @@ function Host({
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
   };

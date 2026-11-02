@@ -1,120 +1,117 @@
-import { citedSourceNumbers } from '../../../chat-protocol/citation-chip';
-import type { RecordLink } from '../../../chat-protocol/record-link';
+import { type ChatPart, type ChatSourcePart, isSourcePart } from '../../../chat-protocol/chat-message';
+import { citationNumbers } from '../../../chat-protocol/citations';
+import { parseCollectionHref, parseRecordHref, recordHref } from '../../../chat-protocol/record-link';
+import { platformOfUrl } from '../../../platform-domains';
 import { canonicalContentRefType } from '../../../utils/list-url';
-import { groupSourcesByTable } from '../../../utils/source-grouping';
-import { recordLinksIn } from '../record-links-in';
-import type { ChatSource } from '../types/message.types';
+import { groupSourcesByTable, type SourceGroup, type SourceRow } from '../../../utils/source-grouping';
+import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
+import { recordLinksInParts } from '../record-links-in';
+import type { SourceRowInput } from './source-row-cta';
 
 /** How many retrieved sources to show when the answer cited none of them. */
 export const FALLBACK_TOP_RETRIEVED = 3;
 
 export interface CitedSources {
-  /** Sources the answer referenced, in the order the answer first referenced
-   *  them — NOT in `index` order. */
-  cited: ChatSource[];
-  /** Everything retrieved but not referenced, in the order supplied. */
-  uncited: ChatSource[];
+  /** The chips of the sources the answer cited or linked, in the order the reader meets them. */
+  cited: SourceGroup[];
+  /** The chips of everything retrieved but not referenced, in the order supplied. */
+  uncited: SourceGroup[];
 }
 
-/** Fenced blocks and inline code spans. */
-const CODE = /```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`/g;
+/** A source's identity across spellings: its record URI in the canonical vocabulary, or its id as given. */
+function sourceKey(sourceId: string): string {
+  const record = parseRecordHref(sourceId);
+  return record ? recordHref(canonicalContentRefType(record.type), record.id) : sourceId;
+}
 
-/**
- * Blank out code before looking for citations.
- *
- * `$items[1]`, `argv[1]`, `matrix[0][1]` — array indexing is not a citation,
- * and this assistant answers with scripts constantly. Left in, a snippet marks
- * a source as cited that the prose never mentions, and worse, seeds the reading
- * order from a position inside a code block.
- *
- * Replaced with spaces rather than removed so nothing outside the block shifts
- * — only whether a marker is inside one is being decided here.
- */
-function withoutCode(content: string): string {
-  return content.replace(CODE, block => ' '.repeat(block.length));
+/** A video is drawn by its card and a collection is no record: neither is ever a row of the strip. */
+function isDrawnAsRow(sourceId: string): boolean {
+  return parseCollectionHref(sourceId) === null && parseRecordHref(sourceId)?.type !== 'video';
 }
 
 /**
- * Split an answer's sources into the ones it cited and the ones it did not.
+ * Split an answer's sources into the ones it referenced and the ones it did not.
  *
- * Reading order, not numeric order: the strip is a legend for the sentences
- * above it, so the chip for the citation the reader meets first comes first,
- * even when the model numbered it `[3]`. A number cited twice is placed once,
- * at its first mention.
+ * Reading order, not list order: the strip is a legend for the sentences above it. Cited = the citations' sources in
+ * reading order, then the records the text links, each once. A cited collection (`record://blog_post`, a citation on a
+ * table's header) marks its type's records cited only when no record of that type is individually cited or linked, each
+ * answering to the collection's number.
  *
- * Each half is then grouped by knowledge table (`groupSourcesByTable`): AFTER
- * the split, because cited-ness belongs to a citation number, and a table whose
- * rows were only partly cited is honestly two chips, the cited rows under
- * "Sources" and the rest behind the expander.
- *
- * `content` is the flat answer text. A segmented message has to be flattened by
- * the caller — citation markers live in text segments, and this function
- * deliberately does not know what a segment is.
+ * Each half is then grouped by table: AFTER the split, because a table whose rows were only partly cited is honestly two
+ * chips, the cited rows under "Sources" and the rest behind the expander.
  */
-export function splitCitedSources(sources: ChatSource[] | undefined, content: string): CitedSources {
-  if (!sources || sources.length === 0) return { cited: [], uncited: [] };
-
-  // An answer that links records cites the records it links: those are what it names, and their cards are under it.
-  // An answer whose links name no retrieved record (a record from an earlier turn) falls back to its numbers.
-  const byLinks = splitByRecords(sources, recordLinksIn(content));
-  if (byLinks.cited.length > 0) return byLinks;
-
-  const firstMentionAt = new Map(citedSourceNumbers(withoutCode(content)).map((index, order) => [index, order]));
-
-  const cited = sources
-    .filter(source => firstMentionAt.has(source.index))
-    .sort((a, b) => (firstMentionAt.get(a.index) ?? 0) - (firstMentionAt.get(b.index) ?? 0));
-  const uncited = sources.filter(source => !firstMentionAt.has(source.index));
-  return { cited: groupSourcesByTable(cited), uncited: groupSourcesByTable(uncited) };
-}
-
-/** One record of a source, as a flat source: a flat source itself, or one row of a grouped source (keeping its own
- *  citation number when it has one, else the group's). */
-function recordsOf(source: ChatSource): ChatSource[] {
-  if (!source.items || source.items.length === 0) return [source];
-  return source.items.map(item => ({
-    index: item.index ?? source.index,
-    id: item.id,
-    name: item.name,
-    path: item.path ?? '',
-    documentType: item.documentType,
-    ...(item.externalUrl ? { externalUrl: item.externalUrl } : {}),
-    targetPlatform: item.targetPlatform ?? null,
-    ...(source.sourceRepo ? { sourceRepo: source.sourceRepo } : {}),
-  }));
-}
-
-/** The key of a record, in the canonical vocabulary record links use. A document is keyed by its id, or
- *  by its path when it carries no id (doc rows are keyed by path). */
-function recordKey(record: ChatSource): string | null {
-  const id = record.id || record.path;
-  return record.documentType && id ? `${canonicalContentRefType(record.documentType)}:${id}` : null;
-}
-
-/** Cited = the records the answer links, in link order; uncited = every other record. Both halves are then grouped
- *  by table, so a table's chip counts exactly its linked records. */
-function splitByRecords(sources: ChatSource[], links: RecordLink[]): CitedSources {
-  const records = sources.flatMap(recordsOf);
-  const byKey = new Map<string, ChatSource>();
-  for (const record of records) {
-    const key = recordKey(record);
-    if (key && !byKey.has(key)) byKey.set(key, record);
+export function splitCitedSources(parts: readonly ChatPart[]): CitedSources {
+  const rows = new Map<string, ChatSourcePart>();
+  for (const part of parts) {
+    if (!isSourcePart(part) || !isDrawnAsRow(part.sourceId)) continue;
+    const key = sourceKey(part.sourceId);
+    if (!rows.has(key)) rows.set(key, part);
   }
-  const cited: ChatSource[] = [];
-  for (const link of links) {
-    const record = byKey.get(`${canonicalContentRefType(link.type)}:${link.id}`);
-    if (record && !cited.includes(record)) cited.push(record);
+  if (rows.size === 0) return { cited: [], uncited: [] };
+
+  const numbers = citationNumbers(parts);
+  const linked = recordLinksInParts(parts).map(record => recordHref(canonicalContentRefType(record.type), record.id));
+
+  // The types a record was individually referenced for, which a cited collection of that type then leaves alone.
+  const individually = new Set<string>();
+  for (const uri of [...numbers.keys(), ...linked]) {
+    const record = parseRecordHref(uri);
+    if (record && rows.has(sourceKey(uri))) individually.add(canonicalContentRefType(record.type));
   }
-  const uncited = records.filter(record => !cited.includes(record));
-  return { cited: groupSourcesByTable(cited), uncited: groupSourcesByTable(uncited) };
+
+  const cited = new Map<string, SourceRow>();
+  const cite = (key: string, number: number | undefined) => {
+    const row = rows.get(key);
+    if (row && !cited.has(key)) cited.set(key, number === undefined ? row : { ...row, number });
+  };
+  for (const [uri, number] of numbers) {
+    const collection = parseCollectionHref(uri);
+    if (!collection) {
+      cite(sourceKey(uri), number);
+      continue;
+    }
+    const type = canonicalContentRefType(collection.type);
+    if (individually.has(type)) continue;
+    for (const key of rows.keys()) {
+      const record = parseRecordHref(key);
+      if (record && canonicalContentRefType(record.type) === type) cite(key, number);
+    }
+  }
+  for (const key of linked) cite(key, undefined);
+
+  const uncited = [...rows].filter(([key]) => !cited.has(key)).map(([, row]) => row);
+  return { cited: groupSourcesByTable([...cited.values()]), uncited: groupSourcesByTable(uncited) };
+}
+
+/** What a source part is called: its title, else its record's id. */
+export function sourceTitleOf(source: ChatSourcePart): string {
+  return source.title ?? parseRecordHref(source.sourceId)?.id ?? source.sourceId;
+}
+
+/** A source part, in the words the one row resolver (`resolveSourceRowCTA`) reads. */
+export function sourceRowInputOf(source: ChatSourcePart): SourceRowInput {
+  const record = parseRecordHref(source.sourceId);
+  const url = source.type === 'source-url' ? source.url : null;
+  return {
+    sourceRepo: record ? defaultTableIdForDocumentType(record.type) : null,
+    documentType: record?.type ?? null,
+    id: record?.id ?? null,
+    title: sourceTitleOf(source),
+    externalUrl: url,
+    targetPlatform: platformOfUrl(url),
+    // TODO(CU-17tkuw61kfy): an old doc source arrives with no url and its tree path as `filename`.
+    path: source.type === 'source-document' ? (source.filename ?? null) : null,
+  };
 }
 
 /**
- * A grouped chip's dropdown row label. A row prints its citation number only to tell rows of different citations
- * apart (a client-built group of several numbers); when every row was cited by the same number, the chip already
- * shows it and each row printing it again is noise.
+ * A grouped chip's dropdown row label. A row prints its citation number only to tell rows of different citations apart;
+ * when every row was cited by the same number, the chip already shows it and each row printing it again is noise.
  */
-export function groupedRowLabels(items: ReadonlyArray<{ name: string; index?: number }>): string[] {
-  const numbers = new Set(items.flatMap(item => (item.index === undefined ? [] : [item.index])));
-  return items.map(item => (numbers.size > 1 && item.index !== undefined ? `[${item.index}] ${item.name}` : item.name));
+export function groupedRowLabels(rows: readonly SourceRow[]): string[] {
+  const numbers = new Set(rows.flatMap(row => (row.number === undefined ? [] : [row.number])));
+  return rows.map(row => {
+    const title = sourceTitleOf(row);
+    return numbers.size > 1 && row.number !== undefined ? `[${row.number}] ${title}` : title;
+  });
 }

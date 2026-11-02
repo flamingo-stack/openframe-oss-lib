@@ -27,6 +27,7 @@
  */
 
 import { byKey, getPlatformProductionUrl } from '../platform-domains';
+import { sanitizeDocPath } from './doc-path';
 import { canonicalContentRefType } from './list-url';
 
 /**
@@ -110,6 +111,9 @@ export interface ContentHrefOptions {
   /** Per-type full override — wins over the suffix logic. Receives the same
    *  `identifier` the seam was called with. */
   overrides?: Record<string, (identifier: string) => { href: string; targetPlatform: string | null }>;
+  /** Hosted types whose record id IS the slug (a doc's tree path, `docs/setup.md`): the href is `/<suffix>/<id>`, never
+   *  the last segment of the url, which would lose the tree. */
+  slugIsIdentifier?: ReadonlySet<string>;
 }
 
 /** What the seam resolves a content reference to. */
@@ -226,6 +230,11 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
       // has NO externalUrl to recover from but DOES know the row's slug once it
       // loads, and its `identifier` must stay the primary key so `overrides`
       // still deep-link correctly.
+      //
+      // `slugIsIdentifier`: the record's id IS its slug (a doc's tree path), and the url's last segment would lose it.
+      if (opts.slugIsIdentifier?.has(type)) {
+        return { href: `/${seg}/${slugHint?.trim() || sanitizeDocPath(identifier)}`, targetPlatform: null };
+      }
       const recovered = externalUrl ? lastPathSegment(externalUrl) : null;
       const slug = recovered && recovered !== seg ? recovered : slugHint?.trim() || identifier;
       return { href: `/${seg}/${slug}`, targetPlatform: null };

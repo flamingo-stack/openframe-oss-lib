@@ -5,7 +5,7 @@ import { fn } from 'storybook/test';
 
 import { MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from '../components/chat/chat-dimensions';
 import { EmbeddableChat } from '../components/chat/embeddable-chat';
-import type { UnifiedChatMessage, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
+import type { UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import {
   BracketCurlyIcon,
   ChartDonutIcon,
@@ -27,6 +27,7 @@ import { type ChatRuntime, ChatRuntimeContext } from '../contexts/chat-runtime-c
 import { ContentAreaWidthContext, useContentBreakpoint } from '../hooks/ui/use-content-breakpoint';
 import type { NavigationSidebarConfig } from '../types/navigation';
 import { cn } from '../utils/cn';
+import { approvalPart, type StoryRow, storyMessage, textPart } from './__fixtures__/chat-messages';
 
 const NAV_ITEMS: NavigationSidebarConfig['items'] = [
   { id: 'dashboard', label: 'Dashboard', icon: <ChartDonutIcon size={24} />, path: '/dashboard', isActive: true },
@@ -264,13 +265,13 @@ const RUNTIME: ChatRuntime = {
 const QUERY_CLIENT = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 const AT = new Date('2026-10-02T14:47:00');
-const MINGO_MESSAGES: UnifiedChatMessage[] = [
+const MINGO_MESSAGES_ROWS: StoryRow[] = [
   {
     id: 'm1',
     role: 'user',
     name: 'Roman Smith',
     authorType: 'admin',
-    content: 'why is osqueryd.exe cert expiring in 3 days?',
+    parts: textPart('why is osqueryd.exe cert expiring in 3 days?'),
     timestamp: AT,
   },
   {
@@ -278,7 +279,7 @@ const MINGO_MESSAGES: UnifiedChatMessage[] = [
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo',
-    content: [{ type: 'thinking', text: 'Checking the renewal job history for osqueryd on this device.' }],
+    parts: [{ type: 'reasoning', text: 'Checking the renewal job history for osqueryd on this device.' }],
     timestamp: AT,
   },
   {
@@ -286,8 +287,9 @@ const MINGO_MESSAGES: UnifiedChatMessage[] = [
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo',
-    content:
+    parts: textPart(
       "The renewal job ran ~6 hours ago but didn't complete. osqueryd.exe cert expires in 3 days - if it's not renewed before then, the agent will fail signature validation and stop reporting.\n\nWant me to trigger a manual renewal or check what blocked the last attempt?",
+    ),
     timestamp: AT,
   },
   {
@@ -295,23 +297,18 @@ const MINGO_MESSAGES: UnifiedChatMessage[] = [
     role: 'assistant',
     name: 'Mingo',
     authorType: 'mingo',
-    content: [
-      {
-        type: 'approval_request',
-        data: {
-          command: '$today = (Get-Date).Date\n$logs = Get-WinEvent -FilterHashtable @{ LogName = "System" }',
-          explanation:
-            'Collects all events from System, Application, and Security logs for today and exports them to a CSV file at C:\\Logs\\today_logs.csv.',
-          approvalRequestId: 'ar-1',
-        },
-        status: 'pending',
-        onApprove: () => undefined,
-        onReject: () => undefined,
-      },
+    parts: [
+      approvalPart({
+        id: 'ar-1',
+        command: '$today = (Get-Date).Date\n$logs = Get-WinEvent -FilterHashtable @{ LogName = "System" }',
+        explanation:
+          'Collects all events from System, Application, and Security logs for today and exports them to a CSV file at C:\\Logs\\today_logs.csv.',
+      }),
     ],
     timestamp: AT,
   },
 ];
+const MINGO_MESSAGES = MINGO_MESSAGES_ROWS.map(storyMessage);
 
 /** A static Mingo thread through the `mingoState` injection path: no transport. */
 function createMingoState(): UnifiedChatState {
@@ -348,8 +345,7 @@ function createMingoState(): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
   };

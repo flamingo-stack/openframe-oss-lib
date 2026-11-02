@@ -104,11 +104,6 @@ export function recordLinkMarkdown(record: RecordLink, label: string): string {
   return `[${text.replace(/([\\[\]])/g, '\\$1')}](${recordHref(record.type, record.id)})`;
 }
 
-/** The key of a record, as the servers' lists of offered records hold it. */
-export function recordKey(record: RecordLink): string {
-  return `${record.type}:${record.id}`;
-}
-
 function safeDecode(value: string): string {
   if (!value.includes('%')) return value;
   try {

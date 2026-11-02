@@ -64,9 +64,10 @@ async function menuRows(name: string | RegExp): Promise<string[]> {
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
-    vi.fn(
-      async () =>
+    vi.fn(() =>
+      Promise.resolve(
         new Response(JSON.stringify({ items: [{ id: '86ad3qvv5', title: 'Patch policies', status: 'working' }] })),
+      ),
     ),
   );
 });
@@ -80,7 +81,8 @@ describe("recordMenuGroups: one list of a record's actions", () => {
     const items = rows({ type: 'roadmap_item', id: '86ad3qvv5', url: '/roadmap#86ad3qvv5' });
     expect(items.map(item => item.label)).toEqual(['Ask Mingo', 'Open Details', 'Open in ClickUp']);
     expect(items[1]).toMatchObject({ href: '/roadmap#86ad3qvv5', iconAction: { 'aria-label': 'Open in new tab' } });
-    expect(items[2]).toMatchObject({ href: expect.stringContaining('86ad3qvv5'), openInNewTab: true });
+    expect(items[2]).toMatchObject({ openInNewTab: true });
+    expect(items[2].href).toContain('86ad3qvv5');
   });
 
   it('an internal task opens in ClickUp itself: one ClickUp row, not two', () => {
@@ -102,7 +104,7 @@ describe('a chip offers what its card offers', () => {
       inChat(
         <ChatMessageEnhanced
           role="assistant"
-          content={[{ type: 'text', text: 'See [Patch policies](record://roadmap_item/86ad3qvv5).' }]}
+          parts={[{ type: 'text', text: 'See [Patch policies](record://roadmap_item/86ad3qvv5).' }]}
           renderEntityCard={() => null}
           NavLinkAnchor={NavLinkAnchor}
         />,
@@ -145,7 +147,7 @@ describe('a chip offers what its card offers', () => {
       inChat(
         <ChatMessageEnhanced
           role="assistant"
-          content={[{ type: 'text', text: 'Restart [MacBook](record://device/m-1).' }]}
+          parts={[{ type: 'text', text: 'Restart [MacBook](record://device/m-1).' }]}
           renderEntityCard={() => null}
           renderRecordChip={({ label }) => <HostChip label={label} />}
           NavLinkAnchor={NavLinkAnchor}
@@ -164,7 +166,7 @@ describe('a chip offers what its card offers', () => {
       inChat(
         <ChatMessageEnhanced
           role="assistant"
-          content={[{ type: 'text', text: 'See [Patch policies](record://roadmap_item/86ad3qvv5).' }]}
+          parts={[{ type: 'text', text: 'See [Patch policies](record://roadmap_item/86ad3qvv5).' }]}
           renderEntityCard={() => null}
           NavLinkAnchor={NavLinkAnchor}
         />,

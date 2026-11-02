@@ -171,6 +171,10 @@ export interface ChatStreamEntry {
 // Headers + encoding
 // =============================================================================
 
+/** What a turn that ended with no completion signal says under its text (`finishReason: 'interrupted'`). */
+export const CHAT_INTERRUPTED_NOTICE =
+  'The answer was interrupted before it finished, so it may be incomplete. Please ask again.';
+
 /**
  * The stream's response headers. `no-transform` goes beyond the standard's `no-cache`: a buffering intermediary breaks
  * a stream that streams, and every hub SSE response has always sent it.

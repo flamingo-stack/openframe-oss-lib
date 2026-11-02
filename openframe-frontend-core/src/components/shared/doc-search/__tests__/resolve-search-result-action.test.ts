@@ -10,17 +10,14 @@ const HUB = 'https://www.flamingo.run';
 const runtimeIn = (mode: 'host' | 'embed'): ChatRuntime =>
   ({ navigation: { mode, defaultContentOrigin: HUB }, source: 'openframe' }) as unknown as ChatRuntime;
 
-/** A RAG row for a guide the hub owns, shaped like `mapDocSearchResults` emits. */
+/** A row for a guide the hub owns, shaped like `mapDocSearchResults` emits. */
 const guideRow: SearchResult = {
   id: 'onboarding-guides/deploy-first-device',
   title: 'Deploy your first device',
   path: 'onboarding-guides/deploy-first-device',
   metadata: {
-    documentType: 'onboarding_guide',
-    externalUrl: `${HUB}/onboarding-guides/deploy-first-device`,
-    sourceRepo: 'onboarding-guides',
-    id: 'guide-123',
-    targetPlatform: 'openframe',
+    url: `${HUB}/onboarding-guides/deploy-first-device`,
+    sourceId: 'record://onboarding_guide/guide-123',
   },
 };
 
@@ -40,15 +37,15 @@ const helpCenterCompose = makeComposeContentUrl({
 });
 
 describe('resolveSearchResultAction — composeContentUrl seam', () => {
-  it("no runtime → the RAG externalUrl verbatim, the lib's default rule (another origin → new tab)", () => {
+  it("no runtime → the server's url verbatim, the lib's default rule (another origin → new tab)", () => {
     expect(resolveSearchResultAction(guideRow, 'openframe', null)).toEqual({
       kind: 'navigate-new-tab',
       href: `${HUB}/onboarding-guides/deploy-first-device`,
-      targetPlatform: 'openframe',
+      targetPlatform: 'flamingo',
     });
   });
 
-  it('hosted type → the host in-app route, slug recovered from externalUrl', () => {
+  it('hosted type → the host in-app route, slug recovered from the url', () => {
     expect(resolveSearchResultAction(guideRow, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-same-tab',
       href: '/help-center/onboarding-guides/deploy-first-device',
@@ -73,10 +70,8 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
       id: 'delivery-1',
       title: 'Fix the thing',
       metadata: {
-        documentType: 'delivery_item',
-        externalUrl: `${HUB}/bug-fixes-and-enhancements?search=abc123`,
-        sourceRepo: 'clickup-delivery',
-        id: 'abc123',
+        url: `${HUB}/bug-fixes-and-enhancements?search=abc123`,
+        sourceId: 'record://delivery_item/abc123',
       },
     };
     expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
@@ -87,16 +82,13 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     });
   });
 
-  it('non-hosted type → the seam returns externalUrl verbatim, opens out', () => {
+  it('non-hosted type → the seam returns the url verbatim, opens out', () => {
     const row: SearchResult = {
       id: 'blog-1',
       title: 'Hello',
       metadata: {
-        documentType: 'blog_post',
-        externalUrl: `${HUB}/blog/hello`,
-        sourceRepo: 'blog-posts',
-        id: 'blog-1',
-        targetPlatform: 'flamingo',
+        url: `${HUB}/blog/hello`,
+        sourceId: 'record://blog_post/blog-1',
       },
     };
     expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
@@ -106,26 +98,26 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     });
   });
 
-  it('row without documentType → seam skipped, externalUrl verbatim', () => {
+  it('row naming no record → seam skipped, the url verbatim, its platform from the url', () => {
     const row: SearchResult = {
       id: 'x',
       title: 'Untyped',
-      metadata: { externalUrl: `${HUB}/somewhere`, targetPlatform: 'openframe' },
+      metadata: { url: `${HUB}/somewhere` },
     };
     expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
-      kind: 'navigate-same-tab',
+      kind: 'navigate-new-tab',
       href: `${HUB}/somewhere`,
-      targetPlatform: 'openframe',
+      targetPlatform: 'flamingo',
     });
   });
 
-  it('no externalUrl → unchanged ask-ai / route / noop fallbacks', () => {
+  it('no url → ask-ai / route / noop fallbacks', () => {
     expect(
       resolveSearchResultAction(
         {
           id: 'cap-1',
           title: 'Cap Table',
-          metadata: { documentType: 'cap_table', sourceRepo: 'financial-cap-table', id: 'row-9' },
+          metadata: { sourceId: 'record://cap_table/row-9' },
         },
         'company-hub',
         runtimeIn('host'),
@@ -138,6 +130,20 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
         ref: { type: 'cap_table', id: 'row-9', title: 'Cap Table', url: null },
       },
     });
+
+    expect(
+      resolveSearchResultAction(
+        {
+          id: 'doc',
+          title: 'Doc',
+          path: 'repo/architecture/api.md',
+          metadata: { sourceId: 'record://markdown/repo%2Farchitecture%2Fapi.md' },
+        },
+        'openframe',
+        runtimeIn('host'),
+        helpCenterCompose,
+      ),
+    ).toEqual({ kind: 'route', path: 'repo/architecture/api.md' });
 
     expect(
       resolveSearchResultAction(

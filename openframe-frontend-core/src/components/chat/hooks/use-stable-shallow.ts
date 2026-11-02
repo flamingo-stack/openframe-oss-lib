@@ -18,6 +18,7 @@
  */
 
 import { useState } from 'react';
+import { type ChatPart, type ChatSourcePart, isSourcePart } from '../../../chat-protocol/chat-message';
 
 function shallowEqual(a: object, b: object): boolean {
   const aKeys = Object.keys(a);
@@ -43,4 +44,12 @@ export function useStableShallow<T extends object | undefined>(value: T): T {
   // The pass that stores `value` also returns it, so callers never see a stale
   // object for a render.
   return same ? cached : value;
+}
+
+/**
+ * A message's source parts, keeping the array's identity across deltas: the reducer writes copy-on-write, so while only
+ * text grows every element here is the same object, and whatever reads the sources does not re-render per token.
+ */
+export function useStableSources(parts: readonly ChatPart[]): ChatSourcePart[] {
+  return useStableShallow(parts.filter(isSourcePart));
 }

@@ -129,6 +129,29 @@ export function formatChatAttachmentMarkdownForBubble(att: ChatAttachment, viewU
   return isImage ? `\n\n![${safeName}](${url})` : `\n\n[Attached: ${safeName}](${url})`;
 }
 
+/**
+ * A `file` part's address on this host: the tail after `chat-attachments/` re-prefixed with the host's
+ * `attachmentViewUrlPrefix`, so a proxied or preview host stays same-origin. A stored url is on the conversation
+ * platform's canonical origin; with no prefix, or a url that is no view url, it is used as given.
+ */
+export function chatFilePartViewUrl(url: string, viewUrlPrefix: string | undefined): string {
+  const marker = 'chat-attachments/';
+  const at = url.indexOf(marker);
+  return viewUrlPrefix && at !== -1 ? `${viewUrlPrefix}${url.slice(at + marker.length)}` : url;
+}
+
+/** A `file` part as the bubble draws it: the same two forms as {@link formatChatAttachmentMarkdownForBubble}. */
+export function chatFilePartMarkdown(
+  part: { mediaType: string; filename?: string; url: string },
+  viewUrlPrefix: string | undefined,
+): string {
+  const safeName = escapeMarkdownInline(part.filename ?? 'attachment');
+  const url = chatFilePartViewUrl(part.url, viewUrlPrefix);
+  return (ANTHROPIC_SUPPORTED_IMAGE_MIME as readonly string[]).includes(part.mediaType)
+    ? `![${safeName}](${url})`
+    : `[Attached: ${safeName}](${url})`;
+}
+
 // ---------------------------------------------------------------------------
 // Server-side strip regex + parser
 // ---------------------------------------------------------------------------

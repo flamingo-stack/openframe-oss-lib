@@ -172,7 +172,6 @@ export {
   type CardDestination,
   type CardDestinationEntry,
   type CardDestinationInput,
-  type CardDestinationSource,
 } from './card-destination';
 export {
   resolveFetchedCardHref,

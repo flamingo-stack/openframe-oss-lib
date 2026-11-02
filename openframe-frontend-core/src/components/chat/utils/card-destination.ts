@@ -1,33 +1,31 @@
 /**
  * Where an inline chat card goes when clicked: THE one decision, pure.
  *
- * A card and the source chip for the same row must land on the same page. The
- * chip always has its row (`externalUrl`, `path`); a card may arrive as a bare
- * record link (`record://type/id`) and learn the rest only when its row loads. So the
- * card asks the chip's resolver (`resolveSourceRowCTA`) with everything known
- * at that moment, the marker's fields first and the fetched row's `path` when
- * the marker had none, and falls back to the fetched row's own destination
- * (`pickFetchedCardHref`) only when that resolver has nothing to route.
+ * A card and the source chip for the same row must land on the same page. The server answers every record's url: on its
+ * source part (`chatRef.url`) or on the row the card fetched (`item.url`). The card asks the chip's resolver
+ * (`resolveSourceRowCTA`) with it, and the host's composer decides where that type lives.
  *
- * `ChatCardLoader` calls this once per render; nothing else decides a card's
- * href. No React, no DOM.
+ * `ChatCardLoader` calls this once per render; nothing else decides a card's href. No React, no DOM.
  */
 
+import { platformOfUrl } from '../../../platform-domains';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import type { ChatRef } from '../chat-ref.types';
 import { safeHref } from './compact-card-classes';
+import { isRelativeHref } from './new-tab-rel';
 import { pickFetchedCardHref, readFetchedCardPath, resolveFetchedCardHref } from './resolve-fetched-card-href';
 import { resolveSourceRowCTA, type SourceRowContext } from './source-row-cta';
-
-/** Which rule produced the destination (for tests and debugging). */
-export type CardDestinationSource = 'row' | 'hostOverride' | 'item' | 'composed' | 'none';
 
 export interface CardDestination {
   url: string | null;
   targetPlatform: string | null;
   /** Doc-tree path, from the ref or the fetched row. The click router uses it for in-app doc navigation. */
   path: string | null;
-  source: CardDestinationSource;
+  /**
+   * The url is a route of the host's own. The server's url is always absolute, so a relative href out of the composer
+   * can only be a route the host claimed.
+   */
+  hostRoute: boolean;
 }
 
 /** The routing fields of a card registry entry, generic over the row type the entry reads. */
@@ -38,18 +36,23 @@ export interface CardDestinationEntry<Item> {
 }
 
 export interface CardDestinationInput<Item = unknown> {
-  /** The ref the card was mounted with: a full ref, or a bare marker (`url: null`, no metadata). */
+  /** The ref the card was mounted with: described by a source part, or a bare record (`url: null`). */
   chatRef: ChatRef;
   /** The row the card fetched; undefined while loading and for ref-only types. */
   item?: Item;
   /** The registry entry's routing fields. */
   entry?: CardDestinationEntry<Item> | null;
-  /** `sourceRowCtxFromRuntime(runtime, surface)`, the same context a source chip is resolved with. */
+  /** `sourceRowCtxFromRuntime(runtime)`, the same context a source chip is resolved with. */
   ctx: SourceRowContext;
   /** The host's content-href seam (`runtime.composeContentUrl`). */
   composeContentUrl?: ComposeContentUrl;
-  /** Embed-mode origin prefix (`resolveHrefForRuntime`), applied to a row-resolved href. */
-  resolveHref?: (href: string) => string;
+}
+
+/** The url the fetched row answers (the one rule on the server), or null. */
+function readFetchedCardUrl(item: unknown): string | null {
+  if (!item || typeof item !== 'object') return null;
+  const { url } = item as { url?: unknown };
+  return typeof url === 'string' && url ? url : null;
 }
 
 export function resolveCardDestination<Item = unknown>({
@@ -58,30 +61,42 @@ export function resolveCardDestination<Item = unknown>({
   entry,
   ctx,
   composeContentUrl,
-  resolveHref = href => href,
 }: CardDestinationInput<Item>): CardDestination {
+  const url = chatRef.url ?? readFetchedCardUrl(item);
   const refPath = typeof chatRef.metadata?.path === 'string' && chatRef.metadata.path ? chatRef.metadata.path : null;
+  // TODO(CU-17tkuw61kfy): an old doc source arrives with no url, and its row's path is what a doc card opens.
   const path = refPath ?? (item ? readFetchedCardPath(item) : null);
-
-  // 1. The chip's resolver, with the row as far as it is known.
   const cta = resolveSourceRowCTA(
     {
-      sourceRepo: chatRef.sourceRepo,
       documentType: chatRef.type,
       id: chatRef.id,
       title: chatRef.title,
-      externalUrl: chatRef.url,
-      targetPlatform: chatRef.targetPlatform,
+      externalUrl: url,
+      targetPlatform: platformOfUrl(url),
       path,
     },
     ctx,
   );
-  const rowUrl = cta.href ? resolveHref(cta.href) : (chatRef.url ?? null);
-  const rowPlatform = cta.targetPlatform ?? chatRef.targetPlatform ?? null;
-  if (rowUrl) return { url: rowUrl, targetPlatform: rowPlatform, path, source: 'row' };
+  if (cta.href) {
+    return { url: cta.href, targetPlatform: cta.targetPlatform, path, hostRoute: isRelativeHref(cta.href) };
+  }
+  return legacyCardDestination({ chatRef, item, entry, composeContentUrl, path });
+}
 
-  // 2. The fetched row's own destination: an explicit host override, else the
-  //    registry's `fallbackHref`, else the host seam's composed href.
+/**
+ * TODO(CU-17tkuw61kfy): the old hub's page-shaped rows answer no url, and `resolveSourceRowCTA` calls the composer only
+ * with a url or a doc path. So the fetched row's own destination: an explicit host override, else the registry's
+ * `fallbackHref`, else the composer's href. Only what the host composed can be a route of its own.
+ */
+function legacyCardDestination<Item>({
+  chatRef,
+  item,
+  entry,
+  composeContentUrl,
+  path,
+}: Pick<CardDestinationInput<Item>, 'chatRef' | 'item' | 'entry' | 'composeContentUrl'> & {
+  path: string | null;
+}): CardDestination {
   if (entry?.contentRefType && item) {
     const choice = pickFetchedCardHref({
       composed: resolveFetchedCardHref({
@@ -95,9 +110,13 @@ export function resolveCardDestination<Item = unknown>({
     });
     const url = choice ? (safeHref(choice.href) ?? null) : null;
     if (choice && url) {
-      // The `item` branch carries no platform of its own: keep the ref's.
-      return { url, targetPlatform: choice.targetPlatform ?? rowPlatform, path, source: choice.source };
+      return {
+        url,
+        targetPlatform: choice.targetPlatform ?? null,
+        path,
+        hostRoute: choice.source !== 'item' && isRelativeHref(url),
+      };
     }
   }
-  return { url: null, targetPlatform: rowPlatform, path, source: 'none' };
+  return { url: null, targetPlatform: null, path, hostRoute: false };
 }

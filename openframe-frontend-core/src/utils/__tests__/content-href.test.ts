@@ -220,3 +220,43 @@ describe('DEFAULT_CONTENT_SUFFIXES', () => {
     });
   });
 });
+
+describe('makeComposeContentUrl: slugIsIdentifier', () => {
+  const compose = makeComposeContentUrl({
+    hostedTypes: new Set(['markdown', 'product_release']),
+    contentOrigin: 'https://www.flamingo.run',
+    suffixes: { markdown: 'knowledge-base', product_release: 'releases' },
+    slugIsIdentifier: new Set(['markdown']),
+  });
+
+  it("keeps a doc's tree path, where the url's last segment would lose it", () => {
+    expect(
+      compose({
+        type: 'markdown',
+        identifier: 'docs/guides/setup.md',
+        externalUrl: 'https://hub.openframe.ai/knowledge-base/docs/guides/setup.md',
+      }),
+    ).toEqual({ href: '/knowledge-base/docs/guides/setup.md', targetPlatform: null });
+  });
+
+  it('strips what a route may not hold', () => {
+    expect(compose({ type: 'markdown', identifier: 'docs/a?x=1#y.md' }).href).toBe('/knowledge-base/docs/ax1y.md');
+  });
+
+  // TODO(CU-17tkuw61kfy): an old doc source arrives with its tree path as the slug, and its row id as the identifier.
+  it('the slug hint wins, for an old doc source', () => {
+    expect(compose({ type: 'markdown', identifier: 'uuid-1', slug: 'docs/setup.md' }).href).toBe(
+      '/knowledge-base/docs/setup.md',
+    );
+  });
+
+  it('every other hosted type recovers its slug from the url', () => {
+    expect(
+      compose({
+        type: 'product_release',
+        identifier: 'id-1',
+        externalUrl: 'https://www.flamingo.run/releases/v1-2-0',
+      }).href,
+    ).toBe('/releases/v1-2-0');
+  });
+});

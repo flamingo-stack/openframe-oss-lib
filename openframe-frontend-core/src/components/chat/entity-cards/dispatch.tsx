@@ -23,7 +23,7 @@
  *   2. Add one entry to `CHAT_CARD_REGISTRY` below.
  *
  * Public entry points consumed by the chat shell:
- *   - `renderChatInlineEntityCard(ref, opts)` — top-level marker dispatch
+ *   - `renderChatInlineEntityCard(ref, opts)` — top-level dispatch
  *     (block-card hoist for video refs, otherwise compact card).
  *   - `<ChatCardLoader />` — fetch + skeleton + render the compact card for
  *     fetch-mode entries.
@@ -102,7 +102,6 @@ import { resolveCardDestination } from '../utils/card-destination';
 import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
 import { buildAnchorProps, navLinkTarget } from '../utils/nav-anchor-props';
-import { isRelativeHref } from '../utils/new-tab-rel';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
@@ -470,7 +469,7 @@ function hubspotStatusToVariant(status: string | undefined): MingoInfoCardStatus
  * Decode a SELF-DESCRIBING record link (`record://video/<id>`) id into playable
  * video metadata — the paired decoder for the hub's
  * `DERIVE_HANDLES_BY_KIND` id minting (keep in lockstep). Embedded
- * videos have no backing table row, so the marker id IS the payload;
+ * videos have no backing table row, so the record id IS the payload;
  * this is what makes video cards transport-independent (no fetch, no
  * server-shipped metadata).
  *   - bare 11-char id → YouTube (lite-youtube facade takes the bare id)
@@ -478,7 +477,7 @@ function hubspotStatusToVariant(status: string | undefined): MingoInfoCardStatus
  *   - `mp4-<base64url(url)>` → decoded https URL
  * Legacy pre-2026-08 sha1-hash ids (`<kind>-<10 hex>`) and anything
  * undecodable return null — the caller falls through to the loader,
- * which renders the marker as plain text (same anti-hallucination
+ * which renders the record as plain text (same anti-hallucination
  * posture as every other card type).
  */
 function decodeVideoMarkerId(id: string): { videoUrl?: string; youtubeUrl?: string } | null {
@@ -496,7 +495,7 @@ function decodeVideoMarkerId(id: string): { videoUrl?: string; youtubeUrl?: stri
     try {
       const b64 = mp4[1].replace(/-/g, '+').replace(/_/g, '/');
       const url = atob(b64);
-      // https-only — the id is model-emitted text; never let a marker
+      // https-only — the id is model-emitted text; never let a record
       // smuggle a non-https src into a player.
       if (!/^https:\/\//.test(url)) return null;
       return { videoUrl: url };
@@ -527,7 +526,7 @@ function CardLoadFailure({ label, id, detail }: { label: string; id: string; det
 /** Build the display ref for a hydrated card PURELY from the fetched API
  *  item — the item IS a ChatRef (minted server-side by the per-object
  *  ref-building SSOTs), so the API is the single display-data
- *  layer. The marker's ref contributes ONLY the loader-resolved
+ *  layer. The record's ref contributes ONLY the loader-resolved
  *  `url`/`targetPlatform` (embed-origin prefixing of the item's own url
  *  via `fallbackHref`) — never titles/previews/metadata. */
 function fetchedItemDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
@@ -1541,7 +1540,7 @@ function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
  *  (`/api/what-i-shipped?ids=`, `/api/how-i-work?ids=`, `/api/prompts?ids=`) — entry-shaped rows
  *  (title / summary / author), not ChatRefs, hence the bespoke row→display
  *  mapping (the FAQ precedent). The destination comes from the ref (the
- *  server-resolved entry url) or, on a bare marker, the host's
+ *  server-resolved entry url) or, on a bare record, the host's
  *  `composeContentUrl` seam for the type. */
 function fetchedEmployeeEntryDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
   const it = item as { title?: unknown; summary?: unknown; author?: { full_name?: unknown } | null };
@@ -1649,7 +1648,7 @@ const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
     // Internal ClickUp work has no public destination on any platform — the
     // seam's default branch would synthesize `<hub>/internal_task/<id>`.
     // The card's destination IS the ClickUp deep link, derived from the
-    // task id post-fetch (the refs frame used to carry it).
+    // task id post-fetch.
     noComposedHref: true,
     fallbackHref: (item: { id?: unknown }) => (item?.id != null ? clickupTaskUrl(String(item.id)) : null),
   },
@@ -1685,7 +1684,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   deleted_data: {
     label: 'Deleted',
     bareInline: true,
-    // The marker descriptor carries no metadata (cards hydrate by id, and a
+    // A bare record carries no metadata (cards hydrate by id, and a
     // deleted entity has nothing to hydrate from), so every prop degrades to
     // null and the card renders its generic "Deleted item" tombstone. The
     // descriptor's `title` defaults to the raw cardId — suppress it so the
@@ -2121,19 +2120,19 @@ export function useRecordDestination(chatRef: ChatRef) {
     fetchEntry ? chatRef.id : '',
   );
 
-  // THE destination, decided in one place (`resolveCardDestination`): the source chip's resolver with the row as far
-  // as it is known (the ref's fields, plus the fetched row's doc path when a bare `record://type/id` ref carried
-  // none), else the fetched row's own destination. Computed BEFORE `isNewTab` so the click sees the page it visits.
+  // THE destination, decided in one place (`resolveCardDestination`): the source chip's resolver with the url the
+  // server answers, on the ref or on the fetched row. Computed BEFORE `isNewTab` so the click sees the page it visits.
   const destination = resolveCardDestination({
     chatRef,
     item: fetchEntry ? item : undefined,
     entry: fetchEntry,
     ctx: sourceRowCtxFromRuntime(runtime),
     composeContentUrl: runtime.composeContentUrl,
-    resolveHref: href => navLinkTarget(runtime, href).href,
   });
+  const sourceRepo = chatRef.sourceRepo ?? defaultTableIdForDocumentType(chatRef.type);
   const hrefResolvedChatRef: ChatRef = {
     ...chatRef,
+    ...(sourceRepo ? { sourceRepo } : {}),
     url: destination.url,
     targetPlatform: destination.targetPlatform,
     // The nav wrapper reads the path off the ref for in-app doc navigation.
@@ -2143,7 +2142,7 @@ export function useRecordDestination(chatRef: ChatRef) {
   // Title enrichment, same synthetic-ref gap as the href above: a record link (`record://type/id`) produces
   // `title: <id>` because the transport ships no ref metadata. Downstream consumers that read `ref.title` (most
   // visibly the "Ask Mingo" prompt, which would otherwise send "Tell me more about 86ad3qvv5") get the row's real
-  // title once it loads. A ref that already carries a distinct title (the SSE path) is untouched.
+  // title once it loads. A ref that already carries a distinct title (its source part's) is untouched.
   const fetchedTitle = fetchEntry && item ? readFetchedCardTitle(item) : null;
   const finalChatRef: ChatRef =
     fetchedTitle && (!hrefResolvedChatRef.title || hrefResolvedChatRef.title === hrefResolvedChatRef.id)
@@ -2151,12 +2150,8 @@ export function useRecordDestination(chatRef: ChatRef) {
       : hrefResolvedChatRef;
 
   // The new-tab decision, ONCE (the same rule chips use), so the rendered `<a target>` agrees with the runtime nav
-  // decision in `RecordNavWrap` + `executeNavigation`. A url the host composed (`composed`, `hostOverride`) as a
-  // relative route of its own is the host's page.
-  const hostRoute =
-    (destination.source === 'composed' || destination.source === 'hostOverride') &&
-    !!finalChatRef.url &&
-    isRelativeHref(finalChatRef.url);
+  // decision in `RecordNavWrap` + `executeNavigation`.
+  const { hostRoute } = destination;
   const isNewTab = finalChatRef.url
     ? navLinkTarget(runtime, finalChatRef.url, finalChatRef.targetPlatform, { hostRoute }).isNewTab
     : false;
@@ -2222,7 +2217,7 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
     );
   if (!fetchEntry) {
     // Ref-only types (`deleted_data`, `video` — nothing exists server-side
-    // to fetch): render straight from the marker's descriptor.
+    // to fetch): render straight from the record's descriptor.
     return finish(entry.render(undefined, finalChatRef, renderOpts));
   }
   if (isLoading) {
@@ -2301,13 +2296,13 @@ export function renderChatInlineEntityCard(
 
   const loader = <ChatCardLoader chatRef={chatRef} onDiscuss={onDiscuss} onDisplay={onDisplay} extras={extras} />;
 
-  // Embedded videos are SELF-DESCRIBING: the marker id alone recovers the
+  // Embedded videos are SELF-DESCRIBING: the record id alone recovers the
   // playable URL (`decodeVideoMarkerId`), so the player renders on ANY
   // transport with zero refs/fetch. Undecodable ids (legacy sha1 hashes,
   // hallucinations) fall through to the loader → plain-text degrade.
   // Hero videos on FETCHED entity types (webinars, releases, …) are
   // handled post-fetch inside ChatCardLoader (`chatCardDisclosureOf`) — the
-  // marker's ref plays no part in either path.
+  // record's ref plays no part in either path.
   if (chatRef.type === 'video') {
     const decoded = decodeVideoMarkerId(chatRef.id);
     if (decoded) {

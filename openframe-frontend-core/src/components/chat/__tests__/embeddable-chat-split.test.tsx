@@ -45,8 +45,18 @@ const DIALOG: DialogItem = {
 };
 
 const MESSAGES: UnifiedChatState['messages'] = [
-  { id: 'm-1', role: 'user', content: 'hello there', timestamp: new Date('2026-01-01T00:00:00Z') },
-  { id: 'm-2', role: 'assistant', content: 'Hi, how can I help?', timestamp: new Date('2026-01-01T00:00:01Z') },
+  {
+    id: 'm-1',
+    role: 'user',
+    metadata: { createdAt: new Date('2026-01-01T00:00:00Z').toISOString() },
+    parts: [{ type: 'text', text: 'hello there' }],
+  },
+  {
+    id: 'm-2',
+    role: 'assistant',
+    metadata: { createdAt: new Date('2026-01-01T00:00:01Z').toISOString() },
+    parts: [{ type: 'text', text: 'Hi, how can I help?' }],
+  },
 ];
 
 const PICKER: ChatContextPickerConfig = {
@@ -91,8 +101,7 @@ function createState(overrides: Partial<UnifiedChatState> = {}): UnifiedChatStat
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
     ...overrides,

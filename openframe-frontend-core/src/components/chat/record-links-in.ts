@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 
+import type { ChatPart } from '../../chat-protocol/chat-message';
 import { parseRecordHref, type RecordLink } from '../../chat-protocol/record-link';
 
 /** A record link as the message shows it: its record and the name it gives it. */
@@ -44,4 +45,17 @@ export function recordLinksIn(markdown: string): DrawnRecordLink[] {
   };
   visit(tree);
   return found;
+}
+
+/** Every record a message's text parts link, once each, in the order they first link it, with the name given it. */
+export function recordLinksInParts(parts: readonly ChatPart[]): DrawnRecordLink[] {
+  const byKey = new Map<string, DrawnRecordLink>();
+  for (const part of parts) {
+    if (part.type !== 'text' || !part.text) continue;
+    for (const record of recordLinksIn(part.text)) {
+      const key = `${record.type}/${record.id}`;
+      if (!byKey.has(key)) byKey.set(key, record);
+    }
+  }
+  return [...byKey.values()];
 }

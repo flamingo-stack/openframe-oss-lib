@@ -1,151 +1,214 @@
-/**
- * The source strip is a legend for the sentences above it, so its order is
- * READING order, not the numbering the model happened to assign. These pin that
- * — and the fallback for an answer that cited nothing at all.
- */
-
 import { describe, expect, it } from 'vitest';
+import type { ChatCitation, ChatPart, ChatSourcePart } from '../../../../chat-protocol/chat-message';
+import { FALLBACK_TOP_RETRIEVED, groupedRowLabels, sourceRowInputOf, splitCitedSources } from '../cited-sources';
 
-import type { ChatSource } from '../../types/message.types';
-import { groupedRowLabels, splitCitedSources } from '../cited-sources';
-
-const source = (index: number): ChatSource => ({
-  index,
-  name: `Source ${index}`,
-  path: `docs/${index}`,
-  documentType: 'markdown',
+const blog = (id: string): ChatSourcePart => ({
+  type: 'source-url',
+  sourceId: `record://blog_post/${id}`,
+  url: `https://www.flamingo.run/blog/${id}`,
+  title: `Post ${id}`,
 });
-
-const sources = [source(1), source(2), source(3)];
+const release = (id: string): ChatSourcePart => ({
+  type: 'source-url',
+  sourceId: `record://product_release/${id}`,
+  url: `https://www.flamingo.run/releases/${id}`,
+  title: `Release ${id}`,
+});
+const collection = (type: string, title: string): ChatSourcePart => ({
+  type: 'source-document',
+  sourceId: `record://${type}`,
+  mediaType: 'text/plain',
+  title,
+});
+const citation = (source: ChatSourcePart, endIndex?: number): ChatCitation => ({
+  source:
+    source.type === 'source-url'
+      ? { type: 'source', sourceType: 'url', id: source.sourceId, url: source.url, title: source.title }
+      : {
+          type: 'source',
+          sourceType: 'document',
+          id: source.sourceId,
+          mediaType: source.mediaType,
+          title: source.title,
+        },
+  ...(endIndex !== undefined ? { endIndex } : {}),
+});
+const text = (value: string, citations?: ChatCitation[]): ChatPart => ({
+  type: 'text',
+  text: value,
+  ...(citations ? { citations } : {}),
+});
+const ids = (groups: ReturnType<typeof splitCitedSources>['cited']) =>
+  groups.flatMap(group => group.rows.map(row => row.sourceId));
 
 describe('splitCitedSources', () => {
-  it('orders cited sources by first mention, not by number', () => {
-    const { cited, uncited } = splitCitedSources(sources, 'See [3], then [1].');
-
-    expect(cited.map(s => s.index)).toEqual([3, 1]);
-    expect(uncited.map(s => s.index)).toEqual([2]);
+  it('leaves nothing to draw for a message with no sources', () => {
+    expect(splitCitedSources([text('Hello')])).toEqual({ cited: [], uncited: [] });
   });
 
-  it('places a repeated citation once, at its first mention', () => {
-    const { cited } = splitCitedSources(sources, '[2] … [1] … [2] again.');
-    expect(cited.map(s => s.index)).toEqual([2, 1]);
+  it('orders the cited by reading order, not by the order the sources arrived', () => {
+    const [a, b, c] = [blog('a'), release('b'), blog('c')];
+    const { cited, uncited } = splitCitedSources([a, b, c, text('One. Two.', [citation(c, 4), citation(b, 9)])]);
+    expect(ids(cited)).toEqual([c.sourceId, b.sourceId]);
+    expect(ids(uncited)).toEqual([a.sourceId]);
+    expect(cited[0].rows[0].number).toBe(1);
+    expect(cited[1].rows[0].number).toBe(2);
   });
 
-  it('treats every source as uncited when the answer cited nothing', () => {
-    // The caller then shows the top few as "retrieved" rather than no strip.
-    const { cited, uncited } = splitCitedSources(sources, 'No citations in this answer.');
-
-    expect(cited).toEqual([]);
-    expect(uncited).toEqual(sources);
+  it('a citation with only endIndex, or none, still reads in order: absent sorts at the part end', () => {
+    const [a, b] = [blog('a'), release('b')];
+    const { cited } = splitCitedSources([a, b, text('One. Two.', [citation(b), citation(a, 4)])]);
+    expect(ids(cited)).toEqual([a.sourceId, b.sourceId]);
   });
 
-  it('ignores a citation number no source claims', () => {
-    const { cited, uncited } = splitCitedSources([source(1)], 'See [7] and [1].');
-
-    expect(cited.map(s => s.index)).toEqual([1]);
+  it('then the records the text links, in text order, each once, with no number', () => {
+    const [a, b] = [blog('a'), release('b')];
+    const { cited, uncited } = splitCitedSources([
+      a,
+      b,
+      text(
+        'See [B](record://product_release/b), and [A](record://blog_post/a) and [B again](record://product_release/b).',
+      ),
+    ]);
+    expect(ids(cited)).toEqual([b.sourceId, a.sourceId]);
+    expect(cited.flatMap(group => group.rows).every(row => row.number === undefined)).toBe(true);
     expect(uncited).toEqual([]);
   });
 
-  it('handles an answer with no sources', () => {
-    expect(splitCitedSources(undefined, '[1]')).toEqual({ cited: [], uncited: [] });
-    expect(splitCitedSources([], '[1]')).toEqual({ cited: [], uncited: [] });
+  it('a record both cited and linked keeps its number and its place', () => {
+    const [a, b] = [blog('a'), release('b')];
+    const { cited } = splitCitedSources([a, b, text('[B](record://product_release/b) One.', [citation(a, 30)])]);
+    expect(ids(cited)).toEqual([a.sourceId, b.sourceId]);
+    expect(cited[0].rows[0].number).toBe(1);
+  });
+
+  it('a link to a record nobody retrieved is no row', () => {
+    const a = blog('a');
+    const { cited, uncited } = splitCitedSources([a, text('See [Old](record://blog_post/old).')]);
+    expect(cited).toEqual([]);
+    expect(ids(uncited)).toEqual([a.sourceId]);
+  });
+
+  it('a cited collection marks its type cited, each row answering to its number, and is no row itself', () => {
+    const posts = [blog('a'), blog('b'), blog('c')];
+    const header = collection('blog_post', 'Blog posts');
+    const { cited, uncited } = splitCitedSources([...posts, release('x'), header, text('All.', [citation(header, 4)])]);
+    expect(cited).toHaveLength(1);
+    expect(cited[0].label).toBe('Blog Posts (3 records)');
+    expect(cited[0].rows.map(row => row.number)).toEqual([1, 1, 1]);
+    expect(ids(uncited)).toEqual(['record://product_release/x']);
+  });
+
+  it('a cited collection leaves its type alone once a record of it is individually cited', () => {
+    const [a, b] = [blog('a'), blog('b')];
+    const header = collection('blog_post', 'Blog posts');
+    const { cited, uncited } = splitCitedSources([
+      a,
+      b,
+      header,
+      text('One. All.', [citation(a, 4), citation(header, 9)]),
+    ]);
+    expect(ids(cited)).toEqual([a.sourceId]);
+    expect(ids(uncited)).toEqual([b.sourceId]);
+  });
+
+  it('or linked', () => {
+    const [a, b] = [blog('a'), blog('b')];
+    const header = collection('blog_post', 'Blog posts');
+    const { cited, uncited } = splitCitedSources([
+      a,
+      b,
+      header,
+      text('See [A](record://blog_post/a).', [citation(header, 5)]),
+    ]);
+    expect(ids(cited)).toEqual([a.sourceId]);
+    expect(ids(uncited)).toEqual([b.sourceId]);
+  });
+
+  it('never draws a video or a collection as a row', () => {
+    const video: ChatSourcePart = {
+      type: 'source-url',
+      sourceId: 'record://video/mux-abc',
+      url: 'https://x.test/v',
+      title: 'V',
+    };
+    const { cited, uncited } = splitCitedSources([
+      video,
+      collection('blog_post', 'Blog posts'),
+      text('Hi.', [citation(video, 3)]),
+    ]);
+    expect(cited).toEqual([]);
+    expect(uncited).toEqual([]);
+  });
+
+  it('a table partly cited is two chips, the cited rows and the rest', () => {
+    const [a, b] = [blog('a'), blog('b')];
+    const { cited, uncited } = splitCitedSources([a, b, text('One.', [citation(a, 4)])]);
+    expect(cited[0].label).toBe('Blog Posts (1 record)');
+    expect(uncited[0].label).toBe('Blog Posts (1 record)');
+  });
+
+  it('matches a linked alias type to its canonical source', () => {
+    const a = blog('a');
+    const { cited } = splitCitedSources([a, text('See [A](record://blog_post_existing/a).')]);
+    expect(ids(cited)).toEqual([a.sourceId]);
+  });
+
+  it('keeps FALLBACK_TOP_RETRIEVED for the strip of an answer that cited nothing', () => {
+    expect(FALLBACK_TOP_RETRIEVED).toBe(3);
   });
 });
 
-describe('splitCitedSources — code is not prose', () => {
-  const retrieved = [
-    { index: 1, name: 'Install the agent', path: '', documentType: '' },
-    { index: 2, name: 'Configure the tenant', path: '', documentType: '' },
-  ];
-
-  it('ignores array indexing inside a fenced block', () => {
-    // This assistant answers with scripts, so `$hosts[1]` is common — and a
-    // source marked cited by a snippet is a citation the prose never made.
-    const answer = ['Run the script below.', '```powershell', '$hosts[1] | Restart-Service', '```'].join('\n');
-    const { cited, uncited } = splitCitedSources(retrieved, answer);
-
-    expect(cited).toEqual([]);
-    expect(uncited).toHaveLength(2);
+describe('sourceRowInputOf: the standard names, in the words the resolver reads', () => {
+  it('a record with a url names its owner from the url', () => {
+    expect(sourceRowInputOf(blog('a'))).toEqual({
+      sourceRepo: 'blog-posts',
+      documentType: 'blog_post',
+      id: 'a',
+      title: 'Post a',
+      externalUrl: 'https://www.flamingo.run/blog/a',
+      targetPlatform: 'flamingo',
+      path: null,
+    });
   });
 
-  it('ignores an index inside an inline code span', () => {
-    expect(splitCitedSources(retrieved, 'Read `argv[1]` first.').cited).toEqual([]);
+  it('a third party names none', () => {
+    const slack: ChatSourcePart = {
+      type: 'source-url',
+      sourceId: 'record://slack_message/1',
+      url: 'https://x.slack.com/a',
+    };
+    expect(sourceRowInputOf(slack)).toMatchObject({
+      externalUrl: 'https://x.slack.com/a',
+      targetPlatform: null,
+      title: '1',
+    });
   });
 
-  it('still reads a citation that sits beside code', () => {
-    const { cited } = splitCitedSources(retrieved, 'Per the guide [1], run `argv[2]`.');
-
-    expect(cited.map(row => row.index)).toEqual([1]);
-  });
-});
-
-// CU-17tkuw61kfy: an answer showed three guide cards and two doc cards, cited the guides as `[1]` (a docs page), and
-// the strip read "OpenFrame Docs (2 records)". An answer with cards cites what its cards show.
-describe('splitCitedSources, an answer with record links', () => {
-  const doc = (index: number, path: string): ChatSource => ({
-    index,
-    id: path,
-    name: path,
-    path,
-    documentType: 'markdown',
-    sourceRepo: 'openframe-docs',
-  });
-  const guides: ChatSource = {
-    index: 9,
-    name: 'Onboarding Guides (4 records)',
-    path: 'onboarding-guides/a',
-    documentType: 'onboarding_guide',
-    sourceRepo: 'onboarding-guides',
-    items: ['a', 'b', 'c', 'd'].map(id => ({ id, name: `Guide ${id}`, documentType: 'onboarding_guide' })),
-  };
-  const all = [doc(1, 'cli/quick-start.md'), doc(2, 'cli/first-steps.md'), doc(3, 'cli/prerequisites.md'), guides];
-
-  it('cites the records it links, whatever numbers it wrote, and counts only those', () => {
-    const answer = [
-      '[b](record://onboarding_guide/b)',
-      '[a](record://onboarding_guide/a)',
-      '[cli/quick-start.md](record://markdown/cli%2Fquick-start.md)',
-      '[cli/prerequisites.md](record://markdown/cli%2Fprerequisites.md)',
-      'Go to Devices [1]. Install the CLI [1][2].',
-    ].join('\n\n');
-    const { cited, uncited } = splitCitedSources(all, answer);
-
-    expect(cited.map(s => s.name)).toEqual(['Onboarding Guides (2 records)', 'OpenFrame Docs (2 records)']);
-    expect(cited[0].items?.map(i => i.id)).toEqual(['b', 'a']);
-    expect(cited[1].items?.map(i => i.id)).toEqual(['cli/quick-start.md', 'cli/prerequisites.md']);
-    expect(uncited.flatMap(s => s.items?.map(i => i.id) ?? [s.id])).toEqual(['cli/first-steps.md', 'c', 'd']);
-  });
-
-  it('ignores a link whose record was not retrieved, and a link inside code', () => {
-    const { cited } = splitCitedSources(
-      all,
-      '`[cli/first-steps.md](record://markdown/cli%2Ffirst-steps.md)`\n\n[zzz](record://onboarding_guide/zzz)',
-    );
-    expect(cited).toEqual([]);
-  });
-
-  it('falls back to its numbers when none of its links names a retrieved record', () => {
-    const { cited } = splitCitedSources(all, '[zzz](record://onboarding_guide/zzz)\n\nSee the quick start [1].');
-    expect(cited.flatMap(s => s.items?.map(i => i.id) ?? [s.id])).toEqual(['cli/quick-start.md']);
+  it('an old doc source opens by its tree path', () => {
+    const doc: ChatSourcePart = {
+      type: 'source-document',
+      sourceId: 'record://markdown/docs%2Fsetup.md',
+      mediaType: 'text/plain',
+      title: 'Setup',
+      filename: 'docs/setup.md',
+    };
+    expect(sourceRowInputOf(doc)).toMatchObject({ id: 'docs/setup.md', externalUrl: null, path: 'docs/setup.md' });
   });
 });
 
 describe('groupedRowLabels', () => {
-  it('leaves the number off when every row shares it', () => {
+  it('prints a number only to tell rows of different citations apart', () => {
+    expect(groupedRowLabels([{ ...blog('a'), number: 1 }, { ...blog('b'), number: 2 }, blog('c')])).toEqual([
+      '[1] Post a',
+      '[2] Post b',
+      'Post c',
+    ]);
     expect(
       groupedRowLabels([
-        { name: 'A', index: 2 },
-        { name: 'B', index: 2 },
+        { ...blog('a'), number: 3 },
+        { ...blog('b'), number: 3 },
       ]),
-    ).toEqual(['A', 'B']);
-    expect(groupedRowLabels([{ name: 'A' }, { name: 'B' }])).toEqual(['A', 'B']);
-  });
-  it('keeps each row its own number when the rows were cited apart', () => {
-    expect(
-      groupedRowLabels([
-        { name: 'A', index: 1 },
-        { name: 'B', index: 3 },
-      ]),
-    ).toEqual(['[1] A', '[3] B']);
+    ).toEqual(['Post a', 'Post b']);
   });
 });

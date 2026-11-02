@@ -1,28 +1,17 @@
 /**
- * Wire shape returned by `/api/docs/search` (one row per result).
- * The hub's server-side RAG layer composes this; the lib hook
- * consumes it. Keep field-for-field identical with the hub's
- * `lib/data/doc-search-utils.ts:DocSearchResult` interface.
+ * One row of `/api/docs/search`, as the lib reads it. A record's identity is its record URI, and what can be derived from
+ * the URI (its type, its id, its table) or the url (its platform) is not carried. The hub's server-side RAG layer
+ * composes the row; `docSearchFieldsOf` (`chat-protocol/message-decoder`) reads it.
  */
 export interface DocSearchResult {
-  path: string;
-  name: string;
+  /** The record URI. Null only for a row an old hub could not name. */
+  sourceId: string | null;
+  title: string;
+  /** Where the record opens, absolute. Absent for a row with no page: a click asks the chat about it instead. */
+  url?: string;
   type: 'file' | 'folder';
   snippet: string;
   matchType: 'title' | 'content';
-  documentType?: string;
-  externalUrl?: string;
-  /** Platform that owns `externalUrl`. Threaded from the rag-config's
-   *  `resolveUrl` so the search-bar click handler can hand it straight
-   *  to the lib's `decideNewTab` for the same-tab-vs-new-tab decision.
-   *  `null` when external/unknown. */
-  targetPlatform?: string | null;
-  sourceRepo?: string;
-  /** Row's `RagTableConfig.primaryKey` value when known. Surfaced so the
-   *  search bar consumer can synthesize a `ChatRef` for entity rows
-   *  that have no public viewer (cap_table, financial-kpis, etc.) — the
-   *  click handler opens the chat panel pre-filled with a row drill-in
-   *  via `entityIdFilter` instead of synthesizing a 404 URL from
-   *  `result.path`. */
-  entityId?: string;
+  /** TODO(CU-17tkuw61kfy): the old hub's doc rows have no url, and open by the tree path. */
+  path?: string;
 }

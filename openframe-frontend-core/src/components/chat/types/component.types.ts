@@ -3,7 +3,7 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
-import type { ChatMessage, ChatPart, ChatToolPart } from '../../../chat-protocol/chat-message';
+import type { ChatMessage, ChatMessageMetadata, ChatPart, ChatToolPart } from '../../../chat-protocol/chat-message';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
@@ -164,6 +164,10 @@ export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement>
   actions?: ChatMessageActions;
   /** The approval tiers drawn while pending (`approvalDisplaysInline`). `undefined` draws every tier. */
   displayApprovalTypes?: readonly string[];
+  /** The stages of the turn (`metadata.progress`), drawn as one-line rows above its parts. */
+  progress?: ChatMessageMetadata['progress'];
+  /** The stream ended with no completion signal (`metadata.finishReason`): the text stays, under a notice saying so. */
+  interrupted?: boolean;
   /**
    * Entity-context items attached to this (user) message. When present the
    * bubble renders a read-only chip strip beneath its text (Figma node
