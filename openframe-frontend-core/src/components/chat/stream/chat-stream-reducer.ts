@@ -142,10 +142,9 @@ export function createEmptyTurnMeta(): ChatTurnMeta {
   };
 }
 
-/** SSE per-send maps, keyed by the send counter (`sendIdx`). Each user send
- *  produces ONE server-side sources entry but can fan out to MULTIPLE
- *  assistant messages client-side — the adapter maps every following
- *  assistant message back to its send's entry. */
+/** SSE per-send maps, keyed by the send counter (`sendIdx`). A send is one stream, a user's question or not (an
+ *  approval's receipt and an auto-continuation are sends too), and its assistant message records its `sendIdx`, so a
+ *  stream's sources and metadata reach the message that stream drew, never another. */
 export interface ChatTurnMetaState {
   meta: Map<number, ChatTurnMeta>;
   sources: Map<number, unknown[]>;
@@ -425,7 +424,7 @@ export interface ChatStreamReducer {
   beginSseSend(options: BeginSseSendOptions): void;
   endSseTurn(): void;
   failSseTurn(errorMessage: string): void;
-  seedSseMaps(seed: { sources?: Array<[number, unknown[]]>; sendCount?: number }): void;
+  seedSseMaps(seed: { sendCount?: number }): void;
 
   // ── Phase / status commands ─────────────────────────────────────────────
   setPhase(phase: StreamingPhase): void;
@@ -1968,6 +1967,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
           content: '',
           segments: [],
           timestamp: new Date(now),
+          sendIdx: sendCount,
           ...(assistantAvatar !== undefined ? { avatar: assistantAvatar } : {}),
         },
       ];
@@ -2005,8 +2005,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       streamingPhase = 'idle';
       invalidate();
     },
-    seedSseMaps({ sources, sendCount: seedSendCount }) {
-      if (sources) for (const [k, v] of sources) sourcesMap.set(k, v);
+    seedSseMaps({ sendCount: seedSendCount }) {
       if (typeof seedSendCount === 'number') sendCount = seedSendCount;
       invalidate();
     },

@@ -241,6 +241,8 @@ export interface UnifiedChatMessage {
    * decodes them out of an `ATTACHMENTS` chunk.
    */
   sources?: ChatSource[];
+  /** Which send (one stream) drew this message, while it is live. A saved message has none: it carries its own `sources`. */
+  sendIdx?: number;
   /**
    * Entity references this answer's metadata described — videos and cards.
    * Data for the record links (`record://type/id`) in the body, not a render list:

@@ -131,6 +131,50 @@ const USAGE_START_FRAME = '{"kind":"usage","stage":"start","input_tokens":1234}\
 const USAGE_END_TRAILER =
   '{"kind":"usage","stage":"end","input_tokens":1234,"output_tokens":56,"hit_rate_pct":81.5,"breakdown":{"haikuRewriter":{"input":10,"output":4},"haikuClassifier":{"input":8,"output":1},"routedAnswer":{"model":"claude-sonnet-x","complexity":"simple","thinkingBudget":0}}}';
 
+describe('a live message shows the sources of the stream that drew it', () => {
+  const sourcesFrame = (name: string) =>
+    `{"sources":[{"index":1,"name":"${name}","path":"docs/${name}.md","documentType":"markdown"}]}\0`;
+  const turn = (name: string | null, text: string) => [
+    ...(name ? [sourcesFrame(name)] : []),
+    '\x1E',
+    text,
+    '\x1F' + USAGE_END_TRAILER,
+  ];
+
+  it('an approval, a send with no user message, shifts no later answer and its receipt repeats no strip', async () => {
+    let now = 1_700_000_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
+    const streams = [
+      turn('first', 'Proposal.'),
+      turn(null, 'Task created.'),
+      turn('second', 'Answer two.'),
+      turn('third', 'Answer three.'),
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({ ok: true, status: 200, body: streamOf(streams.shift() ?? []) } as unknown as Response),
+      ),
+    );
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('create a task');
+    });
+    await act(async () => {
+      // The card's approve path: the option is internal to the adapter, not on its public type.
+      await result.current.sendMessage('', { approvalAction: { proposalId: 'p1', action: 'approve' } } as never);
+    });
+    await act(async () => {
+      await result.current.sendMessage('question two');
+    });
+    await act(async () => {
+      await result.current.sendMessage('question three');
+    });
+    const answers = result.current.messages.filter(m => m.role === 'assistant');
+    expect(answers.map(m => m.sources?.[0]?.name ?? null)).toEqual(['first', null, 'second', 'third']);
+  });
+});
+
 describe('SSE wire decode — golden fixtures (full hook path)', () => {
   it('(a) normal turn: thinking frames → metadata → usage:start → \\x1E → text ×3 → \\x1F trailer', async () => {
     mockFetchStream([

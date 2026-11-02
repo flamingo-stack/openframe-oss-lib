@@ -127,6 +127,8 @@ export interface DocChatMessage {
   content: string;
   /** Structured segments. When set, callers should prefer this over `content`. */
   segments?: MessageSegment[];
+  /** When the message was written: a saved message's own time, not when the chat was opened. */
+  timestamp?: UnifiedChatMessage['timestamp'];
   sources?: ChatSource[];
   /** Per-message viewport-positioning hint emitted by the server. */
   scrollAnchor?: ScrollAnchor;
@@ -200,6 +202,7 @@ function historyMessageToReducerMessage(m: Message): UnifiedChatMessage {
     ...(m.name !== undefined ? { name: m.name } : {}),
     ...(m.avatar != null ? { avatar: m.avatar } : {}),
     ...(m.timestamp !== undefined ? { timestamp: m.timestamp } : {}),
+    ...(m.sources ? { sources: m.sources } : {}),
     ...(m.hidden ? { hidden: true } : {}),
   } as UnifiedChatMessage;
 }
@@ -350,7 +353,7 @@ export function useSseChatAdapter(
     runtime.endpoints.chatHistoryUrl ?? `${runtime.endpoints.chatStreamUrl.replace(/\/+$/, '')}/history`;
   const hydrationSendCountRef = useRef(0);
   const hydrateMessages = useCallback(
-    (history: Message[], sourcesSeed?: Array<[number, unknown[]]>) => {
+    (history: Message[]) => {
       mutate(r => {
         const mapped = history.map(historyMessageToReducerMessage);
         const liveSendCount = r.state.turnMeta.sendCount;
@@ -359,13 +362,7 @@ export function useSseChatAdapter(
         } else {
           r.prependMessages(mapped);
         }
-        r.seedSseMaps({
-          // Restore the hydrated turns' "Sources used" chips (persisted
-          // audit copy, projected by the history route) alongside the
-          // send counter.
-          ...(sourcesSeed && sourcesSeed.length > 0 ? { sources: sourcesSeed } : {}),
-          sendCount: hydrationSendCountRef.current + liveSendCount,
-        });
+        r.seedSseMaps({ sendCount: hydrationSendCountRef.current + liveSendCount });
       });
     },
     [mutate],
@@ -714,17 +711,12 @@ export function useSseChatAdapter(
     [conversationsApi, fetchArchivedDialogs, unarchiveDialog, dialogSearch],
   );
 
-  // ─── Public message mapping (sendIdx fan-out lookup) ──────────────────────
-  // Index sources/scrollAnchor by USER-SEND count (`sendIdx`), not by
-  // assistant-message count. Each user send produces exactly ONE sources
-  // entry server-side, but it can produce MULTIPLE assistant messages on the
-  // client (main RAG reply + post-approve card + auto-continuation prose).
-  // Counting VISIBLE user sends and mapping every following assistant
-  // message to that index keeps the lookup stable — server hydration seeds
-  // the same maps (via `seedSseMaps`) so hydrated turns resolve identically.
+  // ─── Public message mapping ───────────────────────────────────────────────
+  // A live message reads the sources and scroll anchor of the send that drew it (`sendIdx`, which it records). Counting
+  // user messages here instead drifted by one after an approval, a send with no user message: the next answer lost its
+  // strip and the one after showed its predecessor's. A saved message carries its own, as its stored row does.
   const docMessages: DocChatMessage[] = useMemo(() => {
     const { meta, sources: sourcesMap } = state.turnMeta;
-    let sendIdx = -1;
     return state.messages.map(m => {
       const segments = m.segments;
       const content =
@@ -735,15 +727,11 @@ export function useSseChatAdapter(
               .map(s => s.text)
               .join('') ?? '');
 
-      let sources: ChatSource[] | undefined;
+      let sources: ChatSource[] | undefined = m.sources;
       let scrollAnchor: ScrollAnchor | undefined;
-      if (m.role === 'user' && !m.hidden) {
-        sendIdx++;
-      }
-      if (m.role === 'assistant') {
-        const lookupIdx = sendIdx >= 0 ? sendIdx : 0;
-        sources = sourcesMap.get(lookupIdx) as ChatSource[] | undefined;
-        scrollAnchor = (meta.get(lookupIdx)?.scrollAnchor as ScrollAnchor | null) ?? undefined;
+      if (m.role === 'assistant' && m.sendIdx !== undefined) {
+        sources = sourcesMap.get(m.sendIdx) as ChatSource[] | undefined;
+        scrollAnchor = (meta.get(m.sendIdx)?.scrollAnchor as ScrollAnchor | null) ?? undefined;
       }
 
       return {
@@ -751,6 +739,7 @@ export function useSseChatAdapter(
         role: m.role,
         content,
         ...(segments ? { segments } : {}),
+        ...(m.timestamp ? { timestamp: m.timestamp } : {}),
         ...(sources ? { sources } : {}),
         ...(scrollAnchor ? { scrollAnchor } : {}),
         ...(m.hidden ? { hidden: true } : {}),

@@ -348,6 +348,36 @@ describe('server-minted conversation id (full hook path)', () => {
 });
 
 describe('server-history hydration (materializes through the reducer)', () => {
+  it("a saved message keeps its own time and sources; a receipt has none of its answer's", async () => {
+    window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'conv-h2' }));
+    const sources = [{ index: 1, name: 'Pricing overview', path: 'docs/pricing.md', documentType: 'markdown' }];
+    mockRoutedFetch({
+      history: {
+        found: true,
+        messages: [
+          { seq: 0, role: 'user', content: 'create a task', created_at: '2026-07-19T09:00:00.000Z' },
+          { seq: 1, role: 'assistant', content: 'Proposal.', sources, created_at: '2026-07-19T09:00:05.000Z' },
+          {
+            seq: 2,
+            role: 'assistant',
+            content: 'Task created.',
+            sources: null,
+            created_at: '2026-07-19T09:01:00.000Z',
+          },
+        ],
+      },
+      streams: [],
+    });
+    const { result } = renderHook(() => useSseChatAdapter(undefined, { active: true }), { wrapper });
+    await waitFor(() => expect(result.current.messages).toHaveLength(3));
+    expect(result.current.messages.map(m => m.sources?.length ?? 0)).toEqual([0, 1, 0]);
+    expect(result.current.messages.map(m => new Date(m.timestamp ?? 0).toISOString())).toEqual([
+      '2026-07-19T09:00:00.000Z',
+      '2026-07-19T09:00:05.000Z',
+      '2026-07-19T09:01:00.000Z',
+    ]);
+  });
+
   it('rebuilds messages + send counter from the transcript', async () => {
     window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'conv-h1' }));
     const fetchMock = mockRoutedFetch({

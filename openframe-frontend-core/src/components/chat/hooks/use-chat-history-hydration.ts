@@ -38,12 +38,7 @@ export interface UseChatHistoryHydrationArgs {
    *  live send lands on the following `sendIdx`. */
   sendCountRef: MutableRefObject<number>;
   /** `useChat`'s injection primitive (replace-or-prepend). */
-  hydrateMessages: (
-    history: Message[],
-    /** Per-send "Sources used" chips restored from the persisted audit copy
-     *  (`[sendIdx, sources[]]` entries for the reducer's sourcesMap). */
-    sourcesSeed?: Array<[number, unknown[]]>,
-  ) => void;
+  hydrateMessages: (history: Message[]) => void;
   /** Invalidates the adapter's `latestMeta` memo after hydration lands. */
   bumpMetaTick: () => void;
   /** The server answered OK and reported the id as NOT READABLE by this caller
@@ -135,11 +130,6 @@ export function useChatHistoryHydration({
           return;
         }
         const hydrated: Message[] = [];
-        // Per-send "Sources used" chips, restored from the persisted audit
-        // copy the history route projects as `sources` on assistant rows —
-        // seeded into the reducer's sourcesMap so chips survive a refresh
-        // exactly like live turns. Keyed by send index (last row wins).
-        const sourcesSeed = new Map<number, unknown[]>();
         let userTurns = 0;
         for (const row of rows) {
           const role = row.role === 'assistant' ? 'assistant' : row.role === 'user' ? 'user' : null;
@@ -147,16 +137,13 @@ export function useChatHistoryHydration({
           if (role === 'user') {
             userTurns += 1;
           }
-          if (role === 'assistant' && Array.isArray(row.sources) && row.sources.length > 0) {
-            sourcesSeed.set(Math.max(0, userTurns - 1), row.sources as unknown[]);
-          }
           // The one stored-row mapping (`messageFromStoredRow`): an answer with record cards is its ordered parts.
           const message = messageFromStoredRow(row, `hydrated-${String(row.seq ?? hydrated.length)}`);
           if (message) hydrated.push(message);
         }
         if (cancelled || hydrated.length === 0) return;
         sendCountRef.current = userTurns;
-        hydrateMessages(hydrated, Array.from(sourcesSeed.entries()));
+        hydrateMessages(hydrated);
         bumpMetaTick();
       } catch {
         // Fetch failed — start empty; the server still owns history (above).
