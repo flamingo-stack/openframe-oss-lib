@@ -17,5 +17,7 @@ public interface MongoOAuth2AuthorizationRepository extends MongoRepository<Mong
 
     Optional<MongoOAuth2Authorization> findByRefreshTokenValue(String refreshToken);
 
+    Optional<MongoOAuth2Authorization> findByRetiredRefreshTokensValue(String refreshToken);
+
     List<MongoOAuth2Authorization> findAllByPrincipalNameIgnoreCaseAndRefreshTokenValueNotNull(String principalName);
 }

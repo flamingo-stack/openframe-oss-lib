@@ -4,6 +4,8 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.openframe.data.document.oauth.MongoOAuth2Authorization;
+import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.exception.InvalidRefreshTokenException;
 import com.openframe.security.oauth.exception.RefreshUpstreamException;
@@ -27,6 +29,7 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.net.ConnectException;
+import java.util.Optional;
 
 import static com.openframe.security.oauth.exception.RefreshUpstreamReason.CLIENT_REJECTED;
 import static com.openframe.security.oauth.exception.RefreshUpstreamReason.UPSTREAM_ERROR;
@@ -35,6 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OAuthBffServiceRefreshTest {
@@ -85,6 +90,21 @@ class OAuthBffServiceRefreshTest {
         ReflectionTestUtils.setField(service, "clientSecret", "secret");
         lenient().doNothing().when(headersContributor).contribute(any(), any());
         return service;
+    }
+
+    @Test
+    void reproducesBug_CU_17tkuw62gnb_lookupFindsARetiredTokensTenantSoTheRetryReachesTheAuthServer() {
+        MongoOAuth2AuthorizationRepository repository = mock(MongoOAuth2AuthorizationRepository.class);
+        MongoOAuth2Authorization authorization = new MongoOAuth2Authorization();
+        authorization.setArAuthorizationUri("https://shared.example.com/sas/tenant-1/oauth2/authorize");
+        when(repository.findByRefreshTokenValue("retired-token")).thenReturn(Optional.empty());
+        when(repository.findByRetiredRefreshTokensValue("retired-token")).thenReturn(Optional.of(authorization));
+        OAuthBffService service = serviceRespondingWith(HttpStatus.OK, "{\"access_token\":\"a\",\"refresh_token\":\"r\"}");
+        ReflectionTestUtils.setField(service, "authorizationRepository", repository);
+
+        StepVerifier.create(service.refreshTokensByLookup("retired-token", request))
+                .assertNext(tokens -> assertThat(tokens.refresh_token()).isEqualTo("r"))
+                .verifyComplete();
     }
 
     @Test
