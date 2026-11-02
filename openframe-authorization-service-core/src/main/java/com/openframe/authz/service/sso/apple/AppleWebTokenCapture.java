@@ -21,10 +21,10 @@ import static org.springframework.util.StringUtils.hasText;
 /**
  * Captures Apple's refresh token after a successful web SSO callback — Apple issues a fresh one
  * on every code exchange, and App Store guideline 5.1.1(v) obliges us to revoke it when the
- * account is deleted. One hook in the success handler covers plain login, registration,
- * invitation acceptance, and the email-less login alike; by the time it runs, every flow that
- * creates a user has created it, so a lookup by the bound account or the authenticated email
- * finds the owner.
+ * account is deleted. The hook in the success handler covers plain login, registration,
+ * invitation acceptance, and the email-less login alike; a flow parked on the consent page has
+ * no user yet, so SsoJoinController captures once it creates one. By the time either runs, the
+ * user exists, so a lookup by the bound account or the authenticated email finds the owner.
  * Best-effort by contract: a capture failure must never affect the sign-in.
  */
 @Slf4j

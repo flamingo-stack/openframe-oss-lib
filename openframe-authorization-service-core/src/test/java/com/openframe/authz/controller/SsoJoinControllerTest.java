@@ -2,6 +2,7 @@ package com.openframe.authz.controller;
 
 import com.openframe.authz.dto.InvitationRegistrationRequest;
 import com.openframe.authz.security.SessionPrincipalBinder;
+import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.security.SsoLoginCookiePayload;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -46,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,6 +60,8 @@ class SsoJoinControllerTest {
     private InvitationValidator invitationValidator;
     @Mock
     private SessionPrincipalBinder sessionPrincipalBinder;
+    @Mock
+    private AppleWebTokenCapture appleWebTokenCapture;
     @Mock
     private InvitationRegistrationService invitationRegistrationService;
     @Mock
@@ -75,7 +80,7 @@ class SsoJoinControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new SsoJoinController(codec, invitationValidator, invitationRegistrationService, ssoOidcUserService, tenantService, sessionPrincipalBinder);
+        controller = new SsoJoinController(codec, invitationValidator, invitationRegistrationService, ssoOidcUserService, tenantService, sessionPrincipalBinder, appleWebTokenCapture);
         lenient().when(tenantService.findById("tenant-1")).thenReturn(Optional.of(tenant("tenant-1", TenantStatus.ACTIVE)));
     }
 
@@ -165,6 +170,7 @@ class SsoJoinControllerTest {
                     assertThat(e.getReason()).isEqualTo("terms_not_accepted");
                 });
         verify(invitationRegistrationService, never()).registerByInvitation(any());
+        verify(appleWebTokenCapture, never()).captureIfApple(any(), any());
     }
 
     @Test
@@ -178,7 +184,9 @@ class SsoJoinControllerTest {
         ArgumentCaptor<InvitationRegistrationRequest> req = ArgumentCaptor.forClass(InvitationRegistrationRequest.class);
         verify(invitationRegistrationService).registerByInvitation(req.capture());
         assertThat(req.getValue().getInvitationId()).isEqualTo("inv-1");
-        verify(sessionPrincipalBinder).bind(session, invited, request, response);
+        InOrder order = inOrder(sessionPrincipalBinder, appleWebTokenCapture);
+        order.verify(sessionPrincipalBinder).bind(session, invited, request, response);
+        order.verify(appleWebTokenCapture).captureIfApple(request, session);
         assertThat(response.getHeader("Location"))
                 .isEqualTo("https://auth.example.com/oauth/continue?tenantId=tenant-1&redirectTo=%2Fhome");
         assertThat(response.getCookies()).anySatisfy(c -> {
@@ -200,12 +208,25 @@ class SsoJoinControllerTest {
     }
 
     @Test
+    void shouldNotCaptureWhenTheSharedDomainLoginCreatesNoAccount() {
+        when(ssoOidcUserService.autoProvisionByGlobalDomain("apple", sessionUser)).thenReturn(Optional.empty());
+        MockHttpServletRequest request = loginRequest();
+
+        assertThatThrownBy(() -> controller.complete(true, session, request, response))
+                .isInstanceOf(ResponseStatusException.class);
+
+        verify(appleWebTokenCapture, never()).captureIfApple(any(), any());
+    }
+
+    @Test
     void shouldCompleteSharedDomainLoginAndKeepMobileContext() throws Exception {
         when(ssoOidcUserService.autoProvisionByGlobalDomain("apple", sessionUser))
                 .thenReturn(Optional.of(activeUser("u", "tenant-1", "x7k2@privaterelay.appleid.com")));
+        MockHttpServletRequest request = loginRequest();
 
-        controller.complete(true, session, loginRequest(), response);
+        controller.complete(true, session, request, response);
 
+        verify(appleWebTokenCapture).captureIfApple(request, session);
         assertThat(response.getHeader("Location")).isEqualTo(
                 "https://auth.example.com/oauth/continue?tenantId=tenant-1&redirectTo=com.openframe.app%3A%2F%2Fauth&authMobile=true");
         assertThat(response.getCookies()).anySatisfy(c -> assertThat(c.getName()).isEqualTo(SsoFlowCookieNames.OF_SSO_LOGIN));

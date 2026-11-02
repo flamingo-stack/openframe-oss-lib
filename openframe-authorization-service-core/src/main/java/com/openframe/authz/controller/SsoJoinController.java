@@ -6,6 +6,7 @@ import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.service.sso.SsoOidcUserService;
+import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.InvitationRegistrationService;
 import com.openframe.authz.service.validation.InvitationValidator;
@@ -61,6 +62,7 @@ public class SsoJoinController {
     private final SsoOidcUserService ssoOidcUserService;
     private final TenantService tenantService;
     private final SessionPrincipalBinder sessionPrincipalBinder;
+    private final AppleWebTokenCapture appleWebTokenCapture;
 
     public record JoinPendingResponse(String email,
                                       String firstName,
@@ -124,6 +126,7 @@ public class SsoJoinController {
                     Boolean.TRUE.equals(payload.switchTenant()));
             AuthUser created = invitationRegistrationService.registerByInvitation(req);
             sessionPrincipalBinder.bind(authentication, created, request, response);
+            appleWebTokenCapture.captureIfApple(request, authentication);
             clearCookie(response, OF_SSO_INVITE);
             continueInto(response, created.getTenantId(), payload.redirectTo(), payload.authMobile());
             return;
@@ -135,6 +138,7 @@ public class SsoJoinController {
                     .orElseThrow(this::expired);
             AuthUser provisioned = ssoOidcUserService.autoProvisionByGlobalDomain(provider, user)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "no_auto_provision_tenant"));
+            appleWebTokenCapture.captureIfApple(request, authentication);
             clearCookie(response, OF_SSO_LOGIN);
             continueInto(response, provisioned.getTenantId(), payload.redirectTo(), payload.authMobile());
             return;
