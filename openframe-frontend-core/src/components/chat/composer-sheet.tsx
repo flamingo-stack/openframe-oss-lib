@@ -31,7 +31,7 @@ export interface ComposerSheetProps {
   onResetHeight?: () => void;
   /** Share of the layer the sheet takes while `height` is null. Default 0.64. */
   defaultShare?: number;
-  /** Default 320. */
+  /** Default 320; a layer too short for it lowers it, so the sheet stays inside the layer. */
   minHeight?: number;
   /**
    * Whether the tab on its top edge resizes it. Default `true`. Off (a phone, where
@@ -76,8 +76,10 @@ function TabGrip() {
  * The conversation sheet over a page: it rises from the docked composer, the page
  * stays beneath under a scrim, and a tab standing on its top edge resizes it from
  * `minHeight` to the full height of the layer (a drag, the arrow keys, Home / End; a
- * double click asks the host for the default height). Without `resizable` it has no
- * tab and can take the whole layer. Meant for `AppLayout`'s
+ * double click asks the host for the default height). The layer is its limit before
+ * `minHeight` is: a tall dock in a short window leaves less than the floor, and past the
+ * layer's top the sheet's header would run under what stands over it. Without
+ * `resizable` it has no tab and can take the whole layer. Meant for `AppLayout`'s
  * `composerSheet` layer, whose bottom is the dock's top edge: the sheet stands above
  * the composer as a card of its own, its header at its top border.
  *
@@ -122,8 +124,9 @@ export function ComposerSheet({
   // floor for that frame and grow from it. The tab above the sheet stays in the layer.
   const tabHeight = resizable ? TAB_HEIGHT : 0;
   const measured = layerHeight > 0;
-  const maxHeight = measured ? Math.max(minHeight, layerHeight - tabHeight) : Number.POSITIVE_INFINITY;
-  const clamp = (next: number) => Math.round(Math.min(maxHeight, Math.max(minHeight, next)));
+  const maxHeight = measured ? Math.max(0, layerHeight - tabHeight) : Number.POSITIVE_INFINITY;
+  const floor = Math.min(minHeight, maxHeight);
+  const clamp = (next: number) => Math.round(Math.min(maxHeight, Math.max(floor, next)));
   // Until the layer is measured the share is a percentage, so the first frame is right.
   const resolved = height === null ? (measured ? clamp(layerHeight * defaultShare) : null) : clamp(height);
 
@@ -155,7 +158,7 @@ export function ComposerSheet({
         )}
         style={{
           height: resolved ?? `${Math.round(defaultShare * 100)}%`,
-          minHeight,
+          minHeight: floor,
           maxHeight: `calc(100% - ${tabHeight}px)`,
         }}
       >
@@ -171,9 +174,9 @@ export function ComposerSheet({
             <TabFoot side="right" />
             <PanelResizeHandle
               side="bottom"
-              size={resolved ?? minHeight}
-              minSize={minHeight}
-              maxSize={measured ? maxHeight : (resolved ?? minHeight)}
+              size={resolved ?? floor}
+              minSize={floor}
+              maxSize={measured ? maxHeight : (resolved ?? floor)}
               onSize={next => onHeightChange(clamp(next))}
               clampSize={clamp}
               panelRef={panelRef}
