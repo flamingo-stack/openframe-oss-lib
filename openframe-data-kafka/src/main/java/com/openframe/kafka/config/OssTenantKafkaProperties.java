@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 
 /**
- * Configuration properties for OSS Kafka cluster using spring.oss-kafka prefix.
+ * Configuration properties for OSS Kafka cluster using spring.oss-tenant prefix.
  * Inherits all possible parameters from standard KafkaProperties.
  * This is the main/default Kafka cluster configuration.
  */

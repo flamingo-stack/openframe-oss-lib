@@ -13,10 +13,12 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class DualWriteKafkaProducer implements MessageProducer {
 
+    private final ProducerFactory<String, Object> primaryProducerFactory;
     private final OssTenantKafkaProducer primary;
     private final KafkaTemplate<String, Object> secondary;
 
     public DualWriteKafkaProducer(ProducerFactory<String, Object> primaryProducerFactory, ProducerFactory<String, Object> secondaryProducerFactory) {
+        this.primaryProducerFactory = primaryProducerFactory;
         this.primary = new OssTenantKafkaProducer(new KafkaTemplate<>(primaryProducerFactory));
         this.secondary = new KafkaTemplate<>(secondaryProducerFactory);
         this.secondary.setProducerListener(null);
@@ -47,7 +49,7 @@ public class DualWriteKafkaProducer implements MessageProducer {
     }
 
     public void close() {
-        primary.getKafkaTemplate().getProducerFactory().reset();
+        primaryProducerFactory.reset();
         secondary.getProducerFactory().reset();
     }
 
