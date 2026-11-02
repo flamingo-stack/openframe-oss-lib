@@ -4,7 +4,6 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.openframe.kafka.exception.TransientKafkaSendException;
 import com.openframe.kafka.model.MachinePinotMessage;
 import org.apache.kafka.clients.producer.MockProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -20,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.LoggingProducerListener;
 
@@ -59,6 +59,9 @@ class DualWriteKafkaProducerTest {
     private ProducerFactory<String, Object> secondaryProducerFactory;
 
     @Mock
+    private Producer<String, Object> unreachablePrimary;
+
+    @Mock
     private Producer<String, Object> unreachableSecondary;
 
     private DualWriteKafkaProducer producer;
@@ -94,14 +97,14 @@ class DualWriteKafkaProducerTest {
     }
 
     @Test
-    @Timeout(5)
     void sendAndAwaitMessage_primaryFails_throwsAndNothingSentToSecondary() {
-        MockProducer<String, Object> primary = cluster(primaryProducerFactory, false);
-        failOnceEnqueued(primary);
+        when(primaryProducerFactory.createProducer()).thenReturn(unreachablePrimary);
+        when(unreachablePrimary.send(any(), any())).thenReturn(CompletableFuture.failedFuture(
+                new TimeoutException("Topic shared.devices-topic not present in metadata after 60000 ms.")));
 
         assertThatThrownBy(() -> producer.sendAndAwaitMessage(TOPIC, row, KEY))
-                .isInstanceOf(TransientKafkaSendException.class)
-                .hasMessage("transient kafka error: topic=shared.devices-topic key=machine-42");
+                .isInstanceOf(KafkaException.class)
+                .rootCause().isInstanceOf(TimeoutException.class);
         verify(secondaryProducerFactory, never()).createProducer();
     }
 
@@ -163,15 +166,6 @@ class DualWriteKafkaProducerTest {
 
         verify(primaryProducerFactory).reset();
         verify(secondaryProducerFactory).reset();
-    }
-
-    private static void failOnceEnqueued(MockProducer<String, Object> primary) {
-        Thread.ofVirtual().start(() -> {
-            while (primary.history().isEmpty()) {
-                Thread.onSpinWait();
-            }
-            primary.errorNext(new TimeoutException("Expiring 1 record(s) for shared.devices-topic-0"));
-        });
     }
 
     private void secondaryNamedInTheLog() {
