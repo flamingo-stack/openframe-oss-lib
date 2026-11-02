@@ -196,6 +196,17 @@ class CustomerControllerTest {
         verifyNoInteractions(organizationQueryService);
     }
 
+    @Test
+    void reproducesBug_CU_17tkuw62n59_unknownSortFieldIs400AndNeverReachesTheDomain() throws Exception {
+        mockMvc.perform(get(BASE).param("search", "MSP client").param("sortField", "foo"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("sortField"))
+                .andExpect(jsonPath("$.customers").doesNotExist());
+
+        verifyNoInteractions(organizationQueryService);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"0", "-1", "101"})
     void limitOutOfRangeIs400AndNeverReachesTheDomain(String limit) throws Exception {
