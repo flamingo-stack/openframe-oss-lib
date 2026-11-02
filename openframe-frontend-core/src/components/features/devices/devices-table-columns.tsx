@@ -21,6 +21,7 @@ import {
 } from '../../ui';
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { OSTypeBadge } from '../os-type-badge';
+import { directorySourceLabel, directoryUserLines, directoryUserLinkLabel } from './device-directory';
 import { getDeviceName } from './device-name';
 import { getDeviceStatusConfig } from './device-status';
 import { DEFAULT_VISIBLE_STATUSES } from './device-statuses';
@@ -125,6 +126,8 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   actionsColumn?: ColumnDef<T>;
   /** Column ids to drop from the base table columns (e.g. ['organization'] when scoped to a single org). */
   hideColumns?: string[];
+  /** Adds the USER and SOURCES columns, for a host whose tenant has directories. Default: neither. */
+  directoryColumns?: boolean;
   /** Column ids whose header filter is dropped while the column stays visible (e.g. ['status'] on the archive page). */
   disableColumnFilters?: string[];
   /** The facet query is still in flight, see `getDeviceTableColumns`. */
@@ -164,6 +167,7 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
   onColumnFiltersChange,
   actionsColumn,
   hideColumns,
+  directoryColumns = false,
   disableColumnFilters,
   filtersPending,
   totalCount,
@@ -173,12 +177,16 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
   const columns = useMemo<ColumnDef<T>[]>(() => {
     const hidden = new Set(hideColumns ?? []);
     const unfiltered = new Set(disableColumnFilters ?? []);
-    const base = getDeviceTableColumns<T>(deviceFilters ?? null, filtersPending)
+    const base = getDeviceTableColumns<T>(deviceFilters ?? null, filtersPending, {
+      directoryColumns,
+      // Without the customer column there is room for the sources from where the customer's column would have started.
+      roomyDirectory: hidden.has('organization'),
+    })
       .filter(c => !c.id || !hidden.has(c.id))
       .map(c => (c.id && unfiltered.has(c.id) ? { ...c, meta: { ...c.meta, filter: undefined } } : c));
     const open = getDeviceOpenColumn<T>();
     return actionsColumn ? [...base, actionsColumn, open] : [...base, open];
-  }, [deviceFilters, filtersPending, actionsColumn, hideColumns, disableColumnFilters]);
+  }, [deviceFilters, filtersPending, actionsColumn, hideColumns, directoryColumns, disableColumnFilters]);
 
   // While loading the table holds one page of empty rows, drawn with the real cells: every part of a row draws its
   // own loading form (`DataTable.Body`'s `loadingCells`), so a loading row is the loaded row's own layout.
@@ -253,6 +261,36 @@ function DeviceLastSeen({ lastSeen }: { lastSeen: string | undefined }) {
   );
 }
 
+/** The name over its role, as the USER column reads it (Figma 865:55733); the empty mark when nobody is tied. */
+function DirectoryUserCell({ device }: { device: DeviceRow }) {
+  const loading = useLoadingScope();
+  if (loading && !device.directoryUserLink) {
+    return <TextLineSkeleton type="h4" className="w-3/4" />;
+  }
+  const { name, detail } = directoryUserLines(device);
+  return (
+    <div className="flex min-w-0 flex-col justify-center">
+      <TruncateText>{name}</TruncateText>
+      {detail && (
+        <TruncateText variant="h6" tone="secondary">
+          {detail}
+        </TruncateText>
+      )}
+    </div>
+  );
+}
+
+/** The directories that know the device, as tags (Figma 187:61663); nothing when none does. */
+function DirectorySourcesCell({ sources }: { sources: readonly string[] | undefined }) {
+  return (
+    <div data-loading-optional className="flex min-w-0 flex-wrap gap-[var(--spacing-system-xxs)]">
+      {(sources ?? []).map(source => (
+        <Tag key={source} label={directorySourceLabel(source)} variant="grey" />
+      ))}
+    </div>
+  );
+}
+
 export interface DeviceFilterColumn {
   key: string;
   label: string;
@@ -273,6 +311,8 @@ function buildDeviceFilterOptions(deviceFilters?: DeviceFilters | null): {
   status: DeviceFilterOption[];
   os: DeviceFilterOption[];
   organization: DeviceFilterOption[];
+  user: DeviceFilterOption[];
+  sources: DeviceFilterOption[];
 } {
   // Show only DEFAULT_VISIBLE_STATUSES (DELETED and legacy ARCHIVED live on /devices/archive)
   const status = (deviceFilters?.statuses ?? [])
@@ -290,19 +330,42 @@ function buildDeviceFilterOptions(deviceFilters?: DeviceFilters | null): {
     })),
   );
 
-  return { status, os, organization };
+  const user = (deviceFilters?.userLinks ?? []).map(link => ({
+    id: link.value,
+    label: directoryUserLinkLabel(link.value),
+    value: link.value,
+    count: link.count,
+  }));
+
+  const sources = (deviceFilters?.directorySources ?? []).map(source => ({
+    id: source.value,
+    label: directorySourceLabel(source.value),
+    value: source.value,
+    count: source.count,
+  }));
+
+  return { status, os, organization, user, sources };
 }
 
 // Filter column metadata used by the external filter modal (useTagFilterModal).
 // Kept separate from the table ColumnDef because DataTable doesn't carry the
 // filter metadata that the external mobile filter modal needs.
-export function getDeviceFilterColumns(deviceFilters?: DeviceFilters | null): DeviceFilterColumn[] {
+export function getDeviceFilterColumns(
+  deviceFilters?: DeviceFilters | null,
+  { directoryColumns = false }: { directoryColumns?: boolean } = {},
+): DeviceFilterColumn[] {
   const options = buildDeviceFilterOptions(deviceFilters);
   return [
     {
       key: 'device',
       label: 'DEVICE',
     },
+    ...(directoryColumns
+      ? [
+          { key: 'user', label: 'USER', filterable: true, filterOptions: options.user },
+          { key: 'sources', label: 'SOURCES', filterable: true, filterOptions: options.sources },
+        ]
+      : []),
     { key: 'status', label: 'STATUS', filterable: true, filterOptions: options.status },
     { key: 'os', label: 'OS', filterable: true, filterOptions: options.os },
     { key: 'organization', label: 'CUSTOMER', filterable: true, filterOptions: options.organization },
@@ -314,16 +377,50 @@ export function getDeviceFilterColumns(deviceFilters?: DeviceFilters | null): De
  * funnels drawn (inert) rather than growing them when it answers. Absent means
  * these are the final options: an empty one then hides its funnel, which is what
  * a list with no facet source of its own wants.
+ * @param options.directoryColumns Adds USER and SOURCES after DEVICE. Off by default: a picker or a tenant with no
+ * directories has neither.
+ * @param options.roomyDirectory No customer column beside them (one customer's list), so SOURCES shows from `lg`
+ * rather than `xl`.
  */
 export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
   deviceFilters?: DeviceFilters | null,
   filtersPending?: boolean,
+  { directoryColumns = false, roomyDirectory = false }: { directoryColumns?: boolean; roomyDirectory?: boolean } = {},
 ): ColumnDef<T>[] {
   const {
     status: statusFilterOptions,
     os: osFilterOptions,
     organization: orgFilterOptions,
+    user: userFilterOptions,
+    sources: sourcesFilterOptions,
   } = buildDeviceFilterOptions(deviceFilters);
+
+  const directory: ColumnDef<T>[] = directoryColumns
+    ? [
+        {
+          id: 'user',
+          header: 'USER',
+          cell: ({ row }: { row: Row<T> }) => <DirectoryUserCell device={row.original} />,
+          enableSorting: false,
+          meta: {
+            width: 'min-w-0 content-lg:w-[15%]',
+            hideAt: 'lg',
+            filter: { options: userFilterOptions, pending: filtersPending },
+          },
+        },
+        {
+          id: 'sources',
+          header: 'SOURCES',
+          cell: ({ row }: { row: Row<T> }) => <DirectorySourcesCell sources={row.original.directorySources} />,
+          enableSorting: false,
+          meta: {
+            width: 'min-w-0 content-lg:w-[11%]',
+            hideAt: roomyDirectory ? 'lg' : 'xl',
+            filter: { options: sourcesFilterOptions, pending: filtersPending },
+          },
+        },
+      ]
+    : [];
 
   return [
     {
@@ -341,8 +438,10 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
           </div>
         );
       },
-      meta: { width: 'flex-1 content-md:w-1/4' },
+      // The name takes what the other columns leave: with two more of them, their shares below shrink to leave some.
+      meta: { width: directoryColumns ? 'flex-1 min-w-0' : 'flex-1 content-md:w-1/4' },
     },
+    ...directory,
     {
       accessorKey: 'status',
       id: 'status',
@@ -360,7 +459,7 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
         );
       },
       meta: {
-        width: 'w-auto shrink-0 content-md:w-1/5',
+        width: directoryColumns ? 'w-auto shrink-0 content-md:w-[14%]' : 'w-auto shrink-0 content-md:w-1/5',
         // Declared unconditionally, empty options and all. `meta.filter` is what
         // keeps a header cell visible below `lg`, so dropping it until the
         // options query resolves made every header on a tablet disappear on
@@ -377,7 +476,7 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
         <OSTypeBadge osType={row.original.osType} iconSize="w-4 h-4 content-md:w-6 content-md:h-6" />
       ),
       meta: {
-        width: 'w-[200px] content-md:w-1/6',
+        width: directoryColumns ? 'w-[200px] content-md:w-[10%]' : 'w-[200px] content-md:w-1/6',
         hideAt: 'md',
         filter: { options: osFilterOptions, pending: filtersPending },
       },
@@ -388,7 +487,7 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
       header: 'CUSTOMER',
       cell: ({ row }: { row: Row<T> }) => <OrganizationCell device={row.original} />,
       meta: {
-        width: 'w-1/6',
+        width: directoryColumns ? 'w-[14%]' : 'w-1/6',
         hideAt: 'lg',
         filter: { options: orgFilterOptions, placement: 'bottom-end', pending: filtersPending },
       },

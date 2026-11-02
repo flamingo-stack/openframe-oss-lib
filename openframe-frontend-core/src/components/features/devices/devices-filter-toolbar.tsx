@@ -30,6 +30,8 @@ export interface DevicesFilterToolbarProps {
   selectedTags: FilterModalProps['selectedTags'];
   onTagsChange: FilterModalProps['onTagsChange'];
   isLoading?: boolean;
+  /** The search field's prompt. Default "Search for Devices". */
+  searchPlaceholder?: string;
 
   /**
    * When true (default), pins the toolbar at the top with the same negative-margin
@@ -69,6 +71,7 @@ export function DevicesFilterToolbar({
   selectedTags,
   onTagsChange,
   isLoading,
+  searchPlaceholder = 'Search for Devices',
   sticky = true,
   toolbarRef,
 }: DevicesFilterToolbarProps) {
@@ -90,7 +93,7 @@ export function DevicesFilterToolbar({
             onTagRemove={onTagRemove}
             onClearAll={onClearAll}
             onSubmit={onSubmit}
-            placeholder="Search for Devices"
+            placeholder={searchPlaceholder}
             addMorePlaceholder="Add More..."
           />
         </div>

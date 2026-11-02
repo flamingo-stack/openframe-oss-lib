@@ -87,6 +87,9 @@ export function useTagFilterModal({
         statuses: cf.status || [],
         osTypes: cf.os || [],
         organizationIds: cf.organization || [],
+        // Only a host that draws the directory columns has these groups: another's list params stay untouched.
+        ...(cf.user && { userLinks: cf.user }),
+        ...(cf.sources && { directorySources: cf.sources }),
         tags: newTags.filter(isCompleteTag),
       });
       pendingFiltersRef.current = {};
