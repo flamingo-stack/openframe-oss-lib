@@ -29,6 +29,7 @@ import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
+import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -72,6 +73,7 @@ class ScheduleFireDispatcherTest {
     @Mock private MachineRepository machineRepository;
     @Mock private DeviceOnlineDispatchRepository dispatchRepository;
     @Mock private com.openframe.client.service.rmm.ScriptDeliveryRetryStore retryStore;
+    @Mock private DeliveryTracker deliveryTracker;
 
     private ScheduleFireDispatcher dispatcher;
 
@@ -79,7 +81,35 @@ class ScheduleFireDispatcherTest {
     void setUp() {
         dispatcher = new ScheduleFireDispatcher(targetResolver, scriptRepository,
                 scriptExecutionRepository, scheduleScriptExecutionRepository, deliveryRouter,
-                machineRepository, dispatchRepository, retryStore);
+                machineRepository, dispatchRepository, retryStore, deliveryTracker);
+    }
+
+    @Test
+    @DisplayName("route that holds the batch, RETRY_ON_RECONNECT: a machine still offline and waiting for an earlier fire of the schedule gets this fire instead, the earlier batch is withdrawn")
+    void dispatch_heldRoute_machineStillWaitingForAnEarlierFire_earlierBatchWithdrawn() {
+        Instant now = Instant.now();
+        ScheduleScript schedule = schedule(List.of("script-a"));
+        schedule.setTrigger(ScheduleScriptTrigger.DATE_TIME);
+        schedule.setOfflineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT);
+        schedule.setReconnectWindowSeconds(3600L);
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-online", "m-offline"));
+        when(deliveryRouter.holdsForOfflineMachine(eq(DeliveryType.SCRIPT_SCHEDULE), anyString())).thenReturn(true);
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
+        ScriptExecution earlierOffline = ScriptExecution.builder().executionId("exec-earlier").machineId("m-offline").scriptId("script-a").status(ExecutionStatus.QUEUED).build();
+        ScriptExecution earlierOnline = ScriptExecution.builder().executionId("exec-earlier").machineId("m-online").scriptId("script-a").status(ExecutionStatus.QUEUED).build();
+        when(scriptExecutionRepository.findByTenantIdAndScheduleIdAndStatus(TENANT, SCHEDULE_ID, ExecutionStatus.QUEUED))
+                .thenReturn(List.of(earlierOffline, earlierOnline));
+        Machine online = new Machine();
+        online.setMachineId("m-online");
+        online.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(online));
+
+        dispatcher.dispatch(schedule, now);
+
+        verify(deliveryTracker).cancel(DeliveryType.SCRIPT_SCHEDULE, "exec-earlier", "m-offline", "superseded by the schedule's next fire");
+        verify(deliveryTracker, never()).cancel(eq(DeliveryType.SCRIPT_SCHEDULE), anyString(), eq("m-online"), anyString());
+        verify(deliveryRouter, times(2)).dispatch(any(ScriptScheduleDeliverySeed.class));
     }
 
     @Test
