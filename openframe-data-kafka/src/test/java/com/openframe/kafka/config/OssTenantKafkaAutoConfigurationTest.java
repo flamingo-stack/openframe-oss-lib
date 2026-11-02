@@ -3,6 +3,7 @@ package com.openframe.kafka.config;
 import com.openframe.kafka.model.KafkaMessage;
 import com.openframe.kafka.producer.DualWriteKafkaProducer;
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerInterceptor;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -14,8 +15,11 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.kafka.KafkaException;
+import org.springframework.kafka.core.KafkaAdmin;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,12 +82,38 @@ class OssTenantKafkaAutoConfigurationTest {
         assertThat(RecordingProducerInterceptor.closed).isEqualTo(1);
     }
 
+    @Test
+    void kafkaTopics_noReplicationFactorConfigured_topicTakesTheBrokerDefault() {
+        topicsContext().run(context -> assertThat(declaredTopics(context))
+                .singleElement().extracting(NewTopic::replicationFactor).isEqualTo((short) -1));
+    }
+
+    @Test
+    void kafkaTopics_replicationFactorConfigured_topicKeepsIt() {
+        topicsContext("openframe.oss-tenant.kafka.topics.inbound.devices.replication-factor=2")
+                .run(context -> assertThat(declaredTopics(context))
+                        .singleElement().extracting(NewTopic::replicationFactor).isEqualTo((short) 2));
+    }
+
     private ApplicationContextRunner dualWriteContext() {
         return contextRunner.withPropertyValues("spring.oss-tenant.dual-write-bootstrap-servers=" + PRIMARY_CLUSTER);
     }
 
+    private ApplicationContextRunner topicsContext(String... topicProperties) {
+        return contextRunner
+                .withPropertyValues(
+                        "spring.kafka.admin.auto-create=false",
+                        "openframe.oss-tenant.kafka.topics.inbound.devices.name=shared.devices-topic")
+                .withPropertyValues(topicProperties);
+    }
+
     private void sendRow(AssertableApplicationContext context) {
         context.getBean(DualWriteKafkaProducer.class).sendAndAwaitMessage("devices", message, "device-1");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Collection<NewTopic> declaredTopics(AssertableApplicationContext context) {
+        return (Collection<NewTopic>) ReflectionTestUtils.getField(context.getBean(KafkaAdmin.NewTopics.class), "newTopics");
     }
 
     public static class RecordingProducerInterceptor implements ProducerInterceptor<String, Object> {
