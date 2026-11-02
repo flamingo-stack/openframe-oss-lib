@@ -38,6 +38,8 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_DISPATCH_ID = "dispatchId";
     private static final String FIELD_SEQUENCE = "sequence";
     private static final String FIELD_PAYLOAD_ID = "payloadId";
+    private static final String FIELD_OFFLINE_BEHAVIOR = "offlineBehavior";
+    private static final String FIELD_RECONNECT_WINDOW_SECONDS = "reconnectWindowSeconds";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_DUE_AT = "dueAt";
@@ -223,6 +225,12 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
                 .set(FIELD_DISPATCH_ID, replacement.getNextDispatchId())
                 .set(FIELD_DUE_AT, replacement.getDueAt())
                 .unset(FIELD_PAYLOAD_JSON);
+        if (replacement.getOfflineBehavior() != null) {
+            update.set(FIELD_OFFLINE_BEHAVIOR, replacement.getOfflineBehavior());
+        }
+        if (replacement.getReconnectWindowSeconds() != null) {
+            update.set(FIELD_RECONNECT_WINDOW_SECONDS, replacement.getReconnectWindowSeconds());
+        }
         return updateOne(thisDispatch(id, from, dispatchId), update);
     }
 

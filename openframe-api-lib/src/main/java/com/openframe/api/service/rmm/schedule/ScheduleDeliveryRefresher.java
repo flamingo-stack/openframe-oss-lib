@@ -1,7 +1,10 @@
 package com.openframe.api.service.rmm.schedule;
 
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptExecution;
@@ -118,10 +121,51 @@ public class ScheduleDeliveryRefresher {
                 .scripts(items)
                 .build();
         Set<String> waitingMachines = queuedLeaves.stream().map(ScriptExecution::getMachineId).collect(toSet());
+        DeliveryOfflineBehavior offlineBehavior = offlineBehaviorOf(schedule.get());
+        Long reconnectWindowSeconds = reconnectWindowOf(schedule.get());
         long replaced = waitingMachines.stream()
-                .filter(machineId -> deliveryRefresher.refresh(DeliveryType.SCRIPT_SCHEDULE, executionId, machineId, message))
+                .filter(machineId -> deliveryRefresher.refresh(DeliveryType.SCRIPT_SCHEDULE, executionId, machineId, message,
+                        offlineBehavior, reconnectWindowSeconds))
                 .count();
+        followTheScripts(queuedLeaves, scripts);
         log.info("Waiting batches refreshed: executionId={} machines={} replaced={}", executionId, waitingMachines.size(), replaced);
+    }
+
+    // the leaf keeps what the agent will run with: the script's privilege and timeout as they are now (the result
+    // watchdog reads the timeout from the leaf)
+    private void followTheScripts(List<ScriptExecution> queuedLeaves, List<Script> scripts) {
+        Map<String, Script> byId = scripts.stream().collect(toMap(Script::getId, Function.identity(), (first, second) -> first));
+        List<ScriptExecution> changed = queuedLeaves.stream()
+                .filter(leaf -> byId.containsKey(leaf.getScriptId()))
+                .filter(leaf -> follow(leaf, byId.get(leaf.getScriptId())))
+                .toList();
+        if (!changed.isEmpty()) {
+            scriptExecutionRepository.saveAll(changed);
+        }
+    }
+
+    private static boolean follow(ScriptExecution leaf, Script script) {
+        boolean changed = !Objects.equals(leaf.getPrivilegeLevel(), script.getPrivilegeLevel())
+                || !Objects.equals(leaf.getTimeoutSeconds(), script.getDefaultTimeoutSeconds());
+        leaf.setPrivilegeLevel(script.getPrivilegeLevel());
+        leaf.setTimeoutSeconds(script.getDefaultTimeoutSeconds());
+        return changed;
+    }
+
+    // the schedule's rule for a machine that is not online, as the dispatcher sends it with a fire
+    private static DeliveryOfflineBehavior offlineBehaviorOf(ScheduleScript schedule) {
+        return isRetryOnReconnect(schedule) ? DeliveryOfflineBehavior.RETRY_ON_RECONNECT : DeliveryOfflineBehavior.SKIP;
+    }
+
+    private static Long reconnectWindowOf(ScheduleScript schedule) {
+        return isRetryOnReconnect(schedule) ? schedule.getReconnectWindowSeconds() : null;
+    }
+
+    private static boolean isRetryOnReconnect(ScheduleScript schedule) {
+        return schedule.getTrigger() == ScheduleScriptTrigger.DATE_TIME
+                && schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT
+                && schedule.getReconnectWindowSeconds() != null
+                && schedule.getReconnectWindowSeconds() > 0;
     }
 
     private Optional<ScheduleScript> activeSchedule(String tenantId, String scheduleId) {

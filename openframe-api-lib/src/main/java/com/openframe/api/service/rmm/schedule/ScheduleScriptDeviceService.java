@@ -262,10 +262,15 @@ public class ScheduleScriptDeviceService {
     public void applyCriteria(String scheduleId, ScheduleDeviceCriteria criteria, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
         ScheduleScript schedule = requireVisibleSchedule(tenantId, scheduleId);
+        Set<String> before = new HashSet<>(targetResolver.resolveTargetMachineIds(schedule));
         schedule.setSelectionMode(ScheduleDeviceSelectionMode.CRITERIA);
         schedule.setDeviceCriteria(criteria);
         scheduleRepository.save(schedule);
         armDeviceOnlineCriteriaMatches(tenantId, schedule);
+        before.removeAll(targetResolver.resolveTargetMachineIds(schedule));
+        if (!before.isEmpty()) {
+            deliveryRefresher.cancelForMachines(scheduleId, before, DEVICE_REMOVED);
+        }
         log.info("Applied device criteria to script schedule id={} tenantId={} by user={}: {}",
                 scheduleId, tenantId, actorUserId, criteria);
     }

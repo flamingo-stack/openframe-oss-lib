@@ -1,5 +1,6 @@
 package com.openframe.delivery.dispatch;
 
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
@@ -30,6 +31,13 @@ public class DeliveryRefresher {
     private final DeliveryPayloadJson payloadJson;
 
     public boolean refresh(DeliveryType type, String targetId, String machineId, DeliveryPayload payload) {
+        return refresh(type, targetId, machineId, payload, null, null);
+    }
+
+    // with the caller's current rule for a machine that is not online: a row that waits takes it on the spot, so a
+    // schedule switched to skip lets its offline machines go on the next sweep pass
+    public boolean refresh(DeliveryType type, String targetId, String machineId, DeliveryPayload payload,
+                           DeliveryOfflineBehavior offlineBehavior, Long reconnectWindowSeconds) {
         String id = DeliveryId.of(type, targetId, machineId);
         Optional<MachineDelivery> unacked = repository.findByIdOnPrimary(id).filter(DeliveryRefresher::isUnacked);
         if (unacked.isEmpty()) {
@@ -48,6 +56,8 @@ public class DeliveryRefresher {
                 .payloadId(payloadId)
                 .nextDispatchId(nextDispatchId)
                 .dueAt(Instant.now())
+                .offlineBehavior(offlineBehavior)
+                .reconnectWindowSeconds(reconnectWindowSeconds)
                 .build();
         boolean replaced = repository.replacePayload(replacement);
         if (replaced) {

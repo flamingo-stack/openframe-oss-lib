@@ -2,6 +2,9 @@ package com.openframe.api.service.rmm;
 
 import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
@@ -60,6 +63,8 @@ class ScheduleDeliveryRefresherTest {
     @Mock private DeliveryTracker deliveryTracker;
     @Mock private TenantIdProvider tenantIdProvider;
     @Captor private ArgumentCaptor<ScriptScheduleExecutionMessage> messageCaptor;
+    @Captor private ArgumentCaptor<DeliveryOfflineBehavior> behaviorCaptor;
+    @Captor private ArgumentCaptor<Long> windowCaptor;
 
     private ScheduleDeliveryRefresher refresher;
 
@@ -81,12 +86,14 @@ class ScheduleDeliveryRefresherTest {
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule(ScriptStatus.ACTIVE, List.of(SCRIPT_B, SCRIPT_A))));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any()))
                 .thenReturn(List.of(script(SCRIPT_A, "echo a2"), script(SCRIPT_B, "echo b")));
-        when(deliveryRefresher.refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), anyString(), messageCaptor.capture())).thenReturn(true);
+        when(deliveryRefresher.refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), anyString(), messageCaptor.capture(), behaviorCaptor.capture(), windowCaptor.capture())).thenReturn(true);
 
         refresher.refreshForScript(SCRIPT_A);
 
-        verify(deliveryRefresher).refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), any());
-        verify(deliveryRefresher).refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_2), any());
+        verify(deliveryRefresher).refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), any(), any(), any());
+        verify(deliveryRefresher).refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_2), any(), any(), any());
+        assertThat(behaviorCaptor.getValue()).isEqualTo(DeliveryOfflineBehavior.SKIP);
+        assertThat(windowCaptor.getValue()).isNull();
         ScriptScheduleExecutionMessage message = messageCaptor.getValue();
         assertThat(message.getExecutionId()).isEqualTo(EXECUTION_ID);
         assertThat(message.getScheduleId()).isEqualTo(SCHEDULE_ID);
@@ -108,7 +115,7 @@ class ScheduleDeliveryRefresherTest {
         Script deleted = script(SCRIPT_B, "echo b");
         deleted.setStatus(ScriptStatus.DELETED);
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any())).thenReturn(List.of(script(SCRIPT_A, "echo a"), deleted));
-        when(deliveryRefresher.refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), messageCaptor.capture())).thenReturn(true);
+        when(deliveryRefresher.refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), messageCaptor.capture(), any(), any())).thenReturn(true);
 
         refresher.refreshForScript(SCRIPT_A);
 
@@ -164,7 +171,7 @@ class ScheduleDeliveryRefresherTest {
         Script deleted = script(SCRIPT_A, "echo a");
         deleted.setStatus(ScriptStatus.DELETED);
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any())).thenReturn(List.of(deleted, script(SCRIPT_B, "echo b")));
-        when(deliveryRefresher.refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), messageCaptor.capture())).thenReturn(true);
+        when(deliveryRefresher.refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), messageCaptor.capture(), any(), any())).thenReturn(true);
 
         refresher.retireScript(SCRIPT_A, REASON);
 
@@ -192,6 +199,28 @@ class ScheduleDeliveryRefresherTest {
         verifyNoInteractions(deliveryRefresher);
         assertThat(leaf.getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(leaf.getError()).isEqualTo(REASON);
+    }
+
+    @Test
+    @DisplayName("refreshForSchedule: a schedule that waits for offline machines sends its window with the body, and the leaves follow the script's timeout")
+    void refreshForSchedule_waitingSchedule_windowTravelsAndLeavesFollowTheScript() {
+        ScriptExecution leaf = queued(EXECUTION_ID, MACHINE_1, SCRIPT_A);
+        when(scriptExecutionRepository.findByTenantIdAndScheduleIdAndStatus(TENANT_ID, SCHEDULE_ID, ExecutionStatus.QUEUED)).thenReturn(List.of(leaf));
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID)).thenReturn(List.of(leaf));
+        ScheduleScript waiting = schedule(ScriptStatus.ACTIVE, List.of(SCRIPT_A));
+        waiting.setTrigger(ScheduleScriptTrigger.DATE_TIME);
+        waiting.setOfflineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT);
+        waiting.setReconnectWindowSeconds(7200L);
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(waiting));
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any())).thenReturn(List.of(script(SCRIPT_A, "echo a")));
+        when(deliveryRefresher.refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), any(), behaviorCaptor.capture(), windowCaptor.capture())).thenReturn(true);
+
+        refresher.refreshForSchedule(SCHEDULE_ID);
+
+        assertThat(behaviorCaptor.getValue()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+        assertThat(windowCaptor.getValue()).isEqualTo(7200L);
+        assertThat(leaf.getTimeoutSeconds()).isEqualTo(60);
+        verify(scriptExecutionRepository).saveAll(List.of(leaf));
     }
 
     private static ScriptExecution queued(String executionId, String machineId, String scriptId) {

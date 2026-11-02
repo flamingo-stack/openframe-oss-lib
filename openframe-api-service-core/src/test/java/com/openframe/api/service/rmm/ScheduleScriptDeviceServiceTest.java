@@ -132,6 +132,17 @@ class ScheduleScriptDeviceServiceTest {
     }
 
     @Test
+    @DisplayName("applyCriteria: machines the new criteria drop have their waiting batches withdrawn")
+    void applyCriteria_machinesDropped_waitingBatchesWithdrawn() {
+        scheduleExistsWithTrigger(ScriptStatus.ACTIVE, ScheduleScriptTrigger.DATE_TIME);
+        when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m-1", "m-2"), List.of("m-2"));
+
+        service.applyCriteria(SCHEDULE_ID, new ScheduleDeviceCriteria(), "user-1");
+
+        verify(deliveryRefresher).cancelForMachines(eq(SCHEDULE_ID), eq(Set.of("m-1")), eq("device removed from the schedule"));
+    }
+
+    @Test
     @DisplayName("applyCriteria on a DEVICE_ONLINE schedule → arms a NEW sentinel for every currently-matching device (already-online-at-apply devices don't get a came-online event)")
     void applyCriteria_deviceOnline_armsMatchingDevices() {
         scheduleExistsWithTrigger(ScriptStatus.ACTIVE, ScheduleScriptTrigger.DEVICE_ONLINE);

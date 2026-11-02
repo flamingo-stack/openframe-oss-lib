@@ -1,5 +1,6 @@
 package com.openframe.delivery.dispatch;
 
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
@@ -34,6 +35,7 @@ class DeliveryRefresherTest {
     private static final String DISPATCH_ID = "d-1";
     private static final String PAYLOAD_ID = "tenant-1:SCRIPT_SCHEDULE:abc";
     private static final long CLOCK_SLACK_SECONDS = 5L;
+    private static final long WINDOW_SECONDS = 7_200L;
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliveryPayloadStore payloads;
@@ -102,6 +104,22 @@ class DeliveryRefresherTest {
         // verifications
         assertThat(replaced).isFalse();
         verify(payloads, never()).hold(any(), any(), any());
+    }
+
+    @Test
+    void refresh_withTheCallersRule_theRowTakesItWithTheBody() {
+        // setup
+        when(repository.findByIdOnPrimary(ROW_ID)).thenReturn(Optional.of(row(DeliveryStatus.PENDING)));
+        when(payloads.hold(eq(DeliveryType.SCRIPT_SCHEDULE), any(DeliveryPayloadBody.class), any(Instant.class))).thenReturn(PAYLOAD_ID);
+        when(repository.replacePayload(replacementCaptor.capture())).thenReturn(true);
+
+        // execution
+        refresher.refresh(DeliveryType.SCRIPT_SCHEDULE, TARGET_ID, MACHINE_ID, payload, DeliveryOfflineBehavior.RETRY_ON_RECONNECT, WINDOW_SECONDS);
+
+        // verifications
+        PayloadReplacement replacement = replacementCaptor.getValue();
+        assertThat(replacement.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+        assertThat(replacement.getReconnectWindowSeconds()).isEqualTo(WINDOW_SECONDS);
     }
 
     private MachineDelivery row(DeliveryStatus status) {

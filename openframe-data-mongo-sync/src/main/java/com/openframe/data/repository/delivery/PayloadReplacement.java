@@ -1,5 +1,6 @@
 package com.openframe.data.repository.delivery;
 
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import lombok.Builder;
 import lombok.Value;
@@ -18,4 +19,7 @@ public class PayloadReplacement {
     String payloadId;
     String nextDispatchId;
     Instant dueAt;
+    // the row's rule for a machine that is not online moves with the body when the caller sends one
+    DeliveryOfflineBehavior offlineBehavior;
+    Long reconnectWindowSeconds;
 }
