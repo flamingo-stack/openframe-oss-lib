@@ -1,7 +1,6 @@
 'use client';
 
 import { cn } from '../../utils/cn';
-import { AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated';
 import { ChatsIcon } from '../icons-v2-generated/communication/chats-icon';
 import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon';
 import { Button } from '../ui/button';
@@ -9,15 +8,12 @@ import { useLoadingScope } from '../ui/loading-scope';
 import { TabSelector } from '../ui/tab-selector';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { MingoChatHistory } from './mingo-chat-history';
+import { ChatListLoadError, type MingoHistoryScope } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
 // =============================================================================
 // Types
 // =============================================================================
-
-/** Ownership scope of the rail's dialog list — the current user's chats only,
- *  or every admin's chats in the tenant. */
-export type MingoHistoryScope = 'my' | 'all';
 
 export interface MingoHistoryRailProps {
   /** Dialogs to list, assumed already sorted newest-first by the host. */
@@ -55,6 +51,9 @@ export interface MingoHistoryRailProps {
   isLoadingMore?: boolean;
   /** Fetch the next page. */
   onLoadMore?: () => void;
+  /** How the next page loads: as the list's end scrolls into view (`'scroll'`, the default),
+   *  or on a "Show more" under it (`'button'`, a page at a time). */
+  loadMore?: 'scroll' | 'button';
   /** True while the FIRST page of dialogs is still loading. The list draws its
    *  own loading state so the rail doesn't flash the empty state before the list arrives. */
   isLoadingHistory?: boolean;
@@ -99,6 +98,7 @@ export function MingoHistoryRail({
   onScopeChange,
   searchQuery,
   hasMore = false,
+  loadMore = 'scroll',
   isLoadingMore = false,
   onLoadMore,
   isLoadingHistory = false,
@@ -156,18 +156,7 @@ export function MingoHistoryRail({
       ) : null}
 
       {loadError ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[var(--spacing-system-m)] text-center">
-          <AlertCircleIcon className="h-8 w-8 shrink-0 text-ods-text-secondary" />
-          <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-            <p className="text-ods-text-primary text-h4">Couldn’t load your chats</p>
-            <p className="text-ods-text-secondary text-h6">Something went wrong reaching the server. Try again.</p>
-          </div>
-          {onRetry && (
-            <Button variant="outline" size="small" leftIcon={<Refresh01RightIcon />} onClick={onRetry}>
-              Try again
-            </Button>
-          )}
-        </div>
+        <ChatListLoadError onRetry={onRetry} className="min-h-0 flex-1 justify-center" />
       ) : loading || hasList ? (
         <MingoChatHistory
           loading={loading}
@@ -183,6 +172,7 @@ export function MingoHistoryRail({
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
           onLoadMore={onLoadMore}
+          loadMore={loadMore}
         />
       ) : (
         // Figma 113:60939 — no-chats empty state.

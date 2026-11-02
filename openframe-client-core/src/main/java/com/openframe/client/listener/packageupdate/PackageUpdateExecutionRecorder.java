@@ -1,5 +1,6 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -13,6 +14,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -24,20 +26,13 @@ public class PackageUpdateExecutionRecorder {
 
     static final String SUPERSEDED_ERROR = "Superseded by a newer update request";
     static final String FAILED_ERROR = "Update failed";
+    static final String UNDELIVERED_ERROR = "The device did not receive the update";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
 
     public void record(PackageUpdateRequest request, String machineId, PackageUpdateStatusMessage event) {
-        if (request == null || request.getExecutionId() == null) {
-            return;
-        }
-        ScriptExecution row = scriptExecutionRepository
-                .findByTenantIdAndExecutionIdAndMachineIdAndPackageUpdateRequestId(
-                        request.getTenantId(), request.getExecutionId(), machineId, request.getRequestId())
-                .orElse(null);
+        ScriptExecution row = historyRow(request, machineId).orElse(null);
         if (row == null) {
-            log.warn("[package-update] no history row for requestId={} executionId={} machineId={}",
-                    request.getRequestId(), request.getExecutionId(), machineId);
             return;
         }
         Instant now = Instant.now();
@@ -59,6 +54,31 @@ public class PackageUpdateExecutionRecorder {
         }
         row.setStatusChangedAt(now);
         scriptExecutionRepository.save(row);
+    }
+
+    public void recordUndelivered(PackageUpdateRequest request, String machineId, DeliveryFailure failure) {
+        ScriptExecution row = historyRow(request, machineId).orElse(null);
+        if (row == null) {
+            return;
+        }
+        Instant now = Instant.now();
+        update(row, ExecutionStatus.FAILED, now, null, null, UNDELIVERED_ERROR + " (" + failure + ")");
+        row.setStatusChangedAt(now);
+        scriptExecutionRepository.save(row);
+    }
+
+    private Optional<ScriptExecution> historyRow(PackageUpdateRequest request, String machineId) {
+        if (request == null || request.getExecutionId() == null) {
+            return Optional.empty();
+        }
+        Optional<ScriptExecution> row = scriptExecutionRepository
+                .findByTenantIdAndExecutionIdAndMachineIdAndPackageUpdateRequestId(
+                        request.getTenantId(), request.getExecutionId(), machineId, request.getRequestId());
+        if (row.isEmpty()) {
+            log.warn("[package-update] no history row for requestId={} executionId={} machineId={}",
+                    request.getRequestId(), request.getExecutionId(), machineId);
+        }
+        return row;
     }
 
     private static void update(ScriptExecution row, ExecutionStatus status, Instant finishedAt, Integer exitCode,

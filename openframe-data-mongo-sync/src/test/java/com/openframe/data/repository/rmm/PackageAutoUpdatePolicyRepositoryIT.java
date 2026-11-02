@@ -133,6 +133,27 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(chromeByMachine.get("m2").getLastVersion()).isEqualTo("151.0.7922.98");
     }
 
+    @Test
+    @DisplayName("retryRequestId: set when a retry is scheduled, found by device and package, cleared by the next order")
+    void retryRequestId_setByARetry_clearedByTheNextOrder() {
+        PackageAutoUpdatePolicy chrome = template("google-chrome", null, WAIT, "admin@x");
+        chrome.setLastVersion("151.0.7922.98");
+        repository.enable(chrome, List.of("m1"));
+        String id = byMachine("google-chrome").get("m1").getId();
+
+        repository.markRetryScheduled(id, "req-1");
+
+        assertThat(repository.findByTenantIdAndMachineIdAndPackageManagerAndPackageName(TENANT, "m1",
+                chrome.getPackageManager(), "google-chrome")).get()
+                .extracting(PackageAutoUpdatePolicy::getRetryRequestId).isEqualTo("req-1");
+
+        repository.markOrdered(List.of(id), "152.0.7977.65");
+
+        PackageAutoUpdatePolicy ordered = byMachine("google-chrome").get("m1");
+        assertThat(ordered.getRetryRequestId()).isNull();
+        assertThat(ordered.getLastVersion()).isEqualTo("152.0.7977.65");
+    }
+
     private Map<String, PackageAutoUpdatePolicy> byMachine(String packageName) {
         return repository.findAll().stream()
                 .filter(p -> packageName.equals(p.getPackageName()))

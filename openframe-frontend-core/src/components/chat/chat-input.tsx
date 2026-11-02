@@ -180,6 +180,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     onMentionQueryChange,
     onValueChange,
     startIcon,
+    endIcon,
     hideBorder,
     previewText,
     // Remaining textarea-only attrs are intentionally dropped — the editor is a
@@ -241,8 +242,13 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
   // …and any draft edit while a preview is showing dismisses it immediately, so
   // keystrokes into the (preview-hidden) editor become visible at once. Keyed on
   // `value` only — depending on `previewText` would re-dismiss on every hover,
-  // hence the ref above.
+  // hence the ref above. A CHANGE of the value, not the mount: a preview the
+  // host already holds when the composer (re)mounts — a docked composer is
+  // remounted on every conversation switch — is no edit, and must still show.
+  const previewValueRef = useRef(value);
   useEffect(() => {
+    if (previewValueRef.current === value) return;
+    previewValueRef.current = value;
     if (previewTextRef.current) setPreviewDismissed(true);
   }, [value]);
 
@@ -744,6 +750,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 )}
               />
             </div>
+
+            {endIcon && <span className="flex h-6 shrink-0 items-center">{endIcon}</span>}
 
             <Button
               variant="bare"

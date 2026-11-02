@@ -139,6 +139,7 @@ export * from './dropdown-button';
 export * from './more-actions-menu';
 export * from './organization-card';
 export * from './page-actions';
+export * from './mobile-action-bar';
 export * from './service-card';
 export * from './slider';
 export * from './avatar-stack';

@@ -13,13 +13,15 @@ pub enum Feature {
     DeliveryToolInstallation,
     DeliveryClientUninstall,
     DeliveryClientUpdate,
+    PackageAutoUpdate,
 }
 
 impl Feature {
-    pub const ALL: [Feature; 3] = [
+    pub const ALL: [Feature; 4] = [
         Feature::DeliveryToolInstallation,
         Feature::DeliveryClientUninstall,
         Feature::DeliveryClientUpdate,
+        Feature::PackageAutoUpdate,
     ];
 
     pub fn name(self) -> &'static str {
@@ -27,6 +29,7 @@ impl Feature {
             Feature::DeliveryToolInstallation => "delivery-tool-installation",
             Feature::DeliveryClientUninstall => "delivery-client-uninstall",
             Feature::DeliveryClientUpdate => "delivery-client-update",
+            Feature::PackageAutoUpdate => "package-auto-update",
         }
     }
 
@@ -34,7 +37,8 @@ impl Feature {
         match self {
             Feature::DeliveryToolInstallation
             | Feature::DeliveryClientUninstall
-            | Feature::DeliveryClientUpdate => false,
+            | Feature::DeliveryClientUpdate
+            | Feature::PackageAutoUpdate => false,
         }
     }
 }

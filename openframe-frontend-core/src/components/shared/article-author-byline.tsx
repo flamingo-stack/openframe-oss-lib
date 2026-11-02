@@ -78,8 +78,8 @@ const AVATAR_BORDER_CLASS = 'rounded-full border-2 border-ods-border';
 const BODY_CLASS = 'min-w-0 flex-1';
 const NAME_ROW_CLASS = 'flex flex-wrap items-baseline gap-x-3 gap-y-1';
 const NAME_CLASS = 'text-ods-text-primary text-h5';
-const JOB_TITLE_CLASS = 'text-body-sm mt-0.5 font-body text-ods-text-secondary';
-const BIO_CLASS = 'text-body-md mt-2 font-body leading-relaxed text-ods-text-secondary';
+const JOB_TITLE_CLASS = 'mt-0.5 font-body text-ods-text-secondary';
+const BIO_CLASS = 'mt-2 font-body leading-relaxed text-ods-text-secondary';
 
 function formatDate(value: string | Date): string {
   // A published date is a content date: UTC-pinned through the one renderer, so
@@ -147,7 +147,7 @@ export function ArticleAuthorByline({
             )}
           </h3>
           {dateLabel && (
-            <span className="text-body-sm inline-flex items-center gap-1 font-body text-ods-text-secondary">
+            <span className="inline-flex items-center gap-1 font-body text-ods-text-secondary">
               <Calendar className="h-3 w-3" />
               {dateLabel}
             </span>
@@ -157,7 +157,7 @@ export function ArticleAuthorByline({
         {formattedBio ? (
           <p className={BIO_CLASS}>{formattedBio}</p>
         ) : fallbackBio ? (
-          <p className="text-body-md mt-2 font-body italic text-ods-text-secondary">{fallbackBio}</p>
+          <p className="mt-2 font-body italic text-ods-text-secondary">{fallbackBio}</p>
         ) : null}
       </div>
     </div>

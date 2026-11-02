@@ -1,6 +1,6 @@
 'use client';
 
-import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef } from 'react';
+import { type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject, useEffect, useRef } from 'react';
 
 import { cn } from '../../utils/cn';
 
@@ -43,6 +43,10 @@ export interface PanelResizeHandleProps {
    *  `AppLayoutDrawer`. They differ in track width and grip colour only. */
   variant: 'overlay' | 'inLayout';
   ariaLabel?: string;
+  /** Where and how big the hit area is, over the side's default track (merged last). */
+  className?: string;
+  /** What the handle draws in place of the default grip bar. */
+  grip?: ReactNode;
 }
 
 export function PanelResizeHandle({
@@ -55,6 +59,8 @@ export function PanelResizeHandle({
   panelRef,
   variant,
   ariaLabel,
+  className,
+  grip,
 }: PanelResizeHandleProps) {
   const isHorizontal = HORIZONTAL_SIDES.has(side);
   const startRef = useRef<{ x: number; y: number; size: number } | null>(null);
@@ -173,12 +179,15 @@ export function PanelResizeHandle({
         'outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0',
         trackPosition,
         cursorClass,
+        className,
       )}
     >
-      <div
-        aria-hidden
-        className={cn('rounded-full', variant === 'inLayout' ? 'bg-ods-border' : 'bg-ods-bg-surface', gripClass)}
-      />
+      {grip ?? (
+        <div
+          aria-hidden
+          className={cn('rounded-full', variant === 'inLayout' ? 'bg-ods-border' : 'bg-ods-bg-surface', gripClass)}
+        />
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
 use crate::utils::fs::JsonFile;
+use crate::utils::in_progress::InProgressView;
 use crate::utils::version_comparator;
 use anyhow::{anyhow, Context, Result};
 use semver::Version;
@@ -55,12 +56,14 @@ pub struct OpenFrameClientUpdateService {
     last_known_good_service: LastKnownGoodService,
     tool_run_manager: ToolRunManager,
     tool_ops: ToolOps,
+    package_upgrades: InProgressView,
     update_handler_service: UpdateHandlerService,
     /// Set from the update request until the updater is done with this process
     update_in_progress: Arc<AtomicBool>,
 }
 
 impl OpenFrameClientUpdateService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_info_service: OpenFrameClientInfoService,
         github_download_service: GithubDownloadService,
@@ -68,6 +71,7 @@ impl OpenFrameClientUpdateService {
         last_known_good_service: LastKnownGoodService,
         tool_run_manager: ToolRunManager,
         tool_ops: ToolOps,
+        package_upgrades: InProgressView,
         update_handler_service: UpdateHandlerService,
     ) -> Self {
         Self {
@@ -77,6 +81,7 @@ impl OpenFrameClientUpdateService {
             last_known_good_service,
             tool_run_manager,
             tool_ops,
+            package_upgrades,
             update_handler_service,
             update_in_progress: Arc::new(AtomicBool::new(false)),
         }
@@ -90,7 +95,7 @@ impl OpenFrameClientUpdateService {
         self.apply(message, guard).await
     }
 
-    /// Takes the update slot and parks new tool operations, unless another update or a tool holds them
+    /// Takes the update slot and parks new tool operations, unless another update, a tool or a package upgrade holds them
     pub fn reserve(&self, message: &OpenFrameClientUpdateMessage) -> Result<UpdateGuard> {
         let requested_version = message.version.trim();
         info!("Received update request for version: {}", requested_version);
@@ -107,13 +112,25 @@ impl OpenFrameClientUpdateService {
 
         self.tool_run_manager.mark_client_update_pending();
 
-        if self.tool_ops.any_busy() {
-            warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
-            return Err(anyhow!(
-                "Tool operation in progress, deferring client update"
-            ));
+        if let Some(busy) = self.busy_with() {
+            warn!(
+                "{} in progress, deferring client update to version {} (will redeliver)",
+                busy, requested_version
+            );
+            return Err(anyhow!("{} in progress, deferring client update", busy));
         }
         Ok(guard)
+    }
+
+    /// What must finish before the agent may be replaced; the client update waits for it.
+    fn busy_with(&self) -> Option<&'static str> {
+        if self.tool_ops.any_busy() {
+            Some("Tool operation")
+        } else if self.package_upgrades.is_active() {
+            Some("Package upgrade")
+        } else {
+            None
+        }
     }
 
     /// Update processing with version validation and safety checks, under a reserved update slot
@@ -326,8 +343,11 @@ impl OpenFrameClientUpdateService {
             rollback_only: false,
         };
 
-        if self.tool_ops.any_busy() {
-            warn!("Tool operation started during client download, deferring client update (will redeliver)");
+        if let Some(busy) = self.busy_with() {
+            warn!(
+                "{} started during client download, deferring client update (will redeliver)",
+                busy
+            );
             if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
                 warn!(
                     "Failed to remove staged binary after deferring: {}",
@@ -336,7 +356,8 @@ impl OpenFrameClientUpdateService {
             }
             self.update_state_service.clear().await?;
             return Err(anyhow!(
-                "Tool operation started during download, deferring client update"
+                "{} started during download, deferring client update",
+                busy
             ));
         }
 

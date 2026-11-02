@@ -155,9 +155,10 @@ export interface ChatRuntime {
      *  directly cross-origin (CORS-permitting). */
     imageProxyUrlPrefix?: string;
     /** Optional list of hostnames that should bypass the image proxy
-     *  (rendered direct). Hub uses ['openmsp.ai']; embedders typically
-     *  leave it unset. Matches the `skipDomains` parameter of
-     *  `getProxiedImageUrl`. */
+     *  (rendered direct), each matching its exact host and its subdomains.
+     *  Hub uses ['openmsp.ai', <its Supabase project host>]; an embedder
+     *  that shows the hub's content lists the same project host. Matches
+     *  the `skipDomains` parameter of `getProxiedImageUrl`. */
     imageProxySkipDomains?: string[];
     /** Optional base URL for the branded og-placeholder image route — the
      *  DEFAULT cover-image fallback for entity cards with no image. The lib

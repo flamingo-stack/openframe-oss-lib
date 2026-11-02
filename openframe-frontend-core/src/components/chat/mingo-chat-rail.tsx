@@ -1,21 +1,17 @@
 'use client';
 
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useControllableState } from '@radix-ui/react-use-controllable-state';
+import { type ReactNode, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import {
-  AlertCircleIcon,
   Arrow02LeftIcon,
   ChatPlusIcon,
   ChatQuestionIcon,
   ChatsIcon,
   ClockHistoryIcon,
-  DotsLoaderIcon,
   Ellipsis01Icon,
-  MessageIndicatorIcon,
-  Refresh01RightIcon,
   SearchIcon,
-  ShieldCheckIcon,
   UserIcon,
   UsersIcon,
 } from '../icons-v2-generated';
@@ -27,66 +23,43 @@ import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { ChatListItem, ChatListItemLoadingPage, ChatNavSidebar, type ChatNavSidebarItem } from './chat-nav-sidebar';
 import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
-import type { MingoHistoryScope } from './mingo-history-rail';
+import { MingoChatHistorySection } from './mingo-chat-history-section';
+import {
+  ChatListLoadError,
+  MINGO_DIALOG_STATUS_GLYPHS,
+  type MingoChatListProps,
+  type MingoDialogStatus,
+  mingoDialogStatusOf,
+  useLoadMoreSentinel,
+} from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
-/**
- * What a chat is doing, shown at the end of its row:
- * - `working`: Mingo is answering in it
- * - `unread`: a reply the user has not seen
- * - `approval`: Mingo waits for an approval there
- */
-export type MingoDialogStatus = 'working' | 'unread' | 'approval';
-
-export interface MingoChatRailProps {
-  /** Dialogs to list, newest first. */
-  dialogs: ReadonlyArray<DialogItem>;
-  activeDialogId?: string;
-  onSelectDialog?: (id: string) => void;
-  /** A chat being started and not saved yet: a selected row at the top
-   *  (e.g. "New Chat"), so the list says what the chat beside it is. */
-  draftTitle?: string;
+export interface MingoChatRailProps extends MingoChatListProps {
+  /**
+   * `'rail'` (default): the v2 chat panel's own column — the Mingo mark, the
+   * actions below (start a chat, the archive, "What to ask Mingo?") and the
+   * list, at a fixed 296 px.
+   * `'section'`: the chat history block of a host's main navigation sidebar
+   * (`MingoChatHistorySection`) — caption, Search, ⋯ (Chat archive, What to ask Mingo?), the scope,
+   * the chats grouped by day. No outer chrome or width of its own; it fills the
+   * height it is given and scrolls inside. The rail-only props below are
+   * ignored there.
+   */
+  variant?: 'rail' | 'section';
+  /** Rail only. */
   onNewChat?: () => void;
-  /** Open the archive. `archiveActive` marks it as the view on screen. */
-  onOpenArchive?: () => void;
+  /** Rail only: the archive is the view on screen. */
   archiveActive?: boolean;
-  /** "What to ask Mingo?": the suggestions a new chat starts from. */
-  onWhatToAsk?: () => void;
-  /** A row's status glyph. Unread replies are shown without it. */
-  statusOf?: (dialog: DialogItem) => MingoDialogStatus | undefined;
-  onRequestRename?: (dialog: DialogItem) => void;
-  onRequestArchive?: (dialog: DialogItem) => void;
-  onRequestCopyLink?: (dialog: DialogItem) => void;
-  onRequestCompact?: (dialog: DialogItem) => void;
-  /** "Show My Chats" / "Show All Chats" in the list's ⋯ menu; both or neither. */
-  scope?: MingoHistoryScope;
-  onScopeChange?: (scope: MingoHistoryScope) => void;
-  /** Server-side search. With a handler the ⋯ menu offers "Search for Chat". */
-  searchQuery?: string;
-  onSearchChange?: (query: string) => void;
-  hasMore?: boolean;
-  isLoadingMore?: boolean;
-  onLoadMore?: () => void;
-  /** The first page is still loading: the list draws one page of loading rows. */
-  isLoadingHistory?: boolean;
-  /** The host's page size: how many rows the loading state draws. Default `CHAT_HISTORY_PAGE_SIZE`. */
-  pageSize?: number;
-  /** The list failed to load with nothing cached. */
-  loadError?: boolean;
-  onRetry?: () => void;
-  /** The |← control beside the logo: widen the panel to the list and the chat. */
+  /** Rail only — the |← control beside the logo: widen the panel to the list and the chat. */
   onExpand?: () => void;
-  className?: string;
 }
 
-const STATUS_GLYPHS: Record<MingoDialogStatus, { icon: ReactNode; label: string }> = {
-  working: { icon: <DotsLoaderIcon className="text-ods-text-secondary" />, label: 'Mingo is working' },
-  unread: { icon: <MessageIndicatorIcon className="text-ods-accent" />, label: 'New reply' },
-  approval: { icon: <ShieldCheckIcon className="text-ods-accent" />, label: 'Waiting for approval' },
-};
-
-function statusFor(dialog: DialogItem, statusOf: MingoChatRailProps['statusOf']): MingoDialogStatus | undefined {
-  return statusOf?.(dialog) ?? ((dialog.unreadMessagesCount ?? 0) > 0 ? 'unread' : undefined);
+/**
+ * The Mingo chat list. The default rail is the v2 panel's column; the section
+ * is the same list placed in the main sidebar (see `variant`).
+ */
+export function MingoChatRail({ variant = 'rail', ...props }: MingoChatRailProps) {
+  return variant === 'section' ? <MingoChatHistorySection {...props} /> : <MingoChatRailPanel {...props} />;
 }
 
 /**
@@ -96,7 +69,7 @@ function statusFor(dialog: DialogItem, statusOf: MingoChatRailProps['statusOf'])
  * status at the end. Row actions (rename, archive, ...) sit behind a ⋯ that
  * replaces the status on hover.
  */
-export function MingoChatRail({
+function MingoChatRailPanel({
   dialogs,
   activeDialogId,
   onSelectDialog,
@@ -114,6 +87,8 @@ export function MingoChatRail({
   onScopeChange,
   searchQuery,
   onSearchChange,
+  searchOpen: searchOpenProp,
+  onSearchOpenChange,
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
@@ -123,10 +98,14 @@ export function MingoChatRail({
   onRetry,
   onExpand,
   className,
-}: MingoChatRailProps) {
+}: Omit<MingoChatRailProps, 'variant'>) {
   // ONE switch: the first page loading (or the page's loading state) draws one page of the rows' own skeleton.
   const loading = useLoadingScope() || isLoadingHistory;
-  const [searchOpen, setSearchOpen] = useState(!!searchQuery?.trim());
+  const [searchOpen, setSearchOpen] = useControllableState({
+    prop: searchOpenProp,
+    defaultProp: !!searchQuery?.trim(),
+    onChange: onSearchOpenChange,
+  });
   const hasSearch = !!searchQuery?.trim();
 
   const items: ChatNavSidebarItem[] = [];
@@ -176,43 +155,12 @@ export function MingoChatRail({
 
   // Infinite scroll: the next page when the sentinel at the list's end shows.
   // The observer clips against the scrolling list, so the viewport root works.
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const onLoadMoreRef = useRef(onLoadMore);
-  const isLoadingMoreRef = useRef(isLoadingMore);
-  useEffect(() => {
-    onLoadMoreRef.current = onLoadMore;
-    isLoadingMoreRef.current = isLoadingMore;
-  });
-  const dialogCount = dialogs.length;
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel || !hasMore || typeof IntersectionObserver === 'undefined') return undefined;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting && !isLoadingMoreRef.current) onLoadMoreRef.current?.();
-      },
-      { rootMargin: '120px', threshold: 0.1 },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-    // Re-armed per page: a sentinel still in view after a short page keeps loading.
-  }, [hasMore, dialogCount, isLoadingMore]);
+  const sentinelRef = useLoadMoreSentinel({ hasMore, isLoadingMore, onLoadMore, itemCount: dialogs.length });
 
   let list: ReactNode;
   if (loadError) {
     list = (
-      <div className="flex flex-col items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-xs)] py-[var(--spacing-system-l)] text-center">
-        <AlertCircleIcon className="size-8 shrink-0 text-ods-text-secondary" />
-        <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-          <p className="text-ods-text-primary text-h4">Couldn’t load your chats</p>
-          <p className="text-ods-text-secondary text-h6">Something went wrong reaching the server. Try again.</p>
-        </div>
-        {onRetry && (
-          <Button variant="outline" size="small" leftIcon={<Refresh01RightIcon />} onClick={onRetry}>
-            Try again
-          </Button>
-        )}
-      </div>
+      <ChatListLoadError onRetry={onRetry} className="px-[var(--spacing-system-xs)] py-[var(--spacing-system-l)]" />
     );
   } else if (loading) {
     list = <ChatListItemLoadingPage count={pageSize} />;
@@ -238,7 +186,7 @@ export function MingoChatRail({
             data-loading-item
             dialog={dialog}
             active={dialog.id === activeDialogId}
-            status={statusFor(dialog, statusOf)}
+            status={mingoDialogStatusOf(dialog, statusOf)}
             onSelect={onSelectDialog}
             menuItems={chatDialogMenuItems({
               onCopyLink: onRequestCopyLink && (() => onRequestCopyLink(dialog)),
@@ -326,7 +274,7 @@ interface MingoChatRailRowProps {
 function MingoChatRailRow({ dialog, active, status, onSelect, menuItems, ...props }: MingoChatRailRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const hasMenu = menuItems.length > 0;
-  const glyph = status ? STATUS_GLYPHS[status] : undefined;
+  const glyph = status ? MINGO_DIALOG_STATUS_GLYPHS[status] : undefined;
   const title = dialog.title || 'Untitled Chat';
 
   return (

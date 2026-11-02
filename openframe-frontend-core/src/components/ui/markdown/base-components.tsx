@@ -410,7 +410,7 @@ export function buildBaseComponents({
     // bottom row's `border-b` used to sit against the frame's own border as a
     // doubled line.
     table: ({ children }: MdRenderProps<'table'>) => (
-      <div className="table-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card">
+      <div className="my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card">
         <table className="w-full table-fixed md:table-auto [&_tr:last-child_td]:border-b-0">{children}</table>
       </div>
     ),

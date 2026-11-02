@@ -142,7 +142,15 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
         ) : (
           <>
             {hasBody ? (
-              <Button variant="row" type="button" aria-expanded={expanded} onClick={() => setExpanded(prev => !prev)}>
+              // Square: the frame clips the corners, so the hover keeps the frame's own rounding at the top
+              // and meets the open body flat at the bottom.
+              <Button
+                variant="row"
+                type="button"
+                aria-expanded={expanded}
+                onClick={() => setExpanded(prev => !prev)}
+                className="rounded-none"
+              >
                 {headerContent}
               </Button>
             ) : (
