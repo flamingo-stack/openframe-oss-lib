@@ -19,7 +19,6 @@ use crate::models::{
     OpenFrameClientUpdateMessage, PackageRef, PackageUpdateStatusMessage, UpdateStatus,
 };
 use crate::platform::{DirectoryManager, DmgExtractor};
-use crate::services::client_update_retry_service::ClientUpdateRetryService;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
@@ -338,16 +337,6 @@ impl Agent {
             InProgress::default().view(),
             update_handler,
         )
-    }
-
-    fn client_update_handler(&self, service: OpenFrameClientUpdateService) -> ClientUpdateHandler {
-        let legacy_retry = ClientUpdateRetryService::new(
-            &self.directories,
-            service.clone(),
-            self.tool_run_manager.clone(),
-            self.manager.clone(),
-        );
-        ClientUpdateHandler::new(service, legacy_retry, self.tool_run_manager.clone())
     }
 
     fn persisted(&self) -> FeatureFlagsState {
@@ -980,7 +969,10 @@ async fn a_failed_client_update_is_reported_and_stops_holding_tool_operations() 
     let Some((mut agent, _gate)) = Agent::start().await else {
         return;
     };
-    let handler = agent.client_update_handler(agent.client_update_service());
+    let handler = ClientUpdateHandler::new(
+        agent.client_update_service(),
+        agent.tool_run_manager.clone(),
+    );
     agent.launch_command(handler).await;
 
     agent
@@ -1006,7 +998,10 @@ async fn a_client_update_waits_for_a_busy_tool_or_a_running_update_without_an_ac
     };
     let service = agent.client_update_service();
     agent
-        .launch_command(agent.client_update_handler(service.clone()))
+        .launch_command(ClientUpdateHandler::new(
+            service.clone(),
+            agent.tool_run_manager.clone(),
+        ))
         .await;
 
     let busy = agent.tool_ops.lock("mesh").await.mark_busy();

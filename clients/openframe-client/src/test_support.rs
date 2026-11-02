@@ -102,11 +102,9 @@ pub(crate) fn directories(dir: &TempDir) -> DirectoryManager {
 
 /// A client update service over `dir`, with a NATS manager that never connects.
 pub(crate) struct ClientUpdateFixture {
-    pub(crate) directories: DirectoryManager,
     pub(crate) service: OpenFrameClientUpdateService,
     pub(crate) tool_ops: ToolOps,
     pub(crate) tool_run_manager: ToolRunManager,
-    pub(crate) nats: NatsConnectionManager,
 }
 
 pub(crate) fn client_update_fixture(dir: &TempDir) -> ClientUpdateFixture {
@@ -148,7 +146,7 @@ pub(crate) fn client_update_fixture(dir: &TempDir) -> ClientUpdateFixture {
         client_info.clone(),
         UpdateCleanupService::for_binary(dir.path().join("openframe-client")),
         last_known_good.clone(),
-        InstalledAgentMessagePublisher::new(NatsMessagePublisher::new(nats.clone())),
+        InstalledAgentMessagePublisher::new(NatsMessagePublisher::new(nats)),
         config,
         Arc::new(ResultStore::open_or_degrade(
             dm.secured_dir().join("scheduled_outbox.redb"),
@@ -166,11 +164,9 @@ pub(crate) fn client_update_fixture(dir: &TempDir) -> ClientUpdateFixture {
     );
 
     ClientUpdateFixture {
-        directories: dm,
         service,
         tool_ops,
         tool_run_manager,
-        nats,
     }
 }
 

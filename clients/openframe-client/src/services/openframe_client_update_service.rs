@@ -120,21 +120,12 @@ impl OpenFrameClientUpdateService {
 
         if let Some(busy) = self.busy_with() {
             warn!(
-                "{} in progress, deferring client update to version {} (will retry)",
+                "{} in progress, deferring client update to version {} (will redeliver)",
                 busy, requested_version
             );
             return Err(anyhow!("{} in progress, deferring client update", busy));
         }
         Ok(guard)
-    }
-
-    /// A tool operation or a package upgrade is running, which the client update waits for
-    pub fn is_busy(&self) -> bool {
-        self.busy_with().is_some()
-    }
-
-    pub fn update_in_progress(&self) -> bool {
-        self.update_in_progress.load(Ordering::Acquire)
     }
 
     /// What must finish before the agent may be replaced; the client update waits for it.
@@ -262,6 +253,8 @@ impl OpenFrameClientUpdateService {
             {
                 error!("Failed to set update status to Failed: {:#}", status_err);
             }
+
+            info!("Update failed, NATS will retry");
         }
 
         update_result.map(|()| UpdateLaunch::Launched)
@@ -373,7 +366,7 @@ impl OpenFrameClientUpdateService {
 
         if let Some(busy) = self.busy_with() {
             warn!(
-                "{} started during client download, deferring client update (will retry)",
+                "{} started during client download, deferring client update (will redeliver)",
                 busy
             );
             if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
