@@ -23,3 +23,20 @@ describe('FadePreview item mode in the server markup', () => {
     expect(renderToString(<FadePreview hiddenCount={2}>{list(4)}</FadePreview>)).not.toContain('nth-child');
   });
 });
+
+describe('FadePreview counted mode in the server markup', () => {
+  it('carries the collapsed max-height, so a server-rendered list is clamped before it hydrates', () => {
+    expect(renderToString(<FadePreview hiddenCount={2}>{list(4)}</FadePreview>)).toContain('max-height:120px');
+    expect(
+      renderToString(
+        <FadePreview hiddenCount={2} collapsedHeight={160}>
+          {list(4)}
+        </FadePreview>,
+      ),
+    ).toContain('max-height:160px');
+  });
+
+  it('adds no clamp when nothing is hidden', () => {
+    expect(renderToString(<FadePreview hiddenCount={0}>{list(4)}</FadePreview>)).not.toContain('max-height');
+  });
+});

@@ -1,7 +1,9 @@
 package com.openframe.notification.readstate;
 
+import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationEntityType;
+import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
@@ -52,6 +54,24 @@ public class NotificationReadStateService {
                                   NotificationEntityRef entity,
                                   @NotNull RecipientType recipientType,
                                   @NotEmpty Collection<String> recipientIds) {
+        insertUnreadRows(notificationId, category, title, null, null, entity, recipientType, recipientIds);
+    }
+
+    public void createForAudience(@NotNull Notification notification,
+                                  NotificationEntityRef entity,
+                                  @NotNull RecipientType recipientType,
+                                  @NotEmpty Collection<String> recipientIds) {
+        String notificationId = notification.getId();
+        NotificationCategory category = notification.getCategory();
+        String title = notification.getTitle();
+        String type = notification.getType();
+        NotificationSeverity severity = notification.getSeverity();
+        insertUnreadRows(notificationId, category, title, type, severity, entity, recipientType, recipientIds);
+    }
+
+    private void insertUnreadRows(String notificationId, NotificationCategory category, String title,
+                                  String type, NotificationSeverity severity, NotificationEntityRef entity,
+                                  RecipientType recipientType, Collection<String> recipientIds) {
         NotificationEntityType entityType = entity == null ? null : entity.getType();
         String entityId = entity == null ? null : entity.getId();
         List<NotificationReadState> rows = new ArrayList<>(recipientIds.size());
@@ -65,6 +85,8 @@ public class NotificationReadStateService {
                     .entityType(entityType)
                     .entityId(entityId)
                     .title(title)
+                    .type(type)
+                    .severity(severity)
                     .build());
         }
         repository.bulkInsertUnordered(rows);

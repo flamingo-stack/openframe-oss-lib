@@ -9,14 +9,7 @@ import { resolveSourceRowCTA, type SourceRowContext } from '../source-row-cta';
 
 const HUB = 'https://www.flamingo.run';
 const compose = makeComposeContentUrl({ hostedTypes: new Set<string>(), contentOrigin: HUB });
-const ctx: SourceRowContext = {
-  currentPlatform: 'company-hub',
-  composeContentUrl: compose,
-  docPlatformTargets: {
-    data_room_doc: { platform: 'company-hub', basePath: '/data-room' },
-    markdown: { platform: 'flamingo', basePath: '/knowledge-base' },
-  },
-};
+const ctx: SourceRowContext = { composeContentUrl: compose };
 
 /** What a `[card://type:id]` marker becomes before its row loads. */
 const marker = (type: string, id: string): ChatRef => ({ type, id, title: id, url: null });
@@ -97,16 +90,24 @@ describe('resolveCardDestination — precedence', () => {
   const entry = { contentRefType: 'data_room_doc', noComposedHref: true, fallbackHref: () => null };
 
   it('a doc marker has no link until the row brings its path (the Company Hub report)', () => {
+    // The host that serves the data room composes its docs as its own pages.
+    const dataRoomCtx: SourceRowContext = {
+      composeContentUrl: makeComposeContentUrl({
+        hostedTypes: new Set(['data_room_doc']),
+        contentOrigin: HUB,
+        suffixes: { data_room_doc: 'data-room' },
+      }),
+    };
     const chatRef = marker('data_room_doc', 'd-1');
-    expect(resolveCardDestination({ chatRef, entry, ctx }).url).toBeNull();
+    expect(resolveCardDestination({ chatRef, entry, ctx: dataRoomCtx }).url).toBeNull();
     const loaded = resolveCardDestination({
       chatRef,
       item: { id: 'd-1', url: null, metadata: { path: 'legal/ein-cp-575' } },
       entry,
-      ctx,
+      ctx: dataRoomCtx,
     });
-    expect(loaded).toMatchObject({ source: 'row', targetPlatform: 'company-hub', path: 'legal/ein-cp-575' });
-    expect(loaded.url).toMatch(/\/data-room\/legal\/ein-cp-575$/);
+    expect(loaded).toMatchObject({ source: 'row', path: 'legal/ein-cp-575' });
+    expect(loaded.url).toBe('/data-room/legal/ein-cp-575');
   });
 
   it("the ref's own url wins over the fetched row", () => {

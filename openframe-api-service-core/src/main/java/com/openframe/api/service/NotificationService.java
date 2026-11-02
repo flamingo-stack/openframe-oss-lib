@@ -1,6 +1,6 @@
 package com.openframe.api.service;
 
-import com.openframe.api.dto.GenericQueryResult;
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.shared.CursorCodec;
@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.NotificationPage;
+import com.openframe.data.repository.notification.NotificationReadStateFilter;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.NotificationWithStatus;
 import jakarta.validation.constraints.NotNull;
@@ -37,25 +38,44 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final GraphQLNotificationMapper notificationMapper;
 
-    public GenericQueryResult<NotificationView> list(String recipientId,
-                                                     RecipientType recipientType,
-                                                     @NotNull NotificationFilter filter,
-                                                     CursorPaginationCriteria pagination) {
+    public CountedGenericQueryResult<NotificationView> list(String recipientId,
+                                                            RecipientType recipientType,
+                                                            @NotNull NotificationFilter filter,
+                                                            CursorPaginationCriteria pagination) {
         return list(recipientId, recipientType, filter, pagination, null);
     }
 
-    public GenericQueryResult<NotificationView> list(String recipientId,
-                                                     RecipientType recipientType,
-                                                     @NotNull NotificationFilter filter,
-                                                     CursorPaginationCriteria pagination,
-                                                     SortInput sort) {
+    public CountedGenericQueryResult<NotificationView> list(String recipientId,
+                                                            RecipientType recipientType,
+                                                            @NotNull NotificationFilter filter,
+                                                            CursorPaginationCriteria pagination,
+                                                            SortInput sort) {
+        return list(recipientId, recipientType, filter, pagination, sort, true);
+    }
+
+    public CountedGenericQueryResult<NotificationView> list(String recipientId,
+                                                            RecipientType recipientType,
+                                                            @NotNull NotificationFilter filter,
+                                                            CursorPaginationCriteria pagination,
+                                                            SortInput sort,
+                                                            boolean countRequested) {
         CursorPaginationCriteria normalized = pagination.normalize();
         int limit = normalized.getLimit();
         String effectiveSearch = normalizeSearch(filter.search());
+        NotificationReadStateFilter rowFilter = NotificationReadStateFilter.builder()
+                .read(filter.read())
+                .categories(filter.categories())
+                .types(filter.types())
+                .severities(filter.severities())
+                .search(effectiveSearch)
+                .build();
         Sort.Direction direction = resolveSortDirection(sort);
 
+        long filteredCount = countRequested
+                ? notificationRepository.countForRecipient(recipientId, recipientType, rowFilter)
+                : 0;
         NotificationPage repoPage = notificationRepository.findPageForRecipient(
-                recipientId, recipientType, filter.read(), effectiveSearch,
+                recipientId, recipientType, rowFilter,
                 normalized.getCursor(), normalized.isBackward(), direction, limit + 1);
 
         boolean hasMore = repoPage.items().size() > limit;
@@ -69,9 +89,10 @@ public class NotificationService {
                 .map(item -> notificationMapper.toView(item.notification(), item.status()))
                 .toList();
 
-        return GenericQueryResult.<NotificationView>builder()
+        return CountedGenericQueryResult.<NotificationView>builder()
                 .items(views)
                 .pageInfo(buildPageInfo(views, hasMore, normalized))
+                .filteredCount((int) filteredCount)
                 .build();
     }
 

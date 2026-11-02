@@ -15,6 +15,7 @@ import com.openframe.api.service.rmm.schedule.ScheduleRunService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.api.service.user.InvitationService;
 import com.openframe.api.service.user.UserService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
@@ -51,7 +52,7 @@ import static org.mockito.Mockito.when;
         properties = "dgs.graphql.schema-locations=classpath:test-schema/federated-entities.graphqls")
 @MockitoBean(types = {ToolService.class, TagService.class, ToolConnectionService.class,
         InstalledAgentService.class, ScriptService.class, ScriptExecutionService.class, ScheduleScriptService.class,
-        ScheduleRunService.class})
+        ScheduleRunService.class, InvitationService.class})
 class ApiEntitiesDgsTest {
 
     private static final String USER_ID = "665f1c2ab3e4d5f6a7b8c9a1";

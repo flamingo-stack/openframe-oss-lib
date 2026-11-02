@@ -231,7 +231,89 @@ export function L({ loading }: { loading: boolean }) { return loading ? <Wait />
     },
     pass: {
       'components/su.tsx':
-        'export function Su() { return <LoadingSuspense label="Loading X" fallback={<XView x={null} />}><X /></LoadingSuspense>; }\n',
+        'function XReader() { return <X />; }\nexport function Su() { return <LoadingSuspense label="Loading X"><XReader /></LoadingSuspense>; }\n',
+    },
+  },
+  {
+    rule: 'RAW_SUSPENSE',
+    fail: {
+      'components/raw.tsx':
+        'export function Raw() { return <Suspense fallback={<XView x={null} />}><X /></Suspense>; }\n',
+    },
+    pass: {
+      'components/raw.tsx': `export function Raw() {
+  return (
+    <>
+      <X />
+      {/* loading-standard-ok(SUSPENSE_FALLBACK): structured data for crawlers, nothing is drawn */}
+      <Suspense fallback={null}><StructuredData /></Suspense>
+    </>
+  );
+}
+`,
+    },
+  },
+  {
+    rule: 'PAGE_BOUNDARY',
+    fail: {
+      'app/devices/page.tsx': `export default function Page() {
+  return (
+    <LoadingSuspense label="Loading the devices">
+      <DevicesHeading />
+      <DevicesTable />
+    </LoadingSuspense>
+  );
+}
+`,
+      'app/settings/layout.tsx':
+        'export default function Layout({ children }: any) { return <><Suspense fallback={<X />}>{children}</Suspense></>; }\n',
+      'app/pricing/page.tsx':
+        'export default function Page() { return renderPage({ slots: { flamingo: <LoadingSuspense><Pricing /></LoadingSuspense> } }); }\n',
+    },
+    pass: {
+      'app/devices/page.tsx': `export default function Page() {
+  return (
+    <>
+      <DevicesHeading />
+      <DevicesTable />
+    </>
+  );
+}
+`,
+    },
+  },
+  {
+    rule: 'BOUNDARY_OWNER',
+    fail: {
+      'components/devices-view.tsx': `import { DevicesTable } from './devices-table';
+export function DevicesView() {
+  return (
+    <div>
+      <DevicesHeading />
+      <LoadingSuspense label="Loading the devices">
+        <DevicesTable />
+      </LoadingSuspense>
+    </div>
+  );
+}
+`,
+      'components/run-view.tsx':
+        'function RunReader() { return <Run />; }\nexport function RunView() { return <LoadingSuspense label="Loading the run" fallback={<RunSkeleton />}><RunReader /></LoadingSuspense>; }\n',
+    },
+    pass: {
+      'components/devices-table.tsx': `/** The table, with its own boundary: in the scope the reader draws its own rows. */
+export function DevicesTable(props: { search: string }) {
+  return (
+    <LoadingSuspense label="Loading the devices">
+      <DevicesTableReader {...props} />
+    </LoadingSuspense>
+  );
+}
+function DevicesTableReader({ search }: { search: string }) {
+  const loading = useLoadingScope();
+  return <Table rows={loading ? [] : useDevices(search)} loading={loading} />;
+}
+`,
     },
   },
   {

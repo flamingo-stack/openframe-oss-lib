@@ -1,6 +1,16 @@
 'use client';
 
-import { type ReactNode, createContext, forwardRef, useContext, useRef, useEffect, useState } from 'react';
+import {
+  type ReactNode,
+  createContext,
+  forwardRef,
+  useContext,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { RemoveScroll } from 'react-remove-scroll';
 import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
@@ -86,6 +96,13 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
     // Keep the modal mounted while the exit animation plays.
     const [isMounted, setIsMounted] = useState(isOpen);
     const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
+    // The modal's layer lives on <body>, like Drawer's and Dialog's: rendered in
+    // place, an ancestor with a transform, a filter or a backdrop filter (a sticky
+    // header, a bottom action bar, an animated card) becomes the containing block
+    // of its `position: fixed` layer, and the modal is clipped to that box. Set
+    // after mount, so the server renders nothing and hydration matches.
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+    useLayoutEffect(() => setPortalTarget(document.body), []);
     const panelRef = useRef<HTMLDivElement | null>(null);
     const restoreFocusRef = useRef<HTMLElement | null>(null);
     const stackIdRef = useRef<symbol>(Symbol('modal'));
@@ -214,11 +231,11 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
       return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, onClose]);
 
-    if (!isMounted) return null;
+    if (!isMounted || !portalTarget) return null;
 
     const state = isOpen ? 'open' : 'closed';
 
-    return (
+    return createPortal(
       // `forwardProps` — RemoveScroll's default is to WRAP its children in a
       // plain <div>. That wrapper is in normal flow, so a modal rendered inside
       // a `flex`/`grid` container with a `gap` became an extra (zero-height)
@@ -326,7 +343,8 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
               anchor the menus' `position: fixed` to the panel. */}
           <div ref={setPortalHost} className="contents" />
         </div>
-      </RemoveScroll>
+      </RemoveScroll>,
+      portalTarget,
     );
   },
 );

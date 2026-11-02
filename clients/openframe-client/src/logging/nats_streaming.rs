@@ -19,14 +19,38 @@ use super::log_source::{FileLogSource, LogSource, LogSourceKind, LogSourceRegist
 const BATCH_INTERVAL_SECS: u64 = 60;
 const MAX_LOGS_PER_BATCH: usize = 50;
 const RECONNECT_DELAY_SECS: u64 = 5;
-const INITIAL_KEY_CHECK_INTERVAL_SECS: u64 = 10;
+const KEY_CHECK_INTERVAL_SECS: u64 = 10;
 const SOURCE_DISCOVERY_INTERVAL_SECS: u64 = 30;
 const NATS_SUBJECT: &str = "agents.logs";
+
+/// Credential handed to the logs gateway: the log key, or the enrollment key until the device holds one.
+#[derive(Debug, PartialEq)]
+pub enum LogStreamKey {
+    Log(String),
+    Initial(String),
+}
+
+impl LogStreamKey {
+    fn header(&self) -> (&'static str, &str) {
+        match self {
+            Self::Log(key) => ("x-log-key", key),
+            Self::Initial(key) => ("x-initial-key", key),
+        }
+    }
+
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::Log(_) => "log key",
+            Self::Initial(_) => "initial key",
+        }
+    }
+}
+
 pub struct NatsLogConnection {
     jetstream: Option<jetstream::Context>,
     server_host: String,
     tenant_domain: String,
-    initial_key: String,
+    key: LogStreamKey,
     machine_id: String,
 }
 
@@ -34,14 +58,14 @@ impl NatsLogConnection {
     pub fn new(
         server_host: String,
         tenant_domain: String,
-        initial_key: String,
+        key: LogStreamKey,
         machine_id: String,
     ) -> Self {
         Self {
             jetstream: None,
             server_host,
             tenant_domain,
-            initial_key,
+            key,
             machine_id,
         }
     }
@@ -49,14 +73,17 @@ impl NatsLogConnection {
     pub async fn connect(&mut self) -> Result<()> {
         let url = format!("wss://{}/ws/nats-logs", self.server_host);
         info!(
-            "NATS logs: connecting to {} (tenant={})",
-            url, self.tenant_domain
+            "NATS logs: connecting to {} (tenant={}, auth={})",
+            url,
+            self.tenant_domain,
+            self.key.kind()
         );
 
         let tenant_domain = self.tenant_domain.clone();
+        let (key_header, key_value) = self.key.header();
         let client = async_nats::ConnectOptions::new()
             .custom_header("x-tenant-domain", &self.tenant_domain)
-            .custom_header("x-initial-key", &self.initial_key)
+            .custom_header(key_header, key_value)
             .custom_header(MACHINE_ID_HEADER, &self.machine_id)
             .retry_on_initial_connect()
             .reconnect_delay_callback(|attempt| {
@@ -163,12 +190,12 @@ impl LogStreamingRunManager {
 
     pub async fn start(self) -> Result<()> {
         tokio::spawn(async move {
-            let initial_key = self.wait_for_initial_key().await;
+            let key = self.wait_for_key().await;
 
             let mut connection = NatsLogConnection::new(
                 self.server_host.clone(),
                 self.tenant_domain.clone(),
-                initial_key,
+                key,
                 self.machine_id.clone(),
             );
 
@@ -228,18 +255,21 @@ impl LogStreamingRunManager {
         registry
     }
 
-    async fn wait_for_initial_key(&self) -> String {
+    fn stored_key(&self) -> Option<LogStreamKey> {
+        choose_key(
+            self.initial_config_service.get_log_key().ok(),
+            self.initial_config_service.get_initial_key().ok(),
+        )
+    }
+
+    async fn wait_for_key(&self) -> LogStreamKey {
         loop {
-            match self.initial_config_service.get_initial_key() {
-                Ok(key) if !key.is_empty() => {
-                    info!("NATS log streaming: initial key available, starting");
-                    return key;
-                }
-                _ => {
-                    debug!("NATS log streaming: waiting for initial key...");
-                    tokio::time::sleep(Duration::from_secs(INITIAL_KEY_CHECK_INTERVAL_SECS)).await;
-                }
+            if let Some(key) = self.stored_key() {
+                info!("NATS log streaming: {} available, starting", key.kind());
+                return key;
             }
+            debug!("NATS log streaming: waiting for a key...");
+            tokio::time::sleep(Duration::from_secs(KEY_CHECK_INTERVAL_SECS)).await;
         }
     }
 }
@@ -351,9 +381,23 @@ async fn log_streaming_loop(
     }
 }
 
+/// The log key once the device holds one, else the enrollment key still on disk.
+fn choose_key(log_key: Option<String>, initial_key: Option<String>) -> Option<LogStreamKey> {
+    if let Some(key) = log_key.filter(|key| !key.is_empty()) {
+        return Some(LogStreamKey::Log(key));
+    }
+    initial_key
+        .filter(|key| !key.is_empty())
+        .map(LogStreamKey::Initial)
+}
+
 fn extract_tenant_domain(server_host: &str) -> String {
     server_host
         .strip_prefix("api.")
         .unwrap_or(server_host)
         .to_string()
 }
+
+#[cfg(test)]
+#[path = "nats_streaming_tests.rs"]
+mod tests;

@@ -24,7 +24,15 @@ public interface ScriptExecutionRepository
 
     List<ScriptExecution> findByTenantIdAndExecutionId(String tenantId, String executionId);
 
-    List<ScriptExecution> findByStatusAndDispatchedAtBefore(ExecutionStatus status, Instant dispatchedAtBefore);
+    List<ScriptExecution> findByTenantIdAndScriptIdAndStatus(String tenantId, String scriptId, ExecutionStatus status);
+
+    List<ScriptExecution> findByTenantIdAndScheduleIdAndStatus(String tenantId, String scheduleId, ExecutionStatus status);
+
+    Optional<ScriptExecution> findByTenantIdAndExecutionIdAndMachineIdAndPackageUpdateRequestId(
+            String tenantId, String executionId, String machineId, String packageUpdateRequestId);
+
+    List<ScriptExecution> findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(
+            ExecutionStatus status, Instant dispatchedAtBefore);
 
     Optional<ScriptExecution> findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
             String tenantId, String machineId, String scriptId, ExecutionSource source);

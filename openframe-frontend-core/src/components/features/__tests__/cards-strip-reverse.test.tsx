@@ -33,6 +33,7 @@ beforeAll(() => {
     }
     root = null;
     rootMargin = '';
+    scrollMargin = '';
     thresholds = [];
   };
   window.matchMedia = (query: string) => ({

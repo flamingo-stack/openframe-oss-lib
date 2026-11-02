@@ -1,6 +1,5 @@
 package com.openframe.delivery.dispatch;
 
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.metrics.DeliveryMetrics;
@@ -8,7 +7,7 @@ import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.TestPayload;
-import com.openframe.kafka.producer.OssTenantKafkaProducer;
+import com.openframe.kafka.producer.MessageProducer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +15,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,7 +33,7 @@ class KafkaDeliverySinkTest {
     private static final String TARGET_ID = "fleetmdm-agent";
     private static final String DISPATCH_ID = "d-1";
 
-    @Mock private OssTenantKafkaProducer producer;
+    @Mock private MessageProducer producer;
     @Mock private DeliveryMetrics metrics;
 
     @Captor private ArgumentCaptor<DeliveryDispatchMessage> messageCaptor;
@@ -60,19 +61,34 @@ class KafkaDeliverySinkTest {
         sink.accept(request);
 
         // verifications
-        verify(producer).sendAndAwait(eq(TOPIC), eq(MACHINE_ID), messageCaptor.capture());
+        verify(producer).sendAndAwaitMessage(eq(TOPIC), messageCaptor.capture(), eq(MACHINE_ID));
         DeliveryDispatchMessage message = messageCaptor.getValue();
         assertThat(message.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(message.getAudience()).isEqualTo(DeliveryAudience.MACHINE);
         assertThat(message.getPayload().get("delivery").get("dispatchId").asString()).isEqualTo(DISPATCH_ID);
         assertThat(message.getPayload().get("value").asString()).isEqualTo("issued");
+        assertThat(message.getDueAt()).isNull();
         verify(metrics).recordDispatched(DeliveryType.TOOL_INSTALLATION, "kafka");
+    }
+
+    @Test
+    void accept_scheduledRequest_momentCarriedInTheHandOff() {
+        // setup
+        Instant dueAt = Instant.parse("2026-11-01T10:00:00Z");
+        DeliveryRequest<TestPayload> scheduled = request.toBuilder().dueAt(dueAt).build();
+
+        // execution
+        sink.accept(scheduled);
+
+        // verifications
+        verify(producer).sendAndAwaitMessage(eq(TOPIC), messageCaptor.capture(), eq(MACHINE_ID));
+        assertThat(messageCaptor.getValue().getDueAt()).isEqualTo(dueAt);
     }
 
     @Test
     void accept_kafkaDown_countedAndRethrownToTheCaller() {
         // setup
-        doThrow(new IllegalStateException("kafka down")).when(producer).sendAndAwait(eq(TOPIC), eq(MACHINE_ID), any());
+        doThrow(new IllegalStateException("kafka down")).when(producer).sendAndAwaitMessage(eq(TOPIC), any(), eq(MACHINE_ID));
 
         // execution + verifications
         assertThatThrownBy(() -> sink.accept(request)).isInstanceOf(IllegalStateException.class);

@@ -144,6 +144,10 @@ function DirectoryRow({
   );
 }
 
+const NO_HOSTS: SchedulingLink['hosts'] = [];
+/** Hosts a loading row draws: a typical link's (measured 2026-10: every public link has one host). */
+const TYPICAL_HOSTS = 1;
+
 /**
  * Same-shell loading row (co-located-skeleton convention): the row's frame, "Next available" and the chevron box
  * real, the title, subtitle, audience chip, hosts and next time as shapes.
@@ -156,7 +160,8 @@ function MeetingSchedulerDirectoryRowSkeleton(props: { [marker: `data-${string}`
         <TextLineSkeleton type="h6" className="w-1/3" />
       </div>
       <UnifiedSkeleton className="hidden h-6 w-28 shrink-0 content-sm:block" />
-      <UnifiedSkeleton className="h-10 w-10 shrink-0 rounded-full" />
+      {/* The hosts in the stack's own loading form: one face, the typical link's host count. */}
+      <AvatarStack people={NO_HOSTS} loading max={TYPICAL_HOSTS} size="md" label="Hosts" className="flex shrink-0" />
       <div className={ROW_NEXT_COLUMN_CLASS}>
         <p className={ROW_NEXT_LABEL_CLASS}>Next available</p>
         <TextLineSkeleton type="h6" className="w-32" />

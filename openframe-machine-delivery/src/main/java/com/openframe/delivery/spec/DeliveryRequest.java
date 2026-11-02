@@ -1,11 +1,14 @@
 package com.openframe.delivery.spec;
 
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.time.Instant;
+
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class DeliveryRequest<P extends DeliveryPayload> {
     private final DeliveryType type;
     private final String targetId;
@@ -15,8 +18,19 @@ public class DeliveryRequest<P extends DeliveryPayload> {
     @Builder.Default
     private final DeliveryAudience audience = DeliveryAudience.MACHINE;
     private final P payload;
+    // when the command is due to reach the machine, recorded as the row's dueAt; none = at once
+    private final Instant dueAt;
+    // the request's own rule for a machine that is not online, none = the type's policy: a caller whose user chose
+    // per request whether to wait, and how long, says so here
+    private final DeliveryOfflineBehavior offlineBehavior;
+    private final Long reconnectWindowSeconds;
 
     public boolean isForEveryMachine() {
         return audience == DeliveryAudience.EVERY_MACHINE;
+    }
+
+    // a moment already past is no schedule: the command goes out the ordinary way
+    public boolean isDueAfter(Instant now) {
+        return dueAt != null && dueAt.isAfter(now);
     }
 }

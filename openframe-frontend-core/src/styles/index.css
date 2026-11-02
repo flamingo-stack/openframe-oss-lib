@@ -17,5 +17,7 @@
 @import './vendor-react-scroll.css';
 
 @tailwind base;
+/* Per-route stylesheets (`next-styles build`) cut the built sheet here: what follows is the utilities. */
+/*! next-styles:utilities */
 @tailwind components;
 @tailwind utilities;

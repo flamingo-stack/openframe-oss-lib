@@ -88,7 +88,7 @@ Step 1: extract the archive and run `sudo ./openframe-client install` (macOS) or
 
 Step 2, on every platform, with the values shown in your dashboard under **Devices → Add device** (a new terminal on Windows, because the install adds the program folder to PATH):
 
-    sudo openframe-client auth --serverUrl <tenant host> --initialKey <key> --orgId <organization id> --userId <user id>
+    sudo openframe-client auth --serverUrl <tenant host> --initialKey <key> --logKey <log key> --orgId <organization id> --userId <user id>
 
 What the commands do:
 

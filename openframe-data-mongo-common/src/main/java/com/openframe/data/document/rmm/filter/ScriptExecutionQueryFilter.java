@@ -44,4 +44,7 @@ public class ScriptExecutionQueryFilter {
      * rule, not a repository default.
      */
     private List<ExecutionSource> excludedSources;
+
+    /** Hide test runs. Set by the service layer, like {@link #excludedSources}. */
+    private boolean excludeTestRuns;
 }

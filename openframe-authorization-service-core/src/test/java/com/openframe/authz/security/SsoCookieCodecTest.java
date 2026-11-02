@@ -1,6 +1,6 @@
 package com.openframe.authz.security;
 
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -39,7 +39,7 @@ class SsoCookieCodecTest {
 
     @Test
     void shouldRoundTripTenantRegistrationPayloadWithAttribution() {
-        RegistrationAttribution attribution = RegistrationAttribution.builder().utmSource("ads").gclid("g-1").build();
+        Touchpoint attribution = Touchpoint.builder().utmSource("ads").gclid("g-1").build();
         SsoTenantRegCookiePayload payload = new SsoTenantRegCookiePayload(
                 "state-3", "owner@acme.com", "Acme", "acme", "google", null, false, attribution, 1L, inTenMinutes());
 

@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceLocalTimeDispatchStatus;
@@ -9,6 +10,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
@@ -41,6 +43,7 @@ public class DeviceLocalScheduleService {
     private final MachineRepository machineRepository;
     private final ScheduleDeviceLocalDispatchRepository dispatchRepository;
     private final ScheduleFireDispatcher fireDispatcher;
+    private final DeliveryRouter deliveryRouter;
 
     @Value("${openframe.rmm.schedule.device-local.catchup-seconds}")
     private long catchupSeconds;
@@ -185,11 +188,7 @@ public class DeviceLocalScheduleService {
         if (schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT) {
             Instant reconnectDeadline = fireAt.plusSeconds(window);
             if (!now.isAfter(reconnectDeadline)) {
-                fireDispatcher.armReconnectRetry(schedule, machineId, now, reconnectDeadline);
-                record(schedule, machineId, occurrenceAt, now,
-                        ScheduleDeviceLocalTimeDispatchStatus.ARMED_FOR_RECONNECT, sentinel);
-                log.info("DEVICE_LOCAL scheduleId={} machineId={} offline at occurrence fireAt={} — armed "
-                        + "reconnect-retry until {}", schedule.getId(), machineId, fireAt, reconnectDeadline);
+                holdUntil(schedule, machineId, now, reconnectDeadline, occurrenceAt, sentinel);
                 return;
             }
             // Reconnect window already elapsed while the device stayed offline — give up on this occurrence.
@@ -197,6 +196,25 @@ public class DeviceLocalScheduleService {
         record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.MISSED, sentinel);
         log.warn("DEVICE_LOCAL scheduleId={} machineId={} offline at occurrence fireAt={} (offlineBehavior={}) "
                 + "— marked MISSED, advancing", schedule.getId(), machineId, fireAt, schedule.getOfflineBehavior());
+    }
+
+    // the batch waits for the machine on its route when the route holds it; on the route before the engine it is
+    // held here, the way it was, until that route is gone
+    private void holdUntil(ScheduleScript schedule, String machineId, Instant now, Instant reconnectDeadline,
+                           Instant occurrenceAt, ScheduleLocalMachineTimeDispatch sentinel) {
+        if (deliveryRouter.holdsForOfflineMachine(DeliveryType.SCRIPT_SCHEDULE, machineId)) {
+            if (!record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.FIRED, sentinel)) {
+                return;
+            }
+            fireDispatcher.dispatchHeldUntil(schedule, machineId, now, reconnectDeadline);
+            log.info("DEVICE_LOCAL scheduleId={} machineId={} offline at its occurrence — the batch waits on its route "
+                    + "until {}", schedule.getId(), machineId, reconnectDeadline);
+            return;
+        }
+        fireDispatcher.armReconnectRetry(schedule, machineId, now, reconnectDeadline);
+        record(schedule, machineId, occurrenceAt, now, ScheduleDeviceLocalTimeDispatchStatus.ARMED_FOR_RECONNECT, sentinel);
+        log.info("DEVICE_LOCAL scheduleId={} machineId={} offline at its occurrence — armed reconnect-retry until {}",
+                schedule.getId(), machineId, reconnectDeadline);
     }
 
     private long fireWindowSeconds(ScheduleScript schedule) {

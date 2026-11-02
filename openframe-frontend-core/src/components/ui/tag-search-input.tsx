@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react';
 
-import { useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags';
+import { MEASURE_LAYER_CLASS, useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../utils/cn';
 import { SearchIcon } from '../icons-v2-generated/interface/search-icon';
@@ -162,7 +162,7 @@ export function TagSearchInput<T = string>({
           // this container has no adornment spans of its own, so a `[&_span]`
           // rule would ONLY have reached the selected `Tag` chips, whose label is
           // a span, and greyed them into their own fill in the light theme.
-          'has-[:disabled]:[&_svg]:text-ods-text-disabled',
+          '[&_svg]:has-[:disabled]:text-ods-text-disabled',
           className,
         )}
         onClick={() => {
@@ -252,28 +252,22 @@ export function TagSearchInput<T = string>({
       )}
 
       {/* ---- Off-screen measurement containers ---- */}
-      <span
-        ref={textMeasureRef}
-        aria-hidden="true"
-        className="pointer-events-none invisible absolute left-0 top-0 -z-10 whitespace-nowrap text-h4"
-      >
-        {currentPlaceholder}
-      </span>
+      <div aria-hidden="true" className={MEASURE_LAYER_CLASS}>
+        <span ref={textMeasureRef} aria-hidden="true" className="whitespace-nowrap text-h4">
+          {currentPlaceholder}
+        </span>
 
-      <div
-        ref={measureRef}
-        aria-hidden="true"
-        className="pointer-events-none invisible absolute left-0 top-0 -z-10 flex gap-2"
-      >
-        {tags.map(tag => (
-          <Tag
-            key={`m-${String(tag.value)}`}
-            variant="outline"
-            label={renderTag ? renderTag(tag) : tag.label}
-            labelClassName="max-w-[120px] truncate"
-            onClose={() => {}}
-          />
-        ))}
+        <div ref={measureRef} aria-hidden="true" className="flex w-max gap-2">
+          {tags.map(tag => (
+            <Tag
+              key={`m-${String(tag.value)}`}
+              variant="outline"
+              label={renderTag ? renderTag(tag) : tag.label}
+              labelClassName="max-w-[120px] truncate"
+              onClose={() => {}}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

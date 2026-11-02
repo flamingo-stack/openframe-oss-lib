@@ -20,7 +20,11 @@
 
 import { MessageSquare, FileText } from 'lucide-react';
 import type React from 'react';
+import { cn } from '../../utils/cn';
 import { Button } from '../ui/button';
+import { TextHold } from '../ui/layout-hold';
+import { useLoadingScope } from '../ui/loading-scope';
+import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 import type { ChatRef } from './chat-ref.types';
 
 export type SourceActionDensity = 'inline' | 'card' | 'list-row';
@@ -41,7 +45,13 @@ export interface SourceActionButtonProps {
    *  the icon only — the label is used for aria-label / title even when
    *  it doesn't render visibly. */
   label?: string;
+  /** Draw the action's loading form: the same box, its icon and label as skeleton bars. */
+  loading?: boolean;
 }
+
+/** A chat card's footer action (Ask, Display, Watch video): one look for every action in that row. */
+export const CARD_FOOTER_ACTION_CLASS =
+  '!h-auto !p-0 text-h6 font-normal text-ods-text-secondary opacity-60 hover:bg-transparent hover:opacity-100 hover:text-ods-text-primary';
 
 // Per-density styling lives in one map so the three call sites share the
 // SAME hover/opacity/transition rules. Adding a fourth density means
@@ -66,8 +76,7 @@ const DENSITY_STYLES: Record<
     size: 'small',
     showLabel: true,
     iconSize: '!h-3 !w-3',
-    className:
-      '!h-auto !p-0 text-h6 font-normal text-ods-text-secondary opacity-60 hover:bg-transparent hover:opacity-100 hover:text-ods-text-primary',
+    className: CARD_FOOTER_ACTION_CLASS,
   },
   'list-row': {
     size: 'small',
@@ -78,12 +87,78 @@ const DENSITY_STYLES: Record<
   },
 };
 
+/**
+ * A card footer's action: a small transparent button with an icon (and a trailing icon when it opens something below
+ * the card) and its label, or the icon alone when `showLabel` is off. Its loading form is the same button, inert and
+ * unread, with the icons and the label drawn as skeleton bars, so the box is exactly the loaded action's. THE one
+ * footer action: the Ask action and a card's "Watch video" both draw it.
+ */
+export function FooterAction({
+  label,
+  icon,
+  trailingIcon,
+  className,
+  showLabel = true,
+  size = 'small',
+  onClick,
+  ariaLabel,
+  ariaExpanded,
+  title,
+  loading,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  trailingIcon?: React.ReactNode;
+  className: string;
+  showLabel?: boolean;
+  size?: 'small' | 'icon';
+  onClick?: (event: React.MouseEvent) => void;
+  ariaLabel?: string;
+  ariaExpanded?: boolean;
+  title?: string;
+  loading?: boolean;
+}): React.ReactElement {
+  if (useLoadingScope() || loading) {
+    const mark = <span className={cn(SKELETON_SURFACE_CLASS, 'inline-block h-3 w-3 rounded-sm')} />;
+    return (
+      <span aria-hidden inert className="contents">
+        <Button
+          variant="transparent"
+          size={size}
+          tabIndex={-1}
+          leftIcon={showLabel ? mark : undefined}
+          rightIcon={trailingIcon ? mark : undefined}
+          className={cn(className, 'pointer-events-none')}
+        >
+          {showLabel ? <TextHold>{label}</TextHold> : mark}
+        </Button>
+      </span>
+    );
+  }
+  return (
+    <Button
+      variant="transparent"
+      size={size}
+      leftIcon={showLabel ? icon : undefined}
+      rightIcon={trailingIcon}
+      onClick={onClick}
+      aria-label={ariaLabel}
+      aria-expanded={ariaExpanded}
+      title={title}
+      className={className}
+    >
+      {showLabel ? label : icon}
+    </Button>
+  );
+}
+
 export function SourceActionButton({
   chatRef,
   onDiscuss,
   density = 'inline',
   className,
   label = 'Ask',
+  loading,
 }: SourceActionButtonProps): React.ReactElement | null {
   if (!chatRef || !onDiscuss) return null;
 
@@ -103,16 +178,16 @@ export function SourceActionButton({
   const icon = <IconComponent className={styles.iconSize} />;
 
   return (
-    <Button
-      variant="transparent"
+    <FooterAction
+      label={label}
+      icon={icon}
       size={styles.size}
-      leftIcon={styles.showLabel ? icon : undefined}
+      showLabel={styles.showLabel}
       onClick={handle}
-      aria-label={verbLabel}
+      ariaLabel={verbLabel}
       title={verbLabel}
       className={`${styles.className}${className ? ` ${className}` : ''}`}
-    >
-      {styles.showLabel ? label : icon}
-    </Button>
+      loading={loading}
+    />
   );
 }

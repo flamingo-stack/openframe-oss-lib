@@ -1,6 +1,15 @@
 package com.openframe.api.dto.notification;
 
-public record NotificationFilter(Boolean read, String search) {
+import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationSeverity;
 
-    public static final NotificationFilter EMPTY = new NotificationFilter(null, null);
+import java.util.List;
+
+public record NotificationFilter(Boolean read,
+                                 List<NotificationCategory> categories,
+                                 List<String> types,
+                                 List<NotificationSeverity> severities,
+                                 String search) {
+
+    public static final NotificationFilter EMPTY = new NotificationFilter(null, null, null, null, null);
 }

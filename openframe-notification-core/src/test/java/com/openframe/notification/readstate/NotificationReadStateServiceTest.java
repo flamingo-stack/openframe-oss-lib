@@ -1,12 +1,16 @@
 package com.openframe.notification.readstate;
 
+import com.openframe.data.document.notification.Notification;
+import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
+import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.repository.notification.NotificationReadStateRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -14,10 +18,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class NotificationReadStateServiceTest {
@@ -38,6 +44,30 @@ class NotificationReadStateServiceTest {
 
     private NotificationReadStateService service(List<NotificationReadEventListener> listeners) {
         return new NotificationReadStateService(repository, mock(TenantIdProvider.class), listeners);
+    }
+
+    @Test
+    @DisplayName("Given a persisted notification, when rows are created for its audience, then every row carries its type and severity so the list can be narrowed without a join")
+    void create_for_audience_copies_type_and_severity_onto_every_row() {
+        Notification notification = Notification.builder()
+                .id("n-1")
+                .category(NotificationCategory.MINGO)
+                .title("Approval needed")
+                .type("MINGO_APPROVAL_REQUEST")
+                .severity(NotificationSeverity.WARNING)
+                .build();
+
+        service.createForAudience(notification, null, U, List.of(ALICE, "user-bob"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<NotificationReadState>> rows = ArgumentCaptor.forClass(List.class);
+        verify(repository).bulkInsertUnordered(rows.capture());
+        assertThat(rows.getValue())
+                .extracting(NotificationReadState::getRecipientId, NotificationReadState::getType,
+                        NotificationReadState::getSeverity, NotificationReadState::getCategory, NotificationReadState::getStatus)
+                .containsExactly(
+                        tuple(ALICE, "MINGO_APPROVAL_REQUEST", NotificationSeverity.WARNING, NotificationCategory.MINGO, ReadStatus.UNREAD),
+                        tuple("user-bob", "MINGO_APPROVAL_REQUEST", NotificationSeverity.WARNING, NotificationCategory.MINGO, ReadStatus.UNREAD));
     }
 
     @Test

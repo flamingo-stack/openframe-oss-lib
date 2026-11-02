@@ -2,6 +2,7 @@ use crate::config::update_config::ALLOW_DOWNGRADE;
 use crate::models::openframe_client_info::ClientUpdateStatus;
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
 use crate::models::update_state::{UpdatePhase, UpdateState};
+use crate::platform::directories::get_update_staging_directory;
 use crate::platform::updater_launcher::{self, LaunchedUpdater, UpdaterParams};
 use crate::service::FULL_SERVICE_NAME;
 use crate::services::github_download_service::GithubDownloadService;
@@ -11,6 +12,8 @@ use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
+use crate::utils::fs::JsonFile;
+use crate::utils::in_progress::InProgressView;
 use crate::utils::version_comparator;
 use anyhow::{anyhow, Context, Result};
 use semver::Version;
@@ -21,8 +24,14 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+#[derive(Debug, PartialEq)]
+pub enum UpdateLaunch {
+    Launched,
+    Skipped,
+}
+
 /// Marks an update as in progress until dropped
-struct UpdateGuard(Arc<AtomicBool>);
+pub struct UpdateGuard(Arc<AtomicBool>);
 
 impl UpdateGuard {
     fn acquire(flag: &Arc<AtomicBool>) -> Option<Self> {
@@ -47,12 +56,14 @@ pub struct OpenFrameClientUpdateService {
     last_known_good_service: LastKnownGoodService,
     tool_run_manager: ToolRunManager,
     tool_ops: ToolOps,
+    package_upgrades: InProgressView,
     update_handler_service: UpdateHandlerService,
     /// Set from the update request until the updater is done with this process
     update_in_progress: Arc<AtomicBool>,
 }
 
 impl OpenFrameClientUpdateService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_info_service: OpenFrameClientInfoService,
         github_download_service: GithubDownloadService,
@@ -60,6 +71,7 @@ impl OpenFrameClientUpdateService {
         last_known_good_service: LastKnownGoodService,
         tool_run_manager: ToolRunManager,
         tool_ops: ToolOps,
+        package_upgrades: InProgressView,
         update_handler_service: UpdateHandlerService,
     ) -> Self {
         Self {
@@ -69,23 +81,24 @@ impl OpenFrameClientUpdateService {
             last_known_good_service,
             tool_run_manager,
             tool_ops,
+            package_upgrades,
             update_handler_service,
             update_in_progress: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    pub async fn process_update(&self, message: OpenFrameClientUpdateMessage) -> Result<()> {
+    pub async fn process_update(
+        &self,
+        message: OpenFrameClientUpdateMessage,
+    ) -> Result<UpdateLaunch> {
+        let guard = self.reserve(&message)?;
+        self.apply(message, guard).await
+    }
+
+    /// Takes the update slot and parks new tool operations, unless another update, a tool or a package upgrade holds them
+    pub fn reserve(&self, message: &OpenFrameClientUpdateMessage) -> Result<UpdateGuard> {
         let requested_version = message.version.trim();
         info!("Received update request for version: {}", requested_version);
-
-        self.tool_run_manager.mark_client_update_pending();
-
-        if self.tool_ops.any_busy() {
-            warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
-            return Err(anyhow!(
-                "Tool operation in progress, deferring client update"
-            ));
-        }
 
         // 1. Held until the updater is done with this process, so a redelivery cannot overlap a live script
         let Some(guard) = UpdateGuard::acquire(&self.update_in_progress) else {
@@ -97,15 +110,35 @@ impl OpenFrameClientUpdateService {
         };
         info!("Acquired update lock for version: {}", requested_version);
 
-        self.process_update_internal(message, guard).await
+        self.tool_run_manager.mark_client_update_pending();
+
+        if let Some(busy) = self.busy_with() {
+            warn!(
+                "{} in progress, deferring client update to version {} (will redeliver)",
+                busy, requested_version
+            );
+            return Err(anyhow!("{} in progress, deferring client update", busy));
+        }
+        Ok(guard)
     }
 
-    /// Internal update processing with version validation and safety checks
-    async fn process_update_internal(
+    /// What must finish before the agent may be replaced; the client update waits for it.
+    fn busy_with(&self) -> Option<&'static str> {
+        if self.tool_ops.any_busy() {
+            Some("Tool operation")
+        } else if self.package_upgrades.is_active() {
+            Some("Package upgrade")
+        } else {
+            None
+        }
+    }
+
+    /// Update processing with version validation and safety checks, under a reserved update slot
+    pub async fn apply(
         &self,
         message: OpenFrameClientUpdateMessage,
         guard: UpdateGuard,
-    ) -> Result<()> {
+    ) -> Result<UpdateLaunch> {
         let requested_version = message.version.trim();
 
         // 2. Validate version format
@@ -124,7 +157,7 @@ impl OpenFrameClientUpdateService {
                 canonical_version
             );
             self.tool_run_manager.clear_client_update_pending();
-            return Ok(());
+            return Ok(UpdateLaunch::Skipped);
         }
 
         if !ALLOW_DOWNGRADE {
@@ -149,7 +182,7 @@ impl OpenFrameClientUpdateService {
                             requested_version, anchor
                         );
                         self.tool_run_manager.clear_client_update_pending();
-                        return Ok(());
+                        return Ok(UpdateLaunch::Skipped);
                     }
                     Ok(_) => {}
                     Err(e) => warn!(
@@ -218,7 +251,7 @@ impl OpenFrameClientUpdateService {
             info!("Update failed, NATS will retry");
         }
 
-        update_result
+        update_result.map(|()| UpdateLaunch::Launched)
     }
 
     /// Execute the actual update process
@@ -310,8 +343,11 @@ impl OpenFrameClientUpdateService {
             rollback_only: false,
         };
 
-        if self.tool_ops.any_busy() {
-            warn!("Tool operation started during client download, deferring client update (will redeliver)");
+        if let Some(busy) = self.busy_with() {
+            warn!(
+                "{} started during client download, deferring client update (will redeliver)",
+                busy
+            );
             if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
                 warn!(
                     "Failed to remove staged binary after deferring: {}",
@@ -320,7 +356,8 @@ impl OpenFrameClientUpdateService {
             }
             self.update_state_service.clear().await?;
             return Err(anyhow!(
-                "Tool operation started during download, deferring client update"
+                "{} started during download, deferring client update",
+                busy
             ));
         }
 
@@ -399,15 +436,16 @@ impl OpenFrameClientUpdateService {
             }
         }
 
-        let mut state = match self.update_state_service.load().await {
-            Ok(Some(state)) => state,
-            Ok(None) => {
+        let mut state = match self.update_state_service.read_state().await {
+            Ok(JsonFile::Parsed(state)) => state,
+            Ok(JsonFile::Missing) => {
                 warn!(
                     "Updater for {} exited early and the update state is gone (client uninstalled?), nothing to finish",
                     target_version
                 );
                 return;
             }
+            Ok(JsonFile::Corrupt) => UpdateState::new(target_version.to_string()),
             Err(e) => {
                 warn!(
                     "Updater for {} exited early and the update state is unreadable: {:#}",
@@ -442,11 +480,14 @@ impl OpenFrameClientUpdateService {
         }
     }
 
-    /// Writes the extracted binary to a temp file for the updater script. The UUID name means
+    /// Writes the extracted binary to the staging dir for the updater script. The UUID name means
     /// nothing can read it before we return, so no atomic-rename or fsync ceremony is needed.
     async fn stage_binary(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
-        let temp_dir = std::env::temp_dir();
-        let binary_path = temp_dir.join(format!(
+        let staging_dir = get_update_staging_directory();
+        tokio::fs::create_dir_all(&staging_dir)
+            .await
+            .context("Failed to create update staging directory")?;
+        let binary_path = staging_dir.join(format!(
             "openframe-update-{}-{}",
             Uuid::new_v4(),
             binary_name

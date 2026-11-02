@@ -12,6 +12,7 @@ public enum ClientKind {
     IOS("ios", true),
     ANDROID("android", true),
     DESKTOP("desktop", false),
+    CHAT("chat", false),
     UNKNOWN("unknown", false);
 
     private final String label;

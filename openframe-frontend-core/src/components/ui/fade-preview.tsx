@@ -75,6 +75,18 @@ export interface FadePreviewProps {
   children: React.ReactNode;
 }
 
+/**
+ * The preview fade every fading surface shares: the content itself goes from opaque to
+ * fully transparent towards the bottom of its box, from `from` (a CSS length or
+ * percentage) down, so whatever lies behind it shows through - no colour of its own.
+ * `FadePreview` fades from `30%`; the layout's floating composer dock fades the page
+ * under it over the dock's height.
+ */
+export function previewFadeMask(from: string): Pick<React.CSSProperties, 'maskImage' | 'WebkitMaskImage'> {
+  const mask = `linear-gradient(to bottom, black ${from}, transparent 100%)`;
+  return { maskImage: mask, WebkitMaskImage: mask };
+}
+
 /** The content's box in fill mode, per breakpoint (spelled out: Tailwind only emits classes it can read). */
 const FILL_CLASSES: Record<string, string> = {
   true: 'absolute inset-0',
@@ -133,6 +145,9 @@ export function FadePreview({
   const collapsedHeight = collapsedHeightProp ?? (itemMode ? 'auto' : 120);
   const collapsed = itemMode && itemsHeight != null ? itemsHeight : collapsedHeight;
   const [expanded, setExpanded] = useState(false);
+  // The counted mode's expanded height, measured when the reader opens it, so the markup carries a height to animate
+  // to (the layout effect below keeps it in step as the content grows).
+  const [openHeight, setOpenHeight] = useState<number | null>(null);
   // Overflow is a MEASUREMENT (text wraps to the live width), so it is unknown
   // until the first layout pass. Nothing about the block's HEIGHT depends on it:
   // the collapsed height is in the markup and the toggle row is always
@@ -233,14 +248,14 @@ export function FadePreview({
           // Fixed mode renders the collapsed height INTO the markup, so the
           // server-rendered block is already clamped and hydration never shrinks
           // it. The expanded value is a live DOM measurement, so the layout
-          // effect above owns it (and `maxHeight` in the counted mode).
+          // effect above keeps it current.
           ...(fixed && !fill && !expanded ? { height: cssLength(collapsed) } : {}),
-          ...(!expanded && needsFade
-            ? {
-                maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
-              }
+          // The counted mode too: its collapsed max-height is in the server's markup, so a cached page is clamped in
+          // its first paint (it used to show the whole list until hydration, then collapse it).
+          ...(!fixed
+            ? { maxHeight: expanded && openHeight != null ? `${openHeight}px` : cssLength(collapsedHeight) }
             : {}),
+          ...(!expanded && needsFade ? previewFadeMask('30%') : {}),
         }}
       >
         {children}
@@ -254,7 +269,10 @@ export function FadePreview({
           variant="link"
           size="compact"
           noPaddingX
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => {
+            if (!expanded && contentRef.current) setOpenHeight(contentRef.current.scrollHeight);
+            setExpanded(!expanded);
+          }}
           aria-expanded={expanded}
           aria-hidden={showToggle ? undefined : true}
           tabIndex={showToggle ? undefined : -1}

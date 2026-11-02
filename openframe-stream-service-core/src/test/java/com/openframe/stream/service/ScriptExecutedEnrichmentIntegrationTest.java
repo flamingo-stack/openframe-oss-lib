@@ -99,7 +99,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
         // 4. Enrich via the new direct-Machine-lookup service (Option C path).
         RmmEnrichmentService enrichmentService =
                 new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
-                        scriptExecutionRepository, scriptRepository);
+                        scriptExecutionRepository, commandExecutionRepository, scriptRepository);
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         // 5. The four dashboard-visible fields must ALL be non-null — that's the
@@ -143,7 +143,7 @@ class ScriptExecutedEnrichmentIntegrationTest {
 
         RmmEnrichmentService enrichmentService =
                 new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
-                        scriptExecutionRepository, scriptRepository);
+                        scriptExecutionRepository, commandExecutionRepository, scriptRepository);
         IntegratedToolEnrichedData enriched = enrichmentService.getExtraParams(deserialized);
 
         assertThat(enriched.getMachineId()).isEqualTo(MACHINE_ID);

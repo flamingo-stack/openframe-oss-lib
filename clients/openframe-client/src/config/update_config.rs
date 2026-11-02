@@ -27,6 +27,8 @@ pub const DEV_CLIENT_VERSION: &str = "0.0.0-dev";
 pub const OUTBOX_MAX_ENTRIES: usize = 500;
 pub const OUTBOX_FLUSH_INTERVAL_SECS: u64 = 30;
 pub const FLUSH_PUBLISH_TIMEOUT_SECS: u64 = 30;
+// Outlives the longest backend delivery ttl-seconds (30 days), so a repeated dispatch is still recognised
+pub const DELIVERY_LEDGER_TTL_SECS: u64 = 31 * 24 * 60 * 60;
 // In-memory retry when the durable store is unavailable (redb failed to open).
 pub const FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS: u64 = 1000;
 pub const FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS: u64 = 30000;

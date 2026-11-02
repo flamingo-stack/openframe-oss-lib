@@ -76,6 +76,32 @@ class CustomScriptExecutionRepositoryImplSystemShieldTest {
         assertThat(sourceClause(captureFind().getQueryObject())).isNull();
     }
 
+    @Test
+    @DisplayName("findPage + count: a service-supplied test-run exclusion lands as testRun $ne true — list and count agree")
+    void excludeTestRuns_landsOnListAndCount() {
+        when(mongoTemplate.find(any(Query.class), eq(ScriptExecution.class))).thenReturn(List.of());
+        when(mongoTemplate.count(any(Query.class), eq(ScriptExecution.class))).thenReturn(0L);
+        ScriptExecutionQueryFilter filter = ScriptExecutionQueryFilter.builder().excludeTestRuns(true).build();
+
+        repo.findPage(TENANT_ID, ExecutionOwnerScope.forScript(SCRIPT_ID), filter,
+                "_id", Sort.Direction.DESC, null, false, 10, null);
+        repo.count(TENANT_ID, ExecutionOwnerScope.forScript(SCRIPT_ID), filter, null);
+
+        assertThat(captureFind().getQueryObject().get("testRun")).isEqualTo(new Document("$ne", true));
+        assertThat(captureCount().getQueryObject().get("testRun")).isEqualTo(new Document("$ne", true));
+    }
+
+    @Test
+    @DisplayName("the repository stays neutral on test runs: without the service asking, no testRun clause")
+    void noTestRunExclusion_noTestRunClause() {
+        when(mongoTemplate.find(any(Query.class), eq(ScriptExecution.class))).thenReturn(List.of());
+
+        repo.findPage(TENANT_ID, ExecutionOwnerScope.forScript(SCRIPT_ID), serviceFilter(),
+                "_id", Sort.Direction.DESC, null, false, 10, null);
+
+        assertThat(captureFind().getQueryObject().containsKey("testRun")).isFalse();
+    }
+
     private Query captureFind() {
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).find(captor.capture(), eq(ScriptExecution.class));

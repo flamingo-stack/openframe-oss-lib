@@ -47,6 +47,74 @@
   animation: pulse-cursor 1.5s ease-in-out infinite;
 }
 
+/* DotsLoaderIcon (icons-v2/loaders/dots-loader.svg): its circles carry
+   `ods-dots-loader-dot`, which SVGO's prefixIds renames to the class below.
+   Each dot shrinks to r .2 and back (3 → .2 → 3), staggered by .15s.
+
+   WebKit cost of ONE loader on screen, idle (WebKit 26, 2026-10-21; a Mingo
+   chat-history row shows one for as long as a reply streams), CPU per 8 s:
+   SMIL `r` animation 1.55 s · this transform alone 1.2 s · with the icon on a
+   layer of its own 0.2 s · no loader 0.06 s. WebKit composites no SVG child, so
+   each frame repainted whatever layer held the icon (the whole sidebar); on its
+   own layer a frame repaints the 24px icon. */
+svg:has(> .dots-loader_svg__ods-dots-loader-dot) {
+  will-change: transform;
+}
+
+@keyframes ods-dots-loader {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.0667);
+  }
+}
+
+.dots-loader_svg__ods-dots-loader-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ods-dots-loader 0.75s linear infinite;
+}
+
+.dots-loader_svg__ods-dots-loader-dot:nth-of-type(2) {
+  animation-delay: 0.15s;
+}
+
+.dots-loader_svg__ods-dots-loader-dot:nth-of-type(3) {
+  animation-delay: 0.3s;
+}
+
+/* The same loader as HTML boxes, where one stays on screen for long (a Mingo chat
+   row while a reply streams): WebKit runs an HTML box's transform animation off
+   the main thread, an SVG child's on it. Same 24px box, 6px dots centred at 4, 12
+   and 20px, same keyframes and stagger. */
+.ods-dots-loader {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: 1px;
+}
+
+.ods-dots-loader > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: currentColor;
+  animation: ods-dots-loader 0.75s linear infinite;
+}
+
+.ods-dots-loader > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.ods-dots-loader > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
 /* Quick action hint animation - Very slow breathing glow */
 @keyframes hint-pulse-ring {
   0% {

@@ -40,6 +40,18 @@ class DeliveryMetricsTest {
     }
 
     @Test
+    void recordRerunPublished_type_countedApartFromRetries() {
+        // execution
+        metrics.recordRerunPublished(DeliveryType.CLIENT_UPDATE);
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.rerun.published").tags("type", "client_update").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+        assertThat(registry.find("openframe.delivery.retried").counter()).isNull();
+    }
+
+    @Test
     void recordRolloutStarted_type_countedByType() {
         // execution
         metrics.recordRolloutStarted(DeliveryType.CLIENT_UPDATE);

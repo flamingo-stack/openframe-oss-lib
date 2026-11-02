@@ -3,7 +3,6 @@
  * the chat-adjacent surfaces (source chips, inline cards, search results).
  *
  * Lib-side refactor of the hub's `lib/utils/source-row-cta.ts`. Drops:
- *   - `currentPlatform()`        — host injects via `ctx.currentPlatform`
  *   - `traceCompose()` logging   — lib stays log-free; hosts can wrap
  *   - `tableIdForDocumentType`   — host injects via `ctx.tableIdForDocumentType`
  *
@@ -11,11 +10,9 @@
  *   - `icon` + `iconLabel` — for visual + a11y. Sourced from
  *     `SOURCE_ICON_NAMES` keyed by the row's `sourceRepo` (config id),
  *     resolved to a React component via `ICON_REGISTRY`.
- *   - `href` — destination URL. `null` means "no public viewer; Ask is
- *     the only action". Honors the inline card / chip / search bar's
- *     existing fallback chain (externalUrl → in-app path → null) and
- *     also runs `safeHref()` on the final value so a hostile RAG row
- *     can't land `javascript:` / `data:` in the DOM.
+ *   - `href` — destination URL, from the host's composer (`composeContentUrl`). `null` means "no viewer; Ask is
+ *     the only action". Runs `safeHref()` on the final value so a hostile RAG row can't land `javascript:` /
+ *     `data:` in the DOM.
  *   - `askable` — whether the Ask drill-in flow can fire. Requires a
  *     non-empty `id` AND a `documentType`.
  *   - `chatRef` — pre-synthesized `ChatRef` for the Ask handler.
@@ -23,7 +20,6 @@
 
 import { FileText } from 'lucide-react';
 import type React from 'react';
-import { getPlatformUrl } from '../../../platform-domains';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import { canonicalContentRefType } from '../../../utils/list-url';
 import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
@@ -60,18 +56,6 @@ export interface SourceRowInput {
 }
 
 export interface SourceRowContext {
-  /** Chat shell's base route — `/data-room`, `/knowledge-base`, etc. */
-  baseRoute?: string;
-  /** Cross-platform target for the chip / card click. */
-  chipBasePlatform?: string;
-  /**
-   * Host-supplied current-platform identifier. Used as the
-   * `targetPlatform` for path-based fallback URLs that point to the
-   * host's own surface. When omitted, path-based fallback rows get a
-   * `null` targetPlatform — consumers fall back to their legacy
-   * origin-check.
-   */
-  currentPlatform?: string | null;
   /**
    * Host-supplied reverse map: documentType → tableId. Used to derive
    * `sourceRepo` from `documentType` when the caller didn't supply it
@@ -81,25 +65,12 @@ export interface SourceRowContext {
    */
   tableIdForDocumentType?: (documentType: string) => string | null;
   /**
-   * Host-supplied unified content-href resolver (`runtime.composeContentUrl`).
-   * When provided, entity rows WITH a public `externalUrl` resolve their href
-   * through it — so the host's `hostedTypes` / `overrides` route a chat card to
-   * the SAME destination as the equivalent page-view card (in-app for hosted
-   * types, the hub URL otherwise). When omitted, the row's `externalUrl` is used
-   * verbatim (legacy).
+   * The host's ONE address rule (`runtime.composeContentUrl`). Every row resolves its href through it: a record by
+   * its `externalUrl`, a doc by its tree `path` (passed as the `slug`). The host decides where each type lives and
+   * whether that is this site or another platform; the lib builds no address of its own. With no composer, a
+   * record's `externalUrl` is used as given and a doc has no link.
    */
   composeContentUrl?: ComposeContentUrl;
-  /**
-   * Host-supplied per-`documentType` doc-viewer targets — the UNIFIED, DYNAMIC
-   * replacement for the single `chipBasePlatform`. Maps a doc-table documentType
-   * (`'markdown'`, `'data_room_doc'`, …) → the platform whose PUBLIC doc viewer
-   * hosts it + that viewer's base path. A doc chip with no `externalUrl` resolves
-   * to `getPlatformUrl(platform)/<basePath>/<path>` PER ROW — so a chat mixing several
-   * doc sources sends EACH to its own home (markdown→flamingo/knowledge-base,
-   * data_room_doc→company-hub/data-room) instead of one static fallback for all.
-   * Wins over `chipBasePlatform` when a row's documentType has an entry.
-   */
-  docPlatformTargets?: Record<string, { platform: string; basePath: string }>;
 }
 
 export interface SourceRowCTA {
@@ -120,27 +91,11 @@ export interface SourceRowCTA {
 }
 
 /**
- * Build a `SourceRowContext` from a `ChatRuntime` + the surface's `baseRoute` /
- * `chipBasePlatform`. The runtime-derived fields (`currentPlatform`, `composeContentUrl`,
- * `docPlatformTargets`) are wired identically at every `resolveSourceRowCTA` call site
- * (source chips + inline cards), so they live here once — adding a ctx field is then a
- * one-line change instead of editing all three call sites.
+ * Build a `SourceRowContext` from a `ChatRuntime`. Wired identically at every `resolveSourceRowCTA` call site
+ * (source chips + inline cards), so it lives here once.
  */
-export function sourceRowCtxFromRuntime(
-  runtime: {
-    source?: string;
-    composeContentUrl?: ComposeContentUrl;
-    docPlatformTargets?: SourceRowContext['docPlatformTargets'];
-  },
-  surface: { baseRoute?: string; chipBasePlatform?: string } = {},
-): SourceRowContext {
-  return {
-    currentPlatform: runtime.source ?? null,
-    composeContentUrl: runtime.composeContentUrl,
-    docPlatformTargets: runtime.docPlatformTargets,
-    baseRoute: surface.baseRoute,
-    chipBasePlatform: surface.chipBasePlatform,
-  };
+export function sourceRowCtxFromRuntime(runtime: { composeContentUrl?: ComposeContentUrl }): SourceRowContext {
+  return { composeContentUrl: runtime.composeContentUrl };
 }
 
 /**
@@ -155,12 +110,8 @@ function pickSourceIcon(sourceRepo: string | null, documentType: string | null |
   return { icon, iconLabel };
 }
 
-/**
- * Only doc-table rows (DOC_TABLE_TYPES) fall back to doc-viewer navigation when no
- * `externalUrl` is set; the in-app/per-platform viewer can render them. Entity-table
- * rows MUST come with an explicit `externalUrl` from the mapper.
- */
-function shouldFallbackToPathNav(row: SourceRowInput): boolean {
+/** A doc-table row (DOC_TABLE_TYPES) is addressed by its tree `path`; every other row by its `externalUrl`. */
+function isDocRow(row: SourceRowInput): boolean {
   return !!row.documentType && (DOC_TABLE_TYPES as readonly string[]).includes(row.documentType);
 }
 
@@ -186,57 +137,25 @@ export function resolveSourceRowCTA(row: SourceRowInput, ctx: SourceRowContext =
   let href: string | null = null;
   let targetPlatform: string | null = null;
   const idValue = (row.id ?? '').trim();
-  if (row.path && shouldFallbackToPathNav(row) && !row.externalUrl) {
-    // Doc-table (markdown / data-room PDF) with no public URL. Resolve where its
-    // viewer lives, in priority order (NOT a content type the composeContentUrl
-    // seam knows — docs carry a tree `path`, not a slug/id):
-    //   1. docPlatformTargets[documentType] — per-doc-type cross-platform target.
-    //      The UNIFIED, DYNAMIC path: a chat mixing multiple doc sources routes
-    //      EACH row to its own home (markdown→flamingo, data_room_doc→company-hub).
-    //   2. chipBasePlatform — legacy SINGLE cross-platform fallback (one platform
-    //      for every doc; only safe when a surface sees just one doc source).
-    //   3. baseRoute — the host serves the doc viewer in-app → relative path nav.
-    //   else → null (no viewer configured → Ask-only).
-    const safePath = sanitizePath(row.path);
-    if (safePath) {
-      const docTarget = row.documentType ? ctx.docPlatformTargets?.[row.documentType] : undefined;
-      if (docTarget) {
-        // Trim leading/trailing (and collapse empty) segments WITHOUT a regex — the
-        // slash-stripping regex `/^\/+|\/+$/g` tripped CodeQL's js/polynomial-redos (high)
-        // since `\/+$` backtracks on inputs with many '/'. split/filter/join is linear.
-        const seg = docTarget.basePath.split('/').filter(Boolean).join('/');
-        const base = `${getPlatformUrl(docTarget.platform)}${seg ? `/${seg}` : ''}/`;
-        href = safeHref(new URL(safePath, base).toString()) ?? null;
-        targetPlatform = docTarget.platform;
-      } else if (ctx.chipBasePlatform) {
-        const base = `${getPlatformUrl(ctx.chipBasePlatform)}/knowledge-base/`;
-        href = safeHref(new URL(safePath, base).toString()) ?? null;
-        targetPlatform = ctx.chipBasePlatform;
-      } else if (ctx.baseRoute) {
-        const synthetic = `https://_internal_.local${ctx.baseRoute.startsWith('/') ? ctx.baseRoute : '/' + ctx.baseRoute}/`;
-        const absolute = new URL(safePath, synthetic).toString();
-        href = safeHref(absolute.replace('https://_internal_.local', '')) ?? null;
-        targetPlatform = ctx.currentPlatform ?? null;
-      }
-    }
-  } else if (ctx.composeContentUrl && row.documentType && row.externalUrl) {
-    // Entity content WITH a public viewer → the unified content-href seam. The
-    // host's hostedTypes/overrides route hosted types in-app (slug relativized
-    // from the externalUrl) and everything else to the externalUrl verbatim —
-    // the SAME resolver the page-view cards use, so chat + page links match.
+  // ONE address rule, the host's (`composeContentUrl`): a record by its `externalUrl`, a doc by its tree `path`
+  // (passed as the `slug`). The host's composer decides where the type lives and whether that is this site (a
+  // relative link) or another platform; the lib builds no address of its own (CU-17tkuw61kfy).
+  const docPath = !row.externalUrl && row.path && isDocRow(row) ? sanitizePath(row.path) : '';
+  if (ctx.composeContentUrl && row.documentType && (row.externalUrl || docPath)) {
     const composed = ctx.composeContentUrl({
       // Canonical vocabulary only — a rail-vocab alias would miss the host's
       // `hostedTypes` / `overrides` and fall through to the seam's default
       // `<origin>/<type>/<id>` branch. Same canonicalizer `buildListUrl` uses.
       type: canonicalContentRefType(row.documentType),
       identifier: idValue,
-      externalUrl: row.externalUrl,
+      ...(docPath ? { slug: docPath } : {}),
+      externalUrl: row.externalUrl ?? null,
       targetPlatform: row.targetPlatform ?? null,
     });
     href = composed.href ? (safeHref(composed.href) ?? null) : null;
     targetPlatform = composed.targetPlatform;
   } else if (row.externalUrl) {
-    // No composer wired → legacy: the RAG externalUrl verbatim.
+    // No composer wired: the record's own address, as given.
     href = safeHref(row.externalUrl) ?? null;
     targetPlatform = row.targetPlatform ?? null;
   }

@@ -19,6 +19,9 @@ import {
 } from './data-table-row-classes';
 import { alignJustify, getHideClasses } from './utils';
 
+/** A control inside a row link whose click is its own: it never follows the row's link (see `preventControlNavigation`). */
+const ROW_LINK_CONTROL_SELECTOR = 'button, [role="button"]';
+
 export interface DataTableRowProps<T> {
   /** The row. `null` is a row still being read (a body's loading rows): it draws its own skeleton, as it does in a
    *  loading scope. */
@@ -223,6 +226,24 @@ function DataTableRowImpl<T>({
     [onClick, row.original, isLinkMode],
   );
 
+  // Link mode, CAPTURE phase: a click on a control inside the row link (a `data-no-row-click` element, or any
+  // button) runs the control and never follows the link. The bubble handler above cannot promise that alone: a
+  // control that calls `stopPropagation` (or sits in a wrapper that does) keeps the click from ever reaching it, and
+  // the browser then follows the anchor, so the control's own action ran and the page navigated away (an Edit
+  // button opened its modal, then the row's page). A button without the marker followed the link the same way.
+  // Capture runs before any descendant handler. Only `preventDefault`, never `stopPropagation`: the control still
+  // gets its click. Left alone: a portalled descendant's click (its target is outside the anchor, so the anchor has
+  // no default action, and a link in a portalled menu must keep its own), a link nested in a cell (the innermost
+  // link is the one the browser follows), and form fields (cancelling a checkbox's click would undo its check).
+  const preventControlNavigation = useCallback((e: React.MouseEvent) => {
+    const container = containerRef.current;
+    const target = e.target;
+    if (!(target instanceof Element) || !container?.contains(target)) return;
+    const nestedLink = target.closest('a');
+    if (nestedLink && nestedLink !== container && container.contains(nestedLink)) return;
+    if (!isOwnClick(target, container) || target.closest(ROW_LINK_CONTROL_SELECTOR)) e.preventDefault();
+  }, []);
+
   const containerClassName = cn(
     DATA_TABLE_ROW_FRAME_CLASS,
     'text-inherit no-underline',
@@ -282,6 +303,7 @@ function DataTableRowImpl<T>({
         prefetch={false}
         ref={containerRef as React.RefObject<HTMLAnchorElement>}
         className={containerClassName}
+        onClickCapture={preventControlNavigation}
         onClick={handleClick}
         {...markers}
       >
@@ -306,6 +328,7 @@ function DataTableRowImpl<T>({
             'cursor-pointer text-inherit no-underline transition-colors hover:bg-ods-bg-active',
             rowHeightClassName ? 'flex min-h-0 flex-1 flex-col' : 'block',
           )}
+          onClickCapture={preventControlNavigation}
           onClick={handleClick}
         >
           {cells}

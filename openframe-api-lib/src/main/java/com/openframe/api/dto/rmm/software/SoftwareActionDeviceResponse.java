@@ -1,5 +1,6 @@
 package com.openframe.api.dto.rmm.software;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import lombok.Builder;
 import lombok.Data;
@@ -14,6 +15,8 @@ public class SoftwareActionDeviceResponse {
     private String hostname;
     private String organizationId;
     private String organizationName;
+    private DeviceStatus deviceStatus;
+    private Instant lastSeen;
     private SoftwareActionStatus status;
 
     private Integer exitCode;

@@ -37,8 +37,8 @@ spring:
 
 ### Data Model
 
-- **UnifiedLogEvent** - Stored in `unified_logs` table with composite primary key: `ingest_day` + `tool_type` (partition), `event_type` + `event_timestamp` + `tool_event_id` (clustering). Optimized for time-series queries by day and tool type.
-- **UnifiedLogEventRepository** - Spring Data Cassandra repository for CRUD operations on unified log events.
+- **CassandraLogEvent** - Stored in `unified_logs` table with composite primary key: `ingest_day` + `tool_type` (partition), `event_type` + `event_timestamp` + `tool_event_id` (clustering). Optimized for time-series queries by day and tool type.
+- **CassandraLogEventRepository** - Spring Data Cassandra repository for CRUD operations on unified log events.
 
 ## Usage
 

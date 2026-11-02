@@ -8,6 +8,7 @@ import { join, relative } from 'node:path';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { UnifiedSkeleton } from '../components/loading/unified-skeleton';
+import { NavigationSidebarGroupedSkeleton } from '../components/navigation/navigation-sidebar-grouped';
 import { TextHold } from '../components/ui/layout-hold';
 import { LIVE_PULSE_CLASS, SKELETON_SURFACE_CLASS } from '../components/ui/skeleton-surface';
 
@@ -42,6 +43,15 @@ describe('one pulse', () => {
   it('both pulses are the same animation', () => {
     expect(SKELETON_SURFACE_CLASS).toContain('animate-pulse motion-reduce:animate-none');
     expect(LIVE_PULSE_CLASS).toBe('animate-pulse motion-reduce:animate-none');
+  });
+
+  it('times no skeleton surface by a transition: `duration-*` sets the pulse duration too', () => {
+    // tailwindcss-animate makes `duration-*` set `animation-duration` beside the
+    // transition's, so a fade class on a skeleton runs its pulse at the fade's speed.
+    const { container } = render(<NavigationSidebarGroupedSkeleton />);
+    const surfaces = [...container.querySelectorAll('.ods-skeleton')];
+    expect(surfaces.length).toBeGreaterThan(1);
+    for (const surface of surfaces) expect(surface.className).not.toMatch(/(?:^|\s)duration-/);
   });
 
   it('a surface stops the pulse of every surface inside it', () => {

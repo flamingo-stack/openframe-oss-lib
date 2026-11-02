@@ -62,7 +62,7 @@ class FakeWebSocket implements Pick<
   'url' | 'readyState' | 'binaryType' | 'bufferedAmount' | 'close' | 'send'
 > {
   url: string;
-  readyState: number = WS_CONNECTING;
+  readyState: WebSocket['readyState'] = WS_CONNECTING;
   binaryType: BinaryType = 'blob';
   bufferedAmount = 0;
   onopen: ((e?: unknown) => void) | null = null;

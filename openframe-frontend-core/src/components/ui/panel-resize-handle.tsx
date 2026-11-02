@@ -1,14 +1,38 @@
 'use client';
 
-import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef } from 'react';
+import { type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject, useEffect, useRef } from 'react';
 
 import { cn } from '../../utils/cn';
+import { Menu01Icon } from '../icons-v2-generated';
 
 /**
- * The drag-to-resize handle of a side or edge panel, shared by `Drawer` and
- * `AppLayoutDrawer`. A drag writes the panel's size to the DOM and reports it
- * once, on release; arrow keys, Home and End report at once.
+ * The drag-to-resize handle of a side or edge panel, shared by `Drawer`,
+ * `AppLayoutDrawer`, `ComposerSheet` and `NavigationSidebar`. A drag writes the
+ * panel's size to the DOM (or hands it to `onDrag`) and reports it once, on
+ * release; arrow keys, Home and End report at once; a double click asks for the
+ * default (`onReset`).
  */
+
+/**
+ * The grip the design draws on a resizable edge (its `resize-handle`): a 16×32
+ * pill in the page's background astride the panel's border, with a three-line
+ * mark. `NavigationSidebar` hands it to the handle as its `grip`, and
+ * `AppLayoutSidePanel`'s own handle draws it too.
+ */
+export function PanelResizeGrip({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'flex h-8 w-4 items-center justify-center rounded-sm border border-ods-border bg-ods-bg text-ods-text-secondary transition-colors',
+        'group-hover:border-ods-border-hover group-focus-visible:border-ods-accent group-focus-visible:text-ods-accent',
+        className,
+      )}
+    >
+      <Menu01Icon size={12} />
+    </span>
+  );
+}
 
 type PanelSide = 'right' | 'left' | 'top' | 'bottom';
 
@@ -37,12 +61,26 @@ export interface PanelResizeHandleProps {
   onSize: (next: number) => void;
   /** Clamp a candidate size to the min/max and the container. */
   clampSize: (next: number) => number;
-  /** The panel the size applies to — written directly while dragging. */
-  panelRef: RefObject<HTMLDivElement | null>;
+  /** The panel the size applies to — written directly while dragging. Omit for a
+   *  panel sized by other means (`onDrag`). */
+  panelRef?: RefObject<HTMLDivElement | null>;
+  /**
+   * Every size the drag reaches, in place of writing `panelRef`'s inline size:
+   * for a panel whose width is a custom property or a class rather than an
+   * inline style, or one that marks itself while dragged. `onSize` still
+   * reports once, on release.
+   */
+  onDrag?: (next: number) => void;
+  /** A double click on the handle: back to the default size. */
+  onReset?: () => void;
   /** `overlay` is the body-level `Drawer`'s handle, `inLayout` the wider one of
    *  `AppLayoutDrawer`. They differ in track width and grip colour only. */
   variant: 'overlay' | 'inLayout';
   ariaLabel?: string;
+  /** Where and how big the hit area is, over the side's default track (merged last). */
+  className?: string;
+  /** What the handle draws in place of the default grip bar. */
+  grip?: ReactNode;
 }
 
 export function PanelResizeHandle({
@@ -53,8 +91,12 @@ export function PanelResizeHandle({
   onSize,
   clampSize,
   panelRef,
+  onDrag,
+  onReset,
   variant,
   ariaLabel,
+  className,
+  grip,
 }: PanelResizeHandleProps) {
   const isHorizontal = HORIZONTAL_SIDES.has(side);
   const startRef = useRef<{ x: number; y: number; size: number } | null>(null);
@@ -89,12 +131,17 @@ export function PanelResizeHandle({
   // the size is unchanged, so it leaves the style alone.
   const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const start = startRef.current;
-    const panel = panelRef.current;
-    if (!start || !panel) return;
+    if (!start) return;
+    if (!onDrag && !panelRef?.current) return;
     const delta = isHorizontal ? e.clientX - start.x : e.clientY - start.y;
     const next = clampSize(start.size + delta * direction);
     dragSizeRef.current = next;
-    panel.style[isHorizontal ? 'width' : 'height'] = `${next}px`;
+    if (onDrag) {
+      onDrag(next);
+    } else if (panelRef) {
+      const panel = panelRef.current;
+      if (panel) panel.style[isHorizontal ? 'width' : 'height'] = `${next}px`;
+    }
     e.currentTarget.setAttribute('aria-valuenow', String(Math.round(next)));
   };
 
@@ -168,17 +215,21 @@ export function PanelResizeHandle({
       onPointerCancel={endDrag}
       onLostPointerCapture={endDrag}
       onKeyDown={handleKeyDown}
+      onDoubleClick={onReset}
       className={cn(
         'group absolute z-20 flex touch-none select-none',
         'outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0',
         trackPosition,
         cursorClass,
+        className,
       )}
     >
-      <div
-        aria-hidden
-        className={cn('rounded-full', variant === 'inLayout' ? 'bg-ods-border' : 'bg-ods-bg-surface', gripClass)}
-      />
+      {grip ?? (
+        <div
+          aria-hidden
+          className={cn('rounded-full', variant === 'inLayout' ? 'bg-ods-border' : 'bg-ods-bg-surface', gripClass)}
+        />
+      )}
     </div>
   );
 }

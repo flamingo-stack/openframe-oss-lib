@@ -73,8 +73,7 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(({ className, car
               size="icon-sm"
               type="button"
               aria-label="Previous question"
-              disabled={index === 0}
-              onClick={() => setIndex(current => Math.max(0, current - 1))}
+              onClick={() => setIndex(current => (current > 0 ? current - 1 : cards.length - 1))}
             >
               <Chevron02LeftIcon size={16} />
             </Button>
@@ -86,8 +85,7 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(({ className, car
               size="icon-sm"
               type="button"
               aria-label="Next question"
-              disabled={index === cards.length - 1}
-              onClick={() => setIndex(current => Math.min(cards.length - 1, current + 1))}
+              onClick={() => setIndex(current => (current < cards.length - 1 ? current + 1 : 0))}
             >
               <Chevron02RightIcon size={16} />
             </Button>

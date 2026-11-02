@@ -6,6 +6,9 @@ use super::DeviceTag;
 pub struct InitialConfiguration {
     pub server_host: String,
     pub initial_key: String,
+    /// Logs-stream key from the install command or fetched later; the initial key is dropped once it is held.
+    #[serde(default)]
+    pub log_key: String,
     pub local_mode: bool,
     #[serde(default)]
     pub org_id: String,

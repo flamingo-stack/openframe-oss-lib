@@ -9,8 +9,9 @@
  * Server-safe: no React, no browser APIs.
  */
 
+import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import type { ChatStreamEvent } from './events';
-import { chatProgressOf } from './progress';
+import { decodeNatsChunk } from './nats-decoder';
 
 /**
  * Escape `<` so markdown renderers that pass HTML through (rehypeRaw)
@@ -51,9 +52,11 @@ export function frameNum(value: unknown): number | undefined {
  */
 export function mapLeadingFrame(meta: Record<string, unknown>, out: ChatStreamEvent[]): void {
   if (meta.status === 'thinking') {
-    // The frame may name the stage the turn is in; an unknown stage is a plain "thinking".
-    const progress = chatProgressOf(meta);
-    out.push(progress ? { type: 'status', phase: 'thinking', progress } : { type: 'status', phase: 'thinking' });
+    out.push({ type: 'status', phase: 'thinking' });
+  } else if (meta.type === MESSAGE_TYPE.EXECUTING_TOOL || meta.type === MESSAGE_TYPE.EXECUTED_TOOL) {
+    // A step of the turn, in the chunk shape a NATS tool run has, read by the NATS decoder itself.
+    const event = decodeNatsChunk(meta);
+    if (event) out.push(event);
   } else if (meta.kind === 'thinking-delta' && typeof meta.text === 'string') {
     // Wire is ALREADY delta — emit verbatim, append-only contract.
     out.push({ type: 'thinking-delta', text: meta.text });

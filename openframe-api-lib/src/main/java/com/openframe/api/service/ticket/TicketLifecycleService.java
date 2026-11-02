@@ -395,7 +395,9 @@ public class TicketLifecycleService {
         if (filterInput != null) {
             builder.organizationIds(filterInput.getOrganizationIds())
                     .deviceIds(filterInput.getDeviceIds())
-                    .assigneeIds(filterInput.getAssigneeIds());
+                    .assigneeIds(filterInput.getAssigneeIds())
+                    .escalatedByUser(filterInput.getEscalatedByUser())
+                    .hasPendingApproval(filterInput.getHasPendingApproval());
         }
         return builder.build();
     }

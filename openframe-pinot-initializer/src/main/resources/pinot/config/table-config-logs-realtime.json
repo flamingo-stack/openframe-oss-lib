@@ -7,7 +7,7 @@
     "replication": "${pinot.tables.logs.replication}",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "60"
+    "retentionTimeValue": "${pinot.tables.logs.retention-days:30}"
   },
   "instanceAssignmentConfigMap": {
     "CONSUMING": {
@@ -124,7 +124,8 @@
     "instanceSelectorType": "strictReplicaGroup"
   },
   "upsertConfig": {
-    "mode": "FULL"
+    "mode": "FULL",
+    "hashFunction": "MD5"
   },
   "tenants": {
     "broker": "DefaultTenant",

@@ -1,6 +1,6 @@
 type Query {
     user: User!
-    script: Script!
+    invitation: Invitation!
 }
 
 interface Node {
@@ -11,6 +11,6 @@ type User implements Node {
     id: ID!
 }
 
-type Script implements Node {
+type Invitation implements Node {
     id: ID!
 }

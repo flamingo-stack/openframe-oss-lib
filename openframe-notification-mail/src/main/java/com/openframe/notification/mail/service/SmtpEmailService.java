@@ -56,6 +56,11 @@ public class SmtpEmailService implements EmailService {
     }
 
     @Override
+    public void sendDownloadLinkEmail(String toEmail, String downloadId) {
+        throw new UnsupportedOperationException("Download link email via SMTP is not supported; use HubSpot provider");
+    }
+
+    @Override
     public void sendAccountDeletedEmail(String toEmail) {
         String subject = "Your OpenFrame account has been deleted";
         String body = """

@@ -37,10 +37,15 @@ class NotificationEmitterTest {
     private static final AttrKey TICKET_ID = AttrKey.of("ticketId");
     private static final AttrKey ASSIGNEE = AttrKey.of("assigneeUserId");
 
-    private enum TestType implements NotificationType { TEST_TYPE, UNREGISTERED }
+    private enum TestType implements NotificationType { TEST_TYPE, UNREGISTERED, ANNOUNCEMENT }
 
     private record TestSeed(String ticketId, String assigneeUserId) implements NotificationSeed {
         @Override public NotificationType type() { return TestType.TEST_TYPE; }
+    }
+
+    private record AnnouncementSeed(NotificationCategory category, NotificationSeverity severity)
+            implements NotificationSeed {
+        @Override public NotificationType type() { return TestType.ANNOUNCEMENT; }
     }
 
     private record UnregisteredSeed() implements NotificationSeed {
@@ -60,7 +65,7 @@ class NotificationEmitterTest {
     void setUp() {
         broadcaster = mock(NotificationBroadcaster.class);
         spec = new TestSpec();
-        NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec));
+        NotificationTypeRegistry registry = new NotificationTypeRegistry(provider(spec, new AnnouncementSpec()));
         emitter = new NotificationEmitter(registry, broadcaster);
     }
 
@@ -98,6 +103,58 @@ class NotificationEmitterTest {
         verify(broadcaster, never()).broadcast(any());
     }
 
+    @Test
+    void notify_specKeepsDefaultCategoryAndSeverity_commandCarriesSpecConstants() {
+        emitter.notify(NotificationRequest.of(new TestSeed("t-1", "u-9")));
+
+        assertThat(sentCommand())
+                .returns(NotificationCategory.TICKETS, NotificationCommand::getCategory)
+                .returns(NotificationSeverity.INFO, NotificationCommand::getSeverity);
+    }
+
+    @Test
+    void notify_specReadsCategoryAndSeverityFromSeed_commandCarriesSeedValues() {
+        AnnouncementSeed seed = new AnnouncementSeed(NotificationCategory.DEVICES, NotificationSeverity.WARNING);
+
+        emitter.notify(NotificationRequest.of(seed));
+
+        assertThat(sentCommand())
+                .returns(NotificationCategory.DEVICES, NotificationCommand::getCategory)
+                .returns(NotificationSeverity.WARNING, NotificationCommand::getSeverity);
+    }
+
+    @Test
+    void notify_specLeavesOptionalPartsEmpty_broadcastsCommandWithoutThem() {
+        AnnouncementSeed seed = new AnnouncementSeed(NotificationCategory.GENERIC, NotificationSeverity.INFO);
+
+        emitter.notify(NotificationRequest.of(seed));
+
+        NotificationCommand sent = sentCommand();
+        assertThat(sent.getAttributes()).isEmpty();
+        assertThat(sent)
+                .returns(null, NotificationCommand::getDescription)
+                .returns(null, NotificationCommand::getEntity)
+                .returns(null, NotificationCommand::getSettingsGroup)
+                .returns(null, NotificationCommand::getApplePushCategory);
+    }
+
+    @Test
+    void notify_specNamesEntityAndSettingsGroup_commandCarriesThem() {
+        emitter.notify(NotificationRequest.of(new TestSeed("t-1", "u-9")));
+
+        NotificationCommand sent = sentCommand();
+        assertThat(sent.getSettingsGroup()).isEqualTo(NotificationSettingGroup.TICKET_ASSIGNED);
+        assertThat(sent.getEntity())
+                .returns(NotificationEntityType.TICKET, NotificationEntityRef::getType)
+                .returns("t-1", NotificationEntityRef::getId);
+    }
+
+    private NotificationCommand sentCommand() {
+        ArgumentCaptor<NotificationCommand> command = ArgumentCaptor.forClass(NotificationCommand.class);
+        verify(broadcaster).broadcast(command.capture());
+        return command.getValue();
+    }
+
     @SuppressWarnings("unchecked")
     private static ObjectProvider<NotificationTypeSpec<?>> provider(NotificationTypeSpec<?>... specs) {
         ObjectProvider<NotificationTypeSpec<?>> provider = mock(ObjectProvider.class);
@@ -112,9 +169,11 @@ class NotificationEmitterTest {
 
         @Override public NotificationType getType() { return TestType.TEST_TYPE; }
         @Override public Class<TestSeed> getSeedClass() { return TestSeed.class; }
-        @Override public Optional<NotificationSettingGroup> getSettingsGroup() { return Optional.empty(); }
-        @Override public NotificationCategory getCategory() { return NotificationCategory.TICKETS; }
-        @Override public NotificationSeverity getSeverity() { return NotificationSeverity.INFO; }
+        @Override public Optional<NotificationSettingGroup> getSettingsGroup() {
+            return Optional.of(NotificationSettingGroup.TICKET_ASSIGNED);
+        }
+        @Override public NotificationCategory category(TestSeed seed) { return NotificationCategory.TICKETS; }
+        @Override public NotificationSeverity severity(TestSeed seed) { return NotificationSeverity.INFO; }
         @Override public Audience audience(TestSeed seed) { return audience; }
 
         @Override public Optional<NotificationEntityRef> entity(TestSeed seed) {
@@ -136,5 +195,20 @@ class NotificationEmitterTest {
         @Override public Optional<String> getApplePushCategory() {
             return Optional.of("TEST_CATEGORY");
         }
+    }
+
+    private static class AnnouncementSpec implements NotificationTypeSpec<AnnouncementSeed> {
+
+        @Override public NotificationType getType() { return TestType.ANNOUNCEMENT; }
+        @Override public Class<AnnouncementSeed> getSeedClass() { return AnnouncementSeed.class; }
+        @Override public Attrs attrs(AnnouncementSeed seed) { return Attrs.of(Map.of()); }
+        @Override public Optional<NotificationSettingGroup> getSettingsGroup() { return Optional.empty(); }
+        @Override public NotificationCategory category(AnnouncementSeed seed) { return seed.category(); }
+        @Override public Optional<NotificationEntityRef> entity(AnnouncementSeed seed) { return Optional.empty(); }
+        @Override public NotificationSeverity severity(AnnouncementSeed seed) { return seed.severity(); }
+        @Override public Audience audience(AnnouncementSeed seed) { return Audience.allActiveAdmins(); }
+        @Override public String composeTitle(AnnouncementSeed seed) { return "Maintenance tonight"; }
+        @Override public String composeDescription(AnnouncementSeed seed) { return null; }
+        @Override public Optional<String> getApplePushCategory() { return Optional.empty(); }
     }
 }

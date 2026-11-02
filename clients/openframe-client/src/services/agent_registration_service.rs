@@ -42,6 +42,10 @@ impl AgentRegistrationService {
 
     pub async fn register_agent(&self) -> Result<AgentRegistrationResponse> {
         let initial_key = self.initial_configuration_service.get_initial_key()?;
+        anyhow::ensure!(
+            !initial_key.is_empty(),
+            "Initial key is empty: it is cleared once a device holds a log key, so registering again needs a fresh install command"
+        );
 
         let credentials = Self::read_persisted_credentials().await?;
 
@@ -196,3 +200,7 @@ impl AgentRegistrationService {
         Ok(request)
     }
 }
+
+#[cfg(test)]
+#[path = "agent_registration_service_tests.rs"]
+mod tests;

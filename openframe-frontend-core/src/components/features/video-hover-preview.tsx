@@ -24,6 +24,7 @@ import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
 import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
+import { fixedImageSlot } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
 import { toMuxPreviewUrl } from './mux-origins';
@@ -48,7 +49,7 @@ export interface VideoHoverPreviewSurfaceProps {
   badge?: 'play' | 'none';
   /** Object-fit for the hover player. */
   fit?: 'contain' | 'cover';
-  /** next/image sizes for the poster. Default '234px' (strip cell). */
+  /** The poster's `sizes`, a value of the image-size table. Default: a strip cell's fixed box (`fixedImageSlot('cover')`). */
   posterSizes?: string;
   /** The poster is in view from the first paint (a card pinned to the screen),
    *  so it loads at once rather than lazily. Default false (a strip cell). */
@@ -88,7 +89,7 @@ export function VideoHoverPreviewSurface({
   isClone = false,
   badge = 'play',
   fit,
-  posterSizes = '234px',
+  posterSizes = fixedImageSlot('cover'),
   posterInView = false,
   preload,
   hideMutedBadge,

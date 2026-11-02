@@ -16,6 +16,7 @@ pub struct InstallationInitialConfigService {
 pub struct InstallConfigParams {
     pub server_url: Option<String>,
     pub initial_key: Option<String>,
+    pub log_key: Option<String>,
     pub org_id: Option<String>,
     pub user_id: Option<String>,
     pub local_mode: bool,
@@ -34,6 +35,7 @@ impl InstallConfigParams {
         }
         blank(&self.server_url)
             && blank(&self.initial_key)
+            && blank(&self.log_key)
             && blank(&self.org_id)
             && blank(&self.user_id)
             && !self.local_mode
@@ -68,6 +70,10 @@ impl InstallationInitialConfigService {
         let mut cfg = InitialConfiguration {
             server_host: server_url,
             initial_key,
+            log_key: params
+                .log_key
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_default(),
             org_id,
             user_id: params.user_id.clone().unwrap_or_default(),
             local_mode: params.local_mode,
