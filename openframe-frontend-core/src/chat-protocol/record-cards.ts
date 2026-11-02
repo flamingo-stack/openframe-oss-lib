@@ -20,7 +20,9 @@
  */
 
 import { MESSAGE_TYPE, type RecordCard } from '../components/chat/types/message.types';
+import type { ChatRecordCardsPart } from './chat-message';
 import type { RecordCardsEvent } from './events';
+import { normalizeRecordUris } from './record-link';
 import { isRecord } from './wire-narrow';
 
 /** The tool the model calls to show records as cards. */
@@ -44,11 +46,22 @@ export interface RecordCardsPart {
   cards: Array<{ entityType: string; entityId: string }>;
 }
 
-/** Build the wire part from cards (deduplicated, capped). */
-export function recordCardsPart(cards: readonly RecordCard[]): RecordCardsPart {
+/**
+ * The part that shows records as cards: each URI once, in its one spelling. A URI that names no record (a collection,
+ * anything else) is left out. Not capped: `RECORD_CARDS_MAX` binds the tool call, and a stored answer holds what it held.
+ */
+export function recordCardsPart(uris: readonly string[]): ChatRecordCardsPart;
+/** Build the old wire part from cards (deduplicated, capped). */
+export function recordCardsPart(cards: readonly RecordCard[]): RecordCardsPart;
+export function recordCardsPart(
+  items: readonly string[] | readonly RecordCard[],
+): ChatRecordCardsPart | RecordCardsPart {
+  if (items.every((item): item is string => typeof item === 'string')) {
+    return { type: 'data-record-cards', data: { records: normalizeRecordUris(items) } };
+  }
   return {
     type: MESSAGE_TYPE.RECORD_CARDS,
-    cards: uniqueCards(cards).map(card => ({ entityType: card.type, entityId: card.id })),
+    cards: uniqueCards(items).map(card => ({ entityType: card.type, entityId: card.id })),
   };
 }
 

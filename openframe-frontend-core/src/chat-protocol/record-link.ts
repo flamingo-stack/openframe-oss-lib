@@ -4,13 +4,17 @@
  *     The [Mac onboarding guide](record://onboarding_guide/mac-guide) walks you through it.
  *
  * The link text is the name the reader sees, so nothing is typed twice. The chat draws the link as a chip (the
- * record's icon and that name) inside the sentence, and every record the answer links also gets its full card under
- * the answer. A server that knows which records a turn loaded checks each link before it reaches the reader and turns
- * one it never offered into plain text (`unlinkUnknownRecords`).
+ * record's icon and that name) inside the sentence; a card is a part of the message of its own (`./record-cards`). A
+ * server that knows which records a turn loaded checks each link before it reaches the reader and turns one it never
+ * offered into plain text (`unlinkUnknownRecords`).
+ *
+ * The same URI is a record's identity everywhere: a source's `sourceId`, a citation's `source.id`, a card. `record://<type>`
+ * with no id is a COLLECTION: what a citation points at when it cites a table's header block. It names no record, so it
+ * can never become a chip or a card (`parseRecordHref` answers null for it).
  *
  * It replaced two private tokens a model typed into its text, one for a card and one for a chip. Those were not
- * markdown, so markdown broke them (a code span, a link, emphasis), and they carried no name. Stored messages were
- * rewritten to record links, and nothing reads the old tokens.
+ * markdown, so markdown broke them (a code span, a link, emphasis), and they carried no name. Only `./old-wire` still
+ * reads them, for backends and rows from before the move.
  *
  * Server-safe: no React, no browser APIs. Mirrored by the Java agent (openframe-saas-tenant), and pinned by
  * `__tests__/record-link.test.ts`.
@@ -36,10 +40,36 @@ export interface RecordLinkMatch extends RecordLink {
 
 /**
  * The href of a record: `record://<type>/<id>`, the id percent-encoded so a slug, a path (`docs/setup.md`), a space or
- * a `)` can never end the markdown link early. Every server that offers a record to a model hands it this exact href.
+ * a `)` can never end the markdown link early: `encodeURIComponent`, plus `(` and `)`, which it leaves alone and a
+ * markdown destination cannot hold. The Java agent's `RecordKey` encodes the same, pinned by one fixture
+ * (`RECORD_URI_VECTORS`). Every server that offers a record to a model hands it this exact href.
  */
 export function recordHref(type: string, id: string): string {
-  return `${RECORD_LINK_SCHEME}${type}/${encodeURIComponent(id)}`;
+  return `${RECORD_LINK_SCHEME}${type}/${encodeURIComponent(id).replace(/\(/g, '%28').replace(/\)/g, '%29')}`;
+}
+
+/** The URI of a collection: every record of a type, as one source. */
+export function collectionHref(type: string): string {
+  return `${RECORD_LINK_SCHEME}${type}`;
+}
+
+/** The type a collection URI names, or null when it is not one. A record's URI is not a collection. */
+export function parseCollectionHref(href: unknown): { type: string } | null {
+  if (typeof href !== 'string' || !href.startsWith(RECORD_LINK_SCHEME)) return null;
+  const type = href.slice(RECORD_LINK_SCHEME.length);
+  return RECORD_TYPE.test(type) ? { type } : null;
+}
+
+/**
+ * A record or collection URI in its one spelling, or null when it is neither. A URI read off the wire or out of a
+ * model's text goes through this before it is a key: `record://markdown/docs/setup.md` and
+ * `record://markdown/docs%2Fsetup.md` are one record.
+ */
+export function normalizeRecordUri(href: unknown): string | null {
+  const record = parseRecordHref(href);
+  if (record) return recordHref(record.type, record.id);
+  const collection = parseCollectionHref(href);
+  return collection ? collectionHref(collection.type) : null;
 }
 
 /** The record an href names, or null when it is not a record href. The id is decoded; an id the model left unencoded
@@ -52,6 +82,16 @@ export function parseRecordHref(href: unknown): RecordLink | null {
   const type = rest.slice(0, slash);
   if (!RECORD_TYPE.test(type)) return null;
   return { type, id: safeDecode(rest.slice(slash + 1)) };
+}
+
+/** The records a list names: each once, in its one spelling. What names no record (a collection, anything else) goes. */
+export function normalizeRecordUris(uris: unknown): string[] {
+  if (!Array.isArray(uris)) return [];
+  const records = new Set<string>();
+  for (const uri of uris) {
+    if (parseRecordHref(uri)) records.add(normalizeRecordUri(uri) as string);
+  }
+  return [...records];
 }
 
 /**

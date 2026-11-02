@@ -139,3 +139,28 @@ describe('record cards in a message', () => {
     expect(segmentsOfParts(null)).toBeNull();
   });
 });
+
+describe('recordCardsPart(uris)', () => {
+  it('is the standard data part: each URI once, in its one spelling', () => {
+    expect(
+      recordCardsPart([
+        'record://blog_post/1',
+        'record://markdown/docs/a.md',
+        'record://blog_post/1',
+        'record://markdown/docs%2Fa.md',
+      ]),
+    ).toEqual({
+      type: 'data-record-cards',
+      data: { records: ['record://blog_post/1', 'record://markdown/docs%2Fa.md'] },
+    });
+  });
+
+  it('leaves out what names no record: a collection is never a card', () => {
+    expect(recordCardsPart(['record://blog_post', 'https://x.test', '']).data.records).toEqual([]);
+  });
+
+  it('holds every record: the cap binds the tool call', () => {
+    const uris = Array.from({ length: RECORD_CARDS_MAX + 3 }, (_, i) => `record://faq/${i}`);
+    expect(recordCardsPart(uris).data.records).toHaveLength(RECORD_CARDS_MAX + 3);
+  });
+});

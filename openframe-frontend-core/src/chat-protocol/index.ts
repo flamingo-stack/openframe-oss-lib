@@ -33,3 +33,12 @@ export type { RecordCard } from '../components/chat/types/message.types';
 // The `[N]` citation chip grammar — written by the server, read and hidden by the renderer.
 export * from './citation-chip';
 export { escapeThinkingTags } from './leading-frames';
+// The chat message and its stream: the AI SDK's names, one shape on every wire and in every store.
+export * from './chat-message';
+export * from './ui-chunks';
+export * from './apply-chunk';
+export * from './ui-writer';
+export * from './citations';
+export * from './message-decoder';
+// The wire's fixtures, so the hub's conformance tests pin what this package pins.
+export * from './wire-fixtures';

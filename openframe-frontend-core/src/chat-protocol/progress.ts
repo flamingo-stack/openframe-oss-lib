@@ -13,6 +13,7 @@
 
 import { ToolTypeValues } from '../types/tool.types';
 import type { ToolExecutionFrame } from './frames';
+import type { ChatProgressChunk } from './ui-chunks';
 
 export const CHAT_PROGRESS_STAGES = ['understanding', 'searching', 'searching_again', 'reading'] as const;
 
@@ -56,4 +57,21 @@ export function chatProgressFrame(
   return state === 'running'
     ? { type: 'EXECUTING_TOOL', ...row }
     : { type: 'EXECUTED_TOOL', ...row, success: state === 'done' };
+}
+
+/**
+ * The chunk for a stage of one turn: `running` opens its row, `done` or `failed` closes it. Transient: the client holds
+ * it beside the message it is building, never stored. `turnId` keeps the row's id unique to the turn.
+ */
+export function chatProgressChunk(
+  progress: ChatProgress,
+  state: 'running' | 'done' | 'failed',
+  turnId: string,
+): ChatProgressChunk {
+  return {
+    type: 'data-chat-progress',
+    id: `${turnId}:${progress.stage}`,
+    transient: true,
+    data: { stage: progress.stage, ...(progress.count !== undefined ? { count: progress.count } : {}), state },
+  };
 }

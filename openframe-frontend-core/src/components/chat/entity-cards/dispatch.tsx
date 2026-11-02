@@ -2165,7 +2165,8 @@ export function useRecordDestination(chatRef: ChatRef) {
 }
 
 export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCardLoaderProps) {
-  const { entry, fetchEntry, item, isLoading, isError, isFetched, finalChatRef, hostRoute, isNewTab, path } =
+  const entry = CHAT_CARD_REGISTRY[chatRef.type];
+  const { fetchEntry, item, isLoading, isError, isFetched, finalChatRef, hostRoute, isNewTab, path } =
     useRecordDestination(chatRef);
   const runtime = useRequiredChatRuntime();
   if (!entry) return null;

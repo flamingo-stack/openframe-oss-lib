@@ -4,7 +4,18 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { extractRecordLinks, parseRecordHref, recordHref, unlinkUnknownRecords } from '../record-link';
+import {
+  collectionHref,
+  extractRecordLinks,
+  normalizeRecordUri,
+  normalizeRecordUris,
+  parseCollectionHref,
+  parseRecordHref,
+  recordHref,
+  recordLinkMarkdown,
+  unlinkUnknownRecords,
+} from '../record-link';
+import { RECORD_URI_VECTORS } from '../wire-fixtures';
 
 const ID = '6aad91a3b776f95ad7491bd9';
 
@@ -59,5 +70,67 @@ describe('unlinkUnknownRecords', () => {
 
   it('leaves a text with no record link as it is', () => {
     expect(unlinkUnknownRecords('see [docs](https://example.com)', allowed)).toBe('see [docs](https://example.com)');
+  });
+});
+
+describe('the record URI, pinned to the Java agent', () => {
+  it.each(RECORD_URI_VECTORS)('$type/$id', ({ type, id, href }) => {
+    expect(recordHref(type, id)).toBe(href);
+    expect(parseRecordHref(href)).toEqual({ type, id });
+  });
+
+  it('encodes parentheses, which a markdown destination cannot hold', () => {
+    const markdown = recordLinkMarkdown({ type: 'blog', id: 'a (b)' }, 'A (b)');
+    expect(markdown).toBe('[A (b)](record://blog/a%20%28b%29)');
+    expect(extractRecordLinks(markdown)).toMatchObject([{ type: 'blog', id: 'a (b)', label: 'A (b)' }]);
+  });
+});
+
+describe('a collection', () => {
+  it('names a type and no record', () => {
+    expect(collectionHref('blog_post')).toBe('record://blog_post');
+    expect(parseCollectionHref('record://blog_post')).toEqual({ type: 'blog_post' });
+    expect(parseRecordHref('record://blog_post')).toBeNull();
+  });
+
+  it.each(['record://blog_post/1', 'record://', 'record://1x', 'https://x.test', 'blog_post', null, 7])(
+    'is not a collection: %s',
+    href => {
+      expect(parseCollectionHref(href)).toBeNull();
+    },
+  );
+
+  it('can never become a chip', () => {
+    expect(extractRecordLinks('[Blog posts](record://blog_post)')).toEqual([]);
+  });
+});
+
+describe('normalizeRecordUri', () => {
+  it('gives one spelling to every spelling of a record', () => {
+    expect(normalizeRecordUri('record://markdown/docs/setup.md')).toBe('record://markdown/docs%2Fsetup.md');
+    expect(normalizeRecordUri('record://markdown/docs%2Fsetup.md')).toBe('record://markdown/docs%2Fsetup.md');
+    expect(normalizeRecordUri('record://blog/a(b)')).toBe('record://blog/a%28b%29');
+  });
+
+  it('keeps a collection', () => {
+    expect(normalizeRecordUri('record://blog_post')).toBe('record://blog_post');
+  });
+
+  it.each(['https://x.test', 'record://', 'card://a:b', '', null])('is null for %s', href => {
+    expect(normalizeRecordUri(href)).toBeNull();
+  });
+});
+
+describe('normalizeRecordUris', () => {
+  it('is each record once, in its one spelling', () => {
+    expect(normalizeRecordUris(['record://a/1', 'record://m/d/e.md', 'record://m/d%2Fe.md', 'record://a/1'])).toEqual([
+      'record://a/1',
+      'record://m/d%2Fe.md',
+    ]);
+  });
+
+  it('leaves out what names no record', () => {
+    expect(normalizeRecordUris(['record://a', 'https://x.test', 7, null])).toEqual([]);
+    expect(normalizeRecordUris('record://a/1')).toEqual([]);
   });
 });

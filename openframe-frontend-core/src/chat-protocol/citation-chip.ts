@@ -12,9 +12,13 @@
 /** One bracket: a number of one or two digits, or a comma list of them. */
 const CHIP = '\\[\\d{1,2}(?:\\s*,\\s*\\d{1,2})*\\]';
 
+/** A run of chips, and what may follow it: the grammar, for a reader that walks a text as it arrives. */
+export const CITATION_CHIP_RUN = `(?:${CHIP})+`;
+export const CITATION_CHIP_FOLLOW = '[\\s.,;:!?)\\]]';
+
 /** A run of chips standing apart from a word; group 1 is the whitespace (or nothing) before it. */
 function chipRunScanner(): RegExp {
-  return new RegExp(`(^|\\s)(?:${CHIP})+(?=[\\s.,;:!?)\\]]|$)`, 'g');
+  return new RegExp(`(^|\\s)${CITATION_CHIP_RUN}(?=${CITATION_CHIP_FOLLOW}|$)`, 'g');
 }
 
 /** The chips for these source numbers: `[1][3]`, each number once, in ascending order. */
