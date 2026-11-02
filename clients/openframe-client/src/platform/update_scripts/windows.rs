@@ -47,18 +47,6 @@ function Set-UpdatePhase {
     }
 }
 
-# Start-Service keeps the actual Win32 error (timeout, access denied) in the innermost exception
-function Get-ErrorText {
-    param($ErrorRecord)
-    $text = "$ErrorRecord"
-    $inner = $ErrorRecord.Exception.InnerException
-    while ($inner -and $inner.InnerException) { $inner = $inner.InnerException }
-    if ($inner -and $inner.Message -and -not $text.Contains($inner.Message)) {
-        $text = "$text ($($inner.Message))"
-    }
-    return $text
-}
-
 function Remove-NewExe {
     if ($NewExePath -and (Test-Path $NewExePath)) {
         Remove-Item -Path $NewExePath -Force -ErrorAction SilentlyContinue
@@ -86,6 +74,22 @@ function Restore-Reserve {
 
 function Test-AgentUninstalled {
     return (-not $RollbackOnly) -and $UpdateStatePath -and (-not (Test-Path $UpdateStatePath))
+}
+
+# Start-Service keeps the actual Win32 reason (timeout, access denied) in the innermost inner exception
+function Get-ErrorReason {
+    param($ErrorRecord)
+    $reason = "$ErrorRecord"
+    try {
+        $inner = $ErrorRecord.Exception
+        while ($inner.InnerException) { $inner = $inner.InnerException }
+        $innerMessage = "$($inner.Message)".Trim()
+        if ($innerMessage -and -not $reason.Contains($innerMessage)) {
+            $reason = "$reason ($innerMessage)"
+        }
+    }
+    catch { }
+    return $reason
 }
 
 try {
@@ -192,7 +196,7 @@ try {
     exit 0
 }
 catch {
-    $failure = Get-ErrorText $_
+    $failure = Get-ErrorReason $_
     Write-Output "Updater failed: $failure"
 
     if (Test-AgentUninstalled) {
@@ -245,8 +249,9 @@ catch {
             Write-Output "Rollback complete, service restarted"
         }
         catch {
-            Write-Output "Rollback failed: $_"
-            Set-UpdatePhase -Phase "failed" -Reason "$failure; rollback failed: $(Get-ErrorText $_)"
+            $rollbackFailure = Get-ErrorReason $_
+            Write-Output "Rollback failed: $rollbackFailure"
+            Set-UpdatePhase -Phase "failed" -Reason "$failure; rollback failed: $rollbackFailure"
             try {
                 if ((Get-Service -Name $ServiceName -ErrorAction Stop).Status -ne 'Running') {
                     Start-Service -Name $ServiceName -ErrorAction Stop
@@ -254,7 +259,7 @@ catch {
                 }
             }
             catch {
-                Write-Output "Failed to restart service after failed rollback: $_"
+                Write-Output "Failed to restart service after failed rollback: $(Get-ErrorReason $_)"
             }
         }
     }
@@ -269,7 +274,7 @@ catch {
             }
         }
         catch {
-            Write-Output "Failed to restart service after pre-swap failure: $_"
+            Write-Output "Failed to restart service after pre-swap failure: $(Get-ErrorReason $_)"
         }
     }
 

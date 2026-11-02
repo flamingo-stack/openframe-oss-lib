@@ -40,7 +40,71 @@ fn windows_update_script_stays_powershell3_compatible() {
         "rolled_back must be stamped before the service is started"
     );
     assert!(script.contains("-NotePropertyName last_error"));
-    assert!(script.contains("$failure = Get-ErrorText $_"));
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn windows_update_script_records_the_innermost_error_reason() {
+    let script = super::windows::UPDATE_SCRIPT_WINDOWS;
+    assert!(script.contains("$failure = Get-ErrorReason $_"));
+    assert!(script.contains("$rollbackFailure = Get-ErrorReason $_"));
+    assert!(script.contains("-Reason \"$failure; rollback failed: $rollbackFailure\""));
+    assert!(!script.contains("rollback failed: $_"));
+}
+
+// Start-Service nests its Win32 reason two exceptions deep under a message that only names the service.
+#[cfg(target_os = "windows")]
+#[test]
+fn windows_get_error_reason_appends_the_innermost_message_once() {
+    const CASES: &str = r#"
+function Get-Reason([scriptblock]$Action) { try { & $Action } catch { Get-ErrorReason $_ } }
+$win32 = New-Object System.Exception -ArgumentList 'win32 reason'
+$middle = New-Object System.InvalidOperationException -ArgumentList 'cannot start service', $win32
+Get-Reason { throw (New-Object System.InvalidOperationException -ArgumentList 'service cannot be started: cannot start service', $middle) }
+Get-Reason { throw (New-Object System.InvalidOperationException -ArgumentList 'failed: win32 reason', $win32) }
+Get-Reason { throw 'plain failure' }
+"#;
+    let script = super::windows::UPDATE_SCRIPT_WINDOWS;
+    let start = script.find("function Get-ErrorReason").unwrap();
+    let end = start + script[start..].find("\n}\n").unwrap() + 3;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("reason.ps1");
+    std::fs::write(
+        &path,
+        format!(
+            "$ErrorActionPreference = 'Stop'\n{}{CASES}",
+            &script[start..end]
+        ),
+    )
+    .unwrap();
+
+    let output = std::process::Command::new(crate::platform::get_powershell_path())
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+        ])
+        .arg(&path)
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{stdout}");
+    let lines: Vec<&str> = stdout
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    assert_eq!(
+        lines,
+        [
+            "service cannot be started: cannot start service (win32 reason)",
+            "failed: win32 reason",
+            "plain failure",
+        ]
+    );
 }
 
 #[cfg(target_os = "macos")]

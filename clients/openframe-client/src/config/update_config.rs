@@ -50,6 +50,8 @@ pub const ALLOW_DOWNGRADE: bool = false;
 pub const UPDATER_TRANSCRIPTS_KEPT: usize = 5;
 /// Minimum age before a temp update leftover is swept (a live updater's files are younger).
 pub const TEMP_LEFTOVER_MIN_AGE_SECS: u64 = 3600;
+/// How long the staged binary may take to answer `--version` (a first-run antivirus scan included).
+pub const STAGED_VERSION_PROBE_TIMEOUT_SECS: u64 = 30;
 
 // NATS message settings
 pub const CONSUMER_ACK_WAIT_SECS: u64 = 120;
@@ -60,6 +62,3 @@ pub const RESTART_CONSUMER_MAX_DELIVER: i64 = 20; // Larger budget: restart may 
 // Client-before-tool update ordering
 pub const CLIENT_UPDATE_PENDING_TTL_SECS: u64 = 300; // > ack_wait (120s) so the flag survives redelivery gaps of a deferred client update
 pub const PROGRESS_ACK_INTERVAL_SECS: u64 = 60; // well inside ack_wait (120s)
-
-/// How long a downloaded client binary gets to print its version before the update goes ahead unchecked
-pub const STAGED_VERSION_PROBE_TIMEOUT_SECS: u64 = 30;
