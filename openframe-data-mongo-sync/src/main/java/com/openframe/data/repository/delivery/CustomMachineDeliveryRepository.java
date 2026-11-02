@@ -44,4 +44,6 @@ public interface CustomMachineDeliveryRepository {
 
     boolean markRerunPublished(RerunPublication publication);
 
+    boolean replacePayload(PayloadReplacement replacement);
+
 }

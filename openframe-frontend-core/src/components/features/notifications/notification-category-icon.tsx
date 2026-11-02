@@ -6,7 +6,7 @@ import { NamedIcon, type IconRef } from '../../chat/utils/icon-loading';
  * Backend `NotificationCategory` → icon, the icon of the dashboard section the
  * notification belongs to (the app navigation's own). A table of icon NAMES: an
  * icon is loaded when a notification of its category is drawn. GENERIC,
- * INTEGRATIONS and unknown categories have none (the tile draws its severity
+ * INTEGRATIONS, BILLING and unknown categories have none (the tile draws its severity
  * dot). Every icon takes the host's text colour, so a row of them is one colour.
  */
 const ICON_BY_CATEGORY: Readonly<Record<string, IconRef>> = {

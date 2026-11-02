@@ -1,8 +1,10 @@
 package com.openframe.data.repository.delivery.impl;
 
+import com.openframe.data.repository.delivery.PayloadReplacement;
 import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.RerunPublication;
@@ -37,6 +39,9 @@ class CustomMachineDeliveryRepositoryImplTest {
     private static final int LIMIT = 500;
     private static final int ATTEMPTS = 1;
     private static final String DISPATCH_ID = "d-1";
+    private static final String NEXT_DISPATCH_ID = "d-2";
+    private static final long WINDOW_SECONDS = 7_200L;
+    private static final String NEXT_PAYLOAD_ID = "tenant-1:TOOL_INSTALLATION:def";
     private static final String ERROR = "download failed";
     private static final String PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\"}";
 
@@ -355,5 +360,60 @@ class CustomMachineDeliveryRepositoryImplTest {
                 .contains("attempts=1")
                 .doesNotContain("payloadJson")
                 .contains("dueAt");
+    }
+    @Test
+    void replacePayload_unackedRowOfThatDispatch_newBodyAndDispatchDueAtOnce() {
+        // setup
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
+        PayloadReplacement replacement = PayloadReplacement.builder()
+                .id(ID)
+                .from(DeliveryStatus.UNACKED)
+                .dispatchId(DISPATCH_ID)
+                .payloadId(NEXT_PAYLOAD_ID)
+                .nextDispatchId(NEXT_DISPATCH_ID)
+                .dueAt(now)
+                .build();
+
+        // execution
+        boolean replaced = repository.replacePayload(replacement);
+
+        // verifications
+        assertThat(replaced).isTrue();
+        assertThat(queryCaptor.getValue().getQueryObject().toString())
+                .contains(ID)
+                .contains("PENDING")
+                .contains("dispatchId=" + DISPATCH_ID);
+        String update = updateCaptor.getValue().getUpdateObject().toString();
+        assertThat(update)
+                .contains("payloadId=" + NEXT_PAYLOAD_ID)
+                .contains("dispatchId=" + NEXT_DISPATCH_ID)
+                .contains("dueAt")
+                .contains("$unset")
+                .contains("payloadJson");
+    }
+    @Test
+    void replacePayload_withTheCallersRule_ruleWrittenWithTheBody() {
+        // setup
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
+        PayloadReplacement replacement = PayloadReplacement.builder()
+                .id(ID)
+                .from(DeliveryStatus.UNACKED)
+                .dispatchId(DISPATCH_ID)
+                .payloadId(NEXT_PAYLOAD_ID)
+                .nextDispatchId(NEXT_DISPATCH_ID)
+                .dueAt(now)
+                .offlineBehavior(DeliveryOfflineBehavior.SKIP)
+                .reconnectWindowSeconds(WINDOW_SECONDS)
+                .build();
+
+        // execution
+        repository.replacePayload(replacement);
+
+        // verifications
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("offlineBehavior=SKIP")
+                .contains("reconnectWindowSeconds=" + WINDOW_SECONDS);
     }
 }

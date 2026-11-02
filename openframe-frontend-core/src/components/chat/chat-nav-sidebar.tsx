@@ -1,9 +1,11 @@
 'use client';
 
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react';
+import { useClippedLabelTooltip } from '../../hooks/ui/use-clipped-label-tooltip';
 import { cn } from '../../utils/cn';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { BUTTON_KIND_CLASS, Button } from '../ui/button';
+import { FloatingTooltip } from '../ui/floating-tooltip';
 import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 
@@ -157,6 +159,8 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
     ref,
   ) => {
     const loading = useLoadingScope() || loadingProp;
+    // A title the list clips: its full text in a tooltip over it, only while clipped and where a pointer can hover.
+    const { ref: titleRef, enabled: titleTooltip } = useClippedLabelTooltip<HTMLSpanElement>(title);
     const content = (
       <>
         <span className="flex min-w-0 flex-1 flex-col">
@@ -165,11 +169,20 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
             {loading ? (
               <TextLineSkeleton type="h4" className={SKELETON_TITLE_WIDTHS[index % SKELETON_TITLE_WIDTHS.length]} />
             ) : (
-              <span
-                className={cn('min-w-0 flex-1 truncate text-h4', active ? 'text-ods-accent' : 'text-ods-text-primary')}
+              <FloatingTooltip
+                content={title}
+                side="top"
+                as="span"
+                disabled={!titleTooltip}
+                triggerClassName="min-w-0 flex-1"
               >
-                {title}
-              </span>
+                <span
+                  ref={titleRef}
+                  className={cn('block min-w-0 truncate text-h4', active ? 'text-ods-accent' : 'text-ods-text-primary')}
+                >
+                  {title}
+                </span>
+              </FloatingTooltip>
             )}
           </span>
           {subtitle != null &&
