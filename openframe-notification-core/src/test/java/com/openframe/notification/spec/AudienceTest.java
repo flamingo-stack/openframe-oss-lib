@@ -46,11 +46,24 @@ class AudienceTest {
     }
 
     @Test
+    @DisplayName("allActiveOwners is its own marker: it never implies the admins and survives andUsers/except")
+    void owners_marker_is_kept_apart_from_admins() {
+        Audience owners = Audience.allActiveOwners().andUsers(List.of("a")).except("actor");
+
+        assertThat(owners.allActiveOwners).isTrue();
+        assertThat(owners.allActiveAdmins).isFalse();
+        assertThat(owners.userIds).containsExactly("a");
+        assertThat(owners.excludedUserIds).containsExactly("actor");
+        assertThat(Audience.allActiveAdmins().allActiveOwners).isFalse();
+    }
+
+    @Test
     void none_declares_nobody() {
         Audience none = Audience.none();
 
         assertThat(none.userIds).isEmpty();
         assertThat(none.machineIds).isEmpty();
         assertThat(none.allActiveAdmins).isFalse();
+        assertThat(none.allActiveOwners).isFalse();
     }
 }

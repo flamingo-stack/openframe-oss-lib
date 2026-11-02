@@ -15,18 +15,20 @@ public final class Audience {
     final Set<String> userIds;
     final Set<String> machineIds;
     final boolean allActiveAdmins;
+    final boolean allActiveOwners;
     final Set<String> excludedUserIds;
 
     private Audience(Set<String> userIds, Set<String> machineIds,
-                     boolean allActiveAdmins, Set<String> excludedUserIds) {
+                     boolean allActiveAdmins, boolean allActiveOwners, Set<String> excludedUserIds) {
         this.userIds = userIds;
         this.machineIds = machineIds;
         this.allActiveAdmins = allActiveAdmins;
+        this.allActiveOwners = allActiveOwners;
         this.excludedUserIds = excludedUserIds;
     }
 
     public static Audience none() {
-        return new Audience(Set.of(), Set.of(), false, Set.of());
+        return new Audience(Set.of(), Set.of(), false, false, Set.of());
     }
 
     public static Audience users(String... ids) {
@@ -36,7 +38,7 @@ public final class Audience {
 
     public static Audience users(Collection<String> ids) {
         Set<String> sanitized = sanitize(ids);
-        return new Audience(sanitized, Set.of(), false, Set.of());
+        return new Audience(sanitized, Set.of(), false, false, Set.of());
     }
 
     public static Audience machines(String... ids) {
@@ -46,17 +48,22 @@ public final class Audience {
 
     public static Audience machines(Collection<String> ids) {
         Set<String> sanitized = sanitize(ids);
-        return new Audience(Set.of(), sanitized, false, Set.of());
+        return new Audience(Set.of(), sanitized, false, false, Set.of());
     }
 
     public static Audience allActiveAdmins() {
-        return new Audience(Set.of(), Set.of(), true, Set.of());
+        return new Audience(Set.of(), Set.of(), true, false, Set.of());
+    }
+
+    // Owners only — allActiveAdmins() already includes them, so the two never need combining.
+    public static Audience allActiveOwners() {
+        return new Audience(Set.of(), Set.of(), false, true, Set.of());
     }
 
     public Audience andUsers(Collection<String> ids) {
         Set<String> sanitized = sanitize(ids);
         Set<String> merged = union(userIds, sanitized);
-        return new Audience(merged, machineIds, allActiveAdmins, excludedUserIds);
+        return new Audience(merged, machineIds, allActiveAdmins, allActiveOwners, excludedUserIds);
     }
 
     public Audience andMachines(String... ids) {
@@ -67,7 +74,7 @@ public final class Audience {
     public Audience andMachines(Collection<String> ids) {
         Set<String> sanitized = sanitize(ids);
         Set<String> merged = union(machineIds, sanitized);
-        return new Audience(userIds, merged, allActiveAdmins, excludedUserIds);
+        return new Audience(userIds, merged, allActiveAdmins, allActiveOwners, excludedUserIds);
     }
 
     // Two-phase: cuts the id from the explicit set now AND from whatever a marker resolves to later.
@@ -79,7 +86,7 @@ public final class Audience {
         kept.remove(userId);
         Set<String> keptCopy = Set.copyOf(kept);
         Set<String> excluded = union(excludedUserIds, Set.of(userId));
-        return new Audience(keptCopy, machineIds, allActiveAdmins, excluded);
+        return new Audience(keptCopy, machineIds, allActiveAdmins, allActiveOwners, excluded);
     }
 
     private static Set<String> sanitize(Collection<String> ids) {

@@ -1,6 +1,8 @@
 package com.openframe.notification.spec;
 
 import com.openframe.data.document.user.User;
+import com.openframe.data.document.user.UserRole;
+import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +49,19 @@ class AudienceResolverTest {
         Recipients recipients = resolver.resolve(Audience.allActiveAdmins());
 
         assertThat(recipients.getUsers()).containsExactlyInAnyOrder("admin-1", "admin-2");
+    }
+
+    @Test
+    @DisplayName("The allActiveOwners marker asks the user store for OWNER only — an admin is never an owner by proxy")
+    void owners_marker_resolves_to_active_owners_only() {
+        List<UserRole> ownerRole = List.of(UserRole.OWNER);
+        List<User> owners = List.of(user("owner-1"));
+        when(userRepository.findByRolesInAndStatus(ownerRole, UserStatus.ACTIVE)).thenReturn(owners);
+
+        Recipients recipients = resolver.resolve(Audience.allActiveOwners().except("owner-2"));
+
+        assertThat(recipients.getUsers()).containsExactly("owner-1");
+        verify(userRepository).findByRolesInAndStatus(ownerRole, UserStatus.ACTIVE);
     }
 
     @Test
