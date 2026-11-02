@@ -1002,6 +1002,37 @@ describe('createMingoDecoder: the table', () => {
     ]);
   });
 
+  it('a hero video gives no source: its `ref` names its document, whose URI is its handle', () => {
+    const chunks = decodeAll({
+      type: 'ATTACHMENTS',
+      sources: [],
+      videos: [
+        { ref: '[card://video:mux-1]', type: 'video', id: 'mux-1', title: 'Embedded', url: 'https://stream.test/1' },
+        { ref: '[card://webinar:123]', type: 'video', id: '123', title: 'Hero', url: 'https://stream.test/hero' },
+        { recordLink: 'record://webinar/123', type: 'video', id: '123', title: 'Hero by link' },
+      ],
+    });
+    expect(chunks).toEqual([
+      { type: 'source-url', sourceId: 'record://video/mux-1', url: 'https://stream.test/1', title: 'Embedded' },
+    ]);
+  });
+
+  it('a markdown row is keyed by its path, whatever else names it', () => {
+    const chunks = decodeAll({
+      type: 'ATTACHMENTS',
+      sources: [
+        { index: 1, name: 'A', documentType: 'markdown', path: 'docs/a.md', recordLink: 'record://markdown/uuid-1' },
+        { index: 2, name: 'B', documentType: 'markdown', path: 'docs/b.md', ref: '[card://markdown:uuid-2]' },
+        { index: 3, name: 'C', documentType: 'markdown', recordLink: 'record://markdown/uuid-3' },
+      ],
+    });
+    expect(chunks).toEqual([
+      containing({ sourceId: 'record://markdown/docs%2Fa.md', filename: 'docs/a.md' }),
+      containing({ sourceId: 'record://markdown/docs%2Fb.md', filename: 'docs/b.md' }),
+      containing({ sourceId: 'record://markdown/uuid-3' }),
+    ]);
+  });
+
   it('an old row names its record by `recordLink`, then `ref`, then its type and id', () => {
     const chunks = decodeAll({
       type: 'ATTACHMENTS',

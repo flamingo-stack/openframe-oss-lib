@@ -47,16 +47,22 @@ function text(value: unknown): string | undefined {
 
 const OLD_REF = /^\[card:\/\/([a-zA-Z0-9_-]+):([^\]\r\n)]+)\]$/;
 
-/** The record an old row names, in the order the old readers trusted it. A markdown doc is keyed by its path. */
-function oldRecordUri(row: Record<string, unknown>): string | null {
+/** The record an old row's link or `[card://…]` ref names, when it has one. */
+function oldLinkedRecord(row: Record<string, unknown>): { type: string; id: string } | null {
   const link = parseRecordHref(row.recordLink);
-  if (link) return recordHref(link.type, link.id);
+  if (link) return link;
   const ref = typeof row.ref === 'string' ? OLD_REF.exec(row.ref) : null;
-  if (ref) return recordHref(ref[1], ref[2]);
-  const type = text(row.documentType) ?? text(row.entityType);
+  return ref ? { type: ref[1], id: ref[2] } : null;
+}
+
+/** The record an old row names, in the order the old readers trusted it. A markdown doc is keyed by its path, whatever else names it. */
+function oldRecordUri(row: Record<string, unknown>): string | null {
+  const linked = oldLinkedRecord(row);
+  const type = linked?.type ?? text(row.documentType) ?? text(row.entityType);
   if (!type) return null;
-  const id = text(row.entityId) ?? text(row.id);
-  const key = type === 'markdown' ? (text(row.path) ?? id) : (id ?? text(row.path));
+  const path = text(row.path);
+  if (type === 'markdown' && path) return recordHref(type, path);
+  const key = linked?.id ?? text(row.entityId) ?? text(row.id) ?? path;
   return key ? recordHref(type, key) : null;
 }
 
@@ -158,11 +164,16 @@ export function oldRecordCardsOf(row: Record<string, unknown>): string[] {
   return [...new Set(uris)];
 }
 
-/** Old video rows, as the sources they are now. */
+/**
+ * Old video rows, as the sources they are now. A hero video lives on its document's own row and its `ref` names that
+ * document, whose URI is its handle already, so it gives no source.
+ */
 export function oldVideoParts(rows: unknown): ChatSourcePart[] {
   if (!Array.isArray(rows)) return [];
   return rows.filter(isRecord).flatMap(row => {
-    const id = text(row.id) ?? (typeof row.ref === 'string' ? OLD_REF.exec(row.ref)?.[2] : undefined);
+    const linked = oldLinkedRecord(row);
+    if (linked && linked.type !== 'video') return [];
+    const id = linked?.id ?? text(row.id);
     if (!id) return [];
     const sourceId = recordHref('video', id);
     const title = text(row.title) ?? id;
