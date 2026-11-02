@@ -98,7 +98,7 @@ fn read_probe(result: &ExecResult) -> Result<Probe, QueryError> {
     match result.retcode {
         0 => {}
         MODULE_MISSING => {
-            return Err(QueryError::Unavailable(
+            return Err(QueryError::Failed(
                 "the Microsoft.WinGet.Client PowerShell module is not installed".to_string(),
             ))
         }

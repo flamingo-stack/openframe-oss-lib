@@ -2,9 +2,11 @@
 
 import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import type { ReactNode } from 'react';
+import { useClippedLabelTooltip } from '../../hooks/ui/use-clipped-label-tooltip';
 import { cn } from '../../utils';
 import { Chevron02DownIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from '../ui/actions-menu';
+import { FloatingTooltip } from '../ui/floating-tooltip';
 import { SquareAvatar } from '../ui/square-avatar';
 import { UnreadCountBadge, UnreadDot } from './unread-dot';
 
@@ -124,6 +126,11 @@ export function AccountPopover({
   className,
 }: AccountPopoverProps) {
   const unread = items.some(entry => entry.type !== 'divider' && (entry.count ?? 0) > 0);
+  // The name and subtitle a narrow sidebar clips: their full text in a tooltip
+  // over them, only while clipped and where a pointer can hover. The rail's
+  // tooltip is the trigger's `title`.
+  const { ref: nameRef, enabled: nameTooltip } = useClippedLabelTooltip<HTMLSpanElement>(name);
+  const { ref: subtitleRef, enabled: subtitleTooltip } = useClippedLabelTooltip<HTMLSpanElement>(subtitle);
   const [open = false, setOpen] = useControllableState({
     prop: openProp,
     defaultProp: false,
@@ -182,14 +189,36 @@ export function AccountPopover({
             {/* The chevron follows the name, so it reads as this row's menu and not
                 as one more of the buttons a host sets at the row's end. */}
             <span className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)]">
-              <span className="truncate text-ods-text-primary text-h4">{name}</span>
+              <FloatingTooltip
+                content={name}
+                side="top"
+                as="span"
+                disabled={collapsed || !nameTooltip}
+                triggerClassName="min-w-0"
+              >
+                <span ref={nameRef} className="block truncate text-ods-text-primary text-h4">
+                  {name}
+                </span>
+              </FloatingTooltip>
               <Chevron02DownIcon
                 size={16}
                 className="shrink-0 text-ods-text-secondary transition-transform duration-200 group-data-[state=open]/account:rotate-180"
                 aria-hidden="true"
               />
             </span>
-            {subtitle && <span className="truncate text-ods-text-secondary text-code">{subtitle}</span>}
+            {subtitle && (
+              <FloatingTooltip
+                content={subtitle}
+                side="top"
+                as="span"
+                disabled={collapsed || !subtitleTooltip}
+                triggerClassName="min-w-0"
+              >
+                <span ref={subtitleRef} className="block truncate text-ods-text-secondary text-code">
+                  {subtitle}
+                </span>
+              </FloatingTooltip>
+            )}
           </span>
         </button>
       }

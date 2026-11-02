@@ -1,6 +1,8 @@
 package com.openframe.data.nats.rmm.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.openframe.delivery.spec.DeliveryPayload;
+import com.openframe.delivery.spec.DeliveryRef;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,12 +31,18 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ScriptScheduleExecutionMessage {
+public class ScriptScheduleExecutionMessage implements DeliveryPayload {
+
+    // stamped by the delivery engine; absent from the JSON on the path without the engine, and an agent that does not
+    // know the block skips it
+    private DeliveryRef delivery;
 
     private String executionId;
 
     private String scheduleId;
 
+    // no longer set: the agent takes its own id and never read this one, and a batch without it is the same body for
+    // every machine of the fire. Kept so a retry state stored before this change still reads
     private String machineId;
 
     private String initiatedBy;
