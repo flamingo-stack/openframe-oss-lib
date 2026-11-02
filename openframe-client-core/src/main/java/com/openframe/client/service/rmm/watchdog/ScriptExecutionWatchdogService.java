@@ -59,13 +59,14 @@ public class ScriptExecutionWatchdogService {
 
     private void markFailing(ScriptExecution row, Instant now) {
         long thresholdSeconds = thresholdSecondsFor(row);
+        Instant runningSince = row.getStatusChangedAt();
         row.setStatus(ExecutionStatus.FAILED);
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
         row.setTimedOut(Boolean.TRUE);
         row.setError(STUCK_ERROR_MESSAGE_FORMAT.formatted(thresholdSeconds));
         log.info("Reaping stuck Execution: executionId={} machineId={} runningSince={} thresholdSeconds={}",
-                row.getExecutionId(), row.getMachineId(), row.getStatusChangedAt(), thresholdSeconds);
+                row.getExecutionId(), row.getMachineId(), runningSince, thresholdSeconds);
     }
 
     // the clock starts when the agent took the batch (the leaf went RUNNING), not at the fire: a batch waits in the
