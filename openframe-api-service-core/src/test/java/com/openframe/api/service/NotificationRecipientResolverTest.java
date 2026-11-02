@@ -92,13 +92,17 @@ class NotificationRecipientResolverTest {
     }
 
     private static Jwt jwt(String userId, String role, String machineId) {
+        // AuthPrincipal falls back to the subject when the userId claim is blank, so a JWT that
+        // identifies nobody carries neither.
         Jwt.Builder builder = Jwt.withTokenValue("token")
                 .header("alg", "none")
-                .subject("subject-" + userId)
                 .claim("userId", userId)
                 .claim("roles", List.of(role))
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(60));
+        if (!userId.isBlank()) {
+            builder.subject("subject-" + userId);
+        }
         if (machineId != null) {
             builder.claim("machine_id", machineId);
         }
