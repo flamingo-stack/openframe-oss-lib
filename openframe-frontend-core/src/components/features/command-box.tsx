@@ -292,7 +292,7 @@ function CommandBoxSkeleton({
             {commandLines}
             <div className={COMMAND_BOX_COPY_SLOT_CLASS}>
               {/* `cn` resolves the conflicting icon sizes, as `Button` does; without it, the icon is 20px. */}
-              <span className={cn(buttonVariants({ variant: 'transparent', size: 'icon-sm' }))}>
+              <span className={cn(buttonVariants({ variant: 'bare', size: 'icon-sm' }))}>
                 <Copy02Icon />
               </span>
             </div>
