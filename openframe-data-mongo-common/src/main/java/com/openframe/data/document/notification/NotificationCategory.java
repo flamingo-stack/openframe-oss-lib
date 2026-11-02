@@ -12,5 +12,6 @@ public enum NotificationCategory {
     INSIGHTS,
     MINGO,
     INTEGRATIONS,
+    BILLING,
     GENERIC
 }
