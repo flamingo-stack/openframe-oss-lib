@@ -29,7 +29,7 @@ const BRAND_NAMES = [
   'instagram',
   'tiktok',
   'rocket',
-  // PascalCase social_platforms.icon_name values:
+  // PascalCase channel_platforms.icon_name values:
   'LinkedInIcon',
   'XLogo',
   'YouTubeIcon',
