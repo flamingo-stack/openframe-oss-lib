@@ -36,6 +36,7 @@ import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
 import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
 import static com.openframe.core.exception.AuthErrorCode.ORGANIZATION_SSO_REQUIRED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_INVALID;
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -111,7 +112,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
         if (authUser == null) {
             requireEmailTrustedForRouting(provider, user);
-            authUser = userService.findActiveByEmail(email).orElse(null);
+            authUser = findActiveForLogin(email);
             if (authUser == null) {
                 // Shared-domain tenants (global domain policy, no custom app) auto-provision on
                 // first login. If a consent page is configured, defer the CREATE: send the user to
@@ -213,6 +214,15 @@ public class LoginSsoHandler implements SsoFlowHandler {
         }
         log.info("event=sso-login-continue-registration email={}", email);
         response.sendRedirect(signupContinueUrl);
+    }
+
+    // A duplicate active email fails a login, so it must not surface as the flow's registration fallback.
+    private AuthUser findActiveForLogin(String email) {
+        try {
+            return userService.findActiveByEmail(email).orElse(null);
+        } catch (IllegalStateException duplicate) {
+            throw new AuthFlowException(SSO_LOGIN_FAILED, duplicate.getMessage());
+        }
     }
 
     private static String urlEncode(String value) {

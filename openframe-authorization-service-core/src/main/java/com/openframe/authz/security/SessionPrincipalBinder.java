@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Makes the session's principal the account an SSO flow resolved, not whatever email the IdP
@@ -31,6 +32,15 @@ public class SessionPrincipalBinder {
     static final String ACCOUNT_EMAIL_CLAIM = "of_account_email";
 
     private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
+
+    /**
+     * The account this authentication was bound to, empty while it still carries the IdP identity.
+     */
+    public static Optional<String> boundAccountEmail(Authentication authentication) {
+        return authentication != null && authentication.getPrincipal() instanceof OidcUser user
+                ? Optional.ofNullable(user.getClaimAsString(ACCOUNT_EMAIL_CLAIM))
+                : Optional.empty();
+    }
 
     public void bind(Authentication authentication,
                      AuthUser account,

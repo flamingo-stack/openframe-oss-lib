@@ -169,13 +169,16 @@ class SsoJoinControllerTest {
 
     @Test
     void shouldCompleteBoundInvitationAndContinue() throws Exception {
-        when(invitationRegistrationService.registerByInvitation(any())).thenReturn(activeUser("u", "tenant-1", "tim@apple-corp.com"));
+        var invited = activeUser("u", "tenant-1", "tim@apple-corp.com");
+        when(invitationRegistrationService.registerByInvitation(any())).thenReturn(invited);
+        MockHttpServletRequest request = inviteRequest("inv-1", inTenMinutes(), "inv-1");
 
-        controller.complete(true, session, inviteRequest("inv-1", inTenMinutes(), "inv-1"), response);
+        controller.complete(true, session, request, response);
 
         ArgumentCaptor<InvitationRegistrationRequest> req = ArgumentCaptor.forClass(InvitationRegistrationRequest.class);
         verify(invitationRegistrationService).registerByInvitation(req.capture());
         assertThat(req.getValue().getInvitationId()).isEqualTo("inv-1");
+        verify(sessionPrincipalBinder).bind(session, invited, request, response);
         assertThat(response.getHeader("Location"))
                 .isEqualTo("https://auth.example.com/oauth/continue?tenantId=tenant-1&redirectTo=%2Fhome");
         assertThat(response.getCookies()).anySatisfy(c -> {

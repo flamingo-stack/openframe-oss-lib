@@ -26,6 +26,7 @@ import static com.openframe.authz.support.SsoTestFixtures.authentication;
 import static com.openframe.authz.support.SsoTestFixtures.oidcUser;
 import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
 import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -86,6 +87,7 @@ class SsoFlowSuccessHandlerTest {
         assertThat(inviteHandler.handled).isTrue();
         assertThat(loginHandler.handled).isFalse();
         verify(appleWebTokenCapture).captureIfApple(request, authentication);
+        verify(ssoOidcUserService, never()).autoProvisionForTenantLogin(any());
     }
 
     @Test
@@ -116,8 +118,9 @@ class SsoFlowSuccessHandlerTest {
 
         successHandler.onAuthenticationSuccess(request, response, authentication);
 
-        InOrder order = inOrder(microsoftLoginEmailGate, appleWebTokenCapture, ssoIdentityCapture);
+        InOrder order = inOrder(microsoftLoginEmailGate, ssoOidcUserService, appleWebTokenCapture, ssoIdentityCapture);
         order.verify(microsoftLoginEmailGate).require(authentication);
+        order.verify(ssoOidcUserService).autoProvisionForTenantLogin(authentication);
         order.verify(appleWebTokenCapture).captureIfApple(request, authentication);
         order.verify(ssoIdentityCapture).capture(authentication);
         assertThat(response.getRedirectedUrl()).isEqualTo("/");
@@ -131,6 +134,21 @@ class SsoFlowSuccessHandlerTest {
         successHandler.onAuthenticationSuccess(request, response, authentication);
 
         verify(authErrorResponder).send(eq(response), eq(request), eq("sso-login-unverified-email"), any(), eq(EMAIL_NOT_VERIFIED));
+        verify(ssoOidcUserService, never()).autoProvisionForTenantLogin(any());
+        verify(ssoIdentityCapture, never()).capture(any());
+        verify(appleWebTokenCapture, never()).captureIfApple(any(), any());
+    }
+
+    @Test
+    void shouldEndPlainLoginWhenAutoProvisionIsRefused() throws Exception {
+        MockHttpServletRequest request = callback("spring-state");
+        AuthFlowException refused = new AuthFlowException(SSO_LOGIN_FAILED, "already registered elsewhere");
+        doThrow(refused).when(ssoOidcUserService).autoProvisionForTenantLogin(authentication);
+
+        successHandler.onAuthenticationSuccess(request, response, authentication);
+
+        verify(authErrorResponder).send(response, request, "sso-login-auto-provision", refused, SSO_LOGIN_FAILED);
+        assertThat(response.getRedirectedUrl()).isNull();
         verify(ssoIdentityCapture, never()).capture(any());
         verify(appleWebTokenCapture, never()).captureIfApple(any(), any());
     }

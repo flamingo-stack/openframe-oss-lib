@@ -59,8 +59,9 @@ public class UserService {
 
     /**
      * The single ACTIVE account for an email, across tenants. A duplicate (the global
-     * single-active-email invariant broken by data) is reported as a readable error instead of
-     * Spring's non-unique-result exception, so the user sees what is wrong and the log names it.
+     * single-active-email invariant broken by data) is logged with its accounts and thrown as a
+     * plain IllegalStateException instead of Spring's non-unique-result exception. Users only see
+     * the error code of the flow that called this.
      */
     public Optional<AuthUser> findActiveByEmail(String email) {
         List<AuthUser> active = userRepository.findAllByEmailAndStatus(email, ACTIVE);

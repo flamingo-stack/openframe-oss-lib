@@ -13,6 +13,8 @@ import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.core.constants.SsoFlowCookieNames;
+import com.openframe.core.exception.AuthErrorCode;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.auth.SsoIdentity;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
@@ -115,10 +117,27 @@ class LoginSsoHandlerTest {
                 .thenReturn(Optional.of(SsoIdentity.builder().userId("user-1").build()));
         when(userService.findActiveById("user-1")).thenReturn(Optional.of(existing));
 
-        handler.handle(request(), response, authentication("microsoft", untrustedMicrosoft));
+        var authentication = authentication("microsoft", untrustedMicrosoft);
+        MockHttpServletRequest request = request();
+
+        handler.handle(request, response, authentication);
 
         verify(ssoIdentityService).link("microsoft", untrustedMicrosoft.getClaims(), existing);
+        verify(sessionPrincipalBinder).bind(authentication, existing, request, response);
         assertThat(response.getHeader("Location")).isEqualTo("https://auth.example.com/oauth/continue?tenantId=tenant-1");
+    }
+
+    @Test
+    void shouldReportDuplicateActiveEmailAsLoginFailure() {
+        when(userService.findActiveByEmail("ada@acme.com")).thenThrow(new IllegalStateException("duplicate"));
+        MockHttpServletRequest request = request();
+        var authentication = authentication("google", trustedGoogle);
+
+        assertThatThrownBy(() -> handler.handle(request, response, authentication))
+                .isInstanceOfSatisfying(AuthFlowException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(AuthErrorCode.SSO_LOGIN_FAILED));
+
+        verify(ssoIdentityService, never()).link(anyString(), anyMap(), any());
     }
 
     @Test
