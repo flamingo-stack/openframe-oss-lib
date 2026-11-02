@@ -1,3 +1,4 @@
 type Query {
     adminOnly: String
+    required: String!
 }
