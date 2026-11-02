@@ -118,6 +118,7 @@ export function processHistoricalMessages(
     lastRowId = null;
     wire.setMessageId(null);
     wire.textOffsets.clear();
+    decoder.endTurn();
   };
 
   const openTurn = (row: HistoricalMessage): void => {

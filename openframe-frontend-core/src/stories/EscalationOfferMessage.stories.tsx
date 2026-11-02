@@ -4,14 +4,14 @@ import type React from 'react';
 import { EscalationOfferMessage } from '../components/chat/escalation-offer-message';
 
 /**
- * `escalation_offer` message segment — Fae asking the client to confirm a
+ * `data-escalation-offer` part — Fae asking the client to confirm a
  * handoff to a human technician (Figma: fae chat › "escalation to admin").
  *
  * Renders THROUGH the client approval card rather than reimplementing it, so
  * it is pixel-identical to `Chat/Client/ApprovalRequestMessage` down to the
  * Approve/Reject labels and the resolved pill. What differs is the wiring:
  * approve/reject call the ticket-escalation GraphQL mutations, never the
- * tool-approval endpoint — which is why it is a distinct segment type.
+ * tool-approval endpoint — which is why it is a distinct part type.
  *
  * The body copy is backend-fixed; the client never composes it. `origin`
  * (TOOL / MANUAL / a trigger reason) is decoded for telemetry only — every
@@ -37,7 +37,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Renders an `escalation_offer` segment: the backend-fixed handoff prompt with Approve/Reject, or a resolved status pill. Approve performs the handoff (ticket → Tech Required, Fae goes silent); Reject just records the choice.',
+          'Renders a `data-escalation-offer` part: the backend-fixed handoff prompt with Approve/Reject, or a resolved status pill. Approve performs the handoff (ticket → Tech Required, Fae goes silent); Reject just records the choice.',
       },
     },
   },

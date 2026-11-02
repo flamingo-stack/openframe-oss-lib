@@ -1628,10 +1628,15 @@ function EmbeddableChatInner({
   );
 
   // What the thread's cards do. An ask card is gated on `chatLoading` for the same reason the composer is: no second
-  // send while a turn is in flight. Passive demo hosts (previewMode) stay read-only.
+  // send while a turn is in flight. Passive demo hosts (previewMode) stay read-only. A "What to ask?" chip goes out the
+  // way the panel sends a prompt, not the adapter's: that send knows a blocked chat, and keeps a new chat's exchange.
   const messageActions = useMemo(
-    () => ({ ...chatActions, selectAsk: chatLoading || previewMode ? undefined : handleAskSelect }),
-    [chatActions, chatLoading, previewMode, handleAskSelect],
+    () => ({
+      ...chatActions,
+      selectAsk: chatLoading || previewMode ? undefined : handleAskSelect,
+      pickSuggestion: chatPanelHandle.sendPrompt,
+    }),
+    [chatActions, chatLoading, previewMode, handleAskSelect, chatPanelHandle],
   );
 
   // Admin "try-asking chips" → GUIDE-mode quick-action chips only (Mingo mode
@@ -1866,8 +1871,8 @@ function EmbeddableChatInner({
   const renderMessageSources = useCallback(
     (message: ChatMessage, index: number) => {
       if (message.role !== 'assistant') return null;
-      // Suppressed only on the answer still being written: the citation markers
-      // the order is derived from arrive WITH the text, so a strip rendered
+      // Suppressed only on the answer still being written: the citations the
+      // order is derived from arrive WITH the text, so a strip rendered
       // mid-turn reshuffles under the reader as more sentences land.
       //
       // Scoped to the trailing row on purpose. `chatLoading` is a property of

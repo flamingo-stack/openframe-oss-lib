@@ -26,15 +26,6 @@ export interface MessageProcessingOptions {
   escalationOfferStates?: Record<string, ChatApprovalStatus>;
 }
 
-// ========== Message Transformation Types ==========
-
-export interface TransformationOptions {
-  preserveOriginal?: boolean;
-  mergeSegments?: boolean;
-  formatTimestamp?: boolean;
-  includeMetadata?: boolean;
-}
-
 // ========== Stream Processing Types ==========
 
 export interface StreamProcessor {

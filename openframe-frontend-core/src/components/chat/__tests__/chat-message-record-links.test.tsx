@@ -426,4 +426,35 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
     expect(stage.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText(/The answer was interrupted before it finished/)).toBeTruthy();
   });
+
+  it('a stream cut before any text says so too, once: the notice is all that row has', () => {
+    const { unmount } = render(<ChatMessageEnhanced role="assistant" interrupted parts={[]} />);
+    expect(screen.getByText(/The answer was interrupted before it finished/)).toBeTruthy();
+    unmount();
+
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        interrupted
+        parts={[{ type: 'source-url', sourceId: 'record://blog_post/1', url: 'https://x.test/a', title: 'A' }]}
+      />,
+    );
+    expect(screen.getAllByText(/The answer was interrupted before it finished/)).toHaveLength(1);
+  });
+
+  it('a server that wrote the notice itself is not repeated', () => {
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        interrupted
+        parts={[
+          {
+            type: 'text',
+            text: 'The answer was interrupted before it finished, so it may be incomplete. Please ask again.',
+          },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText(/The answer was interrupted before it finished/)).toHaveLength(1);
+  });
 });

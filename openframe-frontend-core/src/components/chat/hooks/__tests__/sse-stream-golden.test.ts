@@ -36,6 +36,7 @@ import {
   FIXTURE_PROPOSAL_ID,
 } from '../../../../chat-protocol/wire-fixtures';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
+import { approvalBatchViewOf } from '../../utils/tool-part-display';
 import { useSseChatAdapter } from '../use-sse-chat-adapter';
 
 // =============================================================================
@@ -426,6 +427,297 @@ describe('the approval round trip', () => {
     ]);
     expect(assistantsOf(result.current.messages)).toHaveLength(1);
     expect(rows(lastMessage(result)).map(approvalStatusOf)).toEqual(['approved', 'approved']);
+  });
+});
+
+describe('an approval whose answer never came', () => {
+  const outcomeUnknown: unknown = expect.stringMatching(/may or may not have gone through/);
+  const toolsOf = (messages: readonly ChatMessage[]) => messages.flatMap(message => message.parts).filter(isToolPart);
+  const statesOf = (messages: readonly ChatMessage[]) => toolsOf(messages).map(part => part.state);
+
+  /** The first response and then a body that stays open, or fails its next read, on the test's say. */
+  function holdSecondResponse(first: readonly UiChunk[], head: readonly UiChunk[], how: 'error' | 'close' | 'hang') {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementationOnce(() =>
+          Promise.resolve({ ok: true, status: 200, body: streamOf(onUiWire(first)) } as unknown as Response),
+        )
+        .mockImplementationOnce((_url: string, init?: RequestInit) => {
+          let at = 0;
+          const encoded = head.map(encodeUiChunk);
+          const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+              init?.signal?.addEventListener('abort', () => {
+                try {
+                  controller.error(new DOMException('The operation was aborted.', 'AbortError'));
+                } catch {
+                  /* already closed */
+                }
+              });
+            },
+            pull(controller) {
+              if (at < encoded.length) controller.enqueue(encoded[at++]);
+              else if (how === 'error') controller.error(new TypeError('network error'));
+              else if (how === 'close') controller.close();
+              else return new Promise<void>(() => {});
+            },
+          });
+          return Promise.resolve({ ok: true, status: 200, body } as unknown as Response);
+        }),
+    );
+  }
+
+  const BATCH_ID = 'batch:prop-a';
+
+  it.each(['error', 'close'] as const)('a cut stream (%s) fails every row of the batch it left waiting', async how => {
+    holdSecondResponse(APPROVAL_BATCH_STREAM, [{ type: 'start' }], how);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('delete both');
+    });
+    await act(async () => {
+      await expect(result.current.actions.approve?.(BATCH_ID)).resolves.toBe(false);
+    });
+    const [first, second] = toolsOf(result.current.messages);
+    expect([first.state, second.state]).toEqual(['output-error', 'output-error']);
+    expect(first).toMatchObject({ errorText: outcomeUnknown, approval: { approved: true } });
+    const { executions } = approvalBatchViewOf([first, second]).data;
+    expect(Object.values(executions ?? {}).map(row => [row.status, row.success])).toEqual([
+      ['done', false],
+      ['done', false],
+    ]);
+    expect(result.current.streamingPhase).toBe('idle');
+  });
+
+  it('a row the stream did answer keeps its answer', async () => {
+    holdSecondResponse(
+      APPROVAL_BATCH_STREAM,
+      [{ type: 'start' }, { type: 'tool-output-available', toolCallId: 'prop-a', dynamic: true, output: { ok: true } }],
+      'error',
+    );
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('delete both');
+    });
+    await act(async () => {
+      await expect(result.current.actions.approve?.(BATCH_ID)).resolves.toBe(false);
+    });
+    expect(statesOf(result.current.messages)).toEqual(['output-available', 'output-error']);
+    expect(toolsOf(result.current.messages)[1]).toMatchObject({ errorText: outcomeUnknown });
+  });
+
+  it('a single card says so too', async () => {
+    holdSecondResponse(APPROVAL_STREAM, [{ type: 'start' }], 'close');
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    await act(async () => {
+      await expect(result.current.actions.approve?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
+    });
+    expect(toolsOf(result.current.messages)[0]).toMatchObject({
+      state: 'output-error',
+      errorText: outcomeUnknown,
+    });
+  });
+
+  it('Stop leaves no row waiting', async () => {
+    holdSecondResponse(APPROVAL_BATCH_STREAM, [{ type: 'start' }], 'hang');
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('delete both');
+    });
+    let answering: unknown;
+    await act(async () => {
+      answering = result.current.actions.approve?.(BATCH_ID);
+      await tick();
+      await tick();
+    });
+    expect(statesOf(result.current.messages)).toEqual(['approval-responded', 'approval-responded']);
+    act(() => {
+      result.current.stopMessage();
+    });
+    await act(async () => {
+      await expect(answering).resolves.toBe(false);
+    });
+    expect(statesOf(result.current.messages)).toEqual(['output-error', 'output-error']);
+    expect(result.current.streamingPhase).toBe('idle');
+  });
+
+  it('a rejection whose answer never came is still a rejection', async () => {
+    holdSecondResponse(APPROVAL_STREAM, [{ type: 'start' }], 'error');
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    await act(async () => {
+      await result.current.actions.reject?.(FIXTURE_PROPOSAL_ID, 'not now');
+    });
+    const [part] = toolsOf(result.current.messages);
+    expect(approvalStatusOf(part)).toBe('rejected');
+    expect(part).toMatchObject({ state: 'output-denied', approval: { approved: false, reason: 'not now' } });
+  });
+
+  it('a rejection the server refuses is still a rejection', async () => {
+    mockFetchResponses([
+      onUiWire(APPROVAL_STREAM),
+      { status: 409, body: { error: 'This approval expired.', code: 'STALE' } },
+    ]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    await act(async () => {
+      await result.current.actions.reject?.(FIXTURE_PROPOSAL_ID);
+    });
+    expect(toolsOf(result.current.messages).map(approvalStatusOf)).toEqual(['rejected']);
+  });
+
+  it('a batch rejected whole reads rejected, whichever row the server refused', async () => {
+    mockFetchResponses([
+      onUiWire(APPROVAL_BATCH_STREAM),
+      onUiWire([
+        { type: 'start' },
+        { type: 'tool-output-denied', toolCallId: 'prop-a' },
+        { type: 'tool-output-error', toolCallId: 'prop-b', dynamic: true, errorText: 'Expired.' },
+        { type: 'finish', finishReason: 'stop' },
+      ]),
+    ]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('delete both');
+    });
+    await act(async () => {
+      await result.current.actions.reject?.(BATCH_ID);
+    });
+    const rows = toolsOf(result.current.messages);
+    expect(rows.map(approvalStatusOf)).toEqual(['rejected', 'rejected']);
+    expect(approvalBatchViewOf(rows).status).toBe('rejected');
+  });
+
+  it('on the old hub too: a body that closes with no decision fails the row it was asked about', async () => {
+    const card = '{"kind":"approval_request","proposalId":"p1","toolName":"x","title":"X"}\0';
+    mockFetchResponses([[card], []]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('do it');
+    });
+    await act(async () => {
+      await expect(result.current.actions.approve?.('p1')).resolves.toBe(false);
+    });
+    expect(toolsOf(result.current.messages)[0]).toMatchObject({
+      state: 'output-error',
+      errorText: outcomeUnknown,
+    });
+  });
+});
+
+describe('a turn cut before any text', () => {
+  const cutAfter = (chunks: readonly UiChunk[], how: 'error' | 'close'): ReadableStream<Uint8Array> => {
+    const encoded = chunks.map(encodeUiChunk);
+    let at = 0;
+    return new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (at < encoded.length) controller.enqueue(encoded[at++]);
+        else if (how === 'error') controller.error(new TypeError('network error'));
+        else controller.close();
+      },
+    });
+  };
+  const stage: UiChunk = {
+    type: 'data-chat-progress',
+    id: 't:searching',
+    transient: true,
+    data: { stage: 'searching', count: 2, state: 'running' },
+  };
+
+  it.each(['error', 'close'] as const)('(%s) keeps its row, says it was cut, and stops its stage', async how => {
+    const body = cutAfter(
+      [
+        { type: 'start', messageId: 'a1' },
+        { type: 'source-url', sourceId: 'record://blog_post/1', url: 'https://www.flamingo.run/blog/x', title: 'X' },
+        stage,
+      ],
+      how,
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, status: 200, body } as unknown as Response)),
+    );
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('q');
+    });
+    const answer = assistantsOf(result.current.messages)[0];
+    expect(answer.metadata?.finishReason).toBe('interrupted');
+    expect(answer.metadata?.progress?.map(row => row.state)).toEqual(['failed']);
+    expect(result.current.streamingPhase).toBe('idle');
+  });
+
+  it.each(['error', 'close'] as const)('(%s) with nothing at all still has a row to say it on', async how => {
+    const body = cutAfter([{ type: 'start', messageId: 'a1' }], how);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, status: 200, body } as unknown as Response)),
+    );
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('q');
+    });
+    expect(assistantsOf(result.current.messages)).toMatchObject([
+      { parts: [], metadata: { finishReason: 'interrupted' } },
+    ]);
+  });
+
+  it('a turn that ended cleanly with nothing to say leaves no row', async () => {
+    mockFetchResponses([onUiWire([{ type: 'start' }, { type: 'finish', finishReason: 'stop' }])]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('q');
+    });
+    expect(assistantsOf(result.current.messages)).toEqual([]);
+  });
+});
+
+describe('a new chat during a turn', () => {
+  it('the rest of the old stream does not draw in the cleared thread', async () => {
+    let ctrl!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        ctrl = controller;
+        controller.enqueue(encodeUiChunk({ type: 'start', messageId: 'a1' }));
+        controller.enqueue(encodeUiChunk({ type: 'text-start', id: 't1' }));
+        controller.enqueue(encodeUiChunk({ type: 'text-delta', id: 't1', delta: 'first ' }));
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, status: 200, body } as unknown as Response)),
+    );
+    const { result } = renderAdapter();
+    let sending!: Promise<void | boolean>;
+    await act(async () => {
+      sending = result.current.sendMessage('q');
+      await tick();
+      await tick();
+    });
+    expect(result.current.messages.length).toBeGreaterThan(0);
+
+    act(() => {
+      result.current.clearMessages();
+    });
+    expect(result.current.messages).toEqual([]);
+
+    await act(async () => {
+      // What was still on its way when the thread was cleared. This mock ignores the abort, as a slow network would.
+      ctrl.enqueue(encodeUiChunk({ type: 'text-delta', id: 't1', delta: 'ghost' }));
+      await sending;
+      await tick();
+    });
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.streamingPhase).toBe('idle');
   });
 });
 

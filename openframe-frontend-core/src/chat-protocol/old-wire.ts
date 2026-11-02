@@ -6,6 +6,7 @@
  *   - the old hub's byte frames (`[JSON]\0 … \x1E <text> [\x1D JSON \0] … \x1F [JSON]`), as chunks;
  *   - an old stored row (`content`, `sources`, parts holding `RECORD_CARDS`), as parts;
  *   - the old source names (`name`, `externalUrl`, `documentType` + `id`, `items`, `videos`, `cards`, `GUIDE`);
+ *   - the old Mingo shapes: `approval_request_id`, an approval row with no tool list, a tool row with no run id;
  *   - `[card://t:i]`, `@marker:id` and `[N]` in a text, as cards, record links and citations. A text arrives in slices,
  *     so an unfinished token at the tail is held until the next slice says what it was;
  *   - the old `/api/docs/search` names.
@@ -175,6 +176,85 @@ export function oldVideoParts(rows: unknown): ChatSourcePart[] {
 }
 
 // =============================================================================
+// Old Mingo shapes
+// =============================================================================
+
+/** The source rows a `GUIDE` entry holds: the envelope `ATTACHMENTS` replaced, the same arrays under `payload`. */
+export function oldGuidePayload(raw: Record<string, unknown>): Record<string, unknown> | null {
+  return isRecord(raw.payload) ? raw.payload : null;
+}
+
+/** An approval's id in its old name. */
+export function oldApprovalRequestId(raw: Record<string, unknown>): string | undefined {
+  return text(raw.approval_request_id);
+}
+
+/** An approval row with no tool list: its command is all there is. */
+export function oldSingleApprovalChunks(
+  data: Record<string, unknown>,
+  requestId: string,
+  approvalType: string,
+): UiChunk[] {
+  const command = typeof data.command === 'string' ? data.command : '';
+  const explanation = typeof data.explanation === 'string' && data.explanation !== '' ? data.explanation : undefined;
+  return [
+    {
+      type: 'tool-input-available',
+      toolCallId: requestId,
+      toolName: 'command',
+      input: {},
+      dynamic: true,
+      ...(command ? { title: command } : {}),
+    },
+    {
+      type: 'tool-approval-request',
+      approvalId: requestId,
+      toolCallId: requestId,
+      ...(explanation ? { reason: explanation } : {}),
+      approvalDescriptor: { approvalType },
+    },
+  ];
+}
+
+/**
+ * A tool row from before runs had an id (`toolExecutionRequestId`, nullable and added 2026-04-27): its tool and function
+ * do not name a row, because a tool runs more than once. Each run opens an id of its own, a result closes the oldest open
+ * run of its tool, and a turn's end leaves what it opened behind, so no run ever pairs across messages.
+ */
+export function createOldRunIds(): {
+  open(data: Record<string, unknown>): string;
+  close(data: Record<string, unknown>): string;
+  endTurn(): void;
+} {
+  const running = new Map<string, string[]>();
+  let next = 0;
+  const keyOf = (data: Record<string, unknown>): string =>
+    `${typeof data.integratedToolType === 'string' ? data.integratedToolType : ''}-${
+      typeof data.toolFunction === 'string' ? data.toolFunction : ''
+    }`;
+  const mint = (key: string): string => `run:${key}:${++next}`;
+
+  return {
+    open(data) {
+      const key = keyOf(data);
+      const id = mint(key);
+      running.set(key, [...(running.get(key) ?? []), id]);
+      return id;
+    },
+    close(data) {
+      const key = keyOf(data);
+      const [oldest, ...rest] = running.get(key) ?? [];
+      if (oldest === undefined) return mint(key);
+      running.set(key, rest);
+      return oldest;
+    },
+    endTurn() {
+      running.clear();
+    },
+  };
+}
+
+// =============================================================================
 // Tokens in a text
 // =============================================================================
 
@@ -333,6 +413,8 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
                 emitText();
                 ops.push({ kind: 'cite', numbers: [...match[0].matchAll(/\d+/g)].map(n => Number(n[0])) });
                 i += match[0].length;
+                // Nothing of its line before it: the space after it would open the line.
+                if (atLineStart()) swallowingSpace = true;
                 continue;
               }
             }
@@ -427,7 +509,15 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
       pending += slice;
       return run(false);
     },
-    flush: () => run(true),
+    flush() {
+      const ops = run(true);
+      // The text part ended, and each is a markdown document of its own: nothing about this line carries over.
+      previous = '';
+      lineBlank = true;
+      fence = null;
+      swallowingSpace = false;
+      return ops;
+    },
   };
 }
 
@@ -447,9 +537,10 @@ export function oldMentionsToRecordLinks(content: string): string {
 // =============================================================================
 
 /**
- * One turn's answer text as chunks. A wire text id stays open across slices; a citation closes it, because `text-end`
- * is the only chunk that carries one, and the next text opens a new id. `citations: false` is Mingo, where a stray
- * number is removed and cites nothing.
+ * One turn's answer text as chunks. A wire text id stays open across slices. A citation waits for the `text-end` that
+ * carries it, the only chunk that can, and text after it closes that id and opens a new one, so a run of chips lands on
+ * one `text-end`. One with no text before it on its id waits for the next id, at its start. `citations: false` is Mingo,
+ * where a stray number is removed and cites nothing.
  */
 export function createOldTextWriter(
   index: OldSourceIndex,
@@ -463,11 +554,13 @@ export function createOldTextWriter(
   const converter = createOldTextConverter(index.labelOf);
   let id: string | null = null;
   let length = 0;
+  let held: ChatCitation[] = [];
 
-  function closeId(citations?: ChatCitation[]): UiChunk[] {
+  function closeId(): UiChunk[] {
     if (id === null) return [];
-    const chunk: UiChunk = { type: 'text-end', id, ...(citations && citations.length > 0 ? { citations } : {}) };
+    const chunk: UiChunk = { type: 'text-end', id, ...(held.length > 0 ? { citations: held } : {}) };
     id = null;
+    held = [];
     return [chunk];
   }
 
@@ -475,6 +568,7 @@ export function createOldTextWriter(
     const out: UiChunk[] = [];
     for (const op of ops) {
       if (op.kind === 'text') {
+        if (id !== null && held.length > 0) out.push(...closeId());
         if (id === null) {
           id = mintId();
           length = 0;
@@ -484,15 +578,13 @@ export function createOldTextWriter(
         length += op.text.length;
       } else if (op.kind === 'card') {
         out.push(...closeId(), { type: 'data-record-cards', data: { records: [op.uri] } });
-      } else if (options.citations && id !== null) {
-        const citations: ChatCitation[] = [];
+      } else if (options.citations) {
         for (const number of op.numbers) {
           const numbered = index.numbered(number);
           if (!numbered) continue;
           if (numbered.part) out.push(numbered.part);
-          citations.push({ source: numbered.source, endIndex: length });
+          held.push({ source: numbered.source, endIndex: id === null ? 0 : length });
         }
-        if (citations.length > 0) out.push(...closeId(citations));
       }
     }
     return out;
@@ -623,10 +715,11 @@ function isProgressStage(value: unknown): value is ChatProgressStage {
 /**
  * The old byte frames as chunks. The stream's quirks stay as they were: a leading block that is not JSON flips the
  * stream into text, whole; a malformed frame inside the text is dropped and the text goes on; `end()` drops a leading
- * buffer nothing terminated. A body with no trailer ends as `finish` with `other`, never `interrupted`: the old hub
- * closes a rejected approval with no trailer at all, and such a stream drew no notice.
+ * buffer nothing terminated. A body that closes with no trailer ends as `finish` with `other`, never `interrupted`: the
+ * old hub closes a rejected approval with no trailer at all, and such a stream drew no notice. A read that failed is
+ * `interrupted`.
  */
-export function createOldFrameDecoder(): { push(bytes: Uint8Array): UiChunk[]; end(): UiChunk[] } {
+export function createOldFrameDecoder(): { push(bytes: Uint8Array): UiChunk[]; end(cut?: boolean): UiChunk[] } {
   const decoder = new TextDecoder();
   const index = createOldSourceIndex();
   let nextId = 0;
@@ -783,7 +876,8 @@ export function createOldFrameDecoder(): { push(bytes: Uint8Array): UiChunk[]; e
           }
         }
         if (receipt !== null) {
-          writeText(willAutoContinue ? `${receipt}\n\n` : receipt, out);
+          // Each answer of a batch writes one, and text coalesces: the break keeps them apart.
+          writeText(`${receipt}\n\n`, out);
           out.push(...writer.close());
         }
         if (isRecord(frame.record_cards)) {
@@ -903,7 +997,7 @@ export function createOldFrameDecoder(): { push(bytes: Uint8Array): UiChunk[]; e
       }
       return out;
     },
-    end() {
+    end(cut = false) {
       if (ended) return [];
       ended = true;
       const out: UiChunk[] = [];
@@ -918,7 +1012,7 @@ export function createOldFrameDecoder(): { push(bytes: Uint8Array): UiChunk[]; e
           // A malformed trailer is ignored, as it always was.
         }
       }
-      const finishReason = usage ? finishReasonOfStop(usage.stop_reason ?? 'end_turn') : 'other';
+      const finishReason = usage ? finishReasonOfStop(usage.stop_reason ?? 'end_turn') : cut ? 'interrupted' : 'other';
       if (finishReason === null) {
         out.push(
           { type: 'message-metadata', messageMetadata: { usage: usage ?? {} } },

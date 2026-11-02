@@ -5,16 +5,17 @@
 
 import { describe, expect, it } from 'vitest';
 import { applyChunk, applyChunkToMessages, createWireState } from '../apply-chunk';
-import { storablePartsOf, type ChatMessage, type ChatPart } from '../chat-message';
+import { storablePartsOf, textOfParts, type ChatMessage, type ChatPart } from '../chat-message';
 import {
   createChatStreamReader,
   createMingoDecoder,
   docSearchFieldsOf,
   messageOfStoredRow,
   mingoUserText,
+  type MingoDecoder,
 } from '../message-decoder';
 import { createOldFrameDecoder, createOldSourceIndex, createOldTextWriter } from '../old-wire';
-import { encodeUiChunk, encodeUiDone, type UiChunk } from '../ui-chunks';
+import { encodeUiChunk, encodeUiDone, type ChatStreamEntry, type UiChunk } from '../ui-chunks';
 import { ANSWER_STREAM, HISTORY_RESPONSE, STORED_ANSWER_PARTS } from '../wire-fixtures';
 
 const encoder = new TextEncoder();
@@ -207,6 +208,53 @@ describe('the old hub`s frames', () => {
       { type: 'message-metadata', messageMetadata: { willAutoContinue: false } },
       { type: 'finish', finishReason: 'other' },
     ]);
+  });
+
+  it('a batch`s receipts stay apart: each answer continues the card`s message, and text coalesces', () => {
+    const decided = (id: string, receiptText: string): string =>
+      frame({
+        kind: 'decision_resolved',
+        proposalId: id,
+        ok: true,
+        action: 'approved',
+        willAutoContinue: false,
+        receiptText,
+      });
+    const card = (id: string): ChatPart => ({
+      type: 'dynamic-tool',
+      toolName: 'del',
+      toolCallId: id,
+      state: 'approval-responded',
+      input: {},
+      approval: { id, approved: true, descriptor: { batchId: 'b' } },
+    });
+    let messages: ChatMessage[] = [{ id: 'card', role: 'assistant', parts: [card('a'), card('b')] }];
+    const wire = createWireState();
+    for (const [id, receipt] of [
+      ['a', '✅ Task A deleted.'],
+      ['b', '✅ Task B deleted.'],
+    ]) {
+      wire.setMessageId('card');
+      const decoder = createOldFrameDecoder();
+      for (const chunk of [...decoder.push(encoder.encode(decided(id, receipt))), ...decoder.end()]) {
+        messages = applyChunkToMessages(messages, chunk, wire);
+      }
+    }
+    expect(textOfParts(messages[0].parts)).toBe('✅ Task A deleted.\n\n✅ Task B deleted.\n\n');
+  });
+
+  it('a read that fails is a cut stream, where a body that closes with no trailer is not', async () => {
+    let pulls = 0;
+    const cut = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulls++ === 0) controller.enqueue(encoder.encode(`${END_OF_LEADING}Partial`));
+        else controller.error(new TypeError('network error'));
+      },
+    });
+    const { wire, chunks } = await readAll(cut);
+    expect(wire).toBe('old');
+    expect(chunks[chunks.length - 1]).toEqual({ type: 'finish', finishReason: 'interrupted' });
+    expect(textOfParts(partsOf(chunks))).toBe('Partial');
   });
 
   it('a failed decision is an error on its row', async () => {
@@ -732,6 +780,90 @@ describe('old tokens in a text', () => {
   });
 });
 
+describe('old citations reach the chips they were', () => {
+  const titled = { index: 1, name: 'A', documentType: 'blog_post', id: '1', externalUrl: 'https://www.flamingo.run/a' };
+  const other = { index: 2, name: 'B', documentType: 'blog_post', id: '2', externalUrl: 'https://www.flamingo.run/b' };
+  const ROW_A = 'record://blog_post/1';
+  const ROW_B = 'record://blog_post/2';
+
+  /** The body of an old row, each text with its citations as `[source, position]`. */
+  function convertedBody(content: string, slice = Infinity): unknown[] {
+    const index = createOldSourceIndex();
+    index.register([titled, other]);
+    const wire = createWireState();
+    let id = 0;
+    const writer = createOldTextWriter(index, () => `t${++id}`);
+    let parts: ChatPart[] = [];
+    const size = Math.min(slice, content.length || 1);
+    for (let at = 0; at < content.length; at += size) {
+      parts = writer.push(content.slice(at, at + size)).reduce((all, chunk) => applyChunk(all, chunk, wire), parts);
+    }
+    parts = writer.close().reduce((all, chunk) => applyChunk(all, chunk, wire), parts);
+    return parts.flatMap(part =>
+      part.type === 'text'
+        ? [[part.text, (part.citations ?? []).map(citation => [citation.source.id, citation.endIndex])]]
+        : part.type === 'data-record-cards'
+          ? [part.data.records]
+          : [],
+    );
+  }
+
+  it.each<[string, string, unknown[]]>([
+    [
+      'two with a space between',
+      'Foo [1] [2] bar.',
+      [
+        [
+          'Foo bar.',
+          [
+            [ROW_A, 3],
+            [ROW_B, 3],
+          ],
+        ],
+      ],
+    ],
+    [
+      'two side by side',
+      'Foo [1][2].',
+      [
+        [
+          'Foo.',
+          [
+            [ROW_A, 3],
+            [ROW_B, 3],
+          ],
+        ],
+      ],
+    ],
+    [
+      'three in a list of words',
+      'Foo [1], [2] done.',
+      [
+        [
+          'Foo, done.',
+          [
+            [ROW_A, 3],
+            [ROW_B, 4],
+          ],
+        ],
+      ],
+    ],
+    ['one opening the answer', '[1] Starts with a chip.', [['Starts with a chip.', [[ROW_A, 0]]]]],
+    ['one alone before a paragraph', '[1]\n\nNext.', [['Next.', [[ROW_A, 0]]]]],
+    ['one right after a card', 'A.\n\n[card://blog_post:1]\n\n[2] B.', [['A.\n\n', []], [ROW_A], ['B.', [[ROW_B, 0]]]]],
+    ['one with no target is removed', 'Alpha [9] beta.', [['Alpha beta.', []]]],
+    ['one at the end', 'Foo [1]', [['Foo', [[ROW_A, 3]]]]],
+  ])('%s', (_name, content, body) => {
+    expect(convertedBody(content)).toEqual(body);
+    // However it arrives.
+    expect(convertedBody(content, 1)).toEqual(body);
+  });
+
+  it('a number with nothing after it and no text before it cites nothing, and breaks nothing', () => {
+    expect(convertedBody('[1]')).toEqual([]);
+  });
+});
+
 describe('createMingoDecoder: the table', () => {
   const decodeAll = (...raws: unknown[]): UiChunk[] => {
     const decoder = createMingoDecoder({ now: () => '2026-11-02T10:00:00Z' });
@@ -953,9 +1085,162 @@ describe('createMingoDecoder: the table', () => {
     ]);
   });
 
-  it('an older backend names a run by its type and function', () => {
-    const [chunk] = decodeAll({ type: 'EXECUTING_TOOL', integratedToolType: 'A', toolFunction: 'b' });
-    expect(chunk).toMatchObject({ type: 'tool-input-available', toolCallId: 'A-b', input: {} });
+  describe('a tool row with no run id', () => {
+    const executing = (title: string): unknown => ({
+      type: 'EXECUTING_TOOL',
+      integratedToolType: 'A',
+      toolFunction: 'b',
+      title,
+    });
+    const executed = (result: string): unknown => ({
+      type: 'EXECUTED_TOOL',
+      integratedToolType: 'A',
+      toolFunction: 'b',
+      result,
+      success: true,
+    });
+    const idsOf = (chunks: readonly UiChunk[], type: UiChunk['type']): string[] =>
+      chunks.flatMap(chunk => (chunk.type === type && 'toolCallId' in chunk ? [chunk.toolCallId] : []));
+
+    it('each run is a row of its own, and a result closes the oldest still open', () => {
+      const chunks = decodeAll(executing('first'), executing('second'), executed('one'), executed('two'));
+      const [first, second] = idsOf(chunks, 'tool-input-available');
+      expect(first).not.toBe(second);
+      expect(idsOf(chunks, 'tool-output-available')).toEqual([first, second]);
+    });
+
+    it('a result with no run open has a row of its own to land on', () => {
+      const chunks = decodeAll(executed('one'));
+      expect(chunks.map(chunk => chunk.type)).toEqual(['tool-input-available', 'tool-output-available']);
+    });
+
+    it('a run a turn left open never takes a later turn`s result', () => {
+      for (const endTurn of [
+        (decoder: MingoDecoder) => decoder.decode({ type: 'MESSAGE_END' }),
+        (decoder: MingoDecoder) => decoder.decode({ type: 'MESSAGE_START' }),
+        (decoder: MingoDecoder) => decoder.endTurn(),
+      ]) {
+        const decoder = createMingoDecoder();
+        const [left] = idsOf(decoder.decode(executing('cut off')).chunks, 'tool-input-available');
+        endTurn(decoder);
+        const [next] = idsOf(decoder.decode(executing('next')).chunks, 'tool-input-available');
+        const [closed] = idsOf(decoder.decode(executed('ok')).chunks, 'tool-output-available');
+        expect(next).not.toBe(left);
+        expect(closed).toBe(next);
+      }
+    });
+
+    it('a row that has its run id keeps it', () => {
+      const [chunk] = decodeAll({
+        type: 'EXECUTING_TOOL',
+        integratedToolType: 'A',
+        toolFunction: 'b',
+        toolExecutionRequestId: 'x',
+      }).slice(-1);
+      expect(chunk).toMatchObject({ type: 'tool-input-available', toolCallId: 'x' });
+    });
+  });
+
+  describe('a redelivery moves no state', () => {
+    const textOf = (entries: readonly ChatStreamEntry[]): string =>
+      textOfParts(partsOf(entries.flatMap(entry => entry.chunks)));
+
+    it('answers no chunks, with its sequence', () => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'TEXT', streamSeq: 2, text: 'a' });
+      expect(decoder.decode({ type: 'TEXT', streamSeq: 2, text: 'a' })).toEqual({ seq: 2, chunks: [] });
+      expect(decoder.decode({ type: 'TEXT', streamSeq: 1, text: 'b' })).toEqual({ seq: 1, chunks: [] });
+    });
+
+    it.each([
+      ['closes nothing it was holding', { type: 'EXECUTING_TOOL', streamSeq: 1, toolFunction: 'f' }],
+      ['opens no new turn over it', { type: 'MESSAGE_START', streamSeq: 1 }],
+      ['adds no second copy of a slice', { type: 'TEXT', streamSeq: 2, text: 'See [' }],
+      ['ends no turn', { type: 'MESSAGE_END', streamSeq: 1 }],
+      ['a ticket event too, by its own sequence', { type: 'TICKET_EVENT', kind: 'RESOLVED', sequenceId: 1 }],
+    ])('%s', (_name, redelivery) => {
+      const decoder = createMingoDecoder();
+      const entries = [
+        decoder.decode({ type: 'MESSAGE_START', streamSeq: 1 }),
+        decoder.decode({ type: 'TEXT', streamSeq: 2, text: 'See [' }),
+        decoder.decode(redelivery),
+        decoder.decode({ type: 'TEXT', streamSeq: 3, text: 'Laptop](record://device/abc) ok' }),
+        decoder.decode({ type: 'MESSAGE_END', streamSeq: 4 }),
+      ];
+      expect(textOf(entries)).toBe('See [Laptop](record://device/abc) ok');
+    });
+
+    it('a code span a redelivery lands inside stays whole', () => {
+      const decoder = createMingoDecoder();
+      const entries = [
+        decoder.decode({ type: 'TEXT', streamSeq: 2, text: 'See `co' }),
+        decoder.decode({ type: 'TEXT', streamSeq: 2, text: 'See `co' }),
+        decoder.decode({ type: 'TEXT', streamSeq: 3, text: 'de` now' }),
+        decoder.decode({ type: 'MESSAGE_END', streamSeq: 4 }),
+      ];
+      expect(textOf(entries)).toBe('See `code` now');
+    });
+
+    it('a row of history is read whatever its sequence: rows are not a stream', () => {
+      const decoder = createMingoDecoder();
+      expect(decoder.decode({ type: 'TEXT', text: 'one' }, { row: { seq: 9 } }).chunks).not.toEqual([]);
+      expect(decoder.decode({ type: 'TEXT', text: 'two' }, { row: { seq: 3 } }).chunks).not.toEqual([]);
+    });
+  });
+
+  describe('a text part is a document of its own', () => {
+    const CARD_FAQ = { type: 'data-record-cards', data: { records: ['record://faq/a'] } };
+    const threadBody = (...raws: unknown[]): unknown[] => {
+      const decoder = createMingoDecoder();
+      const chunks = raws.flatMap((raw, index) => decoder.decode({ streamSeq: index + 1, ...(raw as object) }).chunks);
+      const wire = createWireState();
+      const messages = chunks.reduce<ChatMessage[]>((all, chunk) => applyChunkToMessages(all, chunk, wire), []);
+      return messages.map(message => message.parts.map(part => (part.type === 'text' ? part.text : part)));
+    };
+
+    it('a card alone on a line after a tool row is a card, with no link', () => {
+      const [parts] = threadBody(
+        { type: 'MESSAGE_START' },
+        { type: 'TEXT', text: 'Checking.' },
+        { type: 'EXECUTED_TOOL', toolExecutionRequestId: 'x', toolFunction: 'f', result: '{}', success: true },
+        { type: 'TEXT', text: '[card://faq:a]\n\nThe FAQ.' },
+        { type: 'MESSAGE_END' },
+      ) as unknown[][];
+      expect(parts).toEqual(['Checking.', expect.objectContaining({ type: 'dynamic-tool' }), CARD_FAQ, 'The FAQ.']);
+    });
+
+    it('a card first in a new turn is a card, with no link', () => {
+      expect(
+        threadBody(
+          { type: 'MESSAGE_START' },
+          { type: 'TEXT', text: 'Done.' },
+          { type: 'MESSAGE_END' },
+          { type: 'MESSAGE_START' },
+          { type: 'TEXT', text: '[card://faq:a]' },
+          { type: 'MESSAGE_END' },
+        ),
+      ).toEqual([['Done.'], [CARD_FAQ]]);
+    });
+
+    it('an answer that ends in an open fence leaves the next one alone', () => {
+      expect(
+        threadBody(
+          { type: 'MESSAGE_START' },
+          { type: 'TEXT', text: '```js\ncut off' },
+          { type: 'MESSAGE_END' },
+          { type: 'MESSAGE_START' },
+          { type: 'TEXT', text: 'Next [card://faq:a] turn [1].' },
+          { type: 'MESSAGE_END' },
+        ),
+      ).toEqual([['```js\ncut off'], ['Next [a](record://faq/a) turn.', CARD_FAQ]]);
+    });
+
+    it('the same on rows of history, which share one decoder across a dialog', () => {
+      const decoder = createMingoDecoder();
+      const rowOf = (text: string): UiChunk[] => decoder.decode({ type: 'TEXT', text }, { row: {} }).chunks;
+      expect(rowOf('```js\ncut off').filter(chunk => chunk.type === 'text-delta')).toHaveLength(1);
+      expect(rowOf('[card://faq:a]')).toEqual([CARD_FAQ]);
+    });
   });
 
   it('EXECUTED_TOOL is an output or an error, by `success`', () => {

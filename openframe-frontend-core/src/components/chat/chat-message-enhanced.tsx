@@ -60,7 +60,6 @@ import { ToolExecutionDisplay } from './tool-execution-display';
 import type { ChatMessageEnhancedProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
 import type { ChatMessageActions } from './types/message.types';
-import { approvalDisplaysInline } from './utils/approval-display';
 import { chatFilePartMarkdown } from './utils/chat-attachment-markdown';
 import { sourceRowInputOf, sourceTitleOf } from './utils/cited-sources';
 import {
@@ -69,6 +68,7 @@ import {
   failedBeforeRunning,
   progressExecutionDataOf,
   toolExecutionDataOf,
+  waitsOnAnotherTier,
 } from './utils/tool-part-display';
 
 /** Timestamp label: today's messages show time only ("2:47 PM"),
@@ -130,13 +130,6 @@ function groupBatches(parts: readonly ChatPart[]): Map<number, ChatToolPart[]> {
     }
   });
   return batches;
-}
-
-/** A pending approval of a tier this side does not answer waits on someone else: it is not drawn until it resolves. */
-function waitsOnAnotherTier(part: ChatToolPart, displayApprovalTypes: readonly string[] | undefined): boolean {
-  if (approvalStatusOf(part) !== 'pending') return false;
-  const tier = 'approval' in part ? part.approval?.descriptor?.approvalType : undefined;
-  return tier !== undefined && !approvalDisplaysInline(tier, displayApprovalTypes);
 }
 
 /** A card's Approve or Reject: its button calls with the card's own id. */
@@ -435,10 +428,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     const hasBody = !isSystem || bodyParts.length > 0;
     const files = bodyParts.filter((part): part is ChatFilePart => part.type === 'file');
     const lastTextIndex = bodyParts.reduce((last, part, index) => (part.type === 'text' ? index : last), -1);
-    // Text of its own says it already (a server that writes the notice itself), and a stream cut before any text has
-    // nothing to qualify.
-    const showInterruptedNotice =
-      interrupted && lastTextIndex !== -1 && !textOfParts(bodyParts).includes(CHAT_INTERRUPTED_NOTICE);
+    // A stream cut before any text says so too: the notice is all that row has. Text of its own may say it already (a
+    // server that writes the notice itself).
+    const showInterruptedNotice = interrupted && !textOfParts(bodyParts).includes(CHAT_INTERRUPTED_NOTICE);
 
     // v2 draws a system line (e.g. a technician joining) as an in-thread
     // receipt card rather than as an author row with no body.

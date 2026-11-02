@@ -14,6 +14,7 @@ import { useStickToBottom } from 'use-stick-to-bottom';
 import {
   type ChatMessage,
   type ChatPart,
+  approvalBatchIdOf,
   approvalStatusOf,
   isSourcePart,
   isToolPart,
@@ -36,6 +37,7 @@ import { CyclingPhrase } from './cycling-phrase';
 import type { ChatMessageListProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
 import { SCROLL_ANCHOR } from './types/message.types';
+import { toolPartsWaitingOnAnotherTier } from './utils/tool-part-display';
 
 // Flamingo-themed cycling words shown next to the streaming indicator
 // (Claude-Code-style activity hint). Mix of classic AI verbs, flamingo
@@ -120,6 +122,34 @@ function hasVisibleText(parts: readonly ChatPart[]): boolean {
 function hasDrawnNothing(message: ChatMessage): boolean {
   if ((message.metadata?.progress?.length ?? 0) > 0) return false;
   return message.parts.every(part => isSourcePart(part) || (part.type === 'text' && part.text.length === 0));
+}
+
+/** A turn whose only cards wait on another tier: this side draws none of them, so a row would be a name with no body. */
+function holdsOnlyCardsOfAnotherTier(
+  message: ChatMessage,
+  displayApprovalTypes: readonly string[] | undefined,
+): boolean {
+  if ((message.metadata?.progress?.length ?? 0) > 0 || message.metadata?.finishReason === 'interrupted') return false;
+  const waiting = toolPartsWaitingOnAnotherTier(message.parts, displayApprovalTypes);
+  if (waiting.size === 0) return false;
+  return message.parts.every(
+    part =>
+      isSourcePart(part) || (part.type === 'text' && part.text.length === 0) || (isToolPart(part) && waiting.has(part)),
+  );
+}
+
+/**
+ * A single card that was approved, and its tool has not answered yet. Unlike a batch's row it has no icon of its own, and
+ * the turn's stage rows sit at the top of the message, above the card, so nothing else says the turn is working.
+ */
+function isCardAwaitingItsOutcome(part: ChatPart | undefined): boolean {
+  return (
+    !!part &&
+    isToolPart(part) &&
+    part.state === 'approval-responded' &&
+    part.approval.approved &&
+    approvalBatchIdOf(part) === undefined
+  );
 }
 
 /** Async-growth watcher installed by the top-anchor effect for the 2s
@@ -991,7 +1021,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         : isToolPart(lastPart) && approvalStatusOf(lastPart) === 'pending');
     const turnHasDrawn = lastMessage?.role === 'assistant' && !hasDrawnNothing(lastMessage);
     const showStreamingLoader =
-      isTyping && !turnHasDrawn && !isPausedOnApproval && !(pendingApprovals && pendingApprovals.length > 0);
+      isTyping &&
+      (!turnHasDrawn || isCardAwaitingItsOutcome(lastPart)) &&
+      !isPausedOnApproval &&
+      !(pendingApprovals && pendingApprovals.length > 0);
 
     return (
       <ChatAppearanceContext.Provider value={appearance}>
@@ -1063,6 +1096,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                       message.role === 'assistant' &&
                       hasDrawnNothing(message);
                     if (isEmptyPendingTurn) return null;
+                    if (message.role === 'assistant' && holdsOnlyCardsOfAnotherTier(message, displayApprovalTypes)) {
+                      return null;
+                    }
                     const ownedContent = renderAfterMessage?.(message, index);
                     const { metadata } = message;
                     const row = (

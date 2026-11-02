@@ -171,7 +171,7 @@ export interface ChatStreamEntry {
 // Headers + encoding
 // =============================================================================
 
-/** What a turn that ended with no completion signal says under its text (`finishReason: 'interrupted'`). */
+/** What a turn that ended with no completion signal says, under any text it got out (`finishReason: 'interrupted'`). */
 export const CHAT_INTERRUPTED_NOTICE =
   'The answer was interrupted before it finished, so it may be incomplete. Please ask again.';
 
@@ -419,10 +419,11 @@ function isAbort(error: unknown): boolean {
  */
 export async function* drainChunks(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-  decoder: { push(bytes: Uint8Array): UiChunk[]; end(): UiChunk[] },
+  decoder: { push(bytes: Uint8Array): UiChunk[]; end(cut?: boolean): UiChunk[] },
   head: readonly Uint8Array[] = [],
 ): AsyncGenerator<UiChunk, void, undefined> {
   let finished = false;
+  let cut = false;
   try {
     for (const bytes of head) yield* decoder.push(bytes);
     try {
@@ -433,9 +434,10 @@ export async function* drainChunks(
       }
     } catch (error) {
       if (isAbort(error)) throw error;
+      cut = true;
     }
     finished = true;
-    yield* decoder.end();
+    yield* decoder.end(cut);
   } finally {
     if (!finished) void reader.cancel().catch(() => undefined);
     reader.releaseLock();

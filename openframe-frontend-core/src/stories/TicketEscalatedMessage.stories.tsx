@@ -4,7 +4,7 @@ import type React from 'react';
 import { TicketEscalatedMessage } from '../components/chat/ticket-escalated-message';
 
 /**
- * `ticket_escalated` message segment — the handoff receipt (Figma:
+ * `data-ticket-escalated` part — the handoff receipt (Figma:
  * `ai-assistant-info`, type=escalation).
  *
  * A first-class block on the wire, NOT something the client infers from an

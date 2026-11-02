@@ -299,6 +299,9 @@ export function textWithCitationChips(part: ChatTextPart, numbers: ReadonlyMap<s
     if (insert.block) {
       out += `\n\n${chips}`;
       if (position < text.length) out += '\n';
+    } else if (position === 0) {
+      // Nothing before it: the space goes after it.
+      out += `${chips} `;
     } else {
       out += ` ${chips}`;
     }

@@ -103,6 +103,10 @@ describe('textWithCitationChips', () => {
     expect(textWithCitationChips(part, new Map())).toBe('One.');
   });
 
+  it('a citation at the very start draws before the text, with the space after it', () => {
+    expect(drawn(marked('^Starts with a chip.', 'a'))).toBe(`${chip(1)} Starts with a chip.`);
+  });
+
   describe('trailing whitespace', () => {
     it('goes before a trailing space', () => {
       expect(drawn(marked('One. ^Two.', 'a'))).toBe(`One. ${chip(1)} Two.`);

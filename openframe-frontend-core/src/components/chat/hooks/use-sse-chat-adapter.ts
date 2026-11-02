@@ -237,6 +237,16 @@ function pendingApprovalParts(message: ChatMessage, id: string): ChatToolPart[] 
   );
 }
 
+/** The asked-for parts no answer reached: they still read as answered and waiting on their tool. */
+function unansweredParts(messages: readonly ChatMessage[], asked: readonly ChatToolPart[]): ChatToolPart[] {
+  const held = new Map(messages.flatMap(message => message.parts.filter(isToolPart)).map(p => [p.toolCallId, p]));
+  return asked.filter(part => held.get(part.toolCallId)?.state === 'approval-responded');
+}
+
+/** What a row says when nothing said how its approval ended: a stream that was cut or stopped. It may have run. */
+const APPROVAL_OUTCOME_UNKNOWN =
+  'The answer stopped before saying how this ended, so it may or may not have gone through. Check before trying again.';
+
 /** The newest message holding a pending approval this id names. */
 function cardOfApproval(
   messages: readonly ChatMessage[],
@@ -644,7 +654,7 @@ export function useSseChatAdapter(
    * "send only the last message"): the part flips, the card's message becomes the one being built, and the card's message
    * goes back holding the answered parts. The server's answer continues that message: an output or a denial per part (a
    * refusal is an error on ITS part, so one row of a batch can fail with its cross and the others proceed), the receipt,
-   * and the auto-continuation.
+   * and the auto-continuation. Resolves `false` when a row ended with no answer.
    */
   const answerApproval = useCallback(
     async (id: string, approved: boolean, reason?: string): Promise<boolean> => {
@@ -670,52 +680,53 @@ export function useSseChatAdapter(
       let ok = true;
       let minted = false;
 
-      /** A request that never reached a decision fails its rows: nothing else would stop their loaders. */
-      const failParts = (failed: readonly ChatToolPart[], err: unknown): void => {
-        const errorText = err instanceof Error ? err.message : 'An error occurred while processing your request.';
-        for (const part of failed) {
+      /**
+       * One request, for these parts. A row it left waiting would spin for good: nothing else stops its loader, and a card
+       * is never stored for a reload to settle it. So a request that was refused fails its rows with what the server said,
+       * and a stream that was cut or stopped before it answered a row says that nobody knows how the row ended.
+       */
+      const answerParts = async (asked: readonly ChatToolPart[], url: string, body: unknown): Promise<void> => {
+        let errorText = APPROVAL_OUTCOME_UNKNOWN;
+        try {
+          minted = (await streamFrom(url, body, ctrl, true)) || minted;
+        } catch (err) {
+          if ((err as { name?: string })?.name !== 'AbortError' && !ctrl.signal.aborted) {
+            errorText = err instanceof Error ? err.message : 'An error occurred while processing your request.';
+          }
+        }
+        flushDeltas();
+        for (const part of unansweredParts(store?.getSnapshot(source).messages ?? [], asked)) {
           applyEntry({
             chunks: [{ type: 'tool-output-error', toolCallId: part.toolCallId, dynamic: true, errorText }],
           });
+          ok = false;
         }
-        ok = false;
       };
 
       try {
         if (wireRef.current === 'ui') {
-          try {
-            minted = await streamFrom(
-              endpointsRef.current.chatStreamUrl,
+          await answerParts(parts, endpointsRef.current.chatStreamUrl, {
+            id: conversationIdRef.current,
+            trigger: 'submit-message',
+            messages: [
               {
-                id: conversationIdRef.current,
-                trigger: 'submit-message',
-                messages: [
-                  {
-                    id: message.id,
-                    role: 'assistant',
-                    parts: parts.map(part => ({
-                      type: 'dynamic-tool',
-                      toolName: part.toolName,
-                      toolCallId: part.toolCallId,
-                      state: 'approval-responded',
-                      input: part.input,
-                      approval: {
-                        id: 'approval' in part ? part.approval?.id : part.toolCallId,
-                        approved,
-                        ...(reason !== undefined ? { reason } : {}),
-                      },
-                    })),
+                id: message.id,
+                role: 'assistant',
+                parts: parts.map(part => ({
+                  type: 'dynamic-tool',
+                  toolName: part.toolName,
+                  toolCallId: part.toolCallId,
+                  state: 'approval-responded',
+                  input: part.input,
+                  approval: {
+                    id: 'approval' in part ? part.approval?.id : part.toolCallId,
+                    approved,
+                    ...(reason !== undefined ? { reason } : {}),
                   },
-                ],
+                })),
               },
-              ctrl,
-              true,
-            );
-          } catch (err) {
-            if ((err as { name?: string })?.name === 'AbortError' || ctrl.signal.aborted) return true;
-            flushDeltas();
-            failParts(parts, err);
-          }
+            ],
+          });
           return ok;
         }
 
@@ -725,23 +736,15 @@ export function useSseChatAdapter(
           const proposalId = 'approval' in part ? part.approval?.id : undefined;
           if (!proposalId) continue;
           mutate(r => r.continueMessage(message.id));
-          try {
-            const answered = await streamFrom(
-              endpointsRef.current.approvalToolUrl,
-              buildConfirmToolBody({
-                proposalId,
-                action: approved ? 'approve' : 'reject',
-                conversationId: conversationIdRef.current,
-              }),
-              ctrl,
-              true,
-            );
-            minted = minted || answered;
-          } catch (err) {
-            if ((err as { name?: string })?.name === 'AbortError' || ctrl.signal.aborted) return true;
-            flushDeltas();
-            failParts([part], err);
-          }
+          await answerParts(
+            [part],
+            endpointsRef.current.approvalToolUrl,
+            buildConfirmToolBody({
+              proposalId,
+              action: approved ? 'approve' : 'reject',
+              conversationId: conversationIdRef.current,
+            }),
+          );
         }
         return ok;
       } finally {
@@ -764,6 +767,9 @@ export function useSseChatAdapter(
   }, [applyEntry, flushDeltas]);
 
   const clearMessages = useCallback(() => {
+    // Whatever is still streaming belongs to the thread being left: it must not draw in the new one.
+    abortControllerRef.current?.abort();
+    flushDeltas();
     mutate(r => r.reset());
     // New chat = drop the stored conversation id. The old row stays frozen
     // server-side; the NEXT send goes out id-less and the server mints a
@@ -771,7 +777,7 @@ export function useSseChatAdapter(
     // hydration guard means a re-captured id can hydrate again if needed.
     commitConversationId(null);
     hydratedKeyRef.current = null;
-  }, [mutate, commitConversationId, hydratedKeyRef]);
+  }, [flushDeltas, mutate, commitConversationId, hydratedKeyRef]);
 
   /** Open a conversation from the managed list. Idempotent on the active id. */
   const selectDialog = useCallback(

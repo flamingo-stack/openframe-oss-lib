@@ -9,9 +9,9 @@ import { approvalPart, textPart } from './__fixtures__/chat-messages';
 /**
  * `<ChatMessageEnhanced>` — THE chat message renderer used by
  * ChatMessageList / EmbeddableChat. Renders the avatar + name + timestamp
- * header (Fae pink / Mingo cyan / user grey) and every message-segment type:
- * text (markdown), thinking, tool_execution, approval_request/batch, error,
- * context_compaction.
+ * header (Fae pink / Mingo cyan / user grey) and every part type:
+ * text (markdown), reasoning, a tool's run, an approval card or batch, an error,
+ * a context compaction.
  *
  * The Fae conversation scenes reproduce the Fae desktop-app flow: greeting →
  * user request → approval block → typing dots (Figma "fae-approval-block").

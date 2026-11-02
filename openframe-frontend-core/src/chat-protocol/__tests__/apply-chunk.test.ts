@@ -5,7 +5,15 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { applyChunk, applyChunkToMessages, createWireState } from '../apply-chunk';
-import { storablePartsOf, textOfParts, type ChatCitation, type ChatMessage, type ChatPart } from '../chat-message';
+import {
+  approvalStatusOf,
+  storablePartsOf,
+  textOfParts,
+  type ChatCitation,
+  type ChatMessage,
+  type ChatPart,
+  type ChatToolPart,
+} from '../chat-message';
 import type { UiChunk } from '../ui-chunks';
 import { createUiMessageWriter } from '../ui-writer';
 import {
@@ -386,6 +394,67 @@ describe('tools', () => {
   });
 });
 
+describe('a rejection stands', () => {
+  const rejected: ChatPart = {
+    type: 'dynamic-tool',
+    toolName: 'close',
+    toolCallId: 'p1',
+    title: 'Close',
+    state: 'approval-responded',
+    input: { a: 1 },
+    approval: { id: 'p1', approved: false, reason: 'not now' },
+  };
+
+  it('a refusal of the answer ends it denied, with its reason: it never reads as approved', () => {
+    const [part] = accumulate([{ type: 'tool-output-error', toolCallId: 'p1', errorText: 'Expired.' }], [rejected]);
+    expect(part).toEqual({
+      type: 'dynamic-tool',
+      toolName: 'close',
+      toolCallId: 'p1',
+      title: 'Close',
+      state: 'output-denied',
+      input: { a: 1 },
+      approval: { id: 'p1', approved: false, reason: 'not now' },
+    });
+    expect(approvalStatusOf(part as ChatToolPart)).toBe('rejected');
+  });
+
+  it('so does a tool that failed before it ran', () => {
+    const [part] = accumulate(
+      [{ type: 'tool-input-error', toolCallId: 'p1', toolName: 'close', input: {}, errorText: 'Bad.' }],
+      [rejected],
+    );
+    expect(approvalStatusOf(part as ChatToolPart)).toBe('rejected');
+    expect(part).toMatchObject({ state: 'output-denied', approval: { reason: 'not now' } });
+  });
+
+  it('an approved answer that fails stays approved, with its error', () => {
+    const approved: ChatPart = {
+      type: 'dynamic-tool',
+      toolName: 'close',
+      toolCallId: 'p1',
+      state: 'approval-responded',
+      input: {},
+      approval: { id: 'p1', approved: true },
+    };
+    const [part] = accumulate([{ type: 'tool-output-error', toolCallId: 'p1', errorText: 'Expired.' }], [approved]);
+    expect(part).toMatchObject({ state: 'output-error', errorText: 'Expired.', approval: { approved: true } });
+  });
+
+  it('a gate nobody answered that fails was never rejected', () => {
+    const pending: ChatPart = {
+      type: 'dynamic-tool',
+      toolName: 'close',
+      toolCallId: 'p1',
+      state: 'approval-requested',
+      input: {},
+      approval: { id: 'p1' },
+    };
+    const [part] = accumulate([{ type: 'tool-output-error', toolCallId: 'p1', errorText: 'Failed.' }], [pending]);
+    expect(approvalStatusOf(part as ChatToolPart)).toBe('approved');
+  });
+});
+
 describe('copy-on-write', () => {
   it('a delta keeps the identity of every other part', () => {
     const wire = createWireState();
@@ -623,6 +692,45 @@ describe('applyChunkToMessages: the message being built', () => {
     ] as UiChunk[];
     for (const chunk of chunks) expect(applyChunkToMessages(messages, chunk, wire)).toBe(messages);
     expect(onTransient).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('applyChunkToMessages: a stage left running ends with its turn', () => {
+  const running: ChatMessage = {
+    id: 'a',
+    role: 'assistant',
+    metadata: {
+      progress: [
+        { id: 't:understanding', stage: 'understanding', state: 'done' },
+        { id: 't:searching', stage: 'searching', count: 2, state: 'running' },
+      ],
+    },
+    parts: [],
+  };
+  const statesAfter = (chunk: UiChunk): string[] => {
+    const wire = createWireState();
+    wire.setMessageId('a');
+    const [message] = applyChunkToMessages([running], chunk, wire);
+    return (message.metadata?.progress ?? []).map(row => row.state);
+  };
+
+  it.each<[string, UiChunk, string[]]>([
+    ['a turn that finished', { type: 'finish', finishReason: 'stop' }, ['done', 'done']],
+    ['a turn with no reason', { type: 'finish' }, ['done', 'done']],
+    ['a cut stream', { type: 'finish', finishReason: 'interrupted' }, ['done', 'failed']],
+    ['a turn that failed', { type: 'finish', finishReason: 'error' }, ['done', 'failed']],
+    ['an abort', { type: 'abort', reason: 'timeout' }, ['done', 'failed']],
+    ['a turn-level error', { type: 'error', errorText: 'Failed.' }, ['done', 'failed']],
+  ])('%s', (_name, chunk, states) => {
+    expect(statesAfter(chunk)).toEqual(states);
+  });
+
+  it('a message with nothing running keeps its identity', () => {
+    const settled: ChatMessage = { id: 'a', role: 'assistant', metadata: { aborted: true }, parts: [] };
+    const wire = createWireState();
+    wire.setMessageId('a');
+    const [message] = applyChunkToMessages([settled], { type: 'abort' }, wire);
+    expect(message).toBe(settled);
   });
 });
 

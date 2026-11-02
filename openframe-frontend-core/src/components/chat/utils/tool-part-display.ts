@@ -8,6 +8,8 @@
 import {
   approvalBatchIdOf,
   approvalStatusOf,
+  isToolPart,
+  type ChatPart,
   type ChatProgressRow,
   type ChatToolPart,
 } from '../../../chat-protocol/chat-message';
@@ -20,6 +22,7 @@ import type {
   ApprovalRequestData,
   ToolExecutionData,
 } from '../types/message.types';
+import { approvalDisplaysInline } from './approval-display';
 
 function resultTextOf(output: unknown): string | undefined {
   if (output === null || output === undefined) return undefined;
@@ -75,6 +78,35 @@ export function failedBeforeRunning(part: ChatToolPart): boolean {
     approvalStatusOf(part) === null &&
     !part.title &&
     !part.toolMetadata?.integratedToolType
+  );
+}
+
+/** A pending approval of a tier this side does not answer waits on someone else: it is not drawn until it resolves. */
+export function waitsOnAnotherTier(part: ChatToolPart, displayApprovalTypes: readonly string[] | undefined): boolean {
+  if (approvalStatusOf(part) !== 'pending') return false;
+  const tier = 'approval' in part ? part.approval?.descriptor?.approvalType : undefined;
+  return tier !== undefined && !approvalDisplaysInline(tier, displayApprovalTypes);
+}
+
+/**
+ * The tool parts this side does not draw until another tier answers. A batch draws as one card, so one row waiting holds
+ * back every row of it.
+ */
+export function toolPartsWaitingOnAnotherTier(
+  parts: readonly ChatPart[],
+  displayApprovalTypes: readonly string[] | undefined,
+): Set<ChatToolPart> {
+  const tools = parts.filter(isToolPart);
+  const waitingBatches = new Set<string>();
+  for (const part of tools) {
+    const batchId = approvalBatchIdOf(part);
+    if (batchId !== undefined && waitsOnAnotherTier(part, displayApprovalTypes)) waitingBatches.add(batchId);
+  }
+  return new Set(
+    tools.filter(part => {
+      const batchId = approvalBatchIdOf(part);
+      return batchId !== undefined ? waitingBatches.has(batchId) : waitsOnAnotherTier(part, displayApprovalTypes);
+    }),
   );
 }
 

@@ -166,7 +166,7 @@ export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement>
   displayApprovalTypes?: readonly string[];
   /** The stages of the turn (`metadata.progress`), drawn as one-line rows above its parts. */
   progress?: ChatMessageMetadata['progress'];
-  /** The stream ended with no completion signal (`metadata.finishReason`): the text stays, under a notice saying so. */
+  /** The stream ended with no completion signal (`metadata.finishReason`): what it said stays, over a notice. */
   interrupted?: boolean;
   /**
    * Entity-context items attached to this (user) message. When present the

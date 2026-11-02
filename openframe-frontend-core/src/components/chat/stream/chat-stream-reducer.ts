@@ -1146,9 +1146,15 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     },
     endSseTurn() {
       // A stream that wrote nothing into its placeholder (it was refused, or it ended before it said anything) would
-      // render a blank bubble. Remove the trailing assistant message if it still has no parts.
+      // render a blank bubble. Remove the trailing assistant message if it still has no parts. A cut turn stays: its row
+      // is where the reader learns the answer never came.
       const last = messages[messages.length - 1];
-      if (last && last.role === 'assistant' && last.parts.length === 0) {
+      if (
+        last &&
+        last.role === 'assistant' &&
+        last.parts.length === 0 &&
+        last.metadata?.finishReason !== 'interrupted'
+      ) {
         messages = messages.slice(0, -1);
       }
       wire.setMessageId(null);

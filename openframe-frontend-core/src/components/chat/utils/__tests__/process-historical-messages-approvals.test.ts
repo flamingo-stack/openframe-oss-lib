@@ -77,6 +77,65 @@ describe('an approval of a tier this side does not answer', () => {
   });
 });
 
+describe('tool rows with no run id', () => {
+  const user = (id: string, text: string): HistoricalMessage => ({
+    id,
+    createdAt: '2026-01-01T00:00:00Z',
+    owner: { type: 'ADMIN' },
+    messageData: [{ type: 'TEXT', text }],
+  });
+  const answer = (id: string, messageData: unknown[]): HistoricalMessage =>
+    ({ id, createdAt: '2026-01-01T00:00:01Z', owner: { type: 'ASSISTANT' }, messageData }) as HistoricalMessage;
+  const executing = (title: string) => ({
+    type: 'EXECUTING_TOOL',
+    integratedToolType: 'OPENFRAME',
+    toolFunction: 'search',
+    title,
+  });
+  const executed = (result: string) => ({
+    type: 'EXECUTED_TOOL',
+    integratedToolType: 'OPENFRAME',
+    toolFunction: 'search',
+    result,
+    success: true,
+  });
+  const outputsOf = (messages: readonly ChatMessage[], id: string) =>
+    messages
+      .find(message => message.id === id)
+      ?.parts.filter(isToolPart)
+      .map(part => (part.state === 'output-available' ? part.output : part.state));
+
+  it('each run keeps its own row across turns', () => {
+    const { messages } = processHistoricalMessages([
+      user('u1', 'first'),
+      answer('a1', [executing('first search'), executed('first result'), { type: 'TEXT', text: 'one' }]),
+      user('u2', 'second'),
+      answer('a2', [executing('second search'), executed('second result'), { type: 'TEXT', text: 'two' }]),
+    ]);
+    expect(outputsOf(messages, 'a1')).toEqual(['first result']);
+    expect(outputsOf(messages, 'a2')).toEqual(['second result']);
+  });
+
+  it('two runs in one turn are two rows, each with its own result', () => {
+    const { messages } = processHistoricalMessages([
+      user('u1', 'first'),
+      answer('a1', [executing('A'), executing('B'), executed('ra'), executed('rb'), { type: 'TEXT', text: 'done' }]),
+    ]);
+    expect(outputsOf(messages, 'a1')).toEqual(['ra', 'rb']);
+  });
+
+  it('a run a turn left open stays in its turn: the next turn`s result is the next turn`s', () => {
+    const { messages } = processHistoricalMessages([
+      user('u1', 'first'),
+      answer('a1', [{ type: 'TEXT', text: 'one' }, executing('cut off')]),
+      user('u2', 'second'),
+      answer('a2', [executing('second search'), executed('second result')]),
+    ]);
+    expect(outputsOf(messages, 'a1')).toEqual(['input-available']);
+    expect(outputsOf(messages, 'a2')).toEqual(['second result']);
+  });
+});
+
 describe('a turn’s identity', () => {
   it('does not bleed across a turn that drew nothing: the next turn has its own id and sequence', () => {
     // m1 is an assistant turn whose ONLY row is metadata → it draws nothing. Its grouping identity and sequence must be

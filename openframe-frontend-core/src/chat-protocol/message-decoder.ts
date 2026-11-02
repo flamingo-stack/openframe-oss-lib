@@ -25,11 +25,15 @@ import {
 } from './chat-message';
 import {
   createOldFrameDecoder,
+  createOldRunIds,
   createOldSourceIndex,
   createOldTextWriter,
+  oldApprovalRequestId,
   oldDocSearchFields,
+  oldGuidePayload,
   oldMentionsToRecordLinks,
   oldRecordCardsOf,
+  oldSingleApprovalChunks,
   oldStoredRowMetadata,
   oldStoredRowToParts,
   oldVideoParts,
@@ -101,8 +105,14 @@ export interface MingoDecoder {
    * One NATS chunk, or with `row` one entry of a persisted row: a persisted entry is whole, so what it opens it also
    * closes. `seq` is the JetStream `streamSeq`, the reducer's idempotency gate. Unknown or malformed input answers no
    * chunks: a backend that adds a type must not break the stream.
+   *
+   * A chunk at or below the highest sequence this decoder has read is a redelivery, and answers no chunks and moves no
+   * state: what the reducer's gate would drop must not flush a text this decoder is holding. So a decoder lives exactly
+   * as long as its reducer's sequence does: a host that resets the reducer makes a new decoder.
    */
   decode(raw: unknown, options?: { row?: MingoRowContext }): ChatStreamEntry;
+  /** A turn with no chunk of its own to say it ended (rows of history): what it left open stays in it. */
+  endTurn(): void;
 }
 
 function str(value: unknown): string | undefined {
@@ -168,15 +178,22 @@ export function mingoUserText(content: string): string {
 
 export function createMingoDecoder(options: { now?: () => string } = {}): MingoDecoder {
   const now = options.now ?? (() => new Date().toISOString());
+  // TODO(CU-17tkuw61kfy): the old source names, and the old tokens in a text, go with the old rows; text is then plain.
   const sources = createOldSourceIndex();
   let nextId = 0;
   const mintId = (prefix: string): string => `${prefix}${++nextId}`;
   const writer = createOldTextWriter(sources, () => mintId('t'), { citations: false });
+  // TODO(CU-17tkuw61kfy): a tool row with no run id. Goes once the cleanup's sweep has given those rows ids.
+  const oldRuns = createOldRunIds();
   let reasoningId: string | null = null;
   let compactionId: string | null = null;
-  /** The newest single approval still open: a tool only runs after its gate was granted. */
+  /**
+   * The newest single approval still open: a tool only runs after its gate was granted.
+   * TODO(CU-17tkuw61kfy): only an approval row with no tool list has one.
+   */
   let pendingSingleApproval: string | null = null;
   const seenTools = new Set<string>();
+  let lastSeq = Number.NEGATIVE_INFINITY;
 
   function closeOpen(out: UiChunk[]): void {
     if (reasoningId !== null) {
@@ -201,14 +218,9 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       const part = newSourcePart(row);
       if (part) parts.push(part);
     }
+    // TODO(CU-17tkuw61kfy): a row in the old names, and the old video rows.
     parts.push(...sources.register(rows.filter(row => !nonEmpty(row.sourceId))), ...oldVideoParts(data.videos));
     return parts;
-  }
-
-  function toolCallIdOf(data: Record<string, unknown>): string {
-    return (
-      nonEmpty(data.toolExecutionRequestId) ?? `${str(data.integratedToolType) ?? ''}-${str(data.toolFunction) ?? ''}`
-    );
   }
 
   function toolInput(data: Record<string, unknown>, toolCallId: string): UiChunk {
@@ -244,7 +256,8 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
   }
 
   function approvalChunks(data: Record<string, unknown>, isRow: boolean, out: UiChunk[]): void {
-    const requestId = nonEmpty(data.approvalRequestId) ?? nonEmpty(data.approval_request_id) ?? '';
+    // TODO(CU-17tkuw61kfy): the old name.
+    const requestId = nonEmpty(data.approvalRequestId) ?? oldApprovalRequestId(data) ?? '';
     const approvalType = nonEmpty(data.approvalType) ?? (isRow ? 'CLIENT' : 'USER');
     const calls = Array.isArray(data.toolCalls) ? data.toolCalls.filter(isRecord) : [];
     if (calls.length > 0) {
@@ -281,27 +294,9 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       }
       return;
     }
-    // A row with no tool list: its command is all there is.
+    // TODO(CU-17tkuw61kfy): a row with no tool list.
     if (!requestId) return;
-    const command = str(data.command) ?? '';
-    const explanation = nonEmpty(data.explanation);
-    out.push(
-      {
-        type: 'tool-input-available',
-        toolCallId: requestId,
-        toolName: 'command',
-        input: {},
-        dynamic: true,
-        ...(command ? { title: command } : {}),
-      },
-      {
-        type: 'tool-approval-request',
-        approvalId: requestId,
-        toolCallId: requestId,
-        ...(explanation ? { reason: explanation } : {}),
-        approvalDescriptor: { approvalType },
-      },
-    );
+    out.push(...oldSingleApprovalChunks(data, requestId, approvalType));
     pendingSingleApproval = requestId;
   }
 
@@ -325,17 +320,28 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
     if (!isRecord(raw)) return { chunks: out };
     const { row } = decodeOptions;
     const isRow = row !== undefined;
-    let seq = typeof raw.streamSeq === 'number' ? raw.streamSeq : row?.seq;
+    // A ticket event names its own sequence in the payload; the transport's envelope wins when both are there.
+    const seq =
+      typeof raw.streamSeq === 'number'
+        ? raw.streamSeq
+        : (row?.seq ??
+          (raw.type === MESSAGE_TYPE.TICKET_EVENT && typeof raw.sequenceId === 'number' ? raw.sequenceId : undefined));
+    if (!isRow && seq !== undefined) {
+      if (seq <= lastSeq) return { seq, chunks: out };
+      lastSeq = seq;
+    }
     const resolvedByName = str(raw.resolvedByName) ?? str(raw.displayName);
 
     switch (raw.type) {
       case MESSAGE_TYPE.MESSAGE_START:
         closeOpen(out);
+        oldRuns.endTurn();
         out.push({ type: 'start', messageId: seq !== undefined ? `stream-${seq}` : mintId('stream-') });
         break;
 
       case MESSAGE_TYPE.MESSAGE_END:
         closeOpen(out);
+        oldRuns.endTurn();
         out.push({ type: 'finish', finishReason: 'stop' });
         break;
 
@@ -383,14 +389,17 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         out.push(...sourceChunks(raw));
         break;
 
-      // The envelope `ATTACHMENTS` replaced: the same arrays under `payload`.
-      case MESSAGE_TYPE.GUIDE:
-        if (isRecord(raw.payload)) out.push(...sourceChunks(raw.payload));
+      // TODO(CU-17tkuw61kfy): the envelope `ATTACHMENTS` replaced.
+      case MESSAGE_TYPE.GUIDE: {
+        const payload = oldGuidePayload(raw);
+        if (payload) out.push(...sourceChunks(payload));
         break;
+      }
 
       case MESSAGE_TYPE.RECORD_CARDS: {
         closeOpen(out);
         const records = normalizeRecordUris(raw.records);
+        // TODO(CU-17tkuw61kfy): the old `cards` of a row on a dev cluster.
         const all = records.length > 0 ? records : oldRecordCardsOf(raw);
         if (all.length > 0) out.push({ type: 'data-record-cards', data: { records: all } });
         break;
@@ -409,14 +418,16 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
 
       case MESSAGE_TYPE.EXECUTING_TOOL: {
         closeOpen(out);
-        const toolCallId = toolCallIdOf(raw);
+        // TODO(CU-17tkuw61kfy): a row with no run id.
+        const toolCallId = nonEmpty(raw.toolExecutionRequestId) ?? oldRuns.open(raw);
         out.push(...grantsOfRun(raw, toolCallId), toolInput(raw, toolCallId));
         break;
       }
 
       case MESSAGE_TYPE.EXECUTED_TOOL: {
         closeOpen(out);
-        const toolCallId = toolCallIdOf(raw);
+        // TODO(CU-17tkuw61kfy): a row with no run id.
+        const toolCallId = nonEmpty(raw.toolExecutionRequestId) ?? oldRuns.close(raw);
         out.push(...grantsOfRun(raw, toolCallId));
         // A result can be all that reached this reader: its row still has to exist to take it.
         if (!seenTools.has(toolCallId)) out.push(toolInput(raw, toolCallId));
@@ -434,7 +445,8 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         break;
 
       case MESSAGE_TYPE.APPROVAL_RESULT: {
-        const approvalId = nonEmpty(raw.approvalRequestId) ?? nonEmpty(raw.approval_request_id);
+        // TODO(CU-17tkuw61kfy): the old name.
+        const approvalId = nonEmpty(raw.approvalRequestId) ?? oldApprovalRequestId(raw);
         if (!approvalId) break;
         const approved = raw.approved === true;
         if (pendingSingleApproval === approvalId) pendingSingleApproval = null;
@@ -490,8 +502,6 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         const kind = typeof raw.kind === 'string' ? raw.kind.trim() : '';
         if (!kind) break;
         closeOpen(out);
-        // The chunk names its own sequence in the payload; the transport's envelope wins when both are there.
-        if (seq === undefined && typeof raw.sequenceId === 'number') seq = raw.sequenceId;
         const reason = typeof raw.reason === 'string' && raw.reason.trim() ? raw.reason : undefined;
         const targetStatusKind =
           typeof raw.targetStatusKind === 'string' && raw.targetStatusKind.trim() ? raw.targetStatusKind : undefined;
@@ -599,14 +609,19 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
     return { ...(seq !== undefined ? { seq } : {}), chunks: out };
   }
 
-  return { decode };
+  return {
+    decode,
+    endTurn() {
+      oldRuns.endTurn();
+    },
+  };
 }
 
 // =============================================================================
 // A stored row of the hub
 // =============================================================================
 
-/** A row from before the move: it has `content`, `sources`, or a part in the old names. */
+/** A row from before the move: it has `content`, `sources`, or a part in the old names. TODO(CU-17tkuw61kfy): the cut. */
 function isOldStoredRow(row: Record<string, unknown>): boolean {
   if (typeof row.content === 'string' || Array.isArray(row.sources)) return true;
   return Array.isArray(row.parts) && row.parts.some(part => isRecord(part) && part.type === 'RECORD_CARDS');

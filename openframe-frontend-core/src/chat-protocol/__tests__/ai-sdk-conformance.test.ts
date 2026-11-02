@@ -18,7 +18,15 @@ import {
 } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { applyChunk, applyChunkToMessages, createWireState } from '../apply-chunk';
-import { storablePartsOf, type ChatMessage, type ChatMessageMetadata, type ChatPart } from '../chat-message';
+import {
+  approvalStatusOf,
+  isToolPart,
+  storablePartsOf,
+  type ChatMessage,
+  type ChatMessageMetadata,
+  type ChatPart,
+  type ChatToolPart,
+} from '../chat-message';
 import { createMingoDecoder } from '../message-decoder';
 import { chatProgressChunk } from '../progress';
 import { encodeUiChunk, encodeUiDone, UI_MESSAGE_STREAM_HEADERS, type UiChunk } from '../ui-chunks';
@@ -286,6 +294,54 @@ describe('validateUIMessages', () => {
 });
 
 describe('the stated deviations', () => {
+  it('D1: a NATS chunk keeps its uppercase `type`, and the one decoder hands the library standard chunks', async () => {
+    const decoder = createMingoDecoder();
+    const chunks = [
+      { type: 'MESSAGE_START', streamSeq: 1 },
+      { type: 'TEXT', streamSeq: 2, text: 'Hello.' },
+      { type: 'RECORD_CARDS', streamSeq: 3, records: ['record://blog_post/1108'] },
+      { type: 'MESSAGE_END', streamSeq: 4 },
+    ].flatMap(raw => decoder.decode(raw).chunks);
+    expect(chunks.map(chunk => chunk.type)).toEqual([
+      'start',
+      'text-start',
+      'text-delta',
+      'text-end',
+      'data-record-cards',
+      'finish',
+    ]);
+    const schema = asSchema(uiMessageChunkSchema);
+    for (const chunk of chunks) await expect(schema.validate?.(chunk)).resolves.toMatchObject({ success: true });
+    await expect(schema.validate?.({ type: 'TEXT', text: 'Hello.' })).resolves.toMatchObject({ success: false });
+  });
+
+  it('a rejection the server refuses is a rejection to this package and to a standard reader alike', async () => {
+    const answered: ChatMessage = {
+      ...APPROVAL_CARD_MESSAGE,
+      parts: APPROVAL_CARD_MESSAGE.parts.map(part =>
+        part.type === 'dynamic-tool' && part.state === 'approval-responded'
+          ? { ...part, approval: { ...part.approval, approved: false, reason: 'not now' } }
+          : part,
+      ),
+    };
+    const standard = await standardMessage(APPROVAL_REFUSED_STREAM, answered);
+    const wire = createWireState();
+    wire.setMessageId(answered.id);
+    const [mine] = APPROVAL_REFUSED_STREAM.reduce<ChatMessage[]>(
+      (all, chunk) => applyChunkToMessages(all, chunk, wire),
+      [answered],
+    );
+    const theirs = standard.parts.find(part => part.type === 'dynamic-tool');
+    const ours = mine.parts.find(isToolPart);
+    if (!ours || theirs?.type !== 'dynamic-tool') throw new Error('no tool part');
+    expect(approvalStatusOf(ours)).toBe('rejected');
+    expect(approvalStatusOf(theirs as ChatToolPart)).toBe('rejected');
+    expect('approval' in ours ? ours.approval : undefined).toEqual(theirs.approval);
+    // The SDK's type says `output-error` holds a granted approval and its reader does not enforce it, so the state may
+    // differ; `output-denied` is what its own validator accepts.
+    await expect(validateUIMessages({ messages: [mine] })).resolves.toHaveLength(1);
+  });
+
   it('D5: Mingo has no citations: the standard`s field is optional', () => {
     const decoder = createMingoDecoder();
     const chunks = [{ type: 'TEXT', text: 'Priced per device [1].' }, { type: 'MESSAGE_END' }].flatMap(

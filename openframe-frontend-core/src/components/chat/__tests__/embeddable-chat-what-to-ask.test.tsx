@@ -54,6 +54,8 @@ function Host({
   initialDialogId = null,
   onReset,
   onSend,
+  onAdapterSend,
+  locked = false,
   openChat = [HELLO],
   busy = false,
   whatToAsk = WHAT_TO_ASK,
@@ -63,6 +65,10 @@ function Host({
   initialDialogId?: string | null;
   onReset?: () => void;
   onSend?: (text: string) => void;
+  /** The adapter's own `actions`: nothing in the panel may reach past the panel's send to them. */
+  onAdapterSend?: (text: string) => void;
+  /** The chat cannot take a message. */
+  locked?: boolean;
   /** What the open chat `d-1` holds. */
   openChat?: ChatMessage[];
   /** A turn is running in the open chat. */
@@ -75,6 +81,9 @@ function Host({
   const [activeDialogId, setActiveDialogId] = useState<string | null>(initialDialogId);
   const [sent, setSent] = useState<ChatMessage[]>([]);
   const noop = () => {};
+  const adapterSend = (text: string) => {
+    onAdapterSend?.(text);
+  };
   const asyncNoop = async () => {};
   const state: UnifiedChatState = {
     messages: activeDialogId === 'd-1' ? openChat : activeDialogId === 'd-new' ? sent : [],
@@ -112,7 +121,11 @@ function Host({
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    actions: {},
+    // What every real adapter hands the thread: a send that knows nothing of the panel's exchange or its lock.
+    actions: {
+      selectAsk: adapterSend,
+      pickSuggestion: adapterSend,
+    },
     dialogTokenUsage: null,
     connectionState: 'connected',
   };
@@ -129,6 +142,7 @@ function Host({
         canRename: true,
         fetchArchivedDialogs: () => Promise.resolve({ dialogs: [], nextCursor: null }),
       }}
+      composerLock={locked ? { placeholder: 'Out of balance' } : null}
       whatToAsk={whatToAsk}
       onWhatToAsk={onWhatToAsk}
       chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
@@ -214,6 +228,30 @@ describe('EmbeddableChat - whatToAsk', () => {
     // The send went out and made its dialog (it is in the list now).
     expect((await screen.findAllByText('Sent')).length).toBeGreaterThan(0);
     expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
+  });
+
+  it('a picked prompt goes through the panel, not past it to the adapter', () => {
+    const onSend = vi.fn();
+    const onAdapterSend = vi.fn();
+    renderHost({ onSend, onAdapterSend });
+
+    fireEvent.click(whatToAsk());
+    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
+
+    expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
+    expect(onAdapterSend).not.toHaveBeenCalled();
+  });
+
+  it('a picked prompt does not go out while the chat cannot take a message', () => {
+    const onSend = vi.fn();
+    const onAdapterSend = vi.fn();
+    renderHost({ onSend, onAdapterSend, locked: true });
+
+    fireEvent.click(whatToAsk());
+    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(onAdapterSend).not.toHaveBeenCalled();
   });
 
   it('opens a new chat from the archive list, not into the chat open before it', async () => {

@@ -353,6 +353,29 @@ function grantedApprovalOf(part: ChatToolPart): { approval?: ChatToolApprovalRes
   return approval ? { approval: { ...withoutAnswer(approval), approved: true } } : {};
 }
 
+/** The part denied: what it was asked, and the answer it holds. */
+function deniedPartOf(part: ChatToolPart): ChatToolPart {
+  const approval = approvalOf(part);
+  return {
+    ...baseOf(part),
+    state: 'output-denied',
+    input: part.input,
+    approval: {
+      ...withoutAnswer(approval ?? { id: part.toolCallId }),
+      approved: false,
+      ...(approval?.reason !== undefined ? { reason: approval.reason } : {}),
+    },
+  };
+}
+
+/**
+ * A rejection stands whatever the server then says about it: a refusal (expired, already used) or a request that failed
+ * ran nothing either. `output-error` only holds a granted approval, in the SDK's types too, so it ends denied.
+ */
+function isRejected(part: ChatToolPart): boolean {
+  return approvalOf(part)?.approved === false;
+}
+
 function applyToolInput(parts: ChatPart[], chunk: Extract<UiChunk, { type: 'tool-input-available' }>): ChatPart[] {
   const index = parts.findIndex(part => isToolPart(part) && part.toolCallId === chunk.toolCallId);
   const title = chunk.title !== undefined ? { title: chunk.title } : {};
@@ -404,15 +427,17 @@ function applyToolInputError(parts: ChatPart[], chunk: Extract<UiChunk, { type: 
   }
   const part = parts[index] as ChatToolPart;
   const toolMetadata = mergeMetadata(part.toolMetadata, chunk.toolMetadata);
-  const next: ChatToolPart = {
-    ...baseOf(part),
-    ...title,
-    ...(toolMetadata !== undefined ? { toolMetadata } : {}),
-    state: 'output-error',
-    input: chunk.input,
-    errorText: chunk.errorText,
-    ...grantedApprovalOf(part),
-  };
+  const next: ChatToolPart = isRejected(part)
+    ? deniedPartOf(part)
+    : {
+        ...baseOf(part),
+        ...title,
+        ...(toolMetadata !== undefined ? { toolMetadata } : {}),
+        state: 'output-error',
+        input: chunk.input,
+        errorText: chunk.errorText,
+        ...grantedApprovalOf(part),
+      };
   return sameValue(part, next) ? parts : replaceAt<ChatPart>(parts, index, next);
 }
 
@@ -459,19 +484,9 @@ function applyApprovalResponse(
 }
 
 function applyOutputDenied(parts: ChatPart[], id: string): ChatPart[] {
-  return updateToolParts(parts, id, part => {
-    if (part.state === 'output-available' || part.state === 'output-error') return part;
-    return {
-      ...baseOf(part),
-      state: 'output-denied',
-      input: part.input,
-      approval: {
-        ...withoutAnswer(approvalOf(part) ?? { id: part.toolCallId }),
-        approved: false,
-        ...(approvalOf(part)?.reason !== undefined ? { reason: approvalOf(part)?.reason } : {}),
-      },
-    };
-  });
+  return updateToolParts(parts, id, part =>
+    part.state === 'output-available' || part.state === 'output-error' ? part : deniedPartOf(part),
+  );
 }
 
 function applyOutput(parts: ChatPart[], chunk: Extract<UiChunk, { type: 'tool-output-available' }>): ChatPart[] {
@@ -492,6 +507,7 @@ function applyOutput(parts: ChatPart[], chunk: Extract<UiChunk, { type: 'tool-ou
 function applyOutputError(parts: ChatPart[], chunk: Extract<UiChunk, { type: 'tool-output-error' }>): ChatPart[] {
   return updateToolParts(parts, chunk.toolCallId, part => {
     if (part.state === 'output-denied') return part;
+    if (isRejected(part)) return deniedPartOf(part);
     const toolMetadata = mergeMetadata(part.toolMetadata, chunk.toolMetadata);
     return {
       ...baseOf(part),
@@ -641,6 +657,23 @@ function withProgress(message: ChatMessage, chunk: ChatProgressChunk): ChatMessa
   return { ...message, metadata: { ...message.metadata, progress } };
 }
 
+/**
+ * A stage still running when its turn ends will never say how it went: it finished on a turn that finished, and failed
+ * on one that did not. Nothing else would stop its loader.
+ */
+function withSettledProgress(message: ChatMessage, state: 'done' | 'failed'): ChatMessage {
+  const rows = message.metadata?.progress;
+  if (!rows?.some(row => row.state === 'running')) return message;
+  const progress = rows.map(row => (row.state === 'running' ? { ...row, state } : row));
+  return { ...message, metadata: { ...message.metadata, progress } };
+}
+
+/** How the stages a turn left running ended, from how it ended. */
+function stageStateOfEnd(chunk: Extract<UiChunk, { type: 'finish' | 'abort' }>): 'done' | 'failed' {
+  if (chunk.type === 'abort') return 'failed';
+  return chunk.finishReason === 'interrupted' || chunk.finishReason === 'error' ? 'failed' : 'done';
+}
+
 /** Applies `update` to the message being built. A chunk that only describes a message makes none. */
 function updateCurrent(
   messages: ChatMessage[],
@@ -719,13 +752,18 @@ export function applyChunkToMessages(messages: ChatMessage[], chunk: UiChunk, wi
               ...(chunk.finishReason !== undefined ? { finishReason: chunk.finishReason } : {}),
             };
       const ended = updateCurrent(messages, wire, message =>
-        withParts(withMetadata(message, over), applyChunk(message.parts, chunk, wire)),
+        withSettledProgress(
+          withParts(withMetadata(message, over), applyChunk(message.parts, chunk, wire)),
+          stageStateOfEnd(chunk),
+        ),
       );
       wire.setMessageId(null);
       return ended;
     }
     case 'error': {
-      const failed = applyToCurrent(messages, chunk, wire);
+      const failed = updateCurrent(applyToCurrent(messages, chunk, wire), wire, message =>
+        withSettledProgress(message, 'failed'),
+      );
       wire.setMessageId(null);
       return failed;
     }

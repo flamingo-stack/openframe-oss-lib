@@ -226,6 +226,130 @@ describe('a thinking turn has exactly ONE pending affordance', () => {
   });
 });
 
+describe('a single card that was approved, while its tool runs', () => {
+  const question = row('u1', 'user', 'Michael Assraf', 'close it');
+  const answered = (parts: ChatPart[]): ChatMessage[] => [
+    question,
+    {
+      id: 'a1',
+      role: 'assistant',
+      metadata: { author: { name: 'Mingo' } },
+      parts: [{ type: 'text', text: 'I can close that.' }, ...parts],
+    },
+  ];
+  const card = (approved: boolean, batchId?: string): ChatPart => ({
+    type: 'dynamic-tool',
+    toolName: 'update_ticket',
+    toolCallId: 'p1',
+    title: 'Close',
+    state: 'approval-responded',
+    input: {},
+    approval: { id: 'p1', approved, ...(batchId ? { descriptor: { batchId } } : {}) },
+  });
+
+  it('the footer says the turn is working: the card has no icon of its own', () => {
+    render(<ChatMessageList dialogId="d" messages={answered([card(true)])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+  });
+
+  it('not for a batch: its rows say it themselves', () => {
+    render(<ChatMessageList dialogId="d" messages={answered([card(true, 'b1')])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('not for a rejection: nothing runs', () => {
+    render(<ChatMessageList dialogId="d" messages={answered([card(false)])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('not for a card still waiting on the user', () => {
+    const pending: ChatPart = {
+      type: 'dynamic-tool',
+      toolName: 'update_ticket',
+      toolCallId: 'p1',
+      state: 'approval-requested',
+      input: {},
+      approval: { id: 'p1' },
+    };
+    render(<ChatMessageList dialogId="d" messages={answered([pending])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('not once the tool has answered', () => {
+    const done: ChatPart = {
+      type: 'dynamic-tool',
+      toolName: 'update_ticket',
+      toolCallId: 'p1',
+      state: 'output-available',
+      input: {},
+      output: {},
+      approval: { id: 'p1', approved: true },
+    };
+    render(<ChatMessageList dialogId="d" messages={answered([done])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+});
+
+describe('a turn whose only cards wait on another tier', () => {
+  const cardOf = (toolCallId: string, approvalType: string, batchId?: string): ChatPart => ({
+    type: 'dynamic-tool',
+    toolName: 'x',
+    toolCallId,
+    state: 'approval-requested',
+    input: {},
+    approval: { id: toolCallId, descriptor: { approvalType, ...(batchId ? { batchId } : {}) } },
+  });
+  const turn = (parts: ChatPart[]): ChatMessage[] => [
+    row('u1', 'user', 'Client', 'please do it'),
+    { id: 'a1', role: 'assistant', metadata: { author: { name: 'Fae' } }, parts },
+  ];
+  const clientSide = (parts: ChatPart[], isTyping = false) =>
+    render(
+      <ChatMessageList dialogId="d" messages={turn(parts)} displayApprovalTypes={['CLIENT']} isTyping={isTyping} />,
+    );
+
+  it('draws no row, typing or not', () => {
+    const { unmount } = clientSide([cardOf('r1', 'USER')]);
+    expect(names()).toEqual(['Client']);
+    unmount();
+    clientSide([cardOf('r1', 'USER')], true);
+    expect(names()).toEqual(['Client']);
+  });
+
+  it('nor for a batch one of whose rows waits, or with only sources beside it', () => {
+    clientSide([
+      { type: 'source-url', sourceId: 'record://blog_post/1', url: 'https://x.test/a', title: 'A' },
+      cardOf('r1', 'USER', 'b1'),
+      cardOf('r2', 'CLIENT', 'b1'),
+    ]);
+    expect(names()).toEqual(['Client']);
+  });
+
+  it('a card this side answers draws its row', () => {
+    clientSide([cardOf('r1', 'CLIENT')]);
+    expect(names()).toEqual(['Client', 'Fae']);
+  });
+
+  it('text beside it draws its row', () => {
+    clientSide([{ type: 'text', text: 'Asking your admin.' }, cardOf('r1', 'USER')]);
+    expect(names()).toEqual(['Client', 'Fae']);
+  });
+
+  it('a cut turn draws its row: the notice has to go somewhere', () => {
+    const messages: ChatMessage[] = [
+      row('u1', 'user', 'Client', 'please do it'),
+      {
+        id: 'a1',
+        role: 'assistant',
+        metadata: { author: { name: 'Fae' }, finishReason: 'interrupted' },
+        parts: [cardOf('r1', 'USER')],
+      },
+    ];
+    render(<ChatMessageList dialogId="d" messages={messages} displayApprovalTypes={['CLIENT']} />);
+    expect(names()).toEqual(['Client', 'Fae']);
+  });
+});
+
 describe('a system line is a row of its own', () => {
   it('still renders, with its words in the body', () => {
     const messages: ChatMessage[] = [

@@ -266,11 +266,6 @@ export {
   applyProxyAuth,
 } from './embed-proxy-auth-storage';
 
-// SSE leading-frame reader for the chat-agent `confirm-tool` route.
-// Used by the ticket center to drain the single `decision_resolved`
-// frame the server emits when `messages: []` is in the request body.
-export { readLeadingDecisionFrame, type DecisionResolvedFrame } from './sse-decision-frame';
-
 // Pure text/wire helpers that originated under components/chat/utils/
 // but are needed by SERVER-SIDE hub callers (doc-chat-utils,
 // hubspot-files-utils, rag-mappers). Re-exporting through utils/ keeps
