@@ -739,6 +739,9 @@ const SECTION_IDS = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+/** The mermaid frame's skeleton, shown until the diagram (or its error) is rendered. */
+const MERMAID_LOADING = '[data-testid="mermaid-frame"] [role="status"]';
+
 async function renderStable(ui: React.ReactElement): Promise<HTMLElement> {
   // `render` already commits inside its own `act`; the settle loop below is
   // what flushes everything the commit queued.
@@ -756,6 +759,19 @@ async function renderStable(ui: React.ReactElement): Promise<HTMLElement> {
   // full-suite run on a loaded machine (observed 2026-08-25: the `mermaid`
   // golden snapshotted the loading skeleton once in ~10 runs). Raising the cap
   // costs nothing when the DOM settles early.
+  await settle(container);
+  // A stable DOM is not a rendered diagram: while `import('mermaid')` is still
+  // loading nothing changes, so two reads match on the skeleton and the loop
+  // exits early (a busy `vitest related` run hit it every other time). Wait
+  // the diagram's skeleton out by time, then settle what its render queued.
+  if (container.querySelector(MERMAID_LOADING)) {
+    await waitFor(() => expect(container.querySelector(MERMAID_LOADING)).toBeNull(), { timeout: 5000 });
+    await settle(container);
+  }
+  return container;
+}
+
+async function settle(container: HTMLElement): Promise<void> {
   let previous = '';
   for (let i = 0; i < 60; i++) {
     await act(async () => {
@@ -765,7 +781,6 @@ async function renderStable(ui: React.ReactElement): Promise<HTMLElement> {
     if (html === previous) break;
     previous = html;
   }
-  return container;
 }
 
 function normalize(html: string): string {

@@ -112,7 +112,9 @@ async function stylesheetBuilder({ root, input, config }) {
   const postcss = require(require.resolve('postcss', { paths: [root, __dirname] }));
   const loadConfig = require(require.resolve('tailwindcss/loadConfig', { paths: [root, __dirname] }));
   const source = readInput(resolve(root, input), root);
-  const appConfig = loadConfig(resolve(root, config));
+  const { APP_TAILWIND_CONFIG } = require('./style-sources.cjs');
+  const loaded = loadConfig(resolve(root, config));
+  const appConfig = loaded[APP_TAILWIND_CONFIG] ?? loaded;
   const minify = minifier(root);
   const from = resolve(root, input);
   return async content => {

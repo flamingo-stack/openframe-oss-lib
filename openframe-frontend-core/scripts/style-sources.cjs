@@ -260,6 +260,12 @@ if (require.main === module) {
 }
 
 /**
+ * The config `withRouteStylesTailwind` was given. The route step runs inside `next build`, under the same
+ * `NEXT_STYLES=routes`, so the config it loads is the wrapped one: the complete sheet is built from this.
+ */
+const APP_TAILWIND_CONFIG = Symbol.for('next-styles.app-tailwind-config');
+
+/**
  * The Tailwind config of the stylesheet the root layout imports, for `next-styles build`: under it that sheet is
  * built with no utilities (its tokens, preflight and the app's own rules), because each route's utilities arrive
  * in a sheet of their own. Anywhere else (`next dev`, any other build, the route step itself) it is `config`.
@@ -269,7 +275,14 @@ if (require.main === module) {
  */
 function withRouteStylesTailwind(config) {
   if (process.env.NEXT_STYLES !== 'routes') return config;
-  return { ...config, content: [{ raw: '', extension: 'html' }], safelist: [] };
+  return { ...config, content: [{ raw: '', extension: 'html' }], safelist: [], [APP_TAILWIND_CONFIG]: config };
 }
 
-module.exports = { appStyleSources, routePaths, servedRouteFiles, LAZY_STYLED, withRouteStylesTailwind };
+module.exports = {
+  appStyleSources,
+  routePaths,
+  servedRouteFiles,
+  LAZY_STYLED,
+  withRouteStylesTailwind,
+  APP_TAILWIND_CONFIG,
+};

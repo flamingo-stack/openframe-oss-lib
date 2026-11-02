@@ -44,8 +44,9 @@ const { withRouteStyles, fullSheetUrl } = require('../../scripts/next-styles.cjs
   withRouteStyles: (config: object) => (phase: string) => Promise<Record<string, unknown>>;
   fullSheetUrl: (info: { buildId: string; assetPrefix?: string; basePath?: string }) => string;
 };
-const { withRouteStylesTailwind } = require('../../scripts/style-sources.cjs') as {
+const { withRouteStylesTailwind, APP_TAILWIND_CONFIG } = require('../../scripts/style-sources.cjs') as {
   withRouteStylesTailwind: <T extends object>(config: T) => T;
+  APP_TAILWIND_CONFIG: symbol;
 };
 
 describe('route-styles: the classes a page renders', () => {
@@ -112,6 +113,47 @@ describe('route-styles: a route sheet is the complete sheet with rules left out'
     expect(order(full, selectors)).toEqual([...order(full, selectors)].sort((a, b) => a - b));
     expect(route).not.toContain('.text-center');
     expect(route).toContain('.app-rule');
+  });
+});
+
+describe('route-styles: the complete sheet under next-styles build', () => {
+  let root: string;
+
+  beforeAll(() => {
+    root = mkdtempSync(join(tmpdir(), 'route-styles-full-'));
+    mkdirSync(join(root, 'app'), { recursive: true });
+    writeFileSync(join(root, 'app', 'page.tsx'), 'export default () => <p className="p-2 flex" />');
+    writeFileSync(
+      join(root, 'app', 'globals.css'),
+      `@tailwind base;\n${routeStyles.UTILITIES_MARK}\n@tailwind components;\n@tailwind utilities;\n`,
+    );
+    writeFileSync(
+      join(root, 'tailwind.config.cjs'),
+      `const { withRouteStylesTailwind } = require(${JSON.stringify(require.resolve('../../scripts/style-sources.cjs'))});\n` +
+        `module.exports = withRouteStylesTailwind({ content: [${JSON.stringify(join(root, 'app', 'page.tsx'))}] });`,
+    );
+    writeFileSync(
+      join(root, 'postcss.config.cjs'),
+      `module.exports = { plugins: { ${JSON.stringify(require.resolve('tailwindcss'))}: {} } }`,
+    );
+  });
+
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('is built from the app’s own content, though the build step runs with NEXT_STYLES=routes', async () => {
+    process.env.NEXT_STYLES = 'routes';
+    try {
+      const build = await routeStyles.stylesheetBuilder({
+        root,
+        input: 'app/globals.css',
+        config: 'tailwind.config.cjs',
+      });
+      const full = await build(null);
+      expect(full).toContain('.p-2{');
+      expect(full).toContain('.flex{');
+    } finally {
+      delete process.env.NEXT_STYLES;
+    }
   });
 });
 
@@ -288,13 +330,15 @@ describe('next-styles: the route-styles config wrappers', () => {
     expect(fullSheetUrl({ buildId: 'b1', basePath: '/help/' })).toBe('/help/_next/static/next-styles/full-b1.css');
   });
 
-  it('under next-styles build, build the root sheet with no utilities', () => {
+  it('under next-styles build, build the root sheet with no utilities and keep the app config', () => {
     process.env.NEXT_STYLES = 'routes';
     try {
-      expect(withRouteStylesTailwind({ content: ['a'], safelist: ['b'], theme: {} })).toEqual({
+      const app = { content: ['a'], safelist: ['b'], theme: {} };
+      expect(withRouteStylesTailwind(app)).toEqual({
         content: [{ raw: '', extension: 'html' }],
         safelist: [],
         theme: {},
+        [APP_TAILWIND_CONFIG]: app,
       });
     } finally {
       delete process.env.NEXT_STYLES;
