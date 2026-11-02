@@ -26,7 +26,6 @@ export type OwnerType = (typeof OWNER_TYPE)[keyof typeof OWNER_TYPE];
 export const MESSAGE_ROLE = {
   USER: 'user',
   ASSISTANT: 'assistant',
-  ERROR: 'error',
   SYSTEM: 'system',
 } as const;
 
@@ -126,41 +125,6 @@ export interface MessageOwner {
     image?: { imageUrl?: string | null } | null;
   };
 }
-
-// ========== Content-shape helpers ==========
-
-import type { MessageContent, MessageSegment } from './message.types';
-
-/** Helper function to check if content is structured (segment array). */
-export function isStructuredContent(content: MessageContent): content is MessageSegment[] {
-  return Array.isArray(content);
-}
-
-/** Normalize either a string or segment array into a uniform segment array. */
-export function normalizeContent(content: MessageContent): MessageSegment[] {
-  if (typeof content === 'string') {
-    return content ? [{ type: 'text', text: content }] : [];
-  }
-  return content;
-}
-
-// ========== SSE event data shapes (wire shapes) ==========
-
-export interface TextEventData {
-  type: 'TEXT';
-  text: string;
-}
-
-export interface ToolExecutionEventData {
-  type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL';
-  integratedToolType: string;
-  toolFunction: string;
-  parameters?: Record<string, unknown>;
-  result?: string;
-  success?: boolean;
-}
-
-export type SSEEventData = TextEventData | ToolExecutionEventData;
 
 // ========== Quick-action chip shape ==========
 

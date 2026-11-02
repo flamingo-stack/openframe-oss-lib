@@ -294,7 +294,6 @@ export {
   buildAutoContinuationDirective,
   type BuildAutoContinuationOptions,
 } from '../components/chat/utils/auto-continuation-directive';
-export { flattenAssistantContent } from '../components/chat/utils/flatten-assistant-content';
 export { SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from '../components/chat/utils/scroll-anchor';
 export { SCROLL_ANCHOR, type ScrollAnchor } from '../components/chat/types/message.types';
 export {

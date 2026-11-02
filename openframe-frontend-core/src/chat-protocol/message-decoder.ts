@@ -35,7 +35,7 @@ import {
   oldVideoParts,
 } from './old-wire';
 import { normalizeRecordUris, parseRecordHref } from './record-link';
-import { createUiChunkDecoder, drainChunks, type UiChunk } from './ui-chunks';
+import { createUiChunkDecoder, drainChunks, type ChatStreamEntry, type UiChunk } from './ui-chunks';
 import { isRecord } from './wire-narrow';
 
 // =============================================================================
@@ -88,12 +88,6 @@ export async function createChatStreamReader(response: {
 // Mingo
 // =============================================================================
 
-export interface MingoDecoded {
-  /** The JetStream `streamSeq`: the reducer's idempotency gate keys off it. */
-  seq?: number;
-  chunks: UiChunk[];
-}
-
 /** What a GraphQL row knows that its `messageData` entry does not. */
 export interface MingoRowContext {
   /** The row's `lastChunkStreamSeq`. Only an entry alone in its row may claim it. */
@@ -105,9 +99,10 @@ export interface MingoRowContext {
 export interface MingoDecoder {
   /**
    * One NATS chunk, or with `row` one entry of a persisted row: a persisted entry is whole, so what it opens it also
-   * closes. Unknown or malformed input answers no chunks: a backend that adds a type must not break the stream.
+   * closes. `seq` is the JetStream `streamSeq`, the reducer's idempotency gate. Unknown or malformed input answers no
+   * chunks: a backend that adds a type must not break the stream.
    */
-  decode(raw: unknown, options?: { row?: MingoRowContext }): MingoDecoded;
+  decode(raw: unknown, options?: { row?: MingoRowContext }): ChatStreamEntry;
 }
 
 function str(value: unknown): string | undefined {
@@ -325,7 +320,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
     }
   }
 
-  function decode(raw: unknown, decodeOptions: { row?: MingoRowContext } = {}): MingoDecoded {
+  function decode(raw: unknown, decodeOptions: { row?: MingoRowContext } = {}): ChatStreamEntry {
     const out: UiChunk[] = [];
     if (!isRecord(raw)) return { chunks: out };
     const { row } = decodeOptions;
@@ -529,7 +524,8 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
 
       case MESSAGE_TYPE.CONTEXT_COMPACTION_START:
         closeOpen(out);
-        compactionId = mintId('compaction-');
+        // By sequence where there is one: a hydrated row and a live chunk come from two decoders.
+        compactionId = seq !== undefined ? `compaction-${seq}` : mintId('compaction-');
         out.push({ type: 'data-context-compaction', id: compactionId, data: { status: 'started' } });
         break;
 

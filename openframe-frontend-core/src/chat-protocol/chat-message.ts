@@ -324,8 +324,8 @@ export interface ChatMessageMetadata {
   progress?: ChatProgressRow[];
   author?: ChatMessageAuthor;
   contextItems?: ChatContextItem[];
+  /** The highest chunk sequence consumed into this row: what the history merge decides coverage with. */
   streamSeq?: number;
-  sendIdx?: number;
 }
 
 export interface ChatMessage {
@@ -345,6 +345,12 @@ export function isSourcePart(part: ChatPart): part is ChatSourcePart {
 
 export function isToolPart(part: ChatPart): part is ChatToolPart {
   return part.type === 'dynamic-tool';
+}
+
+/** The batch a tool part belongs to: its approval's, or for a row that needs none, its metadata's. */
+export function approvalBatchIdOf(part: ChatToolPart): string | undefined {
+  const approval = 'approval' in part ? part.approval : undefined;
+  return approval?.descriptor?.batchId ?? part.toolMetadata?.batchId;
 }
 
 /** A citation's source, from the source part it names. */

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * useNatsChatAdapter — the NATS/Mingo-mode transport adapter for the
+ * useNatsChatAdapter: the NATS/Mingo-mode transport adapter for the
  * unified chat surface. Companion of `useSseChatAdapter` (Guide mode);
  * both implement the same `UnifiedChatState` contract so the public
  * `useChat({ mode })` can dispatch between them with zero shell-side
@@ -12,10 +12,10 @@
  *   ┌──────────────────────────────────────────────────────────────┐
  *   │ useNatsDialogSubscription   live tail of agent events        │
  *   │            ↓                                                 │
- *   │   onEvent → decodeNatsChunk → ChatStreamEvent                │
+ *   │   onEvent → createMingoDecoder → { seq, chunks }             │
  *   │            ↓                                                 │
  *   │ createChatStreamReducer     THE master accumulation path     │
- *   │   (via ChatDialogStore + useChatStreamReducer wrapper —      │
+ *   │   (via ChatDialogStore + useChatStreamReducer wrapper:       │
  *   │    messages, phase, token usage, approvals all live there)   │
  *   │                                                              │
  *   │ useChunkCatchup             back-fill missed chunks after    │
@@ -24,14 +24,9 @@
  *   │ config.publishUserMessage   consumer-owned send (HTTP/NATS)  │
  *   └──────────────────────────────────────────────────────────────┘
  *
- * Phase 3 of the chat unification: the adapter's local message-mutation
- * layer (`updateTrailingAssistant` / `appendToTrailingAssistant` /
- * `upsertTrailingCompaction` / `applyToolExecutionToMessages` and the
- * chunk-callback body that drove them) is DELETED — those semantics live in
- * `../stream/chat-stream-reducer` + `../stream/message-mutations` now. The
- * adapter owns only what is genuinely transport/host wiring: dialog-list
- * management, history fetch, catchup orchestration, the NATS subscription,
- * and the publish path.
+ * What a chunk does to the thread lives in `../stream/chat-stream-reducer`. The adapter owns only what is genuinely
+ * transport/host wiring: dialog-list management, history fetch, catchup orchestration, the NATS subscription, and the
+ * publish path.
  *
  * Two operating modes, distinguished by the presence of `fetchDialogs`:
  *
@@ -49,20 +44,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { decodeNatsChunk } from '../../../chat-protocol/nats-decoder';
+import { approvalBatchIdOf, isToolPart, type ChatMessage } from '../../../chat-protocol/chat-message';
+import { createMingoDecoder, type MingoDecoder } from '../../../chat-protocol/message-decoder';
 import type { ChatRef } from '../chat-ref.types';
 import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
 import { createChatDialogStore, DEFAULT_DIALOG_SIDE } from '../stream/chat-dialog-store';
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
-import type {
-  ChunkData,
-  FetchChunksFunction,
-  HistoricalMessage,
-  MessageProcessingOptions,
-  MessageSegment,
-  NatsMessageType,
-  ChatApprovalStatus,
-} from '../types';
+import type { ChunkData, FetchChunksFunction, HistoricalMessage, NatsMessageType, ChatApprovalStatus } from '../types';
+import type { ChatMessageActions } from '../types/message.types';
 import type {
   ChatConnectionState,
   ChatDialogCapabilities,
@@ -70,12 +59,11 @@ import type {
   FetchDialogsParams,
   FetchDialogsResult,
   UnifiedChatState,
-  UnifiedChatMessage,
   UnifiedSendMessageOptions,
 } from '../types/unified-chat-state.types';
 import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
 import { extractIncompleteTailState } from '../utils/extract-incomplete-message-state';
-import { processHistoricalMessagesWithErrors } from '../utils/process-historical-messages';
+import { processHistoricalMessages } from '../utils/process-historical-messages';
 import { useChunkCatchup } from './use-chunk-catchup';
 import { useManagedDialogList } from './use-managed-dialog-list';
 import { useNatsDialogSubscription } from './use-nats-dialog-subscription';
@@ -173,21 +161,10 @@ export interface UseNatsChatAdapterConfig {
   topics?: NatsMessageType[];
 
   /**
-   * Mirrors the reducer's `batchApprovalsEnabled`. Default `true` —
-   * single batch card per APPROVAL_REQUEST with `toolCalls[]`. Set
-   * `false` to fall back to legacy per-tool cards.
+   * Approval types rendered as actionable cards inline (default `['CLIENT']`), the state's `displayApprovalTypes`. Hosts
+   * whose backend emits other types (e.g. `USER`) MUST set this: otherwise such a card is not drawn until it is resolved.
    */
-  batchApprovalsEnabled?: boolean;
-
-  /**
-   * Approval types rendered as actionable cards inline. Mirrors the
-   * reducer's `displayApprovalTypes` (default `['CLIENT']`) and is
-   * forwarded to the history processor so both paths agree. Hosts whose
-   * backend emits other types (e.g. `USER`) MUST set this — otherwise
-   * those approvals are escalated to a callback this adapter doesn't
-   * surface and the card never renders.
-   */
-  displayApprovalTypes?: string[];
+  displayApprovalTypes?: readonly string[];
 
   // ─── Managed-dialog mode (sidebar + history) ─────────────────────────────
 
@@ -207,8 +184,7 @@ export interface UseNatsChatAdapterConfig {
    *
    * Messages must arrive in the same wire shape the openframe backend
    * emits (HistoricalMessage with messageData[]); the adapter feeds
-   * them through `processHistoricalMessagesWithErrors` to produce
-   * reducer-compatible messages.
+   * them through `processHistoricalMessages`.
    */
   fetchDialogMessages?: (params: FetchDialogMessagesParams) => Promise<FetchDialogMessagesResult>;
 
@@ -242,14 +218,19 @@ export interface UseNatsChatAdapterConfig {
   unarchiveDialog?: (dialogId: string) => Promise<void>;
 
   /**
-   * Approve a pending tool-call request. Wired into the reducer's
-   * approval-card callbacks so card buttons fire this directly. When
-   * omitted, approval cards render disabled buttons.
+   * Approve a pending tool-call request, by the id the backend knows it by. Card buttons reach it through the state's
+   * `actions`. When omitted, approval cards render disabled buttons.
    */
   approveRequest?: (requestId: string) => Promise<void>;
 
   /** Reject counterpart of `approveRequest`. */
   rejectRequest?: (requestId: string, reason?: string) => Promise<void>;
+
+  /** Accept an escalation offer: offers resolve through the ticket-escalation mutations, not the approval endpoint. */
+  approveEscalation?: (offerId: string) => void | Promise<void>;
+
+  /** Reject counterpart of `approveEscalation`. */
+  rejectEscalation?: (offerId: string) => void | Promise<void>;
 
   /**
    * Cancel in-flight assistant generation. Without this, `stopMessage`
@@ -264,7 +245,7 @@ export interface UseNatsChatAdapterConfig {
 
   /**
    * GraphQL `chatType` discriminator to filter historical messages by.
-   * When set, `processHistoricalMessagesWithErrors` skips messages
+   * When set, `processHistoricalMessages` skips messages
    * whose `chatType` doesn't match. Openframe-frontend uses
    * `'ADMIN_AI_CHAT'` here.
    */
@@ -303,78 +284,27 @@ export interface UseNatsChatAdapterOptions {
 }
 
 // =============================================================================
-// Historical-message mapping helpers (host-facing)
-// =============================================================================
-
-/**
- * Map `ProcessedMessage` (lib's historical-message format) into
- * `UnifiedChatMessage` (the unified-chat-state contract). Only `user`
- * and `assistant` roles round-trip; `error` is dropped on the floor
- * here because the unified contract surfaces errors as banners, not
- * inline messages. (Hosts that need inline error bubbles can extend
- * the contract later.)
- *
- * Exported for host reuse (e.g. scripted marketing demos that rehydrate a
- * stored `HistoricalMessage[]` via `processHistoricalMessagesWithErrors` and
- * feed a `previewMode` EmbeddableChat). This mapper carries the segment/content
- * shape only; author identity (name/avatar/authorType/timestamp) that a host
- * needs for the demo is re-attached by the host from the same processed rows.
- */
-export function mapProcessedToUnified(
-  processed: Array<{
-    id: string;
-    role: 'user' | 'assistant' | 'error';
-    content: string | MessageSegment[];
-    name?: string;
-  }>,
-): UnifiedChatMessage[] {
-  const out: UnifiedChatMessage[] = [];
-  for (const m of processed) {
-    if (m.role === 'error') continue;
-    if (Array.isArray(m.content)) {
-      out.push({
-        id: m.id,
-        role: m.role,
-        content: '',
-        segments: m.content,
-      });
-    } else {
-      out.push({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-      });
-    }
-  }
-  return out;
-}
-
-/**
- * ONE-CALL `HistoricalMessage[]` -> `UnifiedChatMessage[]` for hosts replaying a
- * stored conversation outside the live adapter (scripted marketing demos, a
- * `previewMode` EmbeddableChat). Does the full pipeline the adapter does inline:
- * `processHistoricalMessagesWithErrors` -> `mapProcessedToUnified` -> re-attach
- * the author identity (name / avatar / authorType / timestamp) the segment
- * mapper drops. Hosts no longer hand-roll the two-step + re-attach.
- */
-export function historicalToUnified(
-  messages: HistoricalMessage[],
-  options: MessageProcessingOptions = {},
-): UnifiedChatMessage[] {
-  const { messages: processed } = processHistoricalMessagesWithErrors(messages, options);
-  const byId = new Map(processed.map(p => [p.id, p]));
-  return mapProcessedToUnified(processed).map(u => {
-    const p = byId.get(u.id);
-    return p ? { ...u, name: p.name, avatar: p.avatar ?? null, authorType: p.authorType, timestamp: p.timestamp } : u;
-  });
-}
-
-// =============================================================================
 // Hook
 // =============================================================================
 
 /** Store key for the draft ("no dialog selected") state. */
 const DRAFT_DIALOG_KEY = '__draft__';
+
+/** Without a host's list, the tier an end user's own approval has. */
+const DEFAULT_DISPLAY_APPROVAL_TYPES: readonly string[] = ['CLIENT'];
+
+/**
+ * The id the backend knows an approval by: one request can hold a batch of calls, and a card's button names the row. A
+ * row that is in no batch is its own request.
+ */
+function approvalRequestIdOf(messages: readonly ChatMessage[], id: string): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    for (const part of messages[i].parts) {
+      if (isToolPart(part) && 'approval' in part && part.approval?.id === id) return approvalBatchIdOf(part) ?? id;
+    }
+  }
+  return id;
+}
 
 export function useNatsChatAdapter(
   config: UseNatsChatAdapterConfig,
@@ -388,8 +318,7 @@ export function useNatsChatAdapter(
     publishUserMessage,
     fetchChunks,
     topics,
-    batchApprovalsEnabled,
-    displayApprovalTypes,
+    displayApprovalTypes = DEFAULT_DISPLAY_APPROVAL_TYPES,
     fetchDialogs,
     fetchDialogMessages,
     createDialog: createDialogCallback,
@@ -400,6 +329,8 @@ export function useNatsChatAdapter(
     unarchiveDialog,
     approveRequest: approveRequestCallback,
     rejectRequest: rejectRequestCallback,
+    approveEscalation,
+    rejectEscalation,
     stopGeneration: stopGenerationCallback,
     assistantName = 'Mingo',
     chatTypeFilter,
@@ -436,27 +367,14 @@ export function useNatsChatAdapter(
   });
 
   // ─── Approval handlers ────────────────────────────────────────────────────
-  // Defined before the reducer so the reducer's create-options can wire the
-  // approval-card buttons. Optimistically flip status before the network
-  // round-trip so the card reflects the user's choice immediately.
+  // Republished below once the reducer exists. A card's button reaches them through the stable `actions` object.
 
   const handleApproveRef = useRef<(requestId: string) => Promise<void>>(async () => {});
   const handleRejectRef = useRef<(requestId: string, reason?: string) => Promise<void>>(async () => {});
 
-  // Reducer-card adapters. The card contract is `(requestId?) => void |
-  // Promise<void>` — single optional arg; narrow at the boundary.
-  const accumApprove = useCallback((requestId?: string): void | Promise<void> => {
-    if (!requestId) return undefined;
-    return handleApproveRef.current(requestId);
-  }, []);
-  const accumReject = useCallback((requestId?: string): void | Promise<void> => {
-    if (!requestId) return undefined;
-    return handleRejectRef.current(requestId);
-  }, []);
-
   // ─── THE reducer (master stream reader) ───────────────────────────────────
   // One `ChatDialogStore` per adapter instance; one reducer per dialog.
-  // Approval statuses are request-id-keyed and GLOBAL across dialogs (a
+  // Approval statuses are id-keyed and GLOBAL across dialogs (a
   // resolved approval must not resurrect as actionable after a dialog
   // switch), so the adapter accumulates them into an instance-lifetime map
   // that seeds every newly-created per-dialog reducer.
@@ -469,16 +387,10 @@ export function useNatsChatAdapter(
   const [globalApprovalStatuses] = useState<Record<string, ChatApprovalStatus>>(() => ({}));
   const dialogKey = dialogId ?? DRAFT_DIALOG_KEY;
 
-  const { state, applyEvent, mutate } = useChatStreamReducer({
+  const { state, applyEntry, mutate } = useChatStreamReducer({
     store: dialogStore,
     dialogId: dialogKey,
-    createReducerOptions: () => ({
-      transport: 'nats',
-      batchApprovalsEnabled,
-      ...(displayApprovalTypes ? { displayApprovalTypes } : {}),
-      approvalStatuses: globalApprovalStatuses,
-      callbacks: { onApprove: accumApprove, onReject: accumReject },
-    }),
+    createReducerOptions: () => ({ approvalStatuses: globalApprovalStatuses }),
   });
 
   // Accumulate resolved statuses globally. In an effect, not the render body:
@@ -494,7 +406,7 @@ export function useNatsChatAdapter(
   // handler still closes over current values, and a discarded render can no
   // longer install a body that was never committed.
   useEffect(() => {
-    handleApproveRef.current = async (requestId: string) => {
+    handleApproveRef.current = async (id: string) => {
       if (!approveRequestCallback) return;
       // Approval hands the turn back to the agent — lock the composer now
       // rather than waiting for the APPROVAL_RESULT/EXECUTING_TOOL chunks.
@@ -502,6 +414,7 @@ export function useNatsChatAdapter(
       // busy (another approval's command executing), a failure of this
       // request must not release a lock it doesn't own.
       const key = dialogKey;
+      const requestId = approvalRequestIdOf(dialogStore.getSnapshot(key).messages, id);
       const tookLock = dialogStore.mutate(key, DEFAULT_DIALOG_SIDE, r => {
         const took = r.state.streamingPhase === 'idle';
         r.setApprovalStatus(requestId, 'approved');
@@ -519,12 +432,13 @@ export function useNatsChatAdapter(
         console.error('[useNatsChatAdapter] approveRequest failed:', err);
       }
     };
-    handleRejectRef.current = async (requestId: string, reason?: string) => {
+    handleRejectRef.current = async (id: string, reason?: string) => {
       if (!rejectRequestCallback) return;
       // Deliberately NO phase lock here (asymmetric with approve): rejection
-      // keeps the composer free so the user can type a correction right away —
+      // keeps the composer free so the user can type a correction right away:
       // the reducer's `approved`-only agent-busy gate is the same asymmetry.
       const key = dialogKey;
+      const requestId = approvalRequestIdOf(dialogStore.getSnapshot(key).messages, id);
       dialogStore.mutate(key, DEFAULT_DIALOG_SIDE, r => r.setApprovalStatus(requestId, 'rejected'));
       try {
         await rejectRequestCallback(requestId, reason);
@@ -535,14 +449,27 @@ export function useNatsChatAdapter(
     };
   });
 
-  // Decode + apply — the ONLY chunk entry point (catchup routes the live
+  // One stateful decoder per dialog: a text's slices meet across chunks, and an answer's sources are read by what follows.
+  const [decoders] = useState(() => new Map<string, MingoDecoder>());
+  const decoderOf = useCallback(
+    (key: string): MingoDecoder => {
+      const known = decoders.get(key);
+      if (known) return known;
+      const decoder = createMingoDecoder();
+      decoders.set(key, decoder);
+      return decoder;
+    },
+    [decoders],
+  );
+
+  // Decode + apply: the ONLY chunk entry point (catchup routes the live
   // tail through here too, so buffering/dedupe stay consistent).
   const processChunk = useCallback(
     (chunk: unknown) => {
-      const event = decodeNatsChunk(chunk);
-      if (event) applyEvent(event);
+      const entry = decoderOf(dialogKey).decode(chunk);
+      if (entry.chunks.length > 0) applyEntry(entry);
     },
-    [applyEvent],
+    [applyEntry, decoderOf, dialogKey],
   );
 
   // ─── Dialog list state (managed-dialog mode only) ─────────────────────────
@@ -571,7 +498,10 @@ export function useNatsChatAdapter(
     pageSize: dialogsPageSize,
     logTag: '[useNatsChatAdapter]',
     onDialogRemoved: (id, reason) => {
-      if (reason === 'deleted') dialogStore.remove(id);
+      if (reason === 'deleted') {
+        dialogStore.remove(id);
+        decoders.delete(id);
+      }
       if (isManagedMode && internalDialogId === id) {
         setInternalDialogId(null);
       }
@@ -611,9 +541,8 @@ export function useNatsChatAdapter(
 
   // ─── Historical message hydration ─────────────────────────────────────────
   // When the active dialog changes AND a `fetchDialogMessages` callback
-  // is wired, load the first page of history, process it through the
-  // history decoder + envelope, and seed the reducer. Streaming chunks for
-  // the same dialog then append on top.
+  // is wired, load the first page of history, process it, and seed the
+  // reducer. Streaming chunks for the same dialog then append on top.
 
   // Monotonic guard: each history load captures a sequence number; when a
   // response resolves, it only applies if it's still the latest request. This
@@ -636,22 +565,17 @@ export function useNatsChatAdapter(
         });
         // Ignore stale responses superseded by a newer dialog selection.
         if (seq !== historyLoadSeqRef.current) return;
-        const { messages: rawProcessed } = processHistoricalMessagesWithErrors(result.messages, {
+        const { messages: processed } = processHistoricalMessages(result.messages, {
           assistantName,
           assistantType: 'mingo',
           chatTypeFilter,
-          onApprove: accumApprove,
-          onReject: accumReject,
           approvalStatuses: store.getSnapshot(id).approvalStatuses,
-          batchApprovalsEnabled,
-          ...(displayApprovalTypes ? { displayApprovalTypes } : {}),
         });
-        const unified = mapProcessedToUnified(rawProcessed);
         store.mutate(id, DEFAULT_DIALOG_SIDE, r => {
           if (cursor === undefined) {
-            // First page — replace. When the trailing assistant is an
+            // First page: replace. When the trailing assistant is an
             // INCOMPLETE turn, the catchup replay will re-stream it from its
-            // MESSAGE_START — let that stream adopt (replace) the partial
+            // MESSAGE_START: let that stream adopt (replace) the partial
             // bubble instead of opening a duplicate one.
             // Gated on an ACTIVE catchup buffer: when the catchup already
             // finalized before this history page resolved, no replay is
@@ -661,22 +585,11 @@ export function useNatsChatAdapter(
             // `extractIncompleteTailState` (not the single-row extractor):
             // one logical turn can span several trailing assistant bubbles,
             // so the unfinished artifact may sit above the last row.
-            r.armAdoptTrailingAssistant(isBufferingActive() && extractIncompleteTailState(rawProcessed) !== undefined);
-            // `initializeWithState`, NOT the raw `setMessages` setter: it also
-            // derives `resumed` from the restored thread, and that flag is what
-            // makes a chunk arriving with no preceding `turn-start` APPEND to
-            // the hydrated bubble instead of replacing its segments. With
-            // `setMessages` the reducer still looked cold, so the first such
-            // chunk — routine, since the turn can open server-side before we
-            // subscribe, and the chunk store expires past ~10 min so the replay
-            // may deliver nothing — wiped the restored bubble. A pending
-            // approval card in that bubble went with it, leaving the agent
-            // blocked on a control the user could no longer see. The SSE
-            // adapter always hydrated through this door; now both do.
-            r.initializeWithState(unified);
+            r.armAdoptTrailingAssistant(isBufferingActive() && extractIncompleteTailState(processed) !== undefined);
+            r.initializeWithState(processed);
           } else {
-            // Older page — prepend.
-            r.prependMessages(unified);
+            // Older page: prepend.
+            r.prependMessages(processed);
           }
           if (result.tokenUsage !== undefined) {
             r.setDialogTokenUsage(result.tokenUsage ?? null);
@@ -693,18 +606,7 @@ export function useNatsChatAdapter(
         }
       }
     },
-    [
-      dialogStore,
-      fetchDialogMessages,
-      messagesPageSize,
-      assistantName,
-      chatTypeFilter,
-      batchApprovalsEnabled,
-      displayApprovalTypes,
-      accumApprove,
-      accumReject,
-      isBufferingActive,
-    ],
+    [dialogStore, fetchDialogMessages, messagesPageSize, assistantName, chatTypeFilter, isBufferingActive],
   );
 
   // Reset + reload when the active dialog changes.
@@ -719,10 +621,11 @@ export function useNatsChatAdapter(
     // this an in-flight response could repopulate the just-cleared state.
     historyLoadSeqRef.current += 1;
 
-    // Clean slate for the (re)entered dialog: thread, per-turn kernel,
-    // participant dedup sets, seq gate, phase. Approval statuses survive
+    // Clean slate for the (re)entered dialog: thread, the stream's state,
+    // participant dedup sets, seq gate, phase, its decoder. Approval statuses survive
     // per-reducer AND get topped up with the adapter's global map (request
     // ids are dialog-independent).
+    decoders.delete(dialogKey);
     dialogStore.mutate(dialogKey, DEFAULT_DIALOG_SIDE, r => {
       r.resetForDialogSwitch();
       // Canonical precedence lives in the reducer: persisted (the adapter's
@@ -739,7 +642,7 @@ export function useNatsChatAdapter(
     // Hydrate history first; then catchup will fold in any chunks that
     // landed between the history snapshot and the live tail.
     void loadDialogHistory(dialogId);
-  }, [active, dialogId, dialogKey, dialogStore, globalApprovalStatuses, loadDialogHistory]);
+  }, [active, decoders, dialogId, dialogKey, dialogStore, globalApprovalStatuses, loadDialogHistory]);
 
   // Trigger initial chunk backfill whenever a fresh dialog activates.
   // Runs alongside history hydration — history seeds processed messages,
@@ -938,13 +841,23 @@ export function useNatsChatAdapter(
     await loadDialogHistory(dialogId, messagesNextCursor);
   }, [dialogId, messagesNextCursor, loadDialogHistory]);
 
-  const approveRequest = useCallback(async (requestId: string) => {
-    await handleApproveRef.current(requestId);
+  const logSendFailure = useCallback((err: unknown) => {
+    // A card or a chip has no composer promise for the rejection to surface through.
+    console.error('[useNatsChatAdapter] send failed:', err);
   }, []);
 
-  const rejectRequest = useCallback(async (requestId: string, reason?: string) => {
-    await handleRejectRef.current(requestId, reason);
-  }, []);
+  // What a message's controls do: a stable object, the message memo compares it by reference.
+  const actions = useMemo<ChatMessageActions>(
+    () => ({
+      approve: id => handleApproveRef.current(id),
+      reject: (id, reason) => handleRejectRef.current(id, reason),
+      ...(approveEscalation ? { approveEscalation } : {}),
+      ...(rejectEscalation ? { rejectEscalation } : {}),
+      selectAsk: label => void sendMessage(label).catch(logSendFailure),
+      pickSuggestion: prompt => void sendMessage(prompt).catch(logSendFailure),
+    }),
+    [approveEscalation, rejectEscalation, sendMessage, logSendFailure],
+  );
 
   // "Ask Mingo" on an inline entity card. The agent transport has NO
   // entity-id-filtered retrieval (its `ContextItemType` enum covers DEVICE /
@@ -1001,6 +914,8 @@ export function useNatsChatAdapter(
   return useMemo<UnifiedChatState>(
     () => ({
       messages,
+      actions,
+      displayApprovalTypes,
       isLoading,
       streamingPhase,
       sendMessage,
@@ -1036,9 +951,6 @@ export function useNatsChatAdapter(
       hasMoreMessages,
       loadMoreMessages,
       dialogCapabilities,
-      // Approval mutations
-      approveRequest,
-      rejectRequest,
       // Token usage
       dialogTokenUsage,
       // Connection state
@@ -1046,6 +958,8 @@ export function useNatsChatAdapter(
     }),
     [
       messages,
+      actions,
+      displayApprovalTypes,
       isLoading,
       streamingPhase,
       sendMessage,
@@ -1069,8 +983,6 @@ export function useNatsChatAdapter(
       hasMoreMessages,
       loadMoreMessages,
       dialogCapabilities,
-      approveRequest,
-      rejectRequest,
       dialogTokenUsage,
       liveModel,
       modelProvider,

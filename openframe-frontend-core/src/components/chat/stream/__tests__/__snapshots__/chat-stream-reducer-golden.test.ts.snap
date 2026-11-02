@@ -1,944 +1,731 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`chat stream reducer — legacy chunk-processor golden event logs > CHARACTERIZATION duplicate/out-of-order: redelivered EXECUTING after EXECUTED in-stream appends a NEW executing segment (no dedup) 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onAgentBusy",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "integratedToolType": "TACTICAL_RMM",
-          "parameters": {
-            "script": "cleanup.sh",
-          },
-          "toolExecutionRequestId": "exec-1",
-          "toolExplanation": undefined,
-          "toolFunction": "run_script",
-          "toolTitle": "Run cleanup script",
-          "type": "EXECUTING_TOOL",
-        },
-        "type": "tool_execution",
-      },
-    ],
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "integratedToolType": "TACTICAL_RMM",
-          "parameters": {
-            "script": "cleanup.sh",
-          },
-          "result": "Freed 2.3 GB",
-          "success": true,
-          "toolExecutionRequestId": "exec-1",
-          "toolExplanation": undefined,
-          "toolFunction": "run_script",
-          "toolTitle": "Run cleanup script",
-          "type": "EXECUTED_TOOL",
-        },
-        "type": "tool_execution",
-      },
-    ],
-  },
-  {
-    "event": "onAgentBusy",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "integratedToolType": "TACTICAL_RMM",
-          "parameters": {
-            "script": "cleanup.sh",
-          },
-          "result": "Freed 2.3 GB",
-          "success": true,
-          "toolExecutionRequestId": "exec-1",
-          "toolExplanation": undefined,
-          "toolFunction": "run_script",
-          "toolTitle": "Run cleanup script",
-          "type": "EXECUTED_TOOL",
-        },
-        "type": "tool_execution",
-      },
-      {
-        "data": {
-          "integratedToolType": "TACTICAL_RMM",
-          "parameters": {
-            "script": "cleanup.sh",
-          },
-          "toolExecutionRequestId": "exec-1",
-          "toolExplanation": undefined,
-          "toolFunction": "run_script",
-          "toolTitle": "Run cleanup script",
-          "type": "EXECUTING_TOOL",
-        },
-        "type": "tool_execution",
-      },
-    ],
-  },
-  {
-    "event": "onStreamEnd",
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > approval request (displayed) → approval result: in-message flip + onApprovalResolved 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "approvalType": "CLIENT",
-          "command": "systemctl restart nats",
-          "explanation": "Restart the broker",
-          "requestId": "req-1",
-        },
-        "onApprove": [Function],
-        "onReject": [Function],
-        "status": "pending",
-        "type": "approval_request",
-      },
-    ],
-  },
-  {
-    "event": "onStreamEnd",
-  },
-  {
-    "event": "onAgentBusy",
-  },
-  {
-    "approvalType": "CLIENT",
-    "event": "onApprovalResolved",
-    "requestId": "req-1",
-    "resolvedByName": "Jane Admin",
-    "status": "approved",
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > approval result WITHOUT onApprovalResolved wired: emits cumulative onSegmentsUpdate instead 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "approvalType": "CLIENT",
-          "command": "reboot",
-          "explanation": undefined,
-          "requestId": "req-1",
-        },
-        "onApprove": [Function],
-        "onReject": [Function],
-        "status": "pending",
-        "type": "approval_request",
-      },
-    ],
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "approvalType": "CLIENT",
-          "command": "reboot",
-          "explanation": undefined,
-          "requestId": "req-1",
-        },
-        "onApprove": [Function],
-        "onReject": [Function],
-        "status": "rejected",
-        "type": "approval_request",
-      },
-    ],
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > batch approval (batchApprovalsEnabled default ON): one batch segment, executions merge into it 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "approvalRequestId": "batch-1",
-          "approvalType": "CLIENT",
-          "toolCalls": [
-            {
-              "approvalType": "CLIENT",
-              "requiresApproval": true,
-              "toolCallArguments": {
-                "subject": "Printer down",
-              },
-              "toolExecutionRequestId": "exec-a",
-              "toolExplanation": undefined,
-              "toolName": "create_ticket",
-              "toolTitle": "Create ticket",
-              "toolType": undefined,
-            },
-            {
-              "approvalType": null,
-              "requiresApproval": false,
-              "toolCallArguments": null,
-              "toolExecutionRequestId": "exec-b",
-              "toolExplanation": undefined,
-              "toolName": "read_kb",
-              "toolTitle": undefined,
-              "toolType": undefined,
-            },
-          ],
-        },
-        "onApprove": [Function],
-        "onReject": [Function],
-        "resolvedByName": undefined,
-        "status": "pending",
-        "type": "approval_batch",
-      },
-    ],
-  },
-  {
-    "event": "onAgentBusy",
-  },
-  {
-    "approvalType": "CLIENT",
-    "event": "onApprovalResolved",
-    "requestId": "batch-1",
-    "resolvedByName": "Alice Client",
-    "status": "approved",
-  },
-  {
-    "event": "onAgentBusy",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "approvalRequestId": "batch-1",
-          "approvalType": "CLIENT",
-          "executions": {
-            "exec-a": {
-              "result": undefined,
-              "status": "executing",
-              "success": undefined,
-            },
-          },
-          "toolCalls": [
-            {
-              "approvalType": "CLIENT",
-              "requiresApproval": true,
-              "toolCallArguments": {
-                "subject": "Printer down",
-              },
-              "toolExecutionRequestId": "exec-a",
-              "toolExplanation": undefined,
-              "toolName": "create_ticket",
-              "toolTitle": "Create ticket",
-              "toolType": undefined,
-            },
-            {
-              "approvalType": null,
-              "requiresApproval": false,
-              "toolCallArguments": null,
-              "toolExecutionRequestId": "exec-b",
-              "toolExplanation": undefined,
-              "toolName": "read_kb",
-              "toolTitle": undefined,
-              "toolType": undefined,
-            },
-          ],
-        },
-        "onApprove": [Function],
-        "onReject": [Function],
-        "resolvedByName": "Alice Client",
-        "status": "approved",
-        "type": "approval_batch",
-      },
-    ],
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "approvalRequestId": "batch-1",
-          "approvalType": "CLIENT",
-          "executions": {
-            "exec-a": {
-              "result": "Ticket #77 created",
-              "status": "done",
-              "success": true,
-            },
-          },
-          "toolCalls": [
-            {
-              "approvalType": "CLIENT",
-              "requiresApproval": true,
-              "toolCallArguments": {
-                "subject": "Printer down",
-              },
-              "toolExecutionRequestId": "exec-a",
-              "toolExplanation": undefined,
-              "toolName": "create_ticket",
-              "toolTitle": "Create ticket",
-              "toolType": undefined,
-            },
-            {
-              "approvalType": null,
-              "requiresApproval": false,
-              "toolCallArguments": null,
-              "toolExecutionRequestId": "exec-b",
-              "toolExplanation": undefined,
-              "toolName": "read_kb",
-              "toolTitle": undefined,
-              "toolType": undefined,
-            },
-          ],
-        },
-        "onApprove": [Function],
-        "onReject": [Function],
-        "resolvedByName": "Alice Client",
-        "status": "approved",
-        "type": "approval_batch",
-      },
-    ],
-  },
-  {
-    "event": "onStreamEnd",
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > batch approval with batchApprovalsEnabled:false unfolds into legacy cards (requiresApproval only) 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "data": {
-          "approvalType": "CLIENT",
-          "command": "Create ticket",
-          "explanation": undefined,
-          "requestId": "batch-1",
-        },
-        "onApprove": [Function],
-        "onReject": [Function],
-        "status": "pending",
-        "type": "approval_request",
-      },
-    ],
-  },
-  {
-    "event": "onStreamEnd",
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > cold start (no MESSAGE_START ever): text emits CUMULATIVE segments (no append flag) 1`] = `
-[
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "cold ",
-        "type": "text",
-      },
-    ],
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "cold start",
-        "type": "text",
-      },
-    ],
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > context compaction outside a stream emits append+isCompacting metadata; inside a stream it is cumulative 1`] = `
+exports[`chat stream reducer — what the thread holds after a wire > a rejected approval is denied, inside the open turn 1`] = `
 {
-  "inStream": [
+  "approvalStatuses": {
+    "req-1": "rejected",
+  },
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
     {
-      "event": "onStreamStart",
-    },
-    {
-      "event": "onSegmentsUpdate",
-      "metadata": undefined,
-      "segments": [
+      "id": "stream-1",
+      "metadata": {
+        "createdAt": "<time>",
+      },
+      "parts": [
         {
-          "status": "started",
-          "type": "context_compaction",
+          "approval": {
+            "approved": false,
+            "descriptor": {
+              "approvalType": "CLIENT",
+            },
+            "id": "req-1",
+          },
+          "input": {},
+          "state": "output-denied",
+          "title": "reboot",
+          "toolCallId": "req-1",
+          "toolName": "command",
+          "type": "dynamic-tool",
         },
       ],
-    },
-    {
-      "event": "onSegmentsUpdate",
-      "metadata": undefined,
-      "segments": [
-        {
-          "status": "completed",
-          "summary": "Mid-stream summary",
-          "type": "context_compaction",
-        },
-      ],
-    },
-    {
-      "event": "onStreamEnd",
+      "role": "assistant",
     },
   ],
-  "standalone": [
-    {
-      "event": "onSegmentsUpdate",
-      "metadata": {
-        "append": true,
-        "isCompacting": true,
-      },
-      "segments": [
-        {
-          "status": "started",
-          "type": "context_compaction",
-        },
-      ],
-    },
-    {
-      "event": "onSegmentsUpdate",
-      "metadata": {
-        "append": true,
-        "isCompacting": true,
-      },
-      "segments": [
-        {
-          "status": "completed",
-          "summary": "Summarized 12 messages",
-          "type": "context_compaction",
-        },
-      ],
-    },
-  ],
+  "streamingPhase": "streaming",
 }
 `;
 
-exports[`chat stream reducer — legacy chunk-processor golden event logs > direct-mode barrier: after a DIRECT_MESSAGE, AI chunks are dropped with a one-shot teardown 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "ai text before takeover",
-        "type": "text",
-      },
-    ],
-  },
-  {
-    "event": "onDirectMessage",
-    "metadata": {
-      "displayName": undefined,
-      "ownerType": "ADMIN",
-      "streamSeq": undefined,
-      "userId": undefined,
-    },
-    "text": "Human takeover",
-  },
-  {
-    "event": "onStreamEnd",
-  },
-  {
-    "event": "onSystemMessage",
-    "metadata": {
-      "streamSeq": undefined,
-    },
-    "text": "still visible",
-  },
-  {
-    "event": "onDirectMessage",
-    "metadata": {
-      "displayName": undefined,
-      "ownerType": undefined,
-      "streamSeq": undefined,
-      "userId": undefined,
-    },
-    "text": "second human message",
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > error chunk: segment append + onError with JSON-extracted message 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "partial",
-        "type": "text",
-      },
-    ],
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "partial",
-        "type": "text",
-      },
-      {
-        "details": "boom",
-        "title": "Agent crashed",
-        "type": "error",
-      },
-    ],
-  },
-  {
-    "details": "boom",
-    "error": "Agent crashed",
-    "event": "onError",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "partial",
-        "type": "text",
-      },
-      {
-        "details": "boom",
-        "title": "Agent crashed",
-        "type": "error",
-      },
-      {
-        "details": "not-json",
-        "title": "Plain details",
-        "type": "error",
-      },
-    ],
-  },
-  {
-    "details": "not-json",
-    "error": "Plain details",
-    "event": "onError",
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > escalated approval (type not displayed) → onEscalatedApproval, then result appends resolved card 1`] = `
+exports[`chat stream reducer — what the thread holds after a wire > a restored partial message: continuation chunks extend it 1`] = `
 {
-  "log": [
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
     {
-      "event": "onStreamStart",
-    },
-    {
-      "data": {
-        "approvalType": "ADMIN",
-        "command": "drop database prod",
-        "explanation": undefined,
-      },
-      "event": "onEscalatedApproval",
-      "requestId": "req-adm",
-    },
-    {
-      "event": "onStreamEnd",
-    },
-    {
-      "event": "onAgentBusy",
-    },
-    {
-      "approved": true,
-      "data": {
-        "approvalType": "ADMIN",
-        "command": "drop database prod",
-        "explanation": undefined,
-      },
-      "event": "onEscalatedApprovalResult",
-      "requestId": "req-adm",
-    },
-    {
-      "event": "onSegmentsUpdate",
+      "id": "<id-1>",
       "metadata": {
-        "append": true,
+        "createdAt": "<time>",
       },
-      "segments": [
+      "parts": [
+        {
+          "state": "streaming",
+          "text": "restored partial and the rest",
+          "type": "text",
+        },
+      ],
+      "role": "assistant",
+    },
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > an approval of a tier this side does not answer stays in the message, with its tier 1`] = `
+{
+  "pending": {
+    "approvalStatuses": {},
+    "dialogTokenUsage": null,
+    "liveModel": null,
+    "messages": [
+      {
+        "id": "stream-1",
+        "metadata": {
+          "createdAt": "<time>",
+          "finishReason": "stop",
+        },
+        "parts": [
+          {
+            "approval": {
+              "descriptor": {
+                "approvalType": "ADMIN",
+              },
+              "id": "req-adm",
+            },
+            "input": {},
+            "state": "approval-requested",
+            "title": "drop database prod",
+            "toolCallId": "req-adm",
+            "toolName": "command",
+            "type": "dynamic-tool",
+          },
+        ],
+        "role": "assistant",
+      },
+    ],
+    "streamingPhase": "idle",
+  },
+  "resolved": {
+    "approvalStatuses": {
+      "req-adm": "approved",
+    },
+    "dialogTokenUsage": null,
+    "liveModel": null,
+    "messages": [
+      {
+        "id": "stream-1",
+        "metadata": {
+          "createdAt": "<time>",
+          "finishReason": "stop",
+        },
+        "parts": [
+          {
+            "approval": {
+              "approved": true,
+              "descriptor": {
+                "approvalType": "ADMIN",
+              },
+              "id": "req-adm",
+            },
+            "input": {},
+            "state": "approval-responded",
+            "title": "drop database prod",
+            "toolCallId": "req-adm",
+            "toolName": "command",
+            "type": "dynamic-tool",
+          },
+        ],
+        "role": "assistant",
+      },
+    ],
+    "streamingPhase": "thinking",
+  },
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > approval request → approval result: the card flips where it stands, with who resolved it 1`] = `
+{
+  "approvalStatuses": {
+    "req-1": "approved",
+  },
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "stream-1",
+      "metadata": {
+        "createdAt": "<time>",
+        "finishReason": "stop",
+      },
+      "parts": [
+        {
+          "approval": {
+            "approved": true,
+            "descriptor": {
+              "approvalType": "CLIENT",
+            },
+            "id": "req-1",
+            "requestReason": "Restart the broker",
+          },
+          "input": {},
+          "state": "approval-responded",
+          "title": "systemctl restart nats",
+          "toolCallId": "req-1",
+          "toolMetadata": {
+            "resolvedByName": "Jane Admin",
+          },
+          "toolName": "command",
+          "type": "dynamic-tool",
+        },
+      ],
+      "role": "assistant",
+    },
+  ],
+  "streamingPhase": "thinking",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > batch approval: one row per tool on one batch, executions merge into them 1`] = `
+{
+  "approvalStatuses": {
+    "batch-1": "approved",
+    "exec-a": "approved",
+  },
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "stream-1",
+      "metadata": {
+        "createdAt": "<time>",
+        "finishReason": "stop",
+      },
+      "parts": [
+        {
+          "approval": {
+            "approved": true,
+            "descriptor": {
+              "approvalType": "CLIENT",
+              "batchId": "batch-1",
+            },
+            "id": "exec-a",
+          },
+          "input": {
+            "subject": "Printer down",
+          },
+          "output": "Ticket #77 created",
+          "state": "output-available",
+          "title": "Create ticket",
+          "toolCallId": "exec-a",
+          "toolMetadata": {
+            "integratedToolType": "PSA",
+            "resolvedByName": "Alice Client",
+          },
+          "toolName": "create_ticket",
+          "type": "dynamic-tool",
+        },
+        {
+          "input": {},
+          "state": "input-available",
+          "toolCallId": "exec-b",
+          "toolMetadata": {
+            "batchId": "batch-1",
+          },
+          "toolName": "read_kb",
+          "type": "dynamic-tool",
+        },
+      ],
+      "role": "assistant",
+    },
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > cold start (no MESSAGE_START ever): text opens the first message 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "<id-1>",
+      "metadata": {
+        "createdAt": "<time>",
+      },
+      "parts": [
+        {
+          "state": "streaming",
+          "text": "cold start",
+          "type": "text",
+        },
+      ],
+      "role": "assistant",
+    },
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > context compaction, outside a stream and inside one 1`] = `
+{
+  "inStream": {
+    "approvalStatuses": {},
+    "dialogTokenUsage": null,
+    "liveModel": null,
+    "messages": [
+      {
+        "id": "stream-1",
+        "metadata": {
+          "createdAt": "<time>",
+          "finishReason": "stop",
+        },
+        "parts": [
+          {
+            "data": {
+              "status": "completed",
+              "summary": "Mid-stream summary",
+            },
+            "id": "compaction-2",
+            "type": "data-context-compaction",
+          },
+        ],
+        "role": "assistant",
+      },
+    ],
+    "streamingPhase": "idle",
+  },
+  "standalone": {
+    "approvalStatuses": {},
+    "dialogTokenUsage": null,
+    "liveModel": null,
+    "messages": [
+      {
+        "id": "<id-1>",
+        "metadata": {
+          "createdAt": "<time>",
+        },
+        "parts": [
+          {
+            "data": {
+              "status": "completed",
+              "summary": "Summarized 12 messages",
+            },
+            "id": "compaction-1",
+            "type": "data-context-compaction",
+          },
+        ],
+        "role": "assistant",
+      },
+    ],
+    "streamingPhase": "idle",
+  },
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > direct-mode barrier: after a DIRECT_MESSAGE, AI chunks are dropped with a one-shot teardown 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "stream-1",
+      "metadata": {
+        "createdAt": "<time>",
+      },
+      "parts": [
+        {
+          "state": "done",
+          "text": "ai text before takeover",
+          "type": "text",
+        },
+      ],
+      "role": "assistant",
+    },
+    {
+      "id": "<id-1>",
+      "metadata": {
+        "author": {
+          "authorType": "admin",
+          "name": "Admin",
+        },
+        "createdAt": "<time>",
+      },
+      "parts": [
+        {
+          "text": "Human takeover",
+          "type": "text",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "id": "<id-2>",
+      "metadata": {
+        "author": {
+          "authorType": "system",
+        },
+        "createdAt": "<time>",
+      },
+      "parts": [
+        {
+          "text": "still visible",
+          "type": "text",
+        },
+      ],
+      "role": "system",
+    },
+    {
+      "id": "<id-3>",
+      "metadata": {
+        "author": {
+          "authorType": "admin",
+          "name": "Admin",
+        },
+        "createdAt": "<time>",
+      },
+      "parts": [
+        {
+          "text": "second human message",
+          "type": "text",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > duplicate / out-of-order: a redelivered EXECUTING after EXECUTED neither adds a row nor downgrades the result 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "stream-1",
+      "metadata": {
+        "createdAt": "<time>",
+        "finishReason": "stop",
+      },
+      "parts": [
+        {
+          "input": {
+            "script": "cleanup.sh",
+          },
+          "output": "Freed 2.3 GB",
+          "state": "output-available",
+          "title": "Run cleanup script",
+          "toolCallId": "exec-1",
+          "toolMetadata": {
+            "integratedToolType": "TACTICAL_RMM",
+          },
+          "toolName": "run_script",
+          "type": "dynamic-tool",
+        },
+      ],
+      "role": "assistant",
+    },
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > error chunks: drawn in the message, with the message a JSON detail names 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "stream-1",
+      "metadata": {
+        "createdAt": "<time>",
+      },
+      "parts": [
+        {
+          "state": "done",
+          "text": "partial",
+          "type": "text",
+        },
         {
           "data": {
-            "approvalType": "ADMIN",
-            "command": "drop database prod",
-            "explanation": undefined,
-            "requestId": "req-adm",
+            "details": "boom",
+            "title": "Agent crashed",
           },
-          "onApprove": [Function],
-          "onReject": [Function],
-          "status": "approved",
-          "type": "approval_request",
+          "type": "data-error",
+        },
+        {
+          "data": {
+            "details": "not-json",
+            "title": "Plain details",
+          },
+          "type": "data-error",
         },
       ],
-    },
-    {
-      "approvalType": "ADMIN",
-      "event": "onApprovalResolved",
-      "requestId": "req-adm",
-      "resolvedByName": undefined,
-      "status": "approved",
+      "role": "assistant",
     },
   ],
-  "pendingAfter": [],
+  "streamingPhase": "streaming",
 }
 `;
 
-exports[`chat stream reducer — legacy chunk-processor golden event logs > initialState resume: continuation chunks after resume take the post-stream append path 1`] = `
-[
-  {
-    "data": {
-      "approvalType": "ADMIN",
-      "command": "escalated cmd",
-    },
-    "event": "onEscalatedApproval",
-    "requestId": "req-esc",
+exports[`chat stream reducer — what the thread holds after a wire > normal turn: start → metadata → text ×3 → token usage → end 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": {
+    "contextSize": 180000,
+    "inputTokensSize": 100,
+    "outputTokensSize": 20,
+    "totalTokensSize": 120,
   },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > normal turn: start → metadata → text ×3 → token usage → end 1`] = `
-[
-  {
-    "event": "onStreamStart",
+  "liveModel": {
+    "contextWindowMaxTokens": 200000,
+    "modelLabel": "Claude Sonnet",
+    "provider": "anthropic",
   },
-  {
-    "event": "onMetadata",
-    "metadata": {
-      "action": "metadata",
-      "contextWindow": 200000,
-      "modelDisplayName": "Claude Sonnet",
-      "modelName": "claude-sonnet-x",
-      "providerName": "anthropic",
-    },
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "Hello",
-        "type": "text",
+  "messages": [
+    {
+      "id": "stream-1",
+      "metadata": {
+        "contextWindowMaxTokens": 200000,
+        "createdAt": "<time>",
+        "finishReason": "stop",
+        "model": "claude-sonnet-x",
+        "modelLabel": "Claude Sonnet",
+        "provider": "anthropic",
       },
-    ],
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "Hello, ",
-        "type": "text",
-      },
-    ],
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "Hello, world",
-        "type": "text",
-      },
-    ],
-  },
-  {
-    "data": {
-      "contextSize": 180000,
-      "inputTokensSize": 100,
-      "outputTokensSize": 20,
-      "totalTokensSize": 120,
-    },
-    "event": "onTokenUsage",
-  },
-  {
-    "event": "onStreamEnd",
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > post-MESSAGE_END continuation: text/thinking emit DELTA segments with append:true 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "in-stream",
-        "type": "text",
-      },
-    ],
-  },
-  {
-    "event": "onStreamEnd",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": {
-      "append": true,
-    },
-    "segments": [
-      {
-        "text": "post-end text",
-        "type": "text",
-      },
-    ],
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": {
-      "append": true,
-    },
-    "segments": [
-      {
-        "text": "post-end thinking",
-        "type": "thinking",
-      },
-    ],
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > reset() clears accumulator + stream flags so the next dialog cold-starts cumulative 1`] = `
-[
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "dialog two cold start",
-        "type": "text",
-      },
-    ],
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > streamSeq on content chunks is threaded into onSegmentsUpdate metadata 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": {
-      "streamSeq": 7,
-    },
-    "segments": [
-      {
-        "text": "seq-stamped",
-        "type": "text",
-      },
-    ],
-  },
-  {
-    "event": "onStreamEnd",
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > tool execution IN-stream: accumulator-driven segment updates, onToolExecuted NOT fired 1`] = `
-[
-  {
-    "event": "onStreamStart",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "Running now. ",
-        "type": "text",
-      },
-    ],
-  },
-  {
-    "event": "onAgentBusy",
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "Running now. ",
-        "type": "text",
-      },
-      {
-        "data": {
-          "integratedToolType": "TACTICAL_RMM",
-          "parameters": {
-            "script": "cleanup.sh",
-          },
-          "toolExecutionRequestId": "exec-1",
-          "toolExplanation": undefined,
-          "toolFunction": "run_script",
-          "toolTitle": "Run cleanup script",
-          "type": "EXECUTING_TOOL",
-        },
-        "type": "tool_execution",
-      },
-    ],
-  },
-  {
-    "event": "onSegmentsUpdate",
-    "metadata": undefined,
-    "segments": [
-      {
-        "text": "Running now. ",
-        "type": "text",
-      },
-      {
-        "data": {
-          "integratedToolType": "TACTICAL_RMM",
-          "parameters": {
-            "script": "cleanup.sh",
-          },
-          "result": "Freed 2.3 GB",
-          "success": true,
-          "toolExecutionRequestId": "exec-1",
-          "toolExplanation": undefined,
-          "toolFunction": "run_script",
-          "toolTitle": "Run cleanup script",
-          "type": "EXECUTED_TOOL",
-        },
-        "type": "tool_execution",
-      },
-    ],
-  },
-  {
-    "event": "onStreamEnd",
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > tool execution OUTSIDE a message window: onAgentBusy + cross-message onToolExecuted (accumulator skipped) 1`] = `
-[
-  {
-    "event": "onAgentBusy",
-  },
-  {
-    "event": "onToolExecuted",
-    "segment": {
-      "data": {
-        "integratedToolType": "TACTICAL_RMM",
-        "parameters": {
-          "script": "cleanup.sh",
-        },
-        "toolExecutionRequestId": "exec-1",
-        "toolExplanation": undefined,
-        "toolFunction": "run_script",
-        "toolTitle": "Run cleanup script",
-        "type": "EXECUTING_TOOL",
-      },
-      "type": "tool_execution",
-    },
-  },
-  {
-    "event": "onToolExecuted",
-    "segment": {
-      "data": {
-        "integratedToolType": "TACTICAL_RMM",
-        "parameters": undefined,
-        "result": "Freed 2.3 GB",
-        "success": true,
-        "toolExecutionRequestId": "exec-1",
-        "toolFunction": "run_script",
-        "toolTitle": undefined,
-        "type": "EXECUTED_TOOL",
-      },
-      "type": "tool_execution",
-    },
-  },
-]
-`;
-
-exports[`chat stream reducer — legacy chunk-processor golden event logs > user echo / system / direct-message / dialog-closed routing 1`] = `
-[
-  {
-    "event": "onUserMessage",
-    "metadata": {
-      "contextItems": [
+      "parts": [
         {
-          "id": "dev-1",
-          "label": "dev-1",
-          "type": "device",
+          "state": "done",
+          "text": "Hello, world",
+          "type": "text",
         },
       ],
-      "displayName": "Alice",
-      "ownerType": "CLIENT",
-      "streamSeq": 3,
-      "userId": "user-42",
+      "role": "assistant",
     },
-    "text": "open a ticket",
-  },
-  {
-    "event": "onSystemMessage",
-    "metadata": {
-      "streamSeq": 4,
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > post-MESSAGE_END continuation: text and thinking extend the finished message 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "stream-1",
+      "metadata": {
+        "createdAt": "<time>",
+        "finishReason": "stop",
+      },
+      "parts": [
+        {
+          "state": "streaming",
+          "text": "post-end thinking",
+          "type": "reasoning",
+        },
+        {
+          "state": "streaming",
+          "text": "in-streampost-end text",
+          "type": "text",
+        },
+      ],
+      "role": "assistant",
     },
-    "text": "User joined the chat",
-  },
-  {
-    "event": "onDirectMessage",
-    "metadata": {
-      "displayName": "Jane Admin",
-      "ownerType": "ADMIN",
-      "streamSeq": 5,
-      "userId": "admin-7",
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > reset() clears everything so the next dialog cold-starts 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "<id-1>",
+      "metadata": {
+        "createdAt": "<time>",
+      },
+      "parts": [
+        {
+          "state": "streaming",
+          "text": "dialog two cold start",
+          "type": "text",
+        },
+      ],
+      "role": "assistant",
     },
-    "text": "Human here now",
-  },
-  {
-    "event": "onDialogClosed",
-  },
-]
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > streamSeq on content chunks reaches the message it built 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "stream-1",
+      "metadata": {
+        "createdAt": "<time>",
+        "finishReason": "stop",
+        "streamSeq": 7,
+      },
+      "parts": [
+        {
+          "state": "done",
+          "text": "seq-stamped",
+          "type": "text",
+        },
+      ],
+      "role": "assistant",
+    },
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > tool execution IN-stream: a row in the message, then its result 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "stream-1",
+      "metadata": {
+        "createdAt": "<time>",
+        "finishReason": "stop",
+      },
+      "parts": [
+        {
+          "state": "done",
+          "text": "Running now. ",
+          "type": "text",
+        },
+        {
+          "input": {
+            "script": "cleanup.sh",
+          },
+          "output": "Freed 2.3 GB",
+          "state": "output-available",
+          "title": "Run cleanup script",
+          "toolCallId": "exec-1",
+          "toolMetadata": {
+            "integratedToolType": "TACTICAL_RMM",
+          },
+          "toolName": "run_script",
+          "type": "dynamic-tool",
+        },
+      ],
+      "role": "assistant",
+    },
+  ],
+  "streamingPhase": "idle",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > tool execution OUTSIDE a message window: the agent is busy, and the result lands on the row 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "<id-1>",
+      "metadata": {
+        "createdAt": "<time>",
+      },
+      "parts": [
+        {
+          "input": {
+            "script": "cleanup.sh",
+          },
+          "output": "Freed 2.3 GB",
+          "state": "output-available",
+          "title": "Run cleanup script",
+          "toolCallId": "exec-1",
+          "toolMetadata": {
+            "integratedToolType": "TACTICAL_RMM",
+          },
+          "toolName": "run_script",
+          "type": "dynamic-tool",
+        },
+      ],
+      "role": "assistant",
+    },
+  ],
+  "streamingPhase": "thinking",
+}
+`;
+
+exports[`chat stream reducer — what the thread holds after a wire > user echo / system / direct-message / dialog-closed routing 1`] = `
+{
+  "approvalStatuses": {},
+  "dialogTokenUsage": null,
+  "liveModel": null,
+  "messages": [
+    {
+      "id": "<id-1>",
+      "metadata": {
+        "author": {
+          "authorType": "user",
+          "name": "Alice",
+        },
+        "contextItems": [
+          {
+            "id": "dev-1",
+            "label": "dev-1",
+            "type": "device",
+          },
+        ],
+        "createdAt": "<time>",
+        "streamSeq": 3,
+      },
+      "parts": [
+        {
+          "text": "open a ticket",
+          "type": "text",
+        },
+      ],
+      "role": "user",
+    },
+    {
+      "id": "<id-2>",
+      "metadata": {
+        "author": {
+          "authorType": "system",
+        },
+        "createdAt": "<time>",
+        "streamSeq": 4,
+      },
+      "parts": [
+        {
+          "text": "User joined the chat",
+          "type": "text",
+        },
+      ],
+      "role": "system",
+    },
+    {
+      "id": "<id-3>",
+      "metadata": {
+        "author": {
+          "authorType": "admin",
+          "name": "Jane Admin",
+        },
+        "createdAt": "<time>",
+        "streamSeq": 5,
+      },
+      "parts": [
+        {
+          "text": "Human here now",
+          "type": "text",
+        },
+      ],
+      "role": "user",
+    },
+  ],
+  "streamingPhase": "idle",
+}
 `;

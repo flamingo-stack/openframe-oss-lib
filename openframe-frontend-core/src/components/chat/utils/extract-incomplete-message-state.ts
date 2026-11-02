@@ -1,193 +1,155 @@
 /**
- * Utility for extracting incomplete message state from historical messages
- * Used to continue building messages across realtime connections
+ * Whether a thread's tail is an unfinished turn, and whether the agent is working on it. Used to continue a message
+ * across realtime connections.
  */
 
+import {
+  approvalBatchIdOf,
+  approvalStatusOf,
+  isToolPart,
+  type ChatMessage,
+  type ChatPart,
+  type ChatToolPart,
+} from '../../../chat-protocol/chat-message';
 import type { InitializeExtras } from '../stream/chat-stream-reducer';
-import type { ProcessedMessage, MessageSegment, PendingApproval, ExecutingToolState } from '../types';
 
 /**
- * What the realtime accumulator needs to RESUME an unfinished turn.
- *
- * DERIVED, not restated: this is exactly the reducer's `InitializeExtras`
- * minus `escalatedApprovals` (which only the live stream can produce — it has
- * no historical representation to extract). Hosts pass the result straight
- * into `reducer.initializeWithState(messages, extras)`, so the two must not
- * drift; a structural coincidence is not a contract.
+ * What the reducer needs to RESUME an unfinished turn. Hosts pass the result straight into
+ * `reducer.initializeWithState(messages, extras)`, so the shape is the reducer's.
  */
-export type IncompleteMessageState = Omit<InitializeExtras, 'escalatedApprovals'>;
+export type IncompleteMessageState = Pick<InitializeExtras, 'agentBusy'>;
+
+/** A batch: its rows are parts of one card, so one row's state means little alone. */
+function batchIsDenied(parts: readonly ChatPart[], batchId: string): boolean {
+  return parts.some(part => isToolPart(part) && approvalBatchIdOf(part) === batchId && part.state === 'output-denied');
+}
+
+function batchIsPending(parts: readonly ChatPart[], batchId: string): boolean {
+  return parts.some(
+    part => isToolPart(part) && approvalBatchIdOf(part) === batchId && approvalStatusOf(part) === 'pending',
+  );
+}
 
 /**
- * Extract incomplete message state from the last historical assistant message
- * Used to initialize realtime chunk processor when continuing an incomplete message
+ * Where one tool part leaves the turn. "Incomplete" and "the agent is working" are DIFFERENT questions, and only the
+ * second one drives the activity indicator. A pending approval is the clearest case of incomplete-but-idle: the turn is
+ * unfinished precisely BECAUSE the agent is blocked on the user, and spinning there claims work that is not happening.
  */
-export function extractIncompleteMessageState(
-  lastMessage: ProcessedMessage | undefined,
-): IncompleteMessageState | undefined {
-  if (!lastMessage || lastMessage.role !== 'assistant' || typeof lastMessage.content === 'string') {
-    return undefined;
+function toolPartState(part: ChatToolPart, parts: readonly ChatPart[], isLast: boolean): 'open' | 'working' | null {
+  const batchId = approvalBatchIdOf(part);
+  switch (part.state) {
+    case 'output-available':
+    case 'output-error':
+    case 'output-denied':
+      return null;
+    case 'approval-requested':
+      return 'open';
+    case 'input-available':
+      if (batchId === undefined) return 'working'; // A run with no result: the tool is running right now.
+      if (batchIsDenied(parts, batchId)) return null;
+      return batchIsPending(parts, batchId) ? 'open' : 'working';
+    case 'approval-responded':
+      if (part.approval.approved !== true) return null;
+      // A row of a batch keeps its record: it is `output-*` once it ran. A single request has none: an approved request
+      // that already ran is recognised by the work that follows it, so only the last thing in the turn is running.
+      return batchId !== undefined || isLast ? 'working' : null;
+    default: {
+      const _exhaustive: never = part;
+      return _exhaustive;
+    }
   }
+}
 
-  const segments = lastMessage.content;
-  const pendingApprovals = new Map<string, PendingApproval>();
-  const executingTools = new Map<string, ExecutingToolState>();
-  let hasIncompleteState = false;
-  // "Incomplete" and "the agent is working" are DIFFERENT questions, and only
-  // the second one drives the activity indicator. A pending approval is the
-  // clearest case of incomplete-but-idle: the turn is unfinished precisely
-  // BECAUSE the agent is blocked on the user, and spinning there claims work
-  // that is not happening. Everything below is the complement of that.
+function incompleteStateOfParts(parts: readonly ChatPart[]): IncompleteMessageState | undefined {
+  let incomplete = false;
   let agentBusy = false;
 
-  segments.forEach((segment, index) => {
-    const isLast = index === segments.length - 1;
-    switch (segment.type) {
-      case 'tool_execution':
-        if (segment.data.type === 'EXECUTING_TOOL') {
-          const toolKey =
-            segment.data.toolExecutionRequestId || `${segment.data.integratedToolType}-${segment.data.toolFunction}`;
-          executingTools.set(toolKey, {
-            integratedToolType: segment.data.integratedToolType,
-            toolFunction: segment.data.toolFunction,
-            toolTitle: segment.data.toolTitle,
-            toolExplanation: segment.data.toolExplanation,
-            parameters: segment.data.parameters,
-          });
-          hasIncompleteState = true;
-          // An EXECUTING with no result: the tool is running right now.
-          agentBusy = true;
-        }
-        break;
-
-      case 'approval_request':
-        if (segment.status === 'pending' && segment.data.requestId) {
-          pendingApprovals.set(segment.data.requestId, {
-            command: segment.data.command,
-            explanation: segment.data.explanation,
-            approvalType: segment.data.approvalType || 'CLIENT',
-          });
-          hasIncompleteState = true;
-        } else if (isLast && segment.status === 'approved') {
-          // The user said yes and the agent has produced NOTHING since — it is
-          // executing the command. Position is the only signal here: unlike a
-          // batch, a single request carries no execution record, so an approved
-          // request that already ran is recognised by the work that follows it.
-          //
-          // This also has to mark the tail incomplete, or the state never
-          // reaches the reducer at all — and the continuation, when it replays,
-          // must merge into THIS bubble rather than open a second one.
-          hasIncompleteState = true;
-          agentBusy = true;
-        }
-        break;
-
-      case 'approval_batch': {
-        // Treat a batch as in-progress until every tool call has a
-        // `done` execution OR the batch was rejected. Otherwise the realtime
-        // accumulator won't hold the segment and post-approval EXECUTED_TOOL
-        // chunks won't be able to merge into it via `applyExecutionToBatch`.
-        const allDone =
-          !!segment.data.executions &&
-          segment.data.toolCalls.every(c => segment.data.executions?.[c.toolExecutionRequestId]?.status === 'done');
-        if (segment.status !== 'rejected' && !allDone) {
-          hasIncompleteState = true;
-        }
-        // Approved with tool calls still outstanding — the agent is running
-        // them. The execution record makes this position-independent: once
-        // every call is `done` the batch stops claiming work.
-        if (segment.status === 'approved' && !allDone) {
-          agentBusy = true;
-        }
+  parts.forEach((part, index) => {
+    const isLast = index === parts.length - 1;
+    switch (part.type) {
+      case 'dynamic-tool': {
+        const state = toolPartState(part, parts, isLast);
+        if (state !== null) incomplete = true;
+        if (state === 'working') agentBusy = true;
         break;
       }
 
-      case 'escalation_offer':
-        // A pending offer leaves the turn unfinished so the reducer holds the
-        // card and the resolution chunk can flip it in place. It never sets
-        // `agentBusy`: Fae is blocked on the user's decision, and on approval
-        // she goes SILENT rather than resuming — there is no work to spin for.
-        if (!segment.status || segment.status === 'pending') {
-          hasIncompleteState = true;
-        }
+      case 'data-escalation-offer':
+        // A pending offer leaves the turn unfinished so the card stays actionable and the resolution chunk can flip it in
+        // place. It never sets `agentBusy`: Fae is blocked on the user's decision, and on approval she goes SILENT rather
+        // than resuming, so there is no work to spin for.
+        if (part.data.status === 'pending') incomplete = true;
         break;
 
-      case 'context_compaction':
-        if (segment.status === 'started') {
-          hasIncompleteState = true;
+      case 'data-context-compaction':
+        if (part.data.status === 'started') {
+          incomplete = true;
           // Compaction is the agent's own work, not a wait on the user.
           agentBusy = true;
         }
         break;
 
-      // Segment kinds that can NEVER leave a turn resumable. Listed rather than
-      // swept up by `default` so the `never` below stays reachable-by-type-only:
-      // a new segment kind then fails the build HERE, instead of silently
-      // reading as "turn finished" and stranding a live turn on reconnect.
+      // Parts that can NEVER leave a turn resumable. Listed rather than swept up by `default` so the `never` below stays
+      // reachable-by-type-only: a new part fails the build HERE, instead of silently reading as "turn finished" and
+      // stranding a live turn on reconnect.
       //
-      // - `text` / `thinking` / `guide` are delta streams with no completeness
-      //   flag; a body cut off mid-stream is indistinguishable from a finished
-      //   one, and calling every trailing paragraph unfinished would resume
-      //   every turn in the thread.
-      // - `ask` closes the turn: the assistant handed a choice back to the user
-      //   and stopped. The pick returns as a NEW user message.
-      // - `ticket_escalated` / `ticket_event` are standalone receipts delivered
-      //   outside MESSAGE_START/END — there is no agent turn to continue.
-      // - `error` ended the turn; resuming it would re-open a bubble the
-      //   backend has already abandoned.
-      // - `suggestions` is built locally by the host and never comes from a turn.
-      // - `record_cards` arrives whole: the cards the answer shows, nothing left to finish.
-      case 'record_cards':
+      // - `text` / `reasoning` have no completeness flag a stored row keeps; a body cut off mid-stream is indistinguishable
+      //   from a finished one, and calling every trailing paragraph unfinished would resume every turn in the thread.
+      // - `source-*`, `file`, `data-record-cards` arrive whole: there is nothing left to finish.
+      // - `data-ask` closes the turn: the assistant handed a choice back to the user and stopped. The pick returns as a NEW
+      //   user message.
+      // - `data-ticket-escalated` / `data-ticket-event` are standalone receipts delivered outside MESSAGE_START/END: there
+      //   is no agent turn to continue.
+      // - `data-error` ended the turn; resuming it would re-open a bubble the backend has already abandoned.
+      // - `data-suggestions` is built locally by the host and never comes from a turn.
       case 'text':
-      case 'thinking':
-      case 'ask':
-      case 'ticket_escalated':
-      case 'ticket_event':
-      case 'error':
-      case 'suggestions':
+      case 'reasoning':
+      case 'source-url':
+      case 'source-document':
+      case 'file':
+      case 'data-record-cards':
+      case 'data-ask':
+      case 'data-ticket-escalated':
+      case 'data-ticket-event':
+      case 'data-error':
+      case 'data-suggestions':
         break;
 
       default: {
-        const _exhaustive: never = segment;
+        const _exhaustive: never = part;
         void _exhaustive;
         break;
       }
     }
   });
 
-  if (!hasIncompleteState) {
-    return undefined;
-  }
+  if (!incomplete) return undefined;
+  return agentBusy ? { agentBusy: true } : {};
+}
 
-  return {
-    existingSegments: segments,
-    pendingApprovals: pendingApprovals.size > 0 ? pendingApprovals : undefined,
-    executingTools: executingTools.size > 0 ? executingTools : undefined,
-    ...(agentBusy ? { agentBusy: true } : {}),
-  };
+/** The state of the last historical assistant message, when it is unfinished. */
+export function extractIncompleteMessageState(
+  lastMessage: ChatMessage | undefined,
+): IncompleteMessageState | undefined {
+  if (!lastMessage || lastMessage.role !== 'assistant') return undefined;
+  return incompleteStateOfParts(lastMessage.parts);
 }
 
 /**
- * THREAD-level generalization of `extractIncompleteMessageState`: given a
- * processed thread, look at the TRAILING RUN of consecutive assistant
- * messages (not just the very last row), flatten it to one segment list, and
- * ask the single-message extractor whether that tail is unfinished.
+ * THREAD-level generalization of `extractIncompleteMessageState`: look at the TRAILING RUN of consecutive assistant
+ * messages (not just the very last row), flatten it to one part list, and ask whether that tail is unfinished.
  *
- * Why the run and not the last row: the backend can split one logical turn
- * across several assistant messages (a preamble bubble, then the approval
- * card, then the continuation). The unfinished artifact — a pending approval,
- * an EXECUTING_TOOL with no result, an open compaction — can therefore sit in
- * an EARLIER bubble of the same trailing run, and a last-row-only check
- * reports "complete" while the turn is very much still in flight.
+ * Why the run and not the last row: the backend can split one logical turn across several assistant messages (a preamble
+ * bubble, then the approval card, then the continuation). The unfinished artifact (a pending approval, an EXECUTING_TOOL
+ * with no result, an open compaction) can therefore sit in an EARLIER bubble of the same trailing run, and a last-row-only
+ * check reports "complete" while the turn is very much still in flight.
  *
- * SSOT for every "is the tail incomplete?" question — the NATS adapter (which
- * used to inline the single-row check) and hosts replaying a stored thread
- * both call this instead of re-deriving the walk.
+ * SSOT for every "is the tail incomplete?" question.
  *
- * A trailing non-assistant row (user / error) means the last turn closed →
- * `undefined`.
+ * A trailing non-assistant row means the last turn closed: `undefined`.
  */
 export function extractIncompleteTailState(
-  messages: readonly ProcessedMessage[] | undefined,
+  messages: readonly ChatMessage[] | undefined,
 ): IncompleteMessageState | undefined {
   if (!messages || messages.length === 0) return undefined;
 
@@ -196,22 +158,7 @@ export function extractIncompleteTailState(
   while (start > 0 && messages[start - 1]?.role === 'assistant') start -= 1;
   if (start === messages.length) return undefined;
 
-  const segments: MessageSegment[] = [];
-  for (let i = start; i < messages.length; i += 1) {
-    const content = messages[i]?.content;
-    // A string-content assistant row is a plain-text bubble with nothing to
-    // resume; skip it rather than aborting — a later row in the same run may
-    // still hold the unfinished segment.
-    if (Array.isArray(content)) segments.push(...content);
-  }
-  if (segments.length === 0) return undefined;
-
-  // Reuse the single-message extractor verbatim by handing it a synthetic
-  // assistant row carrying the flattened run — one incompleteness rule set,
-  // not two.
-  return extractIncompleteMessageState({
-    ...messages[messages.length - 1],
-    role: 'assistant',
-    content: segments,
-  });
+  const parts: ChatPart[] = [];
+  for (let i = start; i < messages.length; i += 1) parts.push(...messages[i].parts);
+  return incompleteStateOfParts(parts);
 }

@@ -1,195 +1,56 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`extractErrorMessages / processHistoricalMessagesWithErrors — golden > extractErrorMessages surfaces ERROR rows as standalone error-role messages 1`] = `
+exports[`processHistoricalMessages — golden corpus > an unresolved single approval stays where it arrived, pending 1`] = `
 [
   {
-    "assistantType": "mingo",
-    "avatar": undefined,
-    "content": "Agent crashed",
-    "id": "a5-error",
-    "name": "Mingo AI",
-    "role": "error",
-    "timestamp": 2026-07-19T09:04:00.000Z,
+    "id": "a1",
+    "metadata": {
+      "author": {
+        "assistantType": "fae",
+        "authorType": "fae",
+        "name": "Fae",
+      },
+      "createdAt": "2026-07-19T09:00:00.000Z",
+    },
+    "parts": [
+      {
+        "approval": {
+          "descriptor": {
+            "approvalType": "CLIENT",
+          },
+          "id": "req-pending",
+        },
+        "input": {},
+        "state": "approval-requested",
+        "title": "reboot server",
+        "toolCallId": "req-pending",
+        "toolName": "command",
+        "type": "dynamic-tool",
+      },
+    ],
+    "role": "assistant",
   },
 ]
-`;
-
-exports[`extractErrorMessages / processHistoricalMessagesWithErrors — golden > processHistoricalMessagesWithErrors output parity on the same corpus (snapshot) 1`] = `
-{
-  "escalatedApprovals": [],
-  "messages": [
-    {
-      "authorType": "user",
-      "avatar": undefined,
-      "content": "diagnose this device please",
-      "contextItems": [
-        {
-          "id": "dev-1",
-          "label": "dev-1",
-          "type": "device",
-        },
-      ],
-      "id": "u1",
-      "name": "You",
-      "role": "user",
-      "streamSeq": 10,
-      "timestamp": 2026-07-19T09:00:00.000Z,
-    },
-    {
-      "assistantType": "mingo",
-      "authorType": "mingo",
-      "avatar": "/avatars/mingo.png",
-      "content": [
-        {
-          "text": "Checking device state… looks like disk pressure.",
-          "type": "thinking",
-        },
-        {
-          "text": "The device is low on disk. ",
-          "type": "text",
-        },
-        {
-          "data": {
-            "integratedToolType": "TACTICAL_RMM",
-            "parameters": {
-              "script": "cleanup.sh",
-            },
-            "result": "Freed 2.3 GB",
-            "success": true,
-            "toolExecutionRequestId": "exec-1",
-            "toolExplanation": undefined,
-            "toolFunction": "run_script",
-            "toolTitle": "Run cleanup script",
-            "type": "EXECUTED_TOOL",
-          },
-          "type": "tool_execution",
-        },
-        {
-          "text": "Cleanup done.",
-          "type": "text",
-        },
-      ],
-      "id": "a2",
-      "name": "Mingo AI",
-      "role": "assistant",
-      "streamSeq": 20,
-      "timestamp": 2026-07-19T09:00:05.000Z,
-    },
-    {
-      "authorType": "admin",
-      "avatar": "/avatars/jane.png",
-      "content": "please restart the broker",
-      "id": "u2",
-      "name": "Jane Admin",
-      "role": "user",
-      "timestamp": 2026-07-19T09:01:00.000Z,
-    },
-    {
-      "assistantType": "mingo",
-      "authorType": "mingo",
-      "avatar": "/avatars/mingo.png",
-      "content": [
-        {
-          "text": "I need approval to restart it.",
-          "type": "text",
-        },
-        {
-          "data": {
-            "approvalType": "CLIENT",
-            "command": "systemctl restart nats",
-            "explanation": "Restart the message broker",
-            "requestId": "req-1",
-          },
-          "onApprove": undefined,
-          "onReject": undefined,
-          "status": "approved",
-          "type": "approval_request",
-        },
-        {
-          "data": {
-            "approvalRequestId": "batch-1",
-            "approvalType": "CLIENT",
-            "executions": {
-              "exec-a": {
-                "result": "Ticket #77 created",
-                "status": "done",
-                "success": true,
-              },
-            },
-            "toolCalls": [
-              {
-                "approvalType": "CLIENT",
-                "requiresApproval": true,
-                "toolCallArguments": {
-                  "subject": "Printer down",
-                },
-                "toolExecutionRequestId": "exec-a",
-                "toolName": "create_ticket",
-                "toolTitle": "Create ticket",
-              },
-              {
-                "requiresApproval": false,
-                "toolExecutionRequestId": "exec-b",
-                "toolName": "read_kb",
-              },
-            ],
-          },
-          "onApprove": undefined,
-          "onReject": undefined,
-          "resolvedByName": "Alice Client",
-          "status": "approved",
-          "type": "approval_batch",
-        },
-      ],
-      "id": "a4",
-      "name": "Mingo AI",
-      "role": "assistant",
-      "streamSeq": 30,
-      "timestamp": 2026-07-19T09:01:05.000Z,
-    },
-    {
-      "authorType": "system",
-      "content": "",
-      "id": "s1",
-      "name": "Technician joined the chat",
-      "role": "user",
-      "streamSeq": 40,
-      "timestamp": 2026-07-19T09:03:00.000Z,
-    },
-    {
-      "assistantType": "mingo",
-      "authorType": "mingo",
-      "avatar": "/avatars/mingo.png",
-      "content": [
-        {
-          "text": "Attempting one more thing… ",
-          "type": "text",
-        },
-        {
-          "details": "boom",
-          "title": "Agent crashed",
-          "type": "error",
-        },
-      ],
-      "id": "a5",
-      "name": "Mingo AI",
-      "role": "assistant",
-      "timestamp": 2026-07-19T09:04:00.000Z,
-    },
-  ],
-}
 `;
 
 exports[`processHistoricalMessages — golden corpus > chatTypeFilter drops rows of other chat types 1`] = `
 [
   {
-    "authorType": "user",
-    "avatar": undefined,
-    "content": "visible",
     "id": "u1",
-    "name": "You",
+    "metadata": {
+      "author": {
+        "authorType": "user",
+        "name": "You",
+      },
+      "createdAt": "2026-07-19T09:00:00.000Z",
+    },
+    "parts": [
+      {
+        "text": "visible",
+        "type": "text",
+      },
+    ],
     "role": "user",
-    "timestamp": 2026-07-19T09:00:00.000Z,
   },
 ]
 `;
@@ -197,43 +58,69 @@ exports[`processHistoricalMessages — golden corpus > chatTypeFilter drops rows
 exports[`processHistoricalMessages — golden corpus > owner-type author resolution: CLIENT vs ADMIN vs ADMIN-without-name display names/avatars 1`] = `
 [
   {
-    "authorType": "user",
-    "avatar": undefined,
-    "content": "from client",
     "id": "u-client",
-    "name": "You",
+    "metadata": {
+      "author": {
+        "authorType": "user",
+        "name": "You",
+      },
+      "createdAt": "2026-07-19T09:00:00.000Z",
+    },
+    "parts": [
+      {
+        "text": "from client",
+        "type": "text",
+      },
+    ],
     "role": "user",
-    "timestamp": 2026-07-19T09:00:00.000Z,
   },
   {
-    "authorType": "admin",
-    "avatar": "/a.png",
-    "content": "from named admin",
     "id": "u-admin-named",
-    "name": "Jane Admin",
+    "metadata": {
+      "author": {
+        "authorType": "admin",
+        "avatar": "/a.png",
+        "name": "Jane Admin",
+      },
+      "createdAt": "2026-07-19T09:00:01.000Z",
+    },
+    "parts": [
+      {
+        "text": "from named admin",
+        "type": "text",
+      },
+    ],
     "role": "user",
-    "timestamp": 2026-07-19T09:00:01.000Z,
   },
   {
-    "authorType": "admin",
-    "avatar": undefined,
-    "content": "from anonymous admin",
     "id": "u-admin-anon",
-    "name": "Admin",
+    "metadata": {
+      "author": {
+        "authorType": "admin",
+        "name": "Admin",
+      },
+      "createdAt": "2026-07-19T09:00:02.000Z",
+    },
+    "parts": [
+      {
+        "text": "from anonymous admin",
+        "type": "text",
+      },
+    ],
     "role": "user",
-    "timestamp": 2026-07-19T09:00:02.000Z,
   },
 ]
 `;
 
 exports[`processHistoricalMessages — golden corpus > processes the full recorded dialog (snapshot) 1`] = `
-{
-  "escalatedApprovals": [],
-  "messages": [
-    {
-      "authorType": "user",
-      "avatar": undefined,
-      "content": "diagnose this device please",
+[
+  {
+    "id": "u1",
+    "metadata": {
+      "author": {
+        "authorType": "user",
+        "name": "You",
+      },
       "contextItems": [
         {
           "id": "dev-1",
@@ -241,180 +128,196 @@ exports[`processHistoricalMessages — golden corpus > processes the full record
           "type": "device",
         },
       ],
-      "id": "u1",
-      "name": "You",
-      "role": "user",
+      "createdAt": "2026-07-19T09:00:00.000Z",
       "streamSeq": 10,
-      "timestamp": 2026-07-19T09:00:00.000Z,
     },
-    {
-      "assistantType": "mingo",
-      "authorType": "mingo",
-      "avatar": "/avatars/mingo.png",
-      "content": [
-        {
-          "text": "Checking device state… looks like disk pressure.",
-          "type": "thinking",
-        },
-        {
-          "text": "The device is low on disk. ",
-          "type": "text",
-        },
-        {
-          "data": {
-            "integratedToolType": "TACTICAL_RMM",
-            "parameters": {
-              "script": "cleanup.sh",
-            },
-            "result": "Freed 2.3 GB",
-            "success": true,
-            "toolExecutionRequestId": "exec-1",
-            "toolExplanation": undefined,
-            "toolFunction": "run_script",
-            "toolTitle": "Run cleanup script",
-            "type": "EXECUTED_TOOL",
-          },
-          "type": "tool_execution",
-        },
-        {
-          "text": "Cleanup done.",
-          "type": "text",
-        },
-      ],
-      "id": "a2",
-      "name": "Mingo AI",
-      "role": "assistant",
-      "streamSeq": 20,
-      "timestamp": 2026-07-19T09:00:05.000Z,
-    },
-    {
-      "authorType": "admin",
-      "avatar": "/avatars/jane.png",
-      "content": "please restart the broker",
-      "id": "u2",
-      "name": "Jane Admin",
-      "role": "user",
-      "timestamp": 2026-07-19T09:01:00.000Z,
-    },
-    {
-      "assistantType": "mingo",
-      "authorType": "mingo",
-      "avatar": "/avatars/mingo.png",
-      "content": [
-        {
-          "text": "I need approval to restart it.",
-          "type": "text",
-        },
-        {
-          "data": {
-            "approvalType": "CLIENT",
-            "command": "systemctl restart nats",
-            "explanation": "Restart the message broker",
-            "requestId": "req-1",
-          },
-          "onApprove": undefined,
-          "onReject": undefined,
-          "status": "approved",
-          "type": "approval_request",
-        },
-        {
-          "data": {
-            "approvalRequestId": "batch-1",
-            "approvalType": "CLIENT",
-            "executions": {
-              "exec-a": {
-                "result": "Ticket #77 created",
-                "status": "done",
-                "success": true,
-              },
-            },
-            "toolCalls": [
-              {
-                "approvalType": "CLIENT",
-                "requiresApproval": true,
-                "toolCallArguments": {
-                  "subject": "Printer down",
-                },
-                "toolExecutionRequestId": "exec-a",
-                "toolName": "create_ticket",
-                "toolTitle": "Create ticket",
-              },
-              {
-                "requiresApproval": false,
-                "toolExecutionRequestId": "exec-b",
-                "toolName": "read_kb",
-              },
-            ],
-          },
-          "onApprove": undefined,
-          "onReject": undefined,
-          "resolvedByName": "Alice Client",
-          "status": "approved",
-          "type": "approval_batch",
-        },
-      ],
-      "id": "a4",
-      "name": "Mingo AI",
-      "role": "assistant",
-      "streamSeq": 30,
-      "timestamp": 2026-07-19T09:01:05.000Z,
-    },
-    {
-      "authorType": "system",
-      "content": "",
-      "id": "s1",
-      "name": "Technician joined the chat",
-      "role": "user",
-      "streamSeq": 40,
-      "timestamp": 2026-07-19T09:03:00.000Z,
-    },
-    {
-      "assistantType": "mingo",
-      "authorType": "mingo",
-      "avatar": "/avatars/mingo.png",
-      "content": [
-        {
-          "text": "Attempting one more thing… ",
-          "type": "text",
-        },
-        {
-          "details": "boom",
-          "title": "Agent crashed",
-          "type": "error",
-        },
-      ],
-      "id": "a5",
-      "name": "Mingo AI",
-      "role": "assistant",
-      "timestamp": 2026-07-19T09:04:00.000Z,
-    },
-  ],
-}
-`;
-
-exports[`processHistoricalMessages — golden corpus > unresolved single approval is resurrected as a synthetic pending-approvals bubble 1`] = `
-[
-  {
-    "assistantType": "fae",
-    "avatar": undefined,
-    "content": [
+    "parts": [
       {
-        "data": {
-          "approvalType": "CLIENT",
-          "command": "reboot server",
-          "explanation": undefined,
-          "requestId": "req-pending",
-        },
-        "onApprove": undefined,
-        "onReject": undefined,
-        "status": "pending",
-        "type": "approval_request",
+        "text": "diagnose this device please",
+        "type": "text",
       },
     ],
-    "id": "pending-approvals-1784541600000",
-    "name": "Fae",
+    "role": "user",
+  },
+  {
+    "id": "a2",
+    "metadata": {
+      "author": {
+        "assistantType": "mingo",
+        "authorType": "mingo",
+        "avatar": "/avatars/mingo.png",
+        "name": "Mingo AI",
+      },
+      "createdAt": "2026-07-19T09:00:05.000Z",
+      "streamSeq": 20,
+    },
+    "parts": [
+      {
+        "state": "done",
+        "text": "Checking device state… looks like disk pressure.",
+        "type": "reasoning",
+      },
+      {
+        "state": "done",
+        "text": "The device is low on disk. ",
+        "type": "text",
+      },
+      {
+        "input": {
+          "script": "cleanup.sh",
+        },
+        "output": "Freed 2.3 GB",
+        "state": "output-available",
+        "title": "Run cleanup script",
+        "toolCallId": "exec-1",
+        "toolMetadata": {
+          "integratedToolType": "TACTICAL_RMM",
+        },
+        "toolName": "run_script",
+        "type": "dynamic-tool",
+      },
+      {
+        "state": "done",
+        "text": "Cleanup done.",
+        "type": "text",
+      },
+    ],
     "role": "assistant",
-    "timestamp": 2026-07-20T10:00:00.000Z,
+  },
+  {
+    "id": "u2",
+    "metadata": {
+      "author": {
+        "authorType": "admin",
+        "avatar": "/avatars/jane.png",
+        "name": "Jane Admin",
+      },
+      "createdAt": "2026-07-19T09:01:00.000Z",
+    },
+    "parts": [
+      {
+        "text": "please restart the broker",
+        "type": "text",
+      },
+    ],
+    "role": "user",
+  },
+  {
+    "id": "a4",
+    "metadata": {
+      "author": {
+        "assistantType": "mingo",
+        "authorType": "mingo",
+        "avatar": "/avatars/mingo.png",
+        "name": "Mingo AI",
+      },
+      "createdAt": "2026-07-19T09:01:05.000Z",
+      "streamSeq": 30,
+    },
+    "parts": [
+      {
+        "state": "done",
+        "text": "I need approval to restart it.",
+        "type": "text",
+      },
+      {
+        "approval": {
+          "approved": true,
+          "descriptor": {
+            "approvalType": "CLIENT",
+          },
+          "id": "req-1",
+          "requestReason": "Restart the message broker",
+        },
+        "input": {},
+        "state": "approval-responded",
+        "title": "systemctl restart nats",
+        "toolCallId": "req-1",
+        "toolMetadata": {
+          "resolvedByName": "Jane Admin",
+        },
+        "toolName": "command",
+        "type": "dynamic-tool",
+      },
+      {
+        "approval": {
+          "approved": true,
+          "descriptor": {
+            "approvalType": "CLIENT",
+            "batchId": "batch-1",
+          },
+          "id": "exec-a",
+        },
+        "input": {
+          "subject": "Printer down",
+        },
+        "output": "Ticket #77 created",
+        "state": "output-available",
+        "title": "Create ticket",
+        "toolCallId": "exec-a",
+        "toolMetadata": {
+          "integratedToolType": "PSA",
+          "resolvedByName": "Alice Client",
+        },
+        "toolName": "create_ticket",
+        "type": "dynamic-tool",
+      },
+      {
+        "input": {},
+        "state": "input-available",
+        "toolCallId": "exec-b",
+        "toolMetadata": {
+          "batchId": "batch-1",
+        },
+        "toolName": "read_kb",
+        "type": "dynamic-tool",
+      },
+    ],
+    "role": "assistant",
+  },
+  {
+    "id": "s1",
+    "metadata": {
+      "author": {
+        "authorType": "system",
+      },
+      "createdAt": "2026-07-19T09:03:00.000Z",
+      "streamSeq": 40,
+    },
+    "parts": [
+      {
+        "text": "Technician joined the chat",
+        "type": "text",
+      },
+    ],
+    "role": "system",
+  },
+  {
+    "id": "a5",
+    "metadata": {
+      "author": {
+        "assistantType": "mingo",
+        "authorType": "mingo",
+        "avatar": "/avatars/mingo.png",
+        "name": "Mingo AI",
+      },
+      "createdAt": "2026-07-19T09:04:00.000Z",
+    },
+    "parts": [
+      {
+        "state": "done",
+        "text": "Attempting one more thing… ",
+        "type": "text",
+      },
+      {
+        "data": {
+          "details": "boom",
+          "title": "Agent crashed",
+        },
+        "type": "data-error",
+      },
+    ],
+    "role": "assistant",
   },
 ]
 `;

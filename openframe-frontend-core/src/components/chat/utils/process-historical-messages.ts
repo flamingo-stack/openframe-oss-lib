@@ -1,62 +1,31 @@
 /**
- * Utility for processing historical messages from GraphQL/API into
- * display-ready format.
+ * Persisted Mingo rows (GraphQL `HistoricalMessage`) as the thread they draw.
  *
- * Phase 3 of the chat unification reduced this file to DECODE + ENVELOPE:
+ * What an entry of a row SAYS is `createMingoDecoder`'s, the decoder a live chunk goes through, and what its chunks do is
+ * `applyChunkToMessages`, so a reloaded answer reads as the one the reader watched arrive. What is here is the envelope a
+ * chunk does not carry: which rows make one turn (user/assistant flush-grouping), who wrote them (OWNER_TYPE author,
+ * display name, avatar), a user row's attached context, a standalone SYSTEM row, and the turn's highest persisted
+ * sequence.
  *
- *   - `decodeHistoricalMessageData` maps one persisted `MessageData` item
- *     into the shared `ChatStreamEvent` vocabulary (historical items share
- *     the MESSAGE_TYPE vocabulary with NATS chunks but are NOT full chunk
- *     envelopes — e.g. compaction summaries ride in `summary`, not `text`,
- *     and APPROVAL_RESULT rows carry `resolvedByName` directly);
- *   - `applyHistoryEvent` replays each decoded event into the shared
- *     per-turn kernel (`MessageSegmentAccumulator` — the same kernel the
- *     master `createChatStreamReducer` instantiates) with the
- *     history-specific approval semantics (display-all default, pending
- *     tracking + `flushPendingApprovals`, `approvalStatuses` overrides);
- *   - the ENVELOPE (user/assistant flush-grouping, OWNER_TYPE author /
- *     display-name / avatar resolution, standalone SYSTEM handling,
- *     per-message contextItems mapping, per-turn streamSeq MAX) lives ONCE
- *     in `processHistory` — the previous near-duplicate second copy was
- *     deleted (`processHistoricalMessagesWithErrors` is an alias; the two
- *     snapshots were byte-identical).
- *
- * Adapters then feed the processed rows into the reducer via
- * `initializeWithState` (see `useNatsChatAdapter.loadDialogHistory`).
+ * An offer and its resolution, or an approval card and its result, can sit in different turns: a user message always
+ * separates an offer from the resolution that message caused. The list rule finds the card wherever it is.
  */
 
-import {
-  ESCALATION_STATE,
-  errorDetailsMessage,
-  escalationResolvedStatus,
-  type ChatStreamEvent,
-} from '../../../chat-protocol/events';
-// One normalizer for ask rows, shared with the live decoder — history and the
-// stream must agree on which options are usable.
-import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
-import { recordCardsEvent } from '../../../chat-protocol/record-cards';
-import {
-  attachmentsEvent,
-  mergeSourceMetadata,
-  sourceMetadataEvent,
-  type SourceMetadata,
-} from '../../../chat-protocol/source-metadata';
-import { applyApprovalStatusToSegment } from '../stream/message-mutations';
+import { applyChunkToMessages, createWireState } from '../../../chat-protocol/apply-chunk';
+import { isSourcePart, type ChatMessage } from '../../../chat-protocol/chat-message';
+import { createMingoDecoder, mingoUserText } from '../../../chat-protocol/message-decoder';
+import type { UiChunk } from '../../../chat-protocol/ui-chunks';
+import { resolutionChunks } from '../stream/message-mutations';
 import {
   MESSAGE_TYPE,
   OWNER_TYPE,
   type AuthorType,
   type ChatApprovalStatus,
   type HistoricalMessage,
-  type PendingToolCallData,
-  type ProcessedMessage,
   type MessageProcessingOptions,
   type MessageData,
   type MessageOwner,
 } from '../types';
-import { approvalDisplaysInline } from './approval-display';
-import { type MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator';
-import { getCommandText } from './tool-call-helpers';
 
 function getOwnerDisplayName(owner?: MessageOwner): string {
   if (owner?.type === OWNER_TYPE.ADMIN && owner.user) {
@@ -73,800 +42,206 @@ function getOwnerAvatar(owner?: MessageOwner): string | undefined {
   return owner?.user?.image?.imageUrl ?? undefined;
 }
 
-function pushStandaloneMessages(
-  processedMessages: ProcessedMessage[],
-  msg: HistoricalMessage,
-  messageDataArray: MessageData[],
-): void {
-  messageDataArray.forEach(data => {
-    if (data.type === MESSAGE_TYPE.SYSTEM && 'text' in data && data.text) {
-      processedMessages.push({
-        id: msg.id,
-        role: 'user',
-        content: '',
-        name: data.text,
-        authorType: 'system',
-        timestamp: new Date(msg.createdAt),
-        ...(typeof msg.lastChunkStreamSeq === 'number' ? { streamSeq: msg.lastChunkStreamSeq } : {}),
-      });
-    }
-  });
+function entriesOf(row: HistoricalMessage): MessageData[] {
+  return Array.isArray(row.messageData) ? row.messageData : row.messageData ? [row.messageData] : [];
 }
 
-// =============================================================================
-// Decode — persisted MessageData item → shared ChatStreamEvent vocabulary
-// =============================================================================
-
-/**
- * Map one persisted `MessageData` item to a normalized `ChatStreamEvent`.
- * Thin shim over the NATS chunk decoder's core mapping — the differences
- * are exactly the persisted-row divergences from the realtime envelope:
- *
- *   - compaction summaries arrive in `summary` (realtime: `text`);
- *   - APPROVAL_RESULT rows carry `resolvedByName` (realtime chunks carry
- *     the resolver's name as `displayName`);
- *   - `approvalType` defaults to 'CLIENT' (legacy history parity;
- *     realtime defaults APPROVAL_REQUEST to 'USER');
- *   - batch `toolCalls` pass through verbatim (already the persisted
- *     `PendingToolCallData` shape — no normalization pass).
- *
- * Returns `null` for rows the assistant-turn path doesn't decode (SYSTEM
- * is handled by the envelope's standalone path; user TEXT rows are handled
- * by the envelope's user path).
- */
-export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent | null {
-  switch (data.type) {
-    case MESSAGE_TYPE.TEXT:
-      if ('text' in data && data.text) {
-        return { type: 'text-delta', text: data.text };
-      }
-      return null;
-
-    case MESSAGE_TYPE.THINKING:
-      if ('text' in data && data.text) {
-        return { type: 'thinking-delta', text: data.text };
-      }
-      return null;
-
-    // Persisted attachments, through the SAME decoder the live chunk uses
-    // (`attachmentsEvent`). That shared parse is the whole reason a reloaded
-    // answer renders identically to the one the reader watched arrive.
-    case MESSAGE_TYPE.ATTACHMENTS:
-      return attachmentsEvent(data);
-
-    // The records the answer shows as cards, through the live chunk's decoder.
-    case MESSAGE_TYPE.RECORD_CARDS:
-      return recordCardsEvent(data);
-
-    // The envelope `ATTACHMENTS` replaced (see `MESSAGE_TYPE.GUIDE`).
-    case MESSAGE_TYPE.GUIDE:
-      return 'payload' in data ? sourceMetadataEvent(data.payload) : null;
-
-    // Same completeness gate as the live decoder (`decodeNatsChunk`): a
-    // persisted row without a question or without options is not a card the
-    // user can answer, so it replays as nothing rather than as empty chrome.
-    case MESSAGE_TYPE.ASK: {
-      if (!('question' in data)) return null;
-      const question = typeof data.question === 'string' ? data.question.trim() : '';
-      const options = normalizeAskOptions(data.options);
-      if (!question || options.length === 0) return null;
-      return {
-        type: 'ask',
-        ...(data.text ? { text: data.text } : {}),
-        question,
-        options,
-      };
-    }
-
-    case MESSAGE_TYPE.EXECUTING_TOOL:
-      if ('integratedToolType' in data) {
-        return {
-          type: 'tool-execution',
-          data: {
-            type: 'EXECUTING_TOOL',
-            integratedToolType: data.integratedToolType || '',
-            toolFunction: data.toolFunction || '',
-            toolTitle: typeof data.title === 'string' ? data.title : undefined,
-            // Same contract as the NATS decoder: the explanation line rides the
-            // EXECUTING chunk only, so a history replay that drops it renders
-            // an empty tool card even though the live stream showed one.
-            toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
-            parameters: data.parameters,
-            toolExecutionRequestId: data.toolExecutionRequestId,
-          },
-        };
-      }
-      return null;
-
-    case MESSAGE_TYPE.EXECUTED_TOOL:
-      if ('integratedToolType' in data) {
-        return {
-          type: 'tool-execution',
-          data: {
-            type: 'EXECUTED_TOOL',
-            integratedToolType: data.integratedToolType || '',
-            toolFunction: data.toolFunction || '',
-            toolTitle: typeof data.title === 'string' ? data.title : undefined,
-            parameters: data.parameters,
-            result: data.result,
-            success: data.success,
-            toolExecutionRequestId: data.toolExecutionRequestId,
-          },
-        };
-      }
-      return null;
-
-    case MESSAGE_TYPE.APPROVAL_REQUEST:
-      if ('approvalRequestId' in data && data.approvalRequestId) {
-        return {
-          type: 'approval-request',
-          requestId: data.approvalRequestId,
-          approvalType: data.approvalType || 'CLIENT',
-          command: data.command || '',
-          explanation: data.explanation,
-          ...(Array.isArray(data.toolCalls) ? { toolCalls: data.toolCalls } : {}),
-        };
-      }
-      return null;
-
-    case MESSAGE_TYPE.APPROVAL_RESULT:
-      if ('approvalRequestId' in data && data.approvalRequestId) {
-        return {
-          type: 'approval-resolved',
-          requestId: data.approvalRequestId,
-          status: data.approved ? 'approved' : 'rejected',
-          approvalType: data.approvalType,
-          resolvedByName: 'resolvedByName' in data ? data.resolvedByName : undefined,
-        };
-      }
-      return null;
-
-    case MESSAGE_TYPE.ESCALATION_OFFER: {
-      if (!('offerId' in data) || !data.offerId) return null;
-      if (data.state === ESCALATION_STATE.PENDING) {
-        return {
-          type: 'escalation-offer',
-          offerId: data.offerId,
-          text: data.text || '',
-          origin: data.origin,
-        };
-      }
-      const status = escalationResolvedStatus(data.state);
-      if (!status) return null;
-      return {
-        type: 'escalation-offer-resolved',
-        offerId: data.offerId,
-        status,
-        resolvedByName: data.resolvedByName,
-      };
-    }
-
-    case MESSAGE_TYPE.TICKET_ESCALATED:
-      if ('ticketId' in data && data.ticketId && data.reason) {
-        return {
-          type: 'ticket-escalated',
-          ticketId: data.ticketId,
-          reason: data.reason,
-          ticketNumber: data.ticketNumber,
-          text: data.text,
-        };
-      }
-      return null;
-
-    // Same completeness gate as the live decoder: `kind` (an OPEN string —
-    // unknown kinds render as a neutral line) is the only required field.
-    // Field names match the chunk, so ONE mapping covers both paths; the
-    // typeof gates also fold the row's GraphQL nulls to undefined.
-    case MESSAGE_TYPE.TICKET_EVENT: {
-      const kind = 'kind' in data && typeof data.kind === 'string' ? data.kind.trim() : '';
-      if (!kind) return null;
-      return {
-        type: 'ticket-event',
-        kind,
-        actorId: typeof data.actorId === 'string' ? data.actorId : undefined,
-        actorName: typeof data.actorName === 'string' ? data.actorName : undefined,
-        actorType: typeof data.actorType === 'string' ? data.actorType : undefined,
-        reason: typeof data.reason === 'string' && data.reason.trim() ? data.reason : undefined,
-        targetStatusKind:
-          typeof data.targetStatusKind === 'string' && data.targetStatusKind.trim() ? data.targetStatusKind : undefined,
-      };
-    }
-
-    case MESSAGE_TYPE.ERROR:
-      if ('error' in data) {
-        return {
-          type: 'error',
-          title: data.error || 'An error occurred',
-          details: 'details' in data ? data.details : undefined,
-        };
-      }
-      return null;
-
-    case MESSAGE_TYPE.CONTEXT_COMPACTION_START:
-      return { type: 'compaction', phase: 'start' };
-
-    case MESSAGE_TYPE.CONTEXT_COMPACTION_END:
-      return {
-        type: 'compaction',
-        phase: 'end',
-        summary: 'summary' in data && typeof data.summary === 'string' ? data.summary : undefined,
-      };
-
-    case MESSAGE_TYPE.SYSTEM:
-      if ('text' in data && data.text) {
-        return { type: 'participant', kind: 'system', text: data.text };
-      }
-      return null;
-
-    default:
-      // Unknown message type — ignore.
-      return null;
-  }
+function isUserRow(row: HistoricalMessage | undefined): boolean {
+  return row?.owner?.type === OWNER_TYPE.CLIENT || row?.owner?.type === OWNER_TYPE.ADMIN;
 }
 
-// =============================================================================
-// Replay — decoded event → per-turn kernel (history approval semantics)
-// =============================================================================
-
-type EscalatedApprovals = Map<
-  string,
-  { command: string; explanation?: string; approvalType: string; toolCalls?: PendingToolCallData[] }
->;
-
-/**
- * Terminal escalation-offer resolutions collected while walking history, so
- * they can be applied to ALREADY-FLUSHED bubbles after the walk. The offer
- * row and its resolution row are separated by the user message that caused
- * SUPERSEDED, which puts them in different assistant envelopes — by the time
- * the resolution is read, the accumulator holding the card has been reset.
- */
-type OfferResolutions = Map<string, { status: ChatApprovalStatus; resolvedByName?: string | null }>;
-
-/**
- * Replay one decoded event into the shared per-turn segment kernel with the
- * HISTORY approval semantics (an omitted `displayApprovalTypes` means
- * "display every approval type" — the original history behavior; the
- * realtime reducer defaults to `['CLIENT']`).
- */
-function applyHistoryEvent(
-  event: ChatStreamEvent,
-  accumulator: MessageSegmentAccumulator,
-  approvalStatuses: Record<string, string>,
-  options: MessageProcessingOptions,
-  escalatedApprovals?: EscalatedApprovals,
-  offerResolutions?: OfferResolutions,
-  rowCreatedAt?: Date,
-  rowStreamSeq?: number,
-): void {
-  // batchApprovalsEnabled is owned by the consumer (oss-tenant chat client /
-  // openframe-frontend tickets). Defaults to ON so consumers that haven't
-  // wired the flag yet get the batch UI; pass `false` to force legacy.
-  const { displayApprovalTypes, batchApprovalsEnabled = true, escalationOfferStates } = options;
-
-  switch (event.type) {
-    case 'escalation-offer':
-      // Always a real segment, never the tracked/flushed treatment single
-      // approvals get: the offer belongs inline where it was posted.
-      accumulator.addEscalationOffer(
-        event.offerId,
-        event.text,
-        event.origin,
-        escalationOfferStates?.[event.offerId] ?? 'pending',
-      );
-      break;
-
-    case 'ticket-escalated':
-      accumulator.addTicketEscalated({
-        ticketId: event.ticketId,
-        ticketNumber: event.ticketNumber,
-        reason: event.reason,
-        text: event.text,
-      });
-      break;
-
-    // `rowStreamSeq` re-stamps the event's JetStream sequence (the persisted
-    // row's `lastChunkStreamSeq` - `messageData` itself does not carry it).
-    // The store's `ticket-event:<seq>` upsert key is the ONLY join between
-    // this hydrated segment and a catch-up/stale-consumer replay of the same
-    // chunk; a seq-less segment never joins, so the replayed copy rendered as
-    // a second identical card (the resolve/reopen duplication). The payload
-    // fallback in `addTicketEvent` cannot own that case: a COMPLETE hydrated
-    // tail seeds no accumulator, so the twins only ever meet in the store.
-    case 'ticket-event':
-      // `rowCreatedAt` is the persisted row's own time - without it the card
-      // renders the enclosing assistant bubble's timestamp, i.e. the FIRST
-      // row of the turn, and every lifecycle card reads the same stale time.
-      accumulator.addTicketEvent(
-        {
-          kind: event.kind,
-          actorId: event.actorId,
-          actorName: event.actorName,
-          actorType: event.actorType,
-          reason: event.reason,
-          targetStatusKind: event.targetStatusKind,
-        },
-        rowStreamSeq,
-        rowCreatedAt,
-      );
-      break;
-
-    case 'escalation-offer-resolved':
-      // Recorded, not applied here: `applyOfferResolutions` runs after every
-      // flush and covers the same-bubble case as well as the cross-bubble one.
-      offerResolutions?.set(event.offerId, {
-        status: event.status,
-        resolvedByName: event.resolvedByName,
-      });
-      break;
-
-    case 'text-delta':
-      accumulator.appendText(event.text);
-      break;
-
-    case 'thinking-delta':
-      accumulator.appendThinking(event.text);
-      break;
-
-    // Mirror of the live path: the intro sentence replays as answer text in
-    // front of the card, so a reloaded thread reads exactly like the stream did.
-    case 'ask':
-      if (event.text) accumulator.appendText(event.text);
-      accumulator.addAsk(event.question, event.options);
-      break;
-
-    case 'record-cards':
-      accumulator.addRecordCards(event.cards);
-      break;
-
-    case 'tool-execution':
-      accumulator.addToolExecution({ type: 'tool_execution', data: event.data });
-      break;
-
-    case 'approval-request': {
-      const approvalType = event.approvalType || 'CLIENT';
-      const toolCalls = event.toolCalls;
-      const isBatch = !!toolCalls && toolCalls.length > 0;
-      // Same rule the live kernels use — a card must not change where it
-      // renders just because the page was reloaded and it came back through
-      // history instead of the stream.
-      if (approvalDisplaysInline(approvalType, displayApprovalTypes)) {
-        if (isBatch) {
-          const status = (approvalStatuses[event.requestId] as ChatApprovalStatus) || 'pending';
-          if (batchApprovalsEnabled) {
-            accumulator.addApprovalBatch(event.requestId, approvalType, toolCalls, status, undefined, undefined);
-          } else {
-            // Flag OFF — unfold batch into N legacy approval cards (same id).
-            for (const call of toolCalls) {
-              if (!call.requiresApproval) continue;
-              accumulator.addApprovalRequest(
-                event.requestId,
-                getCommandText(call),
-                call.toolExplanation,
-                approvalType,
-                status,
-                undefined,
-              );
-            }
-          }
-        } else {
-          // The resolution may already be known to the consumer (realtime
-          // flipped it and fed it back via `approvalStatuses`) while the
-          // matching APPROVAL_RESULT row is absent from the fetched history
-          // pages. Without this, the single-approval path tracks it as
-          // pending and `flushPendingApprovals()` resurrects it as a stale
-          // sticky card on every history re-process. Mirror the batch path
-          // and honor `approvalStatuses`.
-          const resolvedStatus = approvalStatuses[event.requestId] as ChatApprovalStatus | undefined;
-          const isResolved = resolvedStatus === 'approved' || resolvedStatus === 'rejected';
-          if (isResolved) {
-            accumulator.addApprovalRequest(
-              event.requestId,
-              event.command || '',
-              event.explanation,
-              approvalType,
-              resolvedStatus ?? 'pending',
-              event.fields,
-            );
-          } else {
-            accumulator.trackApprovalRequest(event.requestId, {
-              command: event.command || '',
-              explanation: event.explanation,
-              approvalType,
-              fields: event.fields,
-            });
-          }
-        }
-      } else {
-        escalatedApprovals?.set(event.requestId, {
-          command: event.command || '',
-          explanation: event.explanation,
-          approvalType,
-          ...(isBatch ? { toolCalls } : {}),
-        });
-      }
-      break;
-    }
-
-    case 'approval-resolved': {
-      const requestId = event.requestId;
-      if (!requestId) break;
-      const existingStatus = approvalStatuses[requestId] as ChatApprovalStatus | undefined;
-      const status: ChatApprovalStatus = existingStatus || event.status;
-      const resolvedByName = event.resolvedByName;
-      const escalatedData = escalatedApprovals?.get(requestId);
-
-      if (escalatedData?.toolCalls && escalatedData.toolCalls.length > 0) {
-        if (batchApprovalsEnabled) {
-          accumulator.addApprovalBatch(
-            requestId,
-            escalatedData.approvalType,
-            escalatedData.toolCalls,
-            status,
-            undefined,
-            resolvedByName,
-          );
-        } else {
-          for (const call of escalatedData.toolCalls) {
-            if (!call.requiresApproval) continue;
-            accumulator.addApprovalRequest(
-              requestId,
-              getCommandText(call),
-              call.toolExplanation,
-              escalatedData.approvalType,
-              status,
-            );
-          }
-        }
-        escalatedApprovals?.delete(requestId);
-        break;
-      }
-
-      if (escalatedData) {
-        accumulator.trackApprovalRequest(requestId, {
-          command: escalatedData.command,
-          explanation: escalatedData.explanation,
-          approvalType: escalatedData.approvalType,
-        });
-        escalatedApprovals?.delete(requestId);
-      }
-
-      // If a segment with this id is already present (batch or legacy), just
-      // flip its status. updateApprovalStatus matches both `approval_batch`
-      // and `approval_request` segments.
-      const before = accumulator.getSegments();
-      const after = accumulator.updateApprovalStatus(requestId, status, resolvedByName);
-      const updatedExisting = before.some((s, i) => after[i] !== s);
-      if (updatedExisting) break;
-
-      accumulator.processApprovalResult(requestId, status === 'approved', event.approvalType || 'USER');
-      break;
-    }
-
-    case 'error': {
-      // Shared with the live path in `chat-stream-reducer` — one decoder so a
-      // card cannot read one way live and another on refresh.
-      accumulator.addError(event.title, errorDetailsMessage(event.details));
-      break;
-    }
-
-    case 'compaction':
-      if (event.phase === 'start') {
-        accumulator.addContextCompaction();
-      } else {
-        accumulator.completeContextCompaction(event.summary);
-      }
-      break;
-
-    default:
-      // Participant/system rows are envelope concerns; everything else is
-      // realtime-only vocabulary that never appears in persisted rows.
-      break;
-  }
+function isoOf(createdAt: string): string {
+  const time = Date.parse(createdAt);
+  return Number.isNaN(time) ? createdAt : new Date(time).toISOString();
 }
 
-// =============================================================================
-// Envelope — ONE implementation (previous duplicate deleted)
-// =============================================================================
+/** `TextData.contextItems` (server: `[{ type, id }]`), with no label on the wire: the id stands in, as on the live path. */
+function contextItemsOf(data: MessageData): Array<{ type: string; id: string; label: string }> {
+  const raw = (data as { contextItems?: Array<{ type?: unknown; id?: unknown }> }).contextItems;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(item => typeof item?.type === 'string' && typeof item?.id === 'string')
+    .map(item => ({ type: item.type as string, id: item.id as string, label: item.id as string }));
+}
 
-/**
- * Result type for historical message processing
- */
+/** Is this chunk's status already known, so that what the row says gives way to it? */
+function statusAnswered(chunk: UiChunk, known: Record<string, ChatApprovalStatus>): boolean {
+  if (chunk.type === 'tool-approval-response') return known[chunk.approvalId] !== undefined;
+  if (chunk.type === 'tool-output-denied') return known[chunk.toolCallId] !== undefined;
+  return false;
+}
+
+/** Result type for historical message processing */
 export interface ProcessHistoricalMessagesResult {
-  messages: ProcessedMessage[];
-  escalatedApprovals: EscalatedApprovals;
+  messages: ChatMessage[];
 }
 
-/**
- * Process an array of historical messages into display-ready format
- */
+/** Process an array of historical messages into the thread they draw. */
 export function processHistoricalMessages(
-  messages: HistoricalMessage[],
+  rows: HistoricalMessage[],
   options: MessageProcessingOptions = {},
 ): ProcessHistoricalMessagesResult {
   const {
     assistantName = 'Fae',
     assistantType = 'fae',
     assistantAvatar,
-    onApprove,
-    onReject,
     chatTypeFilter,
     approvalStatuses = {},
-    // An omitted option means "display every approval type" — the original
-    // history semantics. Deliberately NOT defaulted to the realtime
-    // reducer's ['CLIENT']: consumers that pass a wider list to their
-    // realtime path but omit it on the history path would silently lose
-    // pending non-CLIENT approval cards on every reload/reconnect refetch
-    // (they also ignore `escalatedApprovals`). Realtime/history parity is
-    // opt-in: pass the same explicit list to both.
-    displayApprovalTypes,
-    batchApprovalsEnabled,
-    escalationOfferStates,
-    onEscalationApprove,
-    onEscalationReject,
+    escalationOfferStates = {},
   } = options;
 
-  const processedMessages: ProcessedMessage[] = [];
-  const accumulator = createMessageSegmentAccumulator({
-    onApprove,
-    onReject,
-    onEscalationApprove,
-    onEscalationReject,
-  });
-  const escalatedApprovals: EscalatedApprovals = new Map();
-  const offerResolutions: OfferResolutions = new Map();
+  const decoder = createMingoDecoder();
+  const wire = createWireState();
+  let messages: ChatMessage[] = [];
+  /** The assistant turn being read: its message, and the id of the last row it took. */
+  let turnId: string | null = null;
+  let lastRowId: string | null = null;
 
-  let currentAssistantId: string | null = null;
-  let currentAssistantTimestamp: Date | null = null;
-  let lastAssistantId: string | null = null;
-  // MAX persisted seq across the rows grouped into the current assistant turn
-  // — carried onto the flushed message's streamSeq for per-role merge coverage.
-  let currentAssistantStreamSeq: number | undefined;
-  // Source metadata for the current assistant turn. It is persisted as its OWN
-  // row (the backend saves it when the remote tool returns, before the answer
-  // text exists), so it arrives as a separate history message that groups into
-  // the same turn — and has to be carried across the group rather than applied
-  // where it was read.
-  let currentAssistantSourceMetadata: SourceMetadata | null = null;
-
-  /**
-   * Flush the current assistant message to processedMessages.
-   * Uses the LAST message ID in the group for stable React keys across page boundaries.
-   */
-  const flushAssistantMessage = () => {
-    const idToUse = lastAssistantId || currentAssistantId;
-    if (idToUse && accumulator.hasContent()) {
-      processedMessages.push({
-        id: idToUse,
-        role: 'assistant',
-        content: accumulator.getSegments(),
-        name: assistantName,
-        assistantType,
-        authorType: assistantType,
-        timestamp: currentAssistantTimestamp || new Date(),
-        avatar: assistantAvatar,
-        ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
-        ...(currentAssistantSourceMetadata ?? {}),
-      });
-      accumulator.resetSegments();
-    }
-    // Reset grouping identity + seq UNCONDITIONALLY — even on an EMPTY flush (an
-    // assistant turn whose only data was a filtered/escalated approval renders
-    // nothing, so `hasContent()` is false and nothing is pushed). Left inside
-    // the push-block, a stale id/timestamp and (worse) a stale
-    // `currentAssistantStreamSeq` bleed into the NEXT assistant turn: `!currentAssistantId`
-    // stays false so it keeps the old id/timestamp, and `Math.max` inflates its
-    // streamSeq — which then over-covers synthetics in the history merge.
-    currentAssistantId = null;
-    currentAssistantTimestamp = null;
-    lastAssistantId = null;
-    currentAssistantStreamSeq = undefined;
-    // Reset UNCONDITIONALLY, for the same reason the seq above is: a turn whose
-    // only row was metadata renders nothing, and leaving it set would stamp the
-    // NEXT answer with citations that belong to this one.
-    currentAssistantSourceMetadata = null;
+  const applyChunks = (chunks: readonly UiChunk[]): void => {
+    for (const chunk of chunks) messages = applyChunkToMessages(messages, chunk, wire);
   };
 
-  messages.forEach((msg, index) => {
-    // Filter by chat type if specified
-    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return;
+  /**
+   * Ends the turn. A turn that has nothing to draw (its only rows were metadata, or tool results for a card further up)
+   * leaves no message. The message takes the LAST row's id, for a React key stable across page boundaries.
+   */
+  const flushTurn = (): void => {
+    if (turnId === null) return;
+    const index = messages.findIndex(message => message.id === turnId);
+    if (index !== -1) {
+      const message = messages[index];
+      messages = messages.slice();
+      if (message.parts.every(isSourcePart)) messages.splice(index, 1);
+      else messages[index] = { ...message, id: lastRowId ?? message.id };
+    }
+    turnId = null;
+    lastRowId = null;
+    wire.setMessageId(null);
+    wire.textOffsets.clear();
+  };
 
-    const messageDataArray = Array.isArray(msg.messageData)
-      ? msg.messageData
-      : msg.messageData
-        ? [msg.messageData]
-        : [];
+  const openTurn = (row: HistoricalMessage): void => {
+    if (turnId === null) {
+      turnId = row.id;
+      messages = [
+        ...messages,
+        {
+          id: row.id,
+          role: 'assistant',
+          metadata: {
+            createdAt: isoOf(row.createdAt),
+            author: {
+              name: assistantName,
+              authorType: assistantType,
+              assistantType,
+              ...(assistantAvatar !== undefined ? { avatar: assistantAvatar } : {}),
+            },
+          },
+          parts: [],
+        },
+      ];
+      wire.setMessageId(row.id);
+    }
+    lastRowId = row.id;
+    if (typeof row.lastChunkStreamSeq === 'number') {
+      const seq = row.lastChunkStreamSeq;
+      messages = messages.map(message => {
+        if (message.id !== turnId) return message;
+        const current = message.metadata?.streamSeq;
+        return current !== undefined && current >= seq
+          ? message
+          : { ...message, metadata: { ...message.metadata, streamSeq: seq } };
+      });
+    }
+  };
 
-    const hasStandaloneData = messageDataArray.some(data => data.type === MESSAGE_TYPE.SYSTEM);
-    if (hasStandaloneData) {
-      flushAssistantMessage();
-      pushStandaloneMessages(processedMessages, msg, messageDataArray);
+  rows.forEach((row, index) => {
+    if (chatTypeFilter && row.chatType !== chatTypeFilter) return;
+    const entries = entriesOf(row);
+
+    if (entries.some(data => data.type === MESSAGE_TYPE.SYSTEM)) {
+      flushTurn();
+      for (const data of entries) {
+        if (data.type === MESSAGE_TYPE.SYSTEM && data.text) {
+          messages = [
+            ...messages,
+            {
+              id: row.id,
+              role: 'system',
+              metadata: {
+                createdAt: isoOf(row.createdAt),
+                author: { authorType: 'system' },
+                ...(typeof row.lastChunkStreamSeq === 'number' ? { streamSeq: row.lastChunkStreamSeq } : {}),
+              },
+              parts: [{ type: 'text', text: data.text }],
+            },
+          ];
+        }
+      }
       return;
     }
 
-    const isUserMessage = msg.owner?.type === OWNER_TYPE.CLIENT || msg.owner?.type === OWNER_TYPE.ADMIN;
-
-    if (isUserMessage) {
-      flushAssistantMessage();
-
-      const userAuthorType: AuthorType = msg.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user';
-      messageDataArray.forEach(data => {
-        if (data.type === MESSAGE_TYPE.TEXT && 'text' in data && data.text) {
-          // `TextData.contextItems` (server: `[{ type, id }]`) — the entity
-          // context the user attached to this message. Surface it so the bubble
-          // renders its chip strip from history (no label on the wire → fall
-          // back to the id, matching the realtime path).
-          const rawContext = (data as { contextItems?: Array<{ type?: unknown; id?: unknown }> }).contextItems;
-          const contextItems = Array.isArray(rawContext)
-            ? rawContext
-                .filter(c => typeof c?.type === 'string' && typeof c?.id === 'string')
-                .map(c => ({ type: c.type as string, id: c.id as string, label: c.id as string }))
-            : undefined;
-          processedMessages.push({
-            id: msg.id,
+    if (isUserRow(row)) {
+      flushTurn();
+      const authorType: AuthorType = row.owner?.type === OWNER_TYPE.ADMIN ? 'admin' : 'user';
+      for (const data of entries) {
+        if (data.type !== MESSAGE_TYPE.TEXT || !data.text) continue;
+        const contextItems = contextItemsOf(data);
+        const avatar = getOwnerAvatar(row.owner);
+        messages = [
+          ...messages,
+          {
+            id: row.id,
             role: 'user',
-            content: data.text,
-            name: getOwnerDisplayName(msg.owner),
-            avatar: getOwnerAvatar(msg.owner),
-            authorType: userAuthorType,
-            timestamp: new Date(msg.createdAt),
-            ...(contextItems && contextItems.length > 0 ? { contextItems } : {}),
-            ...(typeof msg.lastChunkStreamSeq === 'number' ? { streamSeq: msg.lastChunkStreamSeq } : {}),
-          });
-        }
-      });
-    } else {
-      if (!currentAssistantId) {
-        currentAssistantId = msg.id;
-        currentAssistantTimestamp = new Date(msg.createdAt);
+            metadata: {
+              createdAt: isoOf(row.createdAt),
+              author: { name: getOwnerDisplayName(row.owner), authorType, ...(avatar !== undefined ? { avatar } : {}) },
+              ...(contextItems.length > 0 ? { contextItems } : {}),
+              ...(typeof row.lastChunkStreamSeq === 'number' ? { streamSeq: row.lastChunkStreamSeq } : {}),
+            },
+            parts: [{ type: 'text', text: mingoUserText(data.text) }],
+          },
+        ];
       }
-      lastAssistantId = msg.id;
-      if (typeof msg.lastChunkStreamSeq === 'number') {
-        currentAssistantStreamSeq =
-          currentAssistantStreamSeq === undefined
-            ? msg.lastChunkStreamSeq
-            : Math.max(currentAssistantStreamSeq, msg.lastChunkStreamSeq);
-      }
+      return;
+    }
 
-      messageDataArray.forEach(data => {
-        const event = decodeHistoricalMessageData(data);
-        if (!event) return;
-        // Metadata is a property OF the turn, not a segment in it — it never
-        // reaches the accumulator, which would have nothing to do with it.
-        if (event.type === 'sources') {
-          currentAssistantSourceMetadata = mergeSourceMetadata(currentAssistantSourceMetadata, event);
-          return;
+    openTurn(row);
+    const createdAt = isoOf(row.createdAt);
+    for (const data of entries) {
+      // A TICKET_EVENT is standalone, one per row, so the row's seq IS the event's identity, the only join between this
+      // row and a catch-up replay of the same chunk. But vouch for that only when the row holds exactly one entry: a
+      // bundled row's `lastChunkStreamSeq` belongs to its LAST chunk and could stamp the wrong event.
+      const seq =
+        entries.length === 1 && typeof row.lastChunkStreamSeq === 'number' ? row.lastChunkStreamSeq : undefined;
+      const { chunks } = decoder.decode(data, { row: { createdAt, ...(seq !== undefined ? { seq } : {}) } });
+      for (const chunk of chunks) {
+        // A row holds no turn boundary of its own: the rows around it say where its turn ends.
+        if (chunk.type === 'start' || chunk.type === 'finish' || chunk.type === 'abort') continue;
+        if (statusAnswered(chunk, approvalStatuses)) continue;
+        if (chunk.type === 'data-escalation-offer' && chunk.data.status === 'pending') {
+          const known = escalationOfferStates[chunk.id];
+          applyChunks([known !== undefined ? { ...chunk, data: { ...chunk.data, status: known } } : chunk]);
+          continue;
         }
-        applyHistoryEvent(
-          event,
-          accumulator,
-          approvalStatuses,
-          { displayApprovalTypes, batchApprovalsEnabled, escalationOfferStates },
-          escalatedApprovals,
-          offerResolutions,
-          new Date(msg.createdAt),
-          // TICKET_EVENT chunks are standalone, one per row, so the row seq IS
-          // the event seq - but vouch for that only when the row holds exactly
-          // one entry: a bundled row's `lastChunkStreamSeq` belongs to its LAST
-          // chunk and could stamp the wrong event.
-          messageDataArray.length === 1 && typeof msg.lastChunkStreamSeq === 'number'
-            ? msg.lastChunkStreamSeq
-            : undefined,
-        );
-      });
-
-      // Check if we should flush (next message is from user or last message)
-      const nextMsg = messages[index + 1];
-      const isLastMessage = index === messages.length - 1;
-      const nextIsFromUser =
-        nextMsg && (nextMsg.owner?.type === OWNER_TYPE.CLIENT || nextMsg.owner?.type === OWNER_TYPE.ADMIN);
-
-      if (isLastMessage || nextIsFromUser) {
-        flushAssistantMessage();
+        applyChunks([chunk]);
+        if (chunk.type === 'tool-approval-request') {
+          // The resolution may already be known to the consumer while its APPROVAL_RESULT row is not on the fetched pages.
+          const batchId = chunk.approvalDescriptor?.batchId;
+          const known =
+            approvalStatuses[chunk.approvalId] ?? (batchId !== undefined ? approvalStatuses[batchId] : undefined);
+          if (known === 'approved' || known === 'rejected' || known === 'cancelled') {
+            applyChunks(resolutionChunks(chunk.approvalId, known));
+          }
+        }
       }
     }
+
+    // The next row is the user's, or there is none: this turn is complete.
+    if (index === rows.length - 1 || isUserRow(rows[index + 1])) flushTurn();
   });
 
-  flushAssistantMessage();
+  flushTurn();
 
-  const pendingApprovalSegments = accumulator.flushPendingApprovals();
-  if (pendingApprovalSegments.length > 0) {
-    processedMessages.push({
-      id: `pending-approvals-${Date.now()}`,
-      role: 'assistant',
-      content: pendingApprovalSegments,
-      name: assistantName,
-      assistantType,
-      timestamp: new Date(),
-      avatar: assistantAvatar,
-    });
-  }
-
-  const resolvedMessages = applyOfferResolutions(processedMessages, offerResolutions);
-
-  return {
-    messages: resolvedMessages,
-    escalatedApprovals: escalatedApprovals,
-  };
+  return { messages };
 }
-
-/**
- * Flip escalation-offer cards that were flushed into an EARLIER bubble than
- * their resolution row. Returns a new list (unchanged bubbles keep their
- * identity, so the array is only rebuilt when something actually flipped).
- * Uses the same `applyApprovalStatusToSegment` rule as the live projection so
- * the two paths cannot drift.
- */
-function applyOfferResolutions(
-  processedMessages: ProcessedMessage[],
-  offerResolutions: OfferResolutions,
-): ProcessedMessage[] {
-  if (offerResolutions.size === 0) return processedMessages;
-
-  return processedMessages.map(msg => {
-    if (!Array.isArray(msg.content)) return msg;
-    let changed = false;
-    const content = msg.content.map(segment => {
-      if (segment.type !== 'escalation_offer') return segment;
-      const resolution = offerResolutions.get(segment.data.offerId);
-      if (!resolution) return segment;
-      const next = applyApprovalStatusToSegment(
-        segment,
-        segment.data.offerId,
-        resolution.status,
-        resolution.resolvedByName,
-      );
-      if (next !== segment) changed = true;
-      return next;
-    });
-    return changed ? { ...msg, content } : msg;
-  });
-}
-
-/**
- * Extract error messages from historical messages
- * Returns a separate array of error messages that should be displayed
- */
-export function extractErrorMessages(
-  messages: HistoricalMessage[],
-  options: MessageProcessingOptions = {},
-): ProcessedMessage[] {
-  const { assistantName = 'Fae', assistantType = 'fae', assistantAvatar, chatTypeFilter } = options;
-
-  const errorMessages: ProcessedMessage[] = [];
-
-  messages.forEach(msg => {
-    if (chatTypeFilter && msg.chatType !== chatTypeFilter) return;
-
-    const messageDataArray = Array.isArray(msg.messageData)
-      ? msg.messageData
-      : msg.messageData
-        ? [msg.messageData]
-        : [];
-
-    messageDataArray.forEach(data => {
-      if (data.type === MESSAGE_TYPE.ERROR) {
-        errorMessages.push({
-          id: `${msg.id}-error`,
-          role: 'error',
-          content: 'error' in data && data.error ? data.error : 'An error occurred',
-          name: assistantName,
-          assistantType,
-          timestamp: new Date(msg.createdAt),
-          avatar: assistantAvatar,
-        });
-      }
-    });
-  });
-
-  return errorMessages;
-}
-
-/**
- * Process messages and include error messages in the correct order.
- *
- * HISTORICAL ALIAS: this was a byte-identical second copy of
- * `processHistoricalMessages` (both goldens snapshot identical output on the
- * same corpus). The duplicate envelope was deleted in Phase 3 — kept as an
- * alias for the established import sites.
- */
-export const processHistoricalMessagesWithErrors = processHistoricalMessages;

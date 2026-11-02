@@ -1,22 +1,21 @@
 'use client';
 
 /**
- * useChatStreamReducer — thin React wrapper over a `ChatDialogStore` side.
+ * useChatStreamReducer: thin React wrapper over a `ChatDialogStore` side.
  *
  *   - `useSyncExternalStore` over the store (snapshot identity is stable
  *     between mutations, so untouched renders bail out);
  *   - APPEND-ONLY DELTA BATCHING: delegated wholesale to the framework-free
  *     `createDeltaBatcher` (same module) so a non-React host can share the
  *     exact same coalescing/flush policy instead of re-implementing it.
- *   - Any NON-delta event force-flushes the pending batch first, so ordering
- *     is preserved and stream completion (`turn-end`, errors, approval
- *     frames) always lands on fully-applied delta state. Adapters whose
- *     transport has no terminal event (SSE) call `flushDeltas()` explicitly
- *     before their end-of-turn command.
+ *   - Any NON-delta entry force-flushes the pending batch first, so ordering
+ *     is preserved and stream completion (`finish`, errors, approval
+ *     chunks) always lands on fully-applied delta state. An adapter calls
+ *     `flushDeltas()` explicitly before its own end-of-turn command.
  */
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import type { ChatStreamEvent } from '../../../chat-protocol/events';
+import type { ChatStreamEntry } from '../../../chat-protocol/ui-chunks';
 import { DEFAULT_DIALOG_SIDE, type ChatDialogSide, type ChatDialogStore } from './chat-dialog-store';
 import type { ChatReducerState, ChatStreamReducer, ChatStreamReducerOptions } from './chat-stream-reducer';
 import { createDeltaBatcher, type DeltaBatcher } from './delta-batcher';
@@ -37,8 +36,8 @@ export interface UseChatStreamReducerOptions {
 
 export interface UseChatStreamReducerReturn {
   state: ChatReducerState;
-  /** Apply a decoded event (deltas are batched; everything else immediate). */
-  applyEvent: (event: ChatStreamEvent) => void;
+  /** Apply a decoded entry (deltas are batched; everything else immediate). */
+  applyEntry: (entry: ChatStreamEntry) => void;
   /** Synchronously apply any pending delta batch. */
   flushDeltas: () => void;
   /** Run reducer commands (adapter-driven, non-wire mutations). */
@@ -84,22 +83,22 @@ export function useChatStreamReducer({
   // during render.
   const [batcher] = useState<DeltaBatcher<DialogKey>>(() =>
     createDeltaBatcher<DialogKey>({
-      applyOne: (event, k) => {
-        if (k) k.store.apply(k.dialogId, k.side, event);
+      applyOne: (entry, k) => {
+        if (k) k.store.apply(k.dialogId, k.side, entry);
       },
     }),
   );
 
   const flushDeltas = useCallback(() => batcher.flush(), [batcher]);
 
-  const applyEvent = useCallback(
-    (event: ChatStreamEvent) => {
-      // `push` flushes on key change and returns false for non-delta events;
+  const applyEntry = useCallback(
+    (entry: ChatStreamEntry) => {
+      // `push` flushes on key change and returns false for a non-delta entry;
       // those flush the batch first (ordering) and apply synchronously, so
       // completion state always lands on fully-applied deltas.
-      if (batcher.push(event, key)) return;
+      if (batcher.push(entry, key)) return;
       batcher.flush();
-      key.store.apply(key.dialogId, key.side, event);
+      key.store.apply(key.dialogId, key.side, entry);
     },
     [batcher, key],
   );
@@ -113,7 +112,7 @@ export function useChatStreamReducer({
   );
 
   return useMemo(
-    () => ({ state, applyEvent, flushDeltas, mutate, reducer }),
-    [state, applyEvent, flushDeltas, mutate, reducer],
+    () => ({ state, applyEntry, flushDeltas, mutate, reducer }),
+    [state, applyEntry, flushDeltas, mutate, reducer],
   );
 }

@@ -1,9 +1,8 @@
 /**
- * `SuggestionsDisplay` - the grouped prompt chips of a `suggestions` segment.
+ * `SuggestionsDisplay` - the grouped prompt chips of a `data-suggestions` part.
  *
  * Pins: captions, chips and the note render; a chip hands its PROMPT (not its
- * label, when they differ) to the segment's `onPick`, else sends it in the chat
- * panel around it.
+ * label, when they differ) to `onPick`, else sends it in the chat panel around it.
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -11,21 +10,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ChatPanelContext } from '../chat-panel-context';
 import { SuggestionsDisplay } from '../suggestions-display';
-import type { SuggestionsSegment } from '../types/message.types';
 
-const segment = (onPick?: (prompt: string) => void): SuggestionsSegment => ({
-  type: 'suggestions',
+const data = {
   groups: [
     { label: 'Diagnose', prompts: [{ label: 'Why is my laptop slow?' }] },
     { label: 'Fix', prompts: [{ label: 'Free up space', prompt: 'My disk is almost full, can you free up space?' }] },
   ],
   note: 'A note under the chips.',
-  onPick,
-});
+};
 
 describe('SuggestionsDisplay', () => {
   it('renders each group caption, its chips and the note', () => {
-    render(<SuggestionsDisplay segment={segment()} />);
+    render(<SuggestionsDisplay data={data} />);
 
     expect(screen.getByText('Diagnose')).toBeInTheDocument();
     expect(screen.getByText('Fix')).toBeInTheDocument();
@@ -35,7 +31,7 @@ describe('SuggestionsDisplay', () => {
 
   it("hands the chip's prompt to onPick", () => {
     const onPick = vi.fn();
-    render(<SuggestionsDisplay segment={segment(onPick)} />);
+    render(<SuggestionsDisplay data={data} onPick={onPick} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Free up space' }));
     expect(onPick).toHaveBeenCalledWith('My disk is almost full, can you free up space?');
@@ -47,7 +43,7 @@ describe('SuggestionsDisplay', () => {
     const sendPrompt = vi.fn();
     render(
       <ChatPanelContext.Provider value={{ closeChat: vi.fn(), sendPrompt }}>
-        <SuggestionsDisplay segment={segment()} />
+        <SuggestionsDisplay data={data} />
       </ChatPanelContext.Provider>,
     );
 

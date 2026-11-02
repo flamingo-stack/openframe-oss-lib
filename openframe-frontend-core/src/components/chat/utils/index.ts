@@ -3,28 +3,12 @@
  * Export all utilities for processing chat messages
  */
 
-// NOTE: NATS chunk parsing lives in `chat-protocol/nats-decoder`
-// (`decodeNatsChunk`) — the legacy `chunk-parser` module was deleted once the
-// reducer became the single reading path.
-
-// Segment accumulator
-export {
-  MessageSegmentAccumulator,
-  createMessageSegmentAccumulator,
-  type AccumulatorCallbacks,
-} from './message-segment-accumulator';
-
-// Where an approval card renders — one rule for both live kernels, the history
-// replay, and hosts that sort cards between their own footer and the flow.
+// Where an approval card renders: one rule, for the thread and for hosts that sort cards between their own footer and the
+// flow.
 export { approvalDisplaysInline } from './approval-display';
 
 // Historical message processing
-export {
-  processHistoricalMessages,
-  extractErrorMessages,
-  processHistoricalMessagesWithErrors,
-  decodeHistoricalMessageData,
-} from './process-historical-messages';
+export { processHistoricalMessages, type ProcessHistoricalMessagesResult } from './process-historical-messages';
 
 // Incomplete message state extraction
 export { extractIncompleteMessageState, extractIncompleteTailState } from './extract-incomplete-message-state';
@@ -36,7 +20,6 @@ export {
   flattenMessagePagesChronological,
   maxPersistedStreamSeq,
   SYNTHETIC_REALTIME_ID_PREFIXES,
-  type MergeableChatMessage,
   type HistoryMergeInput,
   type HistoryPrependResult,
 } from './history-merge';
@@ -88,7 +71,6 @@ export { decideNewTab, type DecideNewTabInput, type RuntimeMode } from './decide
 // `@flamingo-stack/openframe-frontend-core/utils`.
 
 // Pure content helpers
-export { flattenAssistantContent } from './flatten-assistant-content';
 export { SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from './scroll-anchor';
 export { SCROLL_ANCHOR, type ScrollAnchor } from '../types/message.types';
 export {

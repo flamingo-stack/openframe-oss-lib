@@ -3,6 +3,7 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type { ChatMessage, ChatPart, ChatToolPart } from '../../../chat-protocol/chat-message';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
@@ -17,9 +18,8 @@ import type {
 import type { ChatContextItem } from './context-item.types';
 import type {
   ApprovalRequestData,
-  AskSegment,
-  Message,
-  MessageSegment,
+  AskOptionData,
+  ChatMessageActions,
   ToolExecutionData,
   ApprovalResolutionHandler,
 } from './message.types';
@@ -132,9 +132,10 @@ export interface ConnectionIndicatorProps {
 
 // ========== Chat Message Enhanced Props ==========
 
-export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivElement>, 'content'> {
-  role: 'user' | 'assistant' | 'error';
-  content: string | MessageSegment[];
+export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement> {
+  role: ChatMessage['role'];
+  /** The message: its ordered parts. The memo compares this array by reference. */
+  parts: ChatPart[];
   name?: string;
   assistantType?: AssistantType;
   authorType?: AuthorType;
@@ -145,7 +146,7 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   /** Write the speaker's name on the agent's turn and the viewer's own bubble
    *  too (`ChatMessageList.nameEveryTurn`). Default false. */
   nameEveryTurn?: boolean;
-  /** Viewer variant for approval blocks in this message's segments.
+  /** Viewer variant for approval blocks in this message's parts.
    *  `'admin'` (default) = full command block; `'client'` = end-client
    *  (Fae desktop app) title-only card. Forwarded to
    *  ApprovalRequestMessage / ApprovalBatchMessage. */
@@ -158,12 +159,15 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   timestamp?: Date;
   showAvatar?: boolean;
   isTyping?: boolean;
-  onApprove?: ApprovalResolutionHandler;
-  onReject?: ApprovalResolutionHandler;
+  /** What this message's controls do. Parts hold no callbacks. A stable object: the message memo compares it by
+   *  reference. Omit to draw its cards read-only. */
+  actions?: ChatMessageActions;
+  /** The approval tiers drawn while pending (`approvalDisplaysInline`). `undefined` draws every tier. */
+  displayApprovalTypes?: readonly string[];
   /**
    * Entity-context items attached to this (user) message. When present the
    * bubble renders a read-only chip strip beneath its text (Figma node
-   * 31:28709). Resolved from `UnifiedChatMessage.contextItems` by the host.
+   * 31:28709). Resolved from `metadata.contextItems` by the host.
    */
   contextItems?: ChatContextItem[];
   /**
@@ -203,20 +207,6 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    */
   renderEntityCard?: (reference: ChatRef) => ReactNode;
   /**
-   * References this answer's metadata described, used to expand the
-   * record links (`record://type/id`) in its body.
-   *
-   * A marker on the wire carries only a type and an id, so without these a card
-   * has to be hydrated by id through a per-entity API — which the host may not
-   * have for entities that live on another platform. Supplying the reference
-   * here is what lets such a card render with a real title and link instead of
-   * falling back to its raw id.
-   *
-   * Presence is NOT a render list: only markers actually written into the body
-   * render, and the metadata routinely describes more than the model cited.
-   */
-  refs?: ChatRef[];
-  /**
    * Host-provided anchor component for markdown links. When supplied, the
    * `<a>` override in the markdown renderer delegates to this component
    * so the host's unified click rule (e.g. `useNavLinkViaRuntime`) owns routing
@@ -239,21 +229,12 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    * simply default to undefined on the receiver.
    */
   NavLinkAnchor?: NavLinkAnchorComponent;
-  /**
-   * Picks an option on an `ask` (clarification) card in this message. Receives
-   * the option's label VERBATIM — the host sends it as the user's next message
-   * and the backend resolves the reply against the labels it offered.
-   *
-   * Omit to render ask cards read-only. Keep the identity stable
-   * (`useCallback` / module const): the message memo compares it by reference.
-   */
-  onAskSelect?: (label: string) => void;
 }
 
 // ========== Chat Message List Props ==========
 
 export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
-  messages: Message[];
+  messages: ChatMessage[];
   dialogId?: string;
   /** The thread is still loading: the list draws its own loading state. Inside a `LoadingScope` it does so whatever
    *  this says. */
@@ -321,9 +302,11 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  `classic`; the Fae client passes `v2`. See `ChatAppearance`. */
   appearance?: ChatAppearance;
   assistantIcon?: ReactNode;
-  pendingApprovals?: MessageSegment[];
-  onApprove?: ApprovalResolutionHandler;
-  onReject?: ApprovalResolutionHandler;
+  pendingApprovals?: ChatToolPart[];
+  /** What the messages' controls do. Forwarded verbatim to every message's ChatMessageEnhanced. */
+  actions?: ChatMessageActions;
+  /** The approval tiers drawn while pending. Forwarded verbatim to every message's ChatMessageEnhanced. */
+  displayApprovalTypes?: readonly string[];
   // Infinite scroll for loading older messages
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
@@ -353,15 +336,11 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    * Return `null` for messages that own nothing. Hidden and pending-placeholder
    * messages never reach it — they do not render at all.
    */
-  renderAfterMessage?: (message: Message, index: number) => ReactNode;
+  renderAfterMessage?: (message: ChatMessage, index: number) => ReactNode;
   /** Host-provided anchor for markdown links. Forwarded verbatim to every
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */
   NavLinkAnchor?: NavLinkAnchorComponent;
-  /** Ask-card option pick. Forwarded verbatim to every message's
-   *  ChatMessageEnhanced; the host sends the received label as the user's next
-   *  message. Omit to render ask cards read-only. */
-  onAskSelect?: (label: string) => void;
 }
 
 export interface ChatMessageListRef {
@@ -661,10 +640,10 @@ export interface ThinkingDisplayProps extends HTMLAttributes<HTMLDivElement> {
 // ========== Ask Display Props ==========
 
 export interface AskDisplayProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onSelect'> {
-  /** The clarification cards to show. One entry per `ask` segment; a run of
-   *  consecutive segments is passed as ONE card with a pager, so a multi-question
+  /** The clarification cards to show. One entry per `data-ask` part; a run of
+   *  consecutive parts is passed as ONE card with a pager, so a multi-question
    *  turn reads as a single block instead of a stack of near-identical cards. */
-  cards: AskSegment[];
+  cards: Array<{ question: string; options: AskOptionData[] }>;
   /** Picks an option. Receives the option's `label` VERBATIM — that string is
    *  sent as the user's next message and the backend's classifier resolves it
    *  against the labels it offered, so it must not be reworded. Omit to render

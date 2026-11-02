@@ -1,35 +1,16 @@
 /**
- * Phase-0 GOLDEN CHARACTERIZATION TESTS — `processHistoricalMessages`.
+ * GOLDEN CHARACTERIZATION: `processHistoricalMessages`, persisted rows as the thread they draw.
  *
- * Pins the CURRENT GraphQL-history → ProcessedMessage[] transformation
- * before the stream-reader unification. A recorded corpus of messageData
- * rows is processed and the FULL output array is snapshotted.
+ * A recorded corpus of messageData rows is processed and the FULL output array is snapshotted, so a change to what a reload
+ * shows is a diff to read.
  *
- * NOTE: `process-historical-messages-approvals.test.ts` already guards
- * displayApprovalTypes semantics — this file deliberately does not
- * duplicate it and instead records the full-output shape.
+ * `process-historical-messages-approvals.test.ts` guards approvals and turn identity, and `-sources` the metadata rows. This
+ * file records the whole shape.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { AskMessageData, HistoricalMessage } from '../../types';
-import {
-  processHistoricalMessages,
-  extractErrorMessages,
-  processHistoricalMessagesWithErrors,
-} from '../process-historical-messages';
-
-// Deterministic Date.now for the `pending-approvals-${Date.now()}` synthetic
-// message id + its `new Date()` timestamp.
-const FIXED_NOW = new Date('2026-07-20T10:00:00.000Z');
-
-beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(FIXED_NOW);
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-});
+import { processHistoricalMessages } from '../process-historical-messages';
 
 /** Recorded corpus — one realistic dialog covering every row shape. */
 const CORPUS: HistoricalMessage[] = [
@@ -226,13 +207,10 @@ describe('processHistoricalMessages — golden corpus', () => {
       assistantType: 'mingo',
       assistantAvatar: '/avatars/mingo.png',
     });
-    expect({
-      messages: result.messages,
-      escalatedApprovals: Array.from(result.escalatedApprovals.entries()),
-    }).toMatchSnapshot();
+    expect(result.messages).toMatchSnapshot();
   });
 
-  it('unresolved single approval is resurrected as a synthetic pending-approvals bubble', () => {
+  it('an unresolved single approval stays where it arrived, pending', () => {
     const result = processHistoricalMessages([
       {
         id: 'a1',
@@ -248,7 +226,6 @@ describe('processHistoricalMessages — golden corpus', () => {
         ],
       },
     ]);
-    // Date.now is frozen → deterministic synthetic id.
     expect(result.messages).toMatchSnapshot();
   });
 
@@ -300,30 +277,10 @@ describe('processHistoricalMessages — golden corpus', () => {
   });
 });
 
-describe('extractErrorMessages / processHistoricalMessagesWithErrors — golden', () => {
-  it('extractErrorMessages surfaces ERROR rows as standalone error-role messages', () => {
-    expect(extractErrorMessages(CORPUS, { assistantName: 'Mingo AI', assistantType: 'mingo' })).toMatchSnapshot();
-  });
-
-  it('processHistoricalMessagesWithErrors output parity on the same corpus (snapshot)', () => {
-    const result = processHistoricalMessagesWithErrors(CORPUS, {
-      assistantName: 'Mingo AI',
-      assistantType: 'mingo',
-      assistantAvatar: '/avatars/mingo.png',
-    });
-    expect({
-      messages: result.messages,
-      escalatedApprovals: Array.from(result.escalatedApprovals.entries()),
-    }).toMatchSnapshot();
-  });
-});
-
 // ─── ASK rows ──────────────────────────────────────────────────────────────
 //
-// History must replay a persisted `ASK` row into
-// the SAME shape the live `ASK` chunk produces — the intro sentence as answer
-// text, then the card — or a reloaded dialog loses the clarification the user
-// was about to answer.
+// History must replay a persisted `ASK` row into the SAME shape the live `ASK` chunk produces — the intro sentence as answer
+// text, then the card — or a reloaded dialog loses the clarification the user was about to answer.
 
 describe('processHistoricalMessages — ASK rows', () => {
   const askRow: AskMessageData = {
@@ -336,58 +293,45 @@ describe('processHistoricalMessages — ASK rows', () => {
     ],
   };
 
+  const rowOf = (messageData: HistoricalMessage['messageData']): HistoricalMessage[] => [
+    {
+      id: 'a1',
+      chatType: 'CLIENT_CHAT',
+      createdAt: '2026-07-19T09:00:05Z',
+      owner: { type: 'ASSISTANT' },
+      messageData,
+    },
+  ];
+
   it('replays an ASK row as intro text followed by the card', () => {
-    const dialog: HistoricalMessage[] = [
+    expect(processHistoricalMessages(rowOf([askRow])).messages[0].parts).toEqual([
+      { type: 'text', text: 'Do you want the docs, or your own workspace?', state: 'done' },
       {
-        id: 'a1',
-        chatType: 'CLIENT_CHAT',
-        createdAt: '2026-07-19T09:00:05Z',
-        owner: { type: 'ASSISTANT' },
-        messageData: [askRow],
-      },
-    ];
-    expect(processHistoricalMessages(dialog).messages[0].content).toEqual([
-      { type: 'text', text: 'Do you want the docs, or your own workspace?' },
-      {
-        type: 'ask',
-        question: 'What do you want to work on?',
-        options: [
-          { label: 'Find documentation', description: 'How scripting works and how to set it up' },
-          { label: 'Your scripts', description: 'List, edit or run the scripts in your workspace' },
-        ],
+        type: 'data-ask',
+        data: {
+          question: 'What do you want to work on?',
+          options: [
+            { label: 'Find documentation', description: 'How scripting works and how to set it up' },
+            { label: 'Your scripts', description: 'List, edit or run the scripts in your workspace' },
+          ],
+        },
       },
     ]);
   });
 
-  it('keeps consecutive ASK rows as SEPARATE segments (the card pages them)', () => {
-    const dialog: HistoricalMessage[] = [
-      {
-        id: 'a1',
-        chatType: 'CLIENT_CHAT',
-        createdAt: '2026-07-19T09:00:05Z',
-        owner: { type: 'ASSISTANT' },
-        messageData: [
-          { type: 'ASK', question: 'First?', options: [{ label: 'A' }] },
-          { type: 'ASK', question: 'Second?', options: [{ label: 'B' }] },
-        ],
-      },
-    ];
-    expect(processHistoricalMessages(dialog).messages[0].content).toEqual([
-      { type: 'ask', question: 'First?', options: [{ label: 'A', description: undefined }] },
-      { type: 'ask', question: 'Second?', options: [{ label: 'B', description: undefined }] },
+  it('keeps consecutive ASK rows as SEPARATE parts (the card pages them)', () => {
+    const dialog = rowOf([
+      { type: 'ASK', question: 'First?', options: [{ label: 'A' }] },
+      { type: 'ASK', question: 'Second?', options: [{ label: 'B' }] },
+    ]);
+    expect(processHistoricalMessages(dialog).messages[0].parts).toEqual([
+      { type: 'data-ask', data: { question: 'First?', options: [{ label: 'A' }] } },
+      { type: 'data-ask', data: { question: 'Second?', options: [{ label: 'B' }] } },
     ]);
   });
 
   it('an ASK row with no answerable options decodes to nothing', () => {
-    const dialog: HistoricalMessage[] = [
-      {
-        id: 'a1',
-        chatType: 'CLIENT_CHAT',
-        createdAt: '2026-07-19T09:00:05Z',
-        owner: { type: 'ASSISTANT' },
-        messageData: [{ type: 'ASK', question: 'Which one?', options: [{ description: 'no label' }] }],
-      },
-    ];
+    const dialog = rowOf([{ type: 'ASK', question: 'Which one?', options: [{ description: 'no label' }] }]);
     expect(processHistoricalMessages(dialog).messages).toEqual([]);
   });
 });

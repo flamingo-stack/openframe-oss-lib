@@ -3,16 +3,14 @@
  * a client shows for each.
  *
  * A retrieval chat spends seconds before any text exists (reading the question, searching, reading what it found). Each
- * stage is reported as a step of the turn, in the chunk shape a NATS tool run has (`ToolExecutionFrame`), so the chat
- * draws it as the row it draws for a tool run: working while the stage runs, done when it ends. The stage is a FIXED
- * vocabulary (never model text, a rewritten query or a source name), so it is safe on a public chat, and its line lives
- * here only (`chatProgressLabel`).
+ * stage is reported as a transient chunk (`chatProgressChunk`), held on the message being built and never stored, so the
+ * chat draws it as the row it draws for a tool run: working while the stage runs, done when it ends. The stage is a
+ * FIXED vocabulary (never model text, a rewritten query or a source name), so it is safe on a public chat, and its line
+ * lives here only (`chatProgressLabel`).
  *
  * Server-safe: no React, no browser APIs.
  */
 
-import { ToolTypeValues } from '../types/tool.types';
-import type { ToolExecutionFrame } from './frames';
 import type { ChatProgressChunk } from './ui-chunks';
 
 export const CHAT_PROGRESS_STAGES = ['understanding', 'searching', 'searching_again', 'reading'] as const;
@@ -35,28 +33,6 @@ const PROGRESS_LABEL: Record<ChatProgressStage, (count: number | undefined) => s
 /** The one line shown for a stage. Specific when the server gave a real count, never an invented one. */
 export function chatProgressLabel(progress: ChatProgress): string {
   return PROGRESS_LABEL[progress.stage](progress.count);
-}
-
-/**
- * The frame for a stage of one turn: `running` opens its row, `done` or `failed` closes it. `turnId` keeps the row's id
- * unique to the turn, since a closing frame updates the open row of the same id anywhere in the thread. The tool type is
- * the OpenFrame one, the icon Mingo's rows for the hub's tools show, so the stage is drawn as their one-line row.
- */
-export function chatProgressFrame(
-  progress: ChatProgress,
-  state: 'running' | 'done' | 'failed',
-  turnId: string,
-): ToolExecutionFrame {
-  const id = `${turnId}:${progress.stage}`;
-  const row = {
-    integratedToolType: ToolTypeValues.OPENFRAME,
-    toolFunction: progress.stage,
-    title: chatProgressLabel(progress),
-    toolExecutionRequestId: id,
-  };
-  return state === 'running'
-    ? { type: 'EXECUTING_TOOL', ...row }
-    : { type: 'EXECUTED_TOOL', ...row, success: state === 'done' };
 }
 
 /**

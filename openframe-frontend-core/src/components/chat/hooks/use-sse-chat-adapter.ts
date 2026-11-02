@@ -1,60 +1,53 @@
 'use client';
 
 /**
- * useSseChatAdapter — the SSE/Guide-mode transport adapter for the unified
- * chat surface. One of two `UnifiedChatState` implementations; its NATS
- * counterpart is `useNatsChatAdapter` (Mingo mode). The public
- * `useChat({ mode })` dispatches between them based on `mode.transport`.
+ * useSseChatAdapter: the SSE/Guide-mode transport adapter for the unified chat surface. One of two `UnifiedChatState`
+ * implementations; its NATS counterpart is `useNatsChatAdapter` (Mingo mode). The public `useChat({ mode })` dispatches
+ * between them based on `mode.transport`.
  *
- * Phase 3 of the chat unification: the adapter no longer owns a parser or a
- * message-merge layer. Raw response bytes flow
+ * The adapter owns no parser and no message merge. Raw response bytes flow
  *
- *   fetch body → createSseFrameDecoder → ChatStreamEvent →
- *   createChatStreamReducer (transport: 'sse') — THE master reader
+ *   fetch body → createChatStreamReader → UiChunk → createChatStreamReducer, THE master reader
  *
- * The reducer absorbed `useChat`'s trailing-assistant merge, the
- * `decision_resolved` receipt path, and the sendIdx-keyed
- * sources/meta maps; this file keeps only the transport wiring
- * (fetch/abort, request-body building), the server-issued conversation-id
- * persistence (id ONLY — see below), the mount-time server-history
- * hydration seam, and the public `UnifiedChatState` mapping.
+ * and this file keeps only the transport wiring (fetch/abort, request bodies), the server-issued conversation-id
+ * persistence (id ONLY, see below), the mount-time server-history hydration seam, and the public `UnifiedChatState` mapping.
  *
  * Conversation identity + history (server SSOT):
  *
- *   - Conversation ids are SERVER-minted. The first send of a session goes
- *     out id-less; the server mints an id and echoes it in the leading
- *     metadata frame (surfaced by the decoder as
- *     `ChatMetadataEvent.conversationId`), and every later turn echoes it
- *     back in the request body.
- *   - localStorage stores ONLY that echoed id (`chat-conversation-storage`).
- *     Message history lives server-side in `chat_conversations` /
- *     `chat_messages` and is rebuilt on mount via `useChatHistoryHydration`,
- *     which materializes through the reducer (`initializeWithState` /
- *     `prependMessages` + `seedSseMaps`).
- *   - The wire carries ONLY the newest user message — never a replay of the
- *     client-side thread (the server re-reads `chat_messages` by
- *     conversation id on every turn).
+ *   - Conversation ids are SERVER-minted. The first send of a session goes out with a client id the server does not know,
+ *     so it mints one and echoes it in `metadata.conversationId`, and every later turn sends it back as the request's `id`.
+ *   - localStorage stores ONLY that echoed id (`chat-conversation-storage`). Message history lives server-side in
+ *     `chat_conversations` / `chat_messages` and is rebuilt on mount via `useChatHistoryHydration`, which materializes
+ *     through the reducer (`initializeWithState` / `prependMessages`).
+ *   - The wire carries ONLY the newest user message, never a replay of the client-side thread (the server re-reads
+ *     `chat_messages` by conversation id on every turn).
+ *
+ * An approval is the standard's round trip on the same endpoint: the card's message goes back holding the answered parts,
+ * and the response continues that message (the receipt, the card of what it did, the auto-continuation).
  *
  * Two key contracts vs hub-side chat hooks:
  *
- *   1. `source` is READ FROM THE RUNTIME, not a parameter. It is OPTIONAL —
- *      platform-agnostic embedders leave it unset; an empty `source` falls back
- *      to a stable constant (`DEFAULT_CHAT_SOURCE`) for the localStorage
- *      conversation-id namespace. It is NEVER sent on the wire (the hub
- *      resolves source server-side via `currentPlatform()`).
+ *   1. `source` is READ FROM THE RUNTIME, not a parameter. It is OPTIONAL: platform-agnostic embedders leave it unset; an
+ *      empty `source` falls back to a stable constant (`DEFAULT_CHAT_SOURCE`) for the localStorage conversation-id
+ *      namespace. It is NEVER sent on the wire (the hub resolves source server-side via `currentPlatform()`).
  *
- *   2. `tableIdForDocumentType` is INJECTED via the optional
- *      `tableIdForDocumentType` parameter. Hub callers pass the
- *      registry-backed lookup from `lib/config/rag-table-config`;
- *      embedders that don't supply one fall back to
- *      `defaultTableIdForDocumentType` so the `displayRef` / `discussRef`
- *      Ask + Display buttons WORK out of the box.
+ *   2. `tableIdForDocumentType` is INJECTED via the optional `tableIdForDocumentType` parameter. Hub callers pass the
+ *      registry-backed lookup from `lib/config/rag-table-config`; embedders that don't supply one fall back to
+ *      `defaultTableIdForDocumentType` so the `displayRef` / `discussRef` Ask + Display buttons WORK out of the box.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  approvalStatusOf,
+  isToolPart,
+  type ChatFilePart,
+  type ChatMessage,
+  type ChatMessageMetadata,
+  type ChatToolPart,
+} from '../../../chat-protocol/chat-message';
 import { buildConfirmToolBody, readServerErrorMessage } from '../../../chat-protocol/confirm-tool';
-import { createSseFrameDecoder } from '../../../chat-protocol/decode';
-import type { ChatStreamEvent } from '../../../chat-protocol/events';
+import { createChatStreamReader, type ChatStreamWire } from '../../../chat-protocol/message-decoder';
+import type { UiChunk } from '../../../chat-protocol/ui-chunks';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
@@ -62,17 +55,21 @@ import type { ChatRef } from '../chat-ref.types';
 import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
 import { createChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatDialogStore } from '../stream/chat-dialog-store';
-import type { ChatStreamReducerOptions } from '../stream/chat-stream-reducer';
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
 import type { SlashCommandSummary } from '../types/component.types';
-import type { ChatSource, Message, MessageSegment, ScrollAnchor } from '../types/message.types';
+import type { ChatMessageActions } from '../types/message.types';
 import type {
   ChatDialogCapabilities,
   FetchDialogsParams,
   UnifiedChatState,
-  UnifiedChatMessage,
   UnifiedSendMessageOptions,
+  UnifiedUsageBreakdown,
 } from '../types/unified-chat-state.types';
+import {
+  buildChatAttachmentViewUrl,
+  formatChatAttachmentMarkdownForBubble,
+  type ChatAttachment,
+} from '../utils/chat-attachment-markdown';
 import { createChatConversationStorage, pruneStaleChatConversationStorage } from '../utils/chat-conversation-storage';
 import { createChatConversationsApi } from '../utils/chat-conversations-api';
 import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
@@ -84,68 +81,40 @@ import { useSlashCommandRegistry } from './use-slash-commands';
 
 // ─── Stable no-op references for the capabilities Guide mode never has ──
 // Plain module-scope constants so the adapter's return identity stays stable
-// across renders — consumers that memo on these fields don't get spurious
+// across renders: consumers that memo on these fields don't get spurious
 // re-runs. The dialog LIST itself is no longer stubbed here: without a
 // conversations endpoint the shared `useManagedDialogList` is inert by
 // construction (empty list, false flags, memoized no-op mutations).
 const noopSelectDialog = (_id: string | null): void => {
-  /* No conversations endpoint configured — nothing to select */
+  /* No conversations endpoint configured: nothing to select */
 };
 /** "New chat" is `clearMessages` (the server mints an id on the next send);
  *  there is no create call to make. */
 const noopStartNewDialog = (): Promise<string | null> => Promise.resolve(null);
 const noopDeleteDialog = async (_id: string): Promise<void> => {
-  /* Deletion is not offered — archive replaces it. */
+  /* Deletion is not offered: archive replaces it. */
 };
 const noopAsync = async (): Promise<void> => {
   /* no-op pagination stub (message history, which Guide does not page) */
 };
-const noopApproveRequest = async (_id: string): Promise<void> => {
-  /* Guide mode has no tool-call approval workflow */
-};
-const noopRejectRequest = async (_id: string, _reason?: string): Promise<void> => {
-  /* Guide mode has no tool-call approval workflow */
-};
-/** Stable no-op for the hydration hook's `bumpMetaTick` seam — reducer
- *  invalidation (inside `hydrateMessages`) already re-renders subscribers. */
-const noopBumpMetaTick = (): void => {};
 
 // =============================================================================
 // Public types
 // =============================================================================
 
-/** Source identifier — opaque string ID (registry lookup happens in the
+/** Source identifier: opaque string ID (registry lookup happens in the
  *  hub-side platform-utils, not in lib). */
 export type DocSource = string;
-
-export interface DocChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  /** String form for legacy callers that just want the answer text; structured
-   *  segments include thinking blocks too, which the lib's
-   *  ChatMessageEnhanced renders as <ThinkingDisplay> cards. */
-  content: string;
-  /** Structured segments. When set, callers should prefer this over `content`. */
-  segments?: MessageSegment[];
-  /** When the message was written: a saved message's own time, not when the chat was opened. */
-  timestamp?: UnifiedChatMessage['timestamp'];
-  sources?: ChatSource[];
-  /** Per-message viewport-positioning hint emitted by the server. */
-  scrollAnchor?: ScrollAnchor;
-  /** When true the message is part of the conversation history but is
-   *  NOT rendered in the chat UI. */
-  hidden?: boolean;
-}
 
 /**
  * Optional dependency-injection options for `useSseChatAdapter`.
  *
- *   - `tableIdForDocumentType` — looks up the RagTableConfig.id for an
+ *   - `tableIdForDocumentType`: looks up the RagTableConfig.id for an
  *     LLM document type. Used by `displayRef` + `discussRef` to translate
  *     an inline-card click into a server-side entity-id filter.
  *
  *     **Defaults to `defaultTableIdForDocumentType` from
- *     `src/utils/source-icons.ts`** — a lib-baked map covering every
+ *     `src/utils/source-icons.ts`**: a lib-baked map covering every
  *     documentType currently registered in the hub's RAG_TABLE_CONFIGS.
  *     Override only for polymorphic / per-tenant document types.
  */
@@ -167,48 +136,121 @@ export interface UseSseChatAdapterRuntimeOptions {
 }
 
 // =============================================================================
-// Local persistence — the server-issued conversation id ONLY
+// Local persistence: the server-issued conversation id ONLY
 // =============================================================================
 //
-// The ONLY thing persisted locally is the conversation id the SERVER minted
-// and echoed in the leading metadata frame of the session's first turn.
-// The client never generates ids. Message history lives server-side in
-// `chat_conversations` / `chat_messages` (recorded turn-by-turn by the chat
-// route) and is rehydrated on mount via `GET <chatStreamUrl>/history`.
-// localStorage never stores messages, sources, or send counts —
-// the server transcript is the single source of truth for history.
-// (The retired PersistedChatState v1 full-history blobs are swept on mount
-// by `pruneStaleChatConversationStorage` — never read, never migrated.)
+// The ONLY thing persisted locally is the conversation id the SERVER minted and echoed in the stream of the session's first
+// turn. Message history lives server-side in `chat_conversations` / `chat_messages` (recorded turn-by-turn by the chat
+// route) and is rehydrated on mount via `GET <chatStreamUrl>/history`. localStorage never stores messages or sources: the
+// server transcript is the single source of truth for history. (The retired PersistedChatState v1 full-history blobs are
+// swept on mount by `pruneStaleChatConversationStorage`: never read, never migrated.)
 
 /** localStorage namespace used when no `source` is configured on the
  *  runtime. Embedders are platform-agnostic (see `ChatRuntime.source`), so any
- *  stable string works here — the hub passes its real platform instead. */
+ *  stable string works here: the hub passes its real platform instead. */
 const DEFAULT_CHAT_SOURCE = 'embed';
 
 // Persistence itself lives in `../utils/chat-conversation-storage.ts` (built
 // on the lib-standard `createLocalStorageAdapter`); the mount-time history
 // rebuild lives in `./use-chat-history-hydration.ts`.
 
-/** Server-hydrated wire `Message` → reducer message. Hydrated rows carry
- *  plain-string content; the defensive segments branch keeps the mapper
- *  total over the wider `Message` union the hydration seam is typed with. */
-function historyMessageToReducerMessage(m: Message): UnifiedChatMessage {
-  const segments = Array.isArray(m.content) ? m.content : undefined;
+// =============================================================================
+// Reading a turn's metadata
+// =============================================================================
+
+function isWireRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** The trailing usage's `breakdown` is an OPAQUE wire blob; these readers hand back values that match
+ *  `UnifiedUsageBreakdown`. */
+function readTokenPair(value: unknown): { input: number; output: number } | undefined {
+  if (!isWireRecord(value) || typeof value.input !== 'number') return undefined;
+  // A frame that omitted `output` must not put `undefined` into a `number` field and NaN any downstream sum.
+  return { input: value.input, output: typeof value.output === 'number' ? value.output : 0 };
+}
+
+function readRoutedAnswer(value: unknown): { model: string; complexity: string; thinkingBudget: number } | undefined {
+  if (!isWireRecord(value) || typeof value.model !== 'string') return undefined;
   return {
-    id: m.id,
-    role: m.role,
-    content: typeof m.content === 'string' ? m.content : '',
-    ...(segments ? { segments } : {}),
-    ...(m.name !== undefined ? { name: m.name } : {}),
-    ...(m.avatar != null ? { avatar: m.avatar } : {}),
-    ...(m.timestamp !== undefined ? { timestamp: m.timestamp } : {}),
-    ...(m.sources ? { sources: m.sources } : {}),
-    ...(m.hidden ? { hidden: true } : {}),
-  } as UnifiedChatMessage;
+    model: value.model,
+    complexity: typeof value.complexity === 'string' ? value.complexity : '',
+    thinkingBudget: typeof value.thinkingBudget === 'number' ? value.thinkingBudget : 0,
+  };
+}
+
+function usageBreakdownOf(raw: unknown): UnifiedUsageBreakdown | null {
+  if (!isWireRecord(raw)) return null;
+  return {
+    haikuRewriter: readTokenPair(raw.haikuRewriter),
+    haikuClassifier: readTokenPair(raw.haikuClassifier),
+    haikuSummarizer: readTokenPair(raw.haikuSummarizer),
+    routedAnswer: readRoutedAnswer(raw.routedAnswer),
+  };
+}
+
+/** The newest answer that has reported usage: the live turn's, or until it reports, the one before it. */
+function latestUsageOf(messages: readonly ChatMessage[]): NonNullable<ChatMessageMetadata['usage']> | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const usage = messages[i].metadata?.usage;
+    if (messages[i].role === 'assistant' && usage) return usage;
+  }
+  return null;
+}
+
+/** The conversation id a chunk carries. */
+function conversationIdOfChunk(chunk: UiChunk): string | null {
+  if (chunk.type !== 'message-metadata' && chunk.type !== 'start' && chunk.type !== 'finish') return null;
+  const id = chunk.messageMetadata?.conversationId;
+  return typeof id === 'string' && id !== '' ? id : null;
 }
 
 // =============================================================================
-// useSseChatAdapter — public hook
+// Requests
+// =============================================================================
+
+/** A client id the server does not know: it means a new conversation (the standard's `id` is always there). */
+function newClientId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+/** An attachment as the part it rides in. Its url is the view proxy, through the host's own prefix. */
+function filePartOfAttachment(attachment: ChatAttachment, viewUrlPrefix: string): ChatFilePart {
+  return {
+    type: 'file',
+    mediaType: attachment.contentType,
+    filename: attachment.fileName,
+    url: buildChatAttachmentViewUrl(viewUrlPrefix, attachment.storagePath, attachment.viewToken),
+  };
+}
+
+/** The parts of one approval: the row it names, and when that row is in a batch, the whole batch. Only what still waits. */
+function pendingApprovalParts(message: ChatMessage, id: string): ChatToolPart[] {
+  const tools = message.parts.filter(isToolPart);
+  const named = tools.find(part => 'approval' in part && part.approval?.id === id);
+  const batchId = (named && 'approval' in named ? named.approval?.descriptor?.batchId : undefined) ?? id;
+  return tools.filter(
+    part =>
+      approvalStatusOf(part) === 'pending' &&
+      'approval' in part &&
+      (part.approval?.id === id || part.approval?.descriptor?.batchId === batchId),
+  );
+}
+
+/** The newest message holding a pending approval this id names. */
+function cardOfApproval(
+  messages: readonly ChatMessage[],
+  id: string,
+): { message: ChatMessage; parts: ChatToolPart[] } | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const parts = pendingApprovalParts(messages[i], id);
+    if (parts.length > 0) return { message: messages[i], parts };
+  }
+  return null;
+}
+
+// =============================================================================
+// useSseChatAdapter: public hook
 // =============================================================================
 
 /**
@@ -216,7 +258,7 @@ function historyMessageToReducerMessage(m: Message): UnifiedChatMessage {
  * controls, and per-turn metadata (model name, token counts, routing
  * decision) the lib's `<ChatContainer>` consumes.
  *
- * Source identity comes from `useRequiredChatRuntime().source` — no
+ * Source identity comes from `useRequiredChatRuntime().source`: no
  * parameter. An empty `source` falls back to `DEFAULT_CHAT_SOURCE` (used only
  * for the conversation-id localStorage namespace; never sent on the wire).
  */
@@ -225,61 +267,27 @@ export function useSseChatAdapter(
   runtimeOptions: UseSseChatAdapterRuntimeOptions = {},
 ): UnifiedChatState {
   const { active = true } = runtimeOptions;
-  // Chat-specific code REQUIRES a runtime — the lib's `<HubRuntimeProvider>`
+  // Chat-specific code REQUIRES a runtime: the lib's `<HubRuntimeProvider>`
   // (hub) / embedder's provider must wrap the tree.
   const runtime = useRequiredChatRuntime();
   const source = runtime.source || DEFAULT_CHAT_SOURCE;
   const tableIdForDocumentType = options?.tableIdForDocumentType ?? defaultTableIdForDocumentType;
 
   // ─── Reducer wiring ────────────────────────────────────────────────────────
-  // One store per hook instance; one reducer keyed by the source. Approval
-  // card buttons fire a server-driven confirm-tool turn via `sendMessage`
-  // (hidden approval-action send) — routed through a ref so the reducer's
-  // creation-time callbacks stay stable.
-
-  const sendMessageRef = useRef<(text: string, options?: InternalSendMessageOptions) => Promise<boolean>>(() =>
-    Promise.resolve(true),
-  );
-
-  // Approve/reject pass the transport's boolean outcome through so batch
-  // approve-all loops can mark a FAILED row (expired proposal, network
-  // error) instead of leaving its execution loader spinning. ONE factory
-  // — the two handlers differ only in the action literal.
-  const cardResolve = useCallback(
-    (action: 'approve' | 'reject') =>
-      (reqId?: string): void | Promise<boolean> => {
-        if (!reqId) return undefined;
-        return sendMessageRef.current('', {
-          hidden: true,
-          approvalAction: { proposalId: reqId, action },
-        });
-      },
-    [],
-  );
-  const cardApprove = useMemo(() => cardResolve('approve'), [cardResolve]);
-  const cardReject = useMemo(() => cardResolve('reject'), [cardResolve]);
-
-  const createReducerOptions = useCallback(
-    (): ChatStreamReducerOptions => ({
-      transport: 'sse',
-      callbacks: { onApprove: cardApprove, onReject: cardReject },
-    }),
-    [cardApprove, cardReject],
-  );
+  // One store per hook instance; one reducer keyed by the source.
 
   const storeRef = useRef<ChatDialogStore | null>(null);
   if (storeRef.current === null) storeRef.current = createChatDialogStore();
 
-  const { state, applyEvent, flushDeltas, mutate } = useChatStreamReducer({
+  const { state, applyEntry, flushDeltas, mutate } = useChatStreamReducer({
     store: storeRef.current,
     dialogId: source,
-    createReducerOptions,
   });
 
-  // ─── Conversation identity — server-minted id, restored once on mount ─────
-  // Null = no conversation yet: the FIRST send goes out without an id, the
-  // server mints one, and the metadata-frame capture (in the send loop below)
-  // stores it. The client NEVER generates ids. This is the ONLY local
+  // ─── Conversation identity: server-minted id, restored once on mount ─────
+  // Null = no conversation yet: the FIRST send goes out with a client id, the
+  // server mints one, and the metadata capture (in the stream loop below)
+  // stores it. The client's id never names a conversation. This is the ONLY local
   // persistence — message history hydrates from the server transcript below.
   const conversationStorage = useMemo(() => createChatConversationStorage(source), [source]);
   const conversationIdRef = useRef<string | null>(null);
@@ -308,8 +316,8 @@ export function useSseChatAdapter(
   // ─── Slash-command registry (displayRef lookup) ───────────────────────────
   // Reads from the SAME react-query cache entry as `<EmbeddableChat>`'s
   // onboarding-card list (keyed on `commandsUrl`), so Guide mode fetches
-  // `commands` ONCE. Gated on `active` so a Mingo-only panel — where this
-  // adapter is mounted but idle — never hits the endpoint.
+  // `commands` ONCE. Gated on `active` so a Mingo-only panel, where this
+  // adapter is mounted but idle, never hits the endpoint.
   const commandsUrl = runtime.endpoints.commandsUrl;
   const { commands: slashCommands } = useSlashCommandRegistry(commandsUrl, {
     enabled: active,
@@ -338,37 +346,28 @@ export function useSseChatAdapter(
   }, [slashCommands]);
 
   // ─── Server hydration (history SSOT) ──────────────────────────────────────
-  // Mount-time rebuild of the message list from the server transcript — the
-  // single store of conversation history. The fetch/guard/decode lives in
-  // `use-chat-history-hydration.ts` (see there for the full contract +
-  // failure semantics: a miss starts the UI empty, never loses server
-  // context). THIS adapter owns the materialization seam: the hook hands
-  // back plain `Message[]` rows plus the user-turn count (via the shim ref
-  // below), and `hydrateMessages` feeds ALL of it through the REDUCER —
-  // `initializeWithState` on an empty thread, `prependMessages` when the
-  // user already sent before hydration landed (nothing typed is lost; the
-  // server resolves LLM history from its own store either way), and
-  // `seedSseMaps` for the send counter. No parallel merge path.
+  // Mount-time rebuild of the message list from the server transcript, the single store of conversation history. The
+  // fetch/guard/decode lives in `use-chat-history-hydration.ts` (see there for the full contract + failure semantics: a miss
+  // starts the UI empty, never loses server context). THIS adapter owns the materialization seam: `hydrateMessages` feeds it
+  // through the REDUCER: `initializeWithState` on an empty thread, `prependMessages` when the user already sent before
+  // hydration landed (nothing typed is lost; the server resolves LLM history from its own store either way). No parallel
+  // merge path.
   const historyUrl =
     runtime.endpoints.chatHistoryUrl ?? `${runtime.endpoints.chatStreamUrl.replace(/\/+$/, '')}/history`;
-  const hydrationSendCountRef = useRef(0);
   const hydrateMessages = useCallback(
-    (history: Message[]) => {
+    (history: ChatMessage[]) => {
       mutate(r => {
-        const mapped = history.map(historyMessageToReducerMessage);
-        const liveSendCount = r.state.turnMeta.sendCount;
         if (r.state.messages.length === 0) {
-          r.initializeWithState(mapped);
+          r.initializeWithState(history);
         } else {
-          r.prependMessages(mapped);
+          r.prependMessages(history);
         }
-        r.seedSseMaps({ sendCount: hydrationSendCountRef.current + liveSendCount });
       });
     },
     [mutate],
   );
   // Live message count for the orphan guard below (a ref, so the callback's
-  // identity never changes — see the note on `onOrphanedConversation`).
+  // identity never changes: see the note on `onOrphanedConversation`).
   const messagesLenRef = useRef(0);
   messagesLenRef.current = state.messages.length;
   const onOrphanedConversation = useCallback(
@@ -383,19 +382,15 @@ export function useSseChatAdapter(
     source,
     historyUrl,
     conversationId,
-    sendCountRef: hydrationSendCountRef,
     hydrateMessages,
-    // Meta invalidation is a reducer concern here: `seedSseMaps` (inside
-    // `hydrateMessages` above) already invalidates the snapshot.
-    bumpMetaTick: noopBumpMetaTick,
     // Drop a stored id the server no longer recognizes (deleted, or claimed by
-    // an account while this browser is signed out) — keeping it would stream
+    // an account while this browser is signed out): keeping it would stream
     // answers the server refuses to persist. Guarded on "no live turn yet" so
     // a just-minted id is never dropped.
     //
     // IDENTITY-STABLE by construction: this is a dependency of the hydration
     // effect, so a callback that changed with the message count would CANCEL
-    // an in-flight hydration the moment the user typed — silently discarding
+    // an in-flight hydration the moment the user typed, silently discarding
     // the thread they just opened. The live count is read through a ref.
     onOrphanedConversation,
   });
@@ -411,7 +406,6 @@ export function useSseChatAdapter(
       abortControllerRef.current?.abort();
       flushDeltas();
       mutate(r => r.reset());
-      hydrationSendCountRef.current = 0;
       hydratedKeyRef.current = null;
       commitConversationId(id);
     },
@@ -483,30 +477,29 @@ export function useSseChatAdapter(
   // ─── Send / stream loop ────────────────────────────────────────────────────
 
   /**
-   * Internal sendMessage options — union of the public
-   * `UnifiedSendMessageOptions` (semantic fields: `hidden`, `attachments`)
-   * and SSE-only internal extras (`commandOverride`, `approvalAction`)
-   * set by `discussRef` / `displayRef` / the approval-card callbacks.
+   * Internal sendMessage options: the public `UnifiedSendMessageOptions` (semantic fields: `hidden`, `attachments`) and the
+   * SSE-only `commandOverride` set by `discussRef` / `displayRef`.
    */
   type InternalSendMessageOptions = UnifiedSendMessageOptions & {
     commandOverride?: WireCommandOverride;
-    approvalAction?: { proposalId: string; action: 'approve' | 'reject' };
   };
 
   const endpointsRef = useRef(runtime.endpoints);
   endpointsRef.current = runtime.endpoints;
 
-  /** Capture the SERVER-minted conversation id from a decoded metadata
-   *  event. On the session's FIRST turn this is where the client learns
-   *  its id — persist it so later turns and future visits continue the
-   *  same conversation. The reducer ignores the field (identity is a
-   *  transport/persistence concern, not render state). */
+  /**
+   * What the last stream turned out to be: the hub that answered it answers the next approval.
+   * TODO(CU-17tkuw61kfy): `old` keeps the old POST to `approvalToolUrl`, and the branch goes at the cleanup. A card is never
+   * stored, so a card on screen always came with a stream that set this.
+   */
+  const wireRef = useRef<ChatStreamWire>('ui');
+
+  /** Capture the SERVER-minted conversation id off a chunk. On the session's FIRST turn this is where the client learns
+   *  its id: persist it so later turns and future visits continue the same conversation. */
   const captureConversationId = useCallback(
-    (event: ChatStreamEvent): boolean => {
-      if (event.type !== 'metadata') return false;
-      const id = event.conversationId;
-      if (typeof id !== 'string' || !id) return false;
-      if (conversationIdRef.current === id) return false;
+    (chunk: UiChunk): boolean => {
+      const id = conversationIdOfChunk(chunk);
+      if (id === null || conversationIdRef.current === id) return false;
       // Mark the new id as ALREADY hydrated before it becomes render state:
       // the turn being streamed IS its history, and a mount-style fetch here
       // would prepend that same turn once the server has persisted it.
@@ -517,106 +510,113 @@ export function useSseChatAdapter(
     [commitConversationId, hydratedKeyRef, source],
   );
 
+  /** Keep the managed list in step with the transcript: a first turn re-reads the list (the server-derived title replaces
+   *  the placeholder, the row is persisted by the time the stream ends); a later turn just bumps the row to the top. */
+  const settleDialogList = useCallback(
+    (mintedThisTurn: boolean, ctrl: AbortController) => {
+      if (!conversationsApi || ctrl.signal.aborted) return;
+      if (mintedThisTurn) {
+        reloadDialogs();
+      } else if (conversationIdRef.current) {
+        // Re-insert at the TOP rather than patching in place: the server
+        // has moved this row to the head of `last_message_at desc`, so an
+        // in-place bump would leave the rail's order and its
+        // Today/Yesterday grouping disagreeing with the server.
+        bumpDialogToTop(conversationIdRef.current);
+      }
+    },
+    [conversationsApi, reloadDialogs, bumpDialogToTop],
+  );
+
+  /**
+   * One POST and the stream it answers, chunk by chunk through the reducer. Throws what the server said on a refused
+   * request; an abort throws too, and the caller keeps what arrived. Returns whether this stream minted the conversation.
+   */
+  const streamFrom = useCallback(
+    async (url: string, body: unknown, ctrl: AbortController, hidden: boolean | undefined): Promise<boolean> => {
+      // `embedAuthedFetch` carries the bearer-act-as headers (+ Supabase session cookies): same wrapper
+      // `use-chat-attachments` and `use-chat-identity` use.
+      const response = await embedAuthedFetch(url, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (!response.ok) {
+        // Surface the SERVER's error copy (route-base envelope `{error, code}`): a bare "Chat request failed: 409" told the
+        // user nothing when e.g. a batch approval expired; the server ships real copy ("This approval expired ...").
+        const serverMessage = await readServerErrorMessage(response);
+        throw new Error(serverMessage ?? `Chat request failed: ${response.status}`);
+      }
+      if (!response.body) throw new Error('No response body');
+
+      // The reader is per-request: a rapid send-stop-send sequence must never feed the second stream's first chunk into
+      // the first stream's tail buffer.
+      const reader = await createChatStreamReader(response);
+      wireRef.current = reader.wire;
+      let minted = false;
+      for await (const chunk of reader.chunks) {
+        if (ctrl.signal.aborted) break;
+        if (captureConversationId(chunk)) {
+          minted = true;
+          // Optimistic row so the list shows the new conversation at once; the end-of-turn reload swaps in the server's
+          // title. NEUTRAL placeholder: the SERVER owns titles (it strips slash commands + attachment markdown and cuts at
+          // a word boundary), so guessing here would flash a `/command` token, and a naive slice can split an emoji.
+          const mintedId = conversationIdRef.current;
+          if (conversationsApi && !hidden && mintedId) {
+            upsertDialogTop({ id: mintedId, title: 'New chat', timestamp: new Date() });
+          }
+        }
+        applyEntry({ chunks: [chunk] });
+      }
+      return minted;
+    },
+    [applyEntry, captureConversationId, conversationsApi, upsertDialogTop],
+  );
+
   const sendMessage = useCallback(
-    // Resolves `true` on a clean turn, `false` when the request failed
-    // (surfaced to batch approve-all loops via the card callbacks).
+    // Resolves `true` on a clean turn, `false` when the request failed.
     async (text: string, sendOptions?: InternalSendMessageOptions): Promise<boolean> => {
-      const { hidden, attachments, commandOverride, approvalAction } = sendOptions ?? {};
+      const { hidden, attachments = [], commandOverride } = sendOptions ?? {};
 
-      // URL + body branch — approvalAction routes to the approval-tool
-      // endpoint, the standard chat path routes to the chat-stream endpoint.
-      // `source` is INTENTIONALLY NOT in the body: the chat route resolves
-      // it server-side via its own platform-detection — tamper-proof binding.
+      // `source` is INTENTIONALLY NOT in the body: the chat route resolves it server-side via its own platform-detection,
+      // a tamper-proof binding.
       //
-      // The server is the single source of conversation history: it re-reads
-      // `chat_messages` by conversation id on every turn. The wire therefore
-      // carries ONLY the new user message — never the prior conversation.
+      // The server is the single source of conversation history: it re-reads `chat_messages` by conversation id on every
+      // turn. The wire therefore carries ONLY the new user message, never the prior conversation.
       const echoedConversationId = conversationIdRef.current;
-      const targetPath = approvalAction ? endpointsRef.current.approvalToolUrl : endpointsRef.current.chatStreamUrl;
-      const requestBody = approvalAction
-        ? // Shared with every other transport that resolves a hub proposal —
-          // the body shape is the hub's, not this adapter's. `conversationId`
-          // is always present here: an approval can only happen inside an
-          // established conversation (the proposal turn captured the id).
-          buildConfirmToolBody({ ...approvalAction, conversationId: echoedConversationId })
-        : {
-            messages: [{ role: 'user', content: text }],
-            ...(commandOverride ? { commandOverride } : {}),
-            ...(attachments && attachments.length > 0 ? { pendingAttachments: attachments } : {}),
-            ...(echoedConversationId ? { conversationId: echoedConversationId } : {}),
-          };
+      const viewUrlPrefix = endpointsRef.current.attachmentViewUrlPrefix;
+      const files = attachments.map(attachment => filePartOfAttachment(attachment, viewUrlPrefix));
+      const requestBody = {
+        // A value the server did not issue means a new conversation.
+        id: echoedConversationId ?? newClientId('chat'),
+        messages: [
+          {
+            id: newClientId('user'),
+            role: 'user',
+            parts: [...(text.length > 0 ? [{ type: 'text', text }] : []), ...files],
+            // TODO(CU-17tkuw61kfy): the old hub reads the message's `content`, with the attachments as markdown in it.
+            content: text + attachments.map(att => formatChatAttachmentMarkdownForBubble(att, viewUrlPrefix)).join(''),
+          },
+        ],
+        ...(commandOverride ? { commandOverride } : {}),
+        // TODO(CU-17tkuw61kfy): the old hub reads these, and the new one ignores them.
+        ...(attachments.length > 0 ? { pendingAttachments: attachments } : {}),
+        ...(echoedConversationId ? { conversationId: echoedConversationId } : {}),
+      };
 
-      // Optimistic user bubble + assistant placeholder + phase 'thinking'
-      // + sendCount++ — one reducer command.
-      mutate(r => r.beginSseSend({ text, hidden, userName: 'You', assistantName: 'Mingo AI' }));
+      // Optimistic user bubble + assistant placeholder + phase 'thinking': one reducer command.
+      mutate(r => r.beginSseSend({ text, files, hidden }));
 
       const ctrl = new AbortController();
       abortControllerRef.current = ctrl;
-      let mintedThisTurn = false;
+      let minted = false;
 
       try {
-        // `embedAuthedFetch` carries the bearer-act-as headers (+ Supabase
-        // session cookies) — same wrapper `use-chat-attachments` and
-        // `use-chat-identity` use.
-        const response = await embedAuthedFetch(targetPath, {
-          method: 'POST',
-          body: JSON.stringify(requestBody),
-          signal: ctrl.signal,
-        });
-        if (!response.ok) {
-          // Surface the SERVER's error copy (route-base envelope
-          // `{error, code}`) — a bare "Chat request failed: 409" told
-          // the user nothing when e.g. a batch approval expired; the
-          // server ships real copy ("This approval expired — ...").
-          const serverMessage = await readServerErrorMessage(response);
-          throw new Error(serverMessage ?? `Chat request failed: ${response.status}`);
-        }
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error('No response body');
-
-        // Decoder is per-send (a rapid send-stop-send sequence must never
-        // feed the second stream's first chunk into the first stream's
-        // tail buffer).
-        const frameDecoder = createSseFrameDecoder();
-        let finished = false;
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (ctrl.signal.aborted) break;
-            for (const event of frameDecoder.push(value)) {
-              if (captureConversationId(event)) {
-                mintedThisTurn = true;
-                // Optimistic row so the list shows the new conversation at
-                // once; the end-of-turn reload swaps in the server's title.
-                // NEUTRAL placeholder — the SERVER owns titles (it strips slash
-                // commands + attachment markdown and cuts at a word boundary),
-                // so guessing here would flash a signed attachment URL or a
-                // `/command` token, and a naive slice can split an emoji.
-                const mintedId = conversationIdRef.current;
-                if (conversationsApi && !hidden && mintedId) {
-                  upsertDialogTop({ id: mintedId, title: 'New chat', timestamp: new Date() });
-                }
-              }
-              applyEvent(event);
-            }
-          }
-          finished = true;
-        } finally {
-          // `end()` always runs so the decoder settles; its events (the
-          // trailing usage frame) apply only on a CLEAN end — aborts
-          // propagate without extra state (legacy parity).
-          const endEvents = frameDecoder.end();
-          if (finished) {
-            for (const event of endEvents) applyEvent(event);
-          }
-        }
+        minted = await streamFrom(endpointsRef.current.chatStreamUrl, requestBody, ctrl, hidden);
         return true;
       } catch (err) {
-        // AbortError on user-initiated stop is expected — keep the partial
-        // message, no error row, and DON'T report failure (`true`): the
-        // request may have committed server-side, and a `false` here
-        // would falsely tick a batch row's failure cross.
+        // AbortError on user-initiated stop is expected: keep the partial message, no error row, and DON'T report failure:
+        // the request may have committed server-side.
         if ((err as { name?: string })?.name === 'AbortError' || ctrl.signal.aborted) {
           return true;
         }
@@ -629,46 +629,139 @@ export function useSseChatAdapter(
         if (abortControllerRef.current === ctrl) {
           abortControllerRef.current = null;
         }
-        // Force-flush pending deltas BEFORE the completion state lands, then
-        // settle the turn (drops an empty trailing placeholder — the reject
-        // path streams no text — and returns the phase to idle).
+        // Force-flush pending deltas BEFORE the completion state lands, then settle the turn (drops an empty trailing
+        // placeholder and returns the phase to idle).
         flushDeltas();
         mutate(r => r.endSseTurn());
-        // Keep the managed list in step with the transcript: a first turn
-        // re-reads the list (server-derived title replaces the placeholder,
-        // the row is persisted by the time the stream ends); a later turn
-        // just bumps the row to the top.
-        if (conversationsApi && !ctrl.signal.aborted) {
-          if (mintedThisTurn) {
-            reloadDialogs();
-          } else if (conversationIdRef.current) {
-            // Re-insert at the TOP rather than patching in place: the server
-            // has moved this row to the head of `last_message_at desc`, so an
-            // in-place bump would leave the rail's order and its
-            // Today/Yesterday grouping disagreeing with the server.
-            bumpDialogToTop(conversationIdRef.current);
-          }
-        }
+        settleDialogList(minted, ctrl);
       }
     },
-    [
-      mutate,
-      applyEvent,
-      flushDeltas,
-      captureConversationId,
-      conversationsApi,
-      upsertDialogTop,
-      reloadDialogs,
-      bumpDialogToTop,
-    ],
+    [mutate, flushDeltas, streamFrom, settleDialogList],
   );
-  sendMessageRef.current = sendMessage;
+
+  /**
+   * Answer an approval, by its `approval.id` or its batch's id. The standard's round trip (`addToolApprovalResponse`, then
+   * "send only the last message"): the part flips, the card's message becomes the one being built, and the card's message
+   * goes back holding the answered parts. The server's answer continues that message: an output or a denial per part (a
+   * refusal is an error on ITS part, so one row of a batch can fail with its cross and the others proceed), the receipt,
+   * and the auto-continuation.
+   */
+  const answerApproval = useCallback(
+    async (id: string, approved: boolean, reason?: string): Promise<boolean> => {
+      flushDeltas();
+      const store = storeRef.current;
+      const card = store ? cardOfApproval(store.getSnapshot(source).messages, id) : null;
+      if (!card) return false;
+      const { message, parts } = card;
+
+      for (const part of parts) {
+        const approvalId = 'approval' in part ? part.approval?.id : undefined;
+        if (!approvalId) continue;
+        applyEntry({
+          chunks: [
+            { type: 'tool-approval-response', approvalId, approved, ...(reason !== undefined ? { reason } : {}) },
+          ],
+        });
+      }
+      mutate(r => r.continueMessage(message.id));
+
+      const ctrl = new AbortController();
+      abortControllerRef.current = ctrl;
+      let ok = true;
+      let minted = false;
+
+      /** A request that never reached a decision fails its rows: nothing else would stop their loaders. */
+      const failParts = (failed: readonly ChatToolPart[], err: unknown): void => {
+        const errorText = err instanceof Error ? err.message : 'An error occurred while processing your request.';
+        for (const part of failed) {
+          applyEntry({
+            chunks: [{ type: 'tool-output-error', toolCallId: part.toolCallId, dynamic: true, errorText }],
+          });
+        }
+        ok = false;
+      };
+
+      try {
+        if (wireRef.current === 'ui') {
+          try {
+            minted = await streamFrom(
+              endpointsRef.current.chatStreamUrl,
+              {
+                id: conversationIdRef.current,
+                trigger: 'submit-message',
+                messages: [
+                  {
+                    id: message.id,
+                    role: 'assistant',
+                    parts: parts.map(part => ({
+                      type: 'dynamic-tool',
+                      toolName: part.toolName,
+                      toolCallId: part.toolCallId,
+                      state: 'approval-responded',
+                      input: part.input,
+                      approval: {
+                        id: 'approval' in part ? part.approval?.id : part.toolCallId,
+                        approved,
+                        ...(reason !== undefined ? { reason } : {}),
+                      },
+                    })),
+                  },
+                ],
+              },
+              ctrl,
+              true,
+            );
+          } catch (err) {
+            if ((err as { name?: string })?.name === 'AbortError' || ctrl.signal.aborted) return true;
+            flushDeltas();
+            failParts(parts, err);
+          }
+          return ok;
+        }
+
+        // TODO(CU-17tkuw61kfy): the old hub resolves one proposal per request, and has a route for it. A batch runs serially,
+        // and each answer ends its turn, so the card's message is named again before the next.
+        for (const part of parts) {
+          const proposalId = 'approval' in part ? part.approval?.id : undefined;
+          if (!proposalId) continue;
+          mutate(r => r.continueMessage(message.id));
+          try {
+            const answered = await streamFrom(
+              endpointsRef.current.approvalToolUrl,
+              buildConfirmToolBody({
+                proposalId,
+                action: approved ? 'approve' : 'reject',
+                conversationId: conversationIdRef.current,
+              }),
+              ctrl,
+              true,
+            );
+            minted = minted || answered;
+          } catch (err) {
+            if ((err as { name?: string })?.name === 'AbortError' || ctrl.signal.aborted) return true;
+            flushDeltas();
+            failParts([part], err);
+          }
+        }
+        return ok;
+      } finally {
+        if (abortControllerRef.current === ctrl) {
+          abortControllerRef.current = null;
+        }
+        flushDeltas();
+        mutate(r => r.endSseTurn());
+        settleDialogList(minted, ctrl);
+      }
+    },
+    [applyEntry, flushDeltas, mutate, settleDialogList, source, streamFrom],
+  );
 
   const stopMessage = useCallback(() => {
     abortControllerRef.current?.abort();
     flushDeltas();
-    mutate(r => r.setPhase('idle'));
-  }, [mutate, flushDeltas]);
+    // The turn ends here: what it said stays, and nothing is left reading as streaming.
+    applyEntry({ chunks: [{ type: 'abort', reason: 'user' }] });
+  }, [applyEntry, flushDeltas]);
 
   const clearMessages = useCallback(() => {
     mutate(r => r.reset());
@@ -677,7 +770,6 @@ export function useSseChatAdapter(
     // fresh conversation (echoed back and re-captured then). Resetting the
     // hydration guard means a re-captured id can hydrate again if needed.
     commitConversationId(null);
-    hydrationSendCountRef.current = 0;
     hydratedKeyRef.current = null;
   }, [mutate, commitConversationId, hydratedKeyRef]);
 
@@ -688,6 +780,19 @@ export function useSseChatAdapter(
       switchConversation(id);
     },
     [switchConversation],
+  );
+
+  // What a message's controls do: a stable object, the message memo compares it by reference. This transport has no
+  // escalation offers.
+  const actions = useMemo<ChatMessageActions>(
+    () => ({
+      approve: id => answerApproval(id, true),
+      reject: (id, reason) => answerApproval(id, false, reason),
+      // This adapter's `sendMessage` never rejects: it resolves `false` and renders the failure via `failSseTurn`.
+      selectAsk: label => void sendMessage(label),
+      pickSuggestion: prompt => void sendMessage(prompt),
+    }),
+    [answerApproval, sendMessage],
   );
 
   // Present ONLY with a conversations endpoint — its absence is what keeps a
@@ -710,42 +815,6 @@ export function useSseChatAdapter(
         : undefined,
     [conversationsApi, fetchArchivedDialogs, unarchiveDialog, dialogSearch],
   );
-
-  // ─── Public message mapping ───────────────────────────────────────────────
-  // A live message reads the sources and scroll anchor of the send that drew it (`sendIdx`, which it records). Counting
-  // user messages here instead drifted by one after an approval, a send with no user message: the next answer lost its
-  // strip and the one after showed its predecessor's. A saved message carries its own, as its stored row does.
-  const docMessages: DocChatMessage[] = useMemo(() => {
-    const { meta, sources: sourcesMap } = state.turnMeta;
-    return state.messages.map(m => {
-      const segments = m.segments;
-      const content =
-        typeof m.content === 'string' && !segments
-          ? m.content
-          : (segments
-              ?.filter(s => s.type === 'text')
-              .map(s => s.text)
-              .join('') ?? '');
-
-      let sources: ChatSource[] | undefined = m.sources;
-      let scrollAnchor: ScrollAnchor | undefined;
-      if (m.role === 'assistant' && m.sendIdx !== undefined) {
-        sources = sourcesMap.get(m.sendIdx) as ChatSource[] | undefined;
-        scrollAnchor = (meta.get(m.sendIdx)?.scrollAnchor as ScrollAnchor | null) ?? undefined;
-      }
-
-      return {
-        id: m.id,
-        role: m.role,
-        content,
-        ...(segments ? { segments } : {}),
-        ...(m.timestamp ? { timestamp: m.timestamp } : {}),
-        ...(sources ? { sources } : {}),
-        ...(scrollAnchor ? { scrollAnchor } : {}),
-        ...(m.hidden ? { hidden: true } : {}),
-      };
-    });
-  }, [state.messages, state.turnMeta]);
 
   /**
    * "Display" callback for inline cards whose registry entry sets
@@ -776,7 +845,7 @@ export function useSseChatAdapter(
       // `formatSingularLookupInvocation`'s pattern in slash-dispatch-utils.
       const escaped = queryValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const text = `/${cmdId} display "${escaped}"`;
-      // This adapter's `sendMessage` never rejects — it resolves `false` and
+      // This adapter's `sendMessage` never rejects: it resolves `false` and
       // renders the failure via `failSseTurn`. (The NATS copy's `discussRef`
       // needs an explicit `.catch` because its publish CAN reject.)
       void sendMessage(text);
@@ -808,7 +877,7 @@ export function useSseChatAdapter(
       // comes from the shared builder so the Mingo transport (which has no
       // id filter and leans on the prose) phrases it identically.
       const prompt = buildDiscussPrompt(reference);
-      // Never rejects — see the note on `displayRef`.
+      // Never rejects: see the note on `displayRef`.
       void sendMessage(prompt, {
         commandOverride: { entityIdFilter: { tableId, id: refId } },
       });
@@ -817,15 +886,14 @@ export function useSseChatAdapter(
   );
 
   // ─── Per-turn metadata resolution ─────────────────────────────────────────
-  const latestMeta = useMemo(() => {
-    const { meta, sendCount } = state.turnMeta;
-    return meta.get(sendCount - 1) ?? meta.get(sendCount - 2) ?? null;
-  }, [state]);
+  const usage = useMemo(() => latestUsageOf(state.messages), [state.messages]);
+  const usageBreakdown = useMemo(() => usageBreakdownOf(usage?.breakdown), [usage]);
 
   const streamingPhase = state.streamingPhase;
 
   return {
-    messages: docMessages,
+    messages: state.messages,
+    actions,
     isLoading: streamingPhase !== 'idle',
     sendMessage,
     /** "Discuss" affordance for ObjectCard. */
@@ -838,24 +906,24 @@ export function useSseChatAdapter(
     /** True while the mount-time rebuild from the server transcript runs. */
     isHydratingHistory,
     /** Provider key for the lib's `<ModelDisplay>` icon. */
-    currentProvider: latestMeta?.provider ?? null,
-    currentModelLabel: latestMeta?.modelLabel ?? null,
-    currentContextWindowMaxTokens: latestMeta?.contextWindowMaxTokens ?? null,
-    /** Input tokens (known after server's message_start frame; null until). */
-    currentInputTokens: latestMeta?.inputTokens ?? null,
-    /** Output tokens (known only after server's trailing usage frame). */
-    currentOutputTokens: latestMeta?.outputTokens ?? null,
+    currentProvider: state.liveModel?.provider ?? null,
+    currentModelLabel: state.liveModel?.modelLabel ?? null,
+    currentContextWindowMaxTokens: state.liveModel?.contextWindowMaxTokens ?? null,
+    /** Input tokens (known after the stream's first usage; null until). */
+    currentInputTokens: usage?.inputTokens ?? null,
+    /** Output tokens (known only after the turn's trailing usage). */
+    currentOutputTokens: usage?.outputTokens ?? null,
     /** Cache hit % (read / total-input × 100). null during streaming. */
-    currentCacheHitRatePct: latestMeta?.cacheHitRatePct ?? null,
+    currentCacheHitRatePct: usage?.hit_rate_pct ?? null,
     /** Cross-call usage breakdown (Haiku rewriter/classifier/summarizer
-     *  token counts). null until the trailing usage frame lands. */
-    currentUsageBreakdown: latestMeta?.breakdown ?? null,
+     *  token counts). null until the trailing usage lands. */
+    currentUsageBreakdown: usageBreakdown,
     // ─── Dialog management ───────────────────────────────────────────────
     // With `chatConversationsUrl` the server transcript store IS the dialog
     // list (shared `useManagedDialogList`); selecting a row re-hydrates through
-    // the history route. WITHOUT it the same hook is inert by construction —
+    // the history route. WITHOUT it the same hook is inert by construction:
     // no `fetchDialogs`, so an empty list, false flags and memoized no-op
-    // mutations — which is why only the four genuinely mode-dependent fields
+    // mutations, which is why only the four genuinely mode-dependent fields
     // are branched here.
     dialogs,
     isDialogsLoading,
@@ -866,7 +934,7 @@ export function useSseChatAdapter(
     renameDialog,
     archiveDialog,
     // New chat = `clearMessages` (the server mints on the next send); there is
-    // no create call. Delete is not offered — archive replaces it.
+    // no create call. Delete is not offered: archive replaces it.
     startNewDialog: noopStartNewDialog,
     deleteDialog: noopDeleteDialog,
     activeDialogId: conversationsApi ? conversationId : null,
@@ -875,8 +943,6 @@ export function useSseChatAdapter(
     dialogCapabilities,
     hasMoreMessages: false,
     loadMoreMessages: noopAsync,
-    approveRequest: noopApproveRequest,
-    rejectRequest: noopRejectRequest,
     dialogTokenUsage: null,
     connectionState: 'connected' as const,
   };

@@ -20,6 +20,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { textOfParts } from '../../../../chat-protocol/chat-message';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
 import { useSseChatAdapter } from '../use-sse-chat-adapter';
 
@@ -150,7 +151,7 @@ describe('useSseChatAdapter — managed conversation list', () => {
     act(() => result.current.selectDialog('b'));
     expect(result.current.activeDialogId).toBe('b');
     expect(JSON.parse(window.localStorage.getItem(CONVERSATION_KEY) ?? '{}')).toEqual({ conversationId: 'b' });
-    await waitFor(() => expect(result.current.messages.map(m => m.content)).toEqual(['q for b', 'a for b']));
+    await waitFor(() => expect(result.current.messages.map(m => textOfParts(m.parts))).toEqual(['q for b', 'a for b']));
     expect(result.current.isMessagesLoading).toBe(false);
     expect(urlsOf(calls, '/api/docs/chat/history')).toEqual([
       '/api/docs/chat/history?conversationId=a',

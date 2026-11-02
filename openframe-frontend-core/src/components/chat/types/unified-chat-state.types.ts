@@ -12,16 +12,15 @@
  * embedders) work against this contract and never see which transport is live.
  *
  * Fields that only one transport can populate are typed as nullable (per-turn
- * LLM metadata is SSE-only) or optional (Guide-only message sub-fields like
- * `sources`). In the off-mode they're null/undefined.
+ * LLM metadata is SSE-only). In the off-mode they're null.
  */
 
+import type { ChatMessage } from '../../../chat-protocol/chat-message';
 import type { ChatRef } from '../chat-ref.types';
 import type { ChatAttachment } from '../utils/chat-attachment-markdown';
-import type { AuthorType } from './chat.types';
 import type { DialogItem } from './component.types';
 import type { ChatContextItem } from './context-item.types';
-import type { ChatSource, MessageSegment, ScrollAnchor } from './message.types';
+import type { ChatMessageActions } from './message.types';
 
 // ─── Dialog-list host contract (shared by the NATS + SSE adapters) ───────────
 
@@ -134,8 +133,8 @@ export type ChatConnectionState = 'connected' | 'connecting' | 'disconnected';
  * "Thinking..."/"Streaming..." indicator above the input.
  *
  * - 'idle'      → no in-flight turn
- * - 'thinking'  → request fired; no streamed text/segments yet
- * - 'streaming' → first text/segment chunk arrived; output in progress
+ * - 'thinking'  → request fired; no streamed text yet
+ * - 'streaming' → the turn's stream opened; output in progress
  *
  * Common to both Guide (SSE) and Mingo (NATS) modes — the phase
  * machine fires identically in either transport, just driven by
@@ -161,120 +160,6 @@ export interface UnifiedUsageBreakdown {
   routedAnswer?: { model: string; complexity: string; thinkingBudget: number };
 }
 
-// ─── Message ─────────────────────────────────────────────────────────────────
-
-/**
- * Generic chat message shape — unified between Guide (SSE) and Mingo (NATS).
- *
- * Guide-mode messages populate `sources` (RAG document citations);
- * Mingo-mode messages leave it undefined. Tool-execution and approval
- * events ride inside `segments` and are common to both modes.
- */
-export interface UnifiedChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-
-  /**
-   * Optional host-supplied display name for the message author. When set, the
-   * chat renders it verbatim (e.g. the signed-in user's full name for a
-   * `user` bubble, or a per-message admin name from history); when omitted the
-   * UI falls back to the role default (`'Mingo'` / `'You'`).
-   */
-  name?: string;
-
-  /**
-   * Optional host-supplied avatar URL for the message author. Used by the
-   * panel to render an inline avatar on the author row (proxied via
-   * `useProxiedImageUrl`). Omit/`null` to fall back to initials. For `user`
-   * bubbles the avatar only renders when this is set, so consumers that don't
-   * supply one keep the name-only layout.
-   */
-  avatar?: string | null;
-
-  /**
-   * Optional host-supplied author type — drives the name-row accent color in
-   * `<ChatMessageEnhanced>` (e.g. `'admin'` renders the name in the accent
-   * color, matching the standalone `/mingo` page). When omitted the panel
-   * falls back to the role default (`'user'` for user bubbles, the assistant
-   * type otherwise).
-   */
-  authorType?: AuthorType;
-
-  /**
-   * Flat string form for legacy/simple callers. The structured `segments`
-   * form is preferred — it carries thinking blocks, tool calls, approval
-   * cards, etc., which `<ChatMessageEnhanced>` renders.
-   */
-  content: string;
-  segments?: MessageSegment[];
-
-  /**
-   * Highest chunk `streamSeq` consumed into THIS row. Not render input — it is
-   * the per-message coverage signal `mergeHistoryWithRealtime` decides with:
-   * a live synthetic is a twin of a persisted row only once history reaches
-   * its seq.
-   *
-   * Load-bearing, not bookkeeping. Without it the merge falls through to its
-   * wall-clock fallback ("created before the fetch instant ⇒ history has it"),
-   * which is wrong for every turn the backend has not finished persisting: a
-   * history refetch mid-stream then drops every live bubble except the single
-   * `streamingMessageId`, collapsing the thread to the persisted user prompt.
-   * The reducer stamps it on the rows it owns; hosts stamp the persisted value
-   * on history rows.
-   */
-  streamSeq?: number;
-
-  /**
-   * Optional host-supplied message timestamp (creation/send time). Rendered
-   * as the message-row time and, critically, fed into the memoized message's
-   * equality check. Hosts SHOULD pass a stable value (the message's real
-   * `createdAt`) — when omitted the panel stamps a stable per-id fallback so
-   * memoization still holds. Never re-derive this as "now" per render: a
-   * moving clock defeats memoization and re-renders every message (collapsing
-   * open menus/cards) on each realtime chunk.
-   */
-  timestamp?: Date | string | number;
-
-  /**
-   * Documents this answer cited, rendered as chips beneath it. Produced by
-   * BOTH transports now — SSE reads them off the per-turn metadata frame, NATS
-   * decodes them out of an `ATTACHMENTS` chunk.
-   */
-  sources?: ChatSource[];
-  /** Which send (one stream) drew this message, while it is live. A saved message has none: it carries its own `sources`. */
-  sendIdx?: number;
-  /**
-   * Entity references this answer's metadata described — videos and cards.
-   * Data for the record links (`record://type/id`) in the body, not a render list:
-   * only markers actually present in the text are rendered.
-   */
-  refs?: ChatRef[];
-
-  /**
-   * Per-message viewport-positioning hint. Common to both modes; the
-   * message-list reads it to override default tail-on-stream behaviour
-   * for a single message (e.g. long display-action answers anchor to
-   * the top so the reader starts at the lede).
-   */
-  scrollAnchor?: ScrollAnchor;
-
-  /**
-   * When true the message is part of the conversation history but is
-   * NOT rendered in the chat UI. Used for post-approval auto-continuation
-   * turns where we don't want synthetic prompts polluting the visible
-   * thread.
-   */
-  hidden?: boolean;
-
-  /**
-   * Entity-context items attached to THIS message (user bubbles only). The
-   * host populates this from the outgoing send so the lib can render the
-   * context chips beneath the message text (Figma node 31:28709). Undefined
-   * for messages with no attached context.
-   */
-  contextItems?: ChatContextItem[];
-}
-
 // ─── sendMessage options ─────────────────────────────────────────────────────
 
 /**
@@ -293,9 +178,7 @@ export interface UnifiedSendMessageOptions {
 
   /**
    * Image attachments uploaded via `useChatAttachments` to ride alongside
-   * the user message. Each entry carries `{ storagePath, viewToken }` —
-   * server-side the transport adapter replaces embedded view-URL markdown
-   * lines with provider-native image content blocks.
+   * the user message, as `file` parts of it.
    *
    * Guide/SSE mode: forwarded to the hub's `/api/docs/chat` endpoint.
    * Mingo/NATS mode: ignored (agent backend does not currently accept
@@ -325,7 +208,20 @@ export interface UnifiedSendMessageOptions {
  */
 export interface UnifiedChatState {
   // ─── Message thread ───────────────────────────────────────────────────────
-  messages: UnifiedChatMessage[];
+  messages: ChatMessage[];
+
+  /**
+   * What a message's controls do (approve, reject, an ask card's option, a suggestion chip). Parts hold no callbacks, so
+   * the renderer reaches these. A stable object: the message memo compares it by reference.
+   */
+  actions: ChatMessageActions;
+
+  /**
+   * The approval tiers drawn in the thread while pending; another tier's card waits for its resolution (it takes the
+   * consumer's escalation treatment). `undefined` draws every tier. The part holds its tier
+   * (`approval.descriptor.approvalType`), and `approvalDisplaysInline` is the one rule.
+   */
+  displayApprovalTypes?: readonly string[];
 
   /**
    * True while a user turn is in progress — server-side thinking, streaming,
@@ -521,16 +417,6 @@ export interface UnifiedChatState {
    * producer would have to remember to set both.
    */
   dialogCapabilities?: ChatDialogCapabilities;
-
-  // ─── Approval mutations (Mingo agent tool-call workflow) ──────────────────
-
-  /** Approve an in-flight tool-call request. Errors surface via the
-   *  host-supplied toast in the callback config (lib does not own UI). */
-  approveRequest: (requestId: string) => Promise<void>;
-
-  /** Reject an in-flight tool-call request. Optional `reason` is
-   *  forwarded to the backend when supported. */
-  rejectRequest: (requestId: string, reason?: string) => Promise<void>;
 
   // ─── Per-dialog token usage (Mingo only) ──────────────────────────────────
 

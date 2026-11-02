@@ -3,14 +3,15 @@
 import { forwardRef, type HTMLAttributes } from 'react';
 import { cn } from '../../utils/cn';
 import { ApprovalRequestMessage } from './approval-request-message';
-import type { EscalationOfferSegment } from './types/message.types';
+import type { ChatApprovalStatus } from './types/chat.types';
+import type { ApprovalResolutionHandler, EscalationOfferData } from './types/message.types';
 
 export interface EscalationOfferMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: EscalationOfferSegment['data'];
-  status?: EscalationOfferSegment['status'];
+  data: EscalationOfferData;
+  status?: ChatApprovalStatus;
   resolvedByName?: string | null;
-  onApprove?: EscalationOfferSegment['onApprove'];
-  onReject?: EscalationOfferSegment['onReject'];
+  onApprove?: ApprovalResolutionHandler;
+  onReject?: ApprovalResolutionHandler;
 }
 
 /**
@@ -21,7 +22,7 @@ export interface EscalationOfferMessageProps extends HTMLAttributes<HTMLDivEleme
  * component, down to the Approve/Reject labels and the resolved
  * "Approved by {name}" pill. Only the wiring differs — approve/reject call
  * the ticket-escalation mutations, never the tool-approval endpoint — which
- * is why this is a distinct segment type with its own handlers.
+ * is why this is a distinct part with its own actions.
  *
  * The handoff receipt that follows an approval is NOT rendered here: it is its
  * own `TICKET_ESCALATED` block on the wire, which also covers the inactivity

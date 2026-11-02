@@ -499,7 +499,7 @@ export function useChunkCatchup({
               if (pending.dialogId === currentDialogId) {
                 rearmForQueuedCatchup();
                 // AWAIT the re-run (not fire-and-forget): callers chain their own
-                // finally on this promise — the adapter lowers its onAgentBusy
+                // finally on this promise — the adapter lowers its agent-busy
                 // suppression there, and a detached re-run would replay a dead
                 // tail's EXECUTING chunk with suppression already off, locking
                 // the composer with no MESSAGE_END ever coming.

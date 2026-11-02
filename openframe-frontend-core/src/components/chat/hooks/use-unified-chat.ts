@@ -203,15 +203,12 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
   const setDialogScope = useCallback((scope: 'my' | 'all') => activeStateRef.current.setDialogScope?.(scope), []);
   const reloadDialogs = useCallback(() => activeStateRef.current.reloadDialogs(), []);
   const loadMoreMessages = useCallback(() => activeStateRef.current.loadMoreMessages(), []);
-  const approveRequest = useCallback((requestId: string) => activeStateRef.current.approveRequest(requestId), []);
-  const rejectRequest = useCallback(
-    (requestId: string, reason?: string) => activeStateRef.current.rejectRequest(requestId, reason),
-    [],
-  );
 
   return useMemo<UnifiedChatState>(
     () => ({
       messages: activeState.messages,
+      actions: activeState.actions,
+      displayApprovalTypes: activeState.displayApprovalTypes,
       isLoading: activeState.isLoading,
       streamingPhase: activeState.streamingPhase,
       sendMessage,
@@ -249,9 +246,6 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       loadMoreMessages,
       // THE conversation-list signal — resolved once, above.
       dialogCapabilities,
-      // Approvals
-      approveRequest,
-      rejectRequest,
       // Token usage + connection
       dialogTokenUsage: activeState.dialogTokenUsage,
       connectionState: activeState.connectionState,
@@ -273,8 +267,6 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       setDialogScope,
       reloadDialogs,
       loadMoreMessages,
-      approveRequest,
-      rejectRequest,
     ],
   );
 }

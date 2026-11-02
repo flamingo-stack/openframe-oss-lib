@@ -46,7 +46,6 @@ function ApprovalCardBody({ data }: { data: ApprovalRequestMessageProps['data'] 
     <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
       <div className="flex max-h-32 items-start gap-[var(--spacing-system-xsf)] overflow-y-auto overscroll-contain rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)]">
         <code className="flex-1 whitespace-pre-wrap break-words text-ods-text-primary text-code">{data.command}</code>
-        {data.icon && <div className="h-4 w-4 shrink-0 text-ods-text-tertiary">{data.icon}</div>}
       </div>
       {data.fields && data.fields.length > 0 ? (
         <ApprovalFieldList fields={data.fields} />

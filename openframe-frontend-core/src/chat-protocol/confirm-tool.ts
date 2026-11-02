@@ -1,17 +1,9 @@
 /**
- * The hub's confirm-tool contract — request shape and error envelope.
+ * The old approval route's request, and the error envelope every hub route answers.
  *
- * Resolving a Product Guide proposal is a POST to `endpoints.approvalToolUrl`
- * whose response is an ordinary guide stream (a `decision_resolved` frame, then
- * the hub's auto-continuation). Two callers make that call today: the SSE chat
- * adapter, and any host replaying the same route into a different transport's
- * conversation (the product app resolves guide cards inside a NATS Mingo
- * dialog). They MUST send byte-identical bodies — a proposal is single-use, so a
- * caller that drifts on a field name does not degrade, it fails the write — and
- * they must surface the same server copy, because the hub's errors are written
- * for the end user ("This approval expired — ask again to get a fresh one").
- *
- * Hence both live here rather than at either call site.
+ * `readServerErrorMessage` stays: a failed answer's `error` is written for the end user. The rest is
+ * TODO(CU-17tkuw61kfy): an approval on the UI stream is a chat request (`approval-responded` parts), and only a hub that
+ * still answers old frames takes this body. It goes at the cleanup.
  *
  * Server-safe: no React, no browser APIs.
  */

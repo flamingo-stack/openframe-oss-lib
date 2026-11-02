@@ -1,22 +1,40 @@
 /**
- * Phase-0 GOLDEN CHARACTERIZATION TESTS — the SSE wire decoder inside
- * `useSseChatAdapter` (`createDocStreamFn`), driven through the full
- * public hook (`useSseChatAdapter` → `useChat` → `useSSE`).
+ * GOLDEN CHARACTERIZATION: what `useSseChatAdapter` holds after a response, driven through the full public hook.
  *
- * Wire format (recorded from the hub's /api/docs/chat):
+ * Two wires reach it. The standard's (`data: <chunk>` events, ending `data: [DONE]`), and until the cleanup the old hub's
+ * (TODO(CU-17tkuw61kfy)):
  *   [JSON frame]\0 [JSON frame]\0 …  \x1E  <raw UTF-8 answer deltas>  \x1F [JSON usage trailer]
  *
- * Each fixture feeds a mocked global fetch whose Response body is a
- * ReadableStream of Uint8Array chunks, then snapshots the resulting
- * message state. Behaviors captured here — INCLUDING the sentinel-byte
- * mis-framing in fixture (d) — are the recorded baseline for the
- * unification reducer. Do NOT "fix" them here.
+ * Each fixture feeds a mocked global fetch whose Response body is a ReadableStream of Uint8Array chunks, then snapshots the
+ * resulting message state. Behaviors captured here, INCLUDING the sentinel-byte mis-framing in fixture (d), are the recorded
+ * baseline. Do NOT "fix" them here.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, act } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  approvalBatchIdOf,
+  approvalStatusOf,
+  isSourcePart,
+  isToolPart,
+  textOfParts,
+  type ChatMessage,
+} from '../../../../chat-protocol/chat-message';
+import { encodeUiChunk, encodeUiDone, type UiChunk } from '../../../../chat-protocol/ui-chunks';
+import {
+  ANSWER_STREAM,
+  APPROVAL_BATCH_STREAM,
+  APPROVAL_REFUSED_STREAM,
+  APPROVAL_REJECT_STREAM,
+  APPROVAL_REQUEST_BODY,
+  APPROVAL_RESPONSE_STREAM,
+  APPROVAL_STREAM,
+  FIXTURE_ASSISTANT_ID,
+  FIXTURE_CONVERSATION_ID,
+  FIXTURE_PROPOSAL_ID,
+} from '../../../../chat-protocol/wire-fixtures';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
 import { useSseChatAdapter } from '../use-sse-chat-adapter';
 
@@ -91,15 +109,14 @@ const tick = () => new Promise<void>(r => setTimeout(r, 0));
 
 beforeEach(() => {
   window.localStorage.clear();
-  // Deterministic Date.now: message ids (`user-<now>`) and the 50ms
-  // thinking-throttle both read it. With a frozen clock the FIRST
-  // thinking delta yields immediately (now - 0 >= 50) and every later
-  // delta within the same stream is throttled (now - last = 0 < 50) and
-  // flushed at the \x1E boundary — fully deterministic.
+  // Deterministic ids (`user-<now>-<random>`) and times.
   vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+  vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  vi.useFakeTimers({ toFake: ['Date'], now: 1_700_000_000_000 });
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -131,38 +148,57 @@ const USAGE_START_FRAME = '{"kind":"usage","stage":"start","input_tokens":1234}\
 const USAGE_END_TRAILER =
   '{"kind":"usage","stage":"end","input_tokens":1234,"output_tokens":56,"hit_rate_pct":81.5,"breakdown":{"haikuRewriter":{"input":10,"output":4},"haikuClassifier":{"input":8,"output":1},"routedAnswer":{"model":"claude-sonnet-x","complexity":"simple","thinkingBudget":0}}}';
 
+const sourceTitles = (message: ChatMessage) => message.parts.filter(isSourcePart).map(source => source.title);
+const assistantsOf = (messages: readonly ChatMessage[]) => messages.filter(message => message.role === 'assistant');
+
+/** A stream's bytes on the standard's wire. */
+const onUiWire = (chunks: readonly UiChunk[]): Uint8Array[] => [...chunks.map(encodeUiChunk), encodeUiDone()];
+
+/** Serves one response per request, in order, and records each request. */
+function mockFetchResponses(responses: Array<Array<string | Uint8Array> | { status: number; body: unknown }>) {
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const pending = [...responses];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) => {
+      requests.push({ url: String(url), body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown> });
+      const next = pending.shift() ?? [];
+      if (!Array.isArray(next)) {
+        return Promise.resolve(new Response(JSON.stringify(next.body), { status: next.status }));
+      }
+      return Promise.resolve({ ok: true, status: 200, body: streamOf(next) } as unknown as Response);
+    }),
+  );
+  return requests;
+}
+
 describe('a live message shows the sources of the stream that drew it', () => {
   const sourcesFrame = (name: string) =>
     `{"sources":[{"index":1,"name":"${name}","path":"docs/${name}.md","documentType":"markdown"}]}\0`;
-  const turn = (name: string | null, text: string) => [
+  const turn = (name: string | null, text: string, extra: string[] = []) => [
     ...(name ? [sourcesFrame(name)] : []),
+    ...extra,
     '\x1E',
     text,
     '\x1F' + USAGE_END_TRAILER,
   ];
+  const CARD_FRAME = '{"kind":"approval_request","proposalId":"p1","toolName":"create_task","title":"Create task"}\0';
 
-  it('an approval, a send with no user message, shifts no later answer and its receipt repeats no strip', async () => {
+  it('an approval continues the message of its card: it shifts no later answer and its receipt repeats no strip', async () => {
     let now = 1_700_000_000_000;
     vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
-    const streams = [
-      turn('first', 'Proposal.'),
+    mockFetchResponses([
+      turn('first', 'Proposal.', [CARD_FRAME]),
       turn(null, 'Task created.'),
       turn('second', 'Answer two.'),
       turn('third', 'Answer three.'),
-    ];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve({ ok: true, status: 200, body: streamOf(streams.shift() ?? []) } as unknown as Response),
-      ),
-    );
+    ]);
     const { result } = renderAdapter();
     await act(async () => {
       await result.current.sendMessage('create a task');
     });
     await act(async () => {
-      // The card's approve path: the option is internal to the adapter, not on its public type.
-      await result.current.sendMessage('', { approvalAction: { proposalId: 'p1', action: 'approve' } } as never);
+      await result.current.actions.approve?.('p1');
     });
     await act(async () => {
       await result.current.sendMessage('question two');
@@ -170,11 +206,293 @@ describe('a live message shows the sources of the stream that drew it', () => {
     await act(async () => {
       await result.current.sendMessage('question three');
     });
-    const answers = result.current.messages.filter(m => m.role === 'assistant');
-    expect(answers.map(m => m.sources?.[0]?.name ?? null)).toEqual(['first', null, 'second', 'third']);
+    const answers = assistantsOf(result.current.messages);
+    expect(answers.map(sourceTitles)).toEqual([['first'], ['second'], ['third']]);
+    expect(textOfParts(answers[0].parts)).toContain('Task created.');
   });
 });
 
+describe('the standard wire', () => {
+  it('a whole answer: sources lead, then text and cards in stream order, and the metadata reaches the state', async () => {
+    mockFetchStream(onUiWire(ANSWER_STREAM));
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('what is the pricing?');
+    });
+    expect(snapshotState(result)).toMatchSnapshot();
+  });
+
+  it('survives a split at any byte', async () => {
+    const bytes = Uint8Array.from(onUiWire(ANSWER_STREAM).flatMap(chunk => Array.from(chunk)));
+    const partsFrom = async (chunks: Uint8Array[]) => {
+      mockFetchStream(chunks);
+      const { result, unmount } = renderAdapter();
+      await act(async () => {
+        await result.current.sendMessage('q');
+      });
+      const { parts } = assistantsOf(result.current.messages)[0];
+      unmount();
+      return parts;
+    };
+    const expected = await partsFrom([bytes]);
+    expect(expected.length).toBeGreaterThan(0);
+    expect(await partsFrom(Array.from({ length: bytes.length }, (_, i) => bytes.slice(i, i + 1)))).toEqual(expected);
+  });
+
+  it('a send states the standard’s request, and what an older hub still reads beside it', async () => {
+    const requests = mockFetchResponses([onUiWire(ANSWER_STREAM), onUiWire(ANSWER_STREAM)]);
+    const { result } = renderAdapter();
+    const attachment = {
+      fileName: 'a.png',
+      contentType: 'image/png',
+      storagePath: 'u/a.png',
+      viewToken: 't',
+      fileSize: 1,
+    };
+    await act(async () => {
+      await result.current.sendMessage('look', { attachments: [attachment] } as never);
+    });
+    await act(async () => {
+      await result.current.sendMessage('again');
+    });
+
+    const [first, second] = requests;
+    expect(first.url).toBe('/api/docs/chat');
+    expect(first.body.id).toEqual(expect.stringMatching(/^chat-/));
+    expect(first.body).not.toHaveProperty('conversationId');
+    expect(first.body.pendingAttachments).toEqual([attachment]);
+    expect(first.body.messages).toEqual([
+      {
+        id: expect.stringMatching(/^user-/) as string,
+        role: 'user',
+        parts: [
+          { type: 'text', text: 'look' },
+          {
+            type: 'file',
+            mediaType: 'image/png',
+            filename: 'a.png',
+            url: '/api/storage/view/chat-attachments/u/a.png?t=t',
+          },
+        ],
+        content: expect.stringContaining('look') as string,
+      },
+    ]);
+    // Every later send names the conversation the server minted, with the newest message only.
+    expect(second.body.id).toBe(FIXTURE_CONVERSATION_ID);
+    expect(second.body.conversationId).toBe(FIXTURE_CONVERSATION_ID);
+    expect((second.body.messages as unknown[]).length).toBe(1);
+  });
+
+  it('a user bubble holds its attachments as file parts', async () => {
+    mockFetchStream(onUiWire(ANSWER_STREAM));
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('look', {
+        attachments: [
+          { fileName: 'a.png', contentType: 'image/png', storagePath: 'u/a.png', viewToken: 't', fileSize: 1 },
+        ],
+      } as never);
+    });
+    expect(result.current.messages[0].parts.map(part => part.type)).toEqual(['text', 'file']);
+    // The bubble's text is what was typed: no attachment markdown.
+    expect(textOfParts(result.current.messages[0].parts)).toBe('look');
+  });
+});
+
+describe('the approval round trip', () => {
+  const lastMessage = (result: { current: ReturnType<typeof useSseChatAdapter> }) =>
+    result.current.messages[result.current.messages.length - 1];
+  const rows = (message: ChatMessage) => message.parts.filter(isToolPart);
+
+  async function withCard(responses: Array<Array<string | Uint8Array> | { status: number; body: unknown }>) {
+    const requests = mockFetchResponses([onUiWire(APPROVAL_STREAM), ...responses]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    return { requests, result };
+  }
+
+  it('the card waits on the user, with the composer free', async () => {
+    const { result } = await withCard([]);
+    expect(rows(lastMessage(result)).map(approvalStatusOf)).toEqual(['pending']);
+    expect(result.current.streamingPhase).toBe('idle');
+  });
+
+  it('approving posts the card’s message to the chat endpoint, and the answer continues that message', async () => {
+    const { requests, result } = await withCard([onUiWire(APPROVAL_RESPONSE_STREAM)]);
+    const countBefore = result.current.messages.length;
+    await act(async () => {
+      await result.current.actions.approve?.(FIXTURE_PROPOSAL_ID);
+    });
+
+    const [, approval] = requests;
+    expect(approval.url).toBe('/api/docs/chat');
+    expect(approval.body).toEqual(APPROVAL_REQUEST_BODY);
+
+    expect(result.current.messages).toHaveLength(countBefore);
+    const message = lastMessage(result);
+    expect(message.id).toBe(FIXTURE_ASSISTANT_ID);
+    expect(rows(message)[0]).toMatchObject({ state: 'output-available', approval: { approved: true } });
+    expect(textOfParts(message.parts)).toContain('Ticket closed.');
+    expect(message.parts.map(part => part.type)).toContain('data-record-cards');
+    expect(result.current.streamingPhase).toBe('idle');
+  });
+
+  it('rejecting says so in the request, and the card is denied', async () => {
+    const { requests, result } = await withCard([onUiWire(APPROVAL_REJECT_STREAM)]);
+    await act(async () => {
+      await result.current.actions.reject?.(FIXTURE_PROPOSAL_ID, 'not now');
+    });
+    const sent = (requests[1].body.messages as ChatMessage[])[0].parts[0];
+    expect(sent).toMatchObject({ approval: { id: FIXTURE_PROPOSAL_ID, approved: false, reason: 'not now' } });
+    expect(rows(lastMessage(result))[0].state).toBe('output-denied');
+    expect(rows(lastMessage(result)).map(approvalStatusOf)).toEqual(['rejected']);
+  });
+
+  it('a refusal in the stream is an error on its row', async () => {
+    const { result } = await withCard([onUiWire(APPROVAL_REFUSED_STREAM)]);
+    await act(async () => {
+      await result.current.actions.approve?.(FIXTURE_PROPOSAL_ID);
+    });
+    expect(rows(lastMessage(result))[0]).toMatchObject({
+      state: 'output-error',
+      errorText: 'This approval expired, ask again to get a fresh one.',
+    });
+    expect(result.current.streamingPhase).toBe('idle');
+  });
+
+  it('a request refused outright fails the row with the server’s words, and leaves no loader', async () => {
+    const { result } = await withCard([{ status: 409, body: { error: 'This approval expired.', code: 'STALE' } }]);
+    await act(async () => {
+      await expect(result.current.actions.approve?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
+    });
+    expect(rows(lastMessage(result))[0]).toMatchObject({ state: 'output-error', errorText: 'This approval expired.' });
+    expect(result.current.streamingPhase).toBe('idle');
+  });
+
+  it('a batch is answered whole by any of its ids, one request, every row in it', async () => {
+    const requests = mockFetchResponses([
+      onUiWire(APPROVAL_BATCH_STREAM),
+      onUiWire([
+        { type: 'start' },
+        { type: 'tool-output-available', toolCallId: 'prop-a', dynamic: true, output: { ok: true } },
+        { type: 'tool-output-error', toolCallId: 'prop-b', dynamic: true, errorText: 'Gone.' },
+        { type: 'finish', finishReason: 'stop' },
+      ]),
+    ]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('delete both');
+    });
+    expect(rows(lastMessage(result)).map(approvalBatchIdOf)).toEqual(['batch:prop-a', 'batch:prop-a']);
+
+    await act(async () => {
+      await result.current.actions.approve?.('batch:prop-a');
+    });
+    expect(requests).toHaveLength(2);
+    const sent = (requests[1].body.messages as ChatMessage[])[0].parts;
+    expect(sent.map(part => (isToolPart(part) ? [part.toolCallId, part.state] : null))).toEqual([
+      ['prop-a', 'approval-responded'],
+      ['prop-b', 'approval-responded'],
+    ]);
+    expect(rows(lastMessage(result)).map(part => part.state)).toEqual(['output-available', 'output-error']);
+  });
+
+  it('an id naming no pending card sends nothing', async () => {
+    const { requests, result } = await withCard([]);
+    await act(async () => {
+      await expect(result.current.actions.approve?.('nobody')).resolves.toBe(false);
+    });
+    expect(requests).toHaveLength(1);
+  });
+
+  it('the old hub still answers an approval on its own route, one proposal per request', async () => {
+    const batch =
+      '{"kind":"approval_batch","batchId":"b1","proposals":[{"proposalId":"p1","toolName":"x","title":"X"},{"proposalId":"p2","toolName":"x","title":"Y"}]}\0';
+    const decided = (id: string) =>
+      `{"kind":"decision_resolved","proposalId":"${id}","ok":true,"action":"approved","willAutoContinue":false,"receiptText":"Done ${id}."}\0`;
+    const requests = mockFetchResponses([[batch], [decided('p1'), '\x1E'], [decided('p2'), '\x1E']]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('do both');
+    });
+    await act(async () => {
+      await result.current.actions.approve?.('b1');
+    });
+    expect(requests.slice(1).map(request => [request.url, request.body.proposal_id])).toEqual([
+      ['/api/chat/agent/confirm-tool', 'p1'],
+      ['/api/chat/agent/confirm-tool', 'p2'],
+    ]);
+    expect(assistantsOf(result.current.messages)).toHaveLength(1);
+    expect(rows(lastMessage(result)).map(approvalStatusOf)).toEqual(['approved', 'approved']);
+  });
+});
+
+describe('stop', () => {
+  it('ends the turn where it is: what it said stays, marked aborted', async () => {
+    let ctrl!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        ctrl = c;
+        c.enqueue(encodeUiChunk({ type: 'start', messageId: 'a1' }));
+        c.enqueue(encodeUiChunk({ type: 'text-delta', id: 't1', delta: 'Partial' }));
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        init?.signal?.addEventListener('abort', () => {
+          try {
+            ctrl.error(new DOMException('The operation was aborted.', 'AbortError'));
+          } catch {
+            /* already closed */
+          }
+        });
+        return Promise.resolve({ ok: true, status: 200, body } as unknown as Response);
+      }),
+    );
+    const { result } = renderAdapter();
+    let sending!: Promise<void | boolean>;
+    act(() => {
+      sending = result.current.sendMessage('will be stopped');
+    });
+    await act(async () => {
+      await tick();
+      await tick();
+      await tick();
+    });
+    act(() => {
+      result.current.stopMessage();
+    });
+    await act(async () => {
+      await sending;
+    });
+    const answer = assistantsOf(result.current.messages)[0];
+    expect(textOfParts(answer.parts)).toBe('Partial');
+    expect(answer.parts[0]).toMatchObject({ state: 'done' });
+    expect(answer.metadata?.aborted).toBe(true);
+    expect(result.current.streamingPhase).toBe('idle');
+  });
+});
+
+describe('a failed request', () => {
+  it('states the server’s words on the turn, and the composer is free', async () => {
+    mockFetchResponses([{ status: 503, body: { error: 'The server is busy.', code: 'UPSTREAM_BUSY' } }]);
+    const { result } = renderAdapter();
+    let ok: void | boolean = true;
+    await act(async () => {
+      ok = await result.current.sendMessage('q');
+    });
+    expect(ok).toBe(false);
+    expect(assistantsOf(result.current.messages)[0].parts).toEqual([
+      { type: 'data-error', data: { title: 'The server is busy.' } },
+    ]);
+    expect(result.current.streamingPhase).toBe('idle');
+  });
+});
+
+// TODO(CU-17tkuw61kfy): the old hub's wire. These go at the cleanup, with `old-wire.ts`.
 describe('SSE wire decode — golden fixtures (full hook path)', () => {
   it('(a) normal turn: thinking frames → metadata → usage:start → \\x1E → text ×3 → \\x1F trailer', async () => {
     mockFetchStream([

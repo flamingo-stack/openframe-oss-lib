@@ -1,22 +1,22 @@
 /**
- * createChatDialogStore — framework-free registry of `ChatStreamReducer`
+ * createChatDialogStore: framework-free registry of `ChatStreamReducer`
  * instances keyed by `(dialogId, side)`. Reducer state PERSISTS across
  * component unmounts (the store outlives React), and the store is the
  * `useSyncExternalStore` source for the `useChatStreamReducer` wrapper.
  *
  * CROSS-SIDE PROJECTION: exactly two operations fan out across sides of the
- * same dialogId —
- *   1. approval RESOLUTION by requestId (`approval-resolved` events), and
- *   2. tool-execution MERGE by execId (`tool-execution` events)
- * — implemented as idempotent pure projections over the other side's state
+ * same dialogId:
+ *   1. approval RESOLUTION by its id (`tool-approval-response` chunks), and
+ *   2. a tool's run, merged by its call id (`tool-input-*`, `tool-output-*` chunks),
+ * implemented as idempotent pure projections over the other side's state
  * (recomputed from state, never re-injected into the other side's seq
- * stream; per-side seq gates stay untouched). Everything else — text,
- * thinking, participant rows — is strictly per-side.
+ * stream; per-side seq gates stay untouched). Everything else (text,
+ * thinking, participant rows) is strictly per-side.
  *
  * LIFECYCLE / MEMORY: the reducer map is LRU-capped (`maxReducers`, default
  * `DEFAULT_MAX_REDUCERS`) and evicted through the same path as `remove()`.
  * Without a cap an agent cycling hundreds of dialogs would retain a reducer
- * (thread + accumulator) per dialog for the process's lifetime; under SSR,
+ * (thread) per dialog for the process's lifetime; under SSR,
  * where the store is module-scoped, that growth is shared across every
  * request. `getSnapshot` is PURE — it never creates an entry — and
  * `getServerSnapshot` always returns the shared frozen `EMPTY_STATE`.
@@ -45,7 +45,8 @@
  *      components mid-render. The notify is deferred to a microtask.
  */
 
-import type { ChatStreamEvent } from '../../../chat-protocol/events';
+import { APPROVAL_CANCELLED } from '../../../chat-protocol/chat-message';
+import type { ChatStreamEntry } from '../../../chat-protocol/ui-chunks';
 import {
   createChatStreamReducer,
   type ChatReducerState,
@@ -64,9 +65,9 @@ export interface ChatDialogStore {
   /** Create-or-get the reducer for `(dialogId, side)`. `createOptions` is
    *  consulted ONLY when the instance is first created. */
   getReducer(dialogId: string, side?: ChatDialogSide, createOptions?: CreateReducerOptionsFn): ChatStreamReducer;
-  /** Apply one event to a side, then fan out the cross-side projections to
+  /** Apply one entry to a side, then fan out the cross-side projections to
    *  the other sides of the same dialog. */
-  apply(dialogId: string, side: ChatDialogSide, event: ChatStreamEvent): void;
+  apply(dialogId: string, side: ChatDialogSide, entry: ChatStreamEntry): void;
   /** Run adapter commands against a reducer; subscribers are notified. */
   mutate<T>(dialogId: string, side: ChatDialogSide, fn: (reducer: ChatStreamReducer) => T): T;
   subscribe(listener: () => void): () => void;
@@ -135,7 +136,7 @@ export interface CreateChatDialogStoreOptions {
    * Options applied to any reducer this store creates WITHOUT an explicit
    * per-call `createOptions` — i.e. every reducer first materialized by
    * `apply()` or `mutate()`. Hosts with non-default reducer semantics
-   * (`ownEchoIncludesAdmin`, `selfUserId`, approve/reject `callbacks`, …)
+   * (`ownEchoIncludesAdmin`, `selfUserId`, …)
    * MUST set this: creation options are consulted once, so a bare
    * apply-created instance would keep those semantics missing for its whole
    * lifetime, including for a later `getReducer(..., options)` caller.
@@ -199,11 +200,6 @@ export interface EvictedReducerState {
 const EMPTY_STATE: ChatReducerState = Object.freeze({
   messages: Object.freeze([]) as unknown as ChatReducerState['messages'],
   streamingPhase: 'idle',
-  turnMeta: Object.freeze({
-    meta: new Map(),
-    sources: new Map(),
-    sendCount: 0,
-  }),
   dialogTokenUsage: null,
   liveModel: null,
   approvalStatuses: Object.freeze({}) as ChatReducerState['approvalStatuses'],
@@ -369,7 +365,7 @@ export function createChatDialogStore(options: CreateChatDialogStoreOptions = {}
       // `apply()` / `mutate()` can be the FIRST toucher of a key (an event for
       // a dialog no component has rendered yet). Without the store-level
       // default they would create a reducer missing the host's
-      // `ownEchoIncludesAdmin` / `callbacks` / `batchApprovalsEnabled`, and a
+      // `ownEchoIncludesAdmin` / `selfUserId`, and a
       // later `getReducer(..., options)` would hand back that mis-configured
       // instance (create-options are consulted at creation only).
       const base = (createOptions ?? defaultCreateOptions)?.(dialogId, side) ?? {};
@@ -405,18 +401,28 @@ export function createChatDialogStore(options: CreateChatDialogStoreOptions = {}
     return out;
   }
 
-  function apply(dialogId: string, side: ChatDialogSide, event: ChatStreamEvent): void {
+  function apply(dialogId: string, side: ChatDialogSide, entry: ChatStreamEntry): void {
     const reducer = getReducerInternal(dialogId, side, undefined, false);
-    reducer.apply(event);
+    reducer.apply(entry);
 
-    // Cross-side fan-out — the ONLY two operations that cross sides.
-    if (event.type === 'approval-resolved' && event.requestId) {
-      for (const other of otherSides(dialogId, side)) {
-        other.projectApprovalResolution(event.requestId, event.status, event.resolvedByName);
-      }
-    } else if (event.type === 'tool-execution') {
-      for (const other of otherSides(dialogId, side)) {
-        other.projectToolExecution({ type: 'tool_execution', data: event.data });
+    // Cross-side fan-out: the ONLY two operations that cross sides.
+    for (const chunk of entry.chunks) {
+      switch (chunk.type) {
+        case 'tool-approval-response': {
+          const status = chunk.approved ? 'approved' : chunk.reason === APPROVAL_CANCELLED ? 'cancelled' : 'rejected';
+          for (const other of otherSides(dialogId, side)) {
+            other.projectApprovalResolution(chunk.approvalId, status, chunk.toolMetadata?.resolvedByName);
+          }
+          break;
+        }
+        case 'tool-input-available':
+        case 'tool-input-error':
+        case 'tool-output-available':
+        case 'tool-output-error':
+          for (const other of otherSides(dialogId, side)) other.projectToolChunk(chunk);
+          break;
+        default:
+          break;
       }
     }
   }

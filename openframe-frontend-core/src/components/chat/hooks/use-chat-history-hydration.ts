@@ -1,27 +1,25 @@
 'use client';
 
 /**
- * useChatHistoryHydration — mount-time rebuild of the chat message list from
+ * useChatHistoryHydration: mount-time rebuild of the chat message list from
  * the SERVER-side conversation store (the `chat_conversations` /
  * `chat_messages` SSOT behind `GET <chatStreamUrl>/history`).
  *
  * The client persists ONLY the server-issued conversation id (see
- * `chat-conversation-storage.ts`); this hook turns that id back into rendered
- * history: message bubbles and the send counter. Inline entity cards need no
- * per-row metadata — they hydrate by id from the record links in the
- * message content via the card fetch path.
+ * `chat-conversation-storage.ts`); this hook turns that id back into the
+ * messages it holds, each a row as `messageOfStoredRow` reads it.
  *
- * Failure semantics: a fetch/parse failure simply leaves the UI empty — the
+ * Failure semantics: a fetch/parse failure simply leaves the UI empty: the
  * SERVER still resolves full history for the next turn (it re-reads
  * `chat_messages` by conversation id on every send), so conversation context
  * is never lost when hydration misses.
  */
 
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import type { ChatMessage } from '../../../chat-protocol/chat-message';
+import { messageOfStoredRow } from '../../../chat-protocol/message-decoder';
 import { isRecord, unwrapEnvelope } from '../../../chat-protocol/wire-narrow';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
-import { messageFromStoredRow } from '../stored-message';
-import type { Message } from '../types/message.types';
 
 export interface UseChatHistoryHydrationArgs {
   /** Mirrors the adapter's `active` gate — an idle (Mingo-mode) mount never fetches. */
@@ -34,13 +32,8 @@ export interface UseChatHistoryHydrationArgs {
    *  not a ref: switching conversations (`selectDialog`) must re-run the
    *  fetch, so the id is an effect dependency. */
   conversationId: string | null;
-  /** User-send counter — set to the hydrated user-turn count so the next
-   *  live send lands on the following `sendIdx`. */
-  sendCountRef: MutableRefObject<number>;
-  /** `useChat`'s injection primitive (replace-or-prepend). */
-  hydrateMessages: (history: Message[]) => void;
-  /** Invalidates the adapter's `latestMeta` memo after hydration lands. */
-  bumpMetaTick: () => void;
+  /** The adapter's injection primitive (replace-or-prepend). */
+  hydrateMessages: (history: ChatMessage[]) => void;
   /** The server answered OK and reported the id as NOT READABLE by this caller
    *  (`found: false`) — it no longer exists, or is no longer ours (e.g. the
    *  thread was claimed by an account and this browser is now signed out).
@@ -65,9 +58,7 @@ export function useChatHistoryHydration({
   source,
   historyUrl,
   conversationId,
-  sendCountRef,
   hydrateMessages,
-  bumpMetaTick,
   onOrphanedConversation,
 }: UseChatHistoryHydrationArgs): UseChatHistoryHydrationResult {
   const [isHydratingHistory, setIsHydratingHistory] = useState(false);
@@ -114,11 +105,9 @@ export function useChatHistoryHydration({
         const payload: unknown = await res.json().catch(() => null);
         const body = unwrapEnvelope(payload);
         const rawRows = isRecord(body) ? body.messages : undefined;
-        // Non-object rows are DROPPED, not carried into the loop below. The
-        // loop reads `row.role` unguarded, so a single `null` row threw a
-        // TypeError that the effect's outer `catch` swallowed — abandoning the
-        // hydration wholesale and rendering an EMPTY conversation on refresh.
-        // Skipping the bad row keeps every good one.
+        // Non-object rows are DROPPED, not carried into the loop below: a single
+        // `null` row must not abandon the hydration wholesale and render an EMPTY
+        // conversation on refresh. Skipping the bad row keeps every good one.
         const rows: Array<Record<string, unknown>> = Array.isArray(rawRows) ? rawRows.filter(isRecord) : [];
         if (cancelled) return;
         if (rows.length === 0) {
@@ -129,22 +118,14 @@ export function useChatHistoryHydration({
           if (found === false) onOrphanedConversation?.(conversationId);
           return;
         }
-        const hydrated: Message[] = [];
-        let userTurns = 0;
+        const hydrated: ChatMessage[] = [];
         for (const row of rows) {
-          const role = row.role === 'assistant' ? 'assistant' : row.role === 'user' ? 'user' : null;
-          if (!role) continue;
-          if (role === 'user') {
-            userTurns += 1;
-          }
-          // The one stored-row mapping (`messageFromStoredRow`): an answer with record cards is its ordered parts.
-          const message = messageFromStoredRow(row, `hydrated-${String(row.seq ?? hydrated.length)}`);
+          // An old hub's row has no id of its own.
+          const message = messageOfStoredRow(row, `hydrated-${String(row.seq ?? hydrated.length)}`);
           if (message) hydrated.push(message);
         }
         if (cancelled || hydrated.length === 0) return;
-        sendCountRef.current = userTurns;
         hydrateMessages(hydrated);
-        bumpMetaTick();
       } catch {
         // Fetch failed — start empty; the server still owns history (above).
         // Release the once-guard so re-selecting the conversation retries
@@ -168,9 +149,8 @@ export function useChatHistoryHydration({
       // run raises the flag itself and owns clearing it).
       if (isCurrentRun()) setIsHydratingHistory(false);
     };
-    // `sendCountRef` is a ref: a stable identity, so listing it costs nothing;
     // `conversationId` is the real re-run trigger (dialog switch).
-  }, [active, source, historyUrl, conversationId, hydrateMessages, bumpMetaTick, onOrphanedConversation, sendCountRef]);
+  }, [active, source, historyUrl, conversationId, hydrateMessages, onOrphanedConversation]);
 
   return { isHydratingHistory, hydratedKeyRef };
 }

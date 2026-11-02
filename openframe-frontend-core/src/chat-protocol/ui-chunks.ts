@@ -158,6 +158,15 @@ export type UiChunk =
   | UiDataPartChunk
   | UiTransientChunk;
 
+/**
+ * What a transport hands the reducer: the chunks one wire entry became, and that entry's sequence. One Mingo entry can
+ * become several chunks, so the idempotency gate admits or drops them together.
+ */
+export interface ChatStreamEntry {
+  seq?: number;
+  chunks: UiChunk[];
+}
+
 // =============================================================================
 // Headers + encoding
 // =============================================================================

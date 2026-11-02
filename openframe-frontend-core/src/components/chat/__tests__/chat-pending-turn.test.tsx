@@ -84,9 +84,8 @@ const bodies = () => screen.queryAllByTestId('row-body').map(n => n.textContent)
 
 describe('approval sends mint no visible user row', () => {
   it('beginSseSend with empty text pushes only the assistant placeholder', () => {
-    const r = createChatStreamReducer({ transport: 'sse' });
-    // What `cardApprove` triggers: ('', { hidden: true, approvalAction }).
-    r.beginSseSend({ text: '', hidden: true, assistantName: 'Mingo AI' });
+    const r = createChatStreamReducer();
+    r.beginSseSend({ text: '', hidden: true });
 
     expect(r.state.messages).toHaveLength(1);
     expect(r.state.messages[0].role).toBe('assistant');
@@ -95,7 +94,7 @@ describe('approval sends mint no visible user row', () => {
   });
 
   it('pushOptimisticSend with empty text likewise mints no user row', () => {
-    const r = createChatStreamReducer({ transport: 'nats' });
+    const r = createChatStreamReducer();
     r.pushOptimisticSend('', true);
 
     expect(r.state.messages).toHaveLength(1);
@@ -103,12 +102,12 @@ describe('approval sends mint no visible user row', () => {
   });
 
   it('a normal send still mints the user row', () => {
-    const r = createChatStreamReducer({ transport: 'sse' });
-    r.beginSseSend({ text: 'hello', assistantName: 'Mingo AI' });
+    const r = createChatStreamReducer();
+    r.beginSseSend({ text: 'hello' });
 
     expect(r.state.messages).toHaveLength(2);
-    expect(r.state.messages[0]).toMatchObject({ role: 'user', content: 'hello' });
-    expect(r.state.messages[0].hidden).toBeUndefined();
+    expect(r.state.messages[0]).toMatchObject({ role: 'user', parts: [{ type: 'text', text: 'hello' }] });
+    expect(r.state.messages[0].metadata?.hidden).toBeUndefined();
   });
 });
 
@@ -117,12 +116,12 @@ describe('hidden rows that carry text', () => {
     const directive = buildAutoContinuationDirective('create_ticket', { ticketId: '42' });
     expect(directive.startsWith(AUTO_CONTINUATION_DIRECTIVE_PREFIX)).toBe(true);
 
-    const r = createChatStreamReducer({ transport: 'sse' });
-    r.beginSseSend({ text: directive, hidden: true, assistantName: 'Mingo AI' });
+    const r = createChatStreamReducer();
+    r.beginSseSend({ text: directive, hidden: true });
 
     const userRow = r.state.messages.find(m => m.role === 'user');
-    expect(userRow?.content).toBe(directive);
-    expect(userRow?.hidden).toBe(true);
+    expect(userRow?.parts).toEqual([{ type: 'text', text: directive }]);
+    expect(userRow?.metadata?.hidden).toBe(true);
   });
 
   it('never renders — the raw directive text must not reach the transcript', () => {

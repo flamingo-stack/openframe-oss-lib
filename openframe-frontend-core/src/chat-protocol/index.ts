@@ -1,38 +1,9 @@
 /**
- * Chat wire-protocol SSOT.
- *
- * The byte-level SSE framing contract (frames + encode + decode) and the
- * transport-agnostic `ChatStreamEvent` union both the SSE and NATS
- * decoders emit. Published as the server-safe `./chat-protocol` subpath —
- * no React, no browser APIs beyond TextEncoder/TextDecoder — so the hub's
- * stream route (emit side) and the lib's chat hooks (decode side) share
+ * The chat wire protocol: one message shape and one stream, the AI SDK's. Published as the server-safe `./chat-protocol`
+ * subpath (no React, no browser APIs beyond TextEncoder/TextDecoder), so the hub's stream route and the lib's chat share
  * one protocol module.
  */
 
-export * from './frames';
-export * from './events';
-// The stages a turn reports before its first answer token, and their copy.
-export * from './progress';
-export * from './encode';
-export * from './decode';
-export * from './nats-decoder';
-// The hub's confirm-tool request/error contract — shared by every transport
-// that resolves a Product Guide proposal.
-export * from './confirm-tool';
-// Cross-repo IP bucket-key normalizer (producer app + consumer hub share it).
-export * from './ip-normalize';
-// Cross-repo env-flag predicate — the trust assertion that gates the IP
-// forwarding above must be parsed IDENTICALLY on both sides of the seam.
-export * from './env-flag';
-export { isRecord, unwrapEnvelope } from './wire-narrow';
-// Record links (`[name](record://<type>/<id>)`): the one grammar a record is named by, server and renderer alike.
-export * from './record-link';
-// Record cards: the records an answer shows, a typed part drawn where it sits (never read from the text).
-export * from './record-cards';
-export type { RecordCard } from '../components/chat/types/message.types';
-// The `[N]` citation chip grammar — written by the server, read and hidden by the renderer.
-export * from './citation-chip';
-export { escapeThinkingTags } from './leading-frames';
 // The chat message and its stream: the AI SDK's names, one shape on every wire and in every store.
 export * from './chat-message';
 export * from './ui-chunks';
@@ -40,5 +11,21 @@ export * from './apply-chunk';
 export * from './ui-writer';
 export * from './citations';
 export * from './message-decoder';
+// The stages a turn reports before its first answer token, and their copy.
+export * from './progress';
+// The hub's error envelope, and the old approval route's request.
+export * from './confirm-tool';
+// Cross-repo IP bucket-key normalizer (producer app + consumer hub share it).
+export * from './ip-normalize';
+// Cross-repo env-flag predicate: the trust assertion that gates the IP forwarding above must be parsed IDENTICALLY on
+// both sides of the seam.
+export * from './env-flag';
+export { isRecord, unwrapEnvelope } from './wire-narrow';
+// Record links (`[name](record://<type>/<id>)`): the one grammar a record is named by, server and renderer alike.
+export * from './record-link';
+// Record cards: the records an answer shows, a typed part drawn where it sits (never read from the text).
+export * from './record-cards';
+// The `[N]` grammar: what a stream removes from a model's text.
+export * from './citation-chip';
 // The wire's fixtures, so the hub's conformance tests pin what this package pins.
 export * from './wire-fixtures';

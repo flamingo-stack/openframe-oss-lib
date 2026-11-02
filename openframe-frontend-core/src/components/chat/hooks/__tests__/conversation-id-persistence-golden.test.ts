@@ -13,8 +13,7 @@
  *   - the wire carries ONLY the newest user message (+ the echoed
  *     conversation id) — never a replay of client history;
  *   - mount-time history hydrates from `GET <chatStreamUrl>/history` and
- *     materializes THROUGH THE REDUCER (messages + send counter — same
- *     fan-out lookup as live turns; inline cards hydrate by id from the
+ *     materializes THROUGH THE REDUCER (inline cards hydrate by id from the
  *     record links in the content, no per-row refs);
  *   - stale keys — other proxy-auth identities AND the retired v1
  *     full-history blobs — are swept on mount; a leftover v1 blob neither
@@ -25,6 +24,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { isSourcePart, textOfParts } from '../../../../chat-protocol/chat-message';
+import { encodeUiChunk, encodeUiDone } from '../../../../chat-protocol/ui-chunks';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
 import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../../utils/auto-continuation-directive';
 import {
@@ -130,12 +131,28 @@ function mockRoutedFetch(options: { history?: unknown; streams: Array<Array<stri
  * The chat-stream POST body — the contract these goldens exist to pin. Written
  * out rather than left as `Record<string, unknown>` because the whole point of
  * the suite is WHICH keys the adapter sends: the newest message only, plus the
- * echoed `conversationId` once the server has minted one.
+ * conversation the server has minted. `content` and `conversationId` are what
+ * an older hub reads beside it (TODO(CU-17tkuw61kfy)).
  */
 interface ChatStreamRequestBody {
-  messages: Array<{ role: string; content: string }>;
+  id: string;
+  messages: Array<{ id: string; role: string; parts: unknown[]; content: string }>;
   conversationId?: string;
 }
+
+/** The body of a send of `text`, under a client id or the conversation's. */
+const sendOf = (text: string, conversationId?: string): ChatStreamRequestBody => ({
+  id: conversationId ?? (expect.stringMatching(/^chat-/) as string),
+  messages: [
+    {
+      id: expect.stringMatching(/^user-/) as string,
+      role: 'user',
+      parts: [{ type: 'text', text }],
+      content: text,
+    },
+  ],
+  ...(conversationId !== undefined ? { conversationId } : {}),
+});
 
 /** POST bodies the mock received for the chat-stream endpoint only.
  *  Typed off `mockRoutedFetch` so `mock.calls` carries fetch's real
@@ -160,6 +177,16 @@ function wireTurn(conversationId: string, answer: string): Array<string> {
     '\x1E',
     answer,
     '\x1F' + USAGE_END_TRAILER,
+  ];
+}
+
+/** The same turn on the standard's wire. */
+function uiWireTurn(conversationId: string, answer: string): Uint8Array[] {
+  return [
+    encodeUiChunk({ type: 'start', messageId: 'a-1', messageMetadata: { conversationId } }),
+    encodeUiChunk({ type: 'text-delta', id: 't1', delta: answer }),
+    encodeUiChunk({ type: 'finish', finishReason: 'stop', messageMetadata: { conversationId } }),
+    encodeUiDone(),
   ];
 }
 
@@ -307,14 +334,28 @@ describe('server-minted conversation id (full hook path)', () => {
 
     const bodies = chatBodies(fetchMock);
     // First send of the session: no id yet — the server mints one.
-    expect(bodies[0]).toEqual({ messages: [{ role: 'user', content: 'first question' }] });
+    expect(bodies[0]).toEqual(sendOf('first question'));
     // Every later send: NEWEST message only + the echoed id. The client
     // thread (4 messages by now) is never replayed on the wire.
-    expect(bodies[1]).toEqual({
-      messages: [{ role: 'user', content: 'second question' }],
-      conversationId: 'conv-golden-1',
-    });
+    expect(bodies[1]).toEqual(sendOf('second question', 'conv-golden-1'));
     expect(result.current.messages).toHaveLength(4);
+  });
+
+  it('reads the echoed id off the standard wire the same way', async () => {
+    const fetchMock = mockRoutedFetch({
+      streams: [uiWireTurn('conv-ui-1', 'First answer.'), uiWireTurn('conv-ui-1', 'Second answer.')],
+    });
+    const { result } = renderHook(() => useSseChatAdapter(undefined, { active: false }), { wrapper });
+
+    await act(async () => {
+      await result.current.sendMessage('first question');
+    });
+    expect(readPersistedConversation()).toEqual({ conversationId: 'conv-ui-1' });
+
+    await act(async () => {
+      await result.current.sendMessage('second question');
+    });
+    expect(chatBodies(fetchMock)[1]).toEqual(sendOf('second question', 'conv-ui-1'));
   });
 
   it('clearMessages drops the stored id so the next send is id-less (fresh conversation)', async () => {
@@ -339,7 +380,7 @@ describe('server-minted conversation id (full hook path)', () => {
       await result.current.sendMessage('fresh question');
     });
     const bodies = chatBodies(fetchMock);
-    expect(bodies[1]).toEqual({ messages: [{ role: 'user', content: 'fresh question' }] });
+    expect(bodies[1]).toEqual(sendOf('fresh question'));
     // The new conversation's id is re-captured from the fresh stream.
     expect(readPersistedConversation()).toEqual({
       conversationId: 'conv-golden-3',
@@ -370,23 +411,21 @@ describe('server-history hydration (materializes through the reducer)', () => {
     });
     const { result } = renderHook(() => useSseChatAdapter(undefined, { active: true }), { wrapper });
     await waitFor(() => expect(result.current.messages).toHaveLength(3));
-    expect(result.current.messages.map(m => m.sources?.length ?? 0)).toEqual([0, 1, 0]);
-    expect(result.current.messages.map(m => new Date(m.timestamp ?? 0).toISOString())).toEqual([
+    expect(result.current.messages.map(m => m.parts.filter(isSourcePart).length)).toEqual([0, 1, 0]);
+    expect(result.current.messages.map(m => new Date(m.metadata?.createdAt ?? 0).toISOString())).toEqual([
       '2026-07-19T09:00:00.000Z',
       '2026-07-19T09:00:05.000Z',
       '2026-07-19T09:01:00.000Z',
     ]);
   });
 
-  it('rebuilds messages + send counter from the transcript', async () => {
+  it('rebuilds the thread from the transcript', async () => {
     window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'conv-h1' }));
     const fetchMock = mockRoutedFetch({
       history: HISTORY_PAYLOAD,
       streams: [
         [
-          // The live turn after hydration carries sources — they must land
-          // at the CONTINUED send index (sendIdx 2), proving the hydrated
-          // send counter seeds the reducer's maps.
+          // The live turn after hydration carries sources: they must land on its own message.
           '{"sources":[{"index":1,"name":"Pricing overview","path":"docs/pricing.md","documentType":"markdown"}],"conversationId":"conv-h1"}\0',
           '\x1E',
           'Live answer after hydration.',
@@ -411,21 +450,18 @@ describe('server-history hydration (materializes through the reducer)', () => {
     // marker in the content is the only card channel (hydrate-by-id).
     expect(result.current.messages).toMatchSnapshot();
     const assistants = result.current.messages.filter(m => m.role === 'assistant');
-    expect(assistants[0].content).toContain('[77](record://ticket/77)');
+    expect(textOfParts(assistants[0].parts)).toContain('[77](record://ticket/77)');
 
     // A live send continues the SAME conversation: newest-message-only body
-    // with the stored id, and its sources key at the continued send index.
+    // with the stored id, and its sources on its own message.
     await act(async () => {
       await result.current.sendMessage('and the enterprise tier?');
     });
     const bodies = chatBodies(fetchMock);
-    expect(bodies[0]).toEqual({
-      messages: [{ role: 'user', content: 'and the enterprise tier?' }],
-      conversationId: 'conv-h1',
-    });
+    expect(bodies[0]).toEqual(sendOf('and the enterprise tier?', 'conv-h1'));
     const liveAssistant = result.current.messages[result.current.messages.length - 1];
     expect(liveAssistant.role).toBe('assistant');
-    expect(liveAssistant.sources?.[0]?.name).toBe('Pricing overview');
+    expect(liveAssistant.parts.filter(isSourcePart)[0]?.title).toBe('Pricing overview');
   });
 
   it('marks approval placeholders and auto-continuation directives hidden', async () => {
@@ -454,8 +490,8 @@ describe('server-history hydration (materializes through the reducer)', () => {
       wrapper,
     });
     await waitFor(() => expect(result.current.messages).toHaveLength(4));
-    expect(result.current.messages[2].hidden).toBe(true);
-    expect(result.current.messages[3].hidden).toBe(true);
+    expect(result.current.messages[2].metadata?.hidden).toBe(true);
+    expect(result.current.messages[3].metadata?.hidden).toBe(true);
   });
 
   it('a hydration miss starts the UI empty (server still owns history)', async () => {

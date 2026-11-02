@@ -24,6 +24,7 @@
  */
 
 import {
+  approvalBatchIdOf,
   isSourcePart,
   isToolPart,
   rebaseCitation,
@@ -254,8 +255,22 @@ function replaceData(parts: ChatPart[], index: number, chunk: UiDataPartChunk): 
   return sameValue(existing, next) ? parts : replaceAt(parts, index, next);
 }
 
+/** The compaction still open in these parts: the one a completion belongs to. Earlier ones completed in place. */
+function openCompactionIndex(parts: readonly ChatPart[]): number {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i];
+    if (part.type === 'data-context-compaction' && part.data.status === 'started') return i;
+  }
+  return -1;
+}
+
 function applyData(parts: ChatPart[], chunk: UiDataPartChunk): ChatPart[] {
   if (chunk.type === 'data-record-cards' && chunk.data.records.length === 0) return parts;
+  // A completion finds the row its start drew, whoever decoded that start: a hydrated one has another id.
+  if (chunk.type === 'data-context-compaction' && chunk.data.status === 'completed') {
+    const open = openCompactionIndex(parts);
+    if (open !== -1) return replaceData(parts, open, chunk);
+  }
   const index =
     chunk.id !== undefined
       ? parts.findIndex(part => part.type === chunk.type && 'id' in part && part.id === chunk.id)
@@ -274,11 +289,14 @@ function applyData(parts: ChatPart[], chunk: UiDataPartChunk): ChatPart[] {
 // Tools
 // =============================================================================
 
-/** Does this chunk's id name this part: by its call, its approval, or its approval's batch? */
+/**
+ * Does this chunk's id name this part: by its call, its approval, or the batch it is in? A row of a batch that needs no
+ * approval of its own carries the batch on its metadata, so a denied batch takes that row with it: it will never run.
+ */
 function toolPartMatches(part: ChatToolPart, id: string): boolean {
   if (part.toolCallId === id) return true;
   const approval = 'approval' in part ? part.approval : undefined;
-  return approval?.id === id || approval?.descriptor?.batchId === id;
+  return approval?.id === id || approvalBatchIdOf(part) === id;
 }
 
 function isFinal(part: ChatToolPart): boolean {
@@ -566,8 +584,11 @@ function messageHolding(messages: readonly ChatMessage[], holds: (parts: readonl
   return -1;
 }
 
-/** The chunks that can name a part of an earlier message: what resolves a card, and a tool that runs after one. */
-function crossMessageIndex(messages: readonly ChatMessage[], chunk: UiChunk): number {
+/**
+ * The chunks that can name a part of an earlier message (what resolves a card, a tool that runs after one, an offer's
+ * answer): the index of the message that holds what this chunk names, newest first, or -1.
+ */
+export function messageHoldingChunk(messages: readonly ChatMessage[], chunk: UiChunk): number {
   switch (chunk.type) {
     case 'tool-approval-response':
       return messageHolding(messages, parts => holdsToolPart(parts, chunk.approvalId));
@@ -717,7 +738,7 @@ export function applyChunkToMessages(messages: ChatMessage[], chunk: UiChunk, wi
       wire.onTransient?.(chunk);
       return messages;
     default: {
-      const holder = crossMessageIndex(messages, chunk);
+      const holder = messageHoldingChunk(messages, chunk);
       if (holder === -1) return applyToCurrent(messages, chunk, wire);
       const message = messages[holder];
       const parts = applyChunk(message.parts, chunk, wire);
