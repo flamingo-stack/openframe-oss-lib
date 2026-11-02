@@ -14,6 +14,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.api.service.organization.OrganizationCommandService;
 import com.openframe.api.service.organization.OrganizationQueryService;
+import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.organization.Address;
 import com.openframe.data.document.organization.ContactInformation;
 import com.openframe.data.document.organization.ContactPerson;
@@ -363,6 +364,73 @@ class CustomerControllerTest {
         verify(organizationCommandService).updateOrganization(eq(CUSTOMER_ID), command.capture());
         assertEquals(UpdateOrganizationRequest.builder().name("Acme Corporation").numberOfEmployees(42).build(),
                 command.getValue());
+    }
+
+    @Test
+    void createCustomerWithContractEndingBeforeStartIs400AndNothingIsCreated() throws Exception {
+        mockMvc.perform(json(post(BASE), Map.of("name", "Acme", "contractStartDate", "2026-06-01", "contractEndDate", "2026-01-01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("contractEndDate"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("Contract end date must not be before the start date"));
+
+        verifyNoInteractions(organizationCommandService);
+    }
+
+    @Test
+    void createCustomerWithContractEndingOnTheStartDayIs201() throws Exception {
+        when(organizationCommandService.createOrganization(any())).thenReturn(organization());
+
+        mockMvc.perform(json(post(BASE), Map.of("name", "Acme", "contractStartDate", "2026-06-01", "contractEndDate", "2026-06-01")))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void updateCustomerWithContractEndingBeforeStartIs400AndNothingIsUpdated() throws Exception {
+        mockMvc.perform(json(put(BASE + "/" + CUSTOMER_ID), Map.of("contractStartDate", "2026-06-01", "contractEndDate", "2026-01-01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("contractEndDate"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("Contract end date must not be before the start date"));
+
+        verifyNoInteractions(organizationCommandService);
+    }
+
+    @Test
+    void updateCustomerRefusedAfterTheMergeIs400WithTheFieldError() throws Exception {
+        when(organizationCommandService.updateOrganization(eq(CUSTOMER_ID), any())).thenThrow(new ValidationException(
+                "Contract end date must not be before the start date",
+                List.of(new ValidationException.FieldError("contractEndDate", "Contract end date must not be before the start date"))));
+
+        mockMvc.perform(json(put(BASE + "/" + CUSTOMER_ID), Map.of("contractEndDate", "2026-01-01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("contractEndDate"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("Contract end date must not be before the start date"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"name\":\"\"}", "{\"name\":\"   \"}", "{\"name\":\"\\t\\n\"}", "{\"name\":\" \",\"numberOfEmployees\":5}"})
+    void updateCustomerWithBlankNameIs400AndNothingIsUpdated(String body) throws Exception {
+        mockMvc.perform(put(BASE + "/" + CUSTOMER_ID).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("name"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("Name must not be blank"));
+
+        verifyNoInteractions(organizationCommandService);
+    }
+
+    @Test
+    void updateCustomerWithoutNameLeavesTheNameAlone() throws Exception {
+        when(organizationCommandService.updateOrganization(eq(CUSTOMER_ID), any())).thenReturn(organization());
+
+        mockMvc.perform(json(put(BASE + "/" + CUSTOMER_ID), Map.of("numberOfEmployees", 5)))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<UpdateOrganizationRequest> command = ArgumentCaptor.forClass(UpdateOrganizationRequest.class);
+        verify(organizationCommandService).updateOrganization(eq(CUSTOMER_ID), command.capture());
+        assertNull(command.getValue().name());
     }
 
     @Test
