@@ -2,15 +2,15 @@ package com.openframe.api.service.rmm.schedule;
 
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
-import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
+import com.openframe.data.nats.delivery.ScheduleOfflineRule;
 import com.openframe.data.nats.rmm.util.ScriptScheduleBatch;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -108,12 +108,14 @@ public class ScheduleDeliveryRefresher {
             log.debug("Waiting batches kept, their schedule is gone: executionId={}", executionId);
             return;
         }
-        List<Script> scripts = runnableScriptsOf(tenantId, executionId, schedule.get());
+        ScheduleScript current = schedule.get();
+        List<Script> scripts = runnableScriptsOf(tenantId, executionId, current);
         if (scripts.isEmpty()) {
             cancel(queuedLeaves, NOTHING_LEFT_TO_RUN);
             return;
         }
-        List<ScriptScheduleExecutionItem> items = ScriptScheduleBatch.items(scripts, schedule.get().getScriptCustomParams());
+        List<ScheduledScriptCustomParams> customParams = current.getScriptCustomParams();
+        List<ScriptScheduleExecutionItem> items = ScriptScheduleBatch.items(scripts, customParams);
         ScriptScheduleExecutionMessage message = ScriptScheduleExecutionMessage.builder()
                 .executionId(executionId)
                 .scheduleId(first.getScheduleId())
@@ -121,8 +123,9 @@ public class ScheduleDeliveryRefresher {
                 .scripts(items)
                 .build();
         Set<String> waitingMachines = queuedLeaves.stream().map(ScriptExecution::getMachineId).collect(toSet());
-        DeliveryOfflineBehavior offlineBehavior = offlineBehaviorOf(schedule.get());
-        Long reconnectWindowSeconds = reconnectWindowOf(schedule.get());
+        ScheduleOfflineRule rule = ScheduleOfflineRule.of(current.getTrigger(), current.getOfflineBehavior(), current.getReconnectWindowSeconds());
+        DeliveryOfflineBehavior offlineBehavior = rule.behavior();
+        Long reconnectWindowSeconds = rule.reconnectWindowSeconds();
         long replaced = waitingMachines.stream()
                 .filter(machineId -> deliveryRefresher.refresh(DeliveryType.SCRIPT_SCHEDULE, executionId, machineId, message,
                         offlineBehavior, reconnectWindowSeconds))
@@ -152,21 +155,6 @@ public class ScheduleDeliveryRefresher {
         return changed;
     }
 
-    // the schedule's rule for a machine that is not online, as the dispatcher sends it with a fire
-    private static DeliveryOfflineBehavior offlineBehaviorOf(ScheduleScript schedule) {
-        return isRetryOnReconnect(schedule) ? DeliveryOfflineBehavior.RETRY_ON_RECONNECT : DeliveryOfflineBehavior.SKIP;
-    }
-
-    private static Long reconnectWindowOf(ScheduleScript schedule) {
-        return isRetryOnReconnect(schedule) ? schedule.getReconnectWindowSeconds() : null;
-    }
-
-    private static boolean isRetryOnReconnect(ScheduleScript schedule) {
-        return schedule.getTrigger() == ScheduleScriptTrigger.DATE_TIME
-                && schedule.getOfflineBehavior() == ScheduleOfflineBehavior.RETRY_ON_RECONNECT
-                && schedule.getReconnectWindowSeconds() != null
-                && schedule.getReconnectWindowSeconds() > 0;
-    }
 
     private Optional<ScheduleScript> activeSchedule(String tenantId, String scheduleId) {
         if (scheduleId == null) {

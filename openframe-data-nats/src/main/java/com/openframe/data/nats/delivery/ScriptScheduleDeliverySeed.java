@@ -18,6 +18,10 @@ public class ScriptScheduleDeliverySeed implements DeliverySeed {
     private final DeliveryOfflineBehavior offlineBehavior;
     private final Long reconnectWindowSeconds;
 
+    public static ScriptScheduleDeliverySeed withRule(String machineId, ScriptScheduleExecutionMessage message, ScheduleOfflineRule rule) {
+        return new ScriptScheduleDeliverySeed(machineId, message, rule.behavior(), rule.reconnectWindowSeconds());
+    }
+
     public static ScriptScheduleDeliverySeed skippingOffline(String machineId, ScriptScheduleExecutionMessage message) {
         return new ScriptScheduleDeliverySeed(machineId, message, DeliveryOfflineBehavior.SKIP, null);
     }

@@ -267,7 +267,8 @@ public class ScheduleScriptDeviceService {
         schedule.setDeviceCriteria(criteria);
         scheduleRepository.save(schedule);
         armDeviceOnlineCriteriaMatches(tenantId, schedule);
-        before.removeAll(targetResolver.resolveTargetMachineIds(schedule));
+        List<String> after = targetResolver.resolveTargetMachineIds(schedule);
+        before.removeAll(after);
         if (!before.isEmpty()) {
             deliveryRefresher.cancelForMachines(scheduleId, before, DEVICE_REMOVED);
         }
