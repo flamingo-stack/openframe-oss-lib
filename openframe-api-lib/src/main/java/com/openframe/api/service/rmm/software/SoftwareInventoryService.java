@@ -137,7 +137,8 @@ public class SoftwareInventoryService {
                     if (!fleetPaging) {
                         enrichRealDevicesCount(List.of(row));
                     }
-                    applyStatuses(List.of(row));
+                    List<SoftwareResponse> rows = List.of(row);
+                    applyStatuses(rows);
                     return row;
                 });
     }
@@ -599,8 +600,11 @@ public class SoftwareInventoryService {
         if (title == null || title.getVersions() == null || title.getVersions().isEmpty()) {
             return List.of();
         }
+        // the catalog's newest release when it carries the title, otherwise the highest version installed
         SoftwareResponse titleRow = FleetSoftwareMapper.toResponse(title);
-        String latestVersion = catalogStatus.latestVersion(titleRow).orElse(titleRow.getLatestVersion());
+        List<SoftwareResponse> titleRows = List.of(titleRow);
+        catalogStatus.apply(titleRows);
+        String latestVersion = titleRow.getLatestVersion();
         SoftwareSource installedBy = installedBy(title.getSource());
 
         List<SoftwareTitleVersion> versions = title.getVersions().stream()

@@ -128,11 +128,15 @@ class SoftwareCatalogStatusTest {
     }
 
     @Test
-    void latestVersion_ofOneBrewRow() {
-        catalog(entry("xz", "5.8.4", BrewPackageType.FORMULA));
+    void catalogEntryWithoutAVersionOrToken_isSkipped() {
+        SoftwareResponse xz = row("xz", SoftwareSource.BREW, "5.8.3", 0);
+        PackageCatalogEntry noToken = entry(null, "9.9.9", BrewPackageType.FORMULA);
+        catalog(entry("xz", null, BrewPackageType.FORMULA), noToken, entry("xz", "5.8.4", BrewPackageType.CASK));
 
-        assertThat(status().latestVersion(row("xz", SoftwareSource.BREW, "5.8.3", 0))).contains("5.8.4");
-        assertThat(status().latestVersion(row("Slack", SoftwareSource.UNMANAGED, "4.4", 0))).isEmpty();
+        status().apply(List.of(xz));
+
+        assertThat(xz.getLatestVersion()).isEqualTo("5.8.4");
+        assertThat(xz.getVersionStatus()).isEqualTo(SoftwareVersionStatus.OUTDATED);
     }
 
     private void catalog(PackageCatalogEntry... entries) {

@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 
 import static java.util.stream.Collectors.groupingBy;
@@ -47,7 +46,10 @@ public class SoftwareCatalogStatus {
             return;
         }
         Map<String, String> latest = latestBrewVersions(rows);
-        rows.forEach(row -> apply(row, catalogLatest(row, latest)));
+        for (SoftwareResponse row : rows) {
+            String catalogLatest = catalogLatest(row, latest);
+            apply(row, catalogLatest);
+        }
     }
 
     private static String catalogLatest(SoftwareResponse row, Map<String, String> latest) {
@@ -55,16 +57,12 @@ public class SoftwareCatalogStatus {
         return token == null ? null : latest.get(token);
     }
 
-    public Optional<String> latestVersion(SoftwareResponse row) {
-        String token = brewToken(row);
-        return token == null ? Optional.empty() : Optional.ofNullable(latestBrewVersions(List.of(row)).get(token));
-    }
-
     private static void apply(SoftwareResponse row, String catalogLatest) {
         if (catalogLatest != null) {
             row.setLatestVersion(catalogLatest);
         }
-        row.setVersionStatus(versionStatus(row, catalogLatest));
+        SoftwareVersionStatus status = versionStatus(row, catalogLatest);
+        row.setVersionStatus(status);
         if (row.getAutoUpdate() == null && row.getSource() == SoftwareSource.BREW) {
             row.setAutoUpdate(catalogLatest != null ? SoftwareAutoUpdateStatus.OFF : SoftwareAutoUpdateStatus.NO_PACKAGE);
         }
