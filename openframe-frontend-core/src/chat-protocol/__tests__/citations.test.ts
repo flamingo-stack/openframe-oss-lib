@@ -175,6 +175,63 @@ describe('textWithCitationChips', () => {
     it('a text before a fence keeps its own place', () => {
       expect(drawn(marked(`Run:^\n${fenced}`, 'a'))).toBe(`Run: ${chip(1)}\n${fenced}`);
     });
+
+    describe('opened on a list marker`s line', () => {
+      it.each([
+        ['a numbered step', '1. ```bash\n   npm i\n   ```\n2. Run it.'],
+        ['a bullet', '- ```bash\n  npm i\n  ```\n- Run it.'],
+        ['in a quote', '> - ```bash\n>   npm i\n>   ```\n> - Run it.'],
+      ])('%s: its closing line closes it, so every later citation keeps its chip', (_name, list) => {
+        const out = drawn(
+          marked(`Steps:\n\n${list}^\n\nThe next paragraph says more.^\n\nAnd the last one.^`, 'a', 'b', 'c'),
+        );
+        expect(out).toContain(
+          `${list} ${chip(1)}\n\nThe next paragraph says more. ${chip(2)}\n\nAnd the last one. ${chip(3)}`,
+        );
+      });
+
+      it('a citation inside it leaves the code', () => {
+        const out = drawn(marked('1. ```bash\n   npm ^i\n   ```\n2. Next.', 'a'));
+        expect(out).toContain('1. ```bash\n   npm i\n   ```\n');
+        expect(out).not.toContain(`npm i ${chip(1)}`);
+        expect(out.split(chip(1))).toHaveLength(2);
+      });
+
+      it('later fences still pair up: a chip goes after the sentence it cites, not past another fence', () => {
+        const part = marked(
+          'Before.^\n\n- ```bash\n  npm i\n  ```\n\nAfter one.^\n\n```bash\nnpm t\n```\n\nAfter two.^',
+          'a',
+          'b',
+          'c',
+        );
+        expect(drawn(part)).toBe(
+          `Before. ${chip(1)}\n\n- \`\`\`bash\n  npm i\n  \`\`\`\n\nAfter one. ${chip(2)}\n\n\`\`\`bash\nnpm t\n\`\`\`\n\nAfter two. ${chip(3)}`,
+        );
+      });
+    });
+
+    describe('ended by its container, with no closing line', () => {
+      it('the next item ends a fence in an item', () => {
+        const part = marked('- ```\n  code\n- Next.^', 'a');
+        expect(drawn(part)).toBe(`- \`\`\`\n  code\n- Next. ${chip(1)}`);
+      });
+
+      it('a line outside the quote ends a fence in a quote', () => {
+        const part = marked('> ```\n> code\n\nAfter.^', 'a');
+        expect(drawn(part)).toBe(`> \`\`\`\n> code\n\nAfter. ${chip(1)}`);
+      });
+
+      it('a less indented fence line is no closing line, it opens one', () => {
+        // The item ended at that line, so the fence after it is the document's and never closes: no place after it.
+        expect(drawn(marked('- ```\n  code\n```\nAfter.^', 'a'))).toBe('- ```\n  code\n```\nAfter.');
+      });
+    });
+
+    it('a list marker with no fence after it, and a marker inside a fence, change nothing', () => {
+      expect(drawn(marked('- a^\n- b', 'a'))).toBe(`- a ${chip(1)}\n- b`);
+      const inCode = '```\n- ```\n```';
+      expect(drawn(marked(`${inCode}\n\nAfter.^`, 'a'))).toBe(`${inCode}\n\nAfter. ${chip(1)}`);
+    });
   });
 
   describe('link', () => {

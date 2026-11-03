@@ -52,17 +52,23 @@ export function citationNumbers(parts: readonly ChatPart[]): ReadonlyMap<string,
 // Where a chip can go
 // =============================================================================
 
+/** What a line can sit inside: a quote, or a list item whose content starts this many columns past its parent's. */
+type Container = 'quote' | number;
+
 interface ProtectedRange {
   start: number;
   /** Exclusive. */
   end: number;
   /** A fence or a raw HTML block: a chip after it needs a line of its own, or the block does not close. */
-  block?: boolean;
+  block?: { containers: readonly Container[] };
   /** One that never closes: nothing after it is outside it. */
   open?: boolean;
 }
 
-const FENCE_OPEN = /^[ \t]*(?:>[ \t]*)*(`{3,}|~{3,})(.*)$/;
+/** A fence line, whatever stands before it: what `blockRanges` reads, it reads with its containers taken off. */
+const FENCE_LINE = /^[ \t]*(?:>[ \t]*|(?:[-*+]|\d{1,9}[.)])[ \t]+)*(?:`{3,}|~{3,})/;
+const FENCE_OPEN = /^(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE = /^(`{3,}|~{3,})[ \t]*$/;
 
 /** What may stand before a raw HTML block on its line: a quote's or a list item's marker. */
 const HTML_LINE_START = String.raw`^[ \t]*(?:(?:>|[-*+]|\d{1,9}[.)])[ \t]+)*`;
@@ -89,51 +95,164 @@ const HTML_BLOCKS: ReadonlyArray<{ opens: RegExp; end: RegExp | null }> = [
   { opens: new RegExp(String.raw`${HTML_LINE_START}</?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?/?>[ \t]*$`), end: null },
 ];
 
-/** The fenced code blocks and raw HTML blocks of a text. */
+const LIST_MARKER = /^(?:[-*+]|(\d{1,9})[.)])(?= |$)/;
+const ATX_HEADING = /^#{1,6}(?: |$)/;
+const THEMATIC_BREAK = /^(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/;
+
+function withoutTabs(line: string): string {
+  if (!line.includes('\t')) return line;
+  let out = '';
+  for (const char of line) out += char === '\t' ? ' '.repeat(4 - (out.length % 4)) : char;
+  return out;
+}
+
+function spacesAt(line: string, at: number): number {
+  let count = 0;
+  while (line[at + count] === ' ') count++;
+  return count;
+}
+
+/**
+ * How many of the open containers a line continues, and where its text starts inside them. A blank line continues a list
+ * item, and no quote.
+ */
+function continueContainers(line: string, open: readonly Container[]): { matched: number; at: number } {
+  let at = 0;
+  let matched = 0;
+  for (const container of open) {
+    const indent = spacesAt(line, at);
+    if (container === 'quote') {
+      if (indent > 3 || line[at + indent] !== '>') break;
+      at += indent + 1;
+      if (line[at] === ' ') at++;
+    } else if (at + indent >= line.length) {
+      at = line.length;
+    } else {
+      if (indent < container) break;
+      at += container;
+    }
+    matched++;
+  }
+  return { matched, at };
+}
+
+/** The quotes and list items a line opens from `from`. In a paragraph, an empty item or a list not starting at 1 is text. */
+function openContainers(line: string, from: number, inParagraph: boolean): { opened: Container[]; at: number } {
+  const opened: Container[] = [];
+  let at = from;
+  for (;;) {
+    const indent = spacesAt(line, at);
+    if (indent > 3) break;
+    const rest = line.slice(at + indent);
+    if (rest[0] === '>') {
+      opened.push('quote');
+      at += indent + 1;
+      if (line[at] === ' ') at++;
+      continue;
+    }
+    const marker = LIST_MARKER.exec(rest);
+    if (!marker || THEMATIC_BREAK.test(rest)) break;
+    const after = spacesAt(rest, marker[0].length);
+    const empty = marker[0].length + after >= rest.length;
+    const startsAtOne = marker[1] === undefined || Number(marker[1]) === 1;
+    if (inParagraph && opened.length === 0 && (empty || !startsAtOne)) break;
+    const pad = empty || after > 4 ? 1 : after;
+    opened.push(indent + marker[0].length + pad);
+    at = empty ? line.length : at + indent + marker[0].length + pad;
+  }
+  return { opened, at };
+}
+
+/** The fenced code blocks and raw HTML blocks of a text, each as far as its container holds it. */
 function blockRanges(text: string): ProtectedRange[] {
   const ranges: ProtectedRange[] = [];
+  let open: Container[] = [];
+  let inParagraph = false;
   let fence: { char: string; length: number; start: number } | null = null;
   let html: { start: number; end: RegExp | null; through: number } | null = null;
   let lineStart = 0;
   while (lineStart <= text.length) {
     const newline = text.indexOf('\n', lineStart);
     const lineEnd = newline === -1 ? text.length : newline;
-    const line = text.slice(lineStart, lineEnd);
+    const line = withoutTabs(text.slice(lineStart, lineEnd));
+    const { matched, at } = continueContainers(line, open);
+
+    // A line its container does not hold ends a block in that container, closed or not.
+    if (matched < open.length && fence !== null) {
+      ranges.push({ start: fence.start, end: lineStart - 1, block: { containers: open.slice(0, matched) } });
+      fence = null;
+    }
+    if (matched < open.length && html !== null) {
+      const containers = html.end === null ? open : open.slice(0, matched);
+      ranges.push({ start: html.start, end: html.through, block: { containers } });
+      html = null;
+    }
+
     if (fence !== null) {
-      const match = FENCE_OPEN.exec(line);
-      if (match && match[1][0] === fence.char && match[1].length >= fence.length && match[2].trim() === '') {
-        ranges.push({ start: fence.start, end: lineEnd, block: true });
+      const indent = spacesAt(line, at);
+      const close = indent <= 3 ? FENCE_CLOSE.exec(line.slice(at + indent)) : null;
+      if (close && close[1][0] === fence.char && close[1].length >= fence.length) {
+        ranges.push({ start: fence.start, end: lineEnd, block: { containers: open } });
         fence = null;
       }
-    } else {
-      const match = html === null ? FENCE_OPEN.exec(line) : null;
-      // A backtick fence's info string holds no backtick: that line is inline code instead.
-      if (match && (match[1][0] !== '`' || !match[2].includes('`'))) {
-        fence = { char: match[1][0], length: match[1].length, start: lineStart };
+    } else if (html !== null) {
+      if (html.end === null ? line.slice(at).trim() === '' : html.end.test(line)) {
+        ranges.push({
+          start: html.start,
+          end: html.end === null ? html.through : lineEnd,
+          block: { containers: open },
+        });
+        html = null;
       } else {
-        if (html === null) {
-          const opened = HTML_BLOCKS.find(block => block.opens.test(line));
-          if (opened) html = { start: lineStart, end: opened.end, through: lineEnd };
-        }
-        if (html !== null) {
-          if (html.end === null ? line.trim() === '' : html.end.test(line)) {
-            ranges.push({ start: html.start, end: html.end === null ? html.through : lineEnd, block: true });
-            html = null;
+        html.through = lineEnd;
+      }
+    } else {
+      const continued = matched === open.length;
+      const { opened, at: inner } = openContainers(line, at, inParagraph && continued);
+      const indent = spacesAt(line, inner);
+      const body = line.slice(inner + indent);
+      const opening = indent <= 3 ? FENCE_OPEN.exec(body) : null;
+      // A backtick fence's info string holds no backtick: that line is inline code instead.
+      const opensFence = opening !== null && (opening[1][0] !== '`' || !opening[2].includes('`'));
+      const htmlBlock = indent <= 3 && !opensFence ? HTML_BLOCKS.find(block => block.opens.test(body)) : undefined;
+      const lazy =
+        !continued &&
+        inParagraph &&
+        opened.length === 0 &&
+        body !== '' &&
+        !opensFence &&
+        !htmlBlock &&
+        !ATX_HEADING.test(body) &&
+        !THEMATIC_BREAK.test(body);
+      if (!lazy) {
+        open = [...open.slice(0, matched), ...opened];
+        if (!continued || opened.length > 0) inParagraph = false;
+        if (opensFence) {
+          fence = { char: opening[1][0], length: opening[1].length, start: lineStart };
+          inParagraph = false;
+        } else if (htmlBlock) {
+          inParagraph = false;
+          if (htmlBlock.end?.test(line)) {
+            ranges.push({ start: lineStart, end: lineEnd, block: { containers: open } });
           } else {
-            html.through = lineEnd;
+            html = { start: lineStart, end: htmlBlock.end, through: lineEnd };
           }
+        } else if (body === '' || ATX_HEADING.test(body) || holdsNothing(body)) {
+          inParagraph = false;
+        } else {
+          inParagraph = true;
         }
       }
     }
     if (newline === -1) break;
     lineStart = newline + 1;
   }
-  if (fence !== null) ranges.push({ start: fence.start, end: text.length, block: true, open: true });
+  if (fence !== null) ranges.push({ start: fence.start, end: text.length, block: { containers: open }, open: true });
   if (html !== null) {
     ranges.push(
       html.end === null
-        ? { start: html.start, end: html.through, block: true }
-        : { start: html.start, end: text.length, block: true, open: true },
+        ? { start: html.start, end: html.through, block: { containers: open } }
+        : { start: html.start, end: text.length, block: { containers: open }, open: true },
     );
   }
   return ranges;
@@ -246,7 +365,7 @@ function protectedRanges(text: string): ProtectedRange[] {
  */
 const HOLDS_NOTHING: readonly RegExp[] = [
   /^\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/,
-  /^(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/,
+  THEMATIC_BREAK,
   /^=+[ \t]*$/,
   /^\[[^\]]+\]:/,
 ];
@@ -326,7 +445,7 @@ function paragraphStartOf(text: string, position: number): number {
     if (LIST_ITEM_LINE.test(line) || ONE_LINE_BLOCK.test(line)) return start;
     const previous = lineStartOf(text, start - 1);
     const above = text.slice(previous, start - 1);
-    if (BLANK_LINE_OF_QUOTE.test(above) || FENCE_OPEN.test(above) || ONE_LINE_BLOCK.test(above)) return start;
+    if (BLANK_LINE_OF_QUOTE.test(above) || FENCE_LINE.test(above) || ONE_LINE_BLOCK.test(above)) return start;
     start = previous;
   }
   return start;
