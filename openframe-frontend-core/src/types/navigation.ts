@@ -116,6 +116,35 @@ export interface SlidingSidebarConfig {
 }
 
 /**
+ * `NavigationSidebarConfig.resizable`: the user drags the expanded sidebar's
+ * right edge on desktop (`lg` and up). The 56px rail is not resizable, nor are
+ * the tablet overlay and the burger menu; the overlay opens to the chosen width.
+ */
+export interface NavigationSidebarResizeConfig {
+  /**
+   * Narrowest expanded width, in px. Raised to 141px when lower: the rows read
+   * 140px and up as expanded (`@[140px]/of-nav-sidebar`).
+   */
+  minWidth: number;
+  /** Widest expanded width, in px. Also kept to the room there is (`minContentWidth`). */
+  maxWidth: number;
+  /**
+   * Px of the row the content beside the sidebar always keeps, so a wide sidebar
+   * cannot crowd the page out of a narrow desktop window. Default 720, the lib's
+   * `content-md` breakpoint.
+   */
+  minContentWidth?: number;
+  /**
+   * `localStorage` key for the width the user chose: `{ size }` under
+   * `<storageKey>:chosen` (see `useResizablePanelSize`). Only a drag or a key
+   * press on the handle writes it, never the default or a clamped width; a double
+   * click removes it. Omit to keep the choice for the mount only. A host that seeds
+   * `NAVIGATION_SIDEBAR_WIDTH_VAR` before first paint reads the same entry.
+   */
+  storageKey?: string;
+}
+
+/**
  * Configuration for the navigation sidebar component
  */
 export interface NavigationSidebarConfig {
@@ -237,6 +266,14 @@ export interface NavigationSidebarConfig {
    * chat search in `sectionSlot`.
    */
   revealSignal?: number;
+  /**
+   * Let the user resize the expanded sidebar on desktop: a drag handle astride
+   * its right edge (the grip the Mingo chat drawer had), arrow keys, Home and
+   * End on it, a double click back to the default. The default stays
+   * `expandedWidth` (grouped) or 224px (flat); both variants. Omitted: the fixed
+   * widths, as before.
+   */
+  resizable?: NavigationSidebarResizeConfig;
 }
 
 /** What a slot render function is told about the place it is drawn in. */

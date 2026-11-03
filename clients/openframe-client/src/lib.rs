@@ -687,6 +687,7 @@ impl Client {
             PackageManagerReportRunManager::new(PackageManagerReportPublisher::new(
                 nats_message_publisher.clone(),
                 config_service.clone(),
+                package_auto_update_enabled,
             ));
 
         let script_bootstrap_execution_listener = ExecutionListener::<BootstrapScriptMessage>::new(

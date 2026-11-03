@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
@@ -180,6 +181,35 @@ class AppleTokenLifecycleTest {
 
         verify(service).store("t", "u-1", "com.openframe.web", "apple-refresh");
         verify(clients, never()).loadAuthorizedClient(eq("google"), any(), any());
+    }
+
+    @Test
+    void shouldCaptureWebRefreshTokenForBoundAccountNotTheIdpEmail() {
+        OAuth2AuthorizedClientRepository clients = mock(OAuth2AuthorizedClientRepository.class);
+        UserService userService = mock(UserService.class);
+        AppleTokenService service = mock(AppleTokenService.class);
+        AppleWebTokenCapture capture = new AppleWebTokenCapture(clients, userService, service);
+        var relayAuth = authentication("apple", oidcUser(Map.of("email", "relay@privaterelay.appleid.com")));
+        var boundAuth = authentication("apple", oidcUser(Map.of("of_account_email", "invited@acme.com")));
+        ClientRegistration registration = ClientRegistration.withRegistrationId("apple").clientId("com.openframe.web")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).redirectUri("https://a/cb")
+                .authorizationUri("https://idp/a").tokenUri("https://idp/t").build();
+        OAuth2AuthorizedClient authorized = new OAuth2AuthorizedClient(registration, "p",
+                new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "at", Instant.now(), Instant.now().plusSeconds(60)),
+                new OAuth2RefreshToken("apple-refresh", Instant.now()));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        when(clients.loadAuthorizedClient("apple", relayAuth, request)).thenReturn(authorized);
+        when(userService.findActiveByEmail("invited@acme.com")).thenReturn(Optional.of(activeUser("u-2", "t-2", "invited@acme.com")));
+        SecurityContextHolder.getContext().setAuthentication(boundAuth);
+
+        try {
+            capture.captureIfApple(request, relayAuth);
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+
+        verify(service).store("t-2", "u-2", "com.openframe.web", "apple-refresh");
+        verify(userService, never()).findActiveByEmail("relay@privaterelay.appleid.com");
     }
 
     @Test

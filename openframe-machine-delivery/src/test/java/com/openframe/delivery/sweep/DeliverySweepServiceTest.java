@@ -73,6 +73,8 @@ class DeliverySweepServiceTest {
     private static final int SEQUENCE = 7;
     private static final String RERUN_PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\",\"delivery\":{\"type\":\"TOOL_INSTALLATION\",\"targetId\":\"fleetmdm-agent\",\"dispatchId\":\"d-0\"}}";
     private static final long TWO_DAYS_SECONDS = 172_800L;
+    private static final long THIRTY_DAYS_SECONDS = 2_592_000L;
+    private static final long ONE_HOUR_SECONDS = 3_600L;
     private static final long TEN_SECONDS = 10L;
     private static final long FIRST_RETRY_DELAY = (long) (ACK_THRESHOLD * BACKOFF_MULTIPLIER);
     private static final long CLOCK_SLACK_SECONDS = 5L;
@@ -587,5 +589,54 @@ class DeliverySweepServiceTest {
         doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
         when(spec.getPayloadClass()).thenReturn(TestPayload.class);
         when(spec.subject(MACHINE_ID)).thenReturn(SUBJECT);
+    }
+    @Test
+    void retryPending_offlineRowThatSkipsByItsOwnRule_cancelledWhateverTheType() {
+        // setup
+        delivery.setOfflineBehavior(DeliveryOfflineBehavior.SKIP);
+        stubDue(delivery);
+        stubMachineNotOnline();
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
+        verify(repository, never()).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class));
+    }
+
+    @Test
+    void retryPending_offlineRowThatWaitsByItsOwnRule_parkedThoughTheTypeSkips() {
+        // setup
+        properties.getDefaults().setOfflineBehavior(DeliveryOfflineBehavior.SKIP);
+        delivery.setOfflineBehavior(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+        delivery.setReconnectWindowSeconds(TWO_DAYS_SECONDS);
+        stubDue(delivery);
+        stubMachineNotOnline();
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(repository).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class));
+        verifyNoInteractions(closer);
+    }
+
+    @Test
+    void retryPending_offlineRowPastItsOwnWindow_failedThoughTheTypeWouldStillWait() {
+        // setup
+        properties.getDefaults().setReconnectWindowSeconds(THIRTY_DAYS_SECONDS);
+        Instant twoDaysAgo = Instant.now().minusSeconds(TWO_DAYS_SECONDS);
+        delivery.setDispatchedAt(twoDaysAgo);
+        delivery.setOfflineBehavior(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+        delivery.setReconnectWindowSeconds(ONE_HOUR_SECONDS);
+        stubDue(delivery);
+        stubMachineNotOnline();
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(closer).fail(eq(delivery), eq(DeliveryFailure.OFFLINE), eq(DeliveryStatus.UNACKED), any(Instant.class));
     }
 }

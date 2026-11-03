@@ -41,6 +41,10 @@ public class MachineDelivery implements TenantScoped {
     private String payloadId;
     private String payloadJson;
 
+    // the request's own rule for a machine that is not online; absent = the type's policy at sweep time
+    private DeliveryOfflineBehavior offlineBehavior;
+    private Long reconnectWindowSeconds;
+
     private Instant dispatchedAt;
     private Instant dueAt;
     private Instant ackedAt;

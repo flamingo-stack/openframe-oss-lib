@@ -13,7 +13,7 @@ import {
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { breakpoints, useMediaQuery } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
-import { Menu01Icon } from '../icons-v2-generated';
+import { PanelResizeGrip } from '../ui/panel-resize-handle';
 
 /**
  * - `docked`: a column beside the content, resizable.
@@ -523,12 +523,7 @@ function SidePanelResizeHandle({ state, label, controls }: SidePanelResizeHandle
       onKeyDown={handleKeyDown}
       className="group absolute inset-y-0 left-0 z-10 flex w-4 -translate-x-1/2 cursor-col-resize touch-none select-none items-center justify-center outline-none"
     >
-      <span
-        aria-hidden
-        className="flex h-8 w-4 items-center justify-center rounded-sm border border-ods-border bg-ods-card text-ods-text-secondary transition-colors group-hover:border-ods-border-hover group-focus-visible:border-ods-accent group-focus-visible:text-ods-accent"
-      >
-        <Menu01Icon size={12} />
-      </span>
+      <PanelResizeGrip />
     </div>
   );
 }

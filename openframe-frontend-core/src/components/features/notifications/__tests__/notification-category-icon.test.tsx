@@ -1,7 +1,7 @@
 /**
  * The notification vocabulary and each category's icon: what an announcement
  * may state, and that a tile shows the icon of the section it belongs to (none
- * for GENERIC, INTEGRATIONS or a category the lib does not know).
+ * for GENERIC, INTEGRATIONS, BILLING or a category the lib does not know).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -23,6 +23,10 @@ describe('notification vocabulary', () => {
     for (const category of NOTIFICATION_CATEGORIES) expect(NOTIFICATION_CATEGORY_LABELS[category]).toBeTruthy();
   });
 
+  it('labels BILLING as the settings section names it', () => {
+    expect(NOTIFICATION_CATEGORY_LABELS.BILLING).toBe('Billing');
+  });
+
   it('defaults to what the backend assumes when a field is left out', () => {
     expect(DEFAULT_NOTIFICATION_SEVERITY).toBe('INFO');
     expect(DEFAULT_NOTIFICATION_CATEGORY).toBe('GENERIC');
@@ -32,6 +36,7 @@ describe('notification vocabulary', () => {
     expect(isNotificationSeverity('DANGER')).toBe(true);
     expect(isNotificationSeverity('danger')).toBe(false);
     expect(isNotificationCategory('TICKETS')).toBe(true);
+    expect(isNotificationCategory('BILLING')).toBe(true);
     expect(isNotificationCategory('constructor')).toBe(false);
     expect(isNotificationCategory(undefined)).toBe(false);
   });
@@ -44,8 +49,8 @@ describe('notificationCategoryIcon', () => {
     }
   });
 
-  it('has no icon for GENERIC, INTEGRATIONS, an unknown or a prototype name', () => {
-    for (const category of ['GENERIC', 'INTEGRATIONS', 'NOPE', 'constructor', '', null, undefined]) {
+  it('has no icon for GENERIC, INTEGRATIONS, BILLING, an unknown or a prototype name', () => {
+    for (const category of ['GENERIC', 'INTEGRATIONS', 'BILLING', 'NOPE', 'constructor', '', null, undefined]) {
       expect(notificationCategoryIcon(category)).toBeUndefined();
     }
   });
