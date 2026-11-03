@@ -1310,6 +1310,51 @@ describe('createMingoDecoder: the table', () => {
     });
   });
 
+  describe('closeHeld: a send moves the thread on, and what the decoder holds has to land before it', () => {
+    const typesOf = (entry: ChatStreamEntry): string[] => entry.chunks.map(chunk => chunk.type);
+
+    it.each([
+      ['an open code span', 'Run `ls'],
+      ['an open bracket', 'See ['],
+      ['a mention not finished', 'ask @dev'],
+    ])('%s is written and closed, and the next turn opens with nothing of it', (_name, said) => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'MESSAGE_START', streamSeq: 1 });
+      const seen = decoder.decode({ type: 'TEXT', text: said, streamSeq: 2 }).chunks;
+      const closed = decoder.closeHeld();
+
+      expect(textOfParts(partsOf([...seen, ...closed.chunks]))).toBe(said);
+      expect(closed.chunks[closed.chunks.length - 1]?.type).toBe('text-end');
+      expect(typesOf(decoder.decode({ type: 'MESSAGE_START', streamSeq: 3 }))).toEqual(['start']);
+    });
+
+    it('a card token not finished goes as at any end of a turn: it never shows raw', () => {
+      const decoder = createMingoDecoder();
+      const seen = decoder.decode({ type: 'TEXT', text: 'See [card://blog', streamSeq: 1 }).chunks;
+      expect(textOfParts(partsOf([...seen, ...decoder.closeHeld().chunks]))).toBe('See ');
+    });
+
+    it('an open reasoning closes', () => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'THINKING', text: 'hm', streamSeq: 1 });
+      expect(typesOf(decoder.closeHeld())).toEqual(['reasoning-end']);
+    });
+
+    it('a turn with nothing open answers nothing, and names no sequence: it is no chunk off the wire', () => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'MESSAGE_START', streamSeq: 1 });
+      decoder.decode({ type: 'MESSAGE_END', streamSeq: 2 });
+      expect(decoder.closeHeld()).toEqual({ chunks: [] });
+    });
+
+    it('a redelivery is still a redelivery', () => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'TEXT', text: 'Run `ls', streamSeq: 5 });
+      decoder.closeHeld();
+      expect(decoder.decode({ type: 'TEXT', text: 'again', streamSeq: 5 })).toEqual({ seq: 5, chunks: [] });
+    });
+  });
+
   describe('a redelivery moves no state', () => {
     const textOf = (entries: readonly ChatStreamEntry[]): string =>
       textOfParts(partsOf(entries.flatMap(entry => entry.chunks)));

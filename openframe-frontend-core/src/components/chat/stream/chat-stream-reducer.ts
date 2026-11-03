@@ -272,9 +272,14 @@ export interface ChatStreamReducer {
   /** What follows is drawn in this message: the card's, whose approval is being answered. */
   continueMessage(messageId: string): void;
   endSseTurn(): void;
-  failSseTurn(errorMessage: string): void;
 
   // ── Phase / status commands ─────────────────────────────────────────────
+  /**
+   * The turn being built ends with this failure on it: what it already said stays, and a message with no parts reads as
+   * the failure alone. A host's own word about its own send, so no wire rule applies: the direct-mode barrier stops the
+   * assistant's chunks, and a send that failed is not one.
+   */
+  failTurn(errorMessage: string): void;
   setPhase(phase: StreamingPhase): void;
   setApprovalStatus(requestId: string, status: ChatApprovalStatus | null): void;
   /**
@@ -1151,9 +1156,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       streamingPhase = 'idle';
       invalidate();
     },
-    failSseTurn(errorMessage) {
-      // The message being built ends with the failure on it: what it already said stays, and a row with no parts reads as
-      // the failure alone.
+    failTurn(errorMessage) {
       write({ type: 'error', errorText: errorMessage });
       streamingPhase = 'idle';
       invalidate();

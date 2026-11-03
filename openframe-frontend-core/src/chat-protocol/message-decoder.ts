@@ -122,6 +122,15 @@ export interface MingoDecoder {
    * TODO(CU-17tkuw61kfy): goes with the old text writer. With no old tokens, no tail is ever held.
    */
   discardHeld(): void;
+  /**
+   * What is held back, written and closed: the entry a host applies before a send of its own. A send opens the next turn
+   * with no chunk to say so, and a turn can end with no `MESSAGE_END` (a crash, a lost chunk), so what this decoder still
+   * holds would otherwise be written below the new message by the next chunk that closes it. No sequence: this comes off
+   * no wire.
+   *
+   * TODO(CU-17tkuw61kfy): goes with the old text writer, like `discardHeld`.
+   */
+  closeHeld(): ChatStreamEntry;
 }
 
 function str(value: unknown): string | undefined {
@@ -634,6 +643,11 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
     discardHeld() {
       writer.discard();
       reasoningId = null;
+    },
+    closeHeld() {
+      const chunks: UiChunk[] = [];
+      closeOpen(chunks);
+      return { chunks };
     },
   };
 }

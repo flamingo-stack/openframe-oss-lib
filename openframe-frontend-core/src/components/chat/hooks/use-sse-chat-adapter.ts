@@ -632,7 +632,7 @@ export function useSseChatAdapter(
         }
         flushDeltas();
         mutate(r =>
-          r.failSseTurn(err instanceof Error ? err.message : 'An error occurred while processing your request.'),
+          r.failTurn(err instanceof Error ? err.message : 'An error occurred while processing your request.'),
         );
         return false;
       } finally {
@@ -794,7 +794,7 @@ export function useSseChatAdapter(
     () => ({
       approve: id => answerApproval(id, true),
       reject: (id, reason) => answerApproval(id, false, reason),
-      // This adapter's `sendMessage` never rejects: it resolves `false` and renders the failure via `failSseTurn`.
+      // This adapter's `sendMessage` never rejects: it resolves `false` and renders the failure via `failTurn`.
       selectAsk: label => void sendMessage(label),
       pickSuggestion: prompt => void sendMessage(prompt),
     }),
@@ -852,7 +852,7 @@ export function useSseChatAdapter(
       const escaped = queryValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const text = `/${cmdId} display "${escaped}"`;
       // This adapter's `sendMessage` never rejects: it resolves `false` and
-      // renders the failure via `failSseTurn`. (The NATS copy's `discussRef`
+      // renders the failure via `failTurn`. (The NATS copy's `discussRef`
       // needs an explicit `.catch` because its publish CAN reject.)
       void sendMessage(text);
     },

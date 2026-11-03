@@ -426,7 +426,7 @@ describe('createChatStreamReducer — the message a stream builds', () => {
     const r = createChatStreamReducer();
     r.beginSseSend({ text: 'q' });
     r.apply(text('partial'));
-    r.failSseTurn('The server is busy');
+    r.failTurn('The server is busy');
     expect(r.state.messages).toHaveLength(2);
     expect(body(trailing(r))).toEqual([
       { type: 'text', text: 'partial' },
@@ -439,9 +439,28 @@ describe('createChatStreamReducer — the message a stream builds', () => {
   it('a failed send with nothing said reads as the failure alone', () => {
     const r = createChatStreamReducer();
     r.beginSseSend({ text: 'q' });
-    r.failSseTurn('The server is busy');
+    r.failTurn('The server is busy');
     r.endSseTurn();
     expect(body(trailing(r))).toEqual([{ type: 'data-error', data: { title: 'The server is busy' } }]);
+  });
+
+  it("a host's own failure reaches the thread past the direct-mode barrier, which only stops the assistant's chunks", () => {
+    const r = createChatStreamReducer();
+    r.apply({
+      chunks: [
+        {
+          type: 'data-chat-participant',
+          transient: true,
+          data: { kind: 'direct-message', text: 'Hi', ownerType: 'ADMIN' },
+        },
+      ],
+    });
+    r.pushOptimisticSend('one');
+
+    r.failTurn('Could not send');
+
+    expect(body(trailing(r))).toEqual([{ type: 'data-error', data: { title: 'Could not send' } }]);
+    expect(r.state.streamingPhase).toBe('idle');
   });
 
   it('a send carries its attachments as file parts after its text', () => {
