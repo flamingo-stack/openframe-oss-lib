@@ -316,6 +316,25 @@ describe('textWithCitationChips', () => {
       expect(drawn(marked('Go to https://x.test/^a now.', 'a'))).toBe(`Go to https://x.test/a now. ${chip(1)}`);
     });
 
+    it('moves past a shortcut reference, whose label has a definition', () => {
+      const definition = '\n\n[a. b]: https://x.test';
+      expect(drawn(marked(`See^ [a. b] now. Next.${definition}`, 'a'))).toBe(
+        `See [a. b] now. ${chip(1)} Next.${definition}`,
+      );
+      expect(drawn(marked(`See [a.^ b] now. Next.${definition}`, 'a'))).toBe(
+        `See [a. b] now. ${chip(1)} Next.${definition}`,
+      );
+    });
+
+    it('a label reads whatever its case and spacing', () => {
+      const definition = '\n\n[A.  B]: https://x.test';
+      expect(drawn(marked(`See^ [a. b] now.${definition}`, 'a'))).toBe(`See [a. b] now. ${chip(1)}${definition}`);
+    });
+
+    it('a bracket with no definition is text', () => {
+      expect(drawn(marked('See^ [a. b] now. Next.', 'a'))).toBe(`See [a. ${chip(1)} b] now. Next.`);
+    });
+
     it('an escaped bracket opens no link', () => {
       expect(drawn(marked('A \\[b^ c\\](d) e', 'a'))).toBe(`A \\[b c\\](d) e ${chip(1)}`);
     });
@@ -967,6 +986,7 @@ describe('a chip never breaks the block it lands near', () => {
       'See <https://auto.test> and https://bare.test/a?b=1 now.',
       'Hard break\\\nnext.',
       '[ref]: https://x.test "t"',
+      'See [a shortcut. reference] and more.\n\n[a shortcut. reference]: https://x.test',
       '1. ```bash\n   npm i\n   ```\n2. Next.\n\nFinal para.',
       '- ```bash\n  npm i\n  ```\n- Next.\n\nFinal para.',
       '1. Install:\n   ```bash\n   npm i\n   ```\n2. Run it.',

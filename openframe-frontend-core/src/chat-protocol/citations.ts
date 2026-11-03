@@ -316,8 +316,15 @@ function matchingBracket(text: string, at: number, end: number, open: string, cl
   return -1;
 }
 
-/** The inline code, links and autolinks between `from` and `to`. */
-function inlineRanges(text: string, from: number, to: number): ProtectedRange[] {
+const LINK_DEFINITION = /^ {0,3}(?:>[ \t]*)*\[([^\]]+)\]:/gm;
+
+/** A link label as CommonMark matches it: case and runs of space make no difference. */
+function labelKey(label: string): string {
+  return label.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** The inline code, links and autolinks between `from` and `to`, a `[label]` with a definition among them. */
+function inlineRanges(text: string, from: number, to: number, labels: ReadonlySet<string>): ProtectedRange[] {
   const ranges: ProtectedRange[] = [];
   let i = from;
   while (i < to) {
@@ -347,6 +354,9 @@ function inlineRanges(text: string, from: number, to: number): ProtectedRange[] 
       if (destinationEnd !== -1) {
         ranges.push({ start: i, end: destinationEnd + 1 });
         i = destinationEnd + 1;
+      } else if (labelEnd !== -1 && labels.has(labelKey(text.slice(open + 1, labelEnd)))) {
+        ranges.push({ start: i, end: labelEnd + 1 });
+        i = labelEnd + 1;
       } else {
         i = open + 1;
       }
@@ -370,12 +380,13 @@ function inlineRanges(text: string, from: number, to: number): ProtectedRange[] 
 /** Everything a chip may not land inside, in text order. */
 function protectedRanges(text: string): ProtectedRange[] {
   const ranges: ProtectedRange[] = [];
+  const labels = new Set([...text.matchAll(LINK_DEFINITION)].map(match => labelKey(match[1])));
   let at = 0;
   for (const block of blockRanges(text)) {
-    ranges.push(...inlineRanges(text, at, block.start), block);
+    ranges.push(...inlineRanges(text, at, block.start, labels), block);
     at = block.end;
   }
-  ranges.push(...inlineRanges(text, at, text.length));
+  ranges.push(...inlineRanges(text, at, text.length, labels));
   return ranges;
 }
 
