@@ -62,6 +62,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -87,6 +88,7 @@ class SoftwareInventoryServiceTest {
     @Mock private DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
     @Mock private TenantSoftwareReadModelQuery tenantSoftwareReadModelQuery;
     @Mock private SoftwareAutoUpdateService autoUpdateService;
+    @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private OrganizationRepository organizationRepository;
 
@@ -99,7 +101,7 @@ class SoftwareInventoryServiceTest {
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
-                autoUpdateService, tagAssignmentRepository, organizationRepository);
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }
@@ -718,6 +720,97 @@ class SoftwareInventoryServiceTest {
 
         assertThat(rows).extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getStatus)
                 .containsExactlyInAnyOrder(tuple("m-1", SoftwareOnDeviceStatus.OUTDATED), tuple("m-2", SoftwareOnDeviceStatus.UP_TO_DATE));
+    }
+
+    @Test
+    @DisplayName("softwareDevices status: with a catalog release out, a device on the highest installed version is OUTDATED too")
+    void listDevices_statusAgainstTheCatalog() {
+        stubDevices("homebrew_packages", device("m-1", "5.8.3"), device("m-2", "5.8.4"));
+        catalogLatestIs("5.8.5");
+
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        assertThat(rows).extracting(SoftwareOnDeviceResponse::getStatus)
+                .containsOnly(SoftwareOnDeviceStatus.OUTDATED);
+    }
+
+    @Test
+    @DisplayName("softwareDevices status: a device past a lagging catalog is UP_TO_DATE")
+    void listDevices_devicePastTheCatalog_upToDate() {
+        stubDevices("homebrew_packages", device("m-1", "5.8.5"));
+        catalogLatestIs("5.8.4");
+
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        assertThat(rows).extracting(SoftwareOnDeviceResponse::getStatus).containsExactly(SoftwareOnDeviceStatus.UP_TO_DATE);
+    }
+
+    @Test
+    @DisplayName("software list: the policies set auto-update first, then the catalog fills the rows they do not cover")
+    void listSoftware_policiesThenCatalog() {
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of());
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+
+        service.listSoftware(null, 0, 20, null, null);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
+        order.verify(autoUpdateService).applyToSoftware(anyList());
+        order.verify(catalogStatus).apply(anyList());
+    }
+
+    @Test
+    @DisplayName("software detail: the policies set auto-update first, then the catalog fills the row")
+    void findById_policiesThenCatalog() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(42L);
+        title.setName("xz");
+        title.setSource("homebrew_packages");
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+
+        assertThat(service.findById("42")).isPresent();
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
+        order.verify(autoUpdateService).applyToSoftware(argThat(rows -> rows.size() == 1));
+        order.verify(catalogStatus).apply(argThat(rows -> rows.size() == 1 && "xz".equals(rows.get(0).getName())));
+    }
+
+    @Test
+    @DisplayName("software filters: the facets count the statuses the policies and the catalog set")
+    void getSoftwareFilters_policiesThenCatalog() {
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of());
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+
+        service.getSoftwareFilters(null);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
+        order.verify(autoUpdateService).applyToSoftware(anyList());
+        order.verify(catalogStatus).apply(anyList());
+    }
+
+    @Test
+    @DisplayName("device software list and its filters: the device's policies first, then the catalog")
+    void deviceSoftware_policiesThenCatalog() {
+        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.empty());
+
+        service.listSoftwareForDevice(MACHINE_ID, null, null, FIRST_PAGE, PAGE_SIZE, null);
+        service.getDeviceSoftwareFilters(MACHINE_ID, null);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
+        order.verify(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
+        order.verify(catalogStatus).apply(anyList());
+        order.verify(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
+        order.verify(catalogStatus).apply(anyList());
+    }
+
+    // what SoftwareCatalogStatus does for a title the catalog carries: its newest release becomes the latest version
+    private void catalogLatestIs(String version) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setLatestVersion(version));
+            return null;
+        }).when(catalogStatus).apply(anyList());
     }
 
     @Test

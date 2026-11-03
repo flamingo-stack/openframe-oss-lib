@@ -65,6 +65,7 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
     @Mock private TenantSoftwareReadModelQuery tenantSoftwareReadModelQuery;
     @Mock private SoftwareAutoUpdateService autoUpdateService;
+    @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private OrganizationRepository organizationRepository;
 
@@ -74,7 +75,7 @@ class SoftwareInventoryServiceFleetPagingTest {
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
-                autoUpdateService, tagAssignmentRepository, organizationRepository);
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }

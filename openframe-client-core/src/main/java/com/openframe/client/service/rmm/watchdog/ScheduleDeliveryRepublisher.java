@@ -1,6 +1,7 @@
 package com.openframe.client.service.rmm.watchdog;
 
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
@@ -15,6 +16,7 @@ public class ScheduleDeliveryRepublisher implements DeliveryRepublisher {
 
     private final ObjectMapper objectMapper;
     private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private final EncryptionService encryptionService;
 
     @Override
     public DeliveryChannel channel() {
@@ -26,7 +28,8 @@ public class ScheduleDeliveryRepublisher implements DeliveryRepublisher {
         try {
             ScriptScheduleExecutionMessage message =
                     objectMapper.readValue(messageJson, ScriptScheduleExecutionMessage.class);
-            scriptScheduleNatsPublisher.publish(machineId, message);
+            ScriptScheduleExecutionMessage revealed = message.revealed(encryptionService::decrypt);
+            scriptScheduleNatsPublisher.publish(machineId, revealed);
         } catch (Exception e) {
             log.warn("Failed to re-publish schedule delivery machineId={}: {}", machineId, e.getMessage());
         }

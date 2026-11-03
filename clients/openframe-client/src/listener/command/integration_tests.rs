@@ -1004,7 +1004,11 @@ async fn a_client_update_waits_for_a_busy_tool_or_a_running_update_without_an_ac
         ))
         .await;
 
-    let busy = agent.tool_ops.lock("mesh").await.mark_busy();
+    let busy = agent
+        .tool_ops
+        .try_lock("mesh")
+        .expect("free tool")
+        .mark_busy();
     agent
         .send_to(
             ClientUpdateHandler::subject(MACHINE),

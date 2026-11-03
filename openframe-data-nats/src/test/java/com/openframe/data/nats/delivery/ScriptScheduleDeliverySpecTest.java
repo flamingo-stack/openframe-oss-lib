@@ -1,5 +1,11 @@
 package com.openframe.data.nats.delivery;
 
+import org.springframework.beans.factory.ObjectProvider;
+import java.util.Map;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
+import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
@@ -18,7 +24,35 @@ class ScriptScheduleDeliverySpecTest {
     private static final String EXECUTION_ID = "exec-1";
     private static final long WINDOW_SECONDS = 7_200L;
 
-    private final ScriptScheduleDeliverySpec spec = new ScriptScheduleDeliverySpec();
+    private final EncryptionService encryptionService =
+            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
+    private final StaticListableBeanFactory beans = new StaticListableBeanFactory(Map.of("encryptionService", encryptionService));
+    private final ObjectProvider<EncryptionService> encryptionProvider = beans.getBeanProvider(EncryptionService.class);
+    private final ScriptScheduleDeliverySpec spec = new ScriptScheduleDeliverySpec(encryptionProvider);
+
+    @Test
+    void wireForm_secretsInTheClear_theStoredBatchAndTheDeliveryBlockUntouched() {
+        // setup
+        ScriptEnvVar sealedSecret = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                .sealed(encryptionService::encrypt);
+        ScriptScheduleExecutionItem item = ScriptScheduleExecutionItem.builder().scriptId("script-a")
+                .envVars(List.of(sealedSecret)).build();
+        DeliveryRef delivery = new DeliveryRef(DeliveryType.SCRIPT_SCHEDULE, EXECUTION_ID, "dispatch-1");
+        ScriptScheduleExecutionMessage stored = ScriptScheduleExecutionMessage.builder().executionId(EXECUTION_ID)
+                .delivery(delivery).scripts(List.of(item)).build();
+
+        // execution
+        ScriptScheduleExecutionMessage onTheWire = spec.wireForm(stored);
+
+        // verifications
+        ScriptEnvVar sent = onTheWire.getScripts().get(0).getEnvVars().get(0);
+        assertThat(sent.getValue()).isEqualTo("s3cr3t");
+        assertThat(sent.isEncrypted()).isFalse();
+        assertThat(onTheWire.getDelivery()).isSameAs(delivery);
+        ScriptEnvVar kept = stored.getScripts().get(0).getEnvVars().get(0);
+        assertThat(kept.isEncrypted()).isTrue();
+        assertThat(kept.getValue()).isNotEqualTo("s3cr3t");
+    }
 
     @Test
     void type_scriptSchedule_withTheBatchAsItsPayload_toOneMachineAtATime() {

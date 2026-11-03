@@ -24,7 +24,7 @@ public class OrganizationMapper {
         }
 
         return Organization.builder()
-                .name(request.name())
+                .name(stripped(request.name()))
                 .organizationId(generateOrganizationId())
                 .category(request.category())
                 .numberOfEmployees(request.numberOfEmployees())
@@ -36,6 +36,10 @@ public class OrganizationMapper {
                 .contractEndDate(request.contractEndDate())
                 .isDefault(false)
                 .build();
+    }
+
+    private static String stripped(String name) {
+        return name == null ? null : name.strip();
     }
 
     /**
@@ -58,7 +62,7 @@ public class OrganizationMapper {
 
         // Update only allowed fields (organizationId is immutable)
         if (request.name() != null) {
-            existing.setName(request.name());
+            existing.setName(stripped(request.name()));
         }
         if (request.category() != null) {
             existing.setCategory(request.category());

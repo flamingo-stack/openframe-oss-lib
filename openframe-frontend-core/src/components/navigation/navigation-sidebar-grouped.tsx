@@ -7,6 +7,7 @@ import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FloatingTooltip } from '../ui/floating-tooltip';
+import { CountPill } from './count-pill';
 import { NavigationItemBadge } from './navigation-item-badge';
 import { UnreadDot } from './unread-dot';
 
@@ -131,20 +132,6 @@ const EXPANDED_ONLY =
 interface RowStateProps {
   showLabel: boolean;
   disabled: boolean;
-}
-
-/** The count pill: 24px, widening for "99+". */
-function CountPill({ count, className }: { count: number; className?: string }) {
-  return (
-    <span
-      className={cn(
-        'flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xxs)]',
-        className,
-      )}
-    >
-      <span className="text-ods-text-on-accent text-h5">{count > 99 ? '99+' : count}</span>
-    </span>
-  );
 }
 
 /** The row's end, flush right where every row's count sits. */
