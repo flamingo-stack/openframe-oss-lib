@@ -66,7 +66,7 @@ interface ProtectedRange {
   start: number;
   /** Exclusive. */
   end: number;
-  /** A fence or a raw HTML block: a chip after it needs a line of its own, or the block does not close. */
+  /** A fence, indented code or a raw HTML block: a chip after it needs a line of its own, or it stays inside. */
   block?: BlockEnd;
   /** One that never closes: nothing after it is outside it. */
   open?: boolean;
@@ -170,20 +170,30 @@ function openContainers(line: string, from: number, inParagraph: boolean): { ope
   return { opened, at };
 }
 
-/** The fenced code blocks and raw HTML blocks of a text, each as far as its container holds it. */
+/**
+ * The code blocks and raw HTML blocks of a text, each as far as its container holds it. Indented code needs that as well: a
+ * list item's own continuation looks the same (`- a`, blank, four spaces), and so does a paragraph's next line.
+ */
 function blockRanges(text: string): ProtectedRange[] {
   const ranges: ProtectedRange[] = [];
   let open: Container[] = [];
   let inParagraph = false;
   let fence: { char: string; length: number; start: number } | null = null;
   let html: { start: number; end: RegExp | null; through: number } | null = null;
+  let code: { start: number; through: number; containers: readonly Container[] } | null = null;
   let lineStart = 0;
   while (lineStart <= text.length) {
     const newline = text.indexOf('\n', lineStart);
     const lineEnd = newline === -1 ? text.length : newline;
     const line = withoutTabs(text.slice(lineStart, lineEnd));
     const { matched, at } = continueContainers(line, open);
+    const blank = line.slice(at).trim() === '';
 
+    // Indented code goes on through blank lines, and ends at its last line that holds code.
+    if (code !== null && (matched < open.length || (!blank && spacesAt(line, at) < 4))) {
+      ranges.push({ start: code.start, end: code.through, block: { containers: code.containers } });
+      code = null;
+    }
     // A line its container does not hold ends a block in that container, closed or not.
     if (matched < open.length && fence !== null) {
       ranges.push({ start: fence.start, end: lineStart - 1, block: { containers: open.slice(0, matched) } });
@@ -196,7 +206,9 @@ function blockRanges(text: string): ProtectedRange[] {
       html = null;
     }
 
-    if (fence !== null) {
+    if (code !== null) {
+      if (!blank) code.through = lineEnd;
+    } else if (fence !== null) {
       const indent = spacesAt(line, at);
       const close = indent <= 3 ? FENCE_CLOSE.exec(line.slice(at + indent)) : null;
       if (close && close[1][0] === fence.char && close[1].length >= fence.length) {
@@ -204,7 +216,7 @@ function blockRanges(text: string): ProtectedRange[] {
         fence = null;
       }
     } else if (html !== null) {
-      if (html.end === null ? line.slice(at).trim() === '' : html.end.test(line)) {
+      if (html.end === null ? blank : html.end.test(line)) {
         const block = { containers: open, runsToBlankLine: html.end === null };
         ranges.push({ start: html.start, end: html.end === null ? html.through : lineEnd, block });
         html = null;
@@ -242,7 +254,9 @@ function blockRanges(text: string): ProtectedRange[] {
           } else {
             html = { start: lineStart, end: htmlBlock.end, through: lineEnd };
           }
-        } else if (body === '' || ATX_HEADING.test(body) || holdsNothing(body)) {
+        } else if (body !== '' && indent >= 4 && !inParagraph) {
+          code = { start: lineStart, through: lineEnd, containers: open };
+        } else if (body === '' || (indent < 4 && (ATX_HEADING.test(body) || holdsNothing(body)))) {
           inParagraph = false;
         } else {
           inParagraph = true;
@@ -252,6 +266,7 @@ function blockRanges(text: string): ProtectedRange[] {
     if (newline === -1) break;
     lineStart = newline + 1;
   }
+  if (code !== null) ranges.push({ start: code.start, end: code.through, block: { containers: code.containers } });
   if (fence !== null) ranges.push({ start: fence.start, end: text.length, block: { containers: open }, open: true });
   if (html !== null) {
     ranges.push(
@@ -366,13 +381,14 @@ function protectedRanges(text: string): ProtectedRange[] {
 
 /**
  * Lines the reader sees no text in, each of which stops being what it is with a chip on it: a table's delimiter row, a
- * thematic break, a setext underline, a link's reference definition.
+ * thematic break, a setext underline, a link's reference definition, a quote's blank line.
  */
 const HOLDS_NOTHING: readonly RegExp[] = [
   /^\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/,
   THEMATIC_BREAK,
   /^=+[ \t]*$/,
   /^\[[^\]]+\]:/,
+  /^$/,
 ];
 const LINE_INDENT = /^[ \t]*(?:>[ \t]*)*/;
 const EMPHASIS_CHARS = new Set(['*', '_', '~']);
@@ -466,19 +482,12 @@ interface ChipPlace {
 const AT_TOP_LEVEL: BlockEnd = { containers: [] };
 
 const QUOTE_LINE = /^[ \t]*>/;
-const INDENTED_CODE_LINE = /^(?: {4}|\t)/;
 
 /** A chip in front of what the first line opens would turn it into text. */
 function opensABlock(text: string, ranges: readonly ProtectedRange[]): boolean {
   if (ranges[0]?.block && ranges[0].start === 0) return true;
   const line = text.slice(0, lineEndOf(text, 0));
-  return (
-    LIST_ITEM_LINE.test(line) ||
-    ONE_LINE_BLOCK.test(line) ||
-    QUOTE_LINE.test(line) ||
-    INDENTED_CODE_LINE.test(line) ||
-    holdsNothing(line)
-  );
+  return LIST_ITEM_LINE.test(line) || ONE_LINE_BLOCK.test(line) || QUOTE_LINE.test(line) || holdsNothing(line);
 }
 
 /** What may close around a sentence's last mark: a quote, a bracket, emphasis. */
@@ -563,7 +572,7 @@ function chipPlace(text: string, ranges: readonly ProtectedRange[], endIndex: nu
  */
 function needsABreakAfterTheChip(nextLine: string, containers: readonly Container[]): boolean {
   const line = withoutTabs(nextLine);
-  if (line.trim() === '' || LIST_ITEM_LINE.test(line)) return false;
+  if (BLANK_LINE_OF_QUOTE.test(line) || LIST_ITEM_LINE.test(line)) return false;
   const { matched, at } = continueContainers(line, containers);
   return matched < containers.length || spacesAt(line, at) >= 4 || holdsNothing(line);
 }

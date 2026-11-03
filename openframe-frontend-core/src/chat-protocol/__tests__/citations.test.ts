@@ -234,6 +234,58 @@ describe('textWithCitationChips', () => {
     });
   });
 
+  describe('indented code', () => {
+    it('moves past a block it lands inside, onto a line of its own', () => {
+      expect(drawn(marked('Text.\n\n    code. more^ code\n\nNext.', 'a'))).toBe(
+        `Text.\n\n    code. more code\n\n${chip(1)}\n\n\nNext.`,
+      );
+    });
+
+    it('holds its blank lines, and ends at its last line', () => {
+      expect(drawn(marked('Text.\n\n    a^\n\n    b\n\nNext.', 'a'))).toBe(
+        `Text.\n\n    a\n\n    b\n\n${chip(1)}\n\n\nNext.`,
+      );
+    });
+
+    it('in a list item: the chip stays in the item, under the code', () => {
+      expect(drawn(marked('- item\n\n      code^ here\n\n- next', 'a'))).toBe(
+        `- item\n\n      code here\n  ${chip(1)}\n\n- next`,
+      );
+    });
+
+    it('in a quote: the chip stays in the quote', () => {
+      expect(drawn(marked('> text\n>\n>     code^ here\n>\n> more', 'a'))).toBe(
+        `> text\n>\n>     code here\n> ${chip(1)}\n>\n> more`,
+      );
+    });
+
+    it('a list item`s own continuation is no code', () => {
+      expect(drawn(marked('- item\n\n    more^ text\n- next', 'a'))).toBe(`- item\n\n    more text ${chip(1)}\n- next`);
+      expect(drawn(marked('1. item\n\n    more^ text', 'a'))).toBe(`1. item\n\n    more text ${chip(1)}`);
+    });
+
+    it('an indented line under a paragraph is the paragraph', () => {
+      expect(drawn(marked('Text\n    more^ text', 'a'))).toBe(`Text\n    more text ${chip(1)}`);
+      expect(drawn(marked('- item\n      more^ text', 'a'))).toBe(`- item\n      more text ${chip(1)}`);
+    });
+
+    it('right after a heading or a fence it is code again', () => {
+      expect(drawn(marked('# T\n    code^ here', 'a'))).toBe(`# T\n    code here\n\n${chip(1)}`);
+      expect(drawn(marked('```\nx\n```\n    code^ here', 'a'))).toBe(`\`\`\`\nx\n\`\`\`\n    code here\n\n${chip(1)}`);
+    });
+
+    it.each([
+      ['alone', 'Text.\n\n    code. more code\n\nNext.'],
+      ['two runs', '    a\n\n    b\n\nNext.'],
+      ['in a list', '- item\n\n      code here\n\n- next'],
+      ['in an ordered list', '1. item\n\n       code here\n2. next'],
+      ['in a quote', '> text\n>\n>     code here\n>\n> more'],
+      ['a continuation that is no code', '- item\n\n    more text\n- next'],
+    ])('%s, at every place a citation can end', (_name, text) => {
+      expect(expectChipsToLeaveItAlone(text)).toBe(text.length + 1);
+    });
+  });
+
   describe('link', () => {
     it('moves past a link it lands inside the label of', () => {
       expect(drawn(marked('See [the ^guide](https://x.test/a) now.', 'a'))).toBe(
@@ -722,6 +774,12 @@ describe('a chip never breaks the block it lands near', () => {
       },
     );
 
+    it('a citation on a quote`s blank line goes back to the text above it', () => {
+      expect(drawn({ type: 'text', text: '> text\n>\n> more', citations: [cite('a', 8)] })).toBe(
+        `> text ${chip(1)}\n>\n> more`,
+      );
+    });
+
     it('steps over several', () => {
       const text = 'a\n\n---\n\n***';
       expect(drawn({ type: 'text', text, citations: [cite('a', text.length)] })).toBe(`a ${chip(1)}\n\n---\n\n***`);
@@ -805,6 +863,9 @@ describe('a chip never breaks the block it lands near', () => {
       '- item\n  ```\n  code\n  ```\n  more text\n- next',
       '> Install:\n> ```bash\n> npm i\n> ```\n> Then run it.',
       '- <div>html</div>\n- next',
+      'Before.\n\n    indented code\n\n    more of it\n\nAfter.',
+      '- item\n\n      code in an item\n\n- next',
+      '- item\n\n    continued, no code\n- next',
     ];
     let seed = 20261102;
     const next = (limit: number): number => {
