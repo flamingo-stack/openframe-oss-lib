@@ -780,6 +780,82 @@ describe('old tokens in a text', () => {
   });
 });
 
+describe('any split of a text builds what the whole text builds', () => {
+  /** The parts of a turn whose text arrives in these slices, on the old hub (`citations`) or on Mingo (none). */
+  function partsOfSlices(slices: readonly string[], citations: boolean): ChatPart[] {
+    const index = createOldSourceIndex();
+    index.register(OLD_SOURCES);
+    let id = 0;
+    const writer = createOldTextWriter(index, () => `t${++id}`, { citations });
+    const wire = createWireState();
+    const chunks = [...slices.flatMap(slice => writer.push(slice)), ...writer.close()];
+    return storablePartsOf(chunks.reduce<ChatPart[]>((parts, chunk) => applyChunk(parts, chunk, wire), []));
+  }
+
+  function sliced(text: string, next: (limit: number) => number): string[] {
+    const slices: string[] = [];
+    for (let at = 0; at < text.length;) {
+      const length = 1 + next(7);
+      slices.push(text.slice(at, at + length));
+      at += length;
+    }
+    return slices;
+  }
+
+  it('a closing backtick run the next slice extends is a fence, not a code span', () => {
+    const text = 'Note the stray ` here.\n```\n[card://faq:a]\n```\nDone.';
+    const whole = partsOfSlices([text], true);
+    expect(whole.some(part => part.type === 'data-record-cards')).toBe(false);
+    const cut = text.indexOf('```') + 1;
+    expect(partsOfSlices([text.slice(0, cut), text.slice(cut)], true)).toEqual(whole);
+  });
+
+  it('a `[N]` opening a line takes what follows it, whatever slice its spaces came in', () => {
+    const text = '\n\n [1]\n';
+    expect(partsOfSlices(['\n', '\n ', '[1', ']\n'], true)).toEqual(partsOfSlices([text], true));
+  });
+
+  it('at any seed', () => {
+    const fragments = [
+      'Plain words.',
+      'A stray ` backtick.',
+      '```\n[card://faq:a]\n[1]\n```',
+      '~~~js\n@device:1\n~~~',
+      '`code [1]` and ``a ` b``',
+      '[card://faq:a]',
+      'See [card://blog_post:1108] now.',
+      'Cited [1].',
+      'More [1, 2][3] here',
+      '[2]',
+      'Mention @device:64f0 here, user@host:1 no.',
+      'Broken [card://x] and [card://nope',
+      '[Link](card://faq:a)',
+      'array[1] stays and ([1]) goes',
+      'Escaped \\[1] and \\`x',
+      '| a [1] | b |\n|---|---|\n| c | d [2] |',
+      '> quoted [1]',
+      '- item [1]\n- item [2]',
+      'Emoji ✅ [1] 😀',
+    ];
+    const separators = ['\n\n', '\n', ' ', '', '\n\n ', '  '];
+    let seed = 20261102;
+    const next = (limit: number): number => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed % limit;
+    };
+    for (let round = 0; round < 600; round++) {
+      let text = next(4) === 0 ? separators[next(separators.length)] : '';
+      for (let count = 1 + next(4); count > 0; count--) {
+        text += fragments[next(fragments.length)] + separators[next(separators.length)];
+      }
+      for (const citations of [true, false]) {
+        const whole = partsOfSlices([text], citations);
+        expect({ text, parts: partsOfSlices(sliced(text, next), citations) }).toEqual({ text, parts: whole });
+      }
+    }
+  });
+});
+
 describe('old citations reach the chips they were', () => {
   const titled = { index: 1, name: 'A', documentType: 'blog_post', id: '1', externalUrl: 'https://www.flamingo.run/a' };
   const other = { index: 2, name: 'B', documentType: 'blog_post', id: '2', externalUrl: 'https://www.flamingo.run/b' };
@@ -1626,9 +1702,64 @@ describe('createMingoDecoder: the table', () => {
     );
     expect(mingoUserText('no token')).toBe('no token');
   });
+
+  it.each([
+    ['a code span', 'add `@get:JsonProperty` here'],
+    ['a fence', '```kotlin\n@get:JsonProperty("x")\n```'],
+    ['a tilde fence', '~~~\n@get:JsonProperty("x")\n~~~\n'],
+  ])('a mention pattern in %s stays code', (_name, text) => {
+    expect(mingoUserText(text)).toBe(text);
+  });
+
+  it('a person`s other brackets are their own: a mention beside them converts, the rest stays as typed', () => {
+    expect(mingoUserText('[card://faq:a] [1] (card://x:y) `a` @device:1\n')).toBe(
+      '[card://faq:a] [1] (card://x:y) `a` [@device:1](record://device/1)\n',
+    );
+  });
+
+  it('a stray backtick opens no code, so a mention after it converts', () => {
+    expect(mingoUserText('a ` b @device:1')).toBe('a ` b [@device:1](record://device/1)');
+  });
 });
 
 describe('messageOfStoredRow', () => {
+  it('reads what a row says about itself field by field, and never a key this client keeps for itself', () => {
+    const message = messageOfStoredRow({
+      id: 'a',
+      role: 'assistant',
+      metadata: {
+        seq: 3,
+        createdAt: '2026-11-02T10:00:00Z',
+        kind: 'approval_receipt',
+        aborted: true,
+        sourceCount: 2,
+        hidden: true,
+        progress: 'x',
+        usage: 'y',
+        author: { name: 'Mallory' },
+        streamSeq: 9,
+      },
+      parts: [{ type: 'text', text: 'a' }],
+    });
+    expect(message?.metadata).toEqual({
+      seq: 3,
+      createdAt: '2026-11-02T10:00:00Z',
+      kind: 'approval_receipt',
+      aborted: true,
+      sourceCount: 2,
+    });
+  });
+
+  it('leaves out a field of the wrong type and a kind it does not know', () => {
+    const message = messageOfStoredRow({
+      id: 'a',
+      role: 'assistant',
+      metadata: { seq: '3', createdAt: 123, kind: 'other', aborted: false, sourceCount: 'x' },
+      parts: [{ type: 'text', text: 'a' }],
+    });
+    expect(message?.metadata).toBeUndefined();
+  });
+
   it('reads each row of the history answer', () => {
     for (const row of HISTORY_RESPONSE.messages) expect(messageOfStoredRow(row)).toEqual(row);
   });

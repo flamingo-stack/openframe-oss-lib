@@ -293,8 +293,13 @@ const SPECIAL = /[\\`[@(\n]/g;
  *     its paragraph. A malformed one is removed. Inside code it stays as written;
  *   - `@marker:id` is a record link, its label the token itself until the host's chip resolves a name;
  *   - `[N]` standing apart from a word is removed, with the spaces before it, and reported at that place.
+ *
+ * `mentionsOnly` is a person's text: only the `@marker:id` of an old composer means anything there.
  */
-function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
+function createOldTextConverter(
+  labelOf: (uri: string) => string | undefined,
+  { mentionsOnly = false }: { mentionsOnly?: boolean } = {},
+): {
   push(slice: string): OldTextOp[];
   flush(): OldTextOp[];
 } {
@@ -302,6 +307,8 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
   /** Written, and held back while it could still be the spaces before a chip. */
   let carried = '';
   let previous = '';
+  /** The last character written that is no space or tab: what stands before a chip once its spaces are removed. */
+  let previousSolid = '';
   let lineBlank = true;
   let fence: { char: string; length: number } | null = null;
   let heldCards: string[] = [];
@@ -317,6 +324,8 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
       if (written === '') return;
       out += written;
       previous = written[written.length - 1];
+      const solid = written.replace(/[ \t]+$/, '');
+      if (solid !== '') previousSolid = solid[solid.length - 1];
       const newline = written.lastIndexOf('\n');
       const tail = newline === -1 ? written : written.slice(newline + 1);
       lineBlank = (newline !== -1 || lineBlank) && tail.trim() === '';
@@ -371,6 +380,8 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
           if (i + length === pending.length && !final) break scan;
           const close = closingBacktickRun(pending, i + length, length);
           if (close !== -1) {
+            // A closing run at the very end of what has arrived may yet grow into another length.
+            if (close + length === pending.length && !final) break scan;
             write(pending.slice(i, close + length));
             i = close + length;
             continue;
@@ -381,6 +392,11 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
           continue;
         }
         case '[': {
+          if (mentionsOnly) {
+            write('[');
+            i += 1;
+            continue;
+          }
           const head = pending.slice(i, i + CARD_OPEN.length);
           if (head.length < CARD_OPEN.length && CARD_OPEN.startsWith(head) && !final) break scan;
           if (head === CARD_OPEN) {
@@ -402,6 +418,7 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
                 ops.push({ kind: 'card', uri: recordHref(match[1], match[2]) });
                 i += match[0].length;
                 previous = '\n';
+                previousSolid = '\n';
                 lineBlank = true;
                 swallowingSpace = true;
                 continue;
@@ -423,7 +440,7 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
               if (!final && (after === '' || /^\[[\d,\s]*$/.test(after))) break scan;
               if (after === '' || CHIP_FOLLOW.test(after[0])) {
                 out = out.replace(/[ \t]+$/, '');
-                previous = out[out.length - 1] ?? previous;
+                previous = previousSolid;
                 emitText();
                 ops.push({ kind: 'cite', numbers: [...match[0].matchAll(/\d+/g)].map(n => Number(n[0])) });
                 i += match[0].length;
@@ -457,7 +474,7 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
           continue;
         }
         case '(': {
-          if (previous === ']') {
+          if (previous === ']' && !mentionsOnly) {
             const head = pending.slice(i, i + CARD_DESTINATION_OPEN.length);
             if (head.length < CARD_DESTINATION_OPEN.length && CARD_DESTINATION_OPEN.startsWith(head) && !final)
               break scan;
@@ -527,6 +544,7 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
       const ops = run(true);
       // The text part ended, and each is a markdown document of its own: nothing about this line carries over.
       previous = '';
+      previousSolid = '';
       lineBlank = true;
       fence = null;
       swallowingSpace = false;
@@ -535,15 +553,14 @@ function createOldTextConverter(labelOf: (uri: string) => string | undefined): {
   };
 }
 
-const MENTION_IN_TEXT = /(^|[^\w@/.=\-%&?#+:\\])@([a-zA-Z]+):([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g;
-
-/** A person's text with its `@marker:id` tokens as record links: an old composer wrote them, and they drew as chips. */
+/**
+ * A person's text with its `@marker:id` tokens as record links: an old composer wrote them, and they drew as chips. One
+ * inside code stays code.
+ */
 export function oldMentionsToRecordLinks(content: string): string {
   if (!content.includes('@')) return content;
-  return content.replace(
-    MENTION_IN_TEXT,
-    (_whole, lead: string, type: string, id: string) => `${lead}${recordLinkMarkdown({ type, id }, `@${type}:${id}`)}`,
-  );
+  const converter = createOldTextConverter(() => undefined, { mentionsOnly: true });
+  return [...converter.push(content), ...converter.flush()].map(op => (op.kind === 'text' ? op.text : '')).join('');
 }
 
 // =============================================================================

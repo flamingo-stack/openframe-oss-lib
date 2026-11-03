@@ -2,8 +2,8 @@
  * Pure helpers for the new-tab decision + anchor attribute pair used
  * by chat-rendered links.
  *
- * After the navigation unification (ChatCardLoader pre-resolves
- * `chatRef.url` via `resolveSourceRowCTA` + `resolveHrefForRuntime`,
+ * After the navigation unification (ChatCardLoader resolves `chatRef.url`
+ * via `resolveSourceRowCTA`, `navLinkTarget` resolves it for the runtime,
  * and `RecordNavWrap` handles every primary click via `onClickCapture`
  * → `executeNavigation`), the per-card wrapper only needs
  * `{href, target, rel}` on its inner `<a>` so modifier-click /

@@ -178,6 +178,16 @@ describe('a thinking turn has exactly ONE pending affordance', () => {
     expect(screen.queryAllByRole('status')).toHaveLength(1);
   });
 
+  it('does not take a turn of whitespace alone for one that has drawn something', () => {
+    const withWhitespace: ChatMessage[] = [
+      pending[0],
+      { id: 'a1', role: 'assistant', metadata: { author: { name: 'Mingo' } }, parts: [{ type: 'text', text: '\n\n' }] },
+    ];
+    render(<ChatMessageList dialogId="d" messages={withWhitespace} isTyping />);
+    expect(names()).toEqual(['Michael Assraf']);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+  });
+
   it('renders the assistant row when it carries a stage of the turn', () => {
     const withStage: ChatMessage[] = [
       pending[0],

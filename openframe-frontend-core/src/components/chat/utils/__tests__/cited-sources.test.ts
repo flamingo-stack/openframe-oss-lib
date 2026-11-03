@@ -42,6 +42,50 @@ const ids = (groups: ReturnType<typeof splitCitedSources>['cited']) =>
   groups.flatMap(group => group.rows.map(row => row.sourceId));
 
 describe('splitCitedSources', () => {
+  const cards = (...records: string[]): ChatPart => ({ type: 'data-record-cards', data: { records } });
+
+  it('a record shown only as a card is cited: a card has no number or link of its own to say so', () => {
+    const [a, b, c, d] = [blog('a'), blog('b'), blog('c'), blog('d')];
+    const { cited, uncited } = splitCitedSources([a, b, c, d, cards(d.sourceId), text('That guide covers it.')]);
+    expect(ids(cited)).toEqual([d.sourceId]);
+    expect(ids(uncited)).toEqual([a.sourceId, b.sourceId, c.sourceId]);
+    expect(cited[0].rows[0].number).toBeUndefined();
+  });
+
+  it('cards come after the citations and the links, in the order they show, each once', () => {
+    const [a, b, c, d] = [blog('a'), blog('b'), blog('c'), blog('d')];
+    const { cited } = splitCitedSources([
+      a,
+      b,
+      c,
+      d,
+      cards(d.sourceId, c.sourceId),
+      text('One. See [B](record://blog_post/b).', [citation(a, 4)]),
+      cards(c.sourceId, a.sourceId),
+    ]);
+    expect(ids(cited)).toEqual([a.sourceId, b.sourceId, d.sourceId, c.sourceId]);
+  });
+
+  it('a card reads a record in the spelling a source part gave it', () => {
+    const paren: ChatSourcePart = { ...blog('a'), sourceId: 'record://blog_post/a%28b%29' };
+    expect(ids(splitCitedSources([paren, cards('record://blog_post/a(b)')]).cited)).toEqual([paren.sourceId]);
+  });
+
+  it('a card of a record nothing retrieved names no row', () => {
+    const a = blog('a');
+    const { cited, uncited } = splitCitedSources([a, cards('record://blog_post/other')]);
+    expect(cited).toEqual([]);
+    expect(ids(uncited)).toEqual([a.sourceId]);
+  });
+
+  it('a card leaves a cited collection`s other records alone, as a citation does', () => {
+    const [a, b] = [blog('a'), blog('b')];
+    const posts = collection('blog_post', 'Blog posts');
+    const { cited, uncited } = splitCitedSources([a, b, posts, cards(b.sourceId), text('Two.', [citation(posts, 4)])]);
+    expect(ids(cited)).toEqual([b.sourceId]);
+    expect(ids(uncited)).toEqual([a.sourceId]);
+  });
+
   it('leaves nothing to draw for a message with no sources', () => {
     expect(splitCitedSources([text('Hello')])).toEqual({ cited: [], uncited: [] });
   });

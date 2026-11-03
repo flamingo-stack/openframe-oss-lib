@@ -15,6 +15,7 @@
 import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../components/chat/utils/auto-continuation-directive';
 import {
+  parseMessageMetadata,
   parseStoredParts,
   textOfParts,
   type ChatApprovalDescriptor,
@@ -177,6 +178,11 @@ export function mingoUserText(content: string): string {
   return oldMentionsToRecordLinks(content);
 }
 
+/** The approval a Mingo row or chunk names. TODO(CU-17tkuw61kfy): the old name goes with the old rows. */
+export function mingoApprovalRequestId(raw: Record<string, unknown>): string | undefined {
+  return nonEmpty(raw.approvalRequestId) ?? oldApprovalRequestId(raw);
+}
+
 export function createMingoDecoder(options: { now?: () => string } = {}): MingoDecoder {
   const now = options.now ?? (() => new Date().toISOString());
   // TODO(CU-17tkuw61kfy): the old source names, and the old tokens in a text, go with the old rows; text is then plain.
@@ -260,7 +266,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
 
   function approvalChunks(data: Record<string, unknown>, isRow: boolean, out: UiChunk[]): void {
     // TODO(CU-17tkuw61kfy): the old name.
-    const requestId = nonEmpty(data.approvalRequestId) ?? oldApprovalRequestId(data) ?? '';
+    const requestId = mingoApprovalRequestId(data) ?? '';
     const approvalType = nonEmpty(data.approvalType) ?? (isRow ? 'CLIENT' : 'USER');
     const calls = Array.isArray(data.toolCalls) ? data.toolCalls.filter(isRecord) : [];
     if (calls.length > 0) {
@@ -449,7 +455,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
 
       case MESSAGE_TYPE.APPROVAL_RESULT: {
         // TODO(CU-17tkuw61kfy): the old name.
-        const approvalId = nonEmpty(raw.approvalRequestId) ?? oldApprovalRequestId(raw);
+        const approvalId = mingoApprovalRequestId(raw);
         if (!approvalId) break;
         const approved = raw.approved === true;
         if (pendingSingleApproval === approvalId) pendingSingleApproval = null;
@@ -632,8 +638,8 @@ function isOldStoredRow(row: Record<string, unknown>): boolean {
 
 /**
  * The message a row of `GET /api/docs/chat/history` draws, or null for a role the chat does not show. A user row the
- * chat never shows (the approval placeholder, the server's auto-continuation directive) is `hidden`. `fallbackId` names
- * a row that has no id of its own (an old hub answers none).
+ * chat never shows (the approval placeholder, the server's auto-continuation directive) is `hidden`.
+ * TODO(CU-17tkuw61kfy): `fallbackId` names a row that has no id of its own (an old hub answers none).
  */
 export function messageOfStoredRow(row: unknown, fallbackId?: string): ChatMessage | null {
   if (!isRecord(row)) return null;
@@ -642,7 +648,7 @@ export function messageOfStoredRow(row: unknown, fallbackId?: string): ChatMessa
 
   const old = isOldStoredRow(row);
   const parts = old ? oldStoredRowToParts(row) : parseStoredParts(row.parts);
-  const stored = (isRecord(row.metadata) ? row.metadata : {}) as ChatMessageMetadata;
+  const stored = parseMessageMetadata(row.metadata, 'stored-row');
   const text = textOfParts(parts);
   const hidden =
     role === 'user' &&
@@ -652,6 +658,7 @@ export function messageOfStoredRow(row: unknown, fallbackId?: string): ChatMessa
     ...(old ? oldStoredRowMetadata(row) : stored),
     ...(hidden ? { hidden: true } : {}),
   };
+  // TODO(CU-17tkuw61kfy): an old row's sequence is a column of its own, and only an old row has no id.
   const seq = old ? row.seq : stored.seq;
   return {
     id: nonEmpty(row.id) ?? fallbackId ?? `hydrated-${String(seq ?? '')}`,

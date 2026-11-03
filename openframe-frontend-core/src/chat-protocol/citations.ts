@@ -16,7 +16,7 @@ import type { ChatCitation, ChatPart, ChatTextPart } from './chat-message';
 const CITATION_HREF_PREFIX = '#citation-';
 
 /** A chip's href. */
-export function citationHref(number: number): string {
+function citationHref(number: number): string {
   return `${CITATION_HREF_PREFIX}${number}`;
 }
 
@@ -56,38 +56,86 @@ interface ProtectedRange {
   start: number;
   /** Exclusive. */
   end: number;
-  /** A fence: a chip after it needs a line of its own, or the fence does not close. */
+  /** A fence or a raw HTML block: a chip after it needs a line of its own, or the block does not close. */
   block?: boolean;
-  /** A fence that never closes: nothing after it is outside it. */
+  /** One that never closes: nothing after it is outside it. */
   open?: boolean;
 }
 
 const FENCE_OPEN = /^[ \t]*(?:>[ \t]*)*(`{3,}|~{3,})(.*)$/;
 
-/** The fenced code blocks of a text. */
-function fenceRanges(text: string): ProtectedRange[] {
+/** What may stand before a raw HTML block on its line: a quote's or a list item's marker. */
+const HTML_LINE_START = String.raw`^[ \t]*(?:(?:>|[-*+]|\d{1,9}[.)])[ \t]+)*`;
+/** CommonMark's list of the tags that open a block whatever follows them on the line. */
+const HTML_BLOCK_NAMES =
+  'address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|' +
+  'fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|' +
+  'menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|' +
+  'track|ul';
+/**
+ * What opens a raw HTML block (CommonMark 4.6) and what ends it: a line matching `end`, or a blank line. An inline tag
+ * that opens a paragraph (`<kbd>K</kbd> opens it.`) is none of these.
+ */
+const HTML_BLOCKS: ReadonlyArray<{ opens: RegExp; end: RegExp | null }> = [
+  {
+    opens: new RegExp(String.raw`${HTML_LINE_START}<(?:script|pre|style|textarea)(?:[\s>]|$)`, 'i'),
+    end: /<\/(?:script|pre|style|textarea)>/i,
+  },
+  { opens: new RegExp(`${HTML_LINE_START}<!--`), end: /-->/ },
+  { opens: new RegExp(String.raw`${HTML_LINE_START}<\?`), end: /\?>/ },
+  { opens: new RegExp(String.raw`${HTML_LINE_START}<!\[CDATA\[`), end: /\]\]>/ },
+  { opens: new RegExp(`${HTML_LINE_START}<![a-zA-Z]`), end: />/ },
+  { opens: new RegExp(String.raw`${HTML_LINE_START}</?(?:${HTML_BLOCK_NAMES})(?:[\s/>]|$)`, 'i'), end: null },
+  { opens: new RegExp(String.raw`${HTML_LINE_START}</?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?/?>[ \t]*$`), end: null },
+];
+
+/** The fenced code blocks and raw HTML blocks of a text. */
+function blockRanges(text: string): ProtectedRange[] {
   const ranges: ProtectedRange[] = [];
-  let open: { char: string; length: number; start: number } | null = null;
+  let fence: { char: string; length: number; start: number } | null = null;
+  let html: { start: number; end: RegExp | null; through: number } | null = null;
   let lineStart = 0;
   while (lineStart <= text.length) {
     const newline = text.indexOf('\n', lineStart);
     const lineEnd = newline === -1 ? text.length : newline;
     const line = text.slice(lineStart, lineEnd);
-    const match = FENCE_OPEN.exec(line);
-    if (match) {
-      const char = match[1][0];
-      if (open === null) {
-        // A backtick fence's info string holds no backtick: that line is inline code instead.
-        if (char !== '`' || !match[2].includes('`')) open = { char, length: match[1].length, start: lineStart };
-      } else if (char === open.char && match[1].length >= open.length && match[2].trim() === '') {
-        ranges.push({ start: open.start, end: lineEnd, block: true });
-        open = null;
+    if (fence !== null) {
+      const match = FENCE_OPEN.exec(line);
+      if (match && match[1][0] === fence.char && match[1].length >= fence.length && match[2].trim() === '') {
+        ranges.push({ start: fence.start, end: lineEnd, block: true });
+        fence = null;
+      }
+    } else {
+      const match = html === null ? FENCE_OPEN.exec(line) : null;
+      // A backtick fence's info string holds no backtick: that line is inline code instead.
+      if (match && (match[1][0] !== '`' || !match[2].includes('`'))) {
+        fence = { char: match[1][0], length: match[1].length, start: lineStart };
+      } else {
+        if (html === null) {
+          const opened = HTML_BLOCKS.find(block => block.opens.test(line));
+          if (opened) html = { start: lineStart, end: opened.end, through: lineEnd };
+        }
+        if (html !== null) {
+          if (html.end === null ? line.trim() === '' : html.end.test(line)) {
+            ranges.push({ start: html.start, end: html.end === null ? html.through : lineEnd, block: true });
+            html = null;
+          } else {
+            html.through = lineEnd;
+          }
+        }
       }
     }
     if (newline === -1) break;
     lineStart = newline + 1;
   }
-  if (open !== null) ranges.push({ start: open.start, end: text.length, block: true, open: true });
+  if (fence !== null) ranges.push({ start: fence.start, end: text.length, block: true, open: true });
+  if (html !== null) {
+    ranges.push(
+      html.end === null
+        ? { start: html.start, end: html.through, block: true }
+        : { start: html.start, end: text.length, block: true, open: true },
+    );
+  }
   return ranges;
 }
 
@@ -182,18 +230,27 @@ function inlineRanges(text: string, from: number, to: number): ProtectedRange[] 
 
 /** Everything a chip may not land inside, in text order. */
 function protectedRanges(text: string): ProtectedRange[] {
-  const fences = fenceRanges(text);
   const ranges: ProtectedRange[] = [];
   let at = 0;
-  for (const fence of fences) {
-    ranges.push(...inlineRanges(text, at, fence.start), fence);
-    at = fence.end;
+  for (const block of blockRanges(text)) {
+    ranges.push(...inlineRanges(text, at, block.start), block);
+    at = block.end;
   }
   ranges.push(...inlineRanges(text, at, text.length));
   return ranges;
 }
 
-const TABLE_DELIMITER_ROW = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+/**
+ * Lines the reader sees no text in, each of which stops being what it is with a chip on it: a table's delimiter row, a
+ * thematic break, a setext underline, a link's reference definition.
+ */
+const HOLDS_NOTHING: readonly RegExp[] = [
+  /^\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/,
+  /^(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/,
+  /^=+[ \t]*$/,
+  /^\[[^\]]+\]:/,
+];
+const LINE_INDENT = /^[ \t]*(?:>[ \t]*)*/;
 const EMPHASIS_CHARS = new Set(['*', '_', '~']);
 
 function lineStartOf(text: string, position: number): number {
@@ -220,19 +277,37 @@ function pastClosingEmphasis(text: string, position: number): number {
   return after === undefined || /[\s.,;:!?)\]]/.test(after) ? end : position;
 }
 
-/** A chip in a table stays in its cell: text past a row's closing pipe is an extra cell, which a table does not draw. */
-function insideTableCell(text: string, position: number): number {
+function holdsNothing(line: string): boolean {
+  const body = line.replace(LINE_INDENT, '');
+  return HOLDS_NOTHING.some(pattern => pattern.test(body));
+}
+
+/** The nearest place at or above `position` on a line a chip can sit on, or null when every line up there holds nothing. */
+function placeOnAHoldingLine(text: string, position: number): number | null {
   let at = position;
-  const lineStart = lineStartOf(text, at);
-  const lineEnd = lineEndOf(text, at);
-  // A table's delimiter row, or a thematic break, holds nothing: the line before it does.
-  if (lineStart > 0 && TABLE_DELIMITER_ROW.test(text.slice(lineStart, lineEnd))) at = backOverSpace(text, lineStart);
-  const start = lineStartOf(text, at);
-  const line = text.slice(start, lineEndOf(text, at)).trimStart();
-  if (line.startsWith('|') && text[at - 1] === '|' && text.slice(at, lineEndOf(text, at)).trim() === '') {
-    at = backOverSpace(text, at - 1);
+  while (at > 0) {
+    const start = lineStartOf(text, at);
+    if (!holdsNothing(text.slice(start, lineEndOf(text, at)))) return at;
+    at = backOverSpace(text, start);
   }
-  return at;
+  return null;
+}
+
+const CLOSING_HEADING_HASHES = /^[ \t]*(?:>[ \t]*)*#{1,6}[ \t].*?([ \t]+#+)$/;
+const TRAILING_BACKSLASHES = /\\+$/;
+
+/**
+ * What has to stay last on its line stays last: past a table row's closing pipe a chip is an extra cell, which a table
+ * does not draw; past a heading's closing hashes they are text; past a backslash it is no hard break.
+ */
+function beforeWhatEndsTheLine(text: string, position: number): number {
+  if (text.slice(position, lineEndOf(text, position)).trim() !== '') return position;
+  const line = text.slice(lineStartOf(text, position), position);
+  if (line.trimStart().startsWith('|') && line.endsWith('|')) return backOverSpace(text, position - 1);
+  const hashes = CLOSING_HEADING_HASHES.exec(line);
+  if (hashes) return position - hashes[1].length;
+  const backslashes = TRAILING_BACKSLASHES.exec(line);
+  return backslashes && backslashes[0].length % 2 === 1 ? position - 1 : position;
 }
 
 const LIST_ITEM_LINE = /^[ \t]*(?:>[ \t]*)*(?:[-*+][ \t]|\d{1,9}[.)][ \t])/;
@@ -263,9 +338,28 @@ interface ChipPlace {
   block: boolean;
 }
 
+const QUOTE_LINE = /^[ \t]*>/;
+const INDENTED_CODE_LINE = /^(?: {4}|\t)/;
+
+/** A chip in front of what the first line opens would turn it into text. */
+function opensABlock(text: string, ranges: readonly ProtectedRange[]): boolean {
+  if (ranges[0]?.block && ranges[0].start === 0) return true;
+  const line = text.slice(0, lineEndOf(text, 0));
+  return (
+    LIST_ITEM_LINE.test(line) ||
+    ONE_LINE_BLOCK.test(line) ||
+    QUOTE_LINE.test(line) ||
+    INDENTED_CODE_LINE.test(line) ||
+    holdsNothing(line)
+  );
+}
+
 /** Where a citation's chip goes: never inside what its markdown would break. Null when no place in the text is safe. */
 function chipPlace(text: string, ranges: readonly ProtectedRange[], endIndex: number): ChipPlace | null {
-  let position = backOverSpace(text, Math.min(endIndex, text.length));
+  const cited = backOverSpace(text, Math.min(endIndex, text.length));
+  if (cited === 0) return { position: 0, block: opensABlock(text, ranges) };
+  let position = placeOnAHoldingLine(text, cited);
+  if (position === null) return { position: lineEndOf(text, cited), block: true };
   for (const range of ranges) {
     if (position <= range.start) break;
     if (range.open) return null;
@@ -276,7 +370,7 @@ function chipPlace(text: string, ranges: readonly ProtectedRange[], endIndex: nu
     }
     if (position === range.end && range.block) return { position, block: true };
   }
-  return { position: insideTableCell(text, pastClosingEmphasis(text, position)), block: false };
+  return { position: beforeWhatEndsTheLine(text, pastClosingEmphasis(text, position)), block: false };
 }
 
 /**
@@ -318,12 +412,12 @@ export function textWithCitationChips(part: ChatTextPart, numbers: ReadonlyMap<s
   for (const [position, insert] of [...inserts].sort(([a], [b]) => a - b)) {
     out += text.slice(at, position);
     const chips = insert.numbers.map(n => `[${n}](${citationHref(n)})`).join(' ');
-    if (insert.block) {
+    if (position === 0) {
+      // Nothing before it: what separates it goes after it.
+      out += insert.block ? `${chips}\n\n` : `${chips} `;
+    } else if (insert.block) {
       out += `\n\n${chips}`;
       if (position < text.length) out += '\n';
-    } else if (position === 0) {
-      // Nothing before it: the space goes after it.
-      out += `${chips} `;
     } else {
       out += ` ${chips}`;
     }

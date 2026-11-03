@@ -127,17 +127,9 @@ function incompleteStateOfParts(parts: readonly ChatPart[]): IncompleteMessageSt
   return agentBusy ? { agentBusy: true } : {};
 }
 
-/** The state of the last historical assistant message, when it is unfinished. */
-export function extractIncompleteMessageState(
-  lastMessage: ChatMessage | undefined,
-): IncompleteMessageState | undefined {
-  if (!lastMessage || lastMessage.role !== 'assistant') return undefined;
-  return incompleteStateOfParts(lastMessage.parts);
-}
-
 /**
- * THREAD-level generalization of `extractIncompleteMessageState`: look at the TRAILING RUN of consecutive assistant
- * messages (not just the very last row), flatten it to one part list, and ask whether that tail is unfinished.
+ * Is a thread's tail unfinished? Looks at the TRAILING RUN of consecutive assistant messages (not just the very last row),
+ * flattened to one part list.
  *
  * Why the run and not the last row: the backend can split one logical turn across several assistant messages (a preamble
  * bubble, then the approval card, then the continuation). The unfinished artifact (a pending approval, an EXECUTING_TOOL

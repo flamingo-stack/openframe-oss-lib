@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
+import { mingoApprovalRequestId } from '../../../chat-protocol/message-decoder';
 import {
   type ChunkData,
   type BufferedChunk,
@@ -28,12 +29,7 @@ function makeBatchDedupKey(item: BufferedChunk): string {
   const text = typeof item.chunk.text === 'string' ? item.chunk.text : '';
   const integratedToolType = typeof item.chunk.integratedToolType === 'string' ? item.chunk.integratedToolType : '';
   const toolFunction = typeof item.chunk.toolFunction === 'string' ? item.chunk.toolFunction : '';
-  const approvalRequestId =
-    typeof item.chunk.approvalRequestId === 'string'
-      ? item.chunk.approvalRequestId
-      : typeof item.chunk.approval_request_id === 'string'
-        ? item.chunk.approval_request_id
-        : '';
+  const approvalRequestId = mingoApprovalRequestId(item.chunk) ?? '';
 
   return `${item.messageType}:${seq}:${type}:${text}:${integratedToolType}:${toolFunction}:${approvalRequestId}`;
 }

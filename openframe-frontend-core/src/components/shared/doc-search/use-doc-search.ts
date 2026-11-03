@@ -110,10 +110,9 @@ function readString(source: Record<string, unknown>, key: string): string | unde
  *
  * `Response.json()` is typed `any`, so the rows used to reach
  * `mapDocSearchResults` through an `as DocSearchResult[]` that asserted a
- * shape nothing had checked. `path` and `name` are the two that bite: the
- * mapper uses `path` as the row's React `id` and `name` as its title, so a row
- * missing either renders as a blank, key-colliding entry in the dropdown.
- * Such rows are dropped; the rest of the result set still lists.
+ * shape nothing had checked. `title` is the one that bites: a row with none
+ * renders as a blank entry in the dropdown. Such rows are dropped; the rest of
+ * the result set still lists.
  *
  * Returns null when the envelope itself is not a successful result set.
  */

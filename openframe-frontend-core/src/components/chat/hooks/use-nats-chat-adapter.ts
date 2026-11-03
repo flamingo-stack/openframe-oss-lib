@@ -569,7 +569,7 @@ export function useNatsChatAdapter(
             // coming to consume the flag — arming it anyway would hand the
             // adoption to the NEXT genuine turn, which would overwrite the
             // partial bubble instead of opening a fresh one.
-            // `extractIncompleteTailState` (not the single-row extractor):
+            // `extractIncompleteTailState` reads the whole trailing run:
             // one logical turn can span several trailing assistant bubbles,
             // so the unfinished artifact may sit above the last row.
             r.armAdoptTrailingAssistant(isBufferingActive() && extractIncompleteTailState(processed) !== undefined);

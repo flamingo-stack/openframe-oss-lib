@@ -11,7 +11,7 @@ export { approvalDisplaysInline } from './approval-display';
 export { processHistoricalMessages, type ProcessHistoricalMessagesResult } from './process-historical-messages';
 
 // Incomplete message state extraction
-export { extractIncompleteMessageState, extractIncompleteTailState } from './extract-incomplete-message-state';
+export { extractIncompleteTailState } from './extract-incomplete-message-state';
 
 // History <-> realtime reconciliation
 export {

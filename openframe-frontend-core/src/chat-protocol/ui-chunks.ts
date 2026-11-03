@@ -14,6 +14,7 @@
 
 import {
   parseCitations,
+  parseMessageMetadata,
   type ChatApprovalDescriptor,
   type ChatAskPart,
   type ChatCitation,
@@ -293,7 +294,7 @@ function isDataPayload(type: string, data: Record<string, unknown>): boolean {
  * One chunk off the wire, or null for what this build cannot read: an unknown type, a missing required field. A backend
  * that adds a chunk type must not break the stream, so what cannot be read is dropped rather than thrown.
  */
-export function parseUiChunk(value: unknown): UiChunk | null {
+function parseUiChunk(value: unknown): UiChunk | null {
   if (!isRecord(value) || typeof value.type !== 'string') return null;
   const { type } = value;
   if (type.startsWith('data-')) {
@@ -308,6 +309,8 @@ export function parseUiChunk(value: unknown): UiChunk | null {
   for (const key of ['messageMetadata', 'toolMetadata', 'approvalDescriptor']) {
     if (chunk[key] !== undefined && !isRecord(chunk[key])) delete chunk[key];
   }
+  if (chunk.messageMetadata !== undefined)
+    chunk.messageMetadata = parseMessageMetadata(chunk.messageMetadata, 'stream');
   if (type === 'text-end' && chunk.citations !== undefined) {
     const citations = parseCitations(chunk.citations);
     if (citations.length > 0) chunk.citations = citations;

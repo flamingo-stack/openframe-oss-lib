@@ -1528,7 +1528,7 @@ function EmbeddableChatInner({
   // a different identity source. Overlaying the current viewer's identity there
   // stamped the viewer's photo onto EVERY user's bubble (the reported bug). When
   // not in guide mode these stay `undefined`, so Mingo bubbles use only their
-  // host-supplied `m.name`/`m.avatar` (or the generic 'You' / no-avatar default).
+  // host-supplied `metadata.author` (or the generic 'You' / no-avatar default).
   const guideUserName =
     activeMode === 'guide'
       ? [identityUser?.firstName, identityUser?.lastName].filter(Boolean).join(' ').trim() ||

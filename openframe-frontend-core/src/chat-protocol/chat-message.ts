@@ -569,7 +569,7 @@ export function parseCitations(raw: unknown): ChatCitation[] {
 }
 
 /** One stored part, or null when it is not one a row may hold. */
-export function parseStoredPart(raw: unknown): ChatPart | null {
+function parseStoredPart(raw: unknown): ChatPart | null {
   if (!isRecord(raw)) return null;
   switch (raw.type) {
     case 'text': {
@@ -621,4 +621,95 @@ export function parseStoredParts(raw: unknown): ChatPart[] {
     if (part) parts.push(part);
   }
   return parts;
+}
+
+// =============================================================================
+// Reading metadata
+// =============================================================================
+
+/** Reads one field: its value when it has the type the field holds, else undefined. */
+type FieldReader = (value: unknown) => unknown;
+
+const stringField: FieldReader = value => (typeof value === 'string' ? value : undefined);
+const numberField: FieldReader = value => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
+const booleanField: FieldReader = value => (typeof value === 'boolean' ? value : undefined);
+const recordField: FieldReader = value => (isRecord(value) ? value : undefined);
+
+/** The fields of `raw` these readers accept. Anything else a wire sends is left out. */
+function readFields(raw: Record<string, unknown>, readers: Record<string, FieldReader>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, read] of Object.entries(readers)) {
+    const value = read(raw[key]);
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+const usageField: FieldReader = value => {
+  if (!isRecord(value)) return undefined;
+  return readFields(value, {
+    inputTokens: numberField,
+    outputTokens: numberField,
+    totalTokens: numberField,
+    inputTokenDetails: details =>
+      isRecord(details)
+        ? readFields(details, {
+            noCacheTokens: numberField,
+            cacheReadTokens: numberField,
+            cacheWriteTokens: numberField,
+          })
+        : undefined,
+    hit_rate_pct: numberField,
+    telemetry: telemetry => {
+      if (!isRecord(telemetry)) return undefined;
+      const { cards, citations, sentences, answerLen } = telemetry;
+      return [cards, citations, sentences, answerLen].every(count => numberField(count) !== undefined)
+        ? { cards, citations, sentences, answerLen }
+        : undefined;
+    },
+    breakdown: recordField,
+    debug: recordField,
+    stop_reason: stringField,
+    stop_detail: stringField,
+  });
+};
+
+const routingField: FieldReader = value => {
+  if (!isRecord(value) || typeof value.complexity !== 'string') return undefined;
+  const { thinkingBudget } = value;
+  return {
+    complexity: value.complexity,
+    ...readFields(value, { model: stringField }),
+    ...(thinkingBudget === null || numberField(thinkingBudget) !== undefined ? { thinkingBudget } : {}),
+  };
+};
+
+/**
+ * What a path may say about its message, and nothing else: `hidden`, `progress`, `author` and the rest are this client's
+ * own and are never read off a wire.
+ */
+const METADATA_FIELDS: Record<'stored-row' | 'stream', Record<string, FieldReader>> = {
+  'stored-row': {
+    seq: numberField,
+    createdAt: stringField,
+    kind: value => (value === 'approval_receipt' ? value : undefined),
+    aborted: value => (value === true ? value : undefined),
+    sourceCount: numberField,
+  },
+  stream: {
+    conversationId: stringField,
+    model: stringField,
+    modelLabel: stringField,
+    provider: stringField,
+    contextWindowMaxTokens: numberField,
+    scrollAnchor: stringField,
+    routing: routingField,
+    willAutoContinue: booleanField,
+    usage: usageField,
+  },
+};
+
+/** A message's metadata as a stored row or a stream chunk states it, field by field. */
+export function parseMessageMetadata(raw: unknown, path: 'stored-row' | 'stream'): ChatMessageMetadata {
+  return isRecord(raw) ? readFields(raw, METADATA_FIELDS[path]) : {};
 }

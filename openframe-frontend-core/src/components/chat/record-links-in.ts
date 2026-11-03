@@ -30,7 +30,7 @@ function textOf(node: Nodes): string {
 }
 
 /** Every record link `markdown` draws, repeats included. */
-export function recordLinksIn(markdown: string): DrawnRecordLink[] {
+function recordLinksIn(markdown: string): DrawnRecordLink[] {
   if (!markdown || !markdown.includes('record://')) return [];
   parser ??= createParser();
   const tree = parser.runSync(parser.parse(markdown), markdown) as Root;

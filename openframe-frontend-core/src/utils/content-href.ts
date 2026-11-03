@@ -228,10 +228,10 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
       // `https://hub/releases/` → `'releases'`), fall back to `identifier` instead
       // of emitting a nonsensical `/releases/releases`.
       //
-      // `slug` (the explicit hint) sits between the two: a Mingo fetch-mode card
-      // has NO externalUrl to recover from but DOES know the row's slug once it
-      // loads, and its `identifier` must stay the primary key so `overrides`
-      // still deep-link correctly.
+      // TODO(CU-17tkuw61kfy): `slug` (the explicit hint) sits between the two: an old
+      // row's fetch-mode card has NO externalUrl to recover from but DOES know the
+      // row's slug once it loads, and its `identifier` must stay the primary key so
+      // `overrides` still deep-link correctly.
       //
       // `slugIsIdentifier`: the record's id IS its slug (a doc's tree path), and the url's last segment would lose it.
       if (opts.slugIsIdentifier?.has(type)) {

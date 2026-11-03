@@ -9,10 +9,12 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChatPart } from '../../../chat-protocol/chat-message';
+import { messageOfStoredRow } from '../../../chat-protocol/message-decoder';
 import { recordHref } from '../../../chat-protocol/record-link';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import type { ChatRef } from '../chat-ref.types';
+import { processHistoricalMessages } from '../utils/process-historical-messages';
 
 function NavLinkAnchor({ href, children }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   return <a href={href}>{children}</a>;
@@ -114,6 +116,77 @@ describe('ChatMessageEnhanced — record links', () => {
       { type: 'onboarding_guide', id: 'mac-guide' },
     ]);
     expect(within(screen.getByTestId('chat-record-cards')).getAllByTestId('card-mac-guide')).toHaveLength(1);
+  });
+
+  describe('one card per record in a message, where it first shows', () => {
+    const card = (id: string): ChatPart => ({
+      type: 'data-record-cards',
+      data: { records: [`record://blog_post/${id}`] },
+    });
+    const draw = (parts: ChatPart[]) =>
+      render(<ChatMessageEnhanced role="assistant" parts={parts} renderEntityCard={renderEntityCard} />);
+
+    it('across parts, and a part left with nothing draws nothing', () => {
+      draw([card('7'), { type: 'text', text: 'Between.' }, card('7'), { type: 'text', text: 'End.' }]);
+      expect(screen.getAllByTestId('card-7')).toHaveLength(1);
+      expect(screen.getAllByTestId('chat-record-cards')).toHaveLength(1);
+    });
+
+    it('a part keeps the records it shows first', () => {
+      draw([
+        card('7'),
+        { type: 'text', text: 'Between.' },
+        {
+          type: 'data-record-cards',
+          data: { records: ['record://blog_post/7', 'record://blog_post/8'] },
+        },
+      ]);
+      expect(screen.getAllByTestId('card-7')).toHaveLength(1);
+      expect(screen.getAllByTestId('card-8')).toHaveLength(1);
+    });
+
+    it('an old Mingo row that names a record twice', () => {
+      const { messages } = processHistoricalMessages([
+        {
+          id: 'a1',
+          createdAt: '2026-01-01T00:00:01Z',
+          owner: { type: 'ASSISTANT' },
+          messageData: [
+            { type: 'TEXT', text: 'See [card://blog_post:7] first.\n\nMore.\n\n[card://blog_post:7]\n\nEnd.' },
+          ],
+        },
+      ] as never);
+      draw(messages[0].parts);
+      expect(screen.getAllByTestId('card-7')).toHaveLength(1);
+    });
+
+    it('an old hub`s row that names a record twice', () => {
+      const message = messageOfStoredRow({
+        seq: 2,
+        role: 'assistant',
+        content: '[card://blog_post:7]\n\nIntro.\n\n[card://blog_post:7]\n',
+        sources: [],
+      });
+      draw(message?.parts ?? []);
+      expect(screen.getAllByTestId('card-7')).toHaveLength(1);
+    });
+  });
+
+  it('whitespace between two cards draws no block of its own', () => {
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        parts={[
+          { type: 'data-record-cards', data: { records: ['record://blog_post/1'] } },
+          { type: 'text', text: '\n\n' },
+          { type: 'data-record-cards', data: { records: ['record://blog_post/2'] } },
+        ]}
+        renderEntityCard={renderEntityCard}
+      />,
+    );
+    expect(screen.getByTestId('card-1')).toBeTruthy();
+    expect(screen.getByTestId('card-2')).toBeTruthy();
+    expect(screen.queryByRole('article')).toBeNull();
   });
 
   it('draws no card for a type the chat has none for, even in the part', () => {
@@ -246,6 +319,52 @@ describe('ChatMessageEnhanced — citations', () => {
     expect(chip.getAttribute('href')).toBe(source.url);
     expect(chip.getAttribute('title')).toBe('Pricing post');
     expect(chip.parentElement?.textContent).toBe('Priced per device. [1] Second sentence.');
+  });
+
+  it('an old row opening with its `[N]` keeps the block that follows it, with the chip before it', () => {
+    const message = messageOfStoredRow({
+      seq: 1,
+      role: 'assistant',
+      content: '[1]\n\n# Heading\n\nBody',
+      sources: [{ index: 1, name: 'A', documentType: 'blog_post', id: '1', externalUrl: 'https://x.test/a' }],
+    });
+    render(
+      <ChatRuntimeContext.Provider value={runtime}>
+        <ChatMessageEnhanced role="assistant" parts={message?.parts ?? []} NavLinkAnchor={NavLinkAnchor} />
+      </ChatRuntimeContext.Provider>,
+    );
+    expect(screen.getByRole('heading', { name: 'Heading' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '[1]' })).toBeTruthy();
+  });
+
+  it.each([
+    ['a thematic break', 'a\n\n***\n\nb', 8],
+    ['a raw HTML block', '<div>block</div>\n\nb', 16],
+  ])('draws a chip after %s as a chip, and leaves the block a block', (_name, text, endIndex) => {
+    render(
+      <ChatRuntimeContext.Provider value={runtime}>
+        <ChatMessageEnhanced
+          role="assistant"
+          parts={[
+            source,
+            {
+              type: 'text',
+              text,
+              citations: [
+                {
+                  source: { type: 'source', sourceType: 'url', id: source.sourceId, url: source.url },
+                  endIndex,
+                },
+              ],
+            },
+          ]}
+          NavLinkAnchor={NavLinkAnchor}
+        />
+      </ChatRuntimeContext.Provider>,
+    );
+    expect(screen.getByRole('link', { name: '[1]' })).toBeTruthy();
+    expect(screen.queryByText(/citation-1/)).toBeNull();
+    expect(screen.queryByText(/\*\*\*/)).toBeNull();
   });
 
   it('draws the same chip while the message is still streaming', () => {

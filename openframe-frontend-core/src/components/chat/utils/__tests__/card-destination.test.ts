@@ -222,6 +222,26 @@ describe('legacyCardDestination', () => {
     expect(out).toMatchObject({ url: '/guides/mac', hostRoute: true });
   });
 
+  it('a relative url an old row answered, which the composer hands back, is the content host’s page too', () => {
+    const destination = resolveCardDestination({
+      chatRef: bare('vendor', 'v'),
+      item: { url: '/vendors/v' },
+      ctx: { composeContentUrl: appCompose },
+      composeContentUrl: appCompose,
+    });
+    expect(destination).toEqual({ url: '/vendors/v', targetPlatform: null, path: null, hostRoute: false });
+  });
+
+  it('a relative url the composer turned into a route of its own is one', () => {
+    const destination = resolveCardDestination({
+      chatRef: bare('product_release', 'r'),
+      item: { url: '/releases/r' },
+      ctx: { composeContentUrl: appCompose },
+      composeContentUrl: appCompose,
+    });
+    expect(destination).toMatchObject({ url: '/help-center/releases/r', hostRoute: true });
+  });
+
   it('a relative `fallbackHref` is the content host’s page, never a route of this host', () => {
     const out = resolveCardDestination({
       chatRef: bare('faq', '7'),

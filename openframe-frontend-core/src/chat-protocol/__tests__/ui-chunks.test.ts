@@ -9,7 +9,6 @@ import {
   encodeUiChunk,
   encodeUiDone,
   finishReasonOfStop,
-  parseUiChunk,
   readUiChunks,
   UI_MESSAGE_STREAM_HEADERS,
   type UiChunk,
@@ -264,7 +263,11 @@ describe('readUiChunks', () => {
   });
 });
 
-describe('parseUiChunk', () => {
+describe('what a chunk may say', () => {
+  /** One value through the reader: the chunk it became, or null when it was dropped. */
+  const parseUiChunk = (value: unknown): UiChunk | null =>
+    createUiChunkDecoder().push(encoder.encode(`data: ${JSON.stringify(value)}\n\n`))[0] ?? null;
+
   it.each([
     ['not an object', 'text'],
     ['no type', { id: 't1' }],
@@ -303,10 +306,90 @@ describe('parseUiChunk', () => {
 
   it('reads an optional object that is not one as absent', () => {
     expect(parseUiChunk({ type: 'finish', messageMetadata: 'x' })).toEqual({ type: 'finish' });
+    expect(parseUiChunk({ type: 'start', messageMetadata: 7 })).toEqual({ type: 'start' });
     expect(parseUiChunk({ type: 'tool-output-available', toolCallId: 'x', output: 1, toolMetadata: 'y' })).toEqual({
       type: 'tool-output-available',
       toolCallId: 'x',
       output: 1,
+    });
+  });
+
+  describe('metadata, field by field', () => {
+    const metadataOf = (messageMetadata: unknown) => {
+      const chunk = parseUiChunk({ type: 'message-metadata', messageMetadata });
+      return chunk?.type === 'message-metadata' ? chunk.messageMetadata : null;
+    };
+
+    it('keeps what the stream states, with its types', () => {
+      const stated = {
+        conversationId: 'c',
+        model: 'm',
+        modelLabel: 'M',
+        provider: 'anthropic',
+        contextWindowMaxTokens: 200000,
+        scrollAnchor: 'top',
+        routing: { complexity: 'default', model: 'm', thinkingBudget: null },
+        willAutoContinue: false,
+        usage: {
+          inputTokens: 1,
+          outputTokens: 2,
+          totalTokens: 3,
+          inputTokenDetails: { noCacheTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 },
+          hit_rate_pct: 10,
+          telemetry: { cards: 1, citations: 2, sentences: 3, answerLen: 4 },
+          breakdown: { any: 'shape' },
+          debug: { any: 'shape' },
+          stop_reason: 'end_turn',
+          stop_detail: 'x',
+        },
+      };
+      expect(metadataOf(stated)).toEqual(stated);
+    });
+
+    it('never reads this client`s own keys, or a stored row`s, off a stream', () => {
+      expect(
+        metadataOf({
+          hidden: true,
+          progress: 'x',
+          author: { name: 'Mallory' },
+          contextItems: [],
+          streamSeq: 9,
+          finishReason: 'stop',
+          seq: 1,
+          createdAt: 'now',
+          kind: 'approval_receipt',
+          aborted: true,
+          sourceCount: 1,
+          unknown: 1,
+        }),
+      ).toEqual({});
+    });
+
+    it('leaves out a field of the wrong type and keeps the rest', () => {
+      expect(metadataOf({ conversationId: 7, model: 'm', willAutoContinue: 'yes', usage: 'y' })).toEqual({
+        model: 'm',
+      });
+      expect(metadataOf({ routing: { model: 'm' } })).toEqual({});
+      expect(metadataOf({ routing: { complexity: 'c', thinkingBudget: 'x' } })).toEqual({
+        routing: { complexity: 'c' },
+      });
+      expect(
+        metadataOf({
+          usage: { inputTokens: '1', outputTokens: 2, telemetry: { cards: 1 }, inputTokenDetails: 'x', stop_reason: 3 },
+        }),
+      ).toEqual({ usage: { outputTokens: 2 } });
+    });
+
+    it('holds on a finish and a start too', () => {
+      expect(parseUiChunk({ type: 'finish', messageMetadata: { progress: 'x', usage: { inputTokens: 1 } } })).toEqual({
+        type: 'finish',
+        messageMetadata: { usage: { inputTokens: 1 } },
+      });
+      expect(parseUiChunk({ type: 'start', messageId: 'a', messageMetadata: { hidden: true } })).toEqual({
+        type: 'start',
+        messageId: 'a',
+        messageMetadata: {},
+      });
     });
   });
 });

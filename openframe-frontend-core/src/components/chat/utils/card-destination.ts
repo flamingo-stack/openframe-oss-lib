@@ -22,7 +22,7 @@ export interface CardDestination {
   /** Doc-tree path, from the ref or the fetched row. The click router uses it for in-app doc navigation. */
   path: string | null;
   /**
-   * The url is a route of the host's own. The server's url is always absolute, so a relative href out of the composer
+   * The url is a route of the host's own. The server's url is always absolute, so a relative href the composer made of it
    * can only be a route the host claimed.
    */
   hostRoute: boolean;
@@ -78,7 +78,14 @@ export function resolveCardDestination<Item = unknown>({
     ctx,
   );
   if (cta.href) {
-    return { url: cta.href, targetPlatform: cta.targetPlatform, path, hostRoute: isRelativeHref(cta.href) };
+    return {
+      url: cta.href,
+      targetPlatform: cta.targetPlatform,
+      path,
+      // TODO(CU-17tkuw61kfy): an old hub's row may answer a relative url, which a composer hands back as it came: the
+      // content host's page, never a route of this host. Once every url is absolute, the first half alone.
+      hostRoute: isRelativeHref(cta.href) && cta.href !== url,
+    };
   }
   return legacyCardDestination({ chatRef, item, entry, composeContentUrl, path });
 }

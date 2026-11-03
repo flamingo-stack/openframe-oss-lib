@@ -33,9 +33,10 @@ function isDrawnAsRow(sourceId: string): boolean {
  * Split an answer's sources into the ones it referenced and the ones it did not.
  *
  * Reading order, not list order: the strip is a legend for the sentences above it. Cited = the citations' sources in
- * reading order, then the records the text links, each once. A cited collection (`record://blog_post`, a citation on a
- * table's header) marks its type's records cited only when no record of that type is individually cited or linked, each
- * answering to the collection's number.
+ * reading order, then the records the text links, then the records its cards show, each once: an answer cites what its
+ * cards show, and a card has no number or link of its own to say so. A cited collection (`record://blog_post`, a citation
+ * on a table's header) marks its type's records cited only when no record of that type is individually cited, linked or
+ * carded, each answering to the collection's number.
  *
  * Each half is then grouped by table: AFTER the split, because a table whose rows were only partly cited is honestly two
  * chips, the cited rows under "Sources" and the rest behind the expander.
@@ -51,10 +52,11 @@ export function splitCitedSources(parts: readonly ChatPart[]): CitedSources {
 
   const numbers = citationNumbers(parts);
   const linked = recordLinksInParts(parts).map(record => recordHref(canonicalContentRefType(record.type), record.id));
+  const carded = parts.flatMap(part => (part.type === 'data-record-cards' ? part.data.records.map(sourceKey) : []));
 
   // The types a record was individually referenced for, which a cited collection of that type then leaves alone.
   const individually = new Set<string>();
-  for (const uri of [...numbers.keys(), ...linked]) {
+  for (const uri of [...numbers.keys(), ...linked, ...carded]) {
     const record = parseRecordHref(uri);
     if (record && rows.has(sourceKey(uri))) individually.add(canonicalContentRefType(record.type));
   }
@@ -77,7 +79,7 @@ export function splitCitedSources(parts: readonly ChatPart[]): CitedSources {
       if (record && canonicalContentRefType(record.type) === type) cite(key, number);
     }
   }
-  for (const key of linked) cite(key, undefined);
+  for (const key of [...linked, ...carded]) cite(key, undefined);
 
   const uncited = [...rows].filter(([key]) => !cited.has(key)).map(([, row]) => row);
   return { cited: groupSourcesByTable([...cited.values()]), uncited: groupSourcesByTable(uncited) };

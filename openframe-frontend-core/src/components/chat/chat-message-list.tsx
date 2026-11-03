@@ -118,10 +118,10 @@ function hasVisibleText(parts: readonly ChatPart[]): boolean {
 }
 
 /** A turn that has drawn nothing of its own yet: no stage, and no part but sources (which the body does not draw) and
- *  empty text. */
+ *  text with nothing to show. */
 function hasDrawnNothing(message: ChatMessage): boolean {
   if ((message.metadata?.progress?.length ?? 0) > 0) return false;
-  return message.parts.every(part => isSourcePart(part) || (part.type === 'text' && part.text.length === 0));
+  return message.parts.every(part => isSourcePart(part) || (part.type === 'text' && part.text.trim() === ''));
 }
 
 /** A turn whose only cards wait on another tier: this side draws none of them, so a row would be a name with no body. */

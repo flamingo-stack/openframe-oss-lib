@@ -2095,8 +2095,6 @@ function CardWithDisclosure({
  *   - Pass the ref through `resolveSourceRowCTA` to compute the
  *     canonical `{href, targetPlatform}` through the host's composer
  *     (`composeContentUrl`), the one address rule.
- *   - Pre-resolve href against `runtime.navigation.defaultContentOrigin`
- *     in embed mode (so modifier-click + copy-link land on the hub).
  *   - Re-attach the resolved values onto the ref so EVERY downstream
  *     card — whether it renders an inner `<a>` from `href` prop
  *     (BlogCard, ProgramCard, …) or pulls `anchorProps` from

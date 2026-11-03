@@ -4,7 +4,7 @@
  * composes the row; `docSearchFieldsOf` (`chat-protocol/message-decoder`) reads it.
  */
 export interface DocSearchResult {
-  /** The record URI. Null only for a row an old hub could not name. */
+  /** The record URI. TODO(CU-17tkuw61kfy): null only for a row an old hub could not name. */
   sourceId: string | null;
   title: string;
   /** Where the record opens, absolute. Absent for a row with no page: a click asks the chat about it instead. */

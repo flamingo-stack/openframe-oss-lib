@@ -271,6 +271,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         recordLinksInParts(bodyParts).map(record => [recordHref(record.type, record.id), record.label]),
       );
       const cache = recordCardCache;
+      // One card per record in a message, where it first shows: every wire and stored row can name a record again.
+      const shown = new Set<string>();
       bodyParts.forEach((part, index) => {
         if (part.type !== 'data-record-cards') return;
         const cards: Array<{ key: string; node: React.ReactNode }> = [];
@@ -279,6 +281,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // A type the chat draws no card for (a device, a script) stays a chip in the text.
           if (!record || (record.type !== 'video' && !chatCardLabel(record.type))) continue;
           const key = recordHref(record.type, record.id);
+          if (shown.has(key)) continue;
+          shown.add(key);
           const source = sourceByUri.get(key);
           const label = names.get(key) ?? '';
           let entry = cache.get(key);
@@ -289,6 +293,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               id: record.id,
               title: source ? sourceTitleOf(source) : label,
               url: row?.externalUrl ?? null,
+              // TODO(CU-17tkuw61kfy): an old doc source arrives with no url, and opens by its tree path.
               ...(row?.path ? { metadata: { path: row.path } } : {}),
             };
             const rendered = renderEntityCard(cardRef);
@@ -300,7 +305,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             entry = { render: renderEntityCard, source, label, node };
             cache.set(key, entry);
           }
-          if (entry.node != null && !cards.some(card => card.key === key)) cards.push({ key, node: entry.node });
+          if (entry.node != null) cards.push({ key, node: entry.node });
         }
         if (cards.length > 0) byPart.set(index, cards);
       });
@@ -427,7 +432,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
     const hasBody = !isSystem || bodyParts.length > 0;
     const files = bodyParts.filter((part): part is ChatFilePart => part.type === 'file');
-    const lastTextIndex = bodyParts.reduce((last, part, index) => (part.type === 'text' ? index : last), -1);
+    const lastTextIndex = bodyParts.reduce(
+      (last, part, index) => (part.type === 'text' && part.text.trim() !== '' ? index : last),
+      -1,
+    );
     // A stream cut before any text says so too: the notice is all that row has. Text of its own may say it already (a
     // server that writes the notice itself).
     const showInterruptedNotice = interrupted && !textOfParts(bodyParts).includes(CHAT_INTERRUPTED_NOTICE);
@@ -510,6 +518,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     const partIsStreaming = index === bodyParts.length - 1 && !!isTyping;
                     switch (part.type) {
                       case 'text': {
+                        // Whitespace between two cards draws nothing, not an empty block with its gap.
+                        if (part.text.trim() === '') return null;
                         // The layout of Claude and ChatGPT: what the USER said is a
                         // bubble on the right; what anyone else says is plain text
                         // across the thread's full width, with no bubble. Nothing
