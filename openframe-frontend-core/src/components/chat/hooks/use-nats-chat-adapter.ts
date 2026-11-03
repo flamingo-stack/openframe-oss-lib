@@ -762,7 +762,7 @@ export function useNatsChatAdapter(
       // placeholder, record the echo text, and flip the phase — all inside
       // the reducer. The assistant body fills in as NATS chunks land. What the decoder still holds of a turn that ended
       // with no MESSAGE_END goes in that turn's bubble first: the send moves the thread on.
-      // TODO(CU-17tkuw635xx): goes with `MingoDecoder.closeHeld`.
+      // TODO(CU-17tkuw61kfy): goes with `MingoDecoder.closeHeld`.
       mutate(r => {
         const held = decoders.get(dialogKey)?.closeHeld();
         if (held) r.apply(held);

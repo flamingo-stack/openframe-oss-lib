@@ -211,7 +211,7 @@ export function McpPlaygroundPage() {
       const s = result.structured as {
         conversationId?: string
         parts?: Array<{ type: string }>
-        // TODO(CU-17tkuw635xx): an old hub's source list.
+        // TODO(CU-17tkuw61kfy): an old hub's source list.
         citations?: unknown[]
         pendingApprovals?: PendingApproval[]
       } | null

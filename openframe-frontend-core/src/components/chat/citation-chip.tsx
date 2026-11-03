@@ -65,7 +65,7 @@ export function CitationChip({ number }: { number: number }) {
     <NavLinkAnchorViaRuntime
       href={cta.href}
       targetPlatform={cta.targetPlatform}
-      // TODO(CU-17tkuw635xx): an old doc source's tree path is its `filename`.
+      // TODO(CU-17tkuw61kfy): an old doc source's tree path is its `filename`.
       path={source.type === 'source-document' ? source.filename : null}
       className={CHIP_CLASS}
       title={sourceTitleOf(source)}

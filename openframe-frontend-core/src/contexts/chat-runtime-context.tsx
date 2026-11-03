@@ -48,7 +48,7 @@ export interface ChatRuntime {
     /** POST streaming chat. Hub: '/api/docs/chat'. */
     chatStreamUrl: string;
     /** POST agent approve/reject on an old hub. Hub: '/api/chat/agent/confirm-tool'.
-     *  TODO(CU-17tkuw635xx): the UI stream approves on `chatStreamUrl`; this goes at the cleanup. */
+     *  TODO(CU-17tkuw61kfy): the UI stream approves on `chatStreamUrl`; this goes at the cleanup. */
     approvalToolUrl: string;
     /** Customer-ticket agent endpoints (Help Center). OPTIONAL — when unset,
      *  the ticket hooks fall back to the bare hub paths

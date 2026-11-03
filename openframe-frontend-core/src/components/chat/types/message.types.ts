@@ -12,7 +12,7 @@ export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
   ASK: 'ASK',
-  /** The records an answer was given: `sources` on the entry, what becomes its source parts. TODO(CU-17tkuw635xx):
+  /** The records an answer was given: `sources` on the entry, what becomes its source parts. TODO(CU-17tkuw61kfy):
    *  `GUIDE` is the envelope it replaced, the same arrays under `payload`, read by `old-wire` only. */
   ATTACHMENTS: 'ATTACHMENTS',
   GUIDE: 'GUIDE',
@@ -275,7 +275,7 @@ export interface ThinkingMessageData extends MessageDataBase {
 
 /** Persisted attachments row (GraphQL `AttachmentsData`): the same array the live chunk carries, so history and realtime
  *  share one decoder. Left untyped: it is unvalidated wire data, and `createMingoDecoder` turns it into source parts.
- *  TODO(CU-17tkuw635xx): `videos` and `cards` are old rows' only. */
+ *  TODO(CU-17tkuw61kfy): `videos` and `cards` are old rows' only. */
 export interface AttachmentsMessageData extends MessageDataBase {
   type: 'ATTACHMENTS';
   sources?: unknown;
@@ -283,7 +283,7 @@ export interface AttachmentsMessageData extends MessageDataBase {
   cards?: unknown;
 }
 
-/** Persisted `RECORD_CARDS` row (GraphQL `RecordCardsData`); the live chunk has the same shape. TODO(CU-17tkuw635xx):
+/** Persisted `RECORD_CARDS` row (GraphQL `RecordCardsData`); the live chunk has the same shape. TODO(CU-17tkuw61kfy):
  *  `cards` is a dev cluster's old rows' only. */
 export interface RecordCardsMessageData extends MessageDataBase {
   type: 'RECORD_CARDS';
@@ -291,7 +291,7 @@ export interface RecordCardsMessageData extends MessageDataBase {
   cards?: unknown;
 }
 
-/** TODO(CU-17tkuw635xx): the envelope `ATTACHMENTS` replaced, the same arrays under `payload`. */
+/** TODO(CU-17tkuw61kfy): the envelope `ATTACHMENTS` replaced, the same arrays under `payload`. */
 export interface SourceMetadataMessageData extends MessageDataBase {
   type: 'GUIDE';
   payload?: unknown;

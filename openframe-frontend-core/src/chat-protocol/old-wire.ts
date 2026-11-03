@@ -1,5 +1,5 @@
 /**
- * TODO(CU-17tkuw635xx): everything older backends and older rows say, read into the standard shapes. Deleted whole at
+ * TODO(CU-17tkuw61kfy): everything older backends and older rows say, read into the standard shapes. Deleted whole at
  * the cleanup, once the hub, the tenant and every stored row speak the new names. Only `./message-decoder` reads it.
  *
  * What it reads:

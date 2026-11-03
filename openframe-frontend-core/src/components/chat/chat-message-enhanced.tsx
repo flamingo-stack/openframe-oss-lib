@@ -300,7 +300,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
               id: record.id,
               title: source ? sourceTitleOf(source) : label,
               url: row?.externalUrl ?? null,
-              // TODO(CU-17tkuw635xx): an old doc source arrives with no url, and opens by its tree path.
+              // TODO(CU-17tkuw61kfy): an old doc source arrives with no url, and opens by its tree path.
               ...(row?.path ? { metadata: { path: row.path } } : {}),
             };
             const rendered = renderEntityCard(cardRef);

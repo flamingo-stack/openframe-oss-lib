@@ -122,7 +122,7 @@ export function escapeMarkdownInline(text: string): string {
  * else (HEIC, video, audio) emits the `[Attached: ...]` link form so the
  * bubble shows a clickable file pill instead of a broken-image icon.
  *
- * TODO(CU-17tkuw635xx): only an old hub reads this markdown; a `file` part draws the attachment now.
+ * TODO(CU-17tkuw61kfy): only an old hub reads this markdown; a `file` part draws the attachment now.
  */
 export function formatChatAttachmentMarkdownForBubble(att: ChatAttachment, viewUrlPrefix: string): string {
   const safeName = escapeMarkdownInline(att.fileName);

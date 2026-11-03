@@ -2,7 +2,7 @@
  * The old approval route's request, and the error envelope every hub route answers.
  *
  * `readServerErrorMessage` stays: a failed answer's `error` is written for the end user. The rest is
- * TODO(CU-17tkuw635xx): an approval on the UI stream is a chat request (`approval-responded` parts), and only a hub that
+ * TODO(CU-17tkuw61kfy): an approval on the UI stream is a chat request (`approval-responded` parts), and only a hub that
  * still answers old frames takes this body. It goes at the cleanup.
  *
  * Server-safe: no React, no browser APIs.

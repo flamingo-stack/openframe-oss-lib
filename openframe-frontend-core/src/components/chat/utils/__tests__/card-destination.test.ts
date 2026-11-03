@@ -198,7 +198,7 @@ describe('resolveCardDestination: what a host claims', () => {
   });
 });
 
-// TODO(CU-17tkuw635xx): the old hub's page-shaped rows answer no url.
+// TODO(CU-17tkuw61kfy): the old hub's page-shaped rows answer no url.
 describe('legacyCardDestination', () => {
   const composeContentUrl = makeComposeContentUrl({
     hostedTypes: new Set(['onboarding_guide', 'data_room_doc']),

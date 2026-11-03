@@ -35,7 +35,7 @@ interface RecordChipProps {
 }
 
 /**
- * TODO(CU-17tkuw635xx): goes with the old mention token. `old-wire.ts` writes `@word:value` as a record link labelled with
+ * TODO(CU-17tkuw61kfy): goes with the old mention token. `old-wire.ts` writes `@word:value` as a record link labelled with
  * the token, and prose holds that shape too (`@redis:6379`). A token no host claimed, of a type that names no record the
  * lib knows, stays the raw text it was: a chip would dress it up as something that opens.
  */
@@ -63,7 +63,7 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
   return (
     <InlineChip
       icon={iconFor(type)}
-      // TODO(CU-17tkuw635xx): a link that knows no name but the id (an old receipt's token) shows the name its row answers.
+      // TODO(CU-17tkuw61kfy): a link that knows no name but the id (an old receipt's token) shows the name its row answers.
       label={finalChatRef.title || label}
       link={
         href

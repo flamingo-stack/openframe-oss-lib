@@ -65,7 +65,7 @@ describe('mapDocSearchResults', () => {
     });
   });
 
-  // TODO(CU-17tkuw635xx): the old hub's doc rows have no url, and open by the tree path.
+  // TODO(CU-17tkuw61kfy): the old hub's doc rows have no url, and open by the tree path.
   it('keeps the tree path an old hub sends', () => {
     const [doc] = mapDocSearchResults([
       { sourceId: null, title: 'Doc', path: 'legal/doc.pdf', snippet: '', type: 'file', matchType: 'content' },

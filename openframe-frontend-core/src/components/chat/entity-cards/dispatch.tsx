@@ -1345,7 +1345,7 @@ interface ChatCardRegistryEntry {
    *  the `composeContentUrl` fallback below — but NOT over an explicit
    *  host `override` for the type (see `pickFetchedCardHref`).
    *
-   *  TODO(CU-17tkuw635xx): for an old hub's rows, which answer no url. Goes
+   *  TODO(CU-17tkuw61kfy): for an old hub's rows, which answer no url. Goes
    *  at the cleanup, from every entry. */
   fallbackHref?: (item: ChatCardItem) => string | null;
   /** Opt OUT of the post-fetch `composeContentUrl` SYNTHESIS (see
@@ -1358,7 +1358,7 @@ interface ChatCardRegistryEntry {
    *  point — a host that re-homes a type must be able to say so even when
    *  the row already carries the content host's own url.
    *
-   *  TODO(CU-17tkuw635xx): for an old hub's rows, which answer no url. Goes
+   *  TODO(CU-17tkuw61kfy): for an old hub's rows, which answer no url. Goes
    *  at the cleanup, from every entry. */
   noComposedHref?: boolean;
 }
@@ -1643,9 +1643,9 @@ interface RoadmapEntryConfig {
   label: string;
   cardType: RoadmapCardType;
   contentRefType: string;
-  /** See `ChatCardRegistryEntry.noComposedHref`. TODO(CU-17tkuw635xx): goes with it. */
+  /** See `ChatCardRegistryEntry.noComposedHref`. TODO(CU-17tkuw61kfy): goes with it. */
   noComposedHref?: boolean;
-  /** See `ChatCardRegistryEntry.fallbackHref`. TODO(CU-17tkuw635xx): goes with it. */
+  /** See `ChatCardRegistryEntry.fallbackHref`. TODO(CU-17tkuw61kfy): goes with it. */
   fallbackHref?: (item: ChatCardItem) => string | null;
 }
 const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
