@@ -217,6 +217,7 @@ public class ScriptDispatchService {
                             ? cp.getArgs() : script.getDefaultArgs();
                     List<ScriptEnvVar> effectiveEnv = cp != null && cp.getEnvVars() != null
                             ? cp.getEnvVars() : mergeEnvVars(script.getEnvVars(), null);
+                    List<ScriptEnvVar> sealedEnv = sealed(effectiveEnv);
                     return ScriptScheduleExecutionItem.builder()
                             .scriptId(script.getId())
                             .code(script.getScriptBody())
@@ -224,7 +225,7 @@ public class ScriptDispatchService {
                             .privilegeLevel(script.getPrivilegeLevel())
                             .args(ScriptArgsTokenizer.tokenize(effectiveArgs))
                             .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                            .envVars(sealed(effectiveEnv))
+                            .envVars(sealedEnv)
                             .build();
                 })
                 .toList();

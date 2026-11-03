@@ -1,5 +1,6 @@
 package com.openframe.data.nats.delivery;
 
+import org.springframework.beans.factory.ObjectProvider;
 import java.util.Map;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import com.openframe.delivery.spec.DeliveryRef;
@@ -25,8 +26,9 @@ class ScriptScheduleDeliverySpecTest {
 
     private final EncryptionService encryptionService =
             new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
-    private final ScriptScheduleDeliverySpec spec = new ScriptScheduleDeliverySpec(new StaticListableBeanFactory(
-            Map.of("encryptionService", encryptionService)).getBeanProvider(EncryptionService.class));
+    private final StaticListableBeanFactory beans = new StaticListableBeanFactory(Map.of("encryptionService", encryptionService));
+    private final ObjectProvider<EncryptionService> encryptionProvider = beans.getBeanProvider(EncryptionService.class);
+    private final ScriptScheduleDeliverySpec spec = new ScriptScheduleDeliverySpec(encryptionProvider);
 
     @Test
     void wireForm_secretsInTheClear_theStoredBatchAndTheDeliveryBlockUntouched() {

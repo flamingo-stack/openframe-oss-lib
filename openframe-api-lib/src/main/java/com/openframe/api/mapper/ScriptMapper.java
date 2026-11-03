@@ -28,11 +28,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ScriptMapper {
 
-    private final EncryptionService encryptionService;
+    // ObjectProvider: a service that never reads a stored secret boots without the encryption config
+    private final ObjectProvider<EncryptionService> encryptionService;
     private final ObjectProvider<ScriptSecretSealer> secretSealer;
 
     public Script toEntity(String tenantId, CreateScriptInput input) {
-        List<ScriptEnvVar> envVars = seal(ScriptEnvVarMapper.toEntity(input.getEnvVars()));
+        List<ScriptEnvVarInput> envVarsInput = input.getEnvVars();
+        List<ScriptEnvVar> plainEnvVars = ScriptEnvVarMapper.toEntity(envVarsInput);
+        List<ScriptEnvVar> envVars = seal(plainEnvVars);
         return Script.builder()
                 .tenantId(tenantId)
                 .name(input.getName())
@@ -81,9 +84,10 @@ public class ScriptMapper {
                 .build();
     }
 
-    // Plain in the response: dispatch reads it, and the GraphQL boundary masks secrets.
+    // Plain in the response: dispatch reads it. The API masks secrets in ScriptDataFetcher (Script.envVars) and
+    // ScriptScheduleDataFetcher (custom params), so a caller of this mapper outside them must mask on its own.
     private List<ScriptEnvVarInput> mapEnvVarsToResponse(List<ScriptEnvVar> envVars) {
-        List<ScriptEnvVar> revealed = ScriptEnvVar.revealAll(envVars, encryptionService::decrypt);
+        List<ScriptEnvVar> revealed = ScriptEnvVar.revealAll(envVars, this::decrypt);
         if (revealed == null) {
             return null;
         }
@@ -94,6 +98,11 @@ public class ScriptMapper {
                         .secret(v.isSecret())
                         .build())
                 .toList();
+    }
+
+    private String decrypt(String ciphertext) {
+        EncryptionService service = encryptionService.getObject();
+        return service.decrypt(ciphertext);
     }
 
     private List<ScriptEnvVar> seal(List<ScriptEnvVar> envVars) {

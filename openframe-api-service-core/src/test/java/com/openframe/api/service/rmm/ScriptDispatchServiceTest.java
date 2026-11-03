@@ -1,6 +1,6 @@
 package com.openframe.api.service.rmm;
 
-import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.api.support.TestEncryption;
 import com.openframe.api.mapper.ScriptSecretSealer;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.script.BatchRunScriptInput;
@@ -464,8 +464,8 @@ class ScriptDispatchServiceTest {
     @DisplayName("runSchedule: with encryption on, the batch that goes to the router carries its secrets encrypted")
     void runSchedule_secretsSealedInTheBatch() {
         String scheduleId = "sched-1";
-        EncryptionService encryptionService = new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
-        when(secretSealer.getIfAvailable()).thenReturn(new ScriptSecretSealer(encryptionService));
+        ScriptSecretSealer sealer = new ScriptSecretSealer(TestEncryption.SERVICE);
+        when(secretSealer.getIfAvailable()).thenReturn(sealer);
         when(scheduleScriptService.get(scheduleId)).thenReturn(com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse.builder()
                 .id(scheduleId)
                 .scriptIds(List.of(SCRIPT_ID))

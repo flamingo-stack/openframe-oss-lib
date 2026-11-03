@@ -24,6 +24,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.doThrow;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
@@ -57,6 +59,24 @@ class LegacyDeliveryRouteTest {
         assertThat(route.getTypes()).containsExactlyInAnyOrder(DeliveryType.CLIENT_UNINSTALL, DeliveryType.TOOL_INSTALLATION,
                 DeliveryType.CLIENT_UPDATE, DeliveryType.TOOL_UPDATE, DeliveryType.SCRIPT_SCHEDULE);
         assertThat(route.getGeneration()).isZero();
+    }
+
+    @Test
+    void send_bodyThatCannotBePrepared_nothingPublished_noException() {
+        // setup
+        ScriptScheduleExecutionMessage stored = ScriptScheduleExecutionMessage.builder().executionId("exec-1").build();
+        ScriptScheduleDeliverySeed seed = ScriptScheduleDeliverySeed.skippingOffline(MACHINE_ID, stored);
+        DeliveryRequest<DeliveryPayload> request = DeliveryRequest.<DeliveryPayload>builder()
+                .type(DeliveryType.SCRIPT_SCHEDULE).targetId("exec-1").machineId(MACHINE_ID).payload(stored).build();
+        doReturn(spec).when(specs).require(DeliveryType.SCRIPT_SCHEDULE);
+        doReturn(request).when(spec).request(seed);
+        doThrow(new IllegalStateException("cannot decrypt")).when(spec).wireForm(stored);
+
+        // execution
+        route.send(seed);
+
+        // verifications
+        verifyNoInteractions(natsMessagePublisher);
     }
 
     @Test

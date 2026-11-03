@@ -1,5 +1,6 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.support.TestEncryption;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
@@ -12,7 +13,6 @@ import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -24,11 +24,9 @@ class ScriptScheduleMapperTest {
 
     private static final String SCRIPT_ID = "6a8b9460e0e12b4188881ae2";
 
-    private final EncryptionService encryptionService =
-            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
-    private final ScriptScheduleMapper mapper = new ScriptScheduleMapper(encryptionService,
-            new StaticListableBeanFactory(Map.of("sealer", new ScriptSecretSealer(encryptionService)))
-                    .getBeanProvider(ScriptSecretSealer.class));
+    private final EncryptionService encryptionService = TestEncryption.SERVICE;
+    private final ScriptScheduleMapper mapper = new ScriptScheduleMapper(TestEncryption.service(),
+            TestEncryption.sealerOn());
 
     @Test
     @DisplayName("toEntity (create): secret override with value=null resolves from the script's own env vars — first-time customization keeps the script's stored secret")

@@ -20,6 +20,8 @@ public class ScriptEnvVar {
 
     private boolean secret;
 
+    // true: value is the ciphertext of a secret. Only sealed() sets it and only revealed() clears it; a value that is
+    // not secret or is empty is never encrypted
     private boolean encrypted;
 
     public static List<ScriptEnvVar> sealAll(List<ScriptEnvVar> envVars, UnaryOperator<String> encrypt) {

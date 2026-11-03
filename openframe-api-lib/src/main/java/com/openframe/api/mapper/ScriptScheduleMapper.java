@@ -31,13 +31,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ScriptScheduleMapper {
 
-    private final EncryptionService encryptionService;
+    // ObjectProvider: a service that never reads a stored secret boots without the encryption config
+    private final ObjectProvider<EncryptionService> encryptionService;
     private final ObjectProvider<ScriptSecretSealer> secretSealer;
 
     public ScheduleScript toEntity(String tenantId, CreateScriptScheduleInput input,
                                    Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId) {
-        List<ScheduledScriptCustomParams> customParams = seal(toCustomParams(input.getScriptCustomParams(),
-                Map.of(), scriptDefaultsByScriptId));
+        List<ScheduledScriptCustomParamsInput> customParamsInput = input.getScriptCustomParams();
+        List<ScheduledScriptCustomParams> plainCustomParams = toCustomParams(customParamsInput, Map.of(),
+                scriptDefaultsByScriptId);
+        List<ScheduledScriptCustomParams> customParams = seal(plainCustomParams);
         return ScheduleScript.builder()
                 .tenantId(tenantId)
                 .name(input.getName())
@@ -154,7 +157,12 @@ public class ScriptScheduleMapper {
     }
 
     private List<ScheduledScriptCustomParams> reveal(List<ScheduledScriptCustomParams> customParams) {
-        return withEnvVars(customParams, envVars -> ScriptEnvVar.revealAll(envVars, encryptionService::decrypt));
+        return withEnvVars(customParams, envVars -> ScriptEnvVar.revealAll(envVars, this::decrypt));
+    }
+
+    private String decrypt(String ciphertext) {
+        EncryptionService service = encryptionService.getObject();
+        return service.decrypt(ciphertext);
     }
 
     // Copies, never mutates: the same entity may still be saved after it is mapped to a response.

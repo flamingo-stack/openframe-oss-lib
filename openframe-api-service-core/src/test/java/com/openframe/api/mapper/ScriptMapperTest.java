@@ -1,5 +1,6 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.support.TestEncryption;
 import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
@@ -13,11 +14,8 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
 import java.util.List;
-import java.util.Map;
 
 import static com.openframe.data.document.rmm.script.ScriptStatus.ACTIVE;
 import static com.openframe.data.document.rmm.script.ScriptStatus.ARCHIVED;
@@ -33,23 +31,26 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ScriptMapperTest {
 
-    private final EncryptionService encryptionService =
-            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
-    private final ScriptMapper mapper = new ScriptMapper(encryptionService, sealerOn(encryptionService));
+    private final EncryptionService encryptionService = TestEncryption.SERVICE;
+    private final ScriptMapper mapper = new ScriptMapper(TestEncryption.service(), TestEncryption.sealerOn());
 
-    static ObjectProvider<ScriptSecretSealer> sealerOn(EncryptionService encryptionService) {
-        return new StaticListableBeanFactory(Map.of("sealer", new ScriptSecretSealer(encryptionService)))
-                .getBeanProvider(ScriptSecretSealer.class);
-    }
+    @Test
+    @DisplayName("no encryption config: a script with no encrypted value still maps both ways")
+    void noEncryptionService_plainScript_mapsWithoutIt() {
+        ScriptMapper mapperWithoutKey = new ScriptMapper(TestEncryption.noService(), TestEncryption.sealerOff());
+        CreateScriptInput input = new CreateScriptInput();
+        input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()));
 
-    static ObjectProvider<ScriptSecretSealer> sealerOff() {
-        return new StaticListableBeanFactory().getBeanProvider(ScriptSecretSealer.class);
+        Script entity = mapperWithoutKey.toEntity("tenant-1", input);
+        String value = mapperWithoutKey.toResponse(entity).getEnvVars().get(0).getValue();
+
+        assertThat(value).isEqualTo("s3cr3t");
     }
 
     @Test
     @DisplayName("encryption off: a secret is stored as given, and an already encrypted one still comes back plain")
     void encryptionOff_storesPlain_stillDecrypts() {
-        ScriptMapper plainMapper = new ScriptMapper(encryptionService, sealerOff());
+        ScriptMapper plainMapper = new ScriptMapper(TestEncryption.service(), TestEncryption.sealerOff());
         CreateScriptInput input = new CreateScriptInput();
         input.setEnvVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()));
 

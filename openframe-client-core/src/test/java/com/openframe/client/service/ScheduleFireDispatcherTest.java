@@ -1,5 +1,6 @@
 package com.openframe.client.service;
 
+import com.openframe.client.support.TestEncryption;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
@@ -74,8 +75,7 @@ class ScheduleFireDispatcherTest {
     @Mock private DeviceOnlineDispatchRepository dispatchRepository;
     @Mock private com.openframe.client.service.rmm.ScriptDeliveryRetryStore retryStore;
 
-    private final EncryptionService encryptionService =
-            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
+    private final EncryptionService encryptionService = TestEncryption.SERVICE;
 
     private ScheduleFireDispatcher dispatcher;
 

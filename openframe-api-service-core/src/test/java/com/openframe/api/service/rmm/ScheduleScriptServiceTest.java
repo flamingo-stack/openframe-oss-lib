@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.support.TestEncryption;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
@@ -12,11 +13,9 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
-import com.openframe.api.mapper.ScriptSecretSealer;
 import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
-import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -34,12 +33,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.data.domain.Sort;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
@@ -83,13 +80,9 @@ class ScheduleScriptServiceTest {
         tenantIdProvider = mock(TenantIdProvider.class);
         deviceLocalDispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
         onlineDeviceDispatchRepository = mock(DeviceOnlineDispatchRepository.class);
-        EncryptionService encryptionService =
-                new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
         deliveryRefresher = mock(ScheduleDeliveryRefresher.class);
-        scheduleService = new ScheduleScriptService(scheduleRepository,
-                new ScriptScheduleMapper(encryptionService, new StaticListableBeanFactory(
-                        Map.of("sealer", new ScriptSecretSealer(encryptionService)))
-                        .getBeanProvider(ScriptSecretSealer.class)),
+        ScriptScheduleMapper scheduleMapper = new ScriptScheduleMapper(TestEncryption.service(), TestEncryption.sealerOn());
+        scheduleService = new ScheduleScriptService(scheduleRepository, scheduleMapper,
                 scriptService, tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository, deliveryRefresher);
 
         createInput = new CreateScriptScheduleInput();

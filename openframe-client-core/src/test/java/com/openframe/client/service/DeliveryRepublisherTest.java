@@ -1,5 +1,6 @@
 package com.openframe.client.service;
 
+import com.openframe.client.support.TestEncryption;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.service.rmm.watchdog.DeliveryRepublisher;
@@ -29,8 +30,7 @@ import static org.mockito.Mockito.verify;
 class DeliveryRepublisherTest {
 
     private final ObjectMapper objectMapper = new JsonMapper();
-    private final EncryptionService encryptionService =
-            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
+    private final EncryptionService encryptionService = TestEncryption.SERVICE;
     private final ScriptScheduleNatsPublisher scheduleNats = mock(ScriptScheduleNatsPublisher.class);
     private final SoftwareNatsPublisher softwareNats = mock(SoftwareNatsPublisher.class);
 

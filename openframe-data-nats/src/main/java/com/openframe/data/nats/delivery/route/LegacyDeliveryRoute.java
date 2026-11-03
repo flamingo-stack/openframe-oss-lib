@@ -83,7 +83,17 @@ public class LegacyDeliveryRoute implements DeliveryRoute {
         DeliveryType type = seed.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = specs.require(type);
         DeliveryRequest<DeliveryPayload> request = spec.request(seed);
-        DeliveryPayload message = spec.wireForm(request.getPayload());
+        DeliveryPayload stored = request.getPayload();
+        DeliveryPayload message;
+        try {
+            message = spec.wireForm(stored);
+        } catch (RuntimeException unreadable) {
+            // one body that cannot be prepared (a secret encrypted with another key) must not stop the other machines;
+            // the retry and the result watchdog close this machine's rows
+            log.error("{} not published, its body could not be prepared for the agent: subject={} targetId={}",
+                    type, subject, seed.getTargetId(), unreadable);
+            return;
+        }
         LegacySubject legacySubject = subjectOf(type);
         if (legacySubject.stream()) {
             natsMessagePublisher.publishPersistent(subject, message);
