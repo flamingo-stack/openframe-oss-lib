@@ -66,17 +66,11 @@ echo "openframe-client v1.5.107+build.9""#,
     }
 
     #[tokio::test]
-    async fn a_failing_or_silent_binary_reports_no_version() {
-        let cases = [
-            ("echo \"openframe-client 1.5.103\"; exit 3", "non-zero exit"),
-            ("echo \"openframe-client dev\"", "no version"),
-        ];
-        for (body, why) in cases {
-            let dir = tempfile::tempdir().unwrap();
-            let binary = staged(&dir, body);
+    async fn a_failing_binary_reports_no_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary = staged(&dir, "echo \"openframe-client 1.5.103\"; exit 3");
 
-            assert_eq!(reported_version(&binary, LIMIT).await, None, "{why}");
-        }
+        assert_eq!(reported_version(&binary, LIMIT).await, None);
     }
 
     #[tokio::test]

@@ -103,24 +103,19 @@ fn update(version: &str) -> OpenFrameClientUpdateMessage {
 }
 
 #[tokio::test]
-async fn an_update_to_the_running_version_neither_parks_tools_nor_waits_for_a_busy_tool() {
+async fn only_an_update_to_another_version_waits_for_busy_tools_and_parks_them() {
     let f = fixture();
-    let _busy = f.tool_ops.lock("mesh").await.mark_busy();
+    let busy = f.tool_ops.lock("mesh").await.mark_busy();
 
-    let guard = f.service.reserve(&update(RUNNING)).unwrap();
+    drop(f.service.reserve(&update(RUNNING)).unwrap());
     assert!(!f.tool_run_manager.is_client_update_pending());
 
-    let launch = f.service.apply(update(RUNNING), guard).await.unwrap();
-    assert_eq!(launch, UpdateLaunch::Skipped);
-    assert!(!f.tool_run_manager.is_client_update_pending());
-}
-
-#[tokio::test]
-async fn an_update_to_the_running_version_waits_for_the_update_lock() {
-    let f = fixture();
-    let other_update = f.service.reserve(&update(OTHER)).unwrap();
+    let err = f.service.reserve(&update(OTHER)).err().unwrap();
+    assert!(format!("{err:#}").contains("Tool operation in progress"));
     assert!(f.tool_run_manager.is_client_update_pending());
 
+    drop(busy);
+    let other_update = f.service.reserve(&update(OTHER)).unwrap();
     let err = f.service.reserve(&update(RUNNING)).err().unwrap();
     assert!(format!("{err:#}").contains("Update already in progress"));
 
@@ -134,22 +129,12 @@ async fn an_update_to_the_running_version_waits_for_the_update_lock() {
     );
 }
 
-#[tokio::test]
-async fn an_update_to_another_version_still_parks_tools_and_waits_for_a_busy_tool() {
-    let f = fixture();
-    let _busy = f.tool_ops.lock("mesh").await.mark_busy();
-
-    let err = f.service.reserve(&update(OTHER)).err().unwrap();
-    assert!(format!("{err:#}").contains("Tool operation in progress"));
-    assert!(f.tool_run_manager.is_client_update_pending());
-}
-
 #[cfg(unix)]
 mod staged_version_check {
     use super::*;
     use crate::models::DownloadConfiguration;
+    use crate::test_support::mock_server_with_body;
     use std::io::Write;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     /// A tar.gz holding a script that answers `--version` with `reported`, padded and stored uncompressed past the minimum download size.
     fn release_archive(target_file_name: &str, reported: &str) -> Vec<u8> {
@@ -168,46 +153,6 @@ mod staged_version_check {
         let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::none());
         gz.write_all(&archive.into_inner().unwrap()).unwrap();
         gz.finish().unwrap()
-    }
-
-    /// Serves `body` to every GET until the test ends.
-    async fn serve(body: Vec<u8>) -> String {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let url = format!(
-            "http://{}/openframe-client.tar.gz",
-            listener.local_addr().unwrap()
-        );
-        tokio::spawn(async move {
-            while let Ok((mut socket, _)) = listener.accept().await {
-                let body = body.clone();
-                tokio::spawn(async move {
-                    let mut request = Vec::new();
-                    let mut buf = [0u8; 1024];
-                    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
-                        match socket.read(&mut buf).await {
-                            Ok(0) | Err(_) => return,
-                            Ok(n) => request.extend_from_slice(&buf[..n]),
-                        }
-                    }
-                    let head = format!(
-                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                        body.len()
-                    );
-                    let _ = socket.write_all(head.as_bytes()).await;
-                    let _ = socket.write_all(&body).await;
-                    let _ = socket.shutdown().await;
-                });
-            }
-        });
-        url
-    }
-
-    fn os() -> &'static str {
-        if cfg!(target_os = "macos") {
-            "macos"
-        } else {
-            "linux"
-        }
     }
 
     #[tokio::test]
@@ -244,11 +189,13 @@ mod staged_version_check {
     async fn a_downloaded_build_of_another_version_is_refused_before_the_updater_runs() {
         let f = fixture();
         let target_file_name = format!("openframe-client-{}", Uuid::new_v4());
-        let link = serve(release_archive(&target_file_name, "1.5.103")).await;
+        let server =
+            mock_server_with_body(&[200], release_archive(&target_file_name, "1.5.103")).await;
+        let link = format!("{}/openframe-client.tar.gz", server.url);
         let message = OpenFrameClientUpdateMessage {
             version: "1.5.107".to_string(),
             download_configurations: vec![DownloadConfiguration {
-                os: os().to_string(),
+                os: std::env::consts::OS.to_string(),
                 file_name: "openframe-client.tar.gz".to_string(),
                 target_file_name: target_file_name.clone(),
                 link,

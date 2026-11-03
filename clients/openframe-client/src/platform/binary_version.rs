@@ -4,14 +4,12 @@ use semver::Version;
 use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::time::timeout;
 use tracing::warn;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-const OUTPUT_LIMIT_BYTES: u64 = 4096;
 
 /// Runs `<binary> --version`; None when it cannot be run, hangs past `limit`, fails or prints no client version.
 pub async fn reported_version(binary: &Path, limit: Duration) -> Option<Version> {
@@ -29,52 +27,22 @@ pub async fn reported_version(binary: &Path, limit: Duration) -> Option<Version>
     .await;
 
     let mut cmd = Command::new(binary);
-    cmd.arg("--version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
+    cmd.arg("--version").stdin(Stdio::null()).kill_on_drop(true);
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    let mut child = match cmd.spawn() {
-        Ok(child) => child,
-        Err(e) => {
-            warn!("Failed to run {} --version: {}", binary.display(), e);
-            return None;
-        }
-    };
-
-    let mut stdout = child.stdout.take()?;
-    let run = async {
-        let mut out = Vec::new();
-        (&mut stdout)
-            .take(OUTPUT_LIMIT_BYTES)
-            .read_to_end(&mut out)
-            .await?;
-        let status = child.wait().await?;
-        Ok::<_, std::io::Error>((status, out))
-    };
-
-    let (status, out) = match timeout(limit, run).await {
-        Ok(Ok(done)) => done,
+    let (status, out) = match timeout(limit, cmd.output()).await {
+        Ok(Ok(output)) => (output.status, output.stdout),
         Ok(Err(e)) => {
-            warn!(
-                "Failed to read {} --version output: {}",
-                binary.display(),
-                e
-            );
+            warn!("Failed to run {} --version: {}", binary.display(), e);
             return None;
         }
         Err(_) => {
             warn!(
-                "{} did not answer --version within {:?}, killing it",
+                "{} did not answer --version within {:?}",
                 binary.display(),
                 limit
             );
-            if let Err(e) = child.kill().await {
-                warn!("Failed to kill {} --version: {}", binary.display(), e);
-            }
             return None;
         }
     };
