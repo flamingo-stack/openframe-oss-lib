@@ -24,8 +24,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.doThrow;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
@@ -45,6 +48,7 @@ class LegacyDeliveryRouteTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(spec.wireForm(any())).thenAnswer(invocation -> invocation.getArgument(0));
         message = new ClientUninstallMessage();
         message.setIssuedAt("2026-10-28T10:00:00Z");
     }
@@ -55,6 +59,43 @@ class LegacyDeliveryRouteTest {
         assertThat(route.getTypes()).containsExactlyInAnyOrder(DeliveryType.CLIENT_UNINSTALL, DeliveryType.TOOL_INSTALLATION,
                 DeliveryType.CLIENT_UPDATE, DeliveryType.TOOL_UPDATE, DeliveryType.SCRIPT_SCHEDULE);
         assertThat(route.getGeneration()).isZero();
+    }
+
+    @Test
+    void send_bodyThatCannotBePrepared_nothingPublished_noException() {
+        // setup
+        ScriptScheduleExecutionMessage stored = ScriptScheduleExecutionMessage.builder().executionId("exec-1").build();
+        ScriptScheduleDeliverySeed seed = ScriptScheduleDeliverySeed.skippingOffline(MACHINE_ID, stored);
+        DeliveryRequest<DeliveryPayload> request = DeliveryRequest.<DeliveryPayload>builder()
+                .type(DeliveryType.SCRIPT_SCHEDULE).targetId("exec-1").machineId(MACHINE_ID).payload(stored).build();
+        doReturn(spec).when(specs).require(DeliveryType.SCRIPT_SCHEDULE);
+        doReturn(request).when(spec).request(seed);
+        doThrow(new IllegalStateException("cannot decrypt")).when(spec).wireForm(stored);
+
+        // execution
+        route.send(seed);
+
+        // verifications
+        verifyNoInteractions(natsMessagePublisher);
+    }
+
+    @Test
+    void send_publishesTheSpecsWireForm_notTheStoredBody() {
+        // setup
+        ScriptScheduleExecutionMessage stored = ScriptScheduleExecutionMessage.builder().executionId("exec-1").build();
+        ScriptScheduleExecutionMessage onTheWire = ScriptScheduleExecutionMessage.builder().executionId("exec-1").initiatedBy("wire").build();
+        ScriptScheduleDeliverySeed seed = ScriptScheduleDeliverySeed.skippingOffline(MACHINE_ID, stored);
+        DeliveryRequest<DeliveryPayload> request = DeliveryRequest.<DeliveryPayload>builder()
+                .type(DeliveryType.SCRIPT_SCHEDULE).targetId("exec-1").machineId(MACHINE_ID).payload(stored).build();
+        doReturn(spec).when(specs).require(DeliveryType.SCRIPT_SCHEDULE);
+        doReturn(request).when(spec).request(seed);
+        doReturn(onTheWire).when(spec).wireForm(stored);
+
+        // execution
+        route.send(seed);
+
+        // verifications
+        verify(natsMessagePublisher).publish("machine." + MACHINE_ID + ".script-schedule-execution", onTheWire);
     }
 
     @Test

@@ -1,8 +1,10 @@
 package com.openframe.client.service;
 
+import com.openframe.client.support.TestEncryption;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
@@ -73,6 +75,8 @@ class ScheduleFireDispatcherTest {
     @Mock private DeviceOnlineDispatchRepository dispatchRepository;
     @Mock private com.openframe.client.service.rmm.ScriptDeliveryRetryStore retryStore;
 
+    private final EncryptionService encryptionService = TestEncryption.SERVICE;
+
     private ScheduleFireDispatcher dispatcher;
 
     @BeforeEach
@@ -80,6 +84,34 @@ class ScheduleFireDispatcherTest {
         dispatcher = new ScheduleFireDispatcher(targetResolver, scriptRepository,
                 scriptExecutionRepository, scheduleScriptExecutionRepository, deliveryRouter,
                 machineRepository, dispatchRepository, retryStore);
+    }
+
+    @Test
+    @DisplayName("dispatch: a stored secret stays encrypted in the seed and in the redelivery copy, only the wire form is plain")
+    void dispatch_keepsSecretsSealed() {
+        Instant now = Instant.now();
+        ScheduleScript schedule = schedule(List.of("script-a"));
+        Script script = script("script-a", ScriptShell.BASH);
+        script.setEnvVars(List.of(ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                .sealed(encryptionService::encrypt)));
+        when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m1"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
+                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
+        when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(script));
+
+        dispatcher.dispatch(schedule, now);
+
+        ArgumentCaptor<ScriptScheduleDeliverySeed> seed = ArgumentCaptor.forClass(ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seed.capture());
+        ScriptEnvVar sent = seed.getValue().getMessage().getScripts().get(0).getEnvVars().get(0);
+        assertThat(sent.isEncrypted()).isTrue();
+        assertThat(sent.getValue()).isNotEqualTo("s3cr3t");
+
+        ArgumentCaptor<Object> stored = ArgumentCaptor.forClass(Object.class);
+        verify(retryStore).store(anyString(), eq("m1"), any(), stored.capture());
+        ScriptEnvVar kept = ((ScriptScheduleExecutionMessage) stored.getValue()).getScripts().get(0).getEnvVars().get(0);
+        assertThat(kept.isEncrypted()).isTrue();
+        assertThat(kept.getValue()).isNotEqualTo("s3cr3t");
     }
 
     @Test
@@ -215,7 +247,7 @@ class ScheduleFireDispatcherTest {
                 .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
                 .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
                 .defaultArgs(List.of("--default"))
-                .envVars(List.of(new ScriptEnvVar("BASE", "base-val", false)))
+                .envVars(List.of(ScriptEnvVar.builder().name("BASE").value("base-val").secret(false).build()))
                 .defaultTimeoutSeconds(120).status(ScriptStatus.ACTIVE).build();
         Script scriptB = script("script-b", ScriptShell.POWERSHELL);   // no custom params → defaults
         scriptB.setDefaultArgs(List.of("--b-default"));
@@ -225,7 +257,7 @@ class ScheduleFireDispatcherTest {
         schedule.setScriptCustomParams(List.of(ScheduledScriptCustomParams.builder()
                 .scriptId("script-a")
                 .args(List.of("--custom", "42"))
-                .envVars(List.of(new ScriptEnvVar("OVERRIDE", "custom-val", false)))
+                .envVars(List.of(ScriptEnvVar.builder().name("OVERRIDE").value("custom-val").secret(false).build()))
                 .build()));
 
         dispatcher.dispatch(schedule, Instant.now());
@@ -254,7 +286,7 @@ class ScheduleFireDispatcherTest {
                 .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
                 .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
                 .defaultArgs(List.of("--default"))
-                .envVars(List.of(new ScriptEnvVar("BASE", "base-val", false)))
+                .envVars(List.of(ScriptEnvVar.builder().name("BASE").value("base-val").secret(false).build()))
                 .defaultTimeoutSeconds(120).status(ScriptStatus.ACTIVE).build();
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(scriptA));
 
