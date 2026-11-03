@@ -186,22 +186,19 @@ impl OpenFrameClientUpdateService {
         }
 
         // 4. Log current version for informational purposes
-        let client_info = self
-            .client_info_service
-            .get()
-            .await
-            .context("Failed to get current client info")?;
-
-        if !client_info.current_version.is_empty() {
-            info!(
+        match self.client_info_service.get().await {
+            Ok(client_info) if !client_info.current_version.is_empty() => info!(
                 "Updating from version {} to {}",
                 client_info.current_version, requested_version
-            );
-        } else {
-            info!(
+            ),
+            Ok(_) => info!(
                 "No current version set, installing version: {}",
                 requested_version
-            );
+            ),
+            Err(e) => error!(
+                "Failed to get current client info, updating to {} anyway: {:#}",
+                requested_version, e
+            ),
         }
 
         // 5. Create update state for tracking
@@ -211,14 +208,17 @@ impl OpenFrameClientUpdateService {
             .await
             .context("Failed to save initial update state")?;
 
-        // 6. Set update status to updating
-        self.client_info_service
+        // 6. Set update status to updating; bookkeeping only, so a failure must not block the update
+        if let Err(e) = self
+            .client_info_service
             .set_update_status(
                 ClientUpdateStatus::Updating,
                 Some(canonical_version.clone()),
             )
             .await
-            .context("Failed to set update status")?;
+        {
+            error!("Failed to set update status to Updating: {:#}", e);
+        }
 
         info!("Starting update to version {}", requested_version);
 
