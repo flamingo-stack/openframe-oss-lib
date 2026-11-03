@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * REST API Controller for Organization mutations (Create, Update, Delete).
@@ -60,13 +59,9 @@ public class OrganizationController {
             @Valid @RequestBody UpdateOrganizationRequest request) {
 
         log.info("Internal API: Updating organization: {}", id);
-
-        try {
-            var updated = organizationCommandService.updateOrganization(id, request);
-            return organizationMapper.toResponse(updated);
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        requireOrganization(id);
+        var updated = organizationCommandService.updateOrganization(id, request);
+        return organizationMapper.toResponse(updated);
     }
 
     /**

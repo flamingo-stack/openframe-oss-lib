@@ -82,6 +82,9 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     from device pickers and skips it at dispatch; inventory and vulnerabilities still show it."""
     softwareManagementSupported: Boolean!
     enrollment: DeviceEnrollment
+    """The current user's unread notifications about this device (entity DEVICE, machineId). Counts the same
+    read states as unreadCountsByCategory, so a row and the sidebar badge agree. 0 when none."""
+    unreadNotificationCount: Int!
 }
 
 type DeviceEnrollment {

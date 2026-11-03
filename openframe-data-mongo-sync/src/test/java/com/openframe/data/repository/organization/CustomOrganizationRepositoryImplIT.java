@@ -15,12 +15,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Integration tests for {@link CustomOrganizationRepositoryImpl} against a real
@@ -36,8 +40,12 @@ class CustomOrganizationRepositoryImplIT extends BaseMongoIntegrationTest {
 
     private static final String SORT_UPDATED_AT = "updatedAt";
     private static final String SORT_ID = "_id";
+    private static final String SORT_NAME = "name";
+    private static final String SORT_ORGANIZATION_ID = "organizationId";
+    private static final String SORT_CREATED_AT = "createdAt";
     private static final String DESC = "DESC";
     private static final String ASC = "ASC";
+    private static final int MAX_WALK_PAGES = 10;
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -51,9 +59,13 @@ class CustomOrganizationRepositoryImplIT extends BaseMongoIntegrationTest {
     }
 
     private Organization save(String name, long updatedAtMillis) {
+        return save(name, name, updatedAtMillis);
+    }
+
+    private Organization save(String name, String organizationId, long updatedAtMillis) {
         Organization org = Organization.builder()
                 .name(name)
-                .organizationId(name)
+                .organizationId(organizationId)
                 .status(OrganizationStatus.ACTIVE)
                 .createdAt(Instant.ofEpochMilli(updatedAtMillis))
                 .updatedAt(Instant.ofEpochMilli(updatedAtMillis))
@@ -69,14 +81,37 @@ class CustomOrganizationRepositoryImplIT extends BaseMongoIntegrationTest {
         return org.getUpdatedAt().toEpochMilli() + "_" + org.getId();
     }
 
+    private static String nameCursor(Organization org) {
+        return base64(org.getName()) + "_" + org.getId();
+    }
+
+    private static String organizationIdCursor(Organization org) {
+        return base64(org.getOrganizationId()) + "_" + org.getId();
+    }
+
+    private static String createdAtCursor(Organization org) {
+        return org.getCreatedAt().toEpochMilli() + "_" + org.getId();
+    }
+
+    private static String base64(String value) {
+        return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
     /** Walk every page of the last-activity ordering, returning names in visiting order. */
     private List<String> walkByLastActivity(String direction, int pageSize) {
+        return walkBy(SORT_UPDATED_AT, direction, pageSize, CustomOrganizationRepositoryImplIT::compoundCursor);
+    }
+
+    /** Walk every page of the given ordering with the given cursor encoding, returning names in visiting order. */
+    private List<String> walkBy(String sortField, String direction, int pageSize, Function<Organization, String> cursorOf) {
         List<String> names = new ArrayList<>();
         String cursor = null;
-        while (true) {
+        // A broken keyset repeats the same page forever; stop once the walk exceeds the saved rows.
+        int remainingPages = MAX_WALK_PAGES;
+        while (remainingPages-- > 0) {
             Query query = repository.buildOrganizationQuery(activeFilter(), null);
             List<Organization> page = repository.findOrganizationsWithCursor(
-                    query, cursor, pageSize, SORT_UPDATED_AT, direction);
+                    query, cursor, pageSize, sortField, direction);
             if (page.isEmpty()) {
                 break;
             }
@@ -84,9 +119,17 @@ class CustomOrganizationRepositoryImplIT extends BaseMongoIntegrationTest {
             if (page.size() < pageSize) {
                 break;
             }
-            cursor = compoundCursor(page.get(page.size() - 1));
+            cursor = cursorOf.apply(page.get(page.size() - 1));
         }
         return names;
+    }
+
+    private void saveNamesOutOfOrder() {
+        save("delta", "org-4", 100);
+        save("alpha", "org-1", 200);
+        save("echo", "org-5", 300);
+        save("bravo", "org-2", 400);
+        save("charlie", "org-3", 500);
     }
 
     @Test
@@ -262,5 +305,94 @@ class CustomOrganizationRepositoryImplIT extends BaseMongoIntegrationTest {
 
         assertThat(second).extracting(Organization::getId)
                 .doesNotContainAnyElementsOf(first.stream().map(Organization::getId).toList());
+    }
+
+    @Test
+    @DisplayName("name ASC cursor pagination returns every organization exactly once, in name order")
+    void nameAscPaginationCoversAllPages() {
+        saveNamesOutOfOrder();
+
+        List<String> visited = walkBy(SORT_NAME, ASC, 2, CustomOrganizationRepositoryImplIT::nameCursor);
+
+        assertThat(visited).containsExactly("alpha", "bravo", "charlie", "delta", "echo");
+    }
+
+    @Test
+    @DisplayName("name DESC cursor pagination returns every organization exactly once, in reverse name order")
+    void nameDescPaginationCoversAllPages() {
+        saveNamesOutOfOrder();
+
+        List<String> visited = walkBy(SORT_NAME, DESC, 2, CustomOrganizationRepositoryImplIT::nameCursor);
+
+        assertThat(visited).containsExactly("echo", "delta", "charlie", "bravo", "alpha");
+    }
+
+    @Test
+    @DisplayName("equal names page deterministically via the _id tie-breaker")
+    void nameTieBreakerForEqualNames() {
+        save("same", "org-1", 100);
+        save("same", "org-2", 200);
+        save("same", "org-3", 300);
+
+        List<String> visited = walkBy(SORT_NAME, ASC, 1, CustomOrganizationRepositoryImplIT::nameCursor);
+
+        assertThat(visited).containsExactly("same", "same", "same");
+    }
+
+    @Test
+    @DisplayName("organizationId ASC cursor pagination returns every organization exactly once")
+    void organizationIdAscPaginationCoversAllPages() {
+        saveNamesOutOfOrder();
+
+        List<String> visited = walkBy(SORT_ORGANIZATION_ID, ASC, 2,
+                CustomOrganizationRepositoryImplIT::organizationIdCursor);
+
+        assertThat(visited).containsExactly("alpha", "bravo", "charlie", "delta", "echo");
+    }
+
+    @Test
+    @DisplayName("createdAt ASC cursor pagination returns every organization exactly once")
+    void createdAtAscPaginationCoversAllPages() {
+        saveNamesOutOfOrder();
+
+        List<String> visited = walkBy(SORT_CREATED_AT, ASC, 2, CustomOrganizationRepositoryImplIT::createdAtCursor);
+
+        assertThat(visited).containsExactly("delta", "alpha", "echo", "bravo", "charlie");
+    }
+
+    @Test
+    @DisplayName("_id ASC cursor pagination moves upwards instead of repeating the first page")
+    void idAscPaginationCoversAllPages() {
+        saveNamesOutOfOrder();
+
+        List<String> visited = walkBy(SORT_ID, ASC, 2, Organization::getId);
+
+        assertThat(visited).containsExactly("delta", "alpha", "echo", "bravo", "charlie");
+    }
+
+    @Test
+    @DisplayName("a bare _id cursor under a name sort resumes right after that row")
+    void bareIdCursorUnderNameSortResumesAfterThatRow() {
+        saveNamesOutOfOrder();
+
+        Query firstQuery = repository.buildOrganizationQuery(activeFilter(), null);
+        List<Organization> first = repository.findOrganizationsWithCursor(firstQuery, null, 2, SORT_NAME, ASC);
+        Query secondQuery = repository.buildOrganizationQuery(activeFilter(), null);
+        List<Organization> second = repository.findOrganizationsWithCursor(
+                secondQuery, first.get(1).getId(), 2, SORT_NAME, ASC);
+
+        assertThat(second).extracting(Organization::getName).containsExactly("charlie", "delta");
+    }
+
+    @Test
+    @DisplayName("an unreadable cursor is refused instead of being served as page one")
+    void unreadableCursorIsRefused() {
+        save("a", 100);
+        Query query = repository.buildOrganizationQuery(activeFilter(), null);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> repository.findOrganizationsWithCursor(query, "not-a-cursor", 2, SORT_UPDATED_AT, DESC));
+
+        assertThat(ex.getMessage()).contains("Invalid cursor");
     }
 }

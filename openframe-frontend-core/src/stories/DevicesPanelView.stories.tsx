@@ -4,9 +4,13 @@ import {
   buildDevicePanelActions,
   type DeviceRow,
   DevicesPanelView,
+  DevicesViewConfigProvider,
   type DevicesViewMode,
 } from '../components/features/devices';
-import { DEVICES_FIXTURE } from '../components/product-demo/fixtures/devices';
+import { resolveProductDemoCast } from '../components/product-demo/cast';
+import { buildDevicesFixture } from '../components/product-demo/fixtures/devices';
+
+const DEVICES_FIXTURE = buildDevicesFixture(resolveProductDemoCast());
 
 const meta: Meta<typeof DevicesPanelView<DeviceRow>> = {
   title: 'Features/DevicesPanelView',
@@ -45,6 +49,24 @@ export const Compact: Story = { args: { actions: undefined, hideColumns: ['organ
 
 /** The same rows as cards. */
 export const Grid: Story = { args: { viewMode: 'grid' } };
+
+/**
+ * A host that lists a device's notifications: the unread counts become buttons that open them. Without one (the
+ * stories above, the product page) they are counts only.
+ */
+export const WithNotificationsLink: Story = {
+  decorators: [
+    Story => (
+      <DevicesViewConfigProvider value={{ getDeviceNotificationsHref: device => `#notifications-${device.machineId}` }}>
+        <Story />
+      </DevicesViewConfigProvider>
+    ),
+  ],
+  render: function Render(args) {
+    const [viewMode, setViewMode] = useState<DevicesViewMode>(args.viewMode);
+    return <DevicesPanelView {...args} viewMode={viewMode} onViewModeChange={setViewMode} />;
+  },
+};
 
 /** The request has not answered: the real chrome, locked, over skeleton rows. */
 export const Loading: Story = { args: { loading: true, devices: [] } };
