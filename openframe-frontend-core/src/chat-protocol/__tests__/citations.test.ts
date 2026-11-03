@@ -353,6 +353,42 @@ describe('textWithCitationChips', () => {
       expect(drawn(marked('| A | B |\n| -^ | - |\n| x | y |', 'a'))).toBe(`| A | B ${chip(1)} |\n| - | - |\n| x | y |`);
     });
 
+    it('a row with no leading pipe, past its closing pipe, moves inside the last cell', () => {
+      expect(drawn(marked('a | b |\n--|--|\nc | d |^', 'a'))).toBe(`a | b |\n--|--|\nc | d ${chip(1)} |`);
+    });
+
+    it('a row in a quote or a list, past its closing pipe, moves inside the last cell', () => {
+      expect(drawn(marked('> | a | b |\n> |---|---|\n> | c | d |^', 'a'))).toBe(
+        `> | a | b |\n> |---|---|\n> | c | d ${chip(1)} |`,
+      );
+      expect(drawn(marked('- | a | b |\n  |---|---|\n  | c | d |^', 'a'))).toBe(
+        `- | a | b |\n  |---|---|\n  | c | d ${chip(1)} |`,
+      );
+    });
+
+    it('a citation that ends inside a line`s own markers goes back to the line above, in reading order', () => {
+      expect(drawn(marked('1. first\n2^. second', 'a'))).toBe(`1. first ${chip(1)}\n2. second`);
+      const part = marked('1. first\n2^.^ second', 'a', 'b');
+      expect(drawn(part)).toBe(`1. first ${chip(1)} ${chip(2)}\n2. second`);
+      expect(drawn(marked('1^. first', 'a'))).toBe(`${chip(1)}\n\n1. first`);
+    });
+
+    it('a line that is only a number is the line`s text', () => {
+      expect(drawn(marked('The answer:\n42^', 'a'))).toBe(`The answer:\n42 ${chip(1)}`);
+    });
+
+    it('an escaped pipe at the end of a line is text', () => {
+      expect(drawn(marked('Just text \\|^', 'a'))).toBe(`Just text \\| ${chip(1)}`);
+    });
+
+    it.each([
+      ['no leading pipe', 'a | b |\n--|--|\nc | d |'],
+      ['in a quote', '> | a | b |\n> |---|---|\n> | c | d |'],
+      ['in a list', '- | a | b |\n  |---|---|\n  | c | d |'],
+    ])('%s, at every place a citation can end', (_name, text) => {
+      expect(expectChipsToLeaveItAlone(text)).toBe(text.length + 1);
+    });
+
     it('a table with no outer pipes keeps its chip at the end of the line', () => {
       expect(drawn(marked('A | B\n- | -\nx | y^', 'a'))).toBe(`A | B\n- | -\nx | y ${chip(1)}`);
     });
@@ -866,6 +902,8 @@ describe('a chip never breaks the block it lands near', () => {
       'Before.\n\n    indented code\n\n    more of it\n\nAfter.',
       '- item\n\n      code in an item\n\n- next',
       '- item\n\n    continued, no code\n- next',
+      'a | b |\n--|--|\nc | d |',
+      '> | a | b |\n> |---|---|\n> | c | d |',
     ];
     let seed = 20261102;
     const next = (limit: number): number => {

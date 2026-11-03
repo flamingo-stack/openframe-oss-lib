@@ -433,6 +433,13 @@ function placeOnAHoldingLine(text: string, position: number): number | null {
   return null;
 }
 
+/** Whether a backslash escapes the character at `at`. */
+function isEscaped(text: string, at: number): boolean {
+  let backslashes = 0;
+  while (text[at - backslashes - 1] === '\\') backslashes++;
+  return backslashes % 2 === 1;
+}
+
 const CLOSING_HEADING_HASHES = /^[ \t]*(?:>[ \t]*)*#{1,6}[ \t].*?([ \t]+#+)$/;
 const TRAILING_BACKSLASHES = /\\+$/;
 
@@ -443,7 +450,7 @@ const TRAILING_BACKSLASHES = /\\+$/;
 function beforeWhatEndsTheLine(text: string, position: number): number {
   if (text.slice(position, lineEndOf(text, position)).trim() !== '') return position;
   const line = text.slice(lineStartOf(text, position), position);
-  if (line.trimStart().startsWith('|') && line.endsWith('|')) return backOverSpace(text, position - 1);
+  if (line.endsWith('|') && !isEscaped(text, position - 1)) return backOverSpace(text, position - 1);
   const hashes = CLOSING_HEADING_HASHES.exec(line);
   if (hashes) return position - hashes[1].length;
   const backslashes = TRAILING_BACKSLASHES.exec(line);
@@ -545,9 +552,23 @@ function endOfSentence(text: string, ranges: readonly ProtectedRange[], position
   return backOverSpace(text, lineEnd);
 }
 
+const LINE_MARKERS = /^[ \t]*(?:>[ \t]*|(?:[-*+]|\d{1,9}[.)])(?:[ \t]+|$))*/;
+
+/** Back past a line's own quote and list markers: nothing is cited yet there, and a chip would open the line (a table's row). */
+function beforeLineMarkers(text: string, position: number): number {
+  let at = position;
+  while (at > 0) {
+    const start = lineStartOf(text, at);
+    const markers = LINE_MARKERS.exec(text.slice(start, lineEndOf(text, at)))?.[0] ?? '';
+    if (at - start > markers.length) return at;
+    at = backOverSpace(text, start);
+  }
+  return at;
+}
+
 /** Where a citation's chip goes: never inside what its markdown would break. Null when no place in the text is safe. */
 function chipPlace(text: string, ranges: readonly ProtectedRange[], endIndex: number): ChipPlace | null {
-  const cited = backOverSpace(text, Math.min(endIndex, text.length));
+  const cited = beforeLineMarkers(text, backOverSpace(text, Math.min(endIndex, text.length)));
   if (cited === 0) return { position: 0, block: opensABlock(text, ranges) ? AT_TOP_LEVEL : null };
   let position = placeOnAHoldingLine(text, cited);
   if (position === null) return { position: lineEndOf(text, cited), block: AT_TOP_LEVEL };
