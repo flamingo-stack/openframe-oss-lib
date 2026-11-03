@@ -11,8 +11,8 @@
  * no width cap, no ellipsis, nothing hidden behind a tooltip. That is how inline mentions read in editors (a page or
  * person mention), and what WCAG 1.4.10 (reflow) asks of text at a narrow width. Standalone chips (a filter, a tag)
  * truncate to one line; this one is not standalone. The box is an inline element whose border, fill and corners
- * repeat on every line it spans (`box-decoration-break: clone`), and an unbroken name (an id, a host name) breaks
- * anywhere rather than run out of its column.
+ * repeat on every line it spans (`box-decoration-break: clone`), and an unbroken name (an id, a host name, a name in
+ * Chinese) breaks anywhere rather than run out of its column, with an action or without one.
  *
  * The icon never ends a line on its own. It stands in the start padding of the box that holds the name, out of flow:
  * beside the text as an inline block it was a place a line could break, and a line did ("per the" and the icon alone,
@@ -96,17 +96,21 @@ export function InlineChip({
       name
     );
   // A line must not break between the name and its action, or the "⋯" is left alone at the start of the next line.
-  // Browsers allow a break before an inline button whatever `white-space` says, so the name's LAST WORD and the action
-  // share one `nowrap` box; the rest of the name wraps freely. The last word keeps the link as a second anchor that is
-  // a click target only, and the first anchor carries the whole name as its accessible name.
-  const split = trailing && typeof label === 'string' ? splitLastWord(label) : null;
+  // Browsers allow a break before an inline button whatever `white-space` says, so the name's LAST FEW CHARACTERS and the
+  // action share one `nowrap` box; the rest of the name wraps freely. Only those few: a whole last word held there ran out
+  // of the column whenever it was wider than the column (a host name), and the chat's scroller hides what overflows, the
+  // action included. An ordinary word still moves to the next line whole: the edge of an inline box inside a word is no
+  // place to break, and shaping carries across it (the same widths whole and split in Chromium and in WebKit, Arabic,
+  // Devanagari and Hebrew included). They keep the link as a second anchor that is a click target only, and the first
+  // anchor carries the whole name as its accessible name.
+  const split = trailing && typeof label === 'string' ? splitNameEnd(label) : null;
   if (split) {
     const wrap = (content: React.ReactNode, anchor: InlineChipAnchor) => (link ? link(content, anchor) : content);
     return (
       <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, link && INLINE_CHIP_LINKED_CLASS, className)}>
         {split.head ? wrap(named(split.head), { label: label as string }) : null}
         <span className="whitespace-nowrap">
-          {split.head ? wrap(split.last, { hidden: true }) : wrap(named(split.last), {})}
+          {split.head ? wrap(split.end, { hidden: true }) : wrap(named(split.end), {})}
           <span className={INLINE_CHIP_TRAILING_CLASS}>{trailing}</span>
         </span>
       </span>
@@ -125,9 +129,18 @@ export function InlineChip({
   );
 }
 
-/** A name split before its last word (`head` keeps the space); a one-word name is all `last`. */
-function splitLastWord(name: string): { head: string; last: string } {
+/**
+ * A name's last three characters as a reader counts them, or a line could end inside an emoji or a letter with its mark: a
+ * base with its marks and skin tone, emoji joined by U+200D as one, a flag's two letters as one.
+ */
+const NAME_END = /(?:\p{RI}{2}|\P{M}[\p{M}\p{EMod}]*(?:‍\P{M}\p{M}*)*){1,3}$/u;
+
+/**
+ * A name split before the characters that stay with its action (`head` keeps a space). A last word shorter than that is
+ * all of them, because a space inside the `nowrap` box is no place to break.
+ */
+function splitNameEnd(name: string): { head: string; end: string } {
   const trimmed = name.trimEnd();
-  const at = trimmed.search(/\S+$/);
-  return { head: trimmed.slice(0, at), last: trimmed.slice(at) };
+  const at = Math.max(trimmed.search(/\S+$/), trimmed.search(NAME_END));
+  return { head: trimmed.slice(0, at), end: trimmed.slice(at) };
 }

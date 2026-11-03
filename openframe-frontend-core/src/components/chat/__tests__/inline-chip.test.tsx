@@ -10,7 +10,7 @@ const link = (content: React.ReactNode, anchor: InlineChipAnchor) => (
   </a>
 );
 
-/** The one box the last word and the action share, which a line cannot break. */
+/** The one box the name's end and the action share, which a line cannot break. */
 const unbrokenBoxOf = (element: HTMLElement) => element.closest('.whitespace-nowrap');
 
 describe('InlineChip', () => {
@@ -55,29 +55,60 @@ describe('InlineChip', () => {
       expect(screen.getByTestId('inline-chip')).toHaveTextContent('Devices');
     });
 
-    it('with an action: on the first word, and the last word keeps the action', () => {
+    it('with an action: on the first word, and the name`s last characters keep the action', () => {
       render(<InlineChip icon={icon} label="Platform overview" link={link} trailing={action} />);
-      const name = screen.getByText('Platform');
+      const name = screen.getByText('Platform overv');
       expectIconHeld(name);
       expect(name.closest('a')).toHaveAttribute('aria-label', 'Platform overview');
-      const last = screen.getByText('overview');
-      expect(unbrokenBoxOf(last)).toBe(unbrokenBoxOf(screen.getByRole('button', { name: 'more', hidden: true })));
+      const end = screen.getByText('iew');
+      expect(unbrokenBoxOf(end)).toBe(unbrokenBoxOf(screen.getByRole('button', { name: 'more', hidden: true })));
       expect(unbrokenBoxOf(name)).toBeNull();
     });
 
-    it('with an action and a long name: the words between are free to wrap', () => {
+    it('with an action and a long name: everything but its end is free to wrap', () => {
       render(<InlineChip icon={icon} label="Solo MSP endpoint cleanup" link={link} trailing={action} />);
-      const name = screen.getByText('Solo MSP endpoint');
+      const name = screen.getByText('Solo MSP endpoint clea');
       expectIconHeld(name);
       expect(unbrokenBoxOf(name)).toBeNull();
-      expect(unbrokenBoxOf(screen.getByText('cleanup'))).toBeTruthy();
+      expect(unbrokenBoxOf(screen.getByText('nup'))).toBeTruthy();
     });
 
-    it('a one-word name with an action: icon, word and action are one unbroken piece', () => {
-      render(<InlineChip icon={icon} label="MacBook" link={link} trailing={action} />);
-      const name = screen.getByText('MacBook');
+    it('a one-word name wider than a column: only its end stays with the action, the rest breaks anywhere', () => {
+      const host = 'ip-10-0-12-34.us-west-2.compute.internal';
+      render(<InlineChip icon={icon} label={host} link={link} trailing={action} />);
+      const name = screen.getByText(host.slice(0, -3));
+      expectIconHeld(name);
+      expect(unbrokenBoxOf(name)).toBeNull();
+      expect(unbrokenBoxOf(screen.getByText('nal'))).toBeTruthy();
+      expect(screen.getByTestId('inline-chip').className).toContain('[overflow-wrap:anywhere]');
+    });
+
+    it('a short name: icon, name and action are one unbroken piece', () => {
+      render(<InlineChip icon={icon} label="Ann" link={link} trailing={action} />);
+      const name = screen.getByText('Ann');
       expectIconHeld(name);
       expect(unbrokenBoxOf(name)).toBe(unbrokenBoxOf(screen.getByRole('button', { name: 'more', hidden: true })));
+    });
+
+    it('a short last word stays whole: a space in the unbroken box is no place to break', () => {
+      render(<InlineChip icon={icon} label="Solo MSP" link={link} trailing={action} />);
+      expectIconHeld(screen.getByText('Solo'));
+      expect(unbrokenBoxOf(screen.getByText('MSP'))).toBeTruthy();
+    });
+
+    it.each([
+      ['joined emoji', '\u{1F468}‍\u{1F469}‍\u{1F467}', 'Team '],
+      ['a letter with its mark', 'é', 'caf'],
+      ['a skin tone', '\u{1F44D}\u{1F3FD}', 'Team'],
+      ['a flag', '\u{1F1FA}\u{1F1F8}', 'Team'],
+    ])('%s: what the action holds is never half a character', (_name, character, before) => {
+      const held = character.repeat(3);
+      const label = `${before}${character}${held}`;
+      render(<InlineChip label={label} link={link} trailing={action} />);
+      const chip = screen.getByTestId('inline-chip');
+      expect(chip.textContent).toBe(`${label}more`);
+      expect(chip.querySelector('.whitespace-nowrap a')?.textContent).toBe(held);
+      expect(chip.querySelector(':scope > a')?.textContent).toBe(`${before}${character}`);
     });
 
     it('with no icon there is no box and no padding', () => {
