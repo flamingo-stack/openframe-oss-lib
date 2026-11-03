@@ -22,6 +22,7 @@ import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
 import com.openframe.api.service.rmm.fleet.FleetCalls;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
+import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
 import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.api.service.rmm.fleet.HostInventory.CveHit;
 import com.openframe.api.service.rmm.vulnerability.FleetGlobalVulnerabilityMapper;
@@ -100,6 +101,7 @@ public class SoftwareInventoryService {
     private final TenantIdProvider tenantIdProvider;
     private final DeviceHostInventoryLoader deviceHostInventoryLoader;
     private final SoftwareAutoUpdateService autoUpdateService;
+    private final SoftwareCatalogStatus catalogStatus;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final OrganizationRepository organizationRepository;
 
@@ -135,7 +137,8 @@ public class SoftwareInventoryService {
                     if (!fleetPaging) {
                         enrichRealDevicesCount(List.of(row));
                     }
-                    autoUpdateService.applyToSoftware(List.of(row));
+                    List<SoftwareResponse> rows = List.of(row);
+                    applyStatuses(rows);
                     return row;
                 });
     }
@@ -153,7 +156,7 @@ public class SoftwareInventoryService {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
         if (fleetPaging) {
-            return withAutoUpdate(softwarePageFromFleet(search, page, perPage, sort, vulnerable));
+            return withStatuses(softwarePageFromFleet(search, page, perPage, sort, vulnerable));
         }
 
         List<SoftwareTitle> titles = fetchAllTitles(search, vulnerable);
@@ -166,12 +169,18 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> ordered = field == null
                 ? withDevices
                 : withDevices.stream().sorted(comparatorFor(field, desc)).toList();
-        return withAutoUpdate(paginateList(ordered, page, perPage));
+        return withStatuses(paginateList(ordered, page, perPage));
     }
 
-    private PageResult<SoftwareResponse> withAutoUpdate(PageResult<SoftwareResponse> page) {
-        autoUpdateService.applyToSoftware(page.items());
+    private PageResult<SoftwareResponse> withStatuses(PageResult<SoftwareResponse> page) {
+        applyStatuses(page.items());
         return page;
+    }
+
+    // the policies first: a row they cover keeps its ON / OFF, the catalog fills the rest
+    private void applyStatuses(List<SoftwareResponse> rows) {
+        autoUpdateService.applyToSoftware(rows);
+        catalogStatus.apply(rows);
     }
 
     private PageResult<SoftwareResponse> softwarePageFromFleet(String search, int page, Integer perPage,
@@ -430,6 +439,7 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, filter, search);
         // the filter reads auto-update, so it is set on every row, not only on the page
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
+        catalogStatus.apply(rows);
         List<SoftwareResponse> chosen = rows.stream()
                 .filter(row -> filter == null || selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate()))
                 .toList();
@@ -443,6 +453,7 @@ public class SoftwareInventoryService {
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, null, search);
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
+        catalogStatus.apply(rows);
         return softwareFilters(rows);
     }
 
@@ -485,6 +496,7 @@ public class SoftwareInventoryService {
                 .id(id)
                 .name(title.getName())
                 .source(source)
+                .type(FleetSoftwareType.of(title.getSource()))
                 .currentVersion(installedVersion(installed))
                 .olderVersionsCount(Math.max(0, installed.size() - 1))
                 .vulnerabilitySummary(summarizeDeviceSoftware(title, inventory))
@@ -588,7 +600,11 @@ public class SoftwareInventoryService {
         if (title == null || title.getVersions() == null || title.getVersions().isEmpty()) {
             return List.of();
         }
-        String latestVersion = FleetSoftwareMapper.toResponse(title).getLatestVersion();
+        // the catalog's newest release when it carries the title, otherwise the highest version installed
+        SoftwareResponse titleRow = FleetSoftwareMapper.toResponse(title);
+        List<SoftwareResponse> titleRows = List.of(titleRow);
+        catalogStatus.apply(titleRows);
+        String latestVersion = titleRow.getLatestVersion();
         SoftwareSource installedBy = installedBy(title.getSource());
 
         List<SoftwareTitleVersion> versions = title.getVersions().stream()
@@ -648,7 +664,9 @@ public class SoftwareInventoryService {
         if (device == null) {
             return null;
         }
-        SoftwareOnDeviceStatus status = latestVersion != null && latestVersion.equals(hv.version())
+        // at or past the latest: the catalog can lag behind a release a device already runs
+        SoftwareOnDeviceStatus status = latestVersion != null && hv.version() != null
+                && SoftwareVersions.compare(hv.version(), latestVersion) >= 0
                 ? SoftwareOnDeviceStatus.UP_TO_DATE : SoftwareOnDeviceStatus.OUTDATED;
         return SoftwareOnDeviceResponse.builder()
                 .device(device)
@@ -689,6 +707,7 @@ public class SoftwareInventoryService {
         // here — it would fire N Fleet /hosts lookups just to produce numbers we don't use.
         List<SoftwareTitle> fetched = fetchAllTitles(search, null);
         List<SoftwareResponse> titles = mapTitles(fetched);
+        applyStatuses(titles);
         return softwareFilters(titles);
     }
 

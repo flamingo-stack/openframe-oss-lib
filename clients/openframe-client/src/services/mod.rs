@@ -86,7 +86,7 @@ pub use tool_kill_service::ToolKillService;
 pub use tool_ops::ToolOps;
 pub use tool_restart_service::{RestartOutcome, ToolRestartService};
 pub use tool_run_manager::ToolRunManager;
-pub use tool_uninstall_service::{ToolUninstallService, UninstallOutcome};
+pub use tool_uninstall_service::ToolUninstallService;
 pub use tool_url_params_resolver::ToolUrlParamsResolver;
 pub use update_cleanup_service::UpdateCleanupService;
 pub use update_handler_service::UpdateHandlerService;

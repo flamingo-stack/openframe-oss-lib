@@ -2,6 +2,7 @@ package com.openframe.data.repository.notification.impl;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.ReadStatus;
@@ -42,6 +43,8 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
     private static final String FIELD_CATEGORY = "category";
     private static final String FIELD_TYPE = "type";
     private static final String FIELD_SEVERITY = "severity";
+    private static final String FIELD_ENTITY_TYPE = "entityType";
+    private static final String FIELD_ENTITY_ID = "entityId";
 
     public CustomNotificationRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
         super(mongoTemplate);
@@ -78,6 +81,7 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
         applyTypes(criteria, filter.getTypes());
         applySeverities(criteria, filter.getSeverities());
         applySearch(criteria, filter.getSearch());
+        applyEntity(criteria, filter.getEntityType(), filter.getEntityId());
         return criteria;
     }
 
@@ -165,6 +169,14 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
             return;
         }
         criteria.and(FIELD_SEVERITY).in(severities);
+    }
+
+    // Both halves or nothing: a type without an id would list every row of that type, which no caller wants.
+    private static void applyEntity(Criteria criteria, NotificationEntityType entityType, String entityId) {
+        if (entityType == null || isBlank(entityId)) {
+            return;
+        }
+        criteria.and(FIELD_ENTITY_TYPE).is(entityType).and(FIELD_ENTITY_ID).is(entityId);
     }
 
     private static void applyCursor(Criteria criteria, String cursor, Sort.Direction effectiveDirection) {

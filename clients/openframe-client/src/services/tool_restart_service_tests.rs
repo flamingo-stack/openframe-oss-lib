@@ -53,7 +53,7 @@ fn fixture() -> Fixture {
 #[tokio::test]
 async fn busy_tool_is_not_restarted() {
     let f = fixture();
-    let _op = f.tool_ops.lock(TOOL).await.mark_busy();
+    let _op = f.tool_ops.try_lock(TOOL).expect("free tool").mark_busy();
 
     let outcome = f.service.restart_guarded(TOOL).await.unwrap();
 

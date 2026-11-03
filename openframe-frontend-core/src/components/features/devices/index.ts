@@ -38,6 +38,7 @@ export {
 export { DeviceTagsFilterButton } from './device-tags-filter-button';
 export { renderDeviceTypeIcon } from './device-type-icon';
 export { DeviceTypeTile } from './device-type-tile';
+export { DeviceUnreadIndicator } from './device-unread-indicator';
 export { DevicesFilterToolbar, type DevicesFilterToolbarProps } from './devices-filter-toolbar';
 export { DevicesGrid, type DevicesGridProps } from './devices-grid';
 export { DevicesGridFilters, type DevicesGridFiltersProps } from './devices-grid-filters';

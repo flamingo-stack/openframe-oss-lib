@@ -18,4 +18,5 @@ public class NotificationFilterInput {
     private List<NotificationCategory> categories;
     private List<String> types;
     private List<NotificationSeverity> severities;
+    private NotificationEntityFilterInput entity;
 }
