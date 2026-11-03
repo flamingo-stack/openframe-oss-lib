@@ -103,6 +103,7 @@ class DeliverySweepServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(spec.wireForm(any())).thenAnswer(invocation -> invocation.getArgument(0));
         dispatchedAt = Instant.now().minusSeconds(ACK_THRESHOLD * 2);
         delivery = row(MACHINE_ID, PAYLOAD_JSON);
         properties = DeliveryTestPolicies.properties();

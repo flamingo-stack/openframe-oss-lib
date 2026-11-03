@@ -81,9 +81,8 @@ public class Script implements TenantScoped {
     private List<String> defaultArgs;
     /**
      * Default environment variables exported on the agent before script
-     * execution. Variables flagged as {@code secret} require encryption at
-     * rest and secure delivery to the agent; that pipeline is not yet
-     * implemented — see follow-up secret-management story.
+     * execution. Variables flagged as {@code secret} are stored encrypted and
+     * decrypted only to build the message for the agent.
      */
     private List<ScriptEnvVar> envVars;
     /**

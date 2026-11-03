@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * One saved-script payload inside a {@link ScriptScheduleExecutionMessage}. Mirrors the
@@ -17,7 +18,7 @@ import java.util.List;
  * with no override slots — schedules always run scripts with their stored defaults.
  */
 @Data
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -36,4 +37,9 @@ public class ScriptScheduleExecutionItem {
     private Integer timeoutSeconds;
 
     private List<ScriptEnvVar> envVars;
+
+    public ScriptScheduleExecutionItem revealed(UnaryOperator<String> decrypt) {
+        List<ScriptEnvVar> revealedEnvVars = ScriptEnvVar.revealAll(envVars, decrypt);
+        return toBuilder().envVars(revealedEnvVars).build();
+    }
 }

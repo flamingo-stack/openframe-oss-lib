@@ -4,6 +4,7 @@ import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedule.UpdateScriptScheduleInput;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
@@ -12,10 +13,13 @@ import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 /**
@@ -24,18 +28,26 @@ import java.util.stream.Collectors;
  * {@code GraphQLScriptScheduleMapper}.
  */
 @Component
+@RequiredArgsConstructor
 public class ScriptScheduleMapper {
+
+    // ObjectProvider: a service that never reads a stored secret boots without the encryption config
+    private final ObjectProvider<EncryptionService> encryptionService;
+    private final ObjectProvider<ScriptSecretSealer> secretSealer;
 
     public ScheduleScript toEntity(String tenantId, CreateScriptScheduleInput input,
                                    Map<String, List<ScriptEnvVar>> scriptDefaultsByScriptId) {
+        List<ScheduledScriptCustomParamsInput> customParamsInput = input.getScriptCustomParams();
+        List<ScheduledScriptCustomParams> plainCustomParams = toCustomParams(customParamsInput, Map.of(),
+                scriptDefaultsByScriptId);
+        List<ScheduledScriptCustomParams> customParams = seal(plainCustomParams);
         return ScheduleScript.builder()
                 .tenantId(tenantId)
                 .name(input.getName())
                 .description(input.getDescription())
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .scriptIds(input.getScriptIds())
-                .scriptCustomParams(toCustomParams(input.getScriptCustomParams(),
-                        Map.of(), scriptDefaultsByScriptId))
+                .scriptCustomParams(customParams)
                 .trigger(defaultTrigger(input.getTrigger()))
                 .timeReference(defaultTimeReference(input.getTimeReference()))
                 .offlineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()))
@@ -53,8 +65,9 @@ public class ScriptScheduleMapper {
         existing.setScriptIds(input.getScriptIds());
         // update: the prior stored override wins over script defaults so a customized secret is kept.
         Map<String, List<ScriptEnvVar>> storedByScriptId = storedOverridesByScriptId(existing);
-        existing.setScriptCustomParams(toCustomParams(input.getScriptCustomParams(),
-                storedByScriptId, scriptDefaultsByScriptId));
+        List<ScheduledScriptCustomParams> customParams = toCustomParams(input.getScriptCustomParams(),
+                storedByScriptId, scriptDefaultsByScriptId);
+        existing.setScriptCustomParams(seal(customParams));
         existing.setTrigger(defaultTrigger(input.getTrigger()));
         existing.setTimeReference(defaultTimeReference(input.getTimeReference()));
         existing.setOfflineBehavior(defaultOfflineBehavior(input.getOfflineBehavior()));
@@ -80,14 +93,16 @@ public class ScriptScheduleMapper {
         return mode != null ? mode : ScheduleDeviceSelectionMode.SPECIFIC;
     }
 
+    // Plain in the response, like ScriptMapper: run-now dispatch reads it, the GraphQL boundary masks secrets.
     public ScriptScheduleResponse toResponse(ScheduleScript entity) {
+        List<ScheduledScriptCustomParams> customParams = reveal(entity.getScriptCustomParams());
         return ScriptScheduleResponse.builder()
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .supportedPlatforms(entity.getSupportedPlatforms())
                 .scriptIds(entity.getScriptIds())
-                .scriptCustomParams(entity.getScriptCustomParams())
+                .scriptCustomParams(customParams)
                 .selectionMode(defaultSelectionMode(entity.getSelectionMode()))
                 .deviceCriteria(entity.getDeviceCriteria())
                 .trigger(defaultTrigger(entity.getTrigger()))
@@ -134,6 +149,38 @@ public class ScriptScheduleMapper {
                 .args(args)
                 .envVars(resolvedEnvVars)
                 .build();
+    }
+
+    private List<ScheduledScriptCustomParams> seal(List<ScheduledScriptCustomParams> customParams) {
+        ScriptSecretSealer sealer = secretSealer.getIfAvailable();
+        return sealer == null ? customParams : withEnvVars(customParams, sealer::seal);
+    }
+
+    private List<ScheduledScriptCustomParams> reveal(List<ScheduledScriptCustomParams> customParams) {
+        return withEnvVars(customParams, envVars -> ScriptEnvVar.revealAll(envVars, this::decrypt));
+    }
+
+    private String decrypt(String ciphertext) {
+        EncryptionService service = encryptionService.getObject();
+        return service.decrypt(ciphertext);
+    }
+
+    // Copies, never mutates: the same entity may still be saved after it is mapped to a response.
+    private static List<ScheduledScriptCustomParams> withEnvVars(List<ScheduledScriptCustomParams> customParams,
+                                                                 UnaryOperator<List<ScriptEnvVar>> transform) {
+        if (customParams == null) {
+            return null;
+        }
+        return customParams.stream()
+                .map(p -> withEnvVars(p, transform))
+                .toList();
+    }
+
+    private static ScheduledScriptCustomParams withEnvVars(ScheduledScriptCustomParams params,
+                                                           UnaryOperator<List<ScriptEnvVar>> transform) {
+        List<ScriptEnvVar> envVars = params.getEnvVars();
+        List<ScriptEnvVar> transformed = transform.apply(envVars);
+        return params.toBuilder().envVars(transformed).build();
     }
 
     private static Map<String, List<ScriptEnvVar>> storedOverridesByScriptId(ScheduleScript existing) {
