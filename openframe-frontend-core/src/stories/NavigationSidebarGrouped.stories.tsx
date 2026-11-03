@@ -545,3 +545,17 @@ export const ShortWindowWideSidebar: Story = {
     );
   },
 };
+
+/** `config.resizable`: the grip astride the right edge drags the width between 200 and 480px; a double click is the 264px default. */
+export const Resizable: Story = {
+  render: () => (
+    <GroupedHost
+      initialPath="/devices"
+      config={{
+        expandedWidth: 264,
+        sectionSlot: <ChatHistoryPlaceholder />,
+        resizable: { minWidth: 200, maxWidth: 480, storageKey: 'storybook.navigationSidebarGrouped.width' },
+      }}
+    />
+  ),
+};

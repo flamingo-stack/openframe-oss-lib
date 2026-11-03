@@ -14,6 +14,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.api.service.organization.OrganizationCommandService;
 import com.openframe.api.service.organization.OrganizationQueryService;
+import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.organization.Address;
 import com.openframe.data.document.organization.ContactInformation;
 import com.openframe.data.document.organization.ContactPerson;
@@ -196,6 +197,52 @@ class CustomerControllerTest {
         verifyNoInteractions(organizationQueryService);
     }
 
+    @Test
+    void reproducesBug_CU_17tkuw62n59_unknownSortFieldIs400AndNeverReachesTheDomain() throws Exception {
+        mockMvc.perform(get(BASE).param("search", "MSP client").param("sortField", "foo"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("sortField"))
+                .andExpect(jsonPath("$.customers").doesNotExist());
+
+        verifyNoInteractions(organizationQueryService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Name", "organizationId", "_id"})
+    void undocumentedSortFieldIs400WithTheAllowedFieldsAndNeverReachesTheDomain(String sortField) throws Exception {
+        mockMvc.perform(get(BASE).param("sortField", sortField))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Unknown sort field: " + sortField))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("sortField"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("must be one of: name, createdAt, updatedAt"));
+
+        verifyNoInteractions(organizationQueryService);
+    }
+
+    @Test
+    void blankSortFieldKeepsTheDefaultOrder() throws Exception {
+        when(organizationQueryService.queryOrganizations(any(), any(), any(), any())).thenReturn(page());
+
+        mockMvc.perform(get(BASE).param("sortField", "  ").param("sortDirection", "ASC")).andExpect(status().isOk());
+
+        verify(organizationQueryService).queryOrganizations(any(), any(), isNull(), isNull());
+    }
+
+    @Test
+    void paddedDocumentedSortFieldIsAcceptedAndTrimmed() throws Exception {
+        when(organizationQueryService.queryOrganizations(any(), any(), any(), any())).thenReturn(page());
+
+        mockMvc.perform(get(BASE).param("sortField", " updatedAt ")).andExpect(status().isOk());
+
+        ArgumentCaptor<SortInput> sort = ArgumentCaptor.forClass(SortInput.class);
+        verify(organizationQueryService).queryOrganizations(any(), any(), isNull(), sort.capture());
+        assertEquals("updatedAt", sort.getValue().getField());
+        assertEquals(SortDirection.DESC, sort.getValue().getDirection());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"0", "-1", "101"})
     void limitOutOfRangeIs400AndNeverReachesTheDomain(String limit) throws Exception {
@@ -363,6 +410,73 @@ class CustomerControllerTest {
         verify(organizationCommandService).updateOrganization(eq(CUSTOMER_ID), command.capture());
         assertEquals(UpdateOrganizationRequest.builder().name("Acme Corporation").numberOfEmployees(42).build(),
                 command.getValue());
+    }
+
+    @Test
+    void createCustomerWithContractEndingBeforeStartIs400AndNothingIsCreated() throws Exception {
+        mockMvc.perform(json(post(BASE), Map.of("name", "Acme", "contractStartDate", "2026-06-01", "contractEndDate", "2026-01-01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("contractEndDate"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("Contract end date must not be before the start date"));
+
+        verifyNoInteractions(organizationCommandService);
+    }
+
+    @Test
+    void createCustomerWithContractEndingOnTheStartDayIs201() throws Exception {
+        when(organizationCommandService.createOrganization(any())).thenReturn(organization());
+
+        mockMvc.perform(json(post(BASE), Map.of("name", "Acme", "contractStartDate", "2026-06-01", "contractEndDate", "2026-06-01")))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void updateCustomerWithContractEndingBeforeStartIs400AndNothingIsUpdated() throws Exception {
+        mockMvc.perform(json(put(BASE + "/" + CUSTOMER_ID), Map.of("contractStartDate", "2026-06-01", "contractEndDate", "2026-01-01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("contractEndDate"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("Contract end date must not be before the start date"));
+
+        verifyNoInteractions(organizationCommandService);
+    }
+
+    @Test
+    void updateCustomerRefusedAfterTheMergeIs400WithTheFieldError() throws Exception {
+        when(organizationCommandService.updateOrganization(eq(CUSTOMER_ID), any())).thenThrow(new ValidationException(
+                "Contract end date must not be before the start date",
+                List.of(new ValidationException.FieldError("contractEndDate", "Contract end date must not be before the start date"))));
+
+        mockMvc.perform(json(put(BASE + "/" + CUSTOMER_ID), Map.of("contractEndDate", "2026-01-01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("contractEndDate"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("Contract end date must not be before the start date"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"name\":\"\"}", "{\"name\":\"   \"}", "{\"name\":\"\\t\\n\"}", "{\"name\":\" \",\"numberOfEmployees\":5}"})
+    void updateCustomerWithBlankNameIs400AndNothingIsUpdated(String body) throws Exception {
+        mockMvc.perform(put(BASE + "/" + CUSTOMER_ID).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("name"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("Name must not be blank"));
+
+        verifyNoInteractions(organizationCommandService);
+    }
+
+    @Test
+    void updateCustomerWithoutNameLeavesTheNameAlone() throws Exception {
+        when(organizationCommandService.updateOrganization(eq(CUSTOMER_ID), any())).thenReturn(organization());
+
+        mockMvc.perform(json(put(BASE + "/" + CUSTOMER_ID), Map.of("numberOfEmployees", 5)))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<UpdateOrganizationRequest> command = ArgumentCaptor.forClass(UpdateOrganizationRequest.class);
+        verify(organizationCommandService).updateOrganization(eq(CUSTOMER_ID), command.capture());
+        assertNull(command.getValue().name());
     }
 
     @Test

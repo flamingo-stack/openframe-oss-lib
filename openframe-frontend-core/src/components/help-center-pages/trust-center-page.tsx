@@ -93,7 +93,7 @@ export interface TrustCenterPageProps {
   title?: string;
   /** Page subtitle. Default the brand-neutral `TRUST_CENTER_TAGLINE` (a host adds its brand here). */
   subtitle?: string;
-  /** The FAQ section's "ask the assistant" card (`FaqSection`'s `ask`): the host states its topic. Absent: no card. */
+  /** The FAQ section's "ask the assistant" card (`FaqSection`'s `ask`), for the page's topic (`usePageTopic`): `false` switches it off. */
   ask?: FaqSectionProps['ask'];
   /**
    * Host content shown after the trust sections and BEFORE the FAQ (the hub's

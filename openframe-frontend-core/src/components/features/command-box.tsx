@@ -2,6 +2,7 @@
 
 import { ChevronDown } from 'lucide-react';
 import type React from 'react';
+import { TEXT_LINES_HEIGHT } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
@@ -106,7 +107,11 @@ const COMMAND_BOX_CLASS = 'flex flex-col gap-2';
 const COMMAND_BOX_TITLE_CLASS = 'text-ods-text-primary text-h4';
 const COMMAND_BOX_FRAME_CLASS = 'rounded-[6px] border border-ods-border bg-ods-bg p-4';
 const COMMAND_BOX_COPY_ROW_CLASS = 'flex items-start gap-4';
-const COMMAND_BOX_COPY_BUTTON_LAYOUT = 'shrink-0';
+/**
+ * The copy button's slot, one line of the command's text class tall: the taller button overflows it evenly, so the
+ * frame's padding stays even and the icon stays on the first line of a long command.
+ */
+const COMMAND_BOX_COPY_SLOT_CLASS = cn(TEXT_LINES_HEIGHT[1], 'flex shrink-0 items-center text-code');
 const COMMAND_BOX_ACTIONS_CLASS = 'mt-4 flex flex-col gap-3 content-md:flex-row content-md:justify-end';
 const COMMAND_BOX_ACTION_CLASS = 'w-full content-md:w-auto';
 /** The fixed-height command area: N rows of the `text-code` line height token. Read by the box and its skeleton. */
@@ -184,16 +189,11 @@ export function CommandBox({
         {onCopy ? (
           <div className={COMMAND_BOX_COPY_ROW_CLASS}>
             {commandText}
-            <Button
-              variant="bare"
-              size="icon-sm"
-              type="button"
-              onClick={onCopy}
-              aria-label={copyAriaLabel}
-              className={COMMAND_BOX_COPY_BUTTON_LAYOUT}
-            >
-              <Copy02Icon />
-            </Button>
+            <div className={COMMAND_BOX_COPY_SLOT_CLASS}>
+              <Button variant="bare" size="icon-sm" type="button" onClick={onCopy} aria-label={copyAriaLabel}>
+                <Copy02Icon />
+              </Button>
+            </div>
           </div>
         ) : (
           commandText
@@ -290,14 +290,12 @@ function CommandBoxSkeleton({
         {showCopy ? (
           <div className={COMMAND_BOX_COPY_ROW_CLASS}>
             {commandLines}
-            <span
-              className={cn(
-                buttonVariants({ variant: 'transparent', size: 'icon-sm' }),
-                COMMAND_BOX_COPY_BUTTON_LAYOUT,
-              )}
-            >
-              <Copy02Icon />
-            </span>
+            <div className={COMMAND_BOX_COPY_SLOT_CLASS}>
+              {/* `cn` resolves the conflicting icon sizes, as `Button` does; without it, the icon is 20px. */}
+              <span className={cn(buttonVariants({ variant: 'bare', size: 'icon-sm' }))}>
+                <Copy02Icon />
+              </span>
+            </div>
           </div>
         ) : (
           commandLines

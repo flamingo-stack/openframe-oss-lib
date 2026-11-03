@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import lombok.Data;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -14,4 +15,13 @@ public class MachinePackageManagersMessage {
     public static final String SUBJECT_FILTER = "machine.*.package-managers";
 
     private Map<String, PackageManagerState> packageManagers;
+    private List<Dependency> dependencies = List.of();
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Dependency {
+
+        private String name;
+        private PackageManagerState state;
+    }
 }

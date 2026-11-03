@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import com.nimbusds.jwt.JWTParser;
 import com.openframe.core.exception.AuthFlowException;
+import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
@@ -149,13 +150,20 @@ public class OAuthBffService {
             return Mono.empty();
         }
 
-        return Mono.defer(() -> Mono.justOrEmpty(authorizationRepository.findByRefreshTokenValue(refreshToken)))
+        return Mono.defer(() -> Mono.justOrEmpty(findAuthorizationByRefreshToken(refreshToken)))
                 .subscribeOn(Schedulers.boundedElastic())
+                .switchIfEmpty(Mono.fromRunnable(() -> log.warn("Refresh refused: unknown refresh token")))
                 .flatMap(auth -> {
                     String tenantId = extractTenantIdFromAuthorizationUri(auth.getArAuthorizationUri()).orElse(null);
                     if (!hasText(tenantId)) return Mono.empty();
                     return refreshTokensPublic(tenantId, refreshToken, request);
                 });
+    }
+
+    /** A retired token resolves too: whether it is still inside its grace window is the auth server's call. */
+    private Optional<MongoOAuth2Authorization> findAuthorizationByRefreshToken(String refreshToken) {
+        return authorizationRepository.findByRefreshTokenValue(refreshToken)
+                .or(() -> authorizationRepository.findByRetiredRefreshTokensValue(refreshToken));
     }
 
     private String buildAuthorizeUrl(String tenantId, String codeChallenge, String state, String provider) {
@@ -524,7 +532,7 @@ public class OAuthBffService {
             return Mono.empty();
         }
 
-        return Mono.defer(() -> Mono.justOrEmpty(authorizationRepository.findByRefreshTokenValue(refreshToken)))
+        return Mono.defer(() -> Mono.justOrEmpty(findAuthorizationByRefreshToken(refreshToken)))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(auth -> {
                     String tenantId = extractTenantIdFromAuthorizationUri(auth.getArAuthorizationUri()).orElse(null);

@@ -110,5 +110,11 @@ export function useResizablePanelSize({
     [clampSize, storage],
   );
 
-  return { size, setSize, clampSize };
+  /** Back to `defaultSize`: the choice is forgotten and its stored entry removed. */
+  const resetSize = useCallback(() => {
+    setChosen({ storage, size: null });
+    storage?.clear();
+  }, [storage]);
+
+  return { size, setSize, resetSize, clampSize };
 }

@@ -77,6 +77,18 @@ class GraphQLExceptionHandlerDgsTest {
         assertThat(result.<Map<String, Object>>getData()).containsEntry("adminOnly", "granted");
     }
 
+    @Test
+    void handleException_onANonNullField_answersOneErrorAtItsPath() {
+        signIn("ADMIN");
+
+        ExecutionResult result = queryExecutor.execute("{ required }");
+
+        assertThat(result.getErrors())
+                .singleElement()
+                .returns("countdownSeconds must be positive", GraphQLError::getMessage)
+                .returns(List.of("required"), GraphQLError::getPath);
+    }
+
     private static void signIn(String role) {
         Jwt jwt = Jwt.withTokenValue("token")
                 .header("alg", "none")
@@ -101,6 +113,11 @@ class GraphQLExceptionHandlerDgsTest {
         @PreAuthorize("hasAuthority('ADMIN')")
         String adminOnly() {
             return "granted";
+        }
+
+        @DgsQuery
+        String required() {
+            throw new IllegalArgumentException("countdownSeconds must be positive");
         }
     }
 }

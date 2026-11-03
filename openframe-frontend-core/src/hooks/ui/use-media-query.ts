@@ -13,6 +13,8 @@ export function useMediaQuery(query: string): boolean | undefined {
   const [matches, setMatches] = useState<boolean | undefined>(undefined);
 
   useIsomorphicLayoutEffect(() => {
+    // An environment without matchMedia (jsdom in a consumer's tests) never answers: `undefined` throughout.
+    if (typeof window.matchMedia !== 'function') return undefined;
     const matchMedia = window.matchMedia(query);
 
     const handleChange = () => {

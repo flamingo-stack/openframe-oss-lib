@@ -11,7 +11,7 @@ public class SoftwareOnDeviceFilters {
 
     private List<SoftwareFilterOption> statuses;
 
-    // empty until the read model and the auto-update policy back them: the schema fields are non-null
+    // non-null in the schema; empty when no device has a value for them
     @Builder.Default
     private List<SoftwareFilterOption> installedBy = List.of();
     @Builder.Default

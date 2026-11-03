@@ -14,6 +14,8 @@ import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
 import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
+import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -61,13 +63,15 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
     @Mock private SoftwareAutoUpdateService autoUpdateService;
+    @Mock private TagAssignmentRepository tagAssignmentRepository;
+    @Mock private OrganizationRepository organizationRepository;
 
     private SoftwareInventoryService service;
 
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService);
+                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService, tagAssignmentRepository, organizationRepository);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }
@@ -151,7 +155,7 @@ class SoftwareInventoryServiceFleetPagingTest {
 
         // execution
         PageResult<SoftwareVulnerabilityResponse> result =
-                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
+                service.listVulnerabilitiesForSoftware("42", null, null, 0, 50, null, true);
 
         // verifications
         assertThat(result.items())
@@ -171,7 +175,7 @@ class SoftwareInventoryServiceFleetPagingTest {
 
         // execution
         PageResult<SoftwareVulnerabilityResponse> result =
-                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
+                service.listVulnerabilitiesForSoftware("42", null, null, 0, 50, null, true);
 
         // verifications
         assertThat(result.items()).extracting(SoftwareVulnerabilityResponse::getCveId, SoftwareVulnerabilityResponse::getDiscoveredAt)
@@ -190,7 +194,7 @@ class SoftwareInventoryServiceFleetPagingTest {
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(10L, machine("m-10"), 11L, machine("m-11")));
 
         // execution
-        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 50);
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 50, null);
 
         // verifications
         assertThat(result.items())

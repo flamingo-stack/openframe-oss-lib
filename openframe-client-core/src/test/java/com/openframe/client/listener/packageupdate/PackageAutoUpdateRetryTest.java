@@ -34,6 +34,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -95,7 +96,7 @@ class PackageAutoUpdateRetryTest {
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = {"SUPERSEDED", "NOT_SUPPORTED", "MANAGER_MISSING", "NOT_INSTALLED"})
+    @ValueSource(strings = {"SUPERSEDED", "NOT_SUPPORTED", "MANAGER_MISSING", "NOT_INSTALLED", "NOT_UPGRADABLE"})
     void failureThatWillNotPass_staysFailed(String reason) {
         retry.scheduleIfDue(failed(reason), request);
 
@@ -176,6 +177,61 @@ class PackageAutoUpdateRetryTest {
         retry.scheduleIfDue(failed("TIMEOUT"), null);
 
         nothingScheduled();
+    }
+
+    @Test
+    void packageNotOnTheDevice_policyTurnedOff() {
+        retry.turnOffIfPackageRemoved(failed("NOT_INSTALLED"), request);
+
+        verify(policyRepository).disable(eq("p1"), eq("package-auto-update"), any());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"NOT_UPGRADABLE", "MANAGER_ERROR", "TIMEOUT"})
+    void otherFailure_policyStaysOn(String reason) {
+        retry.turnOffIfPackageRemoved(failed(reason), request);
+
+        policyNotTurnedOff();
+    }
+
+    @Test
+    void anAdminsOrderFindingNoPackage_policyStaysOn() {
+        request.setSource(PackageUpdateSource.ADMIN);
+
+        retry.turnOffIfPackageRemoved(failed("NOT_INSTALLED"), request);
+
+        policyNotTurnedOff();
+    }
+
+    @Test
+    void olderVersionFindingNoPackage_policyStaysOn() {
+        // the package may be back by the time a newer version was ordered
+        policy.setLastVersion("153.0.0.1");
+
+        retry.turnOffIfPackageRemoved(failed("NOT_INSTALLED"), request);
+
+        policyNotTurnedOff();
+    }
+
+    @Test
+    void policyAlreadyOff_notWrittenAgain() {
+        policy.setEnabled(false);
+
+        retry.turnOffIfPackageRemoved(failed("NOT_INSTALLED"), request);
+
+        policyNotTurnedOff();
+    }
+
+    @Test
+    void noRequest_policyStaysOn() {
+        retry.turnOffIfPackageRemoved(failed("NOT_INSTALLED"), null);
+
+        policyNotTurnedOff();
+    }
+
+    private void policyNotTurnedOff() {
+        verify(policyRepository, never()).disable(any(), any(), any());
     }
 
     private void nothingScheduled() {
