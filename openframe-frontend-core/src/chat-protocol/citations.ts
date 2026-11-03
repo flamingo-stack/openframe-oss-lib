@@ -55,12 +55,19 @@ export function citationNumbers(parts: readonly ChatPart[]): ReadonlyMap<string,
 /** What a line can sit inside: a quote, or a list item whose content starts this many columns past its parent's. */
 type Container = 'quote' | number;
 
+/** How a block ends: what a chip on the line after it has to stay inside, so a list stays one list and a quote one quote. */
+interface BlockEnd {
+  containers: readonly Container[];
+  /** It runs on until a blank line, so a chip needs one before it, or the chip is in the block. */
+  runsToBlankLine?: boolean;
+}
+
 interface ProtectedRange {
   start: number;
   /** Exclusive. */
   end: number;
   /** A fence or a raw HTML block: a chip after it needs a line of its own, or the block does not close. */
-  block?: { containers: readonly Container[] };
+  block?: BlockEnd;
   /** One that never closes: nothing after it is outside it. */
   open?: boolean;
 }
@@ -183,8 +190,9 @@ function blockRanges(text: string): ProtectedRange[] {
       fence = null;
     }
     if (matched < open.length && html !== null) {
-      const containers = html.end === null ? open : open.slice(0, matched);
-      ranges.push({ start: html.start, end: html.through, block: { containers } });
+      const block =
+        html.end === null ? { containers: open, runsToBlankLine: true } : { containers: open.slice(0, matched) };
+      ranges.push({ start: html.start, end: html.through, block });
       html = null;
     }
 
@@ -197,11 +205,8 @@ function blockRanges(text: string): ProtectedRange[] {
       }
     } else if (html !== null) {
       if (html.end === null ? line.slice(at).trim() === '' : html.end.test(line)) {
-        ranges.push({
-          start: html.start,
-          end: html.end === null ? html.through : lineEnd,
-          block: { containers: open },
-        });
+        const block = { containers: open, runsToBlankLine: html.end === null };
+        ranges.push({ start: html.start, end: html.end === null ? html.through : lineEnd, block });
         html = null;
       } else {
         html.through = lineEnd;
@@ -251,7 +256,7 @@ function blockRanges(text: string): ProtectedRange[] {
   if (html !== null) {
     ranges.push(
       html.end === null
-        ? { start: html.start, end: html.through, block: { containers: open } }
+        ? { start: html.start, end: html.through, block: { containers: open, runsToBlankLine: true } }
         : { start: html.start, end: text.length, block: { containers: open }, open: true },
     );
   }
@@ -453,9 +458,12 @@ function paragraphStartOf(text: string, position: number): number {
 
 interface ChipPlace {
   position: number;
-  /** After a fence, on a line of its own. */
-  block: boolean;
+  /** After a block, on a line of its own. */
+  block: BlockEnd | null;
 }
+
+/** A line of its own, with nothing holding it. */
+const AT_TOP_LEVEL: BlockEnd = { containers: [] };
 
 const QUOTE_LINE = /^[ \t]*>/;
 const INDENTED_CODE_LINE = /^(?: {4}|\t)/;
@@ -531,21 +539,43 @@ function endOfSentence(text: string, ranges: readonly ProtectedRange[], position
 /** Where a citation's chip goes: never inside what its markdown would break. Null when no place in the text is safe. */
 function chipPlace(text: string, ranges: readonly ProtectedRange[], endIndex: number): ChipPlace | null {
   const cited = backOverSpace(text, Math.min(endIndex, text.length));
-  if (cited === 0) return { position: 0, block: opensABlock(text, ranges) };
+  if (cited === 0) return { position: 0, block: opensABlock(text, ranges) ? AT_TOP_LEVEL : null };
   let position = placeOnAHoldingLine(text, cited);
-  if (position === null) return { position: lineEndOf(text, cited), block: true };
+  if (position === null) return { position: lineEndOf(text, cited), block: AT_TOP_LEVEL };
   for (const range of ranges) {
     if (position <= range.start) break;
     if (range.open) return null;
     if (position < range.end) {
       position = range.end;
-      if (range.block) return { position, block: true };
+      if (range.block) return { position, block: range.block };
       break;
     }
-    if (position === range.end && range.block) return { position, block: true };
+    if (position === range.end && range.block) return { position, block: range.block };
   }
   const end = endOfSentence(text, ranges, position);
-  return { position: beforeWhatEndsTheLine(text, pastClosingEmphasis(text, end)), block: false };
+  return { position: beforeWhatEndsTheLine(text, pastClosingEmphasis(text, end)), block: null };
+}
+
+/**
+ * Whether the line under a chip that closes a block needs a blank line between them: a line what holds the block does not
+ * hold would join the chip's paragraph, a rule would make it a heading, and indented code would lose its indent. A sibling
+ * list item needs none, and with one the list would turn loose.
+ */
+function needsABreakAfterTheChip(nextLine: string, containers: readonly Container[]): boolean {
+  const line = withoutTabs(nextLine);
+  if (line.trim() === '' || LIST_ITEM_LINE.test(line)) return false;
+  const { matched, at } = continueContainers(line, containers);
+  return matched < containers.length || spacesAt(line, at) >= 4 || holdsNothing(line);
+}
+
+/** A chip on a line of its own after a block. With nothing holding the block, blank lines around it. */
+function chipLineAfter(text: string, position: number, block: BlockEnd, chips: string): string {
+  const atTheEnd = position >= text.length;
+  if (block.containers.length === 0) return `\n\n${chips}${atTheEnd ? '' : '\n'}`;
+  const prefix = block.containers.map(container => (container === 'quote' ? '> ' : ' '.repeat(container))).join('');
+  const before = block.runsToBlankLine ? `\n${prefix.trimEnd()}` : '';
+  const nextLine = atTheEnd ? '' : text.slice(position + 1, lineEndOf(text, position + 1));
+  return `${before}\n${prefix}${chips}${needsABreakAfterTheChip(nextLine, block.containers) ? '\n' : ''}`;
 }
 
 /**
@@ -568,7 +598,7 @@ export function textWithCitationChips(part: ChatTextPart, numbers: ReadonlyMap<s
     .sort((a, b) => a.position - b.position || a.number - b.number);
 
   const seen = new Set<string>();
-  const inserts = new Map<number, { block: boolean; numbers: number[] }>();
+  const inserts = new Map<number, { block: BlockEnd | null; numbers: number[] }>();
   for (const place of places) {
     const key = `${paragraphStartOf(text, place.position)}:${place.source}`;
     if (seen.has(key)) continue;
@@ -576,7 +606,7 @@ export function textWithCitationChips(part: ChatTextPart, numbers: ReadonlyMap<s
     const insert = inserts.get(place.position);
     if (insert) {
       if (!insert.numbers.includes(place.number)) insert.numbers.push(place.number);
-      insert.block ||= place.block;
+      insert.block ??= place.block;
     } else {
       inserts.set(place.position, { block: place.block, numbers: [place.number] });
     }
@@ -591,8 +621,7 @@ export function textWithCitationChips(part: ChatTextPart, numbers: ReadonlyMap<s
       // Nothing before it: what separates it goes after it.
       out += insert.block ? `${chips}\n\n` : `${chips} `;
     } else if (insert.block) {
-      out += `\n\n${chips}`;
-      if (position < text.length) out += '\n';
+      out += chipLineAfter(text, position, insert.block, chips);
     } else {
       out += ` ${chips}`;
     }

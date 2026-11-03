@@ -165,7 +165,7 @@ describe('textWithCitationChips', () => {
 
     it('reads tilde fences and an indented fence', () => {
       expect(drawn(marked('~~~\na^\n~~~', 'a'))).toBe(`~~~\na\n~~~\n\n${chip(1)}`);
-      expect(drawn(marked('- item\n  ```\n  a^\n  ```', 'a'))).toBe(`- item\n  \`\`\`\n  a\n  \`\`\`\n\n${chip(1)}`);
+      expect(drawn(marked('  ```\n  a^\n  ```', 'a'))).toBe(`  \`\`\`\n  a\n  \`\`\`\n\n${chip(1)}`);
     });
 
     it('a fence that never closes has no place after it: the chip stays out', () => {
@@ -565,6 +565,97 @@ function expectChipsToLeaveItAlone(text: string): number {
 }
 
 describe('a chip never breaks the block it lands near', () => {
+  describe('a block in a list or a quote: the chip stays in what holds it', () => {
+    const fence = '```bash\nnpm i\n```';
+    const indented = (by: string): string => fence.split('\n').join(`\n${by}`);
+
+    it('numbered steps stay one list', () => {
+      const part = marked(
+        `1. Install:\n   ${indented('   ')}^\n2. Run:\n   ${indented('   ')}^\n3. Done.^`,
+        'a',
+        'b',
+        'c',
+      );
+      expect(drawn(part)).toBe(
+        `1. Install:\n   ${indented('   ')}\n   ${chip(1)}\n2. Run:\n   ${indented('   ')}\n   ${chip(2)}\n3. Done. ${chip(3)}`,
+      );
+    });
+
+    it('a fence opened on the marker`s line', () => {
+      expect(drawn(marked(`1. ${indented('   ')}^\n2. Next.`, 'a'))).toBe(
+        `1. ${indented('   ')}\n   ${chip(1)}\n2. Next.`,
+      );
+    });
+
+    it('a bullet keeps the text after its fence', () => {
+      const code = '```\n  code\n  ```';
+      expect(drawn(marked(`- item\n  ${code}^\n  more text\n- next`, 'a'))).toBe(
+        `- item\n  ${code}\n  ${chip(1)}\n  more text\n- next`,
+      );
+    });
+
+    it('one quote stays one quote', () => {
+      expect(drawn(marked('> Install:\n> ```bash\n> npm i\n> ```^\n> Then run it.', 'a'))).toBe(
+        `> Install:\n> \`\`\`bash\n> npm i\n> \`\`\`\n> ${chip(1)}\n> Then run it.`,
+      );
+    });
+
+    it('nested: an item in an item, a list in a quote', () => {
+      expect(drawn(marked('- a\n  - ```\n    c^\n    ```\n  - b', 'a'))).toBe(
+        `- a\n  - \`\`\`\n    c\n    \`\`\`\n    ${chip(1)}\n  - b`,
+      );
+      expect(drawn(marked('> - ```\n>   c^\n>   ```\n> - b', 'a'))).toBe(
+        `> - \`\`\`\n>   c\n>   \`\`\`\n>   ${chip(1)}\n> - b`,
+      );
+    });
+
+    it('a line outside what holds it does not fall into the chip`s paragraph', () => {
+      expect(drawn(marked('- ```\n  c^\n  ```\nOutside.', 'a'))).toBe(
+        `- \`\`\`\n  c\n  \`\`\`\n  ${chip(1)}\n\nOutside.`,
+      );
+      expect(drawn(marked('> ```\n> c^\n> ```\nOutside.', 'a'))).toBe(
+        `> \`\`\`\n> c\n> \`\`\`\n> ${chip(1)}\n\nOutside.`,
+      );
+    });
+
+    it('a rule under it stays a rule, and indented code stays code', () => {
+      expect(drawn(marked('- ```\n  c^\n  ```\n  ---\n  more', 'a'))).toBe(
+        `- \`\`\`\n  c\n  \`\`\`\n  ${chip(1)}\n\n  ---\n  more`,
+      );
+      expect(drawn(marked('- ```\n  c^\n  ```\n      code', 'a'))).toBe(
+        `- \`\`\`\n  c\n  \`\`\`\n  ${chip(1)}\n\n      code`,
+      );
+    });
+
+    it('a fence its item ended takes the chip outside the item: inside, it would be code', () => {
+      const out = drawn(marked('- ```\n  c^\nOutside.', 'a'));
+      expect(out).toBe(`- \`\`\`\n  c\n\n${chip(1)}\n\nOutside.`);
+    });
+
+    it('an HTML block that runs to a blank line gets one before the chip', () => {
+      expect(drawn(marked('- <div>x</div>^\n- next', 'a'))).toBe(`- <div>x</div>\n\n  ${chip(1)}\n- next`);
+      expect(drawn(marked('> <div>x</div>^', 'a'))).toBe(`> <div>x</div>\n>\n> ${chip(1)}`);
+    });
+
+    it('an HTML block that ends itself does not', () => {
+      expect(drawn(marked('- <pre>\n  x^\n  </pre>\n- next', 'a'))).toBe(
+        `- <pre>\n  x\n  </pre>\n  ${chip(1)}\n- next`,
+      );
+    });
+
+    it.each([
+      ['steps', '1. Install:\n   ```bash\n   npm i\n   ```\n2. Run:\n   ```bash\n   npm start\n   ```\n3. Done.'],
+      ['a bullet with text after', '- item\n  ```\n  code\n  ```\n  more text\n- next'],
+      ['a quote', '> Install:\n> ```bash\n> npm i\n> ```\n> Then run it.'],
+      ['the end of a list', '- ```\n  code\n  ```\nOutside the list.'],
+      ['the end of a quote', '> ```\n> code\n> ```\nOutside the quote.'],
+      ['an item with HTML', '- <div>html</div>\n- next'],
+      ['nested', '- a\n  - ```\n    c\n    ```\n  - b\n  back in a\n- d'],
+    ])('%s, at every place a citation can end', (_name, text) => {
+      expect(expectChipsToLeaveItAlone(text)).toBe(text.length + 1);
+    });
+  });
+
   it('a rule or a delimiter row above a fence: the chip stays out of the fence, and the fence closes', () => {
     const text = 'Run this:\n\n```bash\nnpm i\n```\n\n---\n\nThen read the guide.\n\n```bash\nnpm t\n```\n\nDone.';
     const out = drawn({ type: 'text', text, citations: [cite('a', text.indexOf('---') + 3)] });
@@ -708,6 +799,12 @@ describe('a chip never breaks the block it lands near', () => {
       'See <https://auto.test> and https://bare.test/a?b=1 now.',
       'Hard break\\\nnext.',
       '[ref]: https://x.test "t"',
+      '1. ```bash\n   npm i\n   ```\n2. Next.\n\nFinal para.',
+      '- ```bash\n  npm i\n  ```\n- Next.\n\nFinal para.',
+      '1. Install:\n   ```bash\n   npm i\n   ```\n2. Run it.',
+      '- item\n  ```\n  code\n  ```\n  more text\n- next',
+      '> Install:\n> ```bash\n> npm i\n> ```\n> Then run it.',
+      '- <div>html</div>\n- next',
     ];
     let seed = 20261102;
     const next = (limit: number): number => {
