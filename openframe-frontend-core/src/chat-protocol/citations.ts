@@ -354,6 +354,61 @@ function opensABlock(text: string, ranges: readonly ProtectedRange[]): boolean {
   );
 }
 
+/** What may close around a sentence's last mark: a quote, a bracket, emphasis. */
+const SENTENCE_CLOSERS = new Set(['"', "'", '”', '’', '»', ')', ']', '}', '*', '_', '~']);
+/** A full stop that ends a word and no sentence. */
+const ABBREVIATION = /(?:^|[\s(])(?:e\.g|i\.e|vs)\.$/i;
+
+/**
+ * Past the sentence the mark at `at` ends and what closes around it, or -1 when it ends none. Text right after it means
+ * no end, which is what a decimal, a version and a domain are ($1.00, v1.2.3, flamingo.run).
+ */
+function sentenceEndAt(text: string, at: number): number {
+  if (text[at] !== '.' && text[at] !== '!' && text[at] !== '?') return -1;
+  let end = at + 1;
+  while (end < text.length && SENTENCE_CLOSERS.has(text[end])) end++;
+  if (end < text.length && !/\s/.test(text[end])) return -1;
+  return ABBREVIATION.test(text.slice(Math.max(0, at - 4), at + 1)) ? -1 : end;
+}
+
+/**
+ * The end of the sentence a position is in, so a number reads at the end of what it backs and never before a comma (an
+ * API citation ends where its block ends, which is often mid-sentence). Never past the line, so a table's row and a list's
+ * item stay whole; never past a table's cell; and a line with no end takes the chip at its own end. Code and links are
+ * stepped over: a mark inside one ends nothing, and one that crosses a line ends the walk where it opens.
+ */
+function endOfSentence(text: string, ranges: readonly ProtectedRange[], position: number): number {
+  if (text[position - 1] === '|') return position;
+  let back = position - 1;
+  while (back > 0 && SENTENCE_CLOSERS.has(text[back])) back--;
+  const here = sentenceEndAt(text, back);
+  if (here >= position) return here;
+
+  const lineEnd = lineEndOf(text, position);
+  let at = position;
+  let next = 0;
+  while (at < lineEnd) {
+    while (next < ranges.length && ranges[next].start < at) next++;
+    const range = ranges[next];
+    if (range?.start === at) {
+      if (range.end > lineEnd) return backOverSpace(text, at);
+      at = range.end;
+      // Of everything stepped over, only a bare url can end in a mark, and its full stop is the sentence's.
+      const end = sentenceEndAt(text, at - 1);
+      if (end !== -1) return end;
+    } else if (text[at] === '\\') {
+      at += 2;
+    } else if (text[at] === '|') {
+      return backOverSpace(text, at);
+    } else {
+      const end = sentenceEndAt(text, at);
+      if (end !== -1) return end;
+      at++;
+    }
+  }
+  return backOverSpace(text, lineEnd);
+}
+
 /** Where a citation's chip goes: never inside what its markdown would break. Null when no place in the text is safe. */
 function chipPlace(text: string, ranges: readonly ProtectedRange[], endIndex: number): ChipPlace | null {
   const cited = backOverSpace(text, Math.min(endIndex, text.length));
@@ -370,13 +425,14 @@ function chipPlace(text: string, ranges: readonly ProtectedRange[], endIndex: nu
     }
     if (position === range.end && range.block) return { position, block: true };
   }
-  return { position: beforeWhatEndsTheLine(text, pastClosingEmphasis(text, position)), block: false };
+  const end = endOfSentence(text, ranges, position);
+  return { position: beforeWhatEndsTheLine(text, pastClosingEmphasis(text, end)), block: false };
 }
 
 /**
- * The part's markdown with its citation chips in it, for drawing only: ` [n](#citation-n)` at each citation's `endIndex`,
- * before trailing whitespace, moved past any code span, fence or link it would land in. Each source once per paragraph,
- * and a list item or a table row is a paragraph of its own.
+ * The part's markdown with its citation chips in it, for drawing only: ` [n](#citation-n)` at the end of the sentence
+ * each citation's `endIndex` is in, before trailing whitespace, moved past any code span, fence or link it would land in.
+ * Each source once per paragraph, and a list item or a table row is a paragraph of its own.
  */
 export function textWithCitationChips(part: ChatTextPart, numbers: ReadonlyMap<string, number>): string {
   if (!part.citations || part.citations.length === 0) return part.text;

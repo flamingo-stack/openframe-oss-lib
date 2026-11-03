@@ -127,15 +127,15 @@ describe('textWithCitationChips', () => {
 
   describe('code span', () => {
     it('moves past a span it lands inside', () => {
-      expect(drawn(marked('Run `npm ^install` now.', 'a'))).toBe(`Run \`npm install\` ${chip(1)} now.`);
+      expect(drawn(marked('Run `npm ^install` now.', 'a'))).toBe(`Run \`npm install\` now. ${chip(1)}`);
     });
 
-    it('a chip right after a span stays there', () => {
-      expect(drawn(marked('Run `npm i`^ now.', 'a'))).toBe(`Run \`npm i\` ${chip(1)} now.`);
+    it('from right after a span, goes on to the end of the sentence', () => {
+      expect(drawn(marked('Run `npm i`^ now.', 'a'))).toBe(`Run \`npm i\` now. ${chip(1)}`);
     });
 
     it('matches a run of the same length', () => {
-      expect(drawn(marked('Run ``a ` ^b`` now.', 'a'))).toBe(`Run \`\`a \` b\`\` ${chip(1)} now.`);
+      expect(drawn(marked('Run ``a ` ^b`` now.', 'a'))).toBe(`Run \`\`a \` b\`\` now. ${chip(1)}`);
     });
 
     it('an unclosed backtick protects nothing', () => {
@@ -180,46 +180,48 @@ describe('textWithCitationChips', () => {
   describe('link', () => {
     it('moves past a link it lands inside the label of', () => {
       expect(drawn(marked('See [the ^guide](https://x.test/a) now.', 'a'))).toBe(
-        `See [the guide](https://x.test/a) ${chip(1)} now.`,
+        `See [the guide](https://x.test/a) now. ${chip(1)}`,
       );
     });
 
     it('moves past a link it lands inside the destination of', () => {
-      expect(drawn(marked('See [g](https://x.test/^a) now.', 'a'))).toBe(`See [g](https://x.test/a) ${chip(1)} now.`);
+      expect(drawn(marked('See [g](https://x.test/^a) now.', 'a'))).toBe(`See [g](https://x.test/a) now. ${chip(1)}`);
     });
 
     it('moves past a record link', () => {
       expect(drawn(marked('See [Atera^](record://vendor/42).', 'a'))).toBe(
-        `See [Atera](record://vendor/42) ${chip(1)}.`,
+        `See [Atera](record://vendor/42). ${chip(1)}`,
       );
     });
 
     it('reads a nested label and parentheses in a destination', () => {
-      expect(drawn(marked('[a [b^] c](https://x.test/(d)) e', 'a'))).toBe(`[a [b] c](https://x.test/(d)) ${chip(1)} e`);
+      expect(drawn(marked('[a [b^] c](https://x.test/(d)) e', 'a'))).toBe(`[a [b] c](https://x.test/(d)) e ${chip(1)}`);
     });
 
     it('moves past an image and an autolink', () => {
-      expect(drawn(marked('![a^](x.png) b', 'a'))).toBe(`![a](x.png) ${chip(1)} b`);
-      expect(drawn(marked('<https://x.^test> b', 'a'))).toBe(`<https://x.test> ${chip(1)} b`);
+      expect(drawn(marked('![a^](x.png) b', 'a'))).toBe(`![a](x.png) b ${chip(1)}`);
+      expect(drawn(marked('<https://x.^test> b', 'a'))).toBe(`<https://x.test> b ${chip(1)}`);
     });
 
     it('moves past a bare url', () => {
-      expect(drawn(marked('Go to https://x.test/^a now.', 'a'))).toBe(`Go to https://x.test/a ${chip(1)} now.`);
+      expect(drawn(marked('Go to https://x.test/^a now.', 'a'))).toBe(`Go to https://x.test/a now. ${chip(1)}`);
     });
 
     it('an escaped bracket opens no link', () => {
-      expect(drawn(marked('A \\[b^ c\\](d) e', 'a'))).toBe(`A \\[b ${chip(1)} c\\](d) e`);
+      expect(drawn(marked('A \\[b^ c\\](d) e', 'a'))).toBe(`A \\[b c\\](d) e ${chip(1)}`);
     });
   });
 
   describe('emphasis', () => {
     it('goes after a closing run, not inside it', () => {
-      expect(drawn(marked('A **bold^** word.', 'a'))).toBe(`A **bold** ${chip(1)} word.`);
-      expect(drawn(marked('A **bold*^* word.', 'a'))).toBe(`A **bold** ${chip(1)} word.`);
+      expect(drawn(marked('A **bold sentence.^** Next.', 'a'))).toBe(`A **bold sentence.** ${chip(1)} Next.`);
+      expect(drawn(marked('A **bold sentence.*^* Next.', 'a'))).toBe(`A **bold sentence.** ${chip(1)} Next.`);
+      expect(drawn(marked('A **bold^** word.', 'a'))).toBe(`A **bold** word. ${chip(1)}`);
+      expect(drawn(marked('A **bold phrase^**', 'a'))).toBe(`A **bold phrase** ${chip(1)}`);
     });
 
     it('leaves an underscore inside a word alone', () => {
-      expect(drawn(marked('snake^_case', 'a'))).toBe(`snake ${chip(1)}_case`);
+      expect(drawn(marked('snake^_case', 'a'))).toBe(`snake_case ${chip(1)}`);
     });
   });
 
@@ -258,6 +260,136 @@ describe('textWithCitationChips', () => {
 
     it('a source draws once per item, not once per list', () => {
       expect(drawn(marked('- One.^\n- Two.^', 'a', 'a'))).toBe(`- One. ${chip(1)}\n- Two. ${chip(1)}`);
+    });
+  });
+
+  describe('the end of the sentence', () => {
+    // The answers of two real turns (`e2e/browser/f1.body.txt` and `y2.body.txt`), with their real citation offsets.
+    it('a number no longer lands before a comma', () => {
+      const text =
+        "OpenFrame costs $1.00 per device per month billed monthly, or $0.80 per device per month billed yearly (20% less), far below Atera's per-user plans starting at $139/month, as shown on the [OpenFrame pricing](record://openframe_price/plan) record and the [Atera](record://vendor/299) vendor listing; the [Solo MSP endpoint cleanup case study](record://case_study/72) shows an MSP who found that value worthwhile even on its own.";
+      const part: ChatTextPart = {
+        type: 'text',
+        text,
+        citations: [{ source: source('record://openframe_price/plan'), startIndex: 0, endIndex: 113 }],
+      };
+      expect(text[113]).toBe(',');
+      expect(drawn(part)).toBe(`${text} ${chip(1)}`);
+    });
+
+    it('two sentences, one split across three wire parts, each number at its own end', () => {
+      const first =
+        'OpenFrame covers remote access, patching, device inventory, scripting, security rules, help desk, logs and client docs, built on tools like MeshCentral and Fleet MDM, with Fae and Mingo as AI agents, per the [Platform overview](record://site_page/openframe).';
+      const second = ' It costs $1.00 per device per month billed monthly, or $0.80 per device per month billed yearly';
+      const third = ', and offers a 14 day free trial with no card required';
+      const fourth = ', per [OpenFrame pricing](record://openframe_price/plan).';
+      const part: ChatTextPart = {
+        type: 'text',
+        text: first + second + third + fourth,
+        citations: [
+          { source: source('record://site_page/openframe'), startIndex: 0, endIndex: 198 },
+          { source: source('record://openframe_price/plan'), startIndex: first.length, endIndex: first.length + 96 },
+          {
+            source: source('record://openframe_price/plan'),
+            startIndex: first.length + second.length + 5,
+            endIndex: first.length + second.length + 54,
+          },
+        ],
+      };
+      expect(drawn(part)).toBe(`${first} ${chip(1)}${second}${third}${fourth} ${chip(2)}`);
+    });
+
+    it.each([
+      ['a decimal', 'It costs^ $1.00 today. Next.', `It costs $1.00 today. ${chip(1)} Next.`],
+      ['a version', 'Runs^ on v1.2.3 now. Next.', `Runs on v1.2.3 now. ${chip(1)} Next.`],
+      ['a domain', 'Hosted^ on flamingo.run now. Next.', `Hosted on flamingo.run now. ${chip(1)} Next.`],
+      [
+        'an abbreviation',
+        'Tools^, e.g. Fleet, i.e. MDM, vs. others. Next.',
+        `Tools, e.g. Fleet, i.e. MDM, vs. others. ${chip(1)} Next.`,
+      ],
+      ['an escaped mark', 'Item^ 1\\. stays. Next.', `Item 1\\. stays. ${chip(1)} Next.`],
+    ])('%s ends no sentence', (_name, text, expected) => {
+      expect(drawn(marked(text, 'a'))).toBe(expected);
+    });
+
+    it.each([
+      ['a full stop', 'Ends^ here. Next.', `Ends here. ${chip(1)} Next.`],
+      ['a question mark', 'Does^ it? Next.', `Does it? ${chip(1)} Next.`],
+      ['an exclamation mark', 'It^ does! Next.', `It does! ${chip(1)} Next.`],
+      ['a closing quote', 'He said^ "go." Next.', `He said "go." ${chip(1)} Next.`],
+      ['a curly quote', 'He said^ “go.” Next.', `He said “go.” ${chip(1)} Next.`],
+      ['a closing bracket', 'Some^ text (a note.) Next.', `Some text (a note.) ${chip(1)} Next.`],
+      ['the end of the text', 'Ends^ here.', `Ends here. ${chip(1)}`],
+      ['a version that ends it', 'Upgrade^ to v1.2.3.', `Upgrade to v1.2.3. ${chip(1)}`],
+      ['a bare url that ends it', 'See^ https://x.test/a. Next.', `See https://x.test/a. ${chip(1)} Next.`],
+    ])('%s ends one', (_name, text, expected) => {
+      expect(drawn(marked(text, 'a'))).toBe(expected);
+    });
+
+    it('a citation that already ends its sentence stays, closers and all', () => {
+      expect(drawn(marked('He said "go.^" Next.', 'a'))).toBe(`He said "go." ${chip(1)} Next.`);
+      expect(drawn(marked('He said "go."^ Next.', 'a'))).toBe(`He said "go." ${chip(1)} Next.`);
+      expect(drawn(marked('One.^ Two. Three.', 'a'))).toBe(`One. ${chip(1)} Two. Three.`);
+    });
+
+    it('a mark inside code or a link is no end', () => {
+      expect(drawn(marked('Run^ `a. b` and [c. d](https://x.test) now. Next.', 'a'))).toBe(
+        `Run \`a. b\` and [c. d](https://x.test) now. ${chip(1)} Next.`,
+      );
+    });
+
+    it('with no end on the line, the end of the line, before a hard break too', () => {
+      expect(drawn(marked('No mark^ on this line\nNext.', 'a'))).toBe(`No mark on this line ${chip(1)}\nNext.`);
+      expect(drawn(marked('No mark^ here  \nNext.', 'a'))).toBe(`No mark here ${chip(1)}  \nNext.`);
+    });
+
+    it('never past a line: a soft wrap ends the walk, and so does a link that crosses one', () => {
+      expect(drawn(marked('One^\ntwo. Three.', 'a'))).toBe(`One ${chip(1)}\ntwo. Three.`);
+      expect(drawn(marked('See^ [a\nb](https://x.test). Next.', 'a'))).toBe(
+        `See ${chip(1)} [a\nb](https://x.test). Next.`,
+      );
+    });
+
+    it('never past a cell of a table', () => {
+      expect(drawn(marked('| One^ two | three. |\n|---|---|\n| c | d |', 'a'))).toBe(
+        `| One two ${chip(1)} | three. |\n|---|---|\n| c | d |`,
+      );
+      expect(drawn(marked('| One^. Two | b |\n|---|---|\n| c | d |', 'a'))).toBe(
+        `| One. ${chip(1)} Two | b |\n|---|---|\n| c | d |`,
+      );
+      expect(drawn(marked('| One |^ two |\n|---|---|\n| c | d |', 'a'))).toBe(
+        `| One | ${chip(1)} two |\n|---|---|\n| c | d |`,
+      );
+    });
+
+    it('never past a list item', () => {
+      expect(drawn(marked('- One^ thing\n- Two.\n', 'a'))).toBe(`- One thing ${chip(1)}\n- Two.\n`);
+    });
+
+    it('in a heading, before its closing hashes', () => {
+      expect(drawn(marked('## A^ heading ##\n\nb', 'a'))).toBe(`## A heading ${chip(1)} ##\n\nb`);
+    });
+
+    it('two citations in one sentence meet at its end, as numbers in order', () => {
+      expect(drawn(marked('One^ two^ three. Next.', 'a', 'b'))).toBe(`One two three. ${chip(1)} ${chip(2)} Next.`);
+      expect(drawn(marked('One^ two^ three^ four. Next.', 'a', 'b', 'a'))).toBe(
+        `One two three four. ${chip(1)} ${chip(2)} Next.`,
+      );
+    });
+
+    it('moves a chip and not a number: reading order is still where the citations end', () => {
+      const part = marked('One^ two^ three. Four^.', 'b', 'a', 'c');
+      expect([...citationNumbers([part])]).toEqual([
+        ['b', 1],
+        ['a', 2],
+        ['c', 3],
+      ]);
+      expect(drawn(part)).toBe(`One two three. ${chip(1)} ${chip(2)} Four. ${chip(3)}`);
+    });
+
+    it('a citation at the very start stays where nothing is before it', () => {
+      expect(drawn(marked('^Starts here. Next.', 'a'))).toBe(`${chip(1)} Starts here. Next.`);
     });
   });
 
@@ -366,9 +498,6 @@ function expectChipsToLeaveItAlone(text: string): number {
   const before = structureWithoutChips(markdownParser.parse(text));
   let places = 0;
   for (let endIndex = 0; endIndex <= text.length; endIndex++) {
-    const atLineEnd = endIndex === text.length || text[endIndex] === '\n';
-    const afterSentence = endIndex > 0 && /[.!?:]/.test(text[endIndex - 1]) && /\s/.test(text[endIndex] ?? ' ');
-    if (endIndex !== 0 && !atLineEnd && !afterSentence) continue;
     const out = textWithCitationChips({ type: 'text', text, citations: [cite('a', endIndex)] }, new Map([['a', 1]]));
     const tree = markdownParser.parse(out) as MarkdownNode;
     expect({ endIndex, out, structure: structureWithoutChips(tree) }).toEqual({ endIndex, out, structure: before });
