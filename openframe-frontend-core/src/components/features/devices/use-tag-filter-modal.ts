@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useContentBreakpoint } from '../../../hooks/ui/use-content-breakpoint';
+import { useContentBreakpoint, useContentXlUp } from '../../../hooks/ui/use-content-breakpoint';
 import type { DeviceFilters } from './types';
 
 function isCompleteTag(tag: string): boolean {
@@ -24,7 +24,7 @@ interface UseTagFilterModalParams {
     label: string;
     filterable?: boolean;
     filterOptions?: FilterOption[];
-    inWindowOnDesktop?: boolean;
+    inWindowLgToXl?: boolean;
   }>;
   /** `useApiParams`' setter, each device list param is a list of ids. */
   setParams: (params: Record<string, string[]>) => void;
@@ -49,6 +49,7 @@ export function useTagFilterModal({
   // the window stays wide.
   const breakpoint = useContentBreakpoint();
   const isMdUp = breakpoint === undefined ? undefined : breakpoint !== 'mobile';
+  const xlUp = useContentXlUp();
   const [isOpen, setIsOpen] = useState(false);
 
   // FilterModal calls onFilterChange first, then onTagsChange.
@@ -58,18 +59,21 @@ export function useTagFilterModal({
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
 
-  // Below md the table draws no header, so every column filters here; on a desktop-width area only the columns whose
-  // header has no funnel at that width do.
+  // Below md the table draws no header, so every column filters here; from lg until xl only the columns whose header
+  // has no funnel there do.
   const filterGroups = useMemo(
     () =>
       columns
-        .filter(column => column.filterable && (!isMdUp || (breakpoint === 'desktop' && column.inWindowOnDesktop)))
+        .filter(
+          column =>
+            column.filterable && (!isMdUp || (breakpoint === 'desktop' && xlUp === false && column.inWindowLgToXl)),
+        )
         .map(column => ({
           id: column.key,
           title: column.label,
           options: column.filterOptions || [],
         })),
-    [columns, isMdUp, breakpoint],
+    [columns, isMdUp, breakpoint, xlUp],
   );
 
   const tagFilterKeys = useMemo(() => {

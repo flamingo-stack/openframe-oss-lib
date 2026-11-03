@@ -299,8 +299,8 @@ export interface DeviceFilterColumn {
   label: string;
   filterable?: boolean;
   filterOptions?: DeviceFilterOption[];
-  /** Filters in the filter window on a desktop-width area too: its column's header has no funnel there. */
-  inWindowOnDesktop?: boolean;
+  /** Filters in the filter window from `lg` until `xl` too: its column's header has no funnel there. */
+  inWindowLgToXl?: boolean;
 }
 
 /** A device filter dropdown entry: `meta.filter.options` plus the facet count. */
@@ -375,7 +375,7 @@ export function getDeviceFilterColumns(
             label: 'SOURCES',
             filterable: true,
             filterOptions: options.sources,
-            inWindowOnDesktop: !roomyDirectory,
+            inWindowLgToXl: !roomyDirectory,
           },
         ]
       : []),

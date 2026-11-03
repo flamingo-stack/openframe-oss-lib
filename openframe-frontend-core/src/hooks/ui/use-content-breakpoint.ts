@@ -2,12 +2,24 @@
 
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import { LAYOUT_STEPS } from '../../styles/layout-steps';
-import { useLgUp, useMdUp } from './use-media-query';
+import { useLgUp, useMdUp, useMediaQuery } from './use-media-query';
 
 export type ContentBreakpoint = 'mobile' | 'tablet' | 'desktop';
 
 /** Content-area steps, in px of the area's own width. */
-export const CONTENT_BREAKPOINTS = { md: LAYOUT_STEPS.md.content, lg: LAYOUT_STEPS.lg.content } as const;
+export const CONTENT_BREAKPOINTS = {
+  md: LAYOUT_STEPS.md.content,
+  lg: LAYOUT_STEPS.lg.content,
+  xl: LAYOUT_STEPS.xl.content,
+} as const;
+
+/**
+ * How many content steps a width has passed, `xl` included: `AppLayout` publishes a new width only when this changes,
+ * so every reader below sees each crossing it asks about (`useContentBreakpoint`, `useContentXlUp`).
+ */
+export function contentStepFor(width: number): number {
+  return [CONTENT_BREAKPOINTS.md, CONTENT_BREAKPOINTS.lg, CONTENT_BREAKPOINTS.xl].filter(step => width >= step).length;
+}
 
 /**
  * Width of the enclosing content area (`AppLayout` with a side panel or a composer
@@ -57,4 +69,11 @@ export function useContentMdUp(): boolean | undefined {
 export function useContentLgUp(): boolean | undefined {
   const breakpoint = useContentBreakpoint();
   return breakpoint === undefined ? undefined : breakpoint === 'desktop';
+}
+
+/** The `content-xl:` step in JS: the content area's width from `xl`, the viewport's outside one. */
+export function useContentXlUp(): boolean | undefined {
+  const width = useContext(ContentAreaWidthContext);
+  const viewportXlUp = useMediaQuery(`(min-width: ${LAYOUT_STEPS.xl.viewport}px)`);
+  return width === null ? viewportXlUp : width >= CONTENT_BREAKPOINTS.xl;
 }

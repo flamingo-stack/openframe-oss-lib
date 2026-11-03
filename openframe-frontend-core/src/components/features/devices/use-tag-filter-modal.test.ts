@@ -74,8 +74,12 @@ describe('useTagFilterModal filter groups', () => {
     expect(groupIds(directoryColumns, 800)).toEqual([]);
   });
 
-  it('carries SOURCES on a desktop-width area, where beside the customer column its header has no funnel', () => {
+  it('carries SOURCES from lg until xl, where beside the customer column its header has no funnel', () => {
     expect(groupIds(directoryColumns, 1100)).toEqual(['sources']);
+  });
+
+  it('leaves SOURCES to the header from xl, where its funnel is back', () => {
+    expect(groupIds(directoryColumns, 1300)).toEqual([]);
   });
 
   it("leaves SOURCES to the header on one customer's list", () => {
