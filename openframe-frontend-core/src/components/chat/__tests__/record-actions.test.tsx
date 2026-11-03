@@ -5,7 +5,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
@@ -61,29 +61,48 @@ async function menuRows(name: string | RegExp): Promise<string[]> {
     .map(row => row.textContent?.trim() ?? '');
 }
 
+/** A roadmap row as the hub answers it: the address of the task in ClickUp is the server's, never composed from the id. */
+const ROADMAP_ROW = {
+  id: '86ad3qvv5',
+  title: 'Patch policies',
+  status: 'working',
+  clickupUrl: 'https://app.clickup.com/t/from-the-row',
+};
+
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
-    vi.fn(() =>
-      Promise.resolve(
-        new Response(JSON.stringify({ items: [{ id: '86ad3qvv5', title: 'Patch policies', status: 'working' }] })),
-      ),
-    ),
+    vi.fn(() => Promise.resolve(new Response(JSON.stringify({ items: [ROADMAP_ROW] })))),
   );
 });
 afterEach(() => vi.unstubAllGlobals());
 
 describe("recordMenuGroups: one list of a record's actions", () => {
-  const rows = (ref: Pick<ChatRef, 'type' | 'id' | 'url'>, newTab = true) =>
+  const rows = (ref: Pick<ChatRef, 'type' | 'id' | 'url' | 'clickupUrl'>, newTab = true) =>
     recordMenuGroups(ref, { discuss: { label: 'Ask Mingo', icon: null, run: () => {} }, newTab })?.[0]?.items ?? [];
 
   it('a roadmap item: Ask, its page with the new-tab button, and the task in ClickUp', () => {
-    const items = rows({ type: 'roadmap_item', id: '86ad3qvv5', url: '/roadmap#86ad3qvv5' });
+    const items = rows({
+      type: 'roadmap_item',
+      id: '86ad3qvv5',
+      url: '/roadmap#86ad3qvv5',
+      clickupUrl: ROADMAP_ROW.clickupUrl,
+    });
     expect(items.map(item => item.label)).toEqual(['Ask Mingo', 'Open Details', 'Open in ClickUp']);
     expect(items[1]).toMatchObject({ href: '/roadmap#86ad3qvv5', iconAction: { 'aria-label': 'Open in new tab' } });
-    expect(items[2]).toMatchObject({ openInNewTab: true });
-    expect(items[2].href).toContain('86ad3qvv5');
+    expect(items[2]).toMatchObject({ openInNewTab: true, href: ROADMAP_ROW.clickupUrl });
   });
+
+  it.each(['roadmap_item', 'delivery_item'])(
+    'a %s whose row answered no ClickUp address offers none: none is composed',
+    type => {
+      const items = rows({ type, id: '86ad3qvv5', url: '/roadmap#86ad3qvv5' });
+      expect(items.map(item => item.label)).toEqual(['Ask Mingo', 'Open Details']);
+      expect(
+        rows({ type, id: '86ad3qvv5', url: '/roadmap#86ad3qvv5', clickupUrl: '' }).map(item => item.label),
+      ).toEqual(['Ask Mingo', 'Open Details']);
+    },
+  );
 
   it('an internal task opens in ClickUp itself: one ClickUp row, not two', () => {
     const items = rows({ type: 'internal_task', id: 'abc', url: 'https://app.clickup.com/t/abc' });
@@ -112,6 +131,7 @@ describe('a chip offers what its card offers', () => {
       ),
     );
     expect(await menuRows('Actions for Patch policies')).toEqual(['Ask Mingo', 'Open Details', 'Open in ClickUp']);
+    expect(screen.getByRole('link', { name: /Open in ClickUp/ })).toHaveAttribute('href', ROADMAP_ROW.clickupUrl);
     fireEvent.click(screen.getByRole('menuitem', { name: /Ask Mingo/ }));
     expect(onDiscuss).toHaveBeenCalledWith(expect.objectContaining({ type: 'roadmap_item', id: '86ad3qvv5' }));
   });
@@ -129,6 +149,29 @@ describe('a chip offers what its card offers', () => {
       ),
     );
     expect(await menuRows('Roadmap actions')).toEqual(['Ask Mingo', 'Open Details', 'Open in ClickUp']);
+    expect(screen.getByRole('link', { name: /Open in ClickUp/ })).toHaveAttribute('href', ROADMAP_ROW.clickupUrl);
+  });
+
+  it('a chip whose row has no ClickUp address offers no ClickUp row', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(new Response(JSON.stringify({ items: [{ ...ROADMAP_ROW, clickupUrl: undefined }] }))),
+      ),
+    );
+    render(
+      inChat(
+        <ChatMessageEnhanced
+          role="assistant"
+          parts={[{ type: 'text', text: 'See [Patch policies](record://roadmap_item/86ad3qvv5).' }]}
+          renderEntityCard={() => null}
+          NavLinkAnchor={NavLinkAnchor}
+        />,
+        vi.fn(),
+      ),
+    );
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(await menuRows('Actions for Patch policies')).toEqual(['Ask Mingo', 'Open Details']);
   });
 
   it("a host's chip reads the same menu for the record its link names", async () => {

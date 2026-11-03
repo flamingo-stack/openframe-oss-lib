@@ -21,6 +21,8 @@ export interface ChatRef {
   url: string | null;
   /** The platform that owns `url`, as the host's composer answered it. Derived, in memory only: no wire carries it. */
   targetPlatform?: string | null;
+  /** A ClickUp task's own address, as its row answers it. In memory only: what the record's menu links to, never composed. */
+  clickupUrl?: string | null;
   /** ISO date for the entity's canonical time. Optional. */
   date?: string;
   /** PII-sanitized hover preview text. Optional. */

@@ -370,11 +370,11 @@ const OPEN_IN_CLICKUP = { label: 'Open in ClickUp', icon: <ClickupLogoIcon size=
  * into the record's own app. ONE table for every surface that offers the menu, the record's card and its chip in a
  * sentence (`recordMenuGroups`), so the two can never offer different actions.
  */
-function recordMenuTerms(
-  type: string,
-  id: string,
-): { openDetails?: { label: string; icon: React.ReactNode }; externalLink?: CardExternalLink } {
-  switch (type) {
+function recordMenuTerms(ref: Pick<ChatRef, 'type' | 'clickupUrl'>): {
+  openDetails?: { label: string; icon: React.ReactNode };
+  externalLink?: CardExternalLink;
+} {
+  switch (ref.type) {
     case 'hubspot_ticket':
     case 'hubspot_ticket_anon':
     case 'hubspot_ticket_self':
@@ -384,12 +384,11 @@ function recordMenuTerms(
     // A task's own url IS its ClickUp deep link (its mapper resolves no public page): the details row is the ClickUp row.
     case 'internal_task':
       return { openDetails: OPEN_IN_CLICKUP };
-    // A mirrored ClickUp task whose id IS the ClickUp task id: its page, then the task in ClickUp.
+    // A mirrored ClickUp task: its page, then the task in ClickUp, at the address its row answers. Before the row is read,
+    // and for a row that fails, there is no such row in the menu: the lib composes no address.
     case 'roadmap_item':
-    case 'delivery_item': {
-      const href = clickupTaskUrl(id);
-      return href ? { externalLink: { ...OPEN_IN_CLICKUP, href } } : {};
-    }
+    case 'delivery_item':
+      return ref.clickupUrl ? { externalLink: { ...OPEN_IN_CLICKUP, href: ref.clickupUrl } } : {};
     default:
       return {};
   }
@@ -404,10 +403,10 @@ function recordMenuTerms(
  * resolved destination (`useRecordDestination`).
  */
 export function recordMenuGroups(
-  ref: Pick<ChatRef, 'type' | 'id' | 'url'>,
+  ref: Pick<ChatRef, 'type' | 'url' | 'clickupUrl'>,
   { discuss, newTab }: RecordMenuActions,
 ): ActionsMenuGroup[] | undefined {
-  const { openDetails, externalLink } = recordMenuTerms(ref.type, ref.id);
+  const { openDetails, externalLink } = recordMenuTerms(ref);
   const items: ActionsMenuGroup['items'] = [];
   if (discuss) {
     items.push({
@@ -2136,9 +2135,11 @@ export function useRecordDestination(chatRef: ChatRef) {
     composeContentUrl: runtime.composeContentUrl,
   });
   const sourceRepo = chatRef.sourceRepo ?? defaultTableIdForDocumentType(chatRef.type);
+  const clickupUrl = fetchEntry && typeof item?.clickupUrl === 'string' ? item.clickupUrl : null;
   const hrefResolvedChatRef: ChatRef = {
     ...chatRef,
     ...(sourceRepo ? { sourceRepo } : {}),
+    ...(clickupUrl ? { clickupUrl } : {}),
     url: destination.url,
     targetPlatform: destination.targetPlatform,
     // The nav wrapper reads the path off the ref for in-app doc navigation.
