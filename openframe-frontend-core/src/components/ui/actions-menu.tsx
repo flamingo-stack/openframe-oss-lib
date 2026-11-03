@@ -456,6 +456,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
     if (!open) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      event.preventDefault();
       event.stopPropagation();
       closedByEscape.current = true;
       setOpen(false);

@@ -133,4 +133,11 @@ describe('Escape on an open menu', () => {
     expect(onDocument).toHaveBeenCalledTimes(2);
     document.removeEventListener('keydown', onDocument);
   });
+
+  it('keeps the browser from acting on the key too, as Radix does: a full-screen window stays full screen', async () => {
+    render(<Menu />);
+    await openMenu();
+    // `fireEvent` answers false when a listener called `preventDefault`.
+    expect(fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })).toBe(false);
+  });
 });
