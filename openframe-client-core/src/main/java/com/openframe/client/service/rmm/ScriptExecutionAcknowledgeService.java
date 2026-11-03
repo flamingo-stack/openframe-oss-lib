@@ -1,9 +1,11 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.nats.rmm.model.ScriptExecutionAcknowledgeMessage;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
+import com.openframe.delivery.track.DeliveryTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import java.util.List;
 public class ScriptExecutionAcknowledgeService {
 
     private final ScriptExecutionRepository scriptExecutionRepository;
+    private final DeliveryTracker deliveryTracker;
 
     public void acknowledge(ScriptExecutionAcknowledgeMessage ack) {
         if (isIncomplete(ack)) {
@@ -24,6 +27,10 @@ public class ScriptExecutionAcknowledgeService {
                     ack.getExecutionId(), ack.getMachineId(), ack.getScriptIds());
             return;
         }
+
+        // the agent has the batch: the engine row closes first, so a crash before the leaves move leaves a DONE row
+        // the retry sweep reads, never an open row the engine re-publishes to an agent that already ran the batch
+        deliveryTracker.done(DeliveryType.SCRIPT_SCHEDULE, ack.getExecutionId(), ack.getMachineId());
 
         List<ScriptExecution> leaves = scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptIdIn(
                 ack.getMachineId(), ack.getExecutionId(), ack.getScriptIds());
