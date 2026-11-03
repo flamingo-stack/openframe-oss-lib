@@ -42,6 +42,8 @@ export interface DeviceRow extends DeviceNameSource {
   directoryUserCount?: number;
   /** The directories that know the device besides the agent. The SOURCES column reads it. */
   directorySources?: readonly string[];
+  /** The viewer's unread notifications about this device. Absent or 0: no indicator. */
+  unreadNotificationCount?: number;
 }
 
 export interface DeviceFilterValue {

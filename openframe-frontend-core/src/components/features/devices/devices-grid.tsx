@@ -7,6 +7,7 @@ import { DeviceCard } from '../../ui';
 import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { getDeviceName } from './device-name';
 import { getDeviceOperatingSystem, getDeviceStatusConfig } from './device-status';
+import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDevicesViewConfig } from './devices-view-config';
 import type { DeviceRow } from './types';
 
@@ -102,7 +103,14 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                       : undefined
                   }
                   onDeviceClick={() => handleDeviceClick(device)}
-                  actions={GRID_CARD_ACTIONS}
+                  actions={
+                    device.unreadNotificationCount
+                      ? {
+                          ...GRID_CARD_ACTIONS,
+                          detailsButton: { component: <DeviceUnreadIndicator device={device} /> },
+                        }
+                      : GRID_CARD_ACTIONS
+                  }
                   className="h-full"
                   // One card of a read list: how many there are is the record's (the height gate counts them).
                   data-loading-item

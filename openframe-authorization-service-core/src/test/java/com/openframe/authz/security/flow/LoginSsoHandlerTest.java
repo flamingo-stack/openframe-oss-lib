@@ -3,6 +3,7 @@ package com.openframe.authz.security.flow;
 import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
 import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.security.EmailTrustPolicy;
+import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.service.sso.SSOConfigService;
@@ -12,6 +13,8 @@ import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.core.constants.SsoFlowCookieNames;
+import com.openframe.core.exception.AuthErrorCode;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.auth.SsoIdentity;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
@@ -59,6 +62,8 @@ class LoginSsoHandlerTest {
     @Mock
     private SignupTicketService signupTicketService;
     @Mock
+    private SessionPrincipalBinder sessionPrincipalBinder;
+    @Mock
     private SsoIdentityService ssoIdentityService;
     @Mock
     private SsoOidcUserService ssoOidcUserService;
@@ -80,7 +85,7 @@ class LoginSsoHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new LoginSsoHandler(codec, signupTicketService, ssoIdentityService, ssoOidcUserService,
-                new EmailTrustPolicy(new MicrosoftSSOProperties()), userService, tenantService, ssoConfigService);
+                new EmailTrustPolicy(new MicrosoftSSOProperties()), userService, tenantService, ssoConfigService, sessionPrincipalBinder);
         lenient().when(ssoIdentityService.findLink(anyString(), anyMap())).thenReturn(Optional.empty());
         lenient().when(ssoConfigService.getSSOConfig(anyString(), anyString())).thenReturn(Optional.empty());
         lenient().when(tenantService.findById(TENANT)).thenReturn(Optional.of(tenant(TENANT, TenantStatus.ACTIVE)));
@@ -112,10 +117,27 @@ class LoginSsoHandlerTest {
                 .thenReturn(Optional.of(SsoIdentity.builder().userId("user-1").build()));
         when(userService.findActiveById("user-1")).thenReturn(Optional.of(existing));
 
-        handler.handle(request(), response, authentication("microsoft", untrustedMicrosoft));
+        var authentication = authentication("microsoft", untrustedMicrosoft);
+        MockHttpServletRequest request = request();
+
+        handler.handle(request, response, authentication);
 
         verify(ssoIdentityService).link("microsoft", untrustedMicrosoft.getClaims(), existing);
+        verify(sessionPrincipalBinder).bind(authentication, existing, request, response);
         assertThat(response.getHeader("Location")).isEqualTo("https://auth.example.com/oauth/continue?tenantId=tenant-1");
+    }
+
+    @Test
+    void shouldReportDuplicateActiveEmailAsLoginFailure() {
+        when(userService.findActiveByEmail("ada@acme.com")).thenThrow(new IllegalStateException("duplicate"));
+        MockHttpServletRequest request = request();
+        var authentication = authentication("google", trustedGoogle);
+
+        assertThatThrownBy(() -> handler.handle(request, response, authentication))
+                .isInstanceOfSatisfying(AuthFlowException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(AuthErrorCode.SSO_LOGIN_FAILED));
+
+        verify(ssoIdentityService, never()).link(anyString(), anyMap(), any());
     }
 
     @Test

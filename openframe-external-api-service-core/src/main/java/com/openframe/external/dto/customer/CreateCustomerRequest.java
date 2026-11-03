@@ -1,6 +1,8 @@
 package com.openframe.external.dto.customer;
 
 import com.openframe.api.dto.organization.ContactInformationDto;
+import com.openframe.api.validation.ContractPeriod;
+import com.openframe.api.validation.ValidContractPeriod;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Schema(description = "Create customer request")
+@ValidContractPeriod
 public record CreateCustomerRequest(
         @NotBlank(message = "Name is required")
         @Schema(description = "Customer name", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -25,5 +28,5 @@ public record CreateCustomerRequest(
         BigDecimal monthlyRevenue,
         LocalDate contractStartDate,
         LocalDate contractEndDate
-) {
+) implements ContractPeriod {
 }
