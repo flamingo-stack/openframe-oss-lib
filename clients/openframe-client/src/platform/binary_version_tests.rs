@@ -25,7 +25,7 @@ fn the_version_is_read_from_the_first_line_clap_prints() {
 }
 
 #[tokio::test]
-async fn a_binary_that_cannot_be_run_does_not_block_the_update() {
+async fn a_binary_that_cannot_be_run_reports_no_version() {
     let dir = tempfile::tempdir().unwrap();
     let missing = dir.path().join("openframe-client");
     let not_a_binary = dir.path().join("openframe-update-staged");
@@ -33,9 +33,6 @@ async fn a_binary_that_cannot_be_run_does_not_block_the_update() {
 
     for binary in [missing, not_a_binary] {
         assert_eq!(reported_version(&binary, LIMIT).await, None);
-        verify_staged_version(&binary, &v("1.5.107"), LIMIT)
-            .await
-            .unwrap();
     }
 }
 
@@ -54,7 +51,7 @@ mod unix {
     }
 
     #[tokio::test]
-    async fn the_staged_binary_is_made_executable_and_its_version_accepted_whatever_the_spelling() {
+    async fn the_binary_is_made_executable_and_asked_for_its_version() {
         let dir = tempfile::tempdir().unwrap();
         let binary = staged(
             &dir,
@@ -62,9 +59,6 @@ mod unix {
 echo "openframe-client v1.5.107+build.9""#,
         );
 
-        verify_staged_version(&binary, &v("1.5.107"), LIMIT)
-            .await
-            .unwrap();
         assert_eq!(
             reported_version(&binary, LIMIT).await,
             Some(v("1.5.107+build.9"))
@@ -72,23 +66,7 @@ echo "openframe-client v1.5.107+build.9""#,
     }
 
     #[tokio::test]
-    async fn a_clear_mismatch_refuses_the_update() {
-        for (reported, expected) in [("1.5.103", "1.5.107"), ("1.5.107-rc.1", "1.5.107")] {
-            let dir = tempfile::tempdir().unwrap();
-            let binary = staged(&dir, &format!("echo \"openframe-client {reported}\""));
-
-            let err = verify_staged_version(&binary, &v(expected), LIMIT)
-                .await
-                .expect_err(reported);
-
-            let reason = format!("{err:#}");
-            assert!(reason.contains(reported), "{reason}");
-            assert!(reason.contains(expected), "{reason}");
-        }
-    }
-
-    #[tokio::test]
-    async fn a_failing_or_silent_binary_lets_the_update_proceed() {
+    async fn a_failing_or_silent_binary_reports_no_version() {
         let cases = [
             ("echo \"openframe-client 1.5.103\"; exit 3", "non-zero exit"),
             ("echo \"openframe-client dev\"", "no version"),
@@ -97,21 +75,20 @@ echo "openframe-client v1.5.107+build.9""#,
             let dir = tempfile::tempdir().unwrap();
             let binary = staged(&dir, body);
 
-            verify_staged_version(&binary, &v("1.5.107"), LIMIT)
-                .await
-                .unwrap_or_else(|e| panic!("{why}: {e:#}"));
+            assert_eq!(reported_version(&binary, LIMIT).await, None, "{why}");
         }
     }
 
     #[tokio::test]
-    async fn a_hanging_binary_is_given_up_at_the_deadline_and_lets_the_update_proceed() {
+    async fn a_hanging_binary_is_given_up_at_the_deadline() {
         let dir = tempfile::tempdir().unwrap();
         let binary = staged(&dir, "exec sleep 30");
 
         let started = Instant::now();
-        verify_staged_version(&binary, &v("1.5.107"), Duration::from_secs(2))
-            .await
-            .unwrap();
+        assert_eq!(
+            reported_version(&binary, Duration::from_secs(2)).await,
+            None
+        );
 
         assert!(started.elapsed() < Duration::from_secs(10));
     }

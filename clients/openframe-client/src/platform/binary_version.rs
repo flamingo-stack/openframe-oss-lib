@@ -1,54 +1,28 @@
-use crate::platform::set_executable_permissions;
+use super::binary_writer::set_executable_permissions;
 use crate::utils::version_comparator;
-use anyhow::{anyhow, Result};
 use semver::Version;
-use std::cmp::Ordering;
 use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::time::timeout;
-use tracing::{info, warn};
+use tracing::warn;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const OUTPUT_LIMIT_BYTES: u64 = 4096;
 
-/// Refuses the staged binary only when it clearly reports another version; a binary that cannot tell is let through.
-pub async fn verify_staged_version(
-    binary: &Path,
-    expected: &Version,
-    limit: Duration,
-) -> Result<()> {
-    let Some(reported) = reported_version(binary, limit).await else {
-        warn!(
-            "Could not read the version of the staged binary, installing it unverified as {}",
-            expected
-        );
-        return Ok(());
-    };
-    if version_comparator::precedence(&reported, expected) != Ordering::Equal {
-        return Err(anyhow!(
-            "Downloaded binary reports version {}, expected {}; not installing it",
-            reported,
-            expected
-        ));
-    }
-    info!("Staged binary reports the expected version {}", reported);
-    Ok(())
-}
-
-/// Runs `<binary> --version`; None when it cannot be run, hangs, fails or prints no version.
-async fn reported_version(binary: &Path, limit: Duration) -> Option<Version> {
+/// Runs `<binary> --version`; None when it cannot be run, hangs past `limit`, fails or prints no client version.
+pub async fn reported_version(binary: &Path, limit: Duration) -> Option<Version> {
     if let Err(e) = set_executable_permissions(binary).await {
-        warn!("Staged binary cannot be made executable: {:#}", e);
+        warn!("{} cannot be made executable: {:#}", binary.display(), e);
         return None;
     }
 
-    // a scan still holding the freshly written exe would make the start fail and skip the check
+    // a scan still holding the freshly written exe would make the start fail
     #[cfg(windows)]
-    crate::platform::binary_writer::wait_until_executable_unlocked(
+    super::binary_writer::wait_until_executable_unlocked(
         binary,
         Duration::from_secs(crate::config::service_stop::EXEC_UNLOCK_WAIT_SECS),
     )
@@ -66,11 +40,7 @@ async fn reported_version(binary: &Path, limit: Duration) -> Option<Version> {
     let mut child = match cmd.spawn() {
         Ok(child) => child,
         Err(e) => {
-            warn!(
-                "Failed to run the staged binary {} --version: {}",
-                binary.display(),
-                e
-            );
+            warn!("Failed to run {} --version: {}", binary.display(), e);
             return None;
         }
     };
@@ -85,21 +55,25 @@ async fn reported_version(binary: &Path, limit: Duration) -> Option<Version> {
         let status = child.wait().await?;
         Ok::<_, std::io::Error>((status, out))
     };
-    let outcome = timeout(limit, run).await;
 
-    let (status, out) = match outcome {
+    let (status, out) = match timeout(limit, run).await {
         Ok(Ok(done)) => done,
         Ok(Err(e)) => {
-            warn!("Failed to read the staged binary's --version output: {}", e);
+            warn!(
+                "Failed to read {} --version output: {}",
+                binary.display(),
+                e
+            );
             return None;
         }
         Err(_) => {
             warn!(
-                "Staged binary did not answer --version within {:?}, killing it",
+                "{} did not answer --version within {:?}, killing it",
+                binary.display(),
                 limit
             );
             if let Err(e) = child.kill().await {
-                warn!("Failed to kill the staged binary's --version run: {}", e);
+                warn!("Failed to kill {} --version: {}", binary.display(), e);
             }
             return None;
         }
@@ -108,7 +82,8 @@ async fn reported_version(binary: &Path, limit: Duration) -> Option<Version> {
     let output = String::from_utf8_lossy(&out);
     if !status.success() {
         warn!(
-            "Staged binary --version exited with {}: {:?}",
+            "{} --version exited with {}: {:?}",
+            binary.display(),
             status,
             output.trim()
         );
@@ -117,7 +92,8 @@ async fn reported_version(binary: &Path, limit: Duration) -> Option<Version> {
     let version = parse_reported_version(&output);
     if version.is_none() {
         warn!(
-            "Staged binary --version printed no version: {:?}",
+            "{} --version printed no client version: {:?}",
+            binary.display(),
             output.trim()
         );
     }
@@ -136,5 +112,5 @@ fn parse_reported_version(output: &str) -> Option<Version> {
 }
 
 #[cfg(test)]
-#[path = "staged_binary_probe_tests.rs"]
+#[path = "binary_version_tests.rs"]
 mod tests;

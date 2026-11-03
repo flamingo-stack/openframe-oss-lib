@@ -2,13 +2,13 @@ use crate::config::update_config::{ALLOW_DOWNGRADE, STAGED_VERSION_PROBE_TIMEOUT
 use crate::models::openframe_client_info::ClientUpdateStatus;
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
 use crate::models::update_state::{UpdatePhase, UpdateState};
+use crate::platform::binary_version;
 use crate::platform::directories::get_update_staging_directory;
 use crate::platform::updater_launcher::{self, LaunchedUpdater, UpdaterParams};
 use crate::service::FULL_SERVICE_NAME;
 use crate::services::github_download_service::GithubDownloadService;
 use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
-use crate::services::staged_binary_probe;
 use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
@@ -158,12 +158,12 @@ impl OpenFrameClientUpdateService {
             .with_context(|| format!("Failed to parse requested version: {}", requested_version))?;
         let canonical_version = requested_semver.to_string();
 
-        // reserve() marked nothing for it, so a pending update deferred earlier keeps its claim
         if Self::is_running_version(requested_version) {
             info!(
                 "Already running version {}, ignoring update request",
                 canonical_version
             );
+            self.tool_run_manager.clear_client_update_pending();
             return Ok(UpdateLaunch::Skipped);
         }
 
@@ -327,14 +327,8 @@ impl OpenFrameClientUpdateService {
 
         info!("Update binary staged: {}", staged_path.display());
 
-        // Refused while the service still runs, so a wrong build costs no restart and is retried
-        if let Err(e) = staged_binary_probe::verify_staged_version(
-            &staged_path,
-            expected_version,
-            Duration::from_secs(STAGED_VERSION_PROBE_TIMEOUT_SECS),
-        )
-        .await
-        {
+        // Refused before the service stops, so a wrong build costs no restart; the engine re-runs it, the broadcast is redelivered
+        if let Err(e) = Self::verify_staged_version(&staged_path, expected_version).await {
             error!("Staged binary rejected: {:#}", e);
             if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
                 warn!(
@@ -530,6 +524,27 @@ impl OpenFrameClientUpdateService {
     fn parse_version(version: &str) -> Result<Version> {
         version_comparator::parse_version(version)
             .with_context(|| format!("Failed to parse version: {}", version))
+    }
+
+    /// Refuses the staged binary only when it clearly reports another version; one that cannot tell is installed unverified
+    async fn verify_staged_version(staged_path: &Path, expected: &Version) -> Result<()> {
+        let limit = Duration::from_secs(STAGED_VERSION_PROBE_TIMEOUT_SECS);
+        let Some(reported) = binary_version::reported_version(staged_path, limit).await else {
+            warn!(
+                "Could not read the version of the staged binary, installing it unverified as {}",
+                expected
+            );
+            return Ok(());
+        };
+        if version_comparator::precedence(&reported, expected) != std::cmp::Ordering::Equal {
+            return Err(anyhow!(
+                "Downloaded binary reports version {}, expected {}; not installing it",
+                reported,
+                expected
+            ));
+        }
+        info!("Staged binary reports the expected version {}", reported);
+        Ok(())
     }
 
     /// The request names the version this binary was built as

@@ -33,7 +33,6 @@ pub mod remote_access_mode_service;
 pub mod result_outbox_run_manager;
 pub mod result_store;
 pub mod shared_token_service;
-pub mod staged_binary_probe;
 pub mod token_refresh_run_manager;
 pub mod tool_agent_update_service;
 pub mod tool_command_params_resolver;

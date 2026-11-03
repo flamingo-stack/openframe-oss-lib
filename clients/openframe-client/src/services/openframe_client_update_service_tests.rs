@@ -116,7 +116,7 @@ async fn an_update_to_the_running_version_neither_parks_tools_nor_waits_for_a_bu
 }
 
 #[tokio::test]
-async fn an_update_to_the_running_version_waits_for_the_update_lock_and_keeps_its_claim() {
+async fn an_update_to_the_running_version_waits_for_the_update_lock() {
     let f = fixture();
     let other_update = f.service.reserve(&update(OTHER)).unwrap();
     assert!(f.tool_run_manager.is_client_update_pending());
@@ -129,8 +129,8 @@ async fn an_update_to_the_running_version_waits_for_the_update_lock_and_keeps_it
     let launch = f.service.apply(update(RUNNING), guard).await.unwrap();
     assert_eq!(launch, UpdateLaunch::Skipped);
     assert!(
-        f.tool_run_manager.is_client_update_pending(),
-        "the update to {OTHER} lost its claim on the tools"
+        !f.tool_run_manager.is_client_update_pending(),
+        "a skip releases parked tools, like the downgrade skip; a live deferred update parks them again"
     );
 }
 
@@ -207,6 +207,28 @@ mod staged_version_check {
             "macos"
         } else {
             "linux"
+        }
+    }
+
+    #[tokio::test]
+    async fn only_a_clear_mismatch_refuses_the_staged_binary() {
+        let dir = tempfile::tempdir().unwrap();
+        let expected = Version::parse("1.5.107").unwrap();
+        let verdict = |reported: &str| {
+            let path = dir.path().join(format!("staged-{reported}"));
+            std::fs::write(&path, format!("#!/bin/sh\necho \"{reported}\"\n")).unwrap();
+            let expected = expected.clone();
+            async move { OpenFrameClientUpdateService::verify_staged_version(&path, &expected).await }
+        };
+
+        for reported in ["openframe-client 1.5.103", "openframe-client 1.5.107-rc.1"] {
+            let reason = format!("{:#}", verdict(reported).await.expect_err(reported));
+            assert!(reason.contains("expected 1.5.107"), "{reason}");
+        }
+        for reported in ["openframe-client v1.5.107+build.9", "openframe-client dev"] {
+            verdict(reported)
+                .await
+                .unwrap_or_else(|e| panic!("{reported}: {e:#}"));
         }
     }
 
