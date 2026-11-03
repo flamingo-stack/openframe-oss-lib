@@ -70,6 +70,8 @@ class PackageAutoUpdateRetryTest {
         policy = PackageAutoUpdatePolicy.builder().id("p1").enabled(true).lastVersion(VERSION).build();
         when(policyRepository.findByTenantIdAndMachineIdAndPackageManagerAndPackageName(TENANT, "m1", PackageManagerType.BREW, "google-chrome"))
                 .thenReturn(Optional.of(policy));
+        when(policyRepository.markRetryScheduled("p1", VERSION, "req-1")).thenReturn(1L);
+        when(policyRepository.disable(eq("p1"), eq(VERSION), eq("package-auto-update"), any())).thenReturn(1L);
     }
 
     @ParameterizedTest
@@ -83,7 +85,7 @@ class PackageAutoUpdateRetryTest {
         ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
         ArgumentCaptor<Instant> dueAt = ArgumentCaptor.forClass(Instant.class);
         InOrder order = inOrder(policyRepository, deliveryDispatcher);
-        order.verify(policyRepository).markRetryScheduled("p1", "req-1");
+        order.verify(policyRepository).markRetryScheduled("p1", VERSION, "req-1");
         order.verify(deliveryDispatcher).schedule(seed.capture(), dueAt.capture());
         assertThat(seed.getValue().getRequestId()).isEqualTo("req-1");
         assertThat(seed.getValue().getMachineId()).isEqualTo("m1");
@@ -172,6 +174,18 @@ class PackageAutoUpdateRetryTest {
         nothingScheduled();
     }
 
+    // a newer order or a re-enable between the read and the write: the conditional write matches nothing
+    @Test
+    void policyMovedOnBeforeTheWrite_noRetry() {
+        when(policyRepository.markRetryScheduled("p1", VERSION, "req-1")).thenReturn(0L);
+        PackageUpdateDeviceState state = failed("TIMEOUT");
+
+        retry.scheduleIfDue(state, request);
+
+        verifyNoInteractions(deliveryDispatcher);
+        assertThat(state.getRetries()).isZero();
+    }
+
     @Test
     void noRequest_noRetry() {
         retry.scheduleIfDue(failed("TIMEOUT"), null);
@@ -183,7 +197,16 @@ class PackageAutoUpdateRetryTest {
     void packageNotOnTheDevice_policyTurnedOff() {
         retry.turnOffIfPackageRemoved(failed("NOT_INSTALLED"), request);
 
-        verify(policyRepository).disable(eq("p1"), eq("package-auto-update"), any());
+        verify(policyRepository).disable(eq("p1"), eq(VERSION), eq("package-auto-update"), any());
+    }
+
+    @Test
+    void policyMovedOnBeforeTheWrite_turnOffMatchesNothing() {
+        when(policyRepository.disable(eq("p1"), eq(VERSION), eq("package-auto-update"), any())).thenReturn(0L);
+
+        retry.turnOffIfPackageRemoved(failed("NOT_INSTALLED"), request);
+
+        verify(policyRepository).disable(eq("p1"), eq(VERSION), eq("package-auto-update"), any());
     }
 
     @ParameterizedTest
@@ -231,12 +254,12 @@ class PackageAutoUpdateRetryTest {
     }
 
     private void policyNotTurnedOff() {
-        verify(policyRepository, never()).disable(any(), any(), any());
+        verify(policyRepository, never()).disable(any(), any(), any(), any());
     }
 
     private void nothingScheduled() {
         verifyNoInteractions(deliveryDispatcher);
-        verify(policyRepository, never()).markRetryScheduled(any(), any());
+        verify(policyRepository, never()).markRetryScheduled(any(), any(), any());
     }
 
     private static PackageUpdateDeviceState failed(String reason) {

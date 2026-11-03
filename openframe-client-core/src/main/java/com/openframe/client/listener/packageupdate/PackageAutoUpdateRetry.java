@@ -61,7 +61,11 @@ public class PackageAutoUpdateRetry {
             return;
         }
         currentPolicy(request, state.getMachineId()).ifPresent(policy -> {
-            policyRepository.disable(policy.getId(), TURNED_OFF_BY, Instant.now());
+            if (policyRepository.disable(policy.getId(), policy.getLastVersion(), TURNED_OFF_BY, Instant.now()) == 0) {
+                log.info("[package-update] auto-update left on, the policy moved on since the report requestId={} machineId={}",
+                        request.getRequestId(), state.getMachineId());
+                return;
+            }
             log.info("[package-update] auto-update turned off, the package is not on the device requestId={} machineId={} package={}/{}",
                     request.getRequestId(), state.getMachineId(), request.getPackageManager(), request.getPackageName());
         });
@@ -71,7 +75,11 @@ public class PackageAutoUpdateRetry {
         String machineId = state.getMachineId();
         String requestId = request.getRequestId();
         // written first: a retry the policy does not name could not be withdrawn
-        policyRepository.markRetryScheduled(policy.getId(), requestId);
+        if (policyRepository.markRetryScheduled(policy.getId(), policy.getLastVersion(), requestId) == 0) {
+            log.info("[package-update] no retry, the policy moved on since the failure requestId={} machineId={}",
+                    requestId, machineId);
+            return;
+        }
         Instant dueAt = Instant.now().plusSeconds(backoffSeconds);
         PackageUpdateDeliverySeed seed = PackageUpdateWire.seed(machineId, requestId, request.getSource(),
                 request.getPackageManager(), request.getPackageName(), request.getBrewPackageType(), request.getMode(),

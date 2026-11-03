@@ -50,6 +50,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -85,6 +86,7 @@ class SoftwareInventoryServiceTest {
     @Mock private com.openframe.data.repository.tool.IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
     @Mock private SoftwareAutoUpdateService autoUpdateService;
+    @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private OrganizationRepository organizationRepository;
 
@@ -96,7 +98,8 @@ class SoftwareInventoryServiceTest {
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService, tagAssignmentRepository, organizationRepository);
+                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService, catalogStatus, tagAssignmentRepository,
+                organizationRepository);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }
@@ -715,6 +718,43 @@ class SoftwareInventoryServiceTest {
 
         assertThat(rows).extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getStatus)
                 .containsExactlyInAnyOrder(tuple("m-1", SoftwareOnDeviceStatus.OUTDATED), tuple("m-2", SoftwareOnDeviceStatus.UP_TO_DATE));
+    }
+
+    @Test
+    @DisplayName("softwareDevices status: with a catalog release out, a device on the highest installed version is OUTDATED too")
+    void listDevices_statusAgainstTheCatalog() {
+        stubDevices("homebrew_packages", device("m-1", "5.8.3"), device("m-2", "5.8.4"));
+        when(catalogStatus.latestVersion(any())).thenReturn(Optional.of("5.8.5"));
+
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        assertThat(rows).extracting(SoftwareOnDeviceResponse::getStatus)
+                .containsOnly(SoftwareOnDeviceStatus.OUTDATED);
+    }
+
+    @Test
+    @DisplayName("softwareDevices status: a device past a lagging catalog is UP_TO_DATE")
+    void listDevices_devicePastTheCatalog_upToDate() {
+        stubDevices("homebrew_packages", device("m-1", "5.8.5"));
+        when(catalogStatus.latestVersion(any())).thenReturn(Optional.of("5.8.4"));
+
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        assertThat(rows).extracting(SoftwareOnDeviceResponse::getStatus).containsExactly(SoftwareOnDeviceStatus.UP_TO_DATE);
+    }
+
+    @Test
+    @DisplayName("software list: the policies set auto-update first, then the catalog fills the rows they do not cover")
+    void listSoftware_policiesThenCatalog() {
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of());
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+
+        service.listSoftware(null, 0, 20, null, null);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
+        order.verify(autoUpdateService).applyToSoftware(anyList());
+        order.verify(catalogStatus).apply(anyList());
     }
 
     @Test
