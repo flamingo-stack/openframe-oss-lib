@@ -139,4 +139,22 @@ class PackageUpdateEligibilityServiceTest {
         flag(false, null);
         assertThat(service.isEligible(UPDATE, machine("m1", "9.9.9"))).isFalse();
     }
+
+    // the dev build takes every enabled flag whatever its minVersion, so it must take the orders too
+    @Test
+    void devBuildAgent_isEligibleAboveAnyFloor() {
+        flag(true, "1.6.5");
+        when(machineRepository.findByMachineIdIn(List.of("dev", "old"))).thenReturn(List.of(
+                machine("dev", "0.0.0-dev"),
+                machine("old", "1.6.0")));
+
+        assertThat(service.eligibleMachines(UPDATE, List.of("dev", "old"))).containsExactly("dev");
+        assertThat(service.isEligible(UPDATE, machine("dev", "0.0.0-dev"))).isTrue();
+    }
+
+    @Test
+    void devBuildAgent_flagDisabled_isNotEligible() {
+        flag(false, "1.6.5");
+        assertThat(service.isEligible(UPDATE, machine("dev", "0.0.0-dev"))).isFalse();
+    }
 }

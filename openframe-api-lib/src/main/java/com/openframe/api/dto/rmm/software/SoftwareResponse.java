@@ -15,6 +15,7 @@ public class SoftwareResponse {
     private String name;
     private String publisher;
     private SoftwareSource source;
+    private SoftwareType type;
     private String currentVersion;
     private String latestVersion;
     private SoftwareVersionStatus versionStatus;
