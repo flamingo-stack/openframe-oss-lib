@@ -181,6 +181,7 @@ class OrganizationControllerTest {
 
     @Test
     void updateOrganizationRefusedAfterTheMergeIs400WithTheFieldError() throws Exception {
+        when(organizationService.getOrganizationByOrganizationId(ORG_ID)).thenReturn(Optional.of(new Organization()));
         when(organizationCommandService.updateOrganization(eq(ORG_ID), any())).thenThrow(new ValidationException(
                 "Contract end date must not be before the start date",
                 List.of(new ValidationException.FieldError("contractEndDate", "Contract end date must not be before the start date"))));
