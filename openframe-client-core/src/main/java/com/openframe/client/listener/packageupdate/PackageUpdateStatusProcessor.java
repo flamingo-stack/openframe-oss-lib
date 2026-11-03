@@ -69,6 +69,7 @@ public class PackageUpdateStatusProcessor {
         PackageUpdateDeviceStateReducer.apply(state, request, event);
         driveDeadlineForce(state, request, deadlineBefore, machineId);
         autoUpdateRetry.scheduleIfDue(state, request);
+        autoUpdateRetry.turnOffIfPackageRemoved(state, request);
         executionRecorder.record(request, machineId, event);
         deviceStateRepository.save(state);
         log.info("[package-update] status applied requestId={} machineId={} eventId={} state={} status={} "
