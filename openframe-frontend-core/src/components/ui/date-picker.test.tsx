@@ -22,4 +22,17 @@ describe('date picker labels', () => {
     render(picker);
     expect(screen.getByLabelText('Start date').tagName).toBe('BUTTON');
   });
+
+  // The label is now the trigger's whole name, so the date it shows reaches assistive tech as its description.
+  it.each([
+    ['DatePicker', <DatePicker key="a" mode="single" id="d" label="Start date" value={new Date(2026, 10, 5)} />],
+    ['DatePickerInput', <DatePickerInput key="b" id="d" label="Start date" value={new Date(2026, 10, 5)} />],
+    [
+      'DatePickerInputSimple',
+      <DatePickerInputSimple key="c" id="d" label="Start date" value={new Date(2026, 10, 5)} />,
+    ],
+  ])('describes the trigger by the date it shows (%s)', (_, picker) => {
+    render(picker);
+    expect(screen.getByLabelText('Start date')).toHaveAccessibleDescription(/2026/);
+  });
 });
