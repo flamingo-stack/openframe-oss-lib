@@ -17,10 +17,9 @@ import java.util.Set;
 
 import static java.lang.String.format;
 
-// the subjects the agents before the engine listen on, a JetStream stream behind each but the script batch, which the
-// agent takes over core NATS. The message is the spec's, the one the engine sends, without the delivery block (the
-// field stays out of the JSON while null). A client or tool update is one broadcast there, the agent cannot be
-// addressed one at a time
+// the subjects the agents before the engine still listen on: the script batch alone, which the agent takes over core
+// NATS, no stream behind it. The message is the spec's, the one the engine sends, without the delivery block (the
+// field stays out of the JSON while null)
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -30,10 +29,6 @@ public class LegacyDeliveryRoute implements DeliveryRoute {
     static final int GENERATION = 0;
 
     private static final Map<DeliveryType, LegacySubject> SUBJECTS = Map.of(
-            DeliveryType.CLIENT_UNINSTALL, LegacySubject.perMachine("machine.%s.client-uninstall"),
-            DeliveryType.TOOL_INSTALLATION, LegacySubject.perMachine("machine.%s.tool-installation"),
-            DeliveryType.CLIENT_UPDATE, LegacySubject.broadcast("machine.all.client-update"),
-            DeliveryType.TOOL_UPDATE, LegacySubject.broadcast("machine.all.tool.%s.update"),
             DeliveryType.SCRIPT_SCHEDULE, LegacySubject.perMachineWithoutStream("machine.%s.script-schedule-execution"));
 
     private final DeliverySpecRegistry specs;
@@ -102,14 +97,6 @@ public class LegacyDeliveryRoute implements DeliveryRoute {
     }
 
     record LegacySubject(String template, boolean broadcast, boolean stream) {
-
-        static LegacySubject perMachine(String template) {
-            return new LegacySubject(template, false, true);
-        }
-
-        static LegacySubject broadcast(String template) {
-            return new LegacySubject(template, true, true);
-        }
 
         // a plain publish: nothing keeps the message for an agent that is not subscribed at that moment
         static LegacySubject perMachineWithoutStream(String template) {

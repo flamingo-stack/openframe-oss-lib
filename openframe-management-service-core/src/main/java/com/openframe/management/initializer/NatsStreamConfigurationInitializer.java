@@ -21,40 +21,9 @@ import java.util.List;
 @Slf4j
 public class NatsStreamConfigurationInitializer implements ApplicationRunner {
 
-    private static final long LATEST_MESSAGE_ONLY = 1;
-
     // TODO: use json file
     // TODO: revise stream configuration
     private static final List<StreamConfiguration> CONFIGURATIONS = List.of(
-            // tool installation stream (also carries tool-uninstall on the same stream)
-            StreamConfiguration.builder()
-                    .name("TOOL_INSTALLATION")
-                    .subjects(List.of("machine.*.tool-installation", "machine.*.tool-uninstall"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .build(),
-            // client update stream: only the latest release matters, so an offline agent gets one message, not the backlog
-            StreamConfiguration.builder()
-                    .name("CLIENT_UPDATE")
-                    .subjects(List.of("machine.*.client-update"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .maxMessagesPerSubject(LATEST_MESSAGE_ONLY)
-                    .build(),
-            // client uninstall stream (the message itself is the command, empty payload)
-            StreamConfiguration.builder()
-                    .name("CLIENT_UNINSTALL")
-                    .subjects(List.of("machine.*.client-uninstall"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .build(),
-            // tool agent update stream
-            StreamConfiguration.builder()
-                    .name("TOOL_UPDATE")
-                    .subjects(List.of("machine.*.tool.*.update"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .build(),
             // tool connection stream
             StreamConfiguration.builder()
                     .name("TOOL_CONNECTIONS")
