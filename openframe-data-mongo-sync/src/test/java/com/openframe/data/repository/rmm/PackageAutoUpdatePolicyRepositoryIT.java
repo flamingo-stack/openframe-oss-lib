@@ -17,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -152,6 +153,24 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         PackageAutoUpdatePolicy ordered = byMachine("google-chrome").get("m1");
         assertThat(ordered.getRetryRequestId()).isNull();
         assertThat(ordered.getLastVersion()).isEqualTo("152.0.7977.65");
+    }
+
+    @Test
+    @DisplayName("disable: turns off that one policy, the device's other policies and the other devices stay on")
+    void disable_turnsOffOnePolicy() {
+        repository.enable(template("google-chrome", "title-7", WAIT, "admin@x"), List.of("m1", "m2"));
+        repository.enable(template("slack", "title-9", WAIT, "admin@x"), List.of("m1"));
+        String id = byMachine("google-chrome").get("m1").getId();
+        Instant at = Instant.parse("2026-11-02T10:00:00Z");
+
+        repository.disable(id, "package-auto-update", at);
+
+        PackageAutoUpdatePolicy off = byMachine("google-chrome").get("m1");
+        assertThat(off.isEnabled()).isFalse();
+        assertThat(off.getUpdatedBy()).isEqualTo("package-auto-update");
+        assertThat(off.getUpdatedAt()).isEqualTo(at);
+        assertThat(repository.findByTenantIdAndEnabledTrue(TENANT)).hasSize(2)
+                .noneMatch(policy -> policy.getId().equals(id));
     }
 
     private Map<String, PackageAutoUpdatePolicy> byMachine(String packageName) {

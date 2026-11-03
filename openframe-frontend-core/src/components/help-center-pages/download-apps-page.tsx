@@ -7,7 +7,7 @@
  *     lists its platforms; it does not hide them behind tabs, so nothing moves
  *     when a visitor looks for another system). In a card the installer is THE
  *     action (the other architecture is a quieter button) and each package
- *     manager is one line under it, with its copy button.
+ *     manager is one row under it, with its copy button.
  *   - The mobile app: the store badges, and the install QR code beside them. The
  *     code and the address it encodes are the server's (`mobile.install`): the
  *     website's install link, which the server answers with a redirect to the
@@ -111,7 +111,7 @@ export interface DownloadAppsWebOption {
 
 const SECTIONS_CLASS = 'flex flex-col gap-[var(--spacing-system-xlf)]';
 const SECTION_CLASS = 'flex flex-col gap-[var(--spacing-system-lf)]';
-const CARDS_GRID_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-2';
+const CARDS_GRID_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-lf)] content-lg:grid-cols-2';
 /** One card takes the row; two or more share it. */
 const cardsGridClass = (cards: number) => (cards > 1 ? CARDS_GRID_CLASS : 'grid grid-cols-1');
 const CARD_CLASS =
@@ -183,7 +183,7 @@ function installerLabel(download: AppDownload, siblings: number): string {
   return siblings > 1 && architecture ? `${label} (${architecture})` : label;
 }
 
-/** One system's card: its logo and name, its installers side by side, then each package manager as one line. */
+/** One system's card: its logo and name, its installers side by side, then each package manager as one row. */
 function SystemCard({
   system,
   onDownloadAction,
@@ -243,8 +243,7 @@ function SystemCard({
                 key={row.id}
                 title={row.label ?? undefined}
                 command={row.command}
-                maxLines={1}
-                commandClassName="text-ods-accent"
+                commandClassName="break-words text-ods-accent"
                 copyAriaLabel={`Copy the ${row.label ?? 'install'} command`}
                 onCopy={() => {
                   void copy(row.command as string);

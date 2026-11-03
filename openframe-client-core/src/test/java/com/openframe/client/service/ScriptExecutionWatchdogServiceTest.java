@@ -51,6 +51,19 @@ class ScriptExecutionWatchdogServiceTest {
     }
 
     @Test
+    @DisplayName("a leaf dispatched long ago but taken by the agent just now is not stuck: the clock starts at the ack, the batch waited in the engine")
+    void leafThatWaitedInTheEngine_clockStartsWhenTheAgentTookIt() {
+        ScriptExecution waited = takenAfterWaiting(3600, 30);
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(any(), any()))
+                .thenReturn(List.of(waited));
+
+        service.markStuckExecutionsAsFailed();
+
+        verify(repository, never()).saveAll(any());
+        assertThat(waited.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+    }
+
+    @Test
     @DisplayName("coarse pre-filter queries RUNNING rows older than min(grace, fallback) — the smallest possible per-row threshold, so nothing stuck is missed")
     void coarsePreFilter_usesMinThresholdFloorAndRunningStatus() {
         when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.RUNNING), any()))
@@ -189,6 +202,7 @@ class ScriptExecutionWatchdogServiceTest {
                 .status(ExecutionStatus.RUNNING)
                 .timeoutSeconds(60)
                 .dispatchedAt(Instant.now().minusSeconds(ageSeconds))
+                .statusChangedAt(Instant.now().minusSeconds(ageSeconds))
                 .build();
     }
 
@@ -200,6 +214,20 @@ class ScriptExecutionWatchdogServiceTest {
                 .status(ExecutionStatus.RUNNING)
                 .timeoutSeconds(timeoutSeconds)
                 .dispatchedAt(Instant.now().minusSeconds(ageSeconds))
+                .statusChangedAt(Instant.now().minusSeconds(ageSeconds))
+                .build();
+    }
+
+    // dispatched at the fire, taken by the agent only now: the batch waited in the delivery engine for the machine
+    private static ScriptExecution takenAfterWaiting(long dispatchedAgoSeconds, long runningAgoSeconds) {
+        return ScriptExecution.builder()
+                .id("doc-waited-" + dispatchedAgoSeconds)
+                .executionId("exec-waited-" + dispatchedAgoSeconds)
+                .machineId("m-1")
+                .status(ExecutionStatus.RUNNING)
+                .timeoutSeconds(60)
+                .dispatchedAt(Instant.now().minusSeconds(dispatchedAgoSeconds))
+                .statusChangedAt(Instant.now().minusSeconds(runningAgoSeconds))
                 .build();
     }
 

@@ -277,6 +277,14 @@ public class SoftwareScheduleService {
     }
 
     private static List<SoftwareSchedulePackage> toPackages(List<SoftwareSchedulePackageInput> packages) {
+        List<String> brewMissingType = packages.stream()
+                .filter(p -> p.getPackageManager() == PackageManagerType.BREW && p.getBrewPackageType() == null)
+                .map(SoftwareSchedulePackageInput::getPackageName)
+                .toList();
+        if (!brewMissingType.isEmpty()) {
+            throw new BadRequestException("brewPackageType (CASK or FORMULA) is required for brew packages: "
+                    + brewMissingType);
+        }
         return packages.stream()
                 .map(p -> SoftwareSchedulePackage.builder()
                         .packageManager(p.getPackageManager())
