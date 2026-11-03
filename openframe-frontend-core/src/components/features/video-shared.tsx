@@ -12,6 +12,7 @@
  */
 
 import type React from 'react';
+import { useSyncExternalStore } from 'react';
 import { Button } from '../ui/button';
 
 // =============================================================================
@@ -49,6 +50,41 @@ if (typeof window !== 'undefined') {
     window.addEventListener('pointerdown', markActivated, true);
     window.addEventListener('keydown', markActivated, true);
   }
+}
+
+// =============================================================================
+// The visitor's first input (module scope). Wider than activation above: a mouse
+// that moves or a wheel that turns counts, because a hover comes after one. Until
+// it, a hover preview draws its poster and loads no player, the largest script a
+// page can load (`VideoHoverPreviewSurface`).
+// =============================================================================
+
+const VISITOR_INPUT_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
+let visitorActed = false;
+const visitorActedListeners = new Set<() => void>();
+if (typeof window !== 'undefined') {
+  const markActed = () => {
+    visitorActed = true;
+    for (const type of VISITOR_INPUT_EVENTS) window.removeEventListener(type, markActed, true);
+    for (const listener of visitorActedListeners) listener();
+    visitorActedListeners.clear();
+  };
+  for (const type of VISITOR_INPUT_EVENTS) window.addEventListener(type, markActed, { capture: true, passive: true });
+}
+function subscribeToVisitorActed(listener: () => void): () => void {
+  if (visitorActed) return () => undefined;
+  visitorActedListeners.add(listener);
+  return () => {
+    visitorActedListeners.delete(listener);
+  };
+}
+/** True once the visitor has moved the pointer, touched the page, turned the wheel or pressed a key. False on the server. */
+export function useVisitorActed(): boolean {
+  return useSyncExternalStore(
+    subscribeToVisitorActed,
+    () => visitorActed,
+    () => false,
+  );
 }
 
 // =============================================================================
