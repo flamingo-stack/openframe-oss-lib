@@ -244,11 +244,21 @@ function unansweredParts(messages: readonly ChatMessage[], asked: readonly ChatT
 }
 
 /** What a row says when nothing said how its approval ended: a stream that was cut or stopped. It may have run. */
-const APPROVAL_OUTCOME_UNKNOWN =
+export const APPROVAL_OUTCOME_UNKNOWN =
   'The answer stopped before saying how this ended, so it may or may not have gone through. Check before trying again.';
 
+/** What a row says when the server refused with no words of its own, a gateway's page say. */
+export const APPROVAL_REFUSED = 'The server refused this, so it did not run.';
+
 /** The server answered and refused: nothing ran. A 5xx is none: it may be a gateway's word about a write still running. */
-class RequestRefused extends Error {}
+class RequestRefused extends Error {
+  constructor(
+    message: string,
+    readonly serverMessage: string | null,
+  ) {
+    super(message);
+  }
+}
 
 /** The newest message holding a pending approval this id names. */
 function cardOfApproval(
@@ -409,6 +419,32 @@ export function useSseChatAdapter(
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Render-visible mirror of the ref: from the request until its reader has stopped.
+  const [streamOpen, setStreamOpen] = useState(false);
+  const openStream = useCallback((ctrl: AbortController) => {
+    abortControllerRef.current = ctrl;
+    setStreamOpen(true);
+  }, []);
+  /** Whether the turn is still this stream's to end: a stopped one may be followed by a send before its reader has stopped. */
+  const closeStream = useCallback((ctrl: AbortController): boolean => {
+    if (abortControllerRef.current !== ctrl) return false;
+    abortControllerRef.current = null;
+    setStreamOpen(false);
+    return true;
+  }, []);
+  /** Stopped or left, a stream writes no more, whatever its reader is still doing. */
+  const abortStream = useCallback(() => {
+    abortControllerRef.current?.abort();
+    setStreamOpen(false);
+  }, []);
+  /**
+   * A stream writes where the wire names and Stop reaches one request, so anything sent on top of one takes both: its answer
+   * lands under the new question, and Stop misses the stream still writing.
+   */
+  const isStreamWriting = useCallback(() => {
+    const ctrl = abortControllerRef.current;
+    return ctrl !== null && !ctrl.signal.aborted;
+  }, []);
 
   /** Switch the panel to another conversation (or to the draft state with
    *  `null`): abort any in-flight stream, flush + reset the reducer, re-arm
@@ -416,13 +452,13 @@ export function useSseChatAdapter(
    *  then re-fetches for a non-null id through its `conversationId` dep. */
   const switchConversation = useCallback(
     (id: string | null) => {
-      abortControllerRef.current?.abort();
+      abortStream();
       flushDeltas();
       mutate(r => r.reset());
       hydratedKeyRef.current = null;
       commitConversationId(id);
     },
-    [flushDeltas, mutate, hydratedKeyRef, commitConversationId],
+    [abortStream, flushDeltas, mutate, hydratedKeyRef, commitConversationId],
   );
 
   // ─── Managed dialog list (only with `chatConversationsUrl`) ───────────────
@@ -559,7 +595,7 @@ export function useSseChatAdapter(
         // user nothing when e.g. a batch approval expired; the server ships real copy ("This approval expired ...").
         const serverMessage = await readServerErrorMessage(response);
         const message = serverMessage ?? `Chat request failed: ${response.status}`;
-        throw response.status < 500 ? new RequestRefused(message) : new Error(message);
+        throw response.status < 500 ? new RequestRefused(message, serverMessage) : new Error(message);
       }
       if (!response.body) throw new Error('No response body');
 
@@ -588,8 +624,10 @@ export function useSseChatAdapter(
   );
 
   const sendMessage = useCallback(
-    // Resolves `true` on a clean turn, `false` when the request failed.
+    // Resolves `true` on a clean turn, `false` when the request failed or a stream is open. Nothing in the panel offers a
+    // send then (`isLoading` covers the open stream); this is for what cannot read that, and the click that beat a render.
     async (text: string, sendOptions?: InternalSendMessageOptions): Promise<boolean> => {
+      if (isStreamWriting()) return false;
       const { hidden, attachments = [], commandOverride } = sendOptions ?? {};
 
       // `source` is INTENTIONALLY NOT in the body: the chat route resolves it server-side via its own platform-detection,
@@ -622,7 +660,7 @@ export function useSseChatAdapter(
       mutate(r => r.beginSseSend({ text, files, hidden }));
 
       const ctrl = new AbortController();
-      abortControllerRef.current = ctrl;
+      openStream(ctrl);
       let minted = false;
 
       try {
@@ -640,17 +678,15 @@ export function useSseChatAdapter(
         );
         return false;
       } finally {
-        if (abortControllerRef.current === ctrl) {
-          abortControllerRef.current = null;
-        }
+        const turnIsOurs = closeStream(ctrl);
         // Force-flush pending deltas BEFORE the completion state lands, then settle the turn (drops an empty trailing
         // placeholder and returns the phase to idle).
         flushDeltas();
-        mutate(r => r.endSseTurn());
+        if (turnIsOurs) mutate(r => r.endSseTurn());
         settleDialogList(minted, ctrl);
       }
     },
-    [mutate, flushDeltas, streamFrom, settleDialogList],
+    [mutate, flushDeltas, streamFrom, settleDialogList, openStream, closeStream, isStreamWriting],
   );
 
   /**
@@ -658,10 +694,12 @@ export function useSseChatAdapter(
    * "send only the last message"): the part flips, the card's message becomes the one being built, and the card's message
    * goes back holding the answered parts. The server's answer continues that message: an output or a denial per part (a
    * refusal is an error on ITS part, so one row of a batch can fail with its cross and the others proceed), the receipt,
-   * and the auto-continuation. Resolves `false` when a row ended with no answer.
+   * and the auto-continuation. Resolves `false` when a row ended with no answer, and when a stream is open. The actions offer
+   * no answer then, and this is for the click that landed before a render could say so.
    */
   const answerApproval = useCallback(
     async (id: string, approved: boolean, reason?: string): Promise<boolean> => {
+      if (isStreamWriting()) return false;
       flushDeltas();
       const store = storeRef.current;
       const card = store ? cardOfApproval(store.getSnapshot(source).messages, id) : null;
@@ -673,14 +711,20 @@ export function useSseChatAdapter(
         if (!approvalId) continue;
         applyEntry({
           chunks: [
-            { type: 'tool-approval-response', approvalId, approved, ...(reason !== undefined ? { reason } : {}) },
+            {
+              type: 'tool-approval-response',
+              approvalId,
+              approved,
+              ...(reason !== undefined ? { reason } : {}),
+              toolMetadata: { answerSent: true },
+            },
           ],
         });
       }
       mutate(r => r.continueMessage(message.id));
 
       const ctrl = new AbortController();
-      abortControllerRef.current = ctrl;
+      openStream(ctrl);
       let ok = true;
       let minted = false;
 
@@ -696,7 +740,7 @@ export function useSseChatAdapter(
         try {
           minted = (await streamFrom(url, body, ctrl, true)) || minted;
         } catch (err) {
-          if (err instanceof RequestRefused) refusal = err.message;
+          if (err instanceof RequestRefused) refusal = err.serverMessage ?? APPROVAL_REFUSED;
         }
         flushDeltas();
         for (const part of unansweredParts(store?.getSnapshot(source).messages ?? [], asked)) {
@@ -760,27 +804,25 @@ export function useSseChatAdapter(
         }
         return ok;
       } finally {
-        if (abortControllerRef.current === ctrl) {
-          abortControllerRef.current = null;
-        }
+        const turnIsOurs = closeStream(ctrl);
         flushDeltas();
-        mutate(r => r.endSseTurn());
+        if (turnIsOurs) mutate(r => r.endSseTurn());
         settleDialogList(minted, ctrl);
       }
     },
-    [applyEntry, flushDeltas, mutate, settleDialogList, source, streamFrom],
+    [applyEntry, flushDeltas, mutate, settleDialogList, source, streamFrom, openStream, closeStream, isStreamWriting],
   );
 
   const stopMessage = useCallback(() => {
-    abortControllerRef.current?.abort();
+    abortStream();
     flushDeltas();
     // The turn ends here: what it said stays, and nothing is left reading as streaming.
     applyEntry({ chunks: [{ type: 'abort', reason: 'user' }] });
-  }, [applyEntry, flushDeltas]);
+  }, [abortStream, applyEntry, flushDeltas]);
 
   const clearMessages = useCallback(() => {
     // Whatever is still streaming belongs to the thread being left: it must not draw in the new one.
-    abortControllerRef.current?.abort();
+    abortStream();
     flushDeltas();
     mutate(r => r.reset());
     // New chat = drop the stored conversation id. The old row stays frozen
@@ -789,7 +831,7 @@ export function useSseChatAdapter(
     // hydration guard means a re-captured id can hydrate again if needed.
     commitConversationId(null);
     hydratedKeyRef.current = null;
-  }, [flushDeltas, mutate, commitConversationId, hydratedKeyRef]);
+  }, [abortStream, flushDeltas, mutate, commitConversationId, hydratedKeyRef]);
 
   /** Open a conversation from the managed list. Idempotent on the active id. */
   const selectDialog = useCallback(
@@ -801,17 +843,25 @@ export function useSseChatAdapter(
   );
 
   // What a message's controls do: a stable object, the message memo compares it by reference. This transport has no
-  // escalation offers.
-  const actions = useMemo<ChatMessageActions>(
+  // escalation offers. No approval is answered while a stream is open: a card's buttons read the absence (a Mingo turn may
+  // be loading while paused on its own card, so the gate is this transport's and not the panel's).
+  const asks = useMemo<ChatMessageActions>(
     () => ({
-      approve: id => answerApproval(id, true),
-      reject: (id, reason) => answerApproval(id, false, reason),
       // This adapter's `sendMessage` never rejects: it resolves `false` and renders the failure via `failTurn`.
       selectAsk: label => void sendMessage(label),
       pickSuggestion: prompt => void sendMessage(prompt),
     }),
-    [answerApproval, sendMessage],
+    [sendMessage],
   );
+  const asksAndAnswers = useMemo<ChatMessageActions>(
+    () => ({
+      ...asks,
+      approve: id => answerApproval(id, true),
+      reject: (id, reason) => answerApproval(id, false, reason),
+    }),
+    [asks, answerApproval],
+  );
+  const actions = streamOpen ? asks : asksAndAnswers;
 
   // Present ONLY with a conversations endpoint — its absence is what keeps a
   // Guide panel single-thread, and it is the single signal `EmbeddableChat`
@@ -908,11 +958,17 @@ export function useSseChatAdapter(
   const usageBreakdown = useMemo(() => usageBreakdownOf(usage?.breakdown), [usage]);
 
   const streamingPhase = state.streamingPhase;
+  // `finish` stops naming the message, and the turn runs until its reader has stopped: until then it is still the one being
+  // written, or the last message, a newer answer perhaps, would read as being written and rebuild its text for nothing.
+  const lastWrittenRef = useRef<string | null>(null);
+  lastWrittenRef.current = state.writingMessageId ?? (streamOpen ? lastWrittenRef.current : null);
 
   return {
     messages: state.messages,
     actions,
-    isLoading: streamingPhase !== 'idle',
+    // A stream's `finish` ends the phase before its reader has stopped: until it has, a send would be refused, and the
+    // composer must not offer one it would clear for nothing.
+    isLoading: streamingPhase !== 'idle' || streamOpen,
     sendMessage,
     /** "Discuss" affordance for ObjectCard. */
     discussRef,
@@ -921,6 +977,7 @@ export function useSseChatAdapter(
     stopMessage,
     clearMessages,
     streamingPhase,
+    writingMessageId: lastWrittenRef.current,
     /** True while the mount-time rebuild from the server transcript runs. */
     isHydratingHistory,
     /** Provider key for the lib's `<ModelDisplay>` icon. */
@@ -931,6 +988,7 @@ export function useSseChatAdapter(
     currentInputTokens: usage?.inputTokens ?? null,
     /** Output tokens (known only after the `finish` chunk's usage). */
     currentOutputTokens: usage?.outputTokens ?? null,
+    currentContextTokens: usage?.contextTokens ?? null,
     /** Cache hit % (read / total-input × 100). null during streaming. */
     currentCacheHitRatePct: usage?.hit_rate_pct ?? null,
     /** Cross-call usage breakdown (Haiku rewriter/classifier/summarizer

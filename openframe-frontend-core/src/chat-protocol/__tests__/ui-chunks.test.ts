@@ -3,7 +3,7 @@
  * lib's OWN copy of the chunk union: `ai-sdk-conformance.test.ts` is what holds that copy to the real schema.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APPROVAL_CANCELLED } from '../chat-message';
 import {
   approvalStatusOfResponse,
@@ -13,6 +13,7 @@ import {
   finishReasonOfStop,
   isOwnRowGrant,
   readUiChunks,
+  STREAM_CLOSE_GRACE_MS,
   UI_MESSAGE_STREAM_HEADERS,
   type UiChunk,
 } from '../ui-chunks';
@@ -248,6 +249,79 @@ describe('readUiChunks', () => {
       },
     });
     await expect(collect(readUiChunks(body))).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  describe('a body that has said it is over', () => {
+    const FINISH = { type: 'finish', finishReason: 'stop' } as const;
+    /** A body the test closes or leaves open, and whether anyone cancelled it. */
+    function openBody(...written: Uint8Array[]) {
+      const cancel = vi.fn();
+      let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+      const body = new ReadableStream<Uint8Array>({
+        start(c) {
+          controller = c;
+          for (const bytes of written) c.enqueue(bytes);
+        },
+        cancel,
+      });
+      return { body, cancel, controller: () => controller };
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('the read ends at `[DONE]`, with the body still open, and the body is cancelled only after the bound', async () => {
+      const { body, cancel } = openBody(encodeUiChunk(FINISH), encodeUiDone());
+      expect(await collect(readUiChunks(body))).toEqual([FINISH]);
+      expect(cancel).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(STREAM_CLOSE_GRACE_MS - 1);
+      expect(cancel).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('a server that closes after `[DONE]` is left to: it is never told the reader left', async () => {
+      const { body, cancel, controller } = openBody(encodeUiChunk(FINISH), encodeUiDone());
+      await collect(readUiChunks(body));
+      controller()?.close();
+      await vi.advanceTimersByTimeAsync(STREAM_CLOSE_GRACE_MS * 2);
+      expect(cancel).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('a terminal chunk with no `[DONE]` ends the read at the bound, and the body is cancelled', async () => {
+      const { body, cancel } = openBody(encodeUiChunk(FINISH));
+      const read = collect(readUiChunks(body));
+      await vi.advanceTimersByTimeAsync(STREAM_CLOSE_GRACE_MS - 1);
+      expect(cancel).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await read).toEqual([FINISH]);
+      expect(cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('what arrives inside the bound is still read', async () => {
+      const { body, cancel, controller } = openBody(encodeUiChunk(FINISH));
+      const read = collect(readUiChunks(body));
+      await vi.advanceTimersByTimeAsync(10);
+      controller()?.enqueue(encodeUiDone());
+      controller()?.close();
+      expect(await read).toEqual([FINISH]);
+      await vi.advanceTimersByTimeAsync(STREAM_CLOSE_GRACE_MS * 2);
+      expect(cancel).not.toHaveBeenCalled();
+    });
+
+    it('a stream still running has no bound', async () => {
+      const { body, cancel, controller } = openBody(encodeUiChunk({ type: 'start' }));
+      const read = collect(readUiChunks(body));
+      await vi.advanceTimersByTimeAsync(STREAM_CLOSE_GRACE_MS * 5);
+      expect(cancel).not.toHaveBeenCalled();
+      controller()?.close();
+      expect(await read).toEqual([{ type: 'start' }, { type: 'finish', finishReason: 'interrupted' }]);
+    });
   });
 
   it('leaving early cancels the body', async () => {

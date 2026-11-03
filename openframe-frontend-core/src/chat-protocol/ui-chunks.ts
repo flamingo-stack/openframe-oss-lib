@@ -198,6 +198,26 @@ export function isOwnRowGrant(
 export const CHAT_INTERRUPTED_NOTICE =
   'The answer was interrupted before it finished, so it may be incomplete. Please ask again.';
 
+/** The same under an approval that ran: what was cut is the words after it, and asked again, the request would run twice. */
+export const CHAT_INTERRUPTED_AFTER_RUN_NOTICE =
+  'The answer was interrupted after this ran, so what follows may be incomplete. Ask about what is left rather than repeating the request.';
+
+/** The same when it was time that cut them: a shorter answer is what would fit, and the request has already run. */
+export const CHAT_TIMED_OUT_AFTER_RUN_NOTICE =
+  'The answer ran out of time after this ran, so what follows may be incomplete. Ask about what is left or for a shorter answer, rather than repeating the request.';
+
+/** Does this text say its own end already? A server may write the notice into the answer, and a reader draws no second one. */
+export function saysStreamEnded(text: string): boolean {
+  return [CHAT_INTERRUPTED_NOTICE, CHAT_INTERRUPTED_AFTER_RUN_NOTICE, CHAT_TIMED_OUT_AFTER_RUN_NOTICE].some(notice =>
+    text.includes(notice),
+  );
+}
+
+/** The text as it reads under an approval that ran: an older hub's notice in it would invite running the request twice. */
+export function withAfterRunNotice(text: string): string {
+  return text.replace(CHAT_INTERRUPTED_NOTICE, CHAT_INTERRUPTED_AFTER_RUN_NOTICE);
+}
+
 /**
  * The stream's response headers. `no-transform` goes beyond the standard's `no-cache`: a buffering intermediary breaks
  * a stream that streams, and every hub SSE response has always sent it.
@@ -345,10 +365,21 @@ function parseUiChunk(value: unknown): UiChunk | null {
 // Reading
 // =============================================================================
 
+/**
+ * How long a body may stay open once it has said it is over. The hub writes its terminal chunk, `[DONE]` and the close in
+ * one go, so this only runs out on a connection something else holds open, and nothing may wait on that for long.
+ */
+export const STREAM_CLOSE_GRACE_MS = 1000;
+
+/** How far a stream has said it got: a chunk that ends its turn, then `[DONE]`, which nothing follows. */
+export type StreamClosing = 'terminal' | 'done' | null;
+
 /** Reads a stream's bytes into its chunks. */
 export interface UiChunkDecoder {
   /** Feed raw response bytes; returns the chunks they completed. */
   push(bytes: Uint8Array): UiChunk[];
+  /** What the bytes so far have said of the stream's own end. */
+  closing(): StreamClosing;
   /**
    * The stream ended. A stream that ends with no `finish`, `abort` or `[DONE]` (a cut connection, the gateway) closes
    * what is open and ends the turn as `finish` with `interrupted`, so the partial text stays. An `error` already ended
@@ -420,6 +451,10 @@ export function createUiChunkDecoder(): UiChunkDecoder {
       buffer = buffer.slice(start);
       return out;
     },
+    closing() {
+      if (done) return 'done';
+      return terminated ? 'terminal' : null;
+    },
     end() {
       if (ended) return [];
       ended = true;
@@ -441,18 +476,31 @@ function isAbort(error: unknown): boolean {
 /**
  * Drains a body through a decoder, the bytes already read off it first. A read that fails is a cut connection and ends
  * like one; the caller's own abort is rethrown. Leaving early cancels the body.
+ *
+ * The read ends at `[DONE]`, so nothing that waits on a stream depends on its transport closing. The body then gets
+ * {@link STREAM_CLOSE_GRACE_MS} to close, which leaves a healthy server's own close alone (cancelling a request is what
+ * tells it the reader left). A terminal chunk with no `[DONE]` keeps reading for as long, in case the rest is on its way.
  */
 export async function* drainChunks(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-  decoder: { push(bytes: Uint8Array): UiChunk[]; end(cut?: boolean): UiChunk[] },
+  decoder: { push(bytes: Uint8Array): UiChunk[]; end(cut?: boolean): UiChunk[]; closing?(): StreamClosing },
   head: readonly Uint8Array[] = [],
 ): AsyncGenerator<UiChunk, void, undefined> {
   let finished = false;
   let cut = false;
+  let readEndedAtDone = false;
+  let closeTimer: ReturnType<typeof setTimeout> | undefined;
+  const cancelBody = () => void reader.cancel().catch(() => undefined);
   try {
     for (const bytes of head) yield* decoder.push(bytes);
     try {
       for (;;) {
+        const closing = decoder.closing?.() ?? null;
+        if (closing !== null) closeTimer ??= setTimeout(cancelBody, STREAM_CLOSE_GRACE_MS);
+        if (closing === 'done') {
+          readEndedAtDone = true;
+          break;
+        }
         const { done, value } = await reader.read();
         if (done) break;
         if (value) yield* decoder.push(value);
@@ -464,8 +512,16 @@ export async function* drainChunks(
     finished = true;
     yield* decoder.end(cut);
   } finally {
-    if (!finished) void reader.cancel().catch(() => undefined);
-    reader.releaseLock();
+    const settle = () => {
+      clearTimeout(closeTimer);
+      reader.releaseLock();
+    };
+    // The timer still needs the lock to cancel a body that stays open.
+    if (readEndedAtDone) void reader.closed.then(settle, settle);
+    else {
+      if (!finished) cancelBody();
+      settle();
+    }
   }
 }
 

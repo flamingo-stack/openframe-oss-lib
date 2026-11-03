@@ -91,6 +91,15 @@ export const Pending: Story = {
   },
 };
 
+/** Approved here, and the server has said nothing yet: a live dot, inert buttons, grey loader on the row, no check. */
+export const Approving: Story = {
+  args: {
+    data: executingData,
+    status: 'approving',
+    answerPending: true,
+  },
+};
+
 /** Approved and still executing — grey loader on the row, no result yet. */
 export const ApprovedExecuting: Story = {
   args: {
@@ -136,6 +145,7 @@ export const AllStates: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <ApprovalBatchMessage data={makeData()} status="pending" onApprove={() => {}} onReject={() => {}} />
+      <ApprovalBatchMessage data={executingData} status="approving" answerPending />
       <ApprovalBatchMessage data={executingData} status="approved" resolvedByName="Michael Johnson" />
       <ApprovalBatchMessage data={doneData} status="approved" resolvedByName="Michael Johnson" />
       <ApprovalBatchMessage data={makeData()} status="rejected" resolvedByName="Michael Johnson" />

@@ -40,7 +40,7 @@ import { usePreventScroll } from '@react-aria/overlays';
 import { isIOS } from '@react-aria/utils';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { ChatMessage, ChatToolPart } from '../../chat-protocol/chat-message';
+import { type ChatMessage, type ChatToolPart, writingMessageIndex } from '../../chat-protocol/chat-message';
 import { createRecordLinkScanner, recordHref } from '../../chat-protocol/record-link';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
@@ -1137,6 +1137,7 @@ function EmbeddableChatInner({
     actions: chatActions,
     displayApprovalTypes,
     isLoading: chatLoading,
+    writingMessageId,
     sendMessage: sendMessageRaw,
     discussRef,
     stopMessage,
@@ -1146,6 +1147,7 @@ function EmbeddableChatInner({
     currentContextWindowMaxTokens,
     currentInputTokens,
     currentOutputTokens,
+    currentContextTokens,
     currentCacheHitRatePct,
     currentUsageBreakdown,
     displayRef,
@@ -1229,7 +1231,8 @@ function EmbeddableChatInner({
       guidePromptSentRef.current = false;
       return;
     }
-    if (activeMode !== 'guide' || guidePromptSentRef.current) return;
+    // A send on an open stream would be refused and the question lost: it goes out when the stream has closed.
+    if (activeMode !== 'guide' || guidePromptSentRef.current || chatLoading) return;
     guidePromptSentRef.current = true;
     // Same asymmetry as `handleSend` below: the SSE adapter settles its own
     // failures into an error row, but the Mingo/NATS one rejects on a failed
@@ -1241,7 +1244,7 @@ function EmbeddableChatInner({
       console.error('[EmbeddableChat] guide launcher prompt failed:', err);
     });
     onGuidePromptConsumed?.();
-  }, [guidePendingPrompt, activeMode, sendMessage, onGuidePromptConsumed]);
+  }, [guidePendingPrompt, activeMode, chatLoading, sendMessage, onGuidePromptConsumed]);
 
   // Chat-attachment hooks (v2 attachment feature).
   const {
@@ -1481,21 +1484,29 @@ function EmbeddableChatInner({
   // (`askAboutRef.current` is set next to it: an archived chat is read-only).
   const askAboutRef = useRef<(reference: ChatRef) => void>(discussRef);
   const askAbout = useCallback((reference: ChatRef) => askAboutRef.current(reference), []);
+  // What the thread's own Ask and Display do. Each is a send, gated like an ask card and the composer: no second send while a
+  // turn is in flight, so nothing in the thread offers one the turn would have to refuse.
+  const threadAsk = chatLoading ? undefined : askAbout;
+  const threadDisplay = chatLoading ? undefined : displayRef;
 
   // Host-provided renderer for inline entity cards — routes through the
   // shared dispatcher in lib's `entity-cards/dispatch.tsx`.
   const renderEntityCard = useCallback(
     (reference: ChatRef): React.ReactNode =>
       renderChatInlineEntityCard(reference, {
-        onDiscuss: askAbout,
-        onDisplay: displayRef,
+        onDiscuss: threadAsk,
+        onDisplay: threadDisplay,
+        held: chatLoading,
         extras,
       }),
-    [askAbout, displayRef, extras],
+    [threadAsk, threadDisplay, chatLoading, extras],
   );
 
   // The same Ask and Display a card gets, for every record chip in the thread (`RecordActionsProvider`).
-  const recordActions = useMemo(() => ({ onDiscuss: askAbout, onDisplay: displayRef }), [askAbout, displayRef]);
+  const recordActions = useMemo(
+    () => ({ onDiscuss: threadAsk, onDisplay: threadDisplay, held: chatLoading }),
+    [threadAsk, threadDisplay, chatLoading],
+  );
 
   // Stable assistant-icon element. `<ChatMessageList>` forwards this prop to
   // every assistant `<ChatMessageEnhanced>`, whose memo compares it BY
@@ -1859,6 +1870,14 @@ function EmbeddableChatInner({
     return out;
   }, [commandsById, enabledSet]);
 
+  // The message a running turn writes, the one its transport names, as the thread reads it.
+  const writingIndex = writingMessageIndex(messages, writingMessageId);
+  // The thread as it last stood with no turn running: what a strip draws while one is.
+  const settledMessages = useRef<readonly ChatMessage[]>([]);
+  useEffect(() => {
+    if (!chatLoading) settledMessages.current = messages;
+  }, [chatLoading, messages]);
+
   /**
    * Source chips, under the answer that cited them.
    *
@@ -1871,19 +1890,22 @@ function EmbeddableChatInner({
   const renderMessageSources = useCallback(
     (message: ChatMessage, index: number) => {
       if (message.role !== 'assistant') return null;
-      // Suppressed only on the answer still being written: the citations the
-      // order is derived from arrive WITH the text, so a strip rendered
-      // mid-turn reshuffles under the reader as more sentences land.
+      // The strip of the message being written holds still until its turn ends: the citations the order is derived from
+      // arrive WITH the text, so a strip drawn from the live parts reshuffles under the reader as more sentences land. A
+      // message on screen when the turn began keeps what its strip showed (a card's message, which its answer continues:
+      // on Mingo every answer does, its resume opens no message of its own), so the click leaves the thread nothing to
+      // move. A message this turn began has none yet: the turn's own stage rows already say it is working.
       //
-      // Scoped to the trailing row on purpose. `chatLoading` is a property of
-      // the THREAD, so testing it alone pulls the strips off every earlier
-      // answer too — a reader scrolled up watches finished citations blink out
-      // for the duration of an unrelated turn. Nothing stands in for it meanwhile:
-      // the turn's own stage rows already say it is working.
-      if (chatLoading && index === messages.length - 1) return null;
-      return <ChatMessageSources message={message} onDiscuss={askAbout} />;
+      // Scoped to that one row on purpose. `chatLoading` is a property of the THREAD, so testing it alone pulls the strips
+      // off every other answer too: a reader scrolled up watches finished citations blink out for the duration of an
+      // unrelated turn.
+      if (chatLoading && index === writingIndex) {
+        const settled = settledMessages.current.find(({ id }) => id === message.id);
+        return settled ? <ChatMessageSources message={settled} onDiscuss={threadAsk} /> : null;
+      }
+      return <ChatMessageSources message={message} onDiscuss={threadAsk} />;
     },
-    [chatLoading, messages.length, askAbout],
+    [chatLoading, writingIndex, threadAsk],
   );
 
   // Host node for in-panel Radix portals (see the body wrapper below).
@@ -2174,8 +2196,15 @@ function EmbeddableChatInner({
   // queued until the host has let go of the archived dialog: until then its
   // `discussRef` still writes into the dialog it has open.
   const queuedAskRef = useRef<ChatRef | null>(null);
+  // A page's ask (a search result, `ask-ai:open-with-ref`) can arrive while an answer is being written, when the thread
+  // offers none of its own. A send then would be refused and the question lost, so it goes out when the stream has closed.
+  const heldAsksRef = useRef<ChatRef[]>([]);
   useEffect(() => {
     askAboutRef.current = reference => {
+      if (chatLoading) {
+        heldAsksRef.current.push(reference);
+        return;
+      }
       if (!isViewingArchived) {
         discussRef(reference);
         return;
@@ -2192,6 +2221,11 @@ function EmbeddableChatInner({
     queuedAskRef.current = null;
     discussRef(reference);
   }, [activeDialogId, discussRef]);
+  useEffect(() => {
+    if (chatLoading) return;
+    const reference = heldAsksRef.current.shift();
+    if (reference) askAboutRef.current(reference);
+  }, [chatLoading]);
 
   // The conversation open last, for the |← control: going back to the list
   // closes it, and widening the panel again should bring it back.
@@ -2499,6 +2533,7 @@ function EmbeddableChatInner({
                 // faces, 16px between messages (shared with fae v2).
                 appearance={appearance}
                 isTyping={chatLoading}
+                writingMessageId={writingMessageId}
                 // Sticky footer for approvals the host lifted out of the
                 // thread — see the prop's docblock.
                 pendingApprovals={pendingApprovals}
@@ -2722,7 +2757,8 @@ function EmbeddableChatInner({
               provider: currentProvider ?? 'anthropic',
               modelName: currentModelLabel ?? 'Claude',
               usedTokens:
-                currentInputTokens != null ? (currentInputTokens ?? 0) + (currentOutputTokens ?? 0) : undefined,
+                currentContextTokens ??
+                (currentInputTokens != null ? currentInputTokens + (currentOutputTokens ?? 0) : undefined),
               contextWindow: currentContextWindowMaxTokens ?? undefined,
               inputTokens: currentInputTokens ?? undefined,
               outputTokens: currentOutputTokens ?? undefined,

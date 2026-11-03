@@ -68,6 +68,8 @@ import {
 export interface ChatReducerState {
   messages: ChatMessage[];
   streamingPhase: StreamingPhase;
+  /** The message the wire names as being written (a card's, on its answer). Null when it names none: then a chunk goes to the trailing assistant message. */
+  writingMessageId: string | null;
   dialogTokenUsage?: DialogTokenUsage | null;
   liveModel?: {
     provider: string | null;
@@ -534,10 +536,12 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     onChange?.();
   }
   function getState(): ChatReducerState {
-    if (!stateCache) {
+    // The wire moves inside a write, and not every move changes a message: a read says where it stands now.
+    if (!stateCache || stateCache.writingMessageId !== wire.messageId) {
       stateCache = {
         messages,
         streamingPhase,
+        writingMessageId: wire.messageId,
         dialogTokenUsage,
         liveModel,
         approvalStatuses,

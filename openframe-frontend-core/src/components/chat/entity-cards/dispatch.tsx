@@ -33,6 +33,7 @@ import type React from 'react';
 import type { ReactNode } from 'react';
 import { type ChatRuntime, useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
 import {
@@ -91,8 +92,11 @@ import { ExternalMediaNotice } from '../../ui/markdown/external-media-notice';
 import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
+import { useMessageSourceOf } from '../citation-chip';
 import { useChatCardItem } from '../hooks/use-chat-card-item';
+import { InlineChip } from '../inline-chip';
 import { MingoInfoCard, type MingoInfoCardStatus } from '../mingo-info-card';
+import type { RecordActionHandlers } from '../record-actions';
 import { SourceActionButton } from '../source-action-button';
 import type { PrReviewState, GitHubActivityKind } from '../types/entities/github-activity';
 import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
@@ -101,7 +105,7 @@ import { getStatusColorScheme } from '../utils/agent-status-message';
 import { resolveCardDestination } from '../utils/card-destination';
 import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
-import { buildAnchorProps, navLinkTarget } from '../utils/nav-anchor-props';
+import { buildAnchorProps, navLinkTarget, newTabAnchorAttrs } from '../utils/nav-anchor-props';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
@@ -344,6 +348,8 @@ export interface CardDiscussAction {
   label: string;
   icon: React.ReactNode;
   run: () => void;
+  /** Held while a turn runs: the row keeps its place, and the "⋯" that may hold nothing else stays. */
+  disabled?: boolean;
 }
 
 /** What a record's menu can do in this chat, the SAME for its card and its chip (`recordMenuActions`): the "Ask
@@ -414,6 +420,7 @@ export function recordMenuGroups(
       label: discuss.label,
       icon: discuss.icon,
       onClick: discuss.run,
+      disabled: discuss.disabled,
     });
   }
   if (ref.url) {
@@ -2023,17 +2030,15 @@ export function RecordNavWrap({
  * A record's "Ask Mingo" (or "Display", for a type whose card displays its document) action, the same for its card
  * and its chip: `onDisplay` where the type displays and the host can, else `onDiscuss`, else none.
  */
-export function recordDiscussAction(
-  ref: ChatRef,
-  handlers: { onDiscuss?: (ref: ChatRef) => void; onDisplay?: (ref: ChatRef) => void },
-): CardDiscussAction | undefined {
-  const useDisplay = !!CHAT_CARD_REGISTRY[ref.type]?.displayAction && !!handlers.onDisplay;
+export function recordDiscussAction(ref: ChatRef, handlers: RecordActionHandlers): CardDiscussAction | undefined {
+  const useDisplay = !!CHAT_CARD_REGISTRY[ref.type]?.displayAction && (!!handlers.onDisplay || !!handlers.held);
   const run = useDisplay ? handlers.onDisplay : handlers.onDiscuss;
-  if (!run) return undefined;
+  if (!run && !handlers.held) return undefined;
   return {
     label: useDisplay ? 'Display' : 'Ask Mingo',
     icon: useDisplay ? <FileContentIcon size={20} /> : <AgentMark agent="mingo" className="size-5" />,
-    run: () => run(ref),
+    run: () => run?.(ref),
+    disabled: !run,
   };
 }
 
@@ -2044,7 +2049,7 @@ export function recordDiscussAction(
  */
 export function recordMenuActions(
   ref: ChatRef,
-  handlers: { onDiscuss?: (ref: ChatRef) => void; onDisplay?: (ref: ChatRef) => void },
+  handlers: RecordActionHandlers,
   runtime: Pick<ChatRuntime, 'navigation'>,
 ): RecordMenuActions {
   return { discuss: recordDiscussAction(ref, handlers), newTab: runtime.navigation.opensTabs !== false };
@@ -2054,10 +2059,8 @@ export function recordMenuActions(
 // ChatCardLoader — fetch + skeleton + render for fetch-mode entries.
 // =============================================================================
 
-interface ChatCardLoaderProps {
+interface ChatCardLoaderProps extends RecordActionHandlers {
   chatRef: ChatRef;
-  onDiscuss?: (ref: ChatRef) => void;
-  onDisplay?: (ref: ChatRef) => void;
   extras?: ChatCardDispatchExtras;
 }
 
@@ -2120,7 +2123,7 @@ export function useRecordDestination(chatRef: ChatRef) {
   // `contentRefType` is empty so the hook returns `isLoading=false` and
   // `item=undefined`, which we ignore.
   const fetchEntry = entry && entry.contentRefType ? entry : null;
-  const { item, isLoading, isError, isFetched } = useChatCardItem<ChatCardItem>(
+  const { item, isLoading, isError, isFetched, notFound } = useChatCardItem<ChatCardItem>(
     fetchEntry?.contentRefType ?? '',
     fetchEntry ? chatRef.id : '',
   );
@@ -2163,18 +2166,19 @@ export function useRecordDestination(chatRef: ChatRef) {
     ? navLinkTarget(runtime, finalChatRef.url, finalChatRef.targetPlatform, { hostRoute }).isNewTab
     : false;
   const path = typeof finalChatRef.metadata?.path === 'string' ? finalChatRef.metadata.path : null;
-  return { entry, fetchEntry, item, isLoading, isError, isFetched, finalChatRef, hostRoute, isNewTab, path };
+  return { entry, fetchEntry, item, isLoading, isError, isFetched, notFound, finalChatRef, hostRoute, isNewTab, path };
 }
 
-export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCardLoaderProps) {
+export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, held, extras }: ChatCardLoaderProps) {
   const entry = CHAT_CARD_REGISTRY[chatRef.type];
-  const { fetchEntry, item, isLoading, isError, isFetched, finalChatRef, hostRoute, isNewTab, path } =
+  const { fetchEntry, item, isLoading, isError, isFetched, notFound, finalChatRef, hostRoute, isNewTab, path } =
     useRecordDestination(chatRef);
   const runtime = useRequiredChatRuntime();
+  const source = useMessageSourceOf(chatRef.type, chatRef.id);
   if (!entry) return null;
 
   // The "Ask Mingo"/"Display" row of the card's "⋯" menu, the same action its chip offers (`recordDiscussAction`).
-  const actions = recordMenuActions(finalChatRef, { onDiscuss, onDisplay }, runtime);
+  const actions = recordMenuActions(finalChatRef, { onDiscuss, onDisplay, held }, runtime);
 
   const renderOpts: ChatCardRenderOptions = {
     extras,
@@ -2235,6 +2239,32 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
     );
   }
   if (!item) {
+    // A 404 with the message's own source part: this host cannot read the record (a conversation read on another platform,
+    // whose card route knows no such type), and the message says what it is and where it lives. That one answer makes the
+    // card the record's link, the chip's rule. Anything else that left no row is a failure, source part or not, below.
+    if (notFound && source) {
+      const href = finalChatRef.url;
+      return (
+        <InlineChip
+          icon={sourceGlyph(chatRef.type)}
+          label={source.title ?? `${entry.label} ${chatRef.id}`}
+          link={
+            href
+              ? content =>
+                  navWrap(
+                    <Link
+                      href={href}
+                      className="text-inherit no-underline"
+                      {...newTabAnchorAttrs(isNewTab, href, finalChatRef.targetPlatform)}
+                    >
+                      {content}
+                    </Link>,
+                  )
+              : undefined
+          }
+        />
+      );
+    }
     // FAIL LOUD (explicit product decision 2026-08-13): a card that
     // cannot hydrate renders a VISIBLE error card — silent removal made
     // broken answers look fine. Three distinguishable states:
@@ -2293,15 +2323,13 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
  */
 export function renderChatInlineEntityCard(
   chatRef: ChatRef,
-  options: {
-    onDiscuss?: (ref: ChatRef) => void;
-    onDisplay?: (ref: ChatRef) => void;
-    extras?: ChatCardDispatchExtras;
-  } = {},
+  options: RecordActionHandlers & { extras?: ChatCardDispatchExtras } = {},
 ): React.ReactNode {
-  const { onDiscuss, onDisplay, extras } = options;
+  const { onDiscuss, onDisplay, held, extras } = options;
 
-  const loader = <ChatCardLoader chatRef={chatRef} onDiscuss={onDiscuss} onDisplay={onDisplay} extras={extras} />;
+  const loader = (
+    <ChatCardLoader chatRef={chatRef} onDiscuss={onDiscuss} onDisplay={onDisplay} held={held} extras={extras} />
+  );
 
   // Embedded videos are SELF-DESCRIBING: the record id alone recovers the
   // playable URL (`decodeVideoMarkerId`), so the player renders on ANY

@@ -14,10 +14,12 @@ import { useStickToBottom } from 'use-stick-to-bottom';
 import {
   type ChatMessage,
   type ChatPart,
+  approvalAnswerInFlight,
   approvalBatchIdOf,
   approvalStatusOf,
   isSourcePart,
   isToolPart,
+  writingMessageIndex,
 } from '../../chat-protocol/chat-message';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon, Arrow02DownIcon } from '../icons-v2-generated';
@@ -149,6 +151,11 @@ function leavesTurnUnsaid(part: ChatPart | undefined): boolean {
   return part.state === 'approval-responded' && part.approval.approved && approvalBatchIdOf(part) === undefined;
 }
 
+/** A card somewhere in the thread says Approving: it speaks for the turn, and a loader appearing would move it. */
+function holdsAnswerInFlight(messages: readonly ChatMessage[]): boolean {
+  return messages.some(message => message.parts.some(part => isToolPart(part) && approvalAnswerInFlight(part)));
+}
+
 /** Async-growth watcher installed by the top-anchor effect for the 2s
  *  settle window. Single owner is `anchorWatcherRef`; the helper below
  *  is the only place that knows how to tear one down. */
@@ -178,6 +185,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       pageSize = CHAT_MESSAGE_LIST_SKELETON_MESSAGES,
       fill = false,
       isTyping = false,
+      writingMessageId,
       typingMessage,
       autoScroll = true,
       overscrollContain = true,
@@ -1008,21 +1016,23 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // says what the turn is doing, and a second indicator under it only
     // repeats it. A tool that has answered says nothing of the kind.
     // Hidden too when the agent is PAUSED waiting on the user: the
-    // last message's last part is a pending approval (inline), or
+    // message's last part is a pending approval (inline), or
     // there are escalated pending approvals shown in the sticky bar.
-    const lastMessage = messages[messages.length - 1];
-    const lastPart = lastMessage?.parts[lastMessage.parts.length - 1];
+    const writingIndex = writingMessageIndex(messages, writingMessageId);
+    const writingMessage = messages[writingIndex];
+    const writingPart = writingMessage?.parts[writingMessage.parts.length - 1];
     const isPausedOnApproval =
-      !!lastPart &&
-      (lastPart.type === 'data-escalation-offer'
-        ? lastPart.data.status === 'pending'
-        : isToolPart(lastPart) && approvalStatusOf(lastPart) === 'pending');
-    const turnHasDrawn = lastMessage?.role === 'assistant' && !hasDrawnNothing(lastMessage);
+      !!writingPart &&
+      (writingPart.type === 'data-escalation-offer'
+        ? writingPart.data.status === 'pending'
+        : isToolPart(writingPart) && approvalStatusOf(writingPart) === 'pending');
+    const turnHasDrawn = writingMessage?.role === 'assistant' && !hasDrawnNothing(writingMessage);
     const showStreamingLoader =
       isTyping &&
-      (!turnHasDrawn || leavesTurnUnsaid(lastPart)) &&
+      (!turnHasDrawn || leavesTurnUnsaid(writingPart)) &&
       !isPausedOnApproval &&
-      !(pendingApprovals && pendingApprovals.length > 0);
+      !(pendingApprovals && pendingApprovals.length > 0) &&
+      !holdsAnswerInFlight(messages);
 
     return (
       <ChatAppearanceContext.Provider value={appearance}>
@@ -1089,55 +1099,45 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     // window BEFORE the first token. Any non-text part (tool
                     // execution, approval card, thinking) counts as visible, and so does a stage.
                     const isEmptyPendingTurn =
-                      index === messages.length - 1 &&
-                      isTyping &&
-                      message.role === 'assistant' &&
-                      hasDrawnNothing(message);
+                      index === writingIndex && isTyping && message.role === 'assistant' && hasDrawnNothing(message);
                     if (isEmptyPendingTurn) return null;
                     if (message.role === 'assistant' && holdsOnlyCardsOfAnotherTier(message, displayApprovalTypes)) {
                       return null;
                     }
                     const ownedContent = renderAfterMessage?.(message, index);
                     const { metadata } = message;
-                    const row = (
-                      <ChatMessageEnhanced
-                        key={message.id}
-                        ref={getRegisterMessageEl(message.id)}
-                        role={message.role}
-                        name={metadata?.author?.name}
-                        parts={message.parts}
-                        timestamp={metadata?.createdAt ? new Date(metadata.createdAt) : undefined}
-                        isTyping={index === messages.length - 1 && isTyping && message.role === 'assistant'}
-                        avatar={showAvatars ? metadata?.author?.avatar : null}
-                        showAvatar={showAvatars}
-                        assistantType={metadata?.author?.assistantType || assistantType}
-                        approvalVariant={approvalVariant}
-                        authorType={metadata?.author?.authorType}
-                        selfAuthorType={selfAuthorType}
-                        nameEveryTurn={nameEveryTurn}
-                        assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
-                        contextItems={metadata?.contextItems}
-                        resolveContextIcon={resolveContextIcon}
-                        renderContextItem={renderContextItem}
-                        renderRecordChip={renderRecordChip}
-                        renderEntityCard={renderEntityCard}
-                        actions={index > lastUserMessageIndex ? actions : actionsWithoutAsk}
-                        displayApprovalTypes={displayApprovalTypes}
-                        progress={metadata?.progress}
-                        interrupted={metadata?.finishReason === 'interrupted'}
-                        NavLinkAnchor={NavLinkAnchor}
-                        // One message of a read thread (the height gate counts them); the wrapper carries it instead
-                        // when the row has content of its own below it.
-                        data-loading-item={ownedContent ? undefined : ''}
-                      />
-                    );
-                    // Only wrap when there IS owned content: the bare row keeps
-                    // its own key and its place as a direct flex child, so a
-                    // thread without any stays byte-identical to before.
-                    if (!ownedContent) return row;
+                    // One box per message, whatever it holds below its row: a row's place in the tree must not depend on
+                    // that content, or a strip arriving or leaving remounts the row and refetches every card in it. It lays
+                    // out as the row alone does, and carries the mark of one message of a read thread (the height gate
+                    // counts them).
                     return (
                       <div key={message.id} className="grid w-full min-w-0 grid-cols-1" data-loading-item>
-                        {row}
+                        <ChatMessageEnhanced
+                          ref={getRegisterMessageEl(message.id)}
+                          role={message.role}
+                          name={metadata?.author?.name}
+                          parts={message.parts}
+                          timestamp={metadata?.createdAt ? new Date(metadata.createdAt) : undefined}
+                          isTyping={index === writingIndex && isTyping && message.role === 'assistant'}
+                          avatar={showAvatars ? metadata?.author?.avatar : null}
+                          showAvatar={showAvatars}
+                          assistantType={metadata?.author?.assistantType || assistantType}
+                          approvalVariant={approvalVariant}
+                          authorType={metadata?.author?.authorType}
+                          selfAuthorType={selfAuthorType}
+                          nameEveryTurn={nameEveryTurn}
+                          assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
+                          contextItems={metadata?.contextItems}
+                          resolveContextIcon={resolveContextIcon}
+                          renderContextItem={renderContextItem}
+                          renderRecordChip={renderRecordChip}
+                          renderEntityCard={renderEntityCard}
+                          actions={index > lastUserMessageIndex ? actions : actionsWithoutAsk}
+                          displayApprovalTypes={displayApprovalTypes}
+                          progress={metadata?.progress}
+                          interrupted={metadata?.finishReason === 'interrupted'}
+                          NavLinkAnchor={NavLinkAnchor}
+                        />
                         {ownedContent}
                       </div>
                     );

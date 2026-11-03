@@ -6,7 +6,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { approvalStatusOf, isToolPart, type ChatMessage } from '../../../../chat-protocol/chat-message';
+import {
+  approvalAnswerInFlight,
+  approvalStatusOf,
+  isToolPart,
+  type ChatMessage,
+} from '../../../../chat-protocol/chat-message';
 import { createMingoDecoder } from '../../../../chat-protocol/message-decoder';
 import { createChatStreamReducer } from '../../stream/chat-stream-reducer';
 import type { ChatApprovalStatus, HistoricalMessage } from '../../types';
@@ -242,6 +247,52 @@ describe('a rejected batch read back', () => {
     });
     expect(cardsOf(messages)[0].toolMetadata?.resolvedByName).toBe('Ann Admin');
     expect(approvalStatusOf(cardsOf(messages)[0])).toBe('approved');
+  });
+
+  it('a reloaded row the tenant stored as approved stays Approved: nothing is on its way to it', () => {
+    const approved = { ...rejected, approved: true };
+    const { messages } = processHistoricalMessages([row('a1', [asking]), row('a2', [approved])]);
+    const [gate] = cardsOf(messages);
+    expect(gate.state).toBe('approval-responded');
+    expect(approvalStatusOf(gate)).toBe('approved');
+    expect(approvalAnswerInFlight(gate)).toBe(false);
+  });
+
+  it('nor an old row with no tool list, granted by a tool that ran after it', () => {
+    const old = {
+      type: 'APPROVAL_REQUEST',
+      approvalRequestId: 'req-old',
+      approvalType: 'CLIENT',
+      command: 'ls',
+    };
+    const ran = {
+      type: 'EXECUTED_TOOL',
+      integratedToolType: 'SHELL',
+      toolFunction: 'run',
+      toolExecutionRequestId: 'run-1',
+      success: true,
+      result: 'ok',
+    };
+    const { messages } = processHistoricalMessages([
+      row('a1', [old]),
+      row('a2', [{ type: 'APPROVAL_RESULT', approvalRequestId: 'req-old', approved: true }, ran]),
+    ]);
+    const gate = cardsOf(messages).find(part => part.toolCallId === 'req-old');
+    // Its tool reports on a row of its own, so this state is where it stays.
+    expect(gate?.state).toBe('approval-responded');
+    expect(gate && approvalStatusOf(gate)).toBe('approved');
+  });
+
+  it('nor a live one: its server answered, on the stream, and nothing here is waiting on that', () => {
+    const reducer = createChatStreamReducer();
+    const decoder = createMingoDecoder();
+    for (const raw of [{ type: 'MESSAGE_START' }, asking, { ...rejected, approved: true }]) {
+      reducer.apply(decoder.decode(raw));
+    }
+    const [gate] = cardsOf(reducer.state.messages);
+    expect(gate.state).toBe('approval-responded');
+    expect(approvalStatusOf(gate)).toBe('approved');
+    expect(approvalAnswerInFlight(gate)).toBe(false);
   });
 
   it('denies the rows that ask nothing too, when only the map knows the answer', () => {

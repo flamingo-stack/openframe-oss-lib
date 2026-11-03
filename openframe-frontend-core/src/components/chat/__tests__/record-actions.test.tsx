@@ -11,9 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import type { ChatRef } from '../chat-ref.types';
-import { recordMenuGroups, renderChatInlineEntityCard } from '../entity-cards/dispatch';
+import { recordMenuActions, recordMenuGroups, renderChatInlineEntityCard } from '../entity-cards/dispatch';
 import { InlineChip } from '../inline-chip';
-import { RecordActionsProvider, RecordChipMenu, useRecordChipMenu } from '../record-actions';
+import { type RecordActionHandlers, RecordActionsProvider, RecordChipMenu, useRecordChipMenu } from '../record-actions';
 
 class ResizeObserverStub {
   observe(): void {}
@@ -103,6 +103,31 @@ describe("recordMenuGroups: one list of a record's actions", () => {
       ).toEqual(['Ask Mingo', 'Open Details']);
     },
   );
+
+  describe('while a turn holds Ask and Display', () => {
+    const ask = vi.fn();
+    const ref = { type: 'hubspot_ticket_anon', id: '48', title: 'Agent offline', url: null };
+    const menu = (handlers: RecordActionHandlers) =>
+      recordMenuGroups(ref, recordMenuActions(ref, handlers, { navigation: { mode: 'host' } }));
+
+    it('a record with no page keeps its menu, the row disabled, so its chip keeps its width', () => {
+      const items = menu({ held: true })?.[0]?.items ?? [];
+      expect(items.map(item => [item.label, item.disabled])).toEqual([['Ask Mingo', true]]);
+      items[0]?.onClick?.();
+      expect(ask).not.toHaveBeenCalled();
+    });
+
+    it('a host with no handlers at all, with no turn to hold them, has no row and no menu', () => {
+      expect(menu({})).toBeUndefined();
+    });
+
+    it('with no turn running, the row is live', () => {
+      const items = menu({ onDiscuss: ask })?.[0]?.items ?? [];
+      expect(items[0]?.disabled).toBe(false);
+      items[0]?.onClick?.();
+      expect(ask).toHaveBeenCalledTimes(1);
+    });
+  });
 
   it('an internal task opens in ClickUp itself: one ClickUp row, not two', () => {
     const items = rows({ type: 'internal_task', id: 'abc', url: 'https://app.clickup.com/t/abc' });

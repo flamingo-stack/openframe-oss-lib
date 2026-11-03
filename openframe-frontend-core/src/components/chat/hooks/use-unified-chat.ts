@@ -211,6 +211,7 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       displayApprovalTypes: activeState.displayApprovalTypes,
       isLoading: activeState.isLoading,
       streamingPhase: activeState.streamingPhase,
+      writingMessageId: activeState.writingMessageId,
       sendMessage,
       stopMessage,
       clearMessages,
@@ -221,6 +222,7 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       currentContextWindowMaxTokens: activeState.currentContextWindowMaxTokens,
       currentInputTokens: activeState.currentInputTokens,
       currentOutputTokens: activeState.currentOutputTokens,
+      currentContextTokens: activeState.currentContextTokens,
       currentCacheHitRatePct: activeState.currentCacheHitRatePct,
       currentUsageBreakdown: activeState.currentUsageBreakdown,
       // Dialog management (forwarded from active adapter)

@@ -206,6 +206,8 @@ export interface ApprovalBatchExecutionState {
   success?: boolean;
   /** Nothing said how the row ended: no cross and no check, and `result` says so. */
   outcomeUnknown?: boolean;
+  /** The server refused the answer sent for this row, and `result` is its sentence to a person, not a tool's raw output. */
+  refused?: boolean;
 }
 
 export interface ApprovalBatchData {

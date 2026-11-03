@@ -6,6 +6,7 @@
  */
 
 import {
+  approvalAnswerInFlight,
   approvalBatchIdOf,
   approvalStatusOf,
   isToolPart,
@@ -111,6 +112,19 @@ export function toolPartsWaitingOnAnotherTier(
   );
 }
 
+/**
+ * Does this message hold an approval that ran: a gate that reads Approved, or a row of a batch with an output? A row with no
+ * gate of its own counts, because the batch's card says Approved for it. Asked again, the request would run twice.
+ */
+export function holdsApprovalThatRan(parts: readonly ChatPart[]): boolean {
+  return parts.some(
+    part =>
+      isToolPart(part) &&
+      (approvalStatusOf(part) === 'approved' ||
+        (approvalBatchIdOf(part) !== undefined && part.state === 'output-available')),
+  );
+}
+
 /** The card a single approval draws, or null for a part with no approval. */
 export function approvalRequestDataOf(part: ChatToolPart): ApprovalRequestData | null {
   const approval = 'approval' in part ? part.approval : undefined;
@@ -139,9 +153,13 @@ function executionOf(part: ChatToolPart): ApprovalBatchExecutionState | null {
     return { status: 'done', success: true, ...(result !== undefined ? { result } : {}) };
   }
   if (part.state === 'output-error') {
-    return part.toolMetadata?.outcomeUnknown
-      ? { status: 'done', outcomeUnknown: true, result: part.errorText }
-      : { status: 'done', success: false, result: part.errorText };
+    if (part.toolMetadata?.outcomeUnknown) return { status: 'done', outcomeUnknown: true, result: part.errorText };
+    return {
+      status: 'done',
+      success: false,
+      result: part.errorText,
+      ...(part.toolMetadata?.answerSent ? { refused: true } : {}),
+    };
   }
   return null;
 }
@@ -150,6 +168,8 @@ export interface ApprovalBatchView {
   data: ApprovalBatchData;
   status: ChatApprovalPartStatus;
   resolvedByName?: string | null;
+  /** A row's answer was sent and the server has not said how it went. */
+  answerPending: boolean;
 }
 
 /** The field a person knows a record by. A label for an id ("Task", "Ticket") names a row only when there is no other. */
@@ -183,8 +203,9 @@ function batchRowOf(part: ChatToolPart): PendingToolCallData {
 
 /**
  * A batch's status is its gates', with one exception: a row with no gate of its own counts for what it did, because a gate
- * that failed says nothing about it. Approved while any row ran or runs; a row that failed beside it keeps its own cross. With
- * no row that ran it is `failed`, and `unknown` while a gated row may have.
+ * that failed says nothing about it. Approved while any row ran or runs; a row that failed beside it keeps its own cross. While
+ * the server has said nothing ran and has yet to answer a row it is `approving`. With no row that ran it is `failed`, and
+ * `unknown` while a gated row may have.
  */
 function batchStatusOf(parts: readonly ChatToolPart[]): ChatApprovalPartStatus {
   const statuses = parts.flatMap(part => {
@@ -193,6 +214,9 @@ function batchStatusOf(parts: readonly ChatToolPart[]): ChatApprovalPartStatus {
   });
   if (statuses.includes('pending')) return 'pending';
   if (statuses.includes('approved')) return 'approved';
+  if (statuses.includes('approving')) {
+    return parts.some(part => part.state === 'output-available') ? 'approved' : 'approving';
+  }
   const answer = statuses.includes('unknown') ? 'unknown' : (statuses[0] ?? 'approved');
   const anyRan = parts.some(part => part.state === 'output-available' || isRunning(part));
   return (answer === 'failed' || answer === 'unknown') && anyRan ? 'approved' : answer;
@@ -210,6 +234,7 @@ export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBat
   const resolvedByName = parts.find(part => part.toolMetadata?.resolvedByName)?.toolMetadata?.resolvedByName;
   return {
     status: batchStatusOf(parts),
+    answerPending: parts.some(approvalAnswerInFlight),
     ...(resolvedByName ? { resolvedByName } : {}),
     data: {
       approvalRequestId: approvalBatchIdOf(parts[0]) ?? parts[0].toolCallId,

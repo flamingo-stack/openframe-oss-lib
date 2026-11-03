@@ -198,6 +198,13 @@ export type ChatToolMetadata = {
   started?: boolean;
   /** Nothing said how this approved row ended: its stream was cut or stopped. The hub finishes a write it started, so it may have run. */
   outcomeUnknown?: boolean;
+  /**
+   * This client sent the row's answer on the round trip, and the server answers each such row in that response, in words
+   * for a person. Set by the click and nowhere else: a row in `approval-responded` without it is a gate Mingo's server
+   * granted, which can stay there for good (its tool reports on a row of its own, or never), so the state alone says
+   * nothing about waiting. See {@link approvalAnswerInFlight}.
+   */
+  answerSent?: boolean;
 };
 
 /** The standard's opaque `approval.descriptor`: what the card draws. */
@@ -279,6 +286,11 @@ export interface ChatUsage {
   outputTokens?: number;
   totalTokens?: number;
   inputTokenDetails?: { noCacheTokens?: number; cacheReadTokens?: number; cacheWriteTokens?: number };
+  /**
+   * What the chat holds now: the last request's whole input plus its output. `inputTokens` is what a turn cost, summed over
+   * its requests, so a turn with a follow-up counts the same history twice. An older hub sends none.
+   */
+  contextTokens?: number;
   hit_rate_pct?: number;
   telemetry?: ChatUsageTelemetry;
   /** Left opaque: its reader validates each field it draws. */
@@ -360,6 +372,18 @@ export function isToolPart(part: ChatPart): part is ChatToolPart {
 export function approvalBatchIdOf(part: ChatToolPart): string | undefined {
   const approval = 'approval' in part ? part.approval : undefined;
   return approval?.descriptor?.batchId ?? part.toolMetadata?.batchId;
+}
+
+/**
+ * The message a running turn writes into: the one its transport names (a card's answer continues the card's message, which a
+ * newer answer may have followed), else the last.
+ */
+export function writingMessageIndex(
+  messages: readonly ChatMessage[],
+  writingMessageId: string | null | undefined,
+): number {
+  const named = writingMessageId == null ? -1 : messages.findIndex(message => message.id === writingMessageId);
+  return named === -1 ? messages.length - 1 : named;
 }
 
 /** The id a tool part's approval is answered by: its batch's, or its own for a card of one. A plain tool run has none. */
@@ -511,11 +535,17 @@ export function storablePartsOf(parts: readonly ChatPart[]): ChatPart[] {
 /** The `approval.reason` of a cancellation: a proposal the user neither approved nor rejected, and no longer can. */
 export const APPROVAL_CANCELLED = 'cancelled';
 
+/** The answer was sent from here and the server has not said how this row went. Every request ends by settling its rows. */
+export function approvalAnswerInFlight(part: ChatToolPart): boolean {
+  return part.state === 'approval-responded' && part.toolMetadata?.answerSent === true;
+}
+
 /**
- * Where a tool part's approval stands, from its `state` and `approval` alone (no `cancelled` or `executing` flag
- * anywhere). Null for a tool part with no approval. An approval the server then refused, or whose tool failed, is
- * `failed`: nothing it was approved for happened, and a card must not say Approved above the reason. One whose answer never
- * came is `unknown`: it may have run, so a card can say neither, and Failed invites sending the same write again.
+ * Where a tool part's approval stands, from its `state`, `approval` and `toolMetadata` alone (no `cancelled` or `executing`
+ * flag anywhere). Null for a tool part with no approval. An approval the server has said nothing about yet is `approving`: a
+ * card must not say Approved before anything ran. One the server then refused, or whose tool failed, is `failed`: nothing it
+ * was approved for happened, and a card must not say Approved above the reason. One whose answer never came is `unknown`: it
+ * may have run, so a card can say neither, and Failed invites sending the same write again.
  */
 export function approvalStatusOf(part: ChatToolPart): ChatApprovalPartStatus | null {
   const approval = 'approval' in part ? part.approval : undefined;
@@ -523,7 +553,7 @@ export function approvalStatusOf(part: ChatToolPart): ChatApprovalPartStatus | n
   if (part.state === 'approval-requested') return 'pending';
   if (approval.approved && part.state === 'output-error')
     return part.toolMetadata?.outcomeUnknown ? 'unknown' : 'failed';
-  if (approval.approved) return 'approved';
+  if (approval.approved) return approvalAnswerInFlight(part) ? 'approving' : 'approved';
   return approval.reason === APPROVAL_CANCELLED ? 'cancelled' : 'rejected';
 }
 
@@ -667,6 +697,7 @@ const usageField: FieldReader = value => {
     inputTokens: numberField,
     outputTokens: numberField,
     totalTokens: numberField,
+    contextTokens: numberField,
     inputTokenDetails: details =>
       isRecord(details)
         ? readFields(details, {

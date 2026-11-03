@@ -6,14 +6,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   APPROVAL_CANCELLED,
+  approvalAnswerInFlight,
   approvalIdOfPart,
   approvalRequestIdOf,
   approvalStatusOf,
   isToolPart,
   parseCitations,
+  parseMessageMetadata,
   parseStoredParts,
   storablePartsOf,
   textOfParts,
+  writingMessageIndex,
   type ChatCitation,
   type ChatMessage,
   type ChatPart,
@@ -296,6 +299,48 @@ describe('approvalStatusOf', () => {
     ['requested', { ...base, state: 'approval-requested', approval: { id: '1' } }, 'pending'],
     ['approved, running', { ...base, state: 'approval-responded', approval: { id: '1', approved: true } }, 'approved'],
     [
+      'approved here, and the server has said nothing',
+      {
+        ...base,
+        state: 'approval-responded',
+        approval: { id: '1', approved: true },
+        toolMetadata: { answerSent: true },
+      },
+      'approving',
+    ],
+    [
+      'approved here, and it ran',
+      {
+        ...base,
+        state: 'output-available',
+        output: 1,
+        approval: { id: '1', approved: true },
+        toolMetadata: { answerSent: true },
+      },
+      'approved',
+    ],
+    [
+      'approved here, and refused',
+      {
+        ...base,
+        state: 'output-error',
+        errorText: 'no',
+        approval: { id: '1', approved: true },
+        toolMetadata: { answerSent: true },
+      },
+      'failed',
+    ],
+    [
+      'rejected here: a rejection reads at once',
+      {
+        ...base,
+        state: 'approval-responded',
+        approval: { id: '1', approved: false },
+        toolMetadata: { answerSent: true },
+      },
+      'rejected',
+    ],
+    [
       'rejected, in flight',
       { ...base, state: 'approval-responded', approval: { id: '1', approved: false } },
       'rejected',
@@ -444,6 +489,23 @@ describe('parseCitations', () => {
   });
 });
 
+describe('approvalAnswerInFlight', () => {
+  const base = { type: 'dynamic-tool', toolName: 'x', toolCallId: '1', input: {} } as const;
+  const sent = { toolMetadata: { answerSent: true } };
+
+  it('is the answer sent from here, until the server has said how it went', () => {
+    const approval = { id: '1', approved: true } as const;
+    expect(approvalAnswerInFlight({ ...base, ...sent, state: 'approval-responded', approval })).toBe(true);
+    expect(approvalAnswerInFlight({ ...base, ...sent, state: 'output-available', output: 1, approval })).toBe(false);
+    expect(approvalAnswerInFlight({ ...base, ...sent, state: 'output-error', errorText: 'no', approval })).toBe(false);
+  });
+
+  it('is never a row with no answer of ours: Mingo`s server can leave one in this state for good', () => {
+    const approval = { id: '1', approved: true } as const;
+    expect(approvalAnswerInFlight({ ...base, state: 'approval-responded', approval })).toBe(false);
+  });
+});
+
 describe('approvalIdOfPart', () => {
   const part = (fields: object): ChatToolPart =>
     ({
@@ -487,5 +549,33 @@ describe('approvalRequestIdOf', () => {
   it('a row in no batch is its own request, and so is an id no card holds', () => {
     expect(approvalRequestIdOf(messages, 'single')).toBe('single');
     expect(approvalRequestIdOf(messages, 'batch-1')).toBe('batch-1');
+  });
+});
+
+describe('writingMessageIndex', () => {
+  const thread: ChatMessage[] = [
+    { id: 'u1', role: 'user', parts: [] },
+    { id: 'a1', role: 'assistant', parts: [] },
+    { id: 'u2', role: 'user', parts: [] },
+    { id: 'a2', role: 'assistant', parts: [] },
+  ];
+
+  it('is the message the transport names, wherever it sits', () => {
+    expect(writingMessageIndex(thread, 'a1')).toBe(1);
+  });
+
+  it('is the last when it names none, or one this thread does not hold', () => {
+    expect(writingMessageIndex(thread, null)).toBe(3);
+    expect(writingMessageIndex(thread, undefined)).toBe(3);
+    expect(writingMessageIndex(thread, 'gone')).toBe(3);
+  });
+});
+
+describe('usage on a turn', () => {
+  it('reads contextTokens beside the sums, and leaves out what is not a number', () => {
+    expect(
+      parseMessageMetadata({ usage: { inputTokens: 81017, outputTokens: 500, contextTokens: 40600 } }, 'stream').usage,
+    ).toEqual({ inputTokens: 81017, outputTokens: 500, contextTokens: 40600 });
+    expect(parseMessageMetadata({ usage: { contextTokens: 'lots' } }, 'stream').usage).toEqual({});
   });
 });

@@ -51,8 +51,8 @@ vi.mock('use-stick-to-bottom', () => ({
 // Row stub that renders the author label the way the real component does
 // (`Name:`), so "labeled row with no body" is directly assertable.
 vi.mock('../chat-message-enhanced', () => ({
-  ChatMessageEnhanced: ({ name, parts }: { name?: string; parts: ChatPart[] }) => (
-    <div data-testid="row">
+  ChatMessageEnhanced: ({ name, parts, isTyping }: { name?: string; parts: ChatPart[]; isTyping?: boolean }) => (
+    <div data-testid="row" data-typing={isTyping ? 'yes' : 'no'}>
       <span data-testid="row-name">{name ?? ''}</span>
       <span data-testid="row-body">{parts.map(part => (part.type === 'text' ? part.text : '[part]')).join('')}</span>
     </div>
@@ -262,6 +262,12 @@ describe('a single card that was approved, while its tool runs', () => {
     expect(screen.queryAllByRole('status')).toHaveLength(1);
   });
 
+  it('not while its answer is on its way: the card says Approving, and a loader appearing would move it', () => {
+    const sent = { ...card(true), toolMetadata: { answerSent: true } } as ChatPart;
+    render(<ChatMessageList dialogId="d" messages={answered([sent])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
   it('not for a batch: its rows say it themselves', () => {
     render(<ChatMessageList dialogId="d" messages={answered([card(true, 'b1')])} isTyping />);
     expect(screen.queryAllByRole('status')).toHaveLength(0);
@@ -383,6 +389,110 @@ describe('a turn whose only cards wait on another tier', () => {
     ];
     render(<ChatMessageList dialogId="d" messages={messages} displayApprovalTypes={['CLIENT']} />);
     expect(names()).toEqual(['Client', 'Fae']);
+  });
+});
+
+describe('the message a turn writes, named by its transport', () => {
+  const thread = [
+    row('u1', 'user', 'Michael Assraf', 'close it'),
+    row('a1', 'assistant', 'Mingo', 'I can close that.'),
+    row('u2', 'user', 'Michael Assraf', 'what is your name?'),
+    row('a2', 'assistant', 'Mingo', 'I am Mingo.'),
+  ];
+  const typing = () => screen.getAllByTestId('row').map(element => element.dataset.typing);
+
+  it('is the one streaming, wherever it sits: a finished answer below it is left alone', () => {
+    render(<ChatMessageList dialogId="d" messages={thread} isTyping writingMessageId="a1" />);
+    expect(typing()).toEqual(['no', 'yes', 'no', 'no']);
+  });
+
+  it('named by none, it is the last', () => {
+    const { rerender } = render(<ChatMessageList dialogId="d" messages={thread} isTyping writingMessageId={null} />);
+    expect(typing()).toEqual(['no', 'no', 'no', 'yes']);
+    rerender(<ChatMessageList dialogId="d" messages={thread} isTyping />);
+    expect(typing()).toEqual(['no', 'no', 'no', 'yes']);
+  });
+
+  it('is the empty row the footer speaks for, and an empty row it does not name stays a row', () => {
+    const empty = { ...thread[1], parts: [] };
+    const withEmpty = [thread[0], empty, thread[2], thread[3]];
+    const { rerender } = render(<ChatMessageList dialogId="d" messages={withEmpty} isTyping writingMessageId="a1" />);
+    expect(screen.getAllByTestId('row')).toHaveLength(3);
+    rerender(<ChatMessageList dialogId="d" messages={withEmpty} isTyping writingMessageId="a2" />);
+    expect(screen.getAllByTestId('row')).toHaveLength(4);
+  });
+
+  it('a turn that named a message which has drawn says nothing of the question below it', () => {
+    const endsInQuestion = thread.slice(0, 3);
+    const { rerender } = render(<ChatMessageList dialogId="d" messages={endsInQuestion} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+    rerender(<ChatMessageList dialogId="d" messages={endsInQuestion} isTyping writingMessageId="a1" />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+});
+
+describe('a card saying Approving anywhere in the thread', () => {
+  const row1 = row('u1', 'user', 'Michael Assraf', 'close it');
+  const tool = { type: 'dynamic-tool', toolName: 'update_ticket', title: 'Close', input: {} } as const;
+  const inFlight = (id: string, batchId?: string): ChatPart => ({
+    ...tool,
+    toolCallId: id,
+    state: 'approval-responded',
+    approval: { id, approved: true, ...(batchId ? { descriptor: { batchId } } : {}) },
+    toolMetadata: { answerSent: true },
+  });
+  const assistant = (id: string, parts: ChatPart[]): ChatMessage => ({ id, role: 'assistant', parts });
+
+  it('keeps the loader off when the thread ends in a question below it', () => {
+    const messages = [row1, assistant('a1', [inFlight('p1')]), row('u2', 'user', 'Michael Assraf', 'never mind')];
+    render(<ChatMessageList dialogId="d" messages={messages} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('keeps it off beside a row of its batch that has answered', () => {
+    const answeredRow: ChatPart = {
+      ...tool,
+      toolCallId: 'p2',
+      state: 'output-available',
+      output: {},
+      approval: { id: 'p2', approved: true, descriptor: { batchId: 'b1' } },
+    };
+    render(
+      <ChatMessageList dialogId="d" messages={[row1, assistant('a1', [inFlight('p1', 'b1'), answeredRow])]} isTyping />,
+    );
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('and only then: the same row with its answer in, and the footer speaks again', () => {
+    const answeredRow: ChatPart = {
+      ...tool,
+      toolCallId: 'p2',
+      state: 'output-available',
+      output: {},
+      approval: { id: 'p2', approved: true, descriptor: { batchId: 'b1' } },
+    };
+    render(<ChatMessageList dialogId="d" messages={[row1, assistant('a1', [answeredRow])]} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+  });
+});
+
+describe('a row keeps its identity, whatever it holds below it', () => {
+  const thread = [row('u1', 'user', 'Michael Assraf', 'close it'), row('a1', 'assistant', 'Mingo', 'Closed.')];
+  const strip = () => <aside data-testid="strip" />;
+
+  it('content arriving below a row, or leaving it, remounts neither the row nor another', () => {
+    const { rerender } = render(<ChatMessageList dialogId="d" messages={thread} />);
+    const [user, assistant] = screen.getAllByTestId('row');
+
+    rerender(<ChatMessageList dialogId="d" messages={thread} renderAfterMessage={strip} />);
+    expect(screen.getAllByTestId('strip')).toHaveLength(2);
+    expect(screen.getAllByTestId('row')[0]).toBe(user);
+    expect(screen.getAllByTestId('row')[1]).toBe(assistant);
+
+    rerender(<ChatMessageList dialogId="d" messages={thread} />);
+    expect(screen.queryByTestId('strip')).toBeNull();
+    expect(screen.getAllByTestId('row')[0]).toBe(user);
+    expect(screen.getAllByTestId('row')[1]).toBe(assistant);
   });
 });
 

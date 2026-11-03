@@ -68,6 +68,11 @@ export const Pending: Story = {
   },
 };
 
+/** Approved here, and the server has said nothing yet: a live dot and inert buttons, so the click moves nothing. */
+export const Approving: Story = {
+  args: { data: baseData, status: 'approving', answerPending: true, onApprove: () => {}, onReject: () => {} },
+};
+
 /** Approved — green status tag. */
 export const Approved: Story = {
   args: { data: baseData, status: 'approved' },
@@ -81,6 +86,25 @@ export const Rejected: Story = {
 /** Cancelled — grey status tag. */
 export const Cancelled: Story = {
   args: { data: baseData, status: 'cancelled' },
+};
+
+/** Approved and refused: why, whole, on the foot beside its status. */
+export const Failed: Story = {
+  args: {
+    data: baseData,
+    status: 'failed',
+    notice: 'This approval expired: approval cards are valid for 10 minutes. Ask me again to get fresh cards.',
+  },
+};
+
+/** Approved and cut off: nobody can say how it ended, and the foot says what to do about that. */
+export const OutcomeUnknown: Story = {
+  args: {
+    data: baseData,
+    status: 'unknown',
+    notice:
+      'The answer stopped before saying how this ended, so it may or may not have gone through. Check before trying again.',
+  },
 };
 
 /** Explanation prose instead of a structured field list. */

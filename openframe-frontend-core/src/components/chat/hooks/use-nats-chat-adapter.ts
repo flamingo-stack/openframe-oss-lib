@@ -884,7 +884,7 @@ export function useNatsChatAdapter(
 
   // ─── Return shape ─────────────────────────────────────────────────────────
 
-  const { messages, streamingPhase, dialogTokenUsage = null, liveModel = null } = state;
+  const { messages, streamingPhase, writingMessageId, dialogTokenUsage = null, liveModel = null } = state;
   const isLoading = streamingPhase !== 'idle';
   const hasMoreMessages = messagesNextCursor != null;
 
@@ -911,6 +911,7 @@ export function useNatsChatAdapter(
       displayApprovalTypes,
       isLoading,
       streamingPhase,
+      writingMessageId,
       sendMessage,
       stopMessage,
       clearMessages,
@@ -955,6 +956,7 @@ export function useNatsChatAdapter(
       displayApprovalTypes,
       isLoading,
       streamingPhase,
+      writingMessageId,
       sendMessage,
       stopMessage,
       clearMessages,

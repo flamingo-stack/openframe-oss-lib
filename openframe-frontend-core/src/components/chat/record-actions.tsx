@@ -26,6 +26,11 @@ export interface RecordActionHandlers {
   onDiscuss?: (ref: ChatRef) => void;
   /** "Display" a record whose card displays its document. */
   onDisplay?: (ref: ChatRef) => void;
+  /**
+   * A turn is running, so neither is on offer now: the record's menu shows the row disabled. Taking the row would empty the
+   * "⋯" of a record with no page, and a chip without one is narrower, so its sentence would re-wrap at every turn.
+   */
+  held?: boolean;
 }
 
 const RecordActionsContext = createContext<RecordActionHandlers>({});

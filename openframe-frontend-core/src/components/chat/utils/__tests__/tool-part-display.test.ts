@@ -9,6 +9,7 @@ import {
   approvalBatchViewOf,
   approvalRequestDataOf,
   failedBeforeRunning,
+  holdsApprovalThatRan,
   progressExecutionDataOf,
   toolExecutionDataOf,
 } from '../tool-part-display';
@@ -140,6 +141,129 @@ describe('approvalBatchViewOf', () => {
         { ...row('p2'), state: 'output-available', output: 'ok', approval: { ...gate('p2'), approved: true } },
       ]).status,
     ).toBe('approved');
+  });
+
+  describe('rows answered from here, before the server has said anything', () => {
+    const sent = { toolMetadata: { answerSent: true } };
+    const inFlight = (id: string): ChatToolPart => ({
+      ...row(id),
+      ...sent,
+      state: 'approval-responded',
+      approval: { ...gate(id), approved: true },
+    });
+    const ran = (id: string): ChatToolPart => ({
+      ...row(id),
+      ...sent,
+      state: 'output-available',
+      output: 'ok',
+      approval: { ...gate(id), approved: true },
+    });
+    const refused = (id: string): ChatToolPart => ({
+      ...row(id),
+      ...sent,
+      state: 'output-error',
+      errorText: 'Expired.',
+      approval: { ...gate(id), approved: true },
+    });
+
+    it('nothing has run yet: Approving, and every row waits', () => {
+      const view = approvalBatchViewOf([inFlight('p1'), inFlight('p2')]);
+      expect(view.status).toBe('approving');
+      expect(view.answerPending).toBe(true);
+      expect(view.data.executions).toEqual({ p1: { status: 'executing' }, p2: { status: 'executing' } });
+    });
+
+    it('a refused row beside one still waiting is not Approved yet, and not Failed yet', () => {
+      const view = approvalBatchViewOf([refused('p1'), inFlight('p2')]);
+      expect(view.status).toBe('approving');
+      expect(view.answerPending).toBe(true);
+    });
+
+    it('a row that ran makes it Approved, while another still waits', () => {
+      const view = approvalBatchViewOf([ran('p1'), inFlight('p2')]);
+      expect(view.status).toBe('approved');
+      expect(view.answerPending).toBe(true);
+    });
+
+    it('every row settled and refused is Failed, and nothing waits', () => {
+      const view = approvalBatchViewOf([refused('p1'), refused('p2')]);
+      expect(view.status).toBe('failed');
+      expect(view.answerPending).toBe(false);
+      expect(view.data.executions?.p1).toEqual({ status: 'done', success: false, refused: true, result: 'Expired.' });
+    });
+
+    it('a row with no gate that ran counts: nothing else said so yet', () => {
+      const free: ChatToolPart = {
+        ...row('free'),
+        state: 'output-available',
+        output: 'ok',
+        toolMetadata: { batchId },
+      };
+      expect(approvalBatchViewOf([inFlight('p1'), free]).status).toBe('approved');
+    });
+
+    it('a batch rejected here reads Rejected at once, and still waits on the server', () => {
+      const view = approvalBatchViewOf(
+        (['p1', 'p2'] as const).map(id => ({
+          ...row(id),
+          ...sent,
+          state: 'approval-responded' as const,
+          approval: { ...gate(id), approved: false },
+        })),
+      );
+      expect(view.status).toBe('rejected');
+      expect(view.answerPending).toBe(true);
+    });
+  });
+
+  describe('a gate Mingo`s server granted, which can stay in this state for good', () => {
+    const decode = (rows: Array<Record<string, unknown>>) => {
+      const decoder = createMingoDecoder();
+      const wire = createWireState();
+      let messages: ChatMessage[] = [{ id: 'a1', role: 'assistant', parts: [] }];
+      wire.setMessageId('a1');
+      for (const raw of rows) {
+        for (const chunk of decoder.decode(raw).chunks) {
+          messages = applyChunkToMessages(messages, chunk, wire);
+        }
+      }
+      return messages[0].parts.filter(isToolPart);
+    };
+    const asking = {
+      type: 'APPROVAL_REQUEST',
+      approvalRequestId: 'req1',
+      approvalType: 'ADMIN',
+      toolCalls: [{ toolExecutionRequestId: 't1', toolName: 'run', toolTitle: 'Run ls', requiresApproval: true }],
+    };
+    const granted = { type: 'APPROVAL_RESULT', approvalRequestId: 'req1', approved: true };
+
+    it('a batch with an approved result and no run reads Approved, with nothing waiting on an answer', () => {
+      const parts = decode([asking, granted]);
+      expect(parts.map(part => part.state)).toEqual(['approval-responded']);
+      const view = approvalBatchViewOf(parts);
+      expect(view.status).toBe('approved');
+      expect(view.answerPending).toBe(false);
+    });
+
+    it('its tool`s failure stays in its row: a raw output is no sentence for the foot', () => {
+      const parts = decode([
+        asking,
+        granted,
+        {
+          type: 'EXECUTED_TOOL',
+          toolExecutionRequestId: 't1',
+          integratedToolType: 'SHELL',
+          toolFunction: 'run',
+          success: false,
+          result: 'Traceback (most recent call last)',
+        },
+      ]);
+      expect(approvalBatchViewOf(parts).data.executions?.t1).toEqual({
+        status: 'done',
+        success: false,
+        result: 'Traceback (most recent call last)',
+      });
+    });
   });
 
   describe('a row nobody knows the end of', () => {
@@ -399,6 +523,33 @@ describe('a batch tells its rows apart by what each touches', () => {
       approval: { id: 'c1', approved: true, descriptor: { fields: fields('Fix login', '86a'), batchId } },
     };
     expect(approvalBatchViewOf([answered]).data.toolCalls[0].toolTitle).toBe('Delete task: Fix login');
+  });
+});
+
+describe('holdsApprovalThatRan', () => {
+  const part = (over: Partial<ChatToolPart>) => ({ ...base, state: 'input-available', ...over }) as ChatToolPart;
+  const ran = part({ state: 'output-available', output: 1, approval: { id: 'c1', approved: true } });
+
+  it('a gate that reads Approved, or a row of a batch with an output', () => {
+    expect(holdsApprovalThatRan([ran])).toBe(true);
+    expect(holdsApprovalThatRan([part({ state: 'approval-responded', approval: { id: 'c1', approved: true } })])).toBe(
+      true,
+    );
+    expect(
+      holdsApprovalThatRan([part({ state: 'output-available', output: 1, toolMetadata: { batchId: 'b1' } })]),
+    ).toBe(true);
+  });
+
+  it('never a proposal, a refusal, a rejection, or a tool outside any approval: asking again repeats nothing', () => {
+    expect(holdsApprovalThatRan([part({ state: 'approval-requested', approval: { id: 'c1' } })])).toBe(false);
+    expect(
+      holdsApprovalThatRan([part({ state: 'output-error', errorText: 'no', approval: { id: 'c1', approved: true } })]),
+    ).toBe(false);
+    expect(holdsApprovalThatRan([part({ state: 'output-denied', approval: { id: 'c1', approved: false } })])).toBe(
+      false,
+    );
+    expect(holdsApprovalThatRan([part({ state: 'output-available', output: 1 })])).toBe(false);
+    expect(holdsApprovalThatRan([{ type: 'text', text: 'Hello' }])).toBe(false);
   });
 });
 

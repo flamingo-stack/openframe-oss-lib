@@ -15,6 +15,7 @@ import { renderHook, act } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
+  approvalAnswerInFlight,
   approvalBatchIdOf,
   approvalStatusOf,
   isSourcePart,
@@ -22,7 +23,7 @@ import {
   textOfParts,
   type ChatMessage,
 } from '../../../../chat-protocol/chat-message';
-import { encodeUiChunk, encodeUiDone, type UiChunk } from '../../../../chat-protocol/ui-chunks';
+import { encodeUiChunk, encodeUiDone, STREAM_CLOSE_GRACE_MS, type UiChunk } from '../../../../chat-protocol/ui-chunks';
 import {
   ANSWER_STREAM,
   APPROVAL_BATCH_STREAM,
@@ -37,7 +38,7 @@ import {
 } from '../../../../chat-protocol/wire-fixtures';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
 import { approvalBatchViewOf } from '../../utils/tool-part-display';
-import { useSseChatAdapter } from '../use-sse-chat-adapter';
+import { APPROVAL_REFUSED, useSseChatAdapter } from '../use-sse-chat-adapter';
 
 // =============================================================================
 // Harness
@@ -549,6 +550,31 @@ describe('an approval whose answer never came', () => {
     expect(approvalStatusOf(part)).toBe('failed');
   });
 
+  it('a refusal with no words of its own, a gateway`s page say, is told to a person', async () => {
+    const answers = vi
+      .fn()
+      .mockImplementationOnce(() =>
+        Promise.resolve({ ok: true, status: 200, body: streamOf(onUiWire(APPROVAL_STREAM)) } as unknown as Response),
+      )
+      .mockImplementationOnce(() =>
+        Promise.resolve(
+          new Response('<html>403 Forbidden</html>', { status: 403, headers: { 'content-type': 'text/html' } }),
+        ),
+      );
+    vi.stubGlobal('fetch', answers);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    await act(async () => {
+      await expect(result.current.actions.approve?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
+    });
+    const [part] = toolsOf(result.current.messages);
+    expect(part).toMatchObject({ state: 'output-error', errorText: APPROVAL_REFUSED });
+    expect(APPROVAL_REFUSED).toBe('The server refused this, so it did not run.');
+    expect(approvalStatusOf(part)).toBe('failed');
+  });
+
   it('a 5xx may be a gateway`s word about a write still running: nobody knows', async () => {
     mockFetchResponses([onUiWire(APPROVAL_STREAM), { status: 504, body: { error: 'Gateway timeout' } }]);
     const { result } = renderAdapter();
@@ -581,6 +607,129 @@ describe('an approval whose answer never came', () => {
       await expect(result.current.actions.approve?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
     });
     expect(approvalStatusOf(toolsOf(result.current.messages)[0])).toBe('unknown');
+  });
+
+  describe('while the answer is on its way', () => {
+    const REFUSED = 'This approval expired, ask again to get a fresh one.';
+    const oneCard = () => holdSecondResponse(APPROVAL_STREAM, [{ type: 'start' }], 'hang');
+    const statusesOf = (messages: readonly ChatMessage[]) => toolsOf(messages).map(approvalStatusOf);
+
+    /** The click and the request it sends, with its answer held back until Stop. */
+    async function clicked(answer: () => unknown) {
+      let answering: unknown;
+      await act(async () => {
+        answering = answer();
+        await tick();
+        await tick();
+      });
+      return { settle: () => answering };
+    }
+
+    it('an approved card says Approving, sends no marker, and Approved only once it ran', async () => {
+      const requests = mockFetchResponses([
+        onUiWire(APPROVAL_STREAM),
+        onUiWire([
+          { type: 'start' },
+          { type: 'tool-output-available', toolCallId: FIXTURE_PROPOSAL_ID, dynamic: true, output: { ok: true } },
+          { type: 'finish', finishReason: 'stop' },
+        ]),
+      ]);
+      const { result } = renderAdapter();
+      await act(async () => {
+        await result.current.sendMessage('close it');
+      });
+      await act(async () => {
+        await result.current.actions.approve?.(FIXTURE_PROPOSAL_ID);
+      });
+      expect(statusesOf(result.current.messages)).toEqual(['approved']);
+      // What goes back is the standard's part: the marker is this client's own.
+      expect(JSON.stringify(requests[1].body)).not.toContain('answerSent');
+    });
+
+    it('holds Approving for as long as the server says nothing', async () => {
+      oneCard();
+      const { result } = renderAdapter();
+      await act(async () => {
+        await result.current.sendMessage('close it');
+      });
+      const answer = await clicked(() => result.current.actions.approve?.(FIXTURE_PROPOSAL_ID));
+      expect(statusesOf(result.current.messages)).toEqual(['approving']);
+      expect(approvalAnswerInFlight(toolsOf(result.current.messages)[0])).toBe(true);
+      act(() => {
+        result.current.stopMessage();
+      });
+      await act(async () => {
+        await answer.settle();
+      });
+      expect(statusesOf(result.current.messages)).toEqual(['unknown']);
+    });
+
+    it('a rejection reads Rejected at once, with its answer still on its way', async () => {
+      oneCard();
+      const { result } = renderAdapter();
+      await act(async () => {
+        await result.current.sendMessage('close it');
+      });
+      const answer = await clicked(() => result.current.actions.reject?.(FIXTURE_PROPOSAL_ID, 'not now'));
+      expect(statusesOf(result.current.messages)).toEqual(['rejected']);
+      expect(approvalAnswerInFlight(toolsOf(result.current.messages)[0])).toBe(true);
+      act(() => {
+        result.current.stopMessage();
+      });
+      await act(async () => {
+        await answer.settle();
+      });
+      expect(statusesOf(result.current.messages)).toEqual(['rejected']);
+      expect(approvalAnswerInFlight(toolsOf(result.current.messages)[0])).toBe(false);
+    });
+
+    it('every step of a refused batch is Approving, then Failed: never Approved', async () => {
+      holdSecondResponse(
+        APPROVAL_BATCH_STREAM,
+        [
+          { type: 'start' },
+          { type: 'tool-output-error', toolCallId: 'prop-a', dynamic: true, errorText: REFUSED },
+          { type: 'tool-output-error', toolCallId: 'prop-b', dynamic: true, errorText: REFUSED },
+          { type: 'finish', finishReason: 'stop' },
+        ],
+        'close',
+      );
+      // Every render, not only what an act leaves behind: a card that says Approved for one frame has said it.
+      const seen = new Set<string>();
+      const { result } = renderHook(
+        () => {
+          const state = useSseChatAdapter(undefined, { active: false });
+          const rows = toolsOf(state.messages);
+          if (rows.length > 0) seen.add(approvalBatchViewOf(rows).status);
+          return state;
+        },
+        { wrapper },
+      );
+      await act(async () => {
+        await result.current.sendMessage('delete both');
+      });
+      // From the click on: while the card streamed in, a row has no gate to read yet.
+      seen.clear();
+      await act(async () => {
+        await result.current.actions.approve?.(BATCH_ID);
+      });
+      expect(seen.has('approving')).toBe(true);
+      expect(seen.has('approved')).toBe(false);
+      expect(approvalBatchViewOf(toolsOf(result.current.messages)).status).toBe('failed');
+    });
+
+    it('a cut leaves no row Approving', async () => {
+      holdSecondResponse(APPROVAL_STREAM, [{ type: 'start' }], 'error');
+      const { result } = renderAdapter();
+      await act(async () => {
+        await result.current.sendMessage('close it');
+      });
+      await act(async () => {
+        await expect(result.current.actions.approve?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
+      });
+      expect(statusesOf(result.current.messages)).toEqual(['unknown']);
+      expect(approvalAnswerInFlight(toolsOf(result.current.messages)[0])).toBe(false);
+    });
   });
 
   it('Stop leaves no row waiting', async () => {
@@ -672,6 +821,442 @@ describe('an approval whose answer never came', () => {
       state: 'output-error',
       errorText: outcomeUnknown,
     });
+  });
+});
+
+describe('an approval while another stream is open', () => {
+  const toolsOf = (messages: readonly ChatMessage[]) => messages.flatMap(message => message.parts).filter(isToolPart);
+  const textsOf = (messages: readonly ChatMessage[]) => assistantsOf(messages).map(m => textOfParts(m.parts));
+
+  /** A response the test writes to, chunk by chunk. */
+  function heldStream() {
+    let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+      },
+    });
+    return {
+      response: { ok: true, status: 200, body } as unknown as Response,
+      write: async (...chunks: UiChunk[]) => {
+        for (const chunk of chunks) controller?.enqueue(encodeUiChunk(chunk));
+        await tick();
+        await tick();
+      },
+      close: async () => {
+        controller?.enqueue(encodeUiDone());
+        controller?.close();
+        await tick();
+        await tick();
+      },
+    };
+  }
+  const SECOND_TURN: UiChunk[] = [
+    { type: 'start', messageId: 'a2' },
+    { type: 'text-start', id: 't2' },
+    { type: 'text-delta', id: 't2', delta: 'FIRST-SENTENCE.' },
+  ];
+
+  it('an older card takes no answer from a running turn: its words stay in its message, and Stop reaches it', async () => {
+    const second = heldStream();
+    const answers = vi
+      .fn()
+      .mockImplementationOnce(() =>
+        Promise.resolve({ ok: true, status: 200, body: streamOf(onUiWire(APPROVAL_STREAM)) } as unknown as Response),
+      )
+      .mockImplementationOnce(() => Promise.resolve(second.response));
+    vi.stubGlobal('fetch', answers);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    const staleApprove = result.current.actions.approve;
+    expect(staleApprove).toBeDefined();
+
+    let turn: Promise<unknown> | undefined;
+    await act(async () => {
+      turn = result.current.sendMessage('what is new?');
+      await second.write(...SECOND_TURN);
+    });
+    expect(result.current.actions.approve).toBeUndefined();
+    expect(result.current.actions.reject).toBeUndefined();
+
+    // The click that landed before a render could say so sends nothing, and moves nothing.
+    await act(async () => {
+      await expect(staleApprove?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
+    });
+    expect(answers).toHaveBeenCalledTimes(2);
+    expect(approvalStatusOf(toolsOf(result.current.messages)[0])).toBe('pending');
+
+    await act(async () => {
+      await second.write(
+        { type: 'text-delta', id: 't2', delta: ' SECOND-SENTENCE.' },
+        { type: 'text-end', id: 't2' },
+        { type: 'finish', finishReason: 'stop' },
+      );
+      await second.close();
+      await turn;
+    });
+    expect(textsOf(result.current.messages)).toEqual(['I can close that ticket.', 'FIRST-SENTENCE. SECOND-SENTENCE.']);
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.actions.approve).toBeDefined();
+  });
+
+  it('a card in the stream that proposed it waits for that stream to end, past its `finish`', async () => {
+    const first = heldStream();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(first.response)),
+    );
+    const { result } = renderAdapter();
+    let turn: Promise<unknown> | undefined;
+    const proposal = APPROVAL_STREAM.filter(chunk => chunk.type !== 'finish');
+    await act(async () => {
+      turn = result.current.sendMessage('close it');
+      await first.write(...proposal);
+    });
+    expect(approvalStatusOf(toolsOf(result.current.messages)[0])).toBe('pending');
+    expect(result.current.actions.approve).toBeUndefined();
+
+    // `finish` ends the phase before the reader has stopped. The chat still reads as loading, so the composer offers Stop
+    // and no send it would have to refuse.
+    await act(async () => {
+      await first.write({ type: 'finish', finishReason: 'tool-calls' });
+    });
+    expect(result.current.streamingPhase).toBe('idle');
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.actions.approve).toBeUndefined();
+
+    await act(async () => {
+      await first.close();
+      await turn;
+    });
+    expect(result.current.actions.approve).toBeDefined();
+  });
+
+  describe('a send on top of it', () => {
+    const POST_ONE = { type: 'blog_post', id: '1', title: 'Post 1', url: null };
+    const RECEIPT: UiChunk[] = [
+      { type: 'start' },
+      { type: 'tool-output-available', toolCallId: FIXTURE_PROPOSAL_ID, dynamic: true, output: { ok: true } },
+      { type: 'text-start', id: 'r' },
+      { type: 'text-delta', id: 'r', delta: 'RECEIPT-WORDS.' },
+      { type: 'text-end', id: 'r' },
+    ];
+    const userTexts = (messages: readonly ChatMessage[]) =>
+      messages.filter(message => message.role === 'user').map(message => textOfParts(message.parts));
+
+    /** A proposal, whole, then an answer that stays open; `signals` holds each request's abort signal. */
+    async function answering() {
+      const answer = heldStream();
+      const signals: Array<AbortSignal | null | undefined> = [];
+      const answers = vi
+        .fn((_url: string, init?: RequestInit) => {
+          signals.push(init?.signal);
+          return Promise.resolve(answer.response);
+        })
+        .mockImplementationOnce((_url: string, init?: RequestInit) => {
+          signals.push(init?.signal);
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            body: streamOf(onUiWire(APPROVAL_STREAM)),
+          } as unknown as Response);
+        });
+      vi.stubGlobal('fetch', answers);
+      const rendered = renderAdapter();
+      await act(async () => {
+        await rendered.result.current.sendMessage('close it');
+      });
+      let answered: unknown;
+      await act(async () => {
+        answered = rendered.result.current.actions.approve?.(FIXTURE_PROPOSAL_ID);
+        await tick();
+      });
+      expect(answers).toHaveBeenCalledTimes(2);
+      return { ...rendered, answer, answers, signals, answered: () => answered };
+    }
+
+    it('an Ask during an answer: one request, the receipt in the card`s message, and Stop reaches the answer', async () => {
+      const { result, answer, answers, signals, answered } = await answering();
+
+      act(() => {
+        result.current.discussRef?.(POST_ONE);
+      });
+      await act(async () => {
+        await tick();
+      });
+      expect(answers).toHaveBeenCalledTimes(2);
+      expect(userTexts(result.current.messages)).toEqual(['close it']);
+
+      await act(async () => {
+        await answer.write(...RECEIPT);
+      });
+      expect(textsOf(result.current.messages)).toEqual(['I can close that ticket.\n\nRECEIPT-WORDS.']);
+      expect(assistantsOf(result.current.messages)).toHaveLength(1);
+      expect(result.current.writingMessageId).toBe(FIXTURE_ASSISTANT_ID);
+
+      act(() => {
+        result.current.stopMessage();
+      });
+      expect(signals[1]?.aborted).toBe(true);
+      expect(result.current.isLoading).toBe(false);
+      await act(async () => {
+        await answer.close();
+        await answered();
+      });
+    });
+
+    it('a send during an answer resolves false and draws nothing', async () => {
+      const { result, answer, answers, answered } = await answering();
+      await act(async () => {
+        await expect(result.current.sendMessage('and another thing')).resolves.toBe(false);
+      });
+      expect(answers).toHaveBeenCalledTimes(2);
+      expect(userTexts(result.current.messages)).toEqual(['close it']);
+      await act(async () => {
+        await answer.write(...RECEIPT, { type: 'finish', finishReason: 'stop' });
+        await answer.close();
+        await answered();
+      });
+      // With the stream gone, the same send goes out.
+      await act(async () => {
+        await result.current.sendMessage('and another thing');
+      });
+      expect(answers).toHaveBeenCalledTimes(3);
+    });
+
+    it('a stream someone stopped holds nothing back, and does not end the turn after it', async () => {
+      const { result, answer, answers, answered } = await answering();
+      const next = heldStream();
+      answers.mockImplementationOnce(() => Promise.resolve(next.response));
+      let sent: Promise<unknown> | undefined;
+      await act(async () => {
+        // In one breath, before the stopped reader has stopped.
+        result.current.stopMessage();
+        sent = result.current.sendMessage('never mind that');
+        await tick();
+      });
+      expect(answers).toHaveBeenCalledTimes(3);
+      expect(userTexts(result.current.messages)).toEqual(['close it', 'never mind that']);
+
+      await act(async () => {
+        await answer.close();
+        await answered();
+        await tick();
+      });
+      expect(result.current.isLoading).toBe(true);
+      expect(result.current.streamingPhase).not.toBe('idle');
+
+      await act(async () => {
+        await next.write(...SECOND_TURN, { type: 'text-end', id: 't2' }, { type: 'finish', finishReason: 'stop' });
+        await next.close();
+        await sent;
+      });
+      expect(result.current.isLoading).toBe(false);
+      expect(textsOf(result.current.messages).slice(-1)).toEqual(['FIRST-SENTENCE.']);
+    });
+  });
+
+  describe('a body that stays open past its end', () => {
+    const graceOver = () => new Promise(resolve => setTimeout(resolve, STREAM_CLOSE_GRACE_MS + 50));
+
+    /** A proposing turn written up to its end, its body left open. */
+    async function stalled(...end: Array<UiChunk | 'done'>) {
+      let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+      const body = new ReadableStream<Uint8Array>({
+        start(c) {
+          controller = c;
+        },
+      });
+      const answers = vi.fn(() => Promise.resolve({ ok: true, status: 200, body } as unknown as Response));
+      vi.stubGlobal('fetch', answers);
+      const rendered = renderAdapter();
+      let turn: Promise<unknown> | undefined;
+      await act(async () => {
+        turn = rendered.result.current.sendMessage('close it');
+        await tick();
+        for (const chunk of APPROVAL_STREAM.filter(c => c.type !== 'finish')) {
+          controller?.enqueue(encodeUiChunk(chunk));
+        }
+        for (const item of end) controller?.enqueue(item === 'done' ? encodeUiDone() : encodeUiChunk(item));
+        await tick();
+        await tick();
+      });
+      return { ...rendered, answers, turn: () => turn };
+    }
+    const FINISH: UiChunk = { type: 'finish', finishReason: 'tool-calls' };
+
+    it('`[DONE]` opens the card at once, whatever the transport does', async () => {
+      const { result, turn } = await stalled(FINISH, 'done');
+      await act(async () => {
+        await turn();
+      });
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.actions.approve).toBeDefined();
+    });
+
+    it('`finish` with no `[DONE]`: Stop is on offer until the bound, then the stream closes and the card opens', async () => {
+      const { result, answers, turn } = await stalled(FINISH);
+      expect(result.current.isLoading).toBe(true);
+      expect(result.current.actions.approve).toBeUndefined();
+      await act(async () => {
+        await expect(result.current.sendMessage('in the gap')).resolves.toBe(false);
+      });
+      expect(answers).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await graceOver();
+        await turn();
+      });
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.actions.approve).toBeDefined();
+    });
+  });
+
+  it('keeps one action object for the length of a turn: the message memo compares it by reference', async () => {
+    const first = heldStream();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(first.response)),
+    );
+    const { result } = renderAdapter();
+    const idle = result.current.actions;
+    let turn: Promise<unknown> | undefined;
+    await act(async () => {
+      turn = result.current.sendMessage('close it');
+      await first.write({ type: 'start', messageId: 'a1' }, { type: 'text-start', id: 't1' });
+    });
+    const during = result.current.actions;
+    expect(during).not.toBe(idle);
+    await act(async () => {
+      await first.write({ type: 'text-delta', id: 't1', delta: 'Hello' }, { type: 'text-end', id: 't1' });
+    });
+    expect(result.current.actions).toBe(during);
+    await act(async () => {
+      await first.write({ type: 'finish', finishReason: 'stop' });
+      await first.close();
+      await turn;
+    });
+    expect(result.current.actions).toBe(idle);
+  });
+
+  it('names the card`s message as the one written, for as long as its answer runs', async () => {
+    const answer = heldStream();
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementationOnce(() =>
+          Promise.resolve({ ok: true, status: 200, body: streamOf(onUiWire(APPROVAL_STREAM)) } as unknown as Response),
+        )
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            body: streamOf(onUiWire([{ type: 'start', messageId: 'a2' }, ...ANSWER_STREAM.slice(1)])),
+          } as unknown as Response),
+        )
+        .mockImplementationOnce(() => Promise.resolve(answer.response)),
+    );
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    const card = assistantsOf(result.current.messages)[0].id;
+    await act(async () => {
+      await result.current.sendMessage('and what is new?');
+    });
+    expect(result.current.writingMessageId).toBeNull();
+    expect(assistantsOf(result.current.messages)).toHaveLength(2);
+
+    let answering: unknown;
+    await act(async () => {
+      answering = result.current.actions.approve?.(FIXTURE_PROPOSAL_ID);
+      await tick();
+    });
+    expect(result.current.writingMessageId).toBe(card);
+    // Past `finish` too, until the reader has stopped: named nowhere, the newer answer would read as being written.
+    await act(async () => {
+      await answer.write(
+        { type: 'start' },
+        { type: 'tool-output-available', toolCallId: FIXTURE_PROPOSAL_ID, dynamic: true, output: {} },
+        { type: 'finish', finishReason: 'stop' },
+      );
+    });
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.writingMessageId).toBe(card);
+    await act(async () => {
+      await answer.close();
+      await answering;
+    });
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.writingMessageId).toBeNull();
+  });
+
+  it('a second click on a card already answered sends nothing', async () => {
+    const answer = heldStream();
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementationOnce(() =>
+          Promise.resolve({ ok: true, status: 200, body: streamOf(onUiWire(APPROVAL_STREAM)) } as unknown as Response),
+        )
+        .mockImplementationOnce(() => Promise.resolve(answer.response)),
+    );
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    const approve = result.current.actions.approve;
+    let first: unknown;
+    await act(async () => {
+      first = approve?.(FIXTURE_PROPOSAL_ID);
+      await tick();
+    });
+    expect(result.current.actions.approve).toBeUndefined();
+    await act(async () => {
+      await expect(approve?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await answer.write(
+        { type: 'start' },
+        { type: 'tool-output-available', toolCallId: FIXTURE_PROPOSAL_ID, dynamic: true, output: {} },
+        { type: 'finish', finishReason: 'stop' },
+      );
+      await answer.close();
+      await first;
+    });
+    expect(approvalStatusOf(toolsOf(result.current.messages)[0])).toBe('approved');
+  });
+});
+
+describe('the context a turn leaves', () => {
+  const finishing = (usage: Record<string, number>): UiChunk[] => [
+    { type: 'start', messageId: 'a1' },
+    { type: 'text-delta', id: 't1', delta: 'Hello' },
+    { type: 'finish', finishReason: 'stop', messageMetadata: { usage } },
+  ];
+
+  it('is the hub`s word for it, beside the sums the cost reads', async () => {
+    mockFetchResponses([onUiWire(finishing({ inputTokens: 81_017, outputTokens: 500, contextTokens: 40_600 }))]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('hi');
+    });
+    expect(result.current.currentContextTokens).toBe(40_600);
+    expect(result.current.currentInputTokens).toBe(81_017);
+  });
+
+  it('is unknown from an older hub', async () => {
+    mockFetchResponses([onUiWire(finishing({ inputTokens: 12, outputTokens: 3 }))]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('hi');
+    });
+    expect(result.current.currentContextTokens).toBeNull();
   });
 });
 

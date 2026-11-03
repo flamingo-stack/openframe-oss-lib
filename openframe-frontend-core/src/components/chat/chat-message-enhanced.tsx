@@ -7,6 +7,7 @@ import {
   type ChatPart,
   type ChatSourcePart,
   type ChatToolPart,
+  approvalAnswerInFlight,
   approvalBatchIdOf,
   approvalStatusOf,
   isSourcePart,
@@ -15,7 +16,12 @@ import {
 } from '../../chat-protocol/chat-message';
 import { parseCitationHref, textWithCitationChips } from '../../chat-protocol/citations';
 import { normalizeRecordUri, parseRecordHref, recordHref } from '../../chat-protocol/record-link';
-import { CHAT_INTERRUPTED_NOTICE } from '../../chat-protocol/ui-chunks';
+import {
+  CHAT_INTERRUPTED_AFTER_RUN_NOTICE,
+  CHAT_INTERRUPTED_NOTICE,
+  saysStreamEnded,
+  withAfterRunNotice,
+} from '../../chat-protocol/ui-chunks';
 import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
@@ -66,6 +72,7 @@ import {
   approvalBatchViewOf,
   approvalRequestDataOf,
   failedBeforeRunning,
+  holdsApprovalThatRan,
   progressExecutionDataOf,
   toolExecutionDataOf,
   waitsOnAnotherTier,
@@ -436,9 +443,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       (last, part, index) => (part.type === 'text' && part.text.trim() !== '' ? index : last),
       -1,
     );
+    // Under an approval that ran the words after it were cut, and "ask again" would run it twice.
+    const approvalRan = holdsApprovalThatRan(bodyParts);
     // A stream cut before any text says so too: the notice is all that row has. Text of its own may say it already (a
-    // server that writes the notice itself).
-    const showInterruptedNotice = interrupted && !textOfParts(bodyParts).includes(CHAT_INTERRUPTED_NOTICE);
+    // server that writes the notice itself). An approval nobody knows the end of says the one thing to do itself, check
+    // before trying again.
+    const interruptedNotice =
+      !interrupted ||
+      saysStreamEnded(textOfParts(bodyParts)) ||
+      bodyParts.some(part => isToolPart(part) && approvalStatusOf(part) === 'unknown')
+        ? null
+        : approvalRan
+          ? CHAT_INTERRUPTED_AFTER_RUN_NOTICE
+          : CHAT_INTERRUPTED_NOTICE;
 
     // v2 draws a system line (e.g. a technician joining) as an in-thread
     // receipt card rather than as an author row with no body.
@@ -537,9 +554,10 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                             </div>
                           );
                         }
+                        const answer = textWithCitationChips(part, numbers);
                         return (
                           <div key={index} className={cn(CHAT_MESSAGE_TEXT_CLASS, 'text-ods-text-primary')}>
-                            {renderTextBody(textWithCitationChips(part, numbers), partIsStreaming)}
+                            {renderTextBody(approvalRan ? withAfterRunNotice(answer) : answer, partIsStreaming)}
                             {index === lastTextIndex && files.length > 0 && (
                               <ChatFileParts files={files} componentOverrides={cardComponentOverrides} />
                             )}
@@ -574,6 +592,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                               key={index}
                               data={view.data}
                               status={view.status}
+                              answerPending={view.answerPending}
                               resolvedByName={view.resolvedByName}
                               {...approvalHandlers(actions, view.data.approvalRequestId)}
                               assistantType={assistantType}
@@ -597,26 +616,20 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                         }
                         if (waitsOnAnotherTier(part, displayApprovalTypes)) return null;
                         return (
-                          <React.Fragment key={index}>
-                            <ApprovalRequestMessage
-                              data={approval}
-                              status={approvalStatusOf(part) ?? undefined}
-                              resolvedByName={part.toolMetadata?.resolvedByName}
-                              {...approvalHandlers(actions, approval.requestId ?? part.toolCallId)}
-                              assistantType={assistantType}
-                              variant={approvalVariant}
-                            />
-                            {/* Approved and refused all the same (an expired proposal): the card stays, and says why. */}
-                            {part.state === 'output-error' && !part.toolMetadata?.outcomeUnknown && (
-                              <ErrorMessageDisplay title={part.errorText} />
-                            )}
-                            {/* Nobody knows how it ended: no error box, because it may have gone through. */}
-                            {part.state === 'output-error' && part.toolMetadata?.outcomeUnknown && (
-                              <p className="mb-[var(--spacing-system-xsf)] text-ods-text-secondary text-h6">
-                                {part.errorText}
-                              </p>
-                            )}
-                          </React.Fragment>
+                          <ApprovalRequestMessage
+                            key={index}
+                            data={approval}
+                            status={approvalStatusOf(part) ?? undefined}
+                            answerPending={approvalAnswerInFlight(part)}
+                            // Approved and refused all the same (an expired proposal), or nobody knows how it ended: the
+                            // card stays, and says why, whole. The error box cuts its one line, and this sentence is all
+                            // a reader has to go on.
+                            notice={part.state === 'output-error' ? part.errorText : undefined}
+                            resolvedByName={part.toolMetadata?.resolvedByName}
+                            {...approvalHandlers(actions, approval.requestId ?? part.toolCallId)}
+                            assistantType={assistantType}
+                            variant={approvalVariant}
+                          />
                         );
                       }
                       case 'data-escalation-offer':
@@ -664,9 +677,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                         return null;
                     }
                   })}
-                  {showInterruptedNotice && (
-                    <p className="text-ods-text-secondary text-h6">{CHAT_INTERRUPTED_NOTICE}</p>
-                  )}
+                  {interruptedNotice && <p className="text-ods-text-secondary text-h6">{interruptedNotice}</p>}
                 </div>
               )}
 

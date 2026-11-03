@@ -225,13 +225,20 @@ export interface UnifiedChatState {
 
   /**
    * True while a user turn is in progress — server-side thinking, streaming,
-   * or both. Driven by `streamingPhase` under the hood; exposed as a flat
-   * boolean for the chat-input "submit disabled" affordance.
+   * or both. Driven by `streamingPhase` and, where the transport is a stream,
+   * by that stream being open; exposed as a flat boolean for the chat-input
+   * "submit disabled" affordance.
    */
   isLoading: boolean;
 
   /** Granular phase for the "Thinking..."/"Streaming..." status row above input. */
   streamingPhase: StreamingPhase;
+
+  /**
+   * The message the running turn writes into, when the transport names it: a card's answer continues the card's message,
+   * which a newer answer may have followed. Unset or null, the last message is the one being written.
+   */
+  writingMessageId?: string | null;
 
   /** True while the adapter is rebuilding the message list from the
    *  server-side transcript store (SSE/Guide mount-time hydration). Optional —
@@ -291,6 +298,12 @@ export interface UnifiedChatState {
 
   /** Output tokens for the current turn (only known after stream end). */
   currentOutputTokens: number | null;
+
+  /**
+   * What the chat holds now (the last request's whole input plus its output), for the context gauge. Unset or null, the gauge
+   * reads input plus output, which on a turn with a follow-up counts the same history twice.
+   */
+  currentContextTokens?: number | null;
 
   /** Cache-hit % (read / total-input × 100). Only known after stream end. */
   currentCacheHitRatePct: number | null;

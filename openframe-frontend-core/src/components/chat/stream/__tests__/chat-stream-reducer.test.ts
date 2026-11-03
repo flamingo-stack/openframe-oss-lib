@@ -361,6 +361,45 @@ describe('createChatStreamReducer — the message a stream builds', () => {
     expect(r.state.streamingPhase).toBe('idle');
   });
 
+  it('its state names the message being written: a card`s on its answer, none between turns', () => {
+    const r = createChatStreamReducer();
+    expect(r.state.writingMessageId).toBeNull();
+    r.beginSseSend({ text: 'do it' });
+    expect(r.state.writingMessageId).toBe(trailing(r).id);
+    r.apply(chunks({ type: 'start', messageId: 'card' }));
+    expect(r.state.writingMessageId).toBe('card');
+    r.apply(chunks({ type: 'text-delta', id: 't1', delta: 'I can.' }));
+    r.apply(end());
+    expect(r.state.writingMessageId).toBeNull();
+    r.endSseTurn();
+    r.beginSseSend({ text: 'and now?' });
+    r.apply(chunks({ type: 'start', messageId: 'newer' }));
+    r.apply(chunks({ type: 'text-delta', id: 't2', delta: 'Now.' }));
+    r.apply(end());
+    r.endSseTurn();
+
+    r.continueMessage('card');
+    expect(r.state.writingMessageId).toBe('card');
+    r.apply(chunks({ type: 'start' }));
+    expect(r.state.writingMessageId).toBe('card');
+    r.apply(end());
+    r.endSseTurn();
+    expect(r.state.writingMessageId).toBeNull();
+  });
+
+  it('a read says where the wire stands, when a chunk moved it and changed no message', () => {
+    const r = createChatStreamReducer();
+    r.beginSseSend({ text: 'do it' });
+    r.apply(chunks({ type: 'start', messageId: 'a1' }));
+    r.apply(end());
+    r.setPhase('streaming');
+    expect(r.state.writingMessageId).toBeNull();
+    const held = r.state.messages;
+    r.apply(chunks({ type: 'start' }));
+    expect(r.state.messages).toBe(held);
+    expect(r.state.writingMessageId).toBe('a1');
+  });
+
   it('a replay of an incomplete tail takes that message over, and its old body gives way at the first content', () => {
     const r = createChatStreamReducer();
     r.initializeWithState([

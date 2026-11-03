@@ -17,25 +17,43 @@ vi.mock('../use-nats-dialog-subscription', () => ({
   },
 }));
 
+async function openDialog() {
+  const hook = renderHook(() =>
+    useNatsChatAdapter({
+      getNatsWsUrl: () => null,
+      publishUserMessage: vi.fn(),
+      fetchChunks: vi.fn(() => Promise.resolve([])),
+      fetchDialogs: vi.fn(() =>
+        Promise.resolve({
+          dialogs: [{ id: 'd1', title: 'Chat', timestamp: new Date('2026-08-01T00:00:00Z') }],
+          nextCursor: null,
+        }),
+      ),
+      fetchDialogMessages: vi.fn(() => Promise.resolve({ messages: [], nextCursor: null })),
+    }),
+  );
+  await waitFor(() => expect(hook.result.current.dialogs).toHaveLength(1));
+  act(() => hook.result.current.selectDialog('d1'));
+  await waitFor(() => expect(hook.result.current.streamingPhase).toBe('idle'));
+  return hook;
+}
+
+describe('useNatsChatAdapter: the message a turn writes', () => {
+  it('is named while the stream runs, and by nothing between turns', async () => {
+    const { result } = await openDialog();
+    const feed = (chunk: Record<string, unknown>) => act(() => subscription.onEvent(chunk, 'message'));
+    feed({ type: 'MESSAGE_START', streamSeq: 1 });
+    feed({ type: 'TEXT', text: 'hello', streamSeq: 2 });
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    expect(result.current.writingMessageId).toBe(result.current.messages[0].id);
+    feed({ type: 'MESSAGE_END', streamSeq: 3 });
+    await waitFor(() => expect(result.current.writingMessageId).toBeNull());
+  });
+});
+
 describe('useNatsChatAdapter: a send', () => {
   it('lands what the decoder holds in the turn it belongs to, not below the new message', async () => {
-    const { result } = renderHook(() =>
-      useNatsChatAdapter({
-        getNatsWsUrl: () => null,
-        publishUserMessage: vi.fn(),
-        fetchChunks: vi.fn(() => Promise.resolve([])),
-        fetchDialogs: vi.fn(() =>
-          Promise.resolve({
-            dialogs: [{ id: 'd1', title: 'Chat', timestamp: new Date('2026-08-01T00:00:00Z') }],
-            nextCursor: null,
-          }),
-        ),
-        fetchDialogMessages: vi.fn(() => Promise.resolve({ messages: [], nextCursor: null })),
-      }),
-    );
-    await waitFor(() => expect(result.current.dialogs).toHaveLength(1));
-    act(() => result.current.selectDialog('d1'));
-    await waitFor(() => expect(result.current.streamingPhase).toBe('idle'));
+    const { result } = await openDialog();
     const feed = (chunk: Record<string, unknown>) => act(() => subscription.onEvent(chunk, 'message'));
     const thread = () => result.current.messages.map(message => [message.role, textOfParts(message.parts)]);
 

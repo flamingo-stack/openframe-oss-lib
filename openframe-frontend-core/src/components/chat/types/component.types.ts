@@ -250,6 +250,9 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  loading" and never grows a scrollbar. Default `false` (rows bottom-anchored like the loaded thread). */
   fill?: boolean;
   isTyping?: boolean;
+  /** The message `isTyping` is about, when the transport names it: a card's answer continues the card's message, which a
+   *  newer answer may have followed. Unset or null, the last message. */
+  writingMessageId?: string | null;
   /** The line shown beside the pending-turn loader: what the turn is doing right
    *  now ("Searching 28 sources"). Omitted, the loader cycles its generic phrases. */
   typingMessage?: string;
@@ -602,6 +605,10 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
   onApprove?: ApprovalResolutionHandler;
   onReject?: ApprovalResolutionHandler;
   status?: ChatApprovalPartStatus;
+  /** The answer was sent and the server has not said how it went: the buttons stay, inert, so the click moves nothing. */
+  answerPending?: boolean;
+  /** Why it stands as it does (a refusal, an outcome nobody knows), whole, on the foot beside its status. */
+  notice?: string;
   disabled?: boolean;
   /** Chat identity. Accepted for parity with the batch card; does NOT drive
    *  the styling — use `variant`. */

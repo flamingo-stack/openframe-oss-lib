@@ -3,7 +3,7 @@
 import { forwardRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/button';
-import { ApprovalStatusTag, ApprovalWaitingLine } from './approval-batch-message';
+import { ApprovalFootStatus } from './approval-batch-message';
 import { useChatAppearance } from './chat-appearance-context';
 import { CHAT_BLOCK_CLASS } from './chat-block-frame';
 import type { ApprovalRequestMessageProps } from './types';
@@ -68,6 +68,8 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
       onApprove,
       onReject,
       status = 'pending',
+      answerPending = false,
+      notice,
       assistantType: _assistantType,
       variant = 'admin',
       resolvedByName,
@@ -78,6 +80,8 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
   ) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
+    // A click moves nothing: the foot keeps its height until the server has said how it went.
+    const keepsButtons = status === 'pending' || answerPending;
 
     const handleApprove = async () => {
       setIsProcessing(true);
@@ -115,14 +119,21 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           <p className="w-full whitespace-pre-line break-words text-ods-text-primary text-h4">
             {data.explanation?.trim() || 'Approval required'}
           </p>
-          {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
-          {!showFooterActions ? null : status === 'pending' ? (
+          {showFooterActions && (
+            <ApprovalFootStatus
+              status={status}
+              resolvedByName={resolvedByName}
+              inlineResolver
+              notices={notice ? [notice] : []}
+            />
+          )}
+          {showFooterActions && keepsButtons && (
             <div className="flex w-full items-center gap-[var(--spacing-system-xsf)]">
               <Button
                 size="small-legacy"
                 variant="accent"
                 onClick={handleApprove}
-                disabled={isProcessing || !onApprove}
+                disabled={isProcessing || answerPending || !onApprove}
                 className={cn(
                   'bg-ods-accent hover:bg-ods-accent/90',
                   'text-ods-bg text-h5',
@@ -135,7 +146,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
                 size="small-legacy"
                 variant="outline"
                 onClick={handleReject}
-                disabled={isProcessing || !onReject}
+                disabled={isProcessing || answerPending || !onReject}
                 className={cn(
                   'border-ods-border bg-ods-card',
                   'text-ods-text-primary text-h5',
@@ -145,10 +156,6 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
                 Reject
               </Button>
             </div>
-          ) : (
-            <div className="flex w-full">
-              <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver />
-            </div>
           )}
         </div>
       );
@@ -157,14 +164,21 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
     return (
       <div ref={ref} className={cn('mb-[var(--spacing-system-xsf)]', CHAT_BLOCK_CLASS, className)} {...props}>
         <ApprovalCardBody data={data} />
-        {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
-        {!showFooterActions ? null : status === 'pending' ? (
+        {showFooterActions && (
+          <ApprovalFootStatus
+            status={status}
+            resolvedByName={resolvedByName}
+            inlineResolver
+            notices={notice ? [notice] : []}
+          />
+        )}
+        {showFooterActions && keepsButtons && (
           <div className="flex items-center gap-[var(--spacing-system-xsf)]">
             <Button
               size="small-legacy"
               variant="accent"
               onClick={handleApprove}
-              disabled={isProcessing || !onApprove}
+              disabled={isProcessing || answerPending || !onApprove}
               className={cn(
                 'bg-ods-accent hover:bg-ods-accent/90',
                 'text-ods-bg text-h5',
@@ -177,7 +191,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
               size="small-legacy"
               variant="outline"
               onClick={handleReject}
-              disabled={isProcessing || !onReject}
+              disabled={isProcessing || answerPending || !onReject}
               className={cn(
                 'border-ods-border bg-ods-card',
                 'text-ods-text-primary text-h5',
@@ -186,10 +200,6 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
             >
               Reject
             </Button>
-          </div>
-        ) : (
-          <div className="flex">
-            <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver />
           </div>
         )}
       </div>
