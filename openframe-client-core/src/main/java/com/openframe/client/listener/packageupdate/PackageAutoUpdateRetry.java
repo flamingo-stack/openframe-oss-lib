@@ -33,6 +33,7 @@ public class PackageAutoUpdateRetry {
     // failures that can pass by themselves; any other stays FAILED until the next version
     private static final Set<String> RETRIED_REASONS = Set.of(Failed.Reason.MANAGER_ERROR.name(), Failed.Reason.TIMEOUT.name(),
             Failed.Reason.CLOSE_FAILED.name(), PackageUpdateDeviceStateReducer.NOT_DELIVERED);
+    private static final String TURNED_OFF_BY = "package-auto-update";
 
     private final PackageAutoUpdatePolicyRepository policyRepository;
     private final DeliveryDispatcher deliveryDispatcher;
@@ -52,6 +53,18 @@ public class PackageAutoUpdateRetry {
                 policy -> schedule(state, request, policy),
                 () -> log.info("[package-update] no retry, the policy is off or a newer version is ordered requestId={} machineId={}",
                         request.getRequestId(), machineId));
+    }
+
+    public void turnOffIfPackageRemoved(PackageUpdateDeviceState state, PackageUpdateRequest request) {
+        if (request == null || request.getSource() != PackageUpdateSource.AUTO
+                || !Failed.Reason.NOT_INSTALLED.name().equals(state.getFailedReason())) {
+            return;
+        }
+        currentPolicy(request, state.getMachineId()).ifPresent(policy -> {
+            policyRepository.disable(policy.getId(), TURNED_OFF_BY, Instant.now());
+            log.info("[package-update] auto-update turned off, the package is not on the device requestId={} machineId={} package={}/{}",
+                    request.getRequestId(), state.getMachineId(), request.getPackageManager(), request.getPackageName());
+        });
     }
 
     private void schedule(PackageUpdateDeviceState state, PackageUpdateRequest request, PackageAutoUpdatePolicy policy) {
