@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -51,6 +52,7 @@ class LocalDeliverySinkTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(spec.wireForm(any())).thenAnswer(invocation -> invocation.getArgument(0));
         payload = new ToolInstallationMessage();
         payload.setDelivery(new DeliveryRef(DeliveryType.TOOL_INSTALLATION, TARGET_ID, "d-1"));
         request = DeliveryRequest.<ToolInstallationMessage>builder()

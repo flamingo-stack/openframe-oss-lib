@@ -1,5 +1,8 @@
 package com.openframe.client.service.rmm;
 
+import java.util.List;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -35,6 +38,7 @@ public class PackageManagerBootstrapService {
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
+    private final EncryptionService encryptionService;
 
     @Value("${openframe.rmm.package-manager-bootstrap.cooldown-seconds}")
     private long cooldownSeconds;
@@ -114,6 +118,9 @@ public class PackageManagerBootstrapService {
                 .statusChangedAt(now)
                 .build());
 
+        // the agent gets a stored secret in the clear
+        List<ScriptEnvVar> storedEnvVars = script.getEnvVars();
+        List<ScriptEnvVar> envVars = ScriptEnvVar.revealAll(storedEnvVars, encryptionService::decrypt);
         scriptBootstrapNatsPublisher.publishBootstrapScript(machineId, ScriptMessage.builder()
                 .executionId(executionId)
                 .scriptId(script.getId())
@@ -123,7 +130,7 @@ public class PackageManagerBootstrapService {
                 .privilegeLevel(script.getPrivilegeLevel())
                 .args(ScriptArgsTokenizer.tokenize(script.getDefaultArgs()))
                 .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                .envVars(script.getEnvVars())
+                .envVars(envVars)
                 .build());
 
         log.info("Dispatched {} bootstrap: machineId={} executionId={} scriptId={}",

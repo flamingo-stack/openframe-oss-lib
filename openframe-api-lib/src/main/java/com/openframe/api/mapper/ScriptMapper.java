@@ -4,11 +4,14 @@ import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.ScriptStatus;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -22,9 +25,17 @@ import java.util.List;
  * envelope) live in {@code GraphQLScriptMapper} alongside the DGS resolver.
  */
 @Component
+@RequiredArgsConstructor
 public class ScriptMapper {
 
+    // ObjectProvider: a service that never reads a stored secret boots without the encryption config
+    private final ObjectProvider<EncryptionService> encryptionService;
+    private final ObjectProvider<ScriptSecretSealer> secretSealer;
+
     public Script toEntity(String tenantId, CreateScriptInput input) {
+        List<ScriptEnvVarInput> envVarsInput = input.getEnvVars();
+        List<ScriptEnvVar> plainEnvVars = ScriptEnvVarMapper.toEntity(envVarsInput);
+        List<ScriptEnvVar> envVars = seal(plainEnvVars);
         return Script.builder()
                 .tenantId(tenantId)
                 .name(input.getName())
@@ -35,7 +46,7 @@ public class ScriptMapper {
                 .supportedPlatforms(input.getSupportedPlatforms())
                 .defaultTimeoutSeconds(input.getDefaultTimeoutSeconds())
                 .defaultArgs(input.getDefaultArgs())
-                .envVars(ScriptEnvVarMapper.toEntity(input.getEnvVars()))
+                .envVars(envVars)
                 .build();
     }
 
@@ -48,7 +59,8 @@ public class ScriptMapper {
         existing.setSupportedPlatforms(input.getSupportedPlatforms());
         existing.setDefaultTimeoutSeconds(input.getDefaultTimeoutSeconds());
         existing.setDefaultArgs(input.getDefaultArgs());
-        existing.setEnvVars(ScriptEnvVarMapper.toEntity(input.getEnvVars(), existing.getEnvVars()));
+        List<ScriptEnvVar> envVars = ScriptEnvVarMapper.toEntity(input.getEnvVars(), existing.getEnvVars());
+        existing.setEnvVars(seal(envVars));
     }
 
     public ScriptResponse toResponse(Script entity) {
@@ -72,18 +84,30 @@ public class ScriptMapper {
                 .build();
     }
 
+    // Plain in the response: dispatch reads it. The API masks secrets in ScriptDataFetcher (Script.envVars) and
+    // ScriptScheduleDataFetcher (custom params), so a caller of this mapper outside them must mask on its own.
     private List<ScriptEnvVarInput> mapEnvVarsToResponse(List<ScriptEnvVar> envVars) {
-        if (envVars == null) {
+        List<ScriptEnvVar> revealed = ScriptEnvVar.revealAll(envVars, this::decrypt);
+        if (revealed == null) {
             return null;
         }
-        return envVars.stream()
+        return revealed.stream()
                 .map(v -> ScriptEnvVarInput.builder()
                         .name(v.getName())
-                        // TODO: mask value when secret == true once secret-management lands.
                         .value(v.getValue())
                         .secret(v.isSecret())
                         .build())
                 .toList();
+    }
+
+    private String decrypt(String ciphertext) {
+        EncryptionService service = encryptionService.getObject();
+        return service.decrypt(ciphertext);
+    }
+
+    private List<ScriptEnvVar> seal(List<ScriptEnvVar> envVars) {
+        ScriptSecretSealer sealer = secretSealer.getIfAvailable();
+        return sealer == null ? envVars : sealer.seal(envVars);
     }
 
     private static ScriptCreationSource creationSourceOf(Script entity) {
