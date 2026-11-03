@@ -17,8 +17,8 @@
  */
 
 import { MESSAGE_TYPE } from '../components/chat/types/message.types';
-import type { AskOptionData, CommandReviewData } from '../components/chat/types/message.types';
-import { normalizeCommandReview } from '../components/chat/utils/command-review';
+import type { AskOptionData, PolicyReviewData } from '../components/chat/types/message.types';
+import { normalizePolicyReview } from '../components/chat/utils/policy-review';
 import { ESCALATION_STATE, escalationResolvedStatus } from './events';
 import type { ApprovalToolCall, ChatStreamEvent } from './events';
 import { attachmentsEvent, sourceMetadataEvent } from './source-metadata';
@@ -46,9 +46,9 @@ function numOr(value: unknown, fallback = 0): number {
 }
 
 /** The review rides only RMM commands: absent on the wire, absent on the event (no `undefined` key). */
-function commandReviewField(raw: unknown): { commandReview?: CommandReviewData } {
-  const commandReview = normalizeCommandReview(raw);
-  return commandReview ? { commandReview } : {};
+function policyReviewField(raw: unknown): { policyReview?: PolicyReviewData } {
+  const policyReview = normalizePolicyReview(raw);
+  return policyReview ? { policyReview } : {};
 }
 
 /** Coerce the wire's `toolCalls[]` into the batch-approval shape, dropping
@@ -64,7 +64,7 @@ function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
     requiresApproval: item.requiresApproval === true,
     approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
     toolCallArguments: isRecord(item.toolCallArguments) ? item.toolCallArguments : null,
-    ...commandReviewField(item.commandReview),
+    ...policyReviewField(item.policyReview),
   }));
 }
 
@@ -174,7 +174,7 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
           // the EXECUTING segment held. Dropping it here therefore blanks the
           // card for the whole lifetime of the run.
           toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
-          ...commandReviewField(data.commandReview),
+          ...policyReviewField(data.policyReview),
           parameters: isRecord(data.parameters) ? data.parameters : undefined,
           toolExecutionRequestId:
             typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,

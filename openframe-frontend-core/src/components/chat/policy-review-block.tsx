@@ -2,7 +2,7 @@
 
 import { cn } from '../../utils/cn';
 import { Tag, type TagProps } from '../ui/tag';
-import type { CommandReviewData } from './types';
+import type { PolicyReviewData } from './types';
 
 type TagVariant = NonNullable<TagProps['variant']>;
 
@@ -25,17 +25,29 @@ const LEVEL_LABELS: Record<string, string> = {
   DENY: 'Denied',
 };
 
+const RULE_VARIANTS: Record<string, TagVariant> = {
+  HARD_DENY: 'error',
+  SOFT_DENY: 'warning',
+};
+
 function levelLabel(level: string): string {
   return LEVEL_LABELS[level] ?? level;
 }
 
+function ruleVariant(type: string | undefined): TagVariant {
+  return (type && RULE_VARIANTS[type]) || 'outline';
+}
+
+function title(source: string | undefined): string {
+  return source === 'CLASSIFIER' ? 'AI review' : 'Policy review';
+}
+
 /**
- * The AI guardrail's review of one RMM command: which path set the approval
- * level (the admin's policy, the fallback, a soft or hard rule), the level it
- * set, the rules that matched, the reason and the operations it saw. Admin-only
- * detail: the client variants never render it.
+ * The security policy's review of one tool call: which path set the approval level (the admin's
+ * policy, the fallback, a soft or hard rule), the level it set, the rules that matched, the reason
+ * and the operations it saw. Admin-only detail: the client variants never render it.
  */
-export function CommandReviewBlock({ review, className }: { review: CommandReviewData; className?: string }) {
+export function PolicyReviewBlock({ review, className }: { review: PolicyReviewData; className?: string }) {
   const decision = review.decision ? DECISION_STYLES[review.decision] : undefined;
   const rules = review.matchedRules ?? [];
   const operations = review.operationCodes ?? [];
@@ -50,7 +62,7 @@ export function CommandReviewBlock({ review, className }: { review: CommandRevie
       )}
     >
       <div className="flex w-full flex-wrap items-center gap-[var(--spacing-system-xsf)]">
-        <span className="text-ods-text-secondary text-h5">AI review</span>
+        <span className="text-ods-text-secondary text-h5">{title(review.source)}</span>
         {decision && <Tag as="span" variant={decision.variant} label={decision.label} />}
         {review.approvalLevel && <span className="text-ods-text-primary">{levelLabel(review.approvalLevel)}</span>}
         {raisedFromPolicy && review.policyLevel && (
@@ -62,7 +74,12 @@ export function CommandReviewBlock({ review, className }: { review: CommandRevie
         <div className="flex w-full flex-wrap items-center gap-[var(--spacing-system-xsf)]">
           <span className="text-ods-text-secondary">Rules:</span>
           {rules.map(rule => (
-            <Tag key={rule.code || rule.label} as="span" variant="outline" label={rule.label || rule.code} />
+            <Tag
+              key={rule.code || rule.label}
+              as="span"
+              variant={ruleVariant(rule.type)}
+              label={rule.label || rule.code}
+            />
           ))}
         </div>
       )}

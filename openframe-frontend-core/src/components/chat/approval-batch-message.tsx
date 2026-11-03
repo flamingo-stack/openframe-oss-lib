@@ -11,9 +11,9 @@ import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { StatusLine } from '../ui/status-line';
 import { CHAT_BLOCK_CLASS, CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
-import { CommandReviewBlock } from './command-review-block';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
+import { PolicyReviewBlock } from './policy-review-block';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
 import type {
   ApprovalBlockVariant,
@@ -406,7 +406,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       );
     }
 
-    const reviewedCalls = data.toolCalls.filter(call => !!call.commandReview);
+    const reviewedCalls = data.toolCalls.filter(call => !!call.policyReview);
     const showFooterBlock = explanations.length > 0 || reviewedCalls.length > 0 || showFooterActions;
 
     return (
@@ -449,8 +449,8 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
             )}
 
             {reviewedCalls.map(call =>
-              call.commandReview ? (
-                <CommandReviewBlock key={call.toolExecutionRequestId} review={call.commandReview} />
+              call.policyReview ? (
+                <PolicyReviewBlock key={call.toolExecutionRequestId} review={call.policyReview} />
               ) : null,
             )}
 

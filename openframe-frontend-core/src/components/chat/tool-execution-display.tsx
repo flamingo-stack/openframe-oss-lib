@@ -9,9 +9,9 @@ import { ToolIcon } from '../tool-icon';
 import { Button } from '../ui/button';
 import { StatusLine, type StatusLineTone } from '../ui/status-line';
 import { CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
-import { CommandReviewBlock } from './command-review-block';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
+import { PolicyReviewBlock } from './policy-review-block';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
 import type { ToolExecutionDisplayProps } from './types';
 import { COMMAND_BODY_ARG_KEYS } from './utils/tool-call-helpers';
@@ -57,7 +57,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     }, [message.parameters, variant]);
 
     const hasResult = isExecuted && typeof message.result === 'string' && message.result.length > 0;
-    const commandReview = isClientView ? undefined : message.commandReview;
+    const policyReview = isClientView ? undefined : message.policyReview;
 
     // A remote (MCP) read-only tool deliberately publishes NO parameters and NO
     // result — the backend hides both, and sends a human title instead. There is
@@ -71,7 +71,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     // to a blank line.
     const isConciseRemoteRead = !message.integratedToolType && !!previewText && argEntries.length === 0 && !hasResult;
     const isStaticRow = isClientView || isConciseRemoteRead;
-    const hasBody = argEntries.length > 0 || hasResult || isExecuting || !!commandReview;
+    const hasBody = argEntries.length > 0 || hasResult || isExecuting || !!policyReview;
     // A run with no arguments and no result has nothing behind a chevron either:
     // its header stays, with no chevron and no click target, so the row never
     // opens onto an empty box. (A run still executing has a body: its live
@@ -165,9 +165,9 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
               <div ref={innerRef}>
                 {hasBody && (
                   <div className="flex w-full flex-col items-start gap-0 border-t border-ods-border p-[var(--spacing-system-sf)] text-h6">
-                    {commandReview && (
-                      <CommandReviewBlock
-                        review={commandReview}
+                    {policyReview && (
+                      <PolicyReviewBlock
+                        review={policyReview}
                         className={
                           argEntries.length > 0 || hasResult || isExecuting
                             ? 'mb-[var(--spacing-system-xsf)]'

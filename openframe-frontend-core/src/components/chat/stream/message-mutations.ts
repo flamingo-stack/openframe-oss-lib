@@ -23,7 +23,7 @@ import type {
   ToolExecutionData,
 } from '../types';
 import type { UnifiedChatMessage } from '../types/unified-chat-state.types';
-import { withCommandReview } from '../utils/command-review';
+import { withPolicyReview } from '../utils/policy-review';
 
 export function nextId(role: 'user' | 'assistant'): string {
   // Date.now() + counter sliver keeps ids monotonic even when two
@@ -480,7 +480,7 @@ export function mergeToolExecutionIfPresent(
         const mergedData: ToolExecutionData = {
           ...toolData,
           toolTitle: toolData.toolTitle ?? seg.data.toolTitle,
-          ...withCommandReview(toolData.commandReview ?? seg.data.commandReview),
+          ...withPolicyReview(toolData.policyReview ?? seg.data.policyReview),
           parameters: toolData.parameters || seg.data.parameters,
         };
         // Value-level no-op (replayed duplicate) → prior references.
