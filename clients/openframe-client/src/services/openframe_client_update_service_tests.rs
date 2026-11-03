@@ -105,7 +105,7 @@ fn update(version: &str) -> OpenFrameClientUpdateMessage {
 #[tokio::test]
 async fn only_an_update_to_another_version_waits_for_busy_tools_and_parks_them() {
     let f = fixture();
-    let busy = f.tool_ops.lock("mesh").await.mark_busy();
+    let busy = f.tool_ops.try_lock("mesh").expect("free tool").mark_busy();
 
     drop(f.service.reserve(&update(RUNNING)).unwrap());
     assert!(!f.tool_run_manager.is_client_update_pending());

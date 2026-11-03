@@ -319,7 +319,7 @@ impl OpenFrameClientUpdateService {
 
         info!("Update binary staged: {}", staged_path.display());
 
-        // Refused before the service stops, so a wrong build costs no restart; the engine re-runs it, the broadcast is redelivered
+        // Refused before the service stops, so a wrong build costs no restart; the delivery engine re-runs a failed update
         if let Err(e) = Self::verify_staged_version(&staged_path, expected_version).await {
             error!("Staged binary rejected: {:#}", e);
             if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
