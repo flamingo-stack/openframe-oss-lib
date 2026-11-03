@@ -54,10 +54,10 @@ describe('text after a turn ended', () => {
     expect(said(reducer.state.messages[1])).toEqual([text('done. continuing')]);
   });
 
-  it('reasoning takes its own part, ahead of the text', () => {
+  it('reasoning takes its own part, after the text it follows', () => {
     const { reducer, send } = fromThread([assistant('a1', text('answer'))]);
     send({ type: 'THINKING', text: 'hmm' });
-    expect(said(reducer.state.messages[0])).toEqual([{ type: 'reasoning', text: 'hmm' }, text('answer')]);
+    expect(said(reducer.state.messages[0])).toEqual([text('answer'), { type: 'reasoning', text: 'hmm' }]);
   });
 
   it('opens a fresh assistant bubble when the thread ends with a user message', () => {

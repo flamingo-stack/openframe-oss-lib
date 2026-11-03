@@ -6,8 +6,10 @@
  *   - `text-start` continues the last part when it is text, and `text-end` rebases its citations by the offset that
  *     wire id started at. On the wire a block with citations closes its id, because `text-end` is the only standard
  *     chunk that carries them; in the parts the text stays one part.
- *   - A source chunk inserts at the head of the body, unique by `sourceId`. A reasoning chunk goes before the first
- *     text part. Neither ever splits text.
+ *   - A source chunk inserts at the head of the body, unique by `sourceId`, and never splits text.
+ *   - A reasoning chunk sits where it arrived, extending the run it follows, so a later round's thinking reads after the
+ *     text and tools already shown. Text after it starts a part of its own; `storablePartsOf` joins them again, because a
+ *     stored row keeps no reasoning.
  *   - A record URI enters in its one spelling (a source, a citation's source, a card), so everything that later compares
  *     two of them compares strings.
  *   - A `data-*` chunk with an existing `id` replaces (its fields over the part's: a resolution names no text). A
@@ -153,11 +155,18 @@ function withNormalizedSource(citation: ChatCitation): ChatCitation {
   return id === citation.source.id ? citation : { ...citation, source: { ...citation.source, id } };
 }
 
-/** Citations on a wire part, as offsets into the stored part. One past the part's end is dropped: its range is a lie. */
+/**
+ * Citations on a wire part, as offsets into the stored part. One outside the part is dropped: its range is a lie. That
+ * covers a citation of the text a wire id wrote before reasoning came between; the hub never sends one, because a cited
+ * block closes its id before anything can follow it.
+ */
 function rebasedCitations(citations: readonly ChatCitation[], offset: number, length: number): ChatCitation[] {
   return citations
     .map(citation => rebaseCitation(withNormalizedSource(citation), offset))
-    .filter(citation => (citation.startIndex ?? 0) <= length && (citation.endIndex ?? 0) <= length);
+    .filter(
+      ({ startIndex = 0, endIndex = 0 }) =>
+        startIndex >= 0 && endIndex >= 0 && startIndex <= length && endIndex <= length,
+    );
 }
 
 function applyTextDelta(parts: ChatPart[], id: string, delta: string, wire: WireState): ChatPart[] {
@@ -167,7 +176,11 @@ function applyTextDelta(parts: ChatPart[], id: string, delta: string, wire: Wire
     if (!wire.textOffsets.has(id)) wire.textOffsets.set(id, last.text.length);
     return replaceAt<ChatPart>(parts, parts.length - 1, { ...last, text: last.text + delta, state: 'streaming' });
   }
-  wire.textOffsets.set(id, 0);
+  // A new part. An id already writing (reasoning came between) keeps counting from where it began: that many characters
+  // are behind this part, in the text part before it.
+  const offset = wire.textOffsets.get(id);
+  const before = offset === undefined ? undefined : parts[lastTextIndex(parts)];
+  wire.textOffsets.set(id, offset !== undefined && before?.type === 'text' ? offset - before.text.length : 0);
   return [...parts, { type: 'text', text: delta, state: 'streaming' }];
 }
 
@@ -202,16 +215,11 @@ function applyTextEnd(
 
 function applyReasoningDelta(parts: ChatPart[], delta: string): ChatPart[] {
   if (delta === '') return parts;
-  const open = parts.findIndex(part => part.type === 'reasoning' && part.state === 'streaming');
-  const firstText = parts.findIndex(part => part.type === 'text');
-  const at = firstText === -1 ? parts.length : firstText;
-  const continued = open !== -1 ? open : parts[at - 1]?.type === 'reasoning' ? at - 1 : -1;
-  if (continued !== -1) {
-    const part = parts[continued];
-    if (part.type !== 'reasoning') return parts;
-    return replaceAt<ChatPart>(parts, continued, { ...part, text: part.text + delta, state: 'streaming' });
+  const last = parts[parts.length - 1];
+  if (last?.type === 'reasoning') {
+    return replaceAt<ChatPart>(parts, parts.length - 1, { ...last, text: last.text + delta, state: 'streaming' });
   }
-  return insertAt<ChatPart>(parts, at, { type: 'reasoning', text: delta, state: 'streaming' });
+  return [...closeStreaming(parts), { type: 'reasoning', text: delta, state: 'streaming' }];
 }
 
 function applyReasoningEnd(parts: ChatPart[]): ChatPart[] {

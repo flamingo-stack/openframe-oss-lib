@@ -460,8 +460,9 @@ function appendText(left: ChatTextPart, right: ChatTextPart, separator: string):
  * goes; an empty text part goes, so an empty answer is `[]`.
  *
  * Text parts a dropped part left adjacent become one, with their citations rebased. Across dropped reasoning nothing is
- * added, because reasoning never splits a sentence's text. Across any other dropped part (a tool row) they get the
- * paragraph break {@link textOfParts} draws there, so the row reads as the live message read.
+ * added, because the wire's text carries its own breaks there and a stored row holds what the wire sent. Across any other
+ * dropped part (a tool row) they get the paragraph break {@link textOfParts} draws there, so the row reads as the live
+ * message read.
  */
 export function storablePartsOf(parts: readonly ChatPart[]): ChatPart[] {
   const sources: ChatSourcePart[] = [];

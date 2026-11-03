@@ -8,8 +8,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { applyChunk, createWireState } from '../../../chat-protocol/apply-chunk';
 import type { ChatPart } from '../../../chat-protocol/chat-message';
-import { messageOfStoredRow } from '../../../chat-protocol/message-decoder';
+import { createMingoDecoder, messageOfStoredRow } from '../../../chat-protocol/message-decoder';
 import { recordHref } from '../../../chat-protocol/record-link';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
@@ -49,6 +50,38 @@ describe('ChatMessageEnhanced — record links', () => {
     show('Run [Patch script](record://script/6aad91a3b776f95ad7491bd9) again.');
     expect(screen.getByTestId('chip-script-6aad91a3b776f95ad7491bd9')).toBeTruthy();
     expect(screen.queryByTestId('chat-record-cards')).toBeNull();
+  });
+
+  // TODO(CU-17tkuw61kfy): goes with the old mention token, `old-wire.ts`.
+  describe('an old mention no host resolved', () => {
+    it('reads as the raw token it was, for a word that names no record', () => {
+      show('Connect to [@server:8080](record://server/8080) now.');
+      expect(screen.queryByTestId('inline-chip')).toBeNull();
+      const token = screen.getByText('@server:8080');
+      expect(token.tagName).toBe('SPAN');
+      expect(token.className).toContain('text-ods-text-secondary');
+      expect(screen.queryByText(/record:\/\//)).toBeNull();
+    });
+
+    it('still reads as a chip when the type is a record the lib can open', () => {
+      show('Read [@onboarding_guide:mac-guide](record://onboarding_guide/mac-guide) first.');
+      expect(within(screen.getByTestId('inline-chip')).getByText('@onboarding_guide:mac-guide')).toBeTruthy();
+    });
+
+    it('leaves the host its chip, and a name its chip, whatever the type', () => {
+      show('Run [@script:s1](record://script/s1) on [MacBook](record://device/abc).');
+      expect(screen.getByTestId('chip-script-s1')).toBeTruthy();
+      expect(within(screen.getByTestId('inline-chip')).getByText('MacBook')).toBeTruthy();
+    });
+
+    it('is what the decoder makes of a word followed by a port', () => {
+      const entry = createMingoDecoder().decode({ type: 'TEXT', text: 'Run @redis:6379 first.' }, { row: { seq: 1 } });
+      const wire = createWireState();
+      const parts = entry.chunks.reduce<ChatPart[]>((all, chunk) => applyChunk(all, chunk, wire), []);
+      render(<ChatMessageEnhanced role="assistant" parts={parts} NavLinkAnchor={NavLinkAnchor} />);
+      expect(screen.queryByTestId('inline-chip')).toBeNull();
+      expect(screen.getByText('@redis:6379').tagName).toBe('SPAN');
+    });
   });
 
   it('draws a linked record as a chip with its name in the sentence, and no card from the link', () => {

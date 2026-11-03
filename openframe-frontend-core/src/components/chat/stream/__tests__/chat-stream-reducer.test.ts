@@ -1472,7 +1472,7 @@ describe('createChatStreamReducer — ask cards', () => {
 });
 
 describe('createChatStreamReducer — a thinking answer', () => {
-  it('holds its reasoning before its text, and reasoning never splits the text', () => {
+  it('holds its reasoning where it arrived, so a later round reads after what is already shown', () => {
     const r = createChatStreamReducer();
     r.beginSseSend({ text: 'q' });
     r.apply(chunks({ type: 'reasoning-delta', id: 'r1', delta: 'checking <docs>… ' }));
@@ -1484,8 +1484,10 @@ describe('createChatStreamReducer — a thinking answer', () => {
     r.apply(chunks({ type: 'text-delta', id: 't1', delta: ' Done.' }));
     // The text is stored as written: `<` is escaped where thinking is drawn (`ThinkingDisplay`).
     expect(body(trailing(r))).toEqual([
-      { type: 'reasoning', text: 'checking <docs>… found it. one more check.' },
-      { type: 'text', text: 'Answer body. Done.' },
+      { type: 'reasoning', text: 'checking <docs>… found it.' },
+      { type: 'text', text: 'Answer body.' },
+      { type: 'reasoning', text: ' one more check.' },
+      { type: 'text', text: ' Done.' },
     ]);
     expect(r.state.streamingPhase).toBe('streaming');
   });

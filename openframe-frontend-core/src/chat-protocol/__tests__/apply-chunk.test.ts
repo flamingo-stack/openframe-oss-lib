@@ -219,34 +219,63 @@ describe('sources', () => {
 });
 
 describe('reasoning', () => {
-  it('goes before the first text part and never splits text', () => {
-    const wire = createWireState();
-    let parts = accumulate([sourcePart, ...text('t1', 'One ')]);
-    parts = applyChunk(parts, { type: 'reasoning-start', id: 'r1' }, wire);
-    parts = applyChunk(parts, { type: 'reasoning-delta', id: 'r1', delta: 'hmm' }, wire);
-    parts = applyChunk(parts, { type: 'reasoning-end', id: 'r1' }, wire);
-    parts = [...text('t2', 'two.')].reduce((all, chunk) => applyChunk(all, chunk, wire), parts);
-    expect(parts).toEqual([
-      sourcePart,
-      { type: 'reasoning', text: 'hmm', state: 'done' },
-      { type: 'text', text: 'One two.', state: 'done' },
+  const thinking = (id: string, delta: string): UiChunk[] => [
+    { type: 'reasoning-start', id },
+    { type: 'reasoning-delta', id, delta },
+    { type: 'reasoning-end', id },
+  ];
+  const shape = (parts: ChatPart[]) =>
+    parts.map(part => (part.type === 'text' || part.type === 'reasoning' ? `${part.type}:${part.text}` : part.type));
+
+  it('sits where it arrived, so a later round reads after what is already shown', () => {
+    const parts = accumulate([
+      ...thinking('r1', 'plan'),
+      ...text('t1', 'Let me check.'),
+      { type: 'tool-input-available', toolCallId: '1', toolName: 'x', input: {}, dynamic: true },
+      { type: 'tool-output-available', toolCallId: '1', output: 'ok', dynamic: true },
+      ...thinking('r2', 'analysis'),
+      ...text('t2', 'Found it.'),
+    ]);
+    expect(shape(parts)).toEqual([
+      'reasoning:plan',
+      'text:Let me check.',
+      'dynamic-tool',
+      'reasoning:analysis',
+      'text:Found it.',
     ]);
   });
 
-  it('continues the reasoning already in front of the text', () => {
-    const parts = accumulate([
-      { type: 'reasoning-start', id: 'r1' },
-      { type: 'reasoning-delta', id: 'r1', delta: 'one ' },
-      { type: 'reasoning-end', id: 'r1' },
-      ...text('t1', 'Text.'),
-      { type: 'reasoning-start', id: 'r2' },
-      { type: 'reasoning-delta', id: 'r2', delta: 'two' },
-      { type: 'reasoning-end', id: 'r2' },
-    ]);
+  it('after text, stays behind the text, and the text after it starts a part of its own', () => {
+    const wire = createWireState();
+    let parts = accumulate([sourcePart, ...text('t1', 'One ')]);
+    parts = thinking('r1', 'hmm').reduce((all, chunk) => applyChunk(all, chunk, wire), parts);
+    parts = text('t2', 'two.').reduce((all, chunk) => applyChunk(all, chunk, wire), parts);
     expect(parts).toEqual([
-      { type: 'reasoning', text: 'one two', state: 'done' },
-      { type: 'text', text: 'Text.', state: 'done' },
+      sourcePart,
+      { type: 'text', text: 'One ', state: 'done' },
+      { type: 'reasoning', text: 'hmm', state: 'done' },
+      { type: 'text', text: 'two.', state: 'done' },
     ]);
+  });
+
+  it('continues the run it follows, and only that one', () => {
+    const parts = accumulate([
+      ...thinking('r1', 'one '),
+      ...thinking('r2', 'two'),
+      ...text('t1', 'Text.'),
+      ...thinking('r3', 'three'),
+    ]);
+    expect(shape(parts)).toEqual(['reasoning:one two', 'text:Text.', 'reasoning:three']);
+  });
+
+  it('holds its place while a source lands at the head', () => {
+    const parts = accumulate([
+      { type: 'reasoning-delta', id: 'r1', delta: 'one ' },
+      sourcePart,
+      { type: 'reasoning-delta', id: 'r1', delta: 'two' },
+      { type: 'reasoning-end', id: 'r1' },
+    ]);
+    expect(parts).toEqual([sourcePart, { type: 'reasoning', text: 'one two', state: 'done' }]);
   });
 
   it('sits where it arrived while there is no text yet', () => {
@@ -255,6 +284,47 @@ describe('reasoning', () => {
       { type: 'reasoning-delta', id: 'r1', delta: 'hmm' },
     ]);
     expect(parts.map(part => part.type)).toEqual(['dynamic-tool', 'reasoning']);
+  });
+
+  it('closes the text before it: nothing but the part being written reads as streaming', () => {
+    const parts = accumulate([
+      { type: 'text-delta', id: 't1', delta: 'before' },
+      { type: 'reasoning-delta', id: 'r1', delta: 'hmm' },
+    ]);
+    expect(parts).toEqual([
+      { type: 'text', text: 'before', state: 'done' },
+      { type: 'reasoning', text: 'hmm', state: 'streaming' },
+    ]);
+  });
+
+  // The hub keeps an uncited block's wire id open, and a read tool's round can think before the next block.
+  it('a wire id open across it keeps its citations on the text they name, here and in the stored row', () => {
+    const citation: ChatCitation = { source, startIndex: 6, endIndex: 12 };
+    const parts = accumulate([
+      { type: 'text-start', id: 't1' },
+      { type: 'text-delta', id: 't1', delta: 'Plain ' },
+      { type: 'reasoning-delta', id: 'r1', delta: 'hmm' },
+      { type: 'reasoning-end', id: 'r1' },
+      { type: 'text-delta', id: 't1', delta: 'cited.' },
+      { type: 'text-end', id: 't1', citations: [citation] },
+    ]);
+    const body = parts.filter(part => part.type === 'text' || part.type === 'reasoning');
+    expect(shape(body)).toEqual(['text:Plain ', 'reasoning:hmm', 'text:cited.']);
+    expect(body[2]).toMatchObject({ citations: [{ startIndex: 0, endIndex: 6 }] });
+    expect(storablePartsOf(parts).filter(part => part.type === 'text')).toEqual([
+      { type: 'text', text: 'Plain cited.', citations: [expect.objectContaining({ startIndex: 6, endIndex: 12 })] },
+    ]);
+  });
+
+  it('drops a citation that names text before the part its wire id now writes', () => {
+    const citation: ChatCitation = { source, startIndex: 0, endIndex: 5 };
+    const parts = accumulate([
+      { type: 'text-delta', id: 't1', delta: 'Plain ' },
+      { type: 'reasoning-delta', id: 'r1', delta: 'hmm' },
+      { type: 'text-delta', id: 't1', delta: 'more.' },
+      { type: 'text-end', id: 't1', citations: [citation] },
+    ]);
+    expect(parts.filter(part => part.type === 'text').every(part => !('citations' in part))).toBe(true);
   });
 });
 

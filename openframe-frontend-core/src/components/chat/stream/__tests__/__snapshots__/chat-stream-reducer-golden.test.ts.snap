@@ -515,14 +515,14 @@ exports[`chat stream reducer — what the thread holds after a wire > post-MESSA
       },
       "parts": [
         {
-          "state": "streaming",
-          "text": "post-end thinking",
-          "type": "reasoning",
+          "state": "done",
+          "text": "in-streampost-end text",
+          "type": "text",
         },
         {
           "state": "streaming",
-          "text": "in-streampost-end text",
-          "type": "text",
+          "text": "post-end thinking",
+          "type": "reasoning",
         },
       ],
       "role": "assistant",

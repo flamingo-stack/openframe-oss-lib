@@ -32,8 +32,18 @@ interface RecordChipProps {
   label: string;
 }
 
+/**
+ * TODO(CU-17tkuw61kfy): goes with the old mention token. `old-wire.ts` writes `@word:value` as a record link labelled with
+ * the token, and prose holds that shape too (`@redis:6379`). A token no host claimed, of a type that names no record the
+ * lib knows, stays the raw text it was: a chip would dress it up as something that opens.
+ */
+function isUnclaimedToken({ type, id, label }: RecordChipProps): boolean {
+  return label === `@${type}:${id}` && defaultTableIdForDocumentType(type) === null;
+}
+
 export function RecordChip(props: RecordChipProps) {
   const runtime = useChatRuntime();
+  if (isUnclaimedToken(props)) return <span className="text-ods-text-secondary opacity-60">{props.label}</span>;
   if (!runtime) return <InlineChip icon={iconFor(props.type)} label={props.label} />;
   return <LinkedRecordChip {...props} />;
 }
