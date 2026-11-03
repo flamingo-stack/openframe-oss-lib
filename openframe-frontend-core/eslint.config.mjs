@@ -231,6 +231,9 @@ export default defineConfig([
       // tone a `currentColor` glyph inherits (secondary on outline). Its class IS the contract, so the test walks up
       // from the icon.
       'src/components/ui/__tests__/button-icon-tone.test.tsx',
+      // Where a line can break inside an inline chip: what holds its icon to the name and its last word to its action
+      // are role-less boxes whose nesting and classes ARE the contract, so the test walks them from the text.
+      'src/components/chat/__tests__/inline-chip.test.tsx',
       // A page drawn only in the browser loads the complete stylesheet: the contract is the <link> RouteStyle appends
       // to <head>, outside anything it renders, which no `screen` query reaches.
       'src/__tests__/route-styles-client.test.tsx',

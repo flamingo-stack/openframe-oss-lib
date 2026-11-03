@@ -14,6 +14,10 @@
  * repeat on every line it spans (`box-decoration-break: clone`), and an unbroken name (an id, a host name) breaks
  * anywhere rather than run out of its column.
  *
+ * The icon never ends a line on its own. It stands in the start padding of the box that holds the name, out of flow:
+ * beside the text as an inline block it was a place a line could break, and a line did ("per the" and the icon alone,
+ * with the name on the next line). An inline box's padding goes where its first letter goes and a word does not break,
+ * so the icon stays with the first word, for any label, and the rest wraps with the line.
  *
  * It READS as text: the sentence's own font, size and case (`font: inherit`), never monospace or capitals, set apart
  * by a light tint, its icon and a hover tint, the way an inline smart link or a mention is (body type, a tint and an
@@ -40,9 +44,15 @@ const INLINE_CHIP_CLASS = cn(
 /** A chip with a link: its tint deepens on hover (applied with `link`; a chip inside its anchor passes it as `className`). */
 export const INLINE_CHIP_LINKED_CLASS = 'hover:bg-ods-bg-surface-hover';
 
-/** A 16px muted lead icon, set on the text's line (an inline box has no flex to centre it). */
-const INLINE_CHIP_ICON_CLASS =
-  'mr-[var(--spacing-system-xxs)] inline-block size-4 align-[-0.2em] text-ods-text-secondary [&_svg]:size-4';
+/** The box that holds the name and, in its start padding, the icon. */
+const INLINE_CHIP_NAME_CLASS = 'relative ps-[calc(1rem+var(--spacing-system-xxs))]';
+
+/**
+ * A 16px muted lead icon in that padding, on the first line, ending 0.2em under the text's baseline: an inline box starts
+ * at its font's ascent above the baseline, 0.99em in the chat's body font (measured against the inline version it
+ * replaces: within 0.2px at 14, 16 and 18px, in Chromium and in WebKit).
+ */
+const INLINE_CHIP_ICON_CLASS = 'absolute start-0 top-[calc(1.19em-1rem)] size-4 text-ods-text-secondary [&_svg]:size-4';
 
 /** The action after the name: faint, full on the chip's hover or keyboard focus. */
 const INLINE_CHIP_TRAILING_CLASS = cn(
@@ -75,7 +85,16 @@ export function InlineChip({
   if (loading) {
     return <Tag as="span" variant="badge" icon={icon} label="" loading className="align-middle" />;
   }
-  const iconNode = icon ? <span className={INLINE_CHIP_ICON_CLASS}>{icon}</span> : null;
+  /** The name with the icon held to it (see the header). */
+  const named = (name: React.ReactNode) =>
+    icon ? (
+      <span className={INLINE_CHIP_NAME_CLASS}>
+        <span className={INLINE_CHIP_ICON_CLASS}>{icon}</span>
+        {name}
+      </span>
+    ) : (
+      name
+    );
   // A line must not break between the name and its action, or the "⋯" is left alone at the start of the next line.
   // Browsers allow a break before an inline button whatever `white-space` says, so the name's LAST WORD and the action
   // share one `nowrap` box; the rest of the name wraps freely. The last word keeps the link as a second anchor that is
@@ -85,36 +104,15 @@ export function InlineChip({
     const wrap = (content: React.ReactNode, anchor: InlineChipAnchor) => (link ? link(content, anchor) : content);
     return (
       <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, link && INLINE_CHIP_LINKED_CLASS, className)}>
-        {split.head
-          ? wrap(
-              <>
-                {iconNode}
-                {split.head}
-              </>,
-              { label: label as string },
-            )
-          : null}
+        {split.head ? wrap(named(split.head), { label: label as string }) : null}
         <span className="whitespace-nowrap">
-          {split.head
-            ? wrap(split.last, { hidden: true })
-            : wrap(
-                <>
-                  {iconNode}
-                  {split.last}
-                </>,
-                {},
-              )}
+          {split.head ? wrap(split.last, { hidden: true }) : wrap(named(split.last), {})}
           <span className={INLINE_CHIP_TRAILING_CLASS}>{trailing}</span>
         </span>
       </span>
     );
   }
-  const content = (
-    <>
-      {iconNode}
-      {label}
-    </>
-  );
+  const content = named(label);
   return (
     <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, link && INLINE_CHIP_LINKED_CLASS, className)}>
       {link ? link(content, {}) : content}
