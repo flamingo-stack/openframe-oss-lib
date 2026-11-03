@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.support.TestEncryption;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
@@ -80,8 +81,9 @@ class ScheduleScriptServiceTest {
         deviceLocalDispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
         onlineDeviceDispatchRepository = mock(DeviceOnlineDispatchRepository.class);
         deliveryRefresher = mock(ScheduleDeliveryRefresher.class);
-        scheduleService = new ScheduleScriptService(scheduleRepository, new ScriptScheduleMapper(), scriptService,
-                tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository, deliveryRefresher);
+        ScriptScheduleMapper scheduleMapper = new ScriptScheduleMapper(TestEncryption.service(), TestEncryption.sealerOn());
+        scheduleService = new ScheduleScriptService(scheduleRepository, scheduleMapper,
+                scriptService, tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository, deliveryRefresher);
 
         createInput = new CreateScriptScheduleInput();
         createInput.setName("Nightly Maintenance");

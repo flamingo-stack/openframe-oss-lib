@@ -1,6 +1,9 @@
 package com.openframe.api.dto.organization;
 
+import com.openframe.api.validation.ContractPeriod;
+import com.openframe.api.validation.ValidContractPeriod;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Builder;
 
@@ -13,7 +16,10 @@ import java.time.LocalDate;
  * All fields are optional - only provided fields will be updated.
  */
 @Builder
+@ValidContractPeriod
 public record UpdateOrganizationRequest(
+        // null leaves the name unchanged; a value must contain at least one non-whitespace character
+        @Pattern(regexp = NOT_BLANK, message = "Name must not be blank")
         String name,
 
         String category,
@@ -34,5 +40,7 @@ public record UpdateOrganizationRequest(
         LocalDate contractStartDate,
 
         LocalDate contractEndDate
-) {
+) implements ContractPeriod {
+
+    public static final String NOT_BLANK = "(?s).*\\S.*";
 }

@@ -1,5 +1,7 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.support.TestEncryption;
+import com.openframe.api.mapper.ScriptSecretSealer;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.script.BatchRunScriptInput;
 import com.openframe.api.dto.rmm.script.RunScriptInput;
@@ -29,6 +31,7 @@ import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -79,6 +82,9 @@ class ScriptDispatchServiceTest {
     private com.openframe.data.service.TenantIdProvider tenantIdProvider;
     @Mock
     private ScriptTimeoutValidator timeoutValidator;
+
+    @Mock
+    private ObjectProvider<ScriptSecretSealer> secretSealer;
 
     @InjectMocks
     private ScriptDispatchService scriptDispatchService;
@@ -424,7 +430,7 @@ class ScriptDispatchServiceTest {
                                 ScheduledScriptCustomParams.builder()
                                         .scriptId(SCRIPT_ID)
                                         .args(List.of("--custom", "42"))
-                                        .envVars(List.of(new ScriptEnvVar("OVERRIDE", "v", false)))
+                                        .envVars(List.of(ScriptEnvVar.builder().name("OVERRIDE").value("v").secret(false).build()))
                                         .build()))
                         .build();
         when(scheduleScriptService.get(scheduleId)).thenReturn(schedule);
@@ -454,6 +460,37 @@ class ScriptDispatchServiceTest {
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("OVERRIDE");
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).doesNotContain("BASE");
     }
+    @Test
+    @DisplayName("runSchedule: with encryption on, the batch that goes to the router carries its secrets encrypted")
+    void runSchedule_secretsSealedInTheBatch() {
+        String scheduleId = "sched-1";
+        ScriptSecretSealer sealer = new ScriptSecretSealer(TestEncryption.SERVICE);
+        when(secretSealer.getIfAvailable()).thenReturn(sealer);
+        when(scheduleScriptService.get(scheduleId)).thenReturn(com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse.builder()
+                .id(scheduleId)
+                .scriptIds(List.of(SCRIPT_ID))
+                .build());
+        when(scheduleScriptDeviceService.getMachineIds(scheduleId)).thenReturn(List.of(MACHINE_ID));
+        when(scriptService.getScriptsByIds(List.of(SCRIPT_ID))).thenReturn(List.of(
+                ScriptResponse.builder()
+                        .id(SCRIPT_ID).name("disk").shell(BASH).scriptBody("df -h")
+                        .status(ACTIVE)
+                        .defaultTimeoutSeconds(60)
+                        .envVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()))
+                        .privilegeLevel(PrivilegeLevel.USER)
+                        .build()));
+        when(tenantIdProvider.getTenantId()).thenReturn("tenant-1");
+
+        scriptDispatchService.runSchedule(scheduleId, USER_ID);
+
+        ArgumentCaptor<com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed> seedCaptor =
+                ArgumentCaptor.forClass(com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        ScriptEnvVar sent = seedCaptor.getValue().getMessage().getScripts().get(0).getEnvVars().get(0);
+        assertThat(sent.isEncrypted()).isTrue();
+        assertThat(sent.getValue()).isNotEqualTo("s3cr3t");
+    }
+
     @Test
     @DisplayName("runSchedule: a schedule that waits for offline machines sends its window with the batch")
     void runSchedule_scheduleThatWaitsForOfflineMachines_theWindowTravelsWithTheBatch() {
