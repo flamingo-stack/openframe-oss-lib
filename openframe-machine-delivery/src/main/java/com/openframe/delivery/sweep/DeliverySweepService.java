@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -112,8 +113,8 @@ public class DeliverySweepService {
     }
 
     private void parkSkipOrFailOffline(MachineDelivery delivery, Policy policy, Instant now) {
-        if (shouldSkipOffline(policy)) {
-            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine not online, type skips offline machines", now);
+        if (shouldSkipOffline(delivery, policy)) {
+            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine not online, offline machines are skipped", now);
             return;
         }
         Instant windowEnd = reconnectWindowEnd(delivery, policy);
@@ -279,12 +280,16 @@ public class DeliverySweepService {
         return delivery.getAttempts() < policy.getMaxAttempts();
     }
 
-    private static boolean shouldSkipOffline(Policy policy) {
-        return policy.getOfflineBehavior() == DeliveryOfflineBehavior.SKIP;
+    // the row's own rule wins over the type's policy: the request said what to do with a machine that is not online
+    private static boolean shouldSkipOffline(MachineDelivery delivery, Policy policy) {
+        DeliveryOfflineBehavior behavior = Optional.ofNullable(delivery.getOfflineBehavior())
+                .orElseGet(policy::getOfflineBehavior);
+        return behavior == DeliveryOfflineBehavior.SKIP;
     }
 
     private static Instant reconnectWindowEnd(MachineDelivery delivery, Policy policy) {
-        long windowSeconds = policy.getReconnectWindowSeconds();
+        long windowSeconds = Optional.ofNullable(delivery.getReconnectWindowSeconds())
+                .orElseGet(policy::getReconnectWindowSeconds);
         return delivery.getDispatchedAt().plusSeconds(windowSeconds);
     }
 }

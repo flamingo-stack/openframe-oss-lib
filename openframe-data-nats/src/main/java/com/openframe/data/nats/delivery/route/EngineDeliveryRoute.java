@@ -52,6 +52,12 @@ public class EngineDeliveryRoute implements DeliveryRoute {
         return properties.isEnabled(type) && isRolledOut(type);
     }
 
+    // a row waits for its machine by the request's rule or the type's policy
+    @Override
+    public boolean holdsForOfflineMachine(DeliveryType type) {
+        return true;
+    }
+
     @Override
     public void send(DeliverySeed seed) {
         dispatcher.dispatch(seed);

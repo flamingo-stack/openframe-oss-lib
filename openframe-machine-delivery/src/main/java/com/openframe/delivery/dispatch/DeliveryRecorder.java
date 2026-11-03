@@ -1,5 +1,6 @@
 package com.openframe.delivery.dispatch;
 
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
@@ -83,7 +84,7 @@ public class DeliveryRecorder {
         String dispatchId = delivery.getDispatchId();
         Policy policy = properties.resolve(type);
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
-        long ttlSeconds = policy.getTtlSeconds();
+        long ttlSeconds = policy.getTtlSeconds() + ownReconnectWindowSeconds(request);
         Instant dueAt = online ? runAt.plusSeconds(ackThresholdSeconds) : runAt;
         Instant expiresAt = runAt.plusSeconds(ttlSeconds);
         DeliveryPayloadBody body = payloadJson.body(payload);
@@ -100,9 +101,19 @@ public class DeliveryRecorder {
                 .attempts(0)
                 .errors(0)
                 .payloadId(payloadId)
+                .offlineBehavior(request.getOfflineBehavior())
+                .reconnectWindowSeconds(request.getReconnectWindowSeconds())
                 .dispatchedAt(runAt)
                 .dueAt(dueAt)
                 .expiresAt(expiresAt)
                 .build();
+    }
+
+    // a row that waits by its own window must still be there when the window ends, whatever the type's ttl
+    private static long ownReconnectWindowSeconds(DeliveryRequest<? extends DeliveryPayload> request) {
+        if (request.getOfflineBehavior() != DeliveryOfflineBehavior.RETRY_ON_RECONNECT) {
+            return 0;
+        }
+        return Optional.ofNullable(request.getReconnectWindowSeconds()).orElse(0L);
     }
 }

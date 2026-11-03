@@ -2,9 +2,11 @@
 
 import { cloneElement, isValidElement, type MouseEvent, type ReactNode, useId, useState } from 'react';
 import Link from '../../embed-shims/next-link';
+import { useClippedLabelTooltip } from '../../hooks/ui/use-clipped-label-tooltip';
 import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { FloatingTooltip } from '../ui/floating-tooltip';
 import { NavigationItemBadge } from './navigation-item-badge';
 import { UnreadDot } from './unread-dot';
 
@@ -150,8 +152,15 @@ function RowEnd({ count }: { count: number }) {
   return count > 0 ? <CountPill count={count} className="ml-auto" /> : null;
 }
 
-function RowLabel({ item }: { item: NavigationSidebarItem }) {
+/**
+ * The row's label column. A label the expanded sidebar clips (a narrow width,
+ * a long label) shows its full text in a tooltip over it, as `TruncateText`
+ * offers it — only while it IS clipped, and only where a pointer can hover.
+ * The rail (`showLabel` false) has its own: the row's `title`.
+ */
+function RowLabel({ item, showLabel = true }: { item: NavigationSidebarItem; showLabel?: boolean }) {
   const unreadCount = item.unreadCount ?? 0;
+  const { ref: labelRef, enabled: labelTooltip } = useClippedLabelTooltip<HTMLSpanElement>(item.label);
   return (
     <span
       className={cn(
@@ -159,7 +168,17 @@ function RowLabel({ item }: { item: NavigationSidebarItem }) {
         EXPANDED_ONLY,
       )}
     >
-      <span className="min-w-0 truncate text-h4">{item.label}</span>
+      <FloatingTooltip
+        content={item.label}
+        side="top"
+        as="span"
+        disabled={!showLabel || !labelTooltip}
+        triggerClassName="min-w-0"
+      >
+        <span ref={labelRef} className="block min-w-0 truncate text-h4">
+          {item.label}
+        </span>
+      </FloatingTooltip>
       {item.badge && <NavigationItemBadge label={item.badge} compact />}
       <RowEnd count={unreadCount} />
     </span>
@@ -204,7 +223,7 @@ function GroupedLeafRow({
   const content = (
     <>
       <RowIcon item={item} size={20} className={lit ? 'text-ods-accent' : idleIcon('row')} />
-      <RowLabel item={item} />
+      <RowLabel item={item} showLabel={showLabel} />
     </>
   );
   const shared = {
@@ -248,6 +267,8 @@ function GroupedChildRow({
 }) {
   const name = accessibleName(item);
   const lit = isActive && !disabled;
+  // The clipped label's tooltip, as `RowLabel` offers it.
+  const { ref: labelRef, enabled: labelTooltip } = useClippedLabelTooltip<HTMLSpanElement>(item.label);
   const className = cn(
     // The icon column flush, under the parent's icon at both widths.
     'group/nav-child relative flex h-11 w-full items-stretch gap-[var(--spacing-system-xxs)] rounded-md text-left',
@@ -276,7 +297,17 @@ function GroupedChildRow({
           !lit && !disabled && isPending && 'after:opacity-100',
         )}
       >
-        <span className="min-w-0 truncate text-h4">{item.label}</span>
+        <FloatingTooltip
+          content={item.label}
+          side="top"
+          as="span"
+          disabled={!showLabel || !labelTooltip}
+          triggerClassName="min-w-0"
+        >
+          <span ref={labelRef} className="block min-w-0 truncate text-h4">
+            {item.label}
+          </span>
+        </FloatingTooltip>
         {item.badge && <NavigationItemBadge label={item.badge} compact />}
         <RowEnd count={item.unreadCount ?? 0} />
       </span>
@@ -365,7 +396,7 @@ function GroupedGroup({
         )}
       >
         <RowIcon item={item} size={20} className={lit ? 'text-ods-accent' : idleIcon('row')} />
-        <RowLabel item={item} />
+        <RowLabel item={item} showLabel={showLabel} />
       </button>
       <div
         id={groupDomId}
@@ -517,7 +548,7 @@ export function NavigationSidebarActionRow({
   const content = (
     <>
       <RowIcon item={entry} size={20} className={lit || (outline && !disabled) ? 'text-ods-accent' : idleIcon('row')} />
-      <RowLabel item={entry} />
+      <RowLabel item={entry} showLabel={!minimized} />
     </>
   );
   const shared = { className: classes, title: minimized ? name : undefined, 'aria-label': name };

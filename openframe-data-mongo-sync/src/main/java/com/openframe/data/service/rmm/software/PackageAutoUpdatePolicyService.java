@@ -20,7 +20,8 @@ public class PackageAutoUpdatePolicyService {
     private final PackageAutoUpdatePolicyRepository repository;
     private final PackageCatalogVersions catalogVersions;
 
-    // A run with Auto-update off leaves an earlier policy as it is: only Turn Off Auto-Update turns one off.
+    // A run with Auto-update off leaves an earlier policy as it is: Turn Off Auto-Update turns one off, and so does a
+    // device reporting that the package is gone.
     // The run itself brings the package to the catalog's latest, so the trigger starts from the next release.
     public void turnOn(RunningExecutionRows execution, BrewPackageType brewPackageType, String softwareId,
                        SoftwareAutoUpdate autoUpdate, PackageUpdateSettings updateSettings) {
