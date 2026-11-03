@@ -12,7 +12,12 @@
  */
 
 import type { QuickActionIconSpec } from '../components/chat/quick-action-chip';
-import type { AssistantType, AuthorType, ChatApprovalStatus } from '../components/chat/types/chat.types';
+import type {
+  AssistantType,
+  AuthorType,
+  ChatApprovalPartStatus,
+  ChatApprovalStatus,
+} from '../components/chat/types/chat.types';
 import type { ChatContextItem } from '../components/chat/types/context-item.types';
 import type {
   ApprovalRequestField,
@@ -507,13 +512,14 @@ export const APPROVAL_CANCELLED = 'cancelled';
 
 /**
  * Where a tool part's approval stands, from its `state` and `approval` alone (no `cancelled` or `executing` flag
- * anywhere). Null for a tool part with no approval.
+ * anywhere). Null for a tool part with no approval. An approval the server then refused, or whose tool failed, is
+ * `failed`: nothing it was approved for happened, and a card must not say Approved above the reason.
  */
-export function approvalStatusOf(part: ChatToolPart): ChatApprovalStatus | null {
+export function approvalStatusOf(part: ChatToolPart): ChatApprovalPartStatus | null {
   const approval = 'approval' in part ? part.approval : undefined;
   if (!approval) return null;
   if (part.state === 'approval-requested') return 'pending';
-  if (approval.approved) return 'approved';
+  if (approval.approved) return part.state === 'output-error' ? 'failed' : 'approved';
   return approval.reason === APPROVAL_CANCELLED ? 'cancelled' : 'rejected';
 }
 

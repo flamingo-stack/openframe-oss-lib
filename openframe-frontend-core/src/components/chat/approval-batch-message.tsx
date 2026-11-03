@@ -19,7 +19,7 @@ import type {
   ApprovalBlockVariant,
   AssistantType,
   ApprovalBatchExecutionState,
-  ChatApprovalStatus,
+  ChatApprovalPartStatus,
   PendingToolCallData,
 } from './types';
 import { COMMAND_BODY_ARG_KEYS, getCommandText } from './utils/tool-call-helpers';
@@ -28,7 +28,7 @@ export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement
   /** The batch. `null` is a batch still being read (a list's loading row): the block draws its own loading form, as
    *  it does in a loading scope. */
   data: ApprovalBatchData | null;
-  status?: ChatApprovalStatus;
+  status?: ChatApprovalPartStatus;
   onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>;
   onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>;
   /**
@@ -71,24 +71,26 @@ export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS);
 
 export interface ApprovalStatusTagProps {
-  status?: ChatApprovalStatus;
+  status?: ChatApprovalPartStatus;
   resolvedByName?: string | null;
   inlineResolver?: boolean;
 }
 
 /**
  * Terminal-status badge for a resolved approval batch (approved / rejected /
- * cancelled); renders nothing while pending. With `inlineResolver` the
+ * cancelled / failed); renders nothing while pending. With `inlineResolver` the
  * resolver's name is baked into the tag as a single full-text pill
  * ("Approved by {name}"); otherwise callers render "by {name}" as a separate
- * muted span. Also used by the approval notification tile, which hosts the
- * actions row itself (`showFooterActions={false}`).
+ * muted span. `failed` names nobody: whoever approved it did not fail it. Also
+ * used by the approval notification tile, which hosts the actions row itself
+ * (`showFooterActions={false}`).
  */
 export function ApprovalStatusTag({ status, resolvedByName, inlineResolver = false }: ApprovalStatusTagProps) {
   const suffix = inlineResolver && resolvedByName ? ` by ${resolvedByName}` : '';
   if (status === 'approved') return <StatusLine tone="success" label={`Approved${suffix}`} />;
   if (status === 'cancelled') return <StatusLine tone="muted" label={`Canceled${suffix}`} />;
   if (status === 'rejected') return <StatusLine tone="error" label={`Rejected${suffix}`} />;
+  if (status === 'failed') return <StatusLine tone="error" label="Failed" />;
   return null;
 }
 
@@ -111,27 +113,30 @@ function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
  *  - approved, no exec → DotsLoaderIcon (queued / waiting for backend)
  *  - executing         → DotsLoaderIcon
  *  - done + success    → green check
- *  - done + failure    → red cross
+ *  - done + failure    → red cross, in a failed batch too
+ *  - failed, no exec   → null (a row with no gate of its own: nothing runs it now)
  */
 function ExecutionStatusIcon({
   batchStatus,
   execution,
 }: {
-  batchStatus?: ChatApprovalStatus;
+  batchStatus?: ChatApprovalPartStatus;
   execution: ApprovalBatchExecutionState | undefined;
 }) {
-  if (batchStatus !== 'approved') return null;
+  if (batchStatus !== 'approved' && batchStatus !== 'failed') return null;
+  if (!execution && batchStatus === 'failed') return null;
   if (!execution || execution.status === 'executing')
     return <DotsLoaderIcon size={16} className="text-ods-text-secondary" />;
-  if (execution.success === false) return <XmarkCircleIcon className="h-4 w-4 text-ods-error" />;
-  return <CheckCircleIcon className="h-4 w-4 text-ods-success" />;
+  if (execution.success === false)
+    return <XmarkCircleIcon role="img" aria-label="Failed" className="h-4 w-4 text-ods-error" />;
+  return <CheckCircleIcon role="img" aria-label="Done" className="h-4 w-4 text-ods-success" />;
 }
 
 interface ToolCallRowProps {
   call: PendingToolCallData;
   expanded: boolean;
   onToggle: () => void;
-  batchStatus?: ChatApprovalStatus;
+  batchStatus?: ChatApprovalPartStatus;
   execution: ApprovalBatchExecutionState | undefined;
   showExecutionStatus: boolean;
 }
@@ -454,7 +459,9 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               ) : (
                 <div className="flex items-center gap-[var(--spacing-system-xsf)]">
                   <ApprovalStatusTag status={status} resolvedByName={resolvedByName} />
-                  {resolvedByName && <span className="text-ods-text-secondary text-h6">by {resolvedByName}</span>}
+                  {resolvedByName && status !== 'failed' && (
+                    <span className="text-ods-text-secondary text-h6">by {resolvedByName}</span>
+                  )}
                 </div>
               ))}
           </div>

@@ -72,8 +72,8 @@ describe('a batch of approvals', () => {
     r.apply(entry({ type: 'tool-output-available', toolCallId: 'prop-2', output: { ok: true } }));
     expect(rows(r).map(part => part.state)).toEqual(['output-error', 'output-available']);
     expect(rows(r)[0]).toMatchObject({ errorText: 'This approval expired.' });
-    // An output grants the approval it shows: what ran was approved.
-    expect(rows(r).map(approvalStatusOf)).toEqual(['approved', 'approved']);
+    // What ran was approved; what the server refused has nothing to call approved.
+    expect(rows(r).map(approvalStatusOf)).toEqual(['failed', 'approved']);
   });
 
   it('a rejection denies every row', () => {

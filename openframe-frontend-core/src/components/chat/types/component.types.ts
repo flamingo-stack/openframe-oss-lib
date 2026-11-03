@@ -12,7 +12,7 @@ import type {
   AssistantType,
   AuthorType,
   ChatAppearance,
-  ChatApprovalStatus,
+  ChatApprovalPartStatus,
   ConnectionStatus,
 } from './chat.types';
 import type { ChatContextItem } from './context-item.types';
@@ -601,7 +601,7 @@ export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivEleme
   data: ApprovalRequestData;
   onApprove?: ApprovalResolutionHandler;
   onReject?: ApprovalResolutionHandler;
-  status?: ChatApprovalStatus;
+  status?: ChatApprovalPartStatus;
   disabled?: boolean;
   /** Chat identity. Accepted for parity with the batch card; does NOT drive
    *  the styling — use `variant`. */

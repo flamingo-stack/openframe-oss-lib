@@ -113,6 +113,34 @@ describe('approvalBatchViewOf', () => {
     });
   });
 
+  it('says approved only when a row ran or is running: every row refused is a failed batch, and each keeps its cross', () => {
+    const failed = (id: string): ChatToolPart => ({
+      ...row(id),
+      state: 'output-error',
+      errorText: 'Expired.',
+      approval: { ...gate(id), approved: true },
+      toolMetadata: { resolvedByName: 'Roman' },
+    });
+    const view = approvalBatchViewOf([failed('p1'), failed('p2')]);
+    expect(view.status).toBe('failed');
+    expect(view.data.executions).toEqual({
+      p1: { status: 'done', success: false, result: 'Expired.' },
+      p2: { status: 'done', success: false, result: 'Expired.' },
+    });
+    expect(
+      approvalBatchViewOf([
+        failed('p1'),
+        { ...row('p2'), state: 'approval-responded', approval: { ...gate('p2'), approved: true } },
+      ]).status,
+    ).toBe('approved');
+    expect(
+      approvalBatchViewOf([
+        failed('p1'),
+        { ...row('p2'), state: 'output-available', output: 'ok', approval: { ...gate('p2'), approved: true } },
+      ]).status,
+    ).toBe('approved');
+  });
+
   it('a row with no gate of its own never runs from its state: it follows its batch', () => {
     const view = approvalBatchViewOf([
       { ...row('p1'), state: 'output-denied', approval: { ...gate('p1'), approved: false } },

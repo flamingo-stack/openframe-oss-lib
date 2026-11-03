@@ -553,6 +553,50 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
     );
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
     expect(screen.getByText('Approved')).toBeTruthy();
+    // The row that ran has its check, the one refused its cross: the foot speaks for what ran.
+    expect(screen.getAllByRole('img', { name: 'Done' })).toHaveLength(1);
+    expect(screen.getAllByRole('img', { name: 'Failed' })).toHaveLength(1);
+  });
+
+  it('a batch with every row refused says Failed, never Approved, and each row keeps its cross', () => {
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        parts={(['p1', 'p2'] as const).map(id => ({
+          ...pendingPart(id, 'batch:p1'),
+          state: 'output-error' as const,
+          errorText: 'This approval expired.',
+          approval: { id, approved: true, descriptor: { batchId: 'batch:p1' } },
+          toolMetadata: { resolvedByName: 'Roman' },
+        }))}
+      />,
+    );
+    expect(screen.queryByText('Approved')).toBeNull();
+    expect(screen.getByText('Failed')).toBeTruthy();
+    expect(screen.queryByText('by Roman')).toBeNull();
+    expect(screen.getAllByRole('img', { name: 'Failed' })).toHaveLength(2);
+  });
+
+  it('a card of one that failed reads the same for the end client, with no name on it', () => {
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        assistantType="fae"
+        approvalVariant="client"
+        parts={[
+          {
+            ...pendingPart('p1'),
+            state: 'output-error',
+            errorText: 'It did not run.',
+            approval: { id: 'p1', approved: true },
+            toolMetadata: { resolvedByName: 'Roman' },
+          },
+        ]}
+      />,
+    );
+    expect(screen.queryByText(/Approved/)).toBeNull();
+    expect(screen.getByText('Failed')).toBeTruthy();
+    expect(screen.getByText('It did not run.')).toBeTruthy();
   });
 
   it('draws a single approval that failed as its card and the reason', () => {
@@ -569,7 +613,8 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
         ]}
       />,
     );
-    expect(screen.getByText('Approved')).toBeTruthy();
+    expect(screen.queryByText('Approved')).toBeNull();
+    expect(screen.getByText('Failed')).toBeTruthy();
     expect(screen.getByText('This approval expired, ask again to get a fresh one.')).toBeTruthy();
   });
 

@@ -63,6 +63,13 @@ export const APPROVAL_STATUS = {
 
 export type ChatApprovalStatus = (typeof APPROVAL_STATUS)[keyof typeof APPROVAL_STATUS];
 
+/**
+ * Where an approval's tool part stands: the answer it got, or `failed`, approved and then refused or failed (an expired
+ * proposal, a tool that errored), so that nothing can read as approved. It is a fact about a part and nobody answers it,
+ * so no status map holds it.
+ */
+export type ChatApprovalPartStatus = ChatApprovalStatus | 'failed';
+
 // ========== Approval Block Variant Definitions ==========
 
 /**

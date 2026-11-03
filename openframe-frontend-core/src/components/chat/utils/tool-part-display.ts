@@ -15,7 +15,7 @@ import {
 } from '../../../chat-protocol/chat-message';
 import { chatProgressLabel } from '../../../chat-protocol/progress';
 import { ToolTypeValues } from '../../../types/tool.types';
-import type { ChatApprovalStatus } from '../types/chat.types';
+import type { ChatApprovalPartStatus } from '../types/chat.types';
 import type {
   ApprovalBatchData,
   ApprovalBatchExecutionState,
@@ -137,7 +137,7 @@ function executionOf(part: ChatToolPart): ApprovalBatchExecutionState | null {
 
 export interface ApprovalBatchView {
   data: ApprovalBatchData;
-  status: ChatApprovalStatus;
+  status: ChatApprovalPartStatus;
   resolvedByName?: string | null;
 }
 
@@ -170,13 +170,16 @@ function batchRowOf(part: ChatToolPart): PendingToolCallData {
   };
 }
 
-/** The one card a run of parts with one `batchId` draws. Its status is its gates': a row with none follows them. */
+/**
+ * The one card a run of parts with one `batchId` draws. Its status is its gates': a row with none follows them. Approved
+ * while a row ran or runs; a row that failed beside it keeps its own cross. With every row refused or failed it is `failed`.
+ */
 export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBatchView {
   const statuses = parts.flatMap(part => {
     const status = approvalStatusOf(part);
     return status ? [status] : [];
   });
-  const status: ChatApprovalStatus = statuses.includes('pending')
+  const status: ChatApprovalPartStatus = statuses.includes('pending')
     ? 'pending'
     : statuses.includes('approved')
       ? 'approved'

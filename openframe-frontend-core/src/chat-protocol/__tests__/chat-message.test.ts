@@ -9,6 +9,7 @@ import {
   approvalIdOfPart,
   approvalRequestIdOf,
   approvalStatusOf,
+  isToolPart,
   parseCitations,
   parseStoredParts,
   storablePartsOf,
@@ -18,6 +19,7 @@ import {
   type ChatPart,
   type ChatToolPart,
 } from '../chat-message';
+import { messageOfStoredRow } from '../message-decoder';
 import { parseCollectionHref, parseRecordHref } from '../record-link';
 import { HISTORY_RESPONSE, STORED_ANSWER_PARTS, STORED_RECEIPT_PARTS, STORED_USER_PARTS } from '../wire-fixtures';
 
@@ -244,7 +246,11 @@ describe('approvalStatusOf', () => {
       'rejected',
     ],
     ['executed', { ...base, state: 'output-available', output: 1, approval: { id: '1', approved: true } }, 'approved'],
-    ['failed', { ...base, state: 'output-error', errorText: 'no', approval: { id: '1', approved: true } }, 'approved'],
+    [
+      'approved, then refused or failed: nothing to call approved',
+      { ...base, state: 'output-error', errorText: 'no', approval: { id: '1', approved: true } },
+      'failed',
+    ],
     ['denied', { ...base, state: 'output-denied', approval: { id: '1', approved: false } }, 'rejected'],
     [
       'cancelled',
@@ -254,6 +260,29 @@ describe('approvalStatusOf', () => {
     ['no gate, executed', { ...base, state: 'output-available', output: 1 }, null],
   ])('%s', (_name, part, status) => {
     expect(approvalStatusOf(part)).toBe(status);
+  });
+});
+
+describe('a receipt after a reload', () => {
+  it('is a stored row with no tool part, so no status to read: only the live card says Failed', () => {
+    const failed: ChatToolPart = {
+      type: 'dynamic-tool',
+      toolName: 'x',
+      toolCallId: '1',
+      input: {},
+      state: 'output-error',
+      errorText: 'This approval expired.',
+      approval: { id: '1', approved: true },
+    };
+    const stored = storablePartsOf([failed, { type: 'text', text: 'Task created.' }]);
+    expect(stored).toEqual([{ type: 'text', text: 'Task created.' }]);
+    const row = messageOfStoredRow({
+      id: 'r',
+      role: 'assistant',
+      metadata: { kind: 'approval_receipt' },
+      parts: stored,
+    });
+    expect(row?.parts.some(isToolPart)).toBe(false);
   });
 });
 

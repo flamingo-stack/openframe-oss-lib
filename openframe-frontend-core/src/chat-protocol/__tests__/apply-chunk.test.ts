@@ -635,7 +635,7 @@ describe('a rejection stands', () => {
       approval: { id: 'p1' },
     };
     const [part] = accumulate([{ type: 'tool-output-error', toolCallId: 'p1', errorText: 'Failed.' }], [pending]);
-    expect(approvalStatusOf(part as ChatToolPart)).toBe('approved');
+    expect(approvalStatusOf(part as ChatToolPart)).toBe('failed');
   });
 });
 
