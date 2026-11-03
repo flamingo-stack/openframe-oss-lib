@@ -430,10 +430,15 @@ export function textOfParts(parts: readonly ChatPart[]): string {
   let out = '';
   for (const p of parts) {
     if (p.type !== 'text' || p.text === '') continue;
-    if (out !== '' && !out.endsWith('\n') && !p.text.startsWith('\n')) out += '\n\n';
+    if (out !== '') out += breakBetween(out, p.text);
     out += p.text;
   }
   return out;
+}
+
+/** What two text parts read with between them: a paragraph break, unless one of them brings its own newline. */
+function breakBetween(before: string, after: string): string {
+  return before.endsWith('\n') || after.startsWith('\n') ? '' : '\n\n';
 }
 
 // =============================================================================
@@ -464,16 +469,14 @@ function appendText(left: ChatTextPart, right: ChatTextPart, separator: string):
  * The parts a row stores: `text`, `source-*`, `file` and `data-record-cards`. Sources lead, unique by `sourceId`; `state`
  * goes; an empty text part goes, so an empty answer is `[]`.
  *
- * Text parts a dropped part left adjacent become one, with their citations rebased. Across dropped reasoning nothing is
- * added, because the wire's text carries its own breaks there and a stored row holds what the wire sent. Across any other
- * dropped part (a tool row) they get the paragraph break {@link textOfParts} draws there, so the row reads as the live
- * message read.
+ * Text parts a dropped part (reasoning, a tool row) left adjacent become one, with their citations rebased and the
+ * paragraph break {@link textOfParts} draws there, so the row reads as the live message read: two parts, two paragraphs,
+ * and never two words touching. Wire text that carries its own break gets no second one.
  */
 export function storablePartsOf(parts: readonly ChatPart[]): ChatPart[] {
   const sources: ChatSourcePart[] = [];
   const seen = new Set<string>();
   const body: ChatPart[] = [];
-  let droppedOtherThanReasoning = false;
 
   for (const part of parts) {
     if (isSourcePart(part)) {
@@ -486,18 +489,12 @@ export function storablePartsOf(parts: readonly ChatPart[]): ChatPart[] {
       const { state: _state, ...text } = part;
       const last = body[body.length - 1];
       if (last?.type === 'text') {
-        const breakNeeded =
-          droppedOtherThanReasoning && !last.text.endsWith('\n') && !text.text.startsWith('\n') ? '\n\n' : '';
-        body[body.length - 1] = appendText(last, text, breakNeeded);
+        body[body.length - 1] = appendText(last, text, breakBetween(last.text, text.text));
       } else {
         body.push(text);
       }
-      droppedOtherThanReasoning = false;
     } else if (part.type === 'file' || part.type === 'data-record-cards') {
       body.push(part);
-      droppedOtherThanReasoning = false;
-    } else if (part.type !== 'reasoning') {
-      droppedOtherThanReasoning = true;
     }
   }
   return [...sources, ...body];

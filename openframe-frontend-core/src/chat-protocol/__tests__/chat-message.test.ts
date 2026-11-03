@@ -93,31 +93,86 @@ describe('storablePartsOf', () => {
     expect(part).not.toHaveProperty('state');
   });
 
-  it('merges text-reasoning-text with nothing added, rebasing the citations', () => {
+  it('merges text-reasoning-text with the break the live message draws there, rebasing the citations', () => {
     const parts: ChatPart[] = [
-      { type: 'text', text: 'One two ', citations: [{ source, startIndex: 0, endIndex: 3 }] },
+      { type: 'text', text: 'One two.', citations: [{ source, startIndex: 0, endIndex: 3 }] },
       { type: 'reasoning', text: 'thinking' },
-      { type: 'text', text: 'three.', citations: [{ source, startIndex: 0, endIndex: 6 }] },
+      { type: 'text', text: 'Three.', citations: [{ source, startIndex: 0, endIndex: 6 }] },
     ];
-    expect(storablePartsOf(parts)).toEqual([
+    const stored = storablePartsOf(parts);
+    expect(stored).toEqual([
       {
         type: 'text',
-        text: 'One two three.',
+        text: 'One two.\n\nThree.',
         citations: [
           { source, startIndex: 0, endIndex: 3 },
-          { source, startIndex: 8, endIndex: 14 },
+          { source, startIndex: 10, endIndex: 16 },
         ],
       },
     ]);
+    // A stored row reads as the live message read, and each citation still names the text it named.
+    expect(textOfParts(stored)).toBe(textOfParts(parts));
+    const [part] = stored;
+    if (part.type !== 'text') throw new Error('a text part');
+    expect(part.citations?.map(({ startIndex, endIndex }) => part.text.slice(startIndex, endIndex))).toEqual([
+      'One',
+      'Three.',
+    ]);
+  });
+
+  it('two words never touch across reasoning', () => {
+    const stored = storablePartsOf([
+      { type: 'text', text: 'Hello' },
+      { type: 'reasoning', text: 'thinking' },
+      { type: 'text', text: 'world' },
+    ]);
+    expect(stored).toEqual([{ type: 'text', text: 'Hello\n\nworld' }]);
+  });
+
+  it('adds nothing when the wire text carries its own break (the hub starts a new round with one)', () => {
+    const parts: ChatPart[] = [
+      { type: 'text', text: 'One.' },
+      { type: 'reasoning', text: 'thinking' },
+      { type: 'text', text: '\n\nTwo.', citations: [{ source, endIndex: 6 }] },
+    ];
+    const stored = storablePartsOf(parts);
+    expect(stored).toEqual([{ type: 'text', text: 'One.\n\nTwo.', citations: [{ source, endIndex: 10 }] }]);
+    expect(textOfParts(stored)).toBe(textOfParts(parts));
   });
 
   it('rebases a citation that knows only its end', () => {
     const parts: ChatPart[] = [
-      { type: 'text', text: 'One ' },
+      { type: 'text', text: 'One' },
       { type: 'reasoning', text: 'thinking' },
       { type: 'text', text: 'two', citations: [{ source, endIndex: 3 }] },
     ];
-    expect(storablePartsOf(parts)).toEqual([{ type: 'text', text: 'One two', citations: [{ source, endIndex: 7 }] }]);
+    expect(storablePartsOf(parts)).toEqual([
+      { type: 'text', text: 'One\n\ntwo', citations: [{ source, endIndex: 8 }] },
+    ]);
+  });
+
+  it('reads the same across any mix of what it drops', () => {
+    const tool: ChatPart = {
+      type: 'dynamic-tool',
+      toolName: 'x',
+      toolCallId: '1',
+      state: 'input-available',
+      input: {},
+    };
+    const parts: ChatPart[] = [
+      { type: 'text', text: 'a' },
+      { type: 'reasoning', text: 'r' },
+      tool,
+      { type: 'text', text: 'b' },
+      tool,
+      { type: 'reasoning', text: 'r' },
+      { type: 'text', text: 'c\n' },
+      { type: 'reasoning', text: 'r' },
+      { type: 'text', text: 'd' },
+    ];
+    const stored = storablePartsOf(parts);
+    expect(stored).toHaveLength(1);
+    expect(textOfParts(stored)).toBe(textOfParts(parts));
   });
 
   it('merges across a dropped tool row with the break the live message draws there', () => {

@@ -312,7 +312,7 @@ describe('reasoning', () => {
     expect(shape(body)).toEqual(['text:Plain ', 'reasoning:hmm', 'text:cited.']);
     expect(body[2]).toMatchObject({ citations: [{ startIndex: 0, endIndex: 6 }] });
     expect(storablePartsOf(parts).filter(part => part.type === 'text')).toEqual([
-      { type: 'text', text: 'Plain cited.', citations: [expect.objectContaining({ startIndex: 6, endIndex: 12 })] },
+      { type: 'text', text: 'Plain \n\ncited.', citations: [expect.objectContaining({ startIndex: 8, endIndex: 14 })] },
     ]);
   });
 
