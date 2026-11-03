@@ -533,6 +533,8 @@ function fetchedItemDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
   const it = item as ChatRef;
   return {
     ...it,
+    // A row names no table: the ref derived it from the record's type, and a document's badge reads it.
+    sourceRepo: it.sourceRepo ?? chatRef.sourceRepo,
     url: chatRef.url ?? it.url ?? null,
     targetPlatform: chatRef.targetPlatform ?? it.targetPlatform ?? null,
   };
