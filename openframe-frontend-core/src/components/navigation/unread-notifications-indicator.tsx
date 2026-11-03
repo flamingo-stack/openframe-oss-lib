@@ -1,8 +1,10 @@
 'use client';
 
 import type { MouseEvent } from 'react';
-import { useRouter } from '../../embed-shims/next-navigation';
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { cn } from '../../utils/cn';
+import { isModifierClick } from '../chat/utils/chat-nav-resolution';
+import { executeNavigationImperative, executeNewTabNavigation } from '../chat/utils/execute-navigation';
 import { CountPill } from './count-pill';
 
 /** What the indicator says to a screen reader: the count, in words. */
@@ -23,10 +25,11 @@ export interface UnreadNotificationsIndicatorProps {
  * count pill so a row and its section's badge read alike.
  *
  * A button, not a link: the row or card it sits in is usually a link itself, and a link cannot hold another
- * (`data-no-row-click` keeps a table row from following its own).
+ * (`data-no-row-click` keeps a table row from following its own). It goes through the lib's navigation executor,
+ * so the host decides how `href` opens, and a modifier click asks for a new tab as it would on a link.
  */
 export function UnreadNotificationsIndicator({ count, href, className }: UnreadNotificationsIndicatorProps) {
-  const router = useRouter();
+  const runtime = useChatRuntime();
   if (count <= 0) return null;
 
   const label = unreadNotificationsLabel(count);
@@ -42,7 +45,8 @@ export function UnreadNotificationsIndicator({ count, href, className }: UnreadN
   const open = (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    router.push(href);
+    if (isModifierClick(event)) executeNewTabNavigation({ runtime, href });
+    else executeNavigationImperative({ runtime, href });
   };
 
   return (
