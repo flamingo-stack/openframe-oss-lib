@@ -27,6 +27,7 @@ import { getDeviceName } from './device-name';
 import { getDeviceStatusConfig } from './device-status';
 import { DEFAULT_VISIBLE_STATUSES } from './device-statuses';
 import { DeviceTypeTile } from './device-type-tile';
+import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDeviceImageUrl, useDevicesViewConfig } from './devices-view-config';
 import type { DeviceFilters, DeviceRow } from './types';
 
@@ -341,6 +342,8 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
             <div className="min-w-0 flex-1">
               <TruncateText>{getDeviceName(device)}</TruncateText>
             </div>
+            {/* In the name's cell, not the open column: that one is dropped on a narrow page. */}
+            <DeviceUnreadIndicator device={device} />
           </div>
         );
       },
