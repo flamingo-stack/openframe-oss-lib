@@ -206,12 +206,8 @@ export function TenantsTableView({
         const value = next.find(filter => filter.id === id)?.value;
         return Array.isArray(value) ? (value as string[]) : [];
       };
-      onFiltersChange?.({
-        tenant: picked('tenant'),
-        customer: picked('customer'),
-        licenses: picked('licenses'),
-        access: picked('access'),
-      });
+      const selected = Object.fromEntries(TENANTS_TABLE_FILTER_COLUMNS.map(id => [id, picked(id)]));
+      onFiltersChange?.(selected as Record<TenantsTableFilterColumn, string[]>);
     },
   });
 

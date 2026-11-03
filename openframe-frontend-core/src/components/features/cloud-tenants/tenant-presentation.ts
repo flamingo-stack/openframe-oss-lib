@@ -11,6 +11,7 @@
 import type { ComponentType, SVGProps } from 'react';
 import { formatRelativeTimeFrom } from '../../../utils/date-utils';
 import { formatDate } from '../../../utils/format-date';
+import { presentationFor } from '../../../utils/presentation-for';
 import { GoogleLogoIcon } from '../../icons-v2-generated/brand-logos/google-logo-icon';
 import { Office365LogoIcon } from '../../icons-v2-generated/brand-logos/office-365-logo-icon';
 import { CodingForkIcon } from '../../icons-v2-generated/coding/coding-fork-icon';
@@ -33,10 +34,6 @@ export type TenantAccessState =
 
 /** The directory providers a tenant connects to. */
 export type TenantProvider = 'MICROSOFT_365' | 'GOOGLE_WORKSPACE';
-
-function presentationFor<K extends string, V>(map: Record<K, V>, key: string | null | undefined): V | undefined {
-  return key != null && key in map ? map[key as K] : undefined;
-}
 
 // Colours read off the Figma list (node 1699-8249): red for the two states that
 // need the customer's admin, grey for read-only, outline for write-available,

@@ -353,6 +353,12 @@ function buildDeviceFilterOptions(deviceFilters?: DeviceFilters | null): {
   return { status, os, organization, user, sources };
 }
 
+/** The directory columns of a device list: the table and its filter window take the same ones. */
+interface DeviceDirectoryColumnOptions {
+  directoryColumns?: boolean;
+  roomyDirectory?: boolean;
+}
+
 // Filter column metadata used by the external filter modal (useTagFilterModal).
 // Kept separate from the table ColumnDef because DataTable doesn't carry the
 // filter metadata that the external mobile filter modal needs.
@@ -360,7 +366,7 @@ function buildDeviceFilterOptions(deviceFilters?: DeviceFilters | null): {
 // `xl`, and the header has no funnel for it from `lg` until then, so the window carries it there.
 export function getDeviceFilterColumns(
   deviceFilters?: DeviceFilters | null,
-  { directoryColumns = false, roomyDirectory = false }: { directoryColumns?: boolean; roomyDirectory?: boolean } = {},
+  { directoryColumns = false, roomyDirectory = false }: DeviceDirectoryColumnOptions = {},
 ): DeviceFilterColumn[] {
   const options = buildDeviceFilterOptions(deviceFilters);
   return [
@@ -399,7 +405,7 @@ export function getDeviceFilterColumns(
 export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
   deviceFilters?: DeviceFilters | null,
   filtersPending?: boolean,
-  { directoryColumns = false, roomyDirectory = false }: { directoryColumns?: boolean; roomyDirectory?: boolean } = {},
+  { directoryColumns = false, roomyDirectory = false }: DeviceDirectoryColumnOptions = {},
 ): ColumnDef<T>[] {
   const {
     status: statusFilterOptions,

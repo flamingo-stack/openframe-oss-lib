@@ -34,4 +34,9 @@ describe('labels', () => {
     expect(directoryUserLinkLabel('NEW')).toBe('NEW');
     expect(directorySourceLabel('NEW')).toBe('NEW');
   });
+
+  it('keeps a value named like an inherited key', () => {
+    expect(directoryUserLinkLabel('toString')).toBe('toString');
+    expect(directorySourceLabel('constructor')).toBe('constructor');
+  });
 });

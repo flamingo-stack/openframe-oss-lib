@@ -2,7 +2,7 @@
 
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import { LAYOUT_STEPS } from '../../styles/layout-steps';
-import { useLgUp, useMdUp, useMediaQuery } from './use-media-query';
+import { breakpoints, useLgUp, useMdUp, useMediaQuery } from './use-media-query';
 
 export type ContentBreakpoint = 'mobile' | 'tablet' | 'desktop';
 
@@ -74,6 +74,6 @@ export function useContentLgUp(): boolean | undefined {
 /** The `content-xl:` step in JS: the content area's width from `xl`, the viewport's outside one. */
 export function useContentXlUp(): boolean | undefined {
   const width = useContext(ContentAreaWidthContext);
-  const viewportXlUp = useMediaQuery(`(min-width: ${LAYOUT_STEPS.xl.viewport}px)`);
+  const viewportXlUp = useMediaQuery(breakpoints.xl);
   return width === null ? viewportXlUp : width >= CONTENT_BREAKPOINTS.xl;
 }

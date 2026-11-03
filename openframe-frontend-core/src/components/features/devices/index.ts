@@ -1,6 +1,12 @@
 'use client';
 
-export { directorySourceLabel, directoryUserLines, directoryUserLinkLabel } from './device-directory';
+export {
+  type DeviceDirectorySource,
+  type DeviceDirectoryUserLink,
+  directorySourceLabel,
+  directoryUserLines,
+  directoryUserLinkLabel,
+} from './device-directory';
 export { formatLastOnline } from './device-last-online';
 export { type DeviceNameSource, getDeviceName, matchesDeviceName } from './device-name';
 export {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useContentBreakpoint, useContentXlUp } from '../../../hooks/ui/use-content-breakpoint';
+import { useContentLgUp, useContentMdUp, useContentXlUp } from '../../../hooks/ui/use-content-breakpoint';
 import type { DeviceFilters } from './types';
 
 function isCompleteTag(tag: string): boolean {
@@ -47,8 +47,8 @@ export function useTagFilterModal({
 }: UseTagFilterModalParams) {
   // The content area's step, not the window's: the table header follows it, and a docked side panel narrows it while
   // the window stays wide.
-  const breakpoint = useContentBreakpoint();
-  const isMdUp = breakpoint === undefined ? undefined : breakpoint !== 'mobile';
+  const isMdUp = useContentMdUp();
+  const lgUp = useContentLgUp();
   const xlUp = useContentXlUp();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -64,16 +64,13 @@ export function useTagFilterModal({
   const filterGroups = useMemo(
     () =>
       columns
-        .filter(
-          column =>
-            column.filterable && (!isMdUp || (breakpoint === 'desktop' && xlUp === false && column.inWindowLgToXl)),
-        )
+        .filter(column => column.filterable && (!isMdUp || (lgUp && xlUp === false && column.inWindowLgToXl)))
         .map(column => ({
           id: column.key,
           title: column.label,
           options: column.filterOptions || [],
         })),
-    [columns, isMdUp, breakpoint, xlUp],
+    [columns, isMdUp, lgUp, xlUp],
   );
 
   const tagFilterKeys = useMemo(() => {
