@@ -299,6 +299,8 @@ export interface DeviceFilterColumn {
   label: string;
   filterable?: boolean;
   filterOptions?: DeviceFilterOption[];
+  /** Filters in the filter window on a desktop-width area too: its column's header has no funnel there. */
+  inWindowOnDesktop?: boolean;
 }
 
 /** A device filter dropdown entry: `meta.filter.options` plus the facet count. */
@@ -353,9 +355,11 @@ function buildDeviceFilterOptions(deviceFilters?: DeviceFilters | null): {
 // Filter column metadata used by the external filter modal (useTagFilterModal).
 // Kept separate from the table ColumnDef because DataTable doesn't carry the
 // filter metadata that the external mobile filter modal needs.
+// `roomyDirectory` is the table's own (`getDeviceTableColumns`): beside the customer column SOURCES shows only from
+// `xl`, and the header has no funnel for it from `lg` until then, so the window carries it there.
 export function getDeviceFilterColumns(
   deviceFilters?: DeviceFilters | null,
-  { directoryColumns = false }: { directoryColumns?: boolean } = {},
+  { directoryColumns = false, roomyDirectory = false }: { directoryColumns?: boolean; roomyDirectory?: boolean } = {},
 ): DeviceFilterColumn[] {
   const options = buildDeviceFilterOptions(deviceFilters);
   return [
@@ -366,7 +370,13 @@ export function getDeviceFilterColumns(
     ...(directoryColumns
       ? [
           { key: 'user', label: 'USER', filterable: true, filterOptions: options.user },
-          { key: 'sources', label: 'SOURCES', filterable: true, filterOptions: options.sources },
+          {
+            key: 'sources',
+            label: 'SOURCES',
+            filterable: true,
+            filterOptions: options.sources,
+            inWindowOnDesktop: !roomyDirectory,
+          },
         ]
       : []),
     { key: 'status', label: 'STATUS', filterable: true, filterOptions: options.status },

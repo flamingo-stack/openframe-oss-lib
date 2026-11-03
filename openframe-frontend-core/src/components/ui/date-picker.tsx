@@ -42,6 +42,8 @@ export interface DatePickerBaseProps {
   error?: string;
   /** When true, renders red error border */
   invalid?: boolean;
+  /** The trigger button's id: a label drawn outside the picker names it with `htmlFor`. */
+  id?: string;
 }
 
 export interface SingleDatePickerProps extends DatePickerBaseProps {
@@ -667,6 +669,7 @@ export function DatePicker(props: DatePickerProps) {
     label,
     error,
     invalid = false,
+    id,
   } = props;
 
   const [open, setOpen] = useState(false);
@@ -701,6 +704,7 @@ export function DatePicker(props: DatePickerProps) {
         <Button
           variant="field"
           type="button"
+          id={id}
           disabled={disabled}
           // Same marker Input/Textarea/Select expose — it is how a form finds
           // (and scrolls to) the first field that failed validation.
@@ -749,7 +753,7 @@ export function DatePicker(props: DatePickerProps) {
   );
 
   return (
-    <FieldWrapper label={label} error={error} errorSlot={'error' in props}>
+    <FieldWrapper label={label} htmlFor={id} error={error} errorSlot={'error' in props}>
       {picker}
     </FieldWrapper>
   );
@@ -799,6 +803,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
     label,
     error,
     invalid = false,
+    id,
   } = props;
   const [open, setOpen] = useState(false);
   const portalContainer = usePortalContainer();
@@ -883,6 +888,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
           <Button
             variant="field"
             type="button"
+            id={id}
             disabled={disabled}
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
@@ -984,7 +990,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
   );
 
   return (
-    <FieldWrapper label={label} error={error} errorSlot={'error' in props} className={className}>
+    <FieldWrapper label={label} htmlFor={id} error={error} errorSlot={'error' in props} className={className}>
       {content}
     </FieldWrapper>
   );
@@ -1050,6 +1056,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
     label,
     error,
     invalid = false,
+    id,
   } = props;
   const [open, setOpen] = useState(false);
   const portalContainer = usePortalContainer();
@@ -1112,6 +1119,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
           <Button
             variant="field"
             type="button"
+            id={id}
             disabled={disabled}
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
@@ -1181,7 +1189,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
   );
 
   return (
-    <FieldWrapper label={label} error={error} errorSlot={'error' in props} className={className}>
+    <FieldWrapper label={label} htmlFor={id} error={error} errorSlot={'error' in props} className={className}>
       {content}
     </FieldWrapper>
   );

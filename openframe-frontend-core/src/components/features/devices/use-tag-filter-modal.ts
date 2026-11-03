@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useMdUp } from '../../../hooks/ui/use-media-query';
+import { useContentBreakpoint } from '../../../hooks/ui/use-content-breakpoint';
 import type { DeviceFilters } from './types';
 
 function isCompleteTag(tag: string): boolean {
@@ -19,7 +19,13 @@ interface FilterOption {
 interface UseTagFilterModalParams {
   tags: string[];
   deviceFilters: DeviceFilters | null;
-  columns: Array<{ key: string; label: string; filterable?: boolean; filterOptions?: FilterOption[] }>;
+  columns: Array<{
+    key: string;
+    label: string;
+    filterable?: boolean;
+    filterOptions?: FilterOption[];
+    inWindowOnDesktop?: boolean;
+  }>;
   /** `useApiParams`' setter, each device list param is a list of ids. */
   setParams: (params: Record<string, string[]>) => void;
   /**
@@ -39,7 +45,10 @@ export function useTagFilterModal({
   setParams,
   onApplied = scrollMainToTop,
 }: UseTagFilterModalParams) {
-  const isMdUp = useMdUp();
+  // The content area's step, not the window's: the table header follows it, and a docked side panel narrows it while
+  // the window stays wide.
+  const breakpoint = useContentBreakpoint();
+  const isMdUp = breakpoint === undefined ? undefined : breakpoint !== 'mobile';
   const [isOpen, setIsOpen] = useState(false);
 
   // FilterModal calls onFilterChange first, then onTagsChange.
@@ -49,16 +58,19 @@ export function useTagFilterModal({
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
 
-  const filterGroups = useMemo(() => {
-    if (isMdUp) return [];
-    return columns
-      .filter(column => column.filterable)
-      .map(column => ({
-        id: column.key,
-        title: column.label,
-        options: column.filterOptions || [],
-      }));
-  }, [columns, isMdUp]);
+  // Below md the table draws no header, so every column filters here; on a desktop-width area only the columns whose
+  // header has no funnel at that width do.
+  const filterGroups = useMemo(
+    () =>
+      columns
+        .filter(column => column.filterable && (!isMdUp || (breakpoint === 'desktop' && column.inWindowOnDesktop)))
+        .map(column => ({
+          id: column.key,
+          title: column.label,
+          options: column.filterOptions || [],
+        })),
+    [columns, isMdUp, breakpoint],
+  );
 
   const tagFilterKeys = useMemo(() => {
     if (!deviceFilters?.tagKeys) return [];
