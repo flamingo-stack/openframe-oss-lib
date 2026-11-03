@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.Update;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -34,4 +35,8 @@ public interface PackageAutoUpdatePolicyRepository extends MongoRepository<Packa
     @Query("{ '_id': ?0 }")
     @Update("{ '$set': { 'retryRequestId': ?1 } }")
     long markRetryScheduled(String policyId, String requestId);
+
+    @Query("{ '_id': ?0 }")
+    @Update("{ '$set': { 'enabled': false, 'updatedBy': ?1, 'updatedAt': ?2 } }")
+    long disable(String policyId, String actor, Instant at);
 }

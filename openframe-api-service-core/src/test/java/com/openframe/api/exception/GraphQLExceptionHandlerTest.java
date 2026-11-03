@@ -10,7 +10,11 @@ import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.loki.client.LokiQueryRejectedException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import graphql.GraphQLError;
+import graphql.Scalars;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
+import graphql.execution.ExecutionStepInfo;
+import graphql.execution.ResultPath;
+import graphql.schema.DataFetchingEnvironment;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -39,6 +43,8 @@ import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.MAP;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(OutputCaptureExtension.class)
 class GraphQLExceptionHandlerTest {
@@ -226,8 +232,14 @@ class GraphQLExceptionHandlerTest {
     }
 
     private List<GraphQLError> handle(Throwable exception) {
+        DataFetchingEnvironment environment = mock(DataFetchingEnvironment.class);
+        when(environment.getExecutionStepInfo()).thenReturn(ExecutionStepInfo.newExecutionStepInfo()
+                .type(Scalars.GraphQLString)
+                .path(ResultPath.rootPath())
+                .build());
         DataFetcherExceptionHandlerParameters parameters = DataFetcherExceptionHandlerParameters
                 .newExceptionParameters()
+                .dataFetchingEnvironment(environment)
                 .exception(exception)
                 .build();
         return handler.handleException(parameters).join().getErrors();

@@ -49,6 +49,33 @@ class UserServiceTest {
     }
 
     @Test
+    void shouldFindTheSingleActiveAccountByEmail() {
+        AuthUser only = activeUser("u", "t", "ada@acme.com");
+        when(repository.findAllByEmailAndStatus("ada@acme.com", UserStatus.ACTIVE)).thenReturn(List.of(only));
+
+        assertThat(service.findActiveByEmail("ada@acme.com")).contains(only);
+    }
+
+    @Test
+    void shouldFindNothingForEmailWithoutActiveAccount() {
+        when(repository.findAllByEmailAndStatus("ada@acme.com", UserStatus.ACTIVE)).thenReturn(List.of());
+
+        assertThat(service.findActiveByEmail("ada@acme.com")).isEmpty();
+        assertThat(service.existsActiveByEmail("ada@acme.com")).isFalse();
+    }
+
+    @Test
+    void shouldRefuseEmailActiveInTwoTenantsButStillReportItExists() {
+        when(repository.findAllByEmailAndStatus("ada@acme.com", UserStatus.ACTIVE))
+                .thenReturn(List.of(activeUser("u1", "t1", "ada@acme.com"), activeUser("u2", "t2", "ada@acme.com")));
+
+        assertThatThrownBy(() -> service.findActiveByEmail("ada@acme.com"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("more than one organization");
+        assertThat(service.existsActiveByEmail("ada@acme.com")).isTrue();
+    }
+
+    @Test
     void shouldCreateUserWithEncodedPasswordAndLocalProvider() {
         when(repository.findByEmailAndTenantId("ada@acme.com", "t")).thenReturn(Optional.empty());
 
