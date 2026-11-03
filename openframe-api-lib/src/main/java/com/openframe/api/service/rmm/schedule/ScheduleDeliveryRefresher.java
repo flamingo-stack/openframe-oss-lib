@@ -40,15 +40,15 @@ import static java.util.stream.Collectors.toSet;
 
 // a batch waiting on the engine for a machine carries what the user sees now, not what was there when the schedule
 // fired: an edit of a script or of the schedule replaces the waiting bodies and the leaves follow (a script added to
-// the schedule gets a leaf, one removed closes), a schedule or a device that is gone withdraws them. A leaf still
-// QUEUED is the sign the machine has not received the batch
+// the schedule gets a leaf, one that left it loses its leaf: the leaf was the promise of a batch the agent never
+// received, a run shows what ran), a schedule or a device that is gone withdraws them. A leaf still QUEUED is the sign
+// the machine has not received the batch
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ScheduleDeliveryRefresher {
 
     private static final String NOTHING_LEFT_TO_RUN = "no runnable script left in the batch";
-    private static final String REMOVED_FROM_SCHEDULE = "Script was removed from the schedule before the agent received it";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptScheduleRepository scheduleRepository;
@@ -67,20 +67,6 @@ public class ScheduleDeliveryRefresher {
         String tenantId = tenantIdProvider.getTenantId();
         List<ScriptExecution> queued = queuedLeavesOf(tenantId, scheduleId);
         refresh(tenantId, queued);
-    }
-
-    // the script is gone: the batches still waiting carry what is left of the fire, a batch with nothing left is
-    // withdrawn, and the script's own leaves close here with the reason, the agent will never run them
-    public void retireScript(String scriptId, String reason) {
-        String tenantId = tenantIdProvider.getTenantId();
-        List<ScriptExecution> queued = scriptExecutionRepository.findByTenantIdAndScriptIdAndStatus(tenantId, scriptId, ExecutionStatus.QUEUED);
-        refresh(tenantId, queued);
-        Instant now = Instant.now();
-        queued.forEach(leaf -> markFailed(leaf, now, reason));
-        if (!queued.isEmpty()) {
-            scriptExecutionRepository.saveAll(queued);
-            log.info("Leaves of a retired script closed: scriptId={} leaves={} reason={}", scriptId, queued.size(), reason);
-        }
     }
 
     public void cancelForSchedule(String scheduleId, String reason) {
@@ -136,19 +122,20 @@ public class ScheduleDeliveryRefresher {
                         offlineBehavior, reconnectWindowSeconds))
                 .collect(toSet());
         List<ScriptExecution> leavesOfTheFire = scriptExecutionRepository.findByTenantIdAndExecutionId(tenantId, executionId);
-        alignLeaves(leavesOfTheFire, replaced, scripts);
+        alignLeaves(executionId, leavesOfTheFire, replaced, scripts);
         log.info("Waiting batches refreshed: executionId={} machines={} replaced={}", executionId, waitingMachines.size(), replaced.size());
     }
 
     // the leaves of a machine whose waiting body was replaced are the batch it will get: a script that left the batch
-    // closes, a script that joined it gets a leaf (or its closed leaf back, the fire holds one leaf per script and
-    // machine), the rest keep the script's privilege and timeout as they are now (the result watchdog reads the leaf).
-    // A machine whose body stayed (the agent took it, or it is on the route before the engine) keeps its leaves: they
-    // are the batch the agent runs
-    private void alignLeaves(List<ScriptExecution> leavesOfTheFire, Set<String> replacedMachines, List<Script> scripts) {
+    // loses its leaf, a script that joined it gets one (the fire holds one leaf per script and machine), the rest keep
+    // the script's privilege and timeout as they are now (the result watchdog reads the leaf). A machine whose body
+    // stayed (the agent took it, or it is on the route before the engine) keeps its leaves: they are the batch the
+    // agent runs
+    private void alignLeaves(String executionId, List<ScriptExecution> leavesOfTheFire, Set<String> replacedMachines, List<Script> scripts) {
         Instant now = Instant.now();
         Map<String, Script> byId = scripts.stream().collect(toMap(Script::getId, Function.identity(), (first, second) -> first));
         List<ScriptExecution> changed = new ArrayList<>();
+        List<ScriptExecution> gone = new ArrayList<>();
         for (String machineId : replacedMachines) {
             Map<String, ScriptExecution> byScript = leavesOfTheFire.stream()
                     .filter(leaf -> machineId.equals(leaf.getMachineId()))
@@ -156,21 +143,19 @@ public class ScheduleDeliveryRefresher {
             ScriptExecution own = byScript.values().iterator().next();
             byScript.values().stream()
                     .filter(leaf -> isQueued(leaf) && !byId.containsKey(leaf.getScriptId()))
-                    .forEach(leaf -> {
-                        markFailed(leaf, now, REMOVED_FROM_SCHEDULE);
-                        changed.add(leaf);
-                    });
+                    .forEach(gone::add);
             for (Script script : scripts) {
                 ScriptExecution leaf = byScript.get(script.getId());
                 if (leaf == null) {
                     changed.add(newLeaf(own, machineId, script, now));
-                } else if (!isQueued(leaf)) {
-                    reopen(leaf, script, now);
-                    changed.add(leaf);
                 } else if (follow(leaf, script)) {
                     changed.add(leaf);
                 }
             }
+        }
+        if (!gone.isEmpty()) {
+            scriptExecutionRepository.deleteAll(gone);
+            log.info("Leaves of scripts that left the waiting batches removed: executionId={} leaves={}", executionId, gone.size());
         }
         if (!changed.isEmpty()) {
             scriptExecutionRepository.saveAll(changed);
@@ -193,15 +178,6 @@ public class ScheduleDeliveryRefresher {
                 .dispatchedAt(own.getDispatchedAt())
                 .statusChangedAt(now)
                 .build();
-    }
-
-    private static void reopen(ScriptExecution leaf, Script script, Instant now) {
-        leaf.setStatus(ExecutionStatus.QUEUED);
-        leaf.setStatusChangedAt(now);
-        leaf.setFinishedAt(null);
-        leaf.setTimedOut(null);
-        leaf.setError(null);
-        follow(leaf, script);
     }
 
     private static boolean isQueued(ScriptExecution leaf) {
@@ -243,13 +219,6 @@ public class ScheduleDeliveryRefresher {
         if (!waiting.isEmpty()) {
             log.info("Waiting batches withdrawn: deliveries={} reason={}", waiting.size(), reason);
         }
-    }
-
-    private static void markFailed(ScriptExecution leaf, Instant now, String reason) {
-        leaf.setStatus(ExecutionStatus.FAILED);
-        leaf.setStatusChangedAt(now);
-        leaf.setFinishedAt(now);
-        leaf.setError(reason);
     }
 
     private static boolean isActive(ScheduleScript schedule) {

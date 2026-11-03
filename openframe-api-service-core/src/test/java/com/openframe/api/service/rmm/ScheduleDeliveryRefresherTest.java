@@ -162,30 +162,30 @@ class ScheduleDeliveryRefresherTest {
     }
 
     @Test
-    @DisplayName("retireScript: the batch goes on without the script, the script's own waiting leaves close with the reason")
-    void retireScript_otherScriptsLeft_batchRebuiltWithoutItAndItsLeavesClosed() {
+    @DisplayName("refreshForScript: a deleted script leaves the waiting batch: its leaf goes, the batch goes on without it, the run will show what ran")
+    void refreshForScript_scriptDeleted_itsLeafGoesBatchGoesOn() {
         ScriptExecution leafA = queued(EXECUTION_ID, MACHINE_1, SCRIPT_A);
+        ScriptExecution leafB = queued(EXECUTION_ID, MACHINE_1, SCRIPT_B);
         when(scriptExecutionRepository.findByTenantIdAndScriptIdAndStatus(TENANT_ID, SCRIPT_A, ExecutionStatus.QUEUED)).thenReturn(List.of(leafA));
-        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
-                .thenReturn(List.of(leafA, queued(EXECUTION_ID, MACHINE_1, SCRIPT_B)));
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID)).thenReturn(List.of(leafA, leafB));
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule(ScriptStatus.ACTIVE, List.of(SCRIPT_A, SCRIPT_B))));
         Script deleted = script(SCRIPT_A, "echo a");
         deleted.setStatus(ScriptStatus.DELETED);
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any())).thenReturn(List.of(deleted, script(SCRIPT_B, "echo b")));
         when(deliveryRefresher.refresh(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), messageCaptor.capture(), any(), any())).thenReturn(true);
 
-        refresher.retireScript(SCRIPT_A, REASON);
+        refresher.refreshForScript(SCRIPT_A);
 
         assertThat(messageCaptor.getValue().getScripts()).extracting(ScriptScheduleExecutionItem::getScriptId).containsExactly(SCRIPT_B);
-        assertThat(leafA.getStatus()).isEqualTo(ExecutionStatus.FAILED);
-        assertThat(leafA.getError()).isEqualTo(REASON);
-        verify(scriptExecutionRepository).saveAll(List.of(leafA));
+        verify(scriptExecutionRepository).deleteAll(List.of(leafA));
+        assertThat(leafB.getStatus()).isEqualTo(ExecutionStatus.QUEUED);
+        verify(scriptExecutionRepository).saveAll(List.of(leafB));
         verifyNoInteractions(deliveryTracker);
     }
 
     @Test
-    @DisplayName("retireScript: it was the only script of the batch, the waiting rows are withdrawn and the leaves close")
-    void retireScript_nothingLeft_rowsWithdrawnAndLeavesClosed() {
+    @DisplayName("refreshForScript: the deleted script was the only one of the batch: the waiting rows are withdrawn, the leaves are left to the engine's closing")
+    void refreshForScript_scriptDeletedNothingLeft_rowsWithdrawnLeavesLeft() {
         ScriptExecution leaf = queued(EXECUTION_ID, MACHINE_1, SCRIPT_A);
         when(scriptExecutionRepository.findByTenantIdAndScriptIdAndStatus(TENANT_ID, SCRIPT_A, ExecutionStatus.QUEUED)).thenReturn(List.of(leaf));
         when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(schedule(ScriptStatus.ACTIVE, List.of(SCRIPT_A))));
@@ -193,12 +193,12 @@ class ScheduleDeliveryRefresherTest {
         deleted.setStatus(ScriptStatus.DELETED);
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT_ID), any())).thenReturn(List.of(deleted));
 
-        refresher.retireScript(SCRIPT_A, REASON);
+        refresher.refreshForScript(SCRIPT_A);
 
         verify(deliveryTracker).cancel(eq(DeliveryType.SCRIPT_SCHEDULE), eq(EXECUTION_ID), eq(MACHINE_1), anyString());
         verifyNoInteractions(deliveryRefresher);
-        assertThat(leaf.getStatus()).isEqualTo(ExecutionStatus.FAILED);
-        assertThat(leaf.getError()).isEqualTo(REASON);
+        verify(scriptExecutionRepository, never()).deleteAll(any());
+        assertThat(leaf.getStatus()).isEqualTo(ExecutionStatus.QUEUED);
     }
 
     @Test
@@ -250,8 +250,8 @@ class ScheduleDeliveryRefresherTest {
     }
 
     @Test
-    @DisplayName("refreshForSchedule: a script removed from the schedule leaves the waiting batch: its leaf closes with the reason, the body goes on without it")
-    void refreshForSchedule_scriptRemoved_leafClosesBodyGoesOn() {
+    @DisplayName("refreshForSchedule: a script removed from the schedule leaves the waiting batch: its leaf goes (the run shows what ran), the body goes on without it")
+    void refreshForSchedule_scriptRemoved_leafGoesBodyGoesOn() {
         ScriptExecution leafA = queued(EXECUTION_ID, MACHINE_1, SCRIPT_A);
         ScriptExecution leafB = queued(EXECUTION_ID, MACHINE_1, SCRIPT_B);
         when(scriptExecutionRepository.findByTenantIdAndScheduleIdAndStatus(TENANT_ID, SCHEDULE_ID, ExecutionStatus.QUEUED)).thenReturn(List.of(leafA, leafB));
@@ -263,11 +263,10 @@ class ScheduleDeliveryRefresherTest {
         refresher.refreshForSchedule(SCHEDULE_ID);
 
         assertThat(messageCaptor.getValue().getScripts()).extracting(ScriptScheduleExecutionItem::getScriptId).containsExactly(SCRIPT_B);
-        assertThat(leafA.getStatus()).isEqualTo(ExecutionStatus.FAILED);
-        assertThat(leafA.getError()).isEqualTo("Script was removed from the schedule before the agent received it");
+        verify(scriptExecutionRepository).deleteAll(List.of(leafA));
         assertThat(leafB.getStatus()).isEqualTo(ExecutionStatus.QUEUED);
         assertThat(leafB.getTimeoutSeconds()).isEqualTo(60);
-        verify(scriptExecutionRepository).saveAll(List.of(leafA, leafB));
+        verify(scriptExecutionRepository).saveAll(List.of(leafB));
     }
 
     @Test
