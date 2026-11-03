@@ -306,6 +306,17 @@ describe('approvalStatusOf', () => {
       { ...base, state: 'output-error', errorText: 'no', approval: { id: '1', approved: true } },
       'failed',
     ],
+    [
+      'approved, and nobody knows how it ended: it may have run',
+      {
+        ...base,
+        state: 'output-error',
+        errorText: 'no answer',
+        approval: { id: '1', approved: true },
+        toolMetadata: { outcomeUnknown: true },
+      },
+      'unknown',
+    ],
     ['denied', { ...base, state: 'output-denied', approval: { id: '1', approved: false } }, 'rejected'],
     [
       'cancelled',

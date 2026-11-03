@@ -78,10 +78,10 @@ export interface ApprovalStatusTagProps {
 
 /**
  * Terminal-status badge for a resolved approval batch (approved / rejected /
- * cancelled / failed); renders nothing while pending. With `inlineResolver` the
+ * cancelled / failed / unknown); renders nothing while pending. With `inlineResolver` the
  * resolver's name is baked into the tag as a single full-text pill
  * ("Approved by {name}"); otherwise callers render "by {name}" as a separate
- * muted span. `failed` names nobody: whoever approved it did not fail it. Also
+ * muted span. `failed` and `unknown` name nobody: whoever approved it did not fail it. Also
  * used by the approval notification tile, which hosts the actions row itself
  * (`showFooterActions={false}`).
  */
@@ -91,6 +91,7 @@ export function ApprovalStatusTag({ status, resolvedByName, inlineResolver = fal
   if (status === 'cancelled') return <StatusLine tone="muted" label={`Canceled${suffix}`} />;
   if (status === 'rejected') return <StatusLine tone="error" label={`Rejected${suffix}`} />;
   if (status === 'failed') return <StatusLine tone="error" label="Failed" />;
+  if (status === 'unknown') return <StatusLine tone="muted" label="Outcome unknown" />;
   return null;
 }
 
@@ -114,6 +115,7 @@ function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
  *  - executing         → DotsLoaderIcon
  *  - done + success    → green check
  *  - done + failure    → red cross, in a failed batch too
+ *  - nobody knows       → null: a cross would say it failed, and it may have gone through
  *  - failed, no exec   → null (a row with no gate of its own: nothing runs it now)
  */
 function ExecutionStatusIcon({
@@ -125,6 +127,7 @@ function ExecutionStatusIcon({
 }) {
   if (batchStatus !== 'approved' && batchStatus !== 'failed') return null;
   if (!execution && batchStatus === 'failed') return null;
+  if (execution?.outcomeUnknown) return null;
   if (!execution || execution.status === 'executing')
     return <DotsLoaderIcon size={16} className="text-ods-text-secondary" />;
   if (execution.success === false)
@@ -329,6 +332,8 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
     }
 
     const explanations = data.toolCalls.map(c => c.toolExplanation?.trim()).filter((s): s is string => !!s);
+    // Said with no row opened: the rows of an answered batch stay collapsed.
+    const outcomeNotice = Object.values(data.executions ?? {}).find(row => row.outcomeUnknown)?.result;
 
     const handleApprove = async () => {
       setIsProcessing(true);
@@ -403,8 +408,9 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
             (status === 'pending' ? (
               <div className="flex w-full items-center gap-[var(--spacing-system-xsf)]">{actionButtons}</div>
             ) : (
-              <div className="flex w-full">
+              <div className="flex w-full flex-col gap-[var(--spacing-system-xxs)]">
                 <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver />
+                {outcomeNotice && <p className="text-ods-text-secondary text-h6">{outcomeNotice}</p>}
               </div>
             ))}
         </div>
@@ -459,11 +465,12 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               ) : (
                 <div className="flex items-center gap-[var(--spacing-system-xsf)]">
                   <ApprovalStatusTag status={status} resolvedByName={resolvedByName} />
-                  {resolvedByName && status !== 'failed' && (
+                  {resolvedByName && status !== 'failed' && status !== 'unknown' && (
                     <span className="text-ods-text-secondary text-h6">by {resolvedByName}</span>
                   )}
                 </div>
               ))}
+            {showFooterActions && outcomeNotice && <p className="text-ods-text-secondary text-h6">{outcomeNotice}</p>}
           </div>
         )}
       </div>

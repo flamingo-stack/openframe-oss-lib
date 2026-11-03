@@ -204,6 +204,8 @@ export interface ApprovalBatchExecutionState {
   status: 'executing' | 'done';
   result?: string;
   success?: boolean;
+  /** Nothing said how the row ended: no cross and no check, and `result` says so. */
+  outcomeUnknown?: boolean;
 }
 
 export interface ApprovalBatchData {

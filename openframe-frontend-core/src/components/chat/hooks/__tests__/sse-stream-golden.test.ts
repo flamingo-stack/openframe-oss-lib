@@ -471,25 +471,33 @@ describe('an approval whose answer never came', () => {
 
   const BATCH_ID = 'batch:prop-a';
 
-  it.each(['error', 'close'] as const)('a cut stream (%s) fails every row of the batch it left waiting', async how => {
-    holdSecondResponse(APPROVAL_BATCH_STREAM, [{ type: 'start' }], how);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('delete both');
-    });
-    await act(async () => {
-      await expect(result.current.actions.approve?.(BATCH_ID)).resolves.toBe(false);
-    });
-    const [first, second] = toolsOf(result.current.messages);
-    expect([first.state, second.state]).toEqual(['output-error', 'output-error']);
-    expect(first).toMatchObject({ errorText: outcomeUnknown, approval: { approved: true } });
-    const { executions } = approvalBatchViewOf([first, second]).data;
-    expect(Object.values(executions ?? {}).map(row => [row.status, row.success])).toEqual([
-      ['done', false],
-      ['done', false],
-    ]);
-    expect(result.current.streamingPhase).toBe('idle');
-  });
+  it.each(['error', 'close'] as const)(
+    'a cut stream (%s) says nobody knows, on every row it left waiting',
+    async how => {
+      holdSecondResponse(APPROVAL_BATCH_STREAM, [{ type: 'start' }], how);
+      const { result } = renderAdapter();
+      await act(async () => {
+        await result.current.sendMessage('delete both');
+      });
+      await act(async () => {
+        await expect(result.current.actions.approve?.(BATCH_ID)).resolves.toBe(false);
+      });
+      const [first, second] = toolsOf(result.current.messages);
+      expect([first.state, second.state]).toEqual(['output-error', 'output-error']);
+      expect(first).toMatchObject({ errorText: outcomeUnknown, approval: { approved: true } });
+      expect([first, second].map(approvalStatusOf)).toEqual(['unknown', 'unknown']);
+      const view = approvalBatchViewOf([first, second]);
+      expect(view.status).toBe('unknown');
+      // No cross and no check: a cross would say the write failed, and it may have gone through.
+      expect(
+        Object.values(view.data.executions ?? {}).map(row => [row.status, row.success, row.outcomeUnknown]),
+      ).toEqual([
+        ['done', undefined, true],
+        ['done', undefined, true],
+      ]);
+      expect(result.current.streamingPhase).toBe('idle');
+    },
+  );
 
   it('a row the stream did answer keeps its answer', async () => {
     holdSecondResponse(
@@ -521,6 +529,58 @@ describe('an approval whose answer never came', () => {
       state: 'output-error',
       errorText: outcomeUnknown,
     });
+    expect(approvalStatusOf(toolsOf(result.current.messages)[0])).toBe('unknown');
+  });
+
+  it('a refusal is known: nothing ran, and it says Failed with the server`s words', async () => {
+    mockFetchResponses([
+      onUiWire(APPROVAL_STREAM),
+      { status: 409, body: { error: 'This approval expired.', code: 'STALE' } },
+    ]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    await act(async () => {
+      await expect(result.current.actions.approve?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
+    });
+    const [part] = toolsOf(result.current.messages);
+    expect(part).toMatchObject({ state: 'output-error', errorText: 'This approval expired.' });
+    expect(approvalStatusOf(part)).toBe('failed');
+  });
+
+  it('a 5xx may be a gateway`s word about a write still running: nobody knows', async () => {
+    mockFetchResponses([onUiWire(APPROVAL_STREAM), { status: 504, body: { error: 'Gateway timeout' } }]);
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    await act(async () => {
+      await expect(result.current.actions.approve?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
+    });
+    const [part] = toolsOf(result.current.messages);
+    expect(part).toMatchObject({ state: 'output-error', errorText: outcomeUnknown });
+    expect(approvalStatusOf(part)).toBe('unknown');
+  });
+
+  it('a request that never got an answer: nobody knows either', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementationOnce(() =>
+          Promise.resolve({ ok: true, status: 200, body: streamOf(onUiWire(APPROVAL_STREAM)) } as unknown as Response),
+        )
+        .mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    const { result } = renderAdapter();
+    await act(async () => {
+      await result.current.sendMessage('close it');
+    });
+    await act(async () => {
+      await expect(result.current.actions.approve?.(FIXTURE_PROPOSAL_ID)).resolves.toBe(false);
+    });
+    expect(approvalStatusOf(toolsOf(result.current.messages)[0])).toBe('unknown');
   });
 
   it('Stop leaves no row waiting', async () => {
@@ -543,6 +603,7 @@ describe('an approval whose answer never came', () => {
       await expect(answering).resolves.toBe(false);
     });
     expect(statesOf(result.current.messages)).toEqual(['output-error', 'output-error']);
+    expect(toolsOf(result.current.messages).map(approvalStatusOf)).toEqual(['unknown', 'unknown']);
     expect(result.current.streamingPhase).toBe('idle');
   });
 

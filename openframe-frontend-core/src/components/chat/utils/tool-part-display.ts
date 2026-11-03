@@ -131,7 +131,11 @@ function executionOf(part: ChatToolPart): ApprovalBatchExecutionState | null {
     const result = resultTextOf(part.output);
     return { status: 'done', success: true, ...(result !== undefined ? { result } : {}) };
   }
-  if (part.state === 'output-error') return { status: 'done', success: false, result: part.errorText };
+  if (part.state === 'output-error') {
+    return part.toolMetadata?.outcomeUnknown
+      ? { status: 'done', outcomeUnknown: true, result: part.errorText }
+      : { status: 'done', success: false, result: part.errorText };
+  }
   return null;
 }
 
@@ -172,7 +176,8 @@ function batchRowOf(part: ChatToolPart): PendingToolCallData {
 
 /**
  * The one card a run of parts with one `batchId` draws. Its status is its gates': a row with none follows them. Approved
- * while a row ran or runs; a row that failed beside it keeps its own cross. With every row refused or failed it is `failed`.
+ * while a row ran or runs; a row that failed beside it keeps its own cross. With every row refused or failed it is `failed`,
+ * and `unknown` while any of them may have run.
  */
 export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBatchView {
   const statuses = parts.flatMap(part => {
@@ -183,7 +188,9 @@ export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBat
     ? 'pending'
     : statuses.includes('approved')
       ? 'approved'
-      : (statuses[0] ?? 'approved');
+      : statuses.includes('unknown')
+        ? 'unknown'
+        : (statuses[0] ?? 'approved');
   const firstGate = parts.find(part => approvalStatusOf(part) !== null);
   const descriptor = firstGate && 'approval' in firstGate ? firstGate.approval?.descriptor : undefined;
   const executions: Record<string, ApprovalBatchExecutionState> = {};

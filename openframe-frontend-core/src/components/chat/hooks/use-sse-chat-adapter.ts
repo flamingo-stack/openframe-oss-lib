@@ -247,6 +247,9 @@ function unansweredParts(messages: readonly ChatMessage[], asked: readonly ChatT
 const APPROVAL_OUTCOME_UNKNOWN =
   'The answer stopped before saying how this ended, so it may or may not have gone through. Check before trying again.';
 
+/** The server answered and refused: nothing ran. A 5xx is none: it may be a gateway's word about a write still running. */
+class RequestRefused extends Error {}
+
 /** The newest message holding a pending approval this id names. */
 function cardOfApproval(
   messages: readonly ChatMessage[],
@@ -555,7 +558,8 @@ export function useSseChatAdapter(
         // Surface the SERVER's error copy (route-base envelope `{error, code}`): a bare "Chat request failed: 409" told the
         // user nothing when e.g. a batch approval expired; the server ships real copy ("This approval expired ...").
         const serverMessage = await readServerErrorMessage(response);
-        throw new Error(serverMessage ?? `Chat request failed: ${response.status}`);
+        const message = serverMessage ?? `Chat request failed: ${response.status}`;
+        throw response.status < 500 ? new RequestRefused(message) : new Error(message);
       }
       if (!response.body) throw new Error('No response body');
 
@@ -682,22 +686,30 @@ export function useSseChatAdapter(
 
       /**
        * One request, for these parts. A row it left waiting would spin for good: nothing else stops its loader, and a card
-       * is never stored for a reload to settle it. So a request that was refused fails its rows with what the server said,
-       * and a stream that was cut or stopped before it answered a row says that nobody knows how the row ended.
+       * is never stored for a reload to settle it. So a request that was refused fails its rows with what the server said.
+       * Anything else that left a row unanswered (a cut, Stop, a request that got no answer, a 5xx that may be a gateway's
+       * word about a write still running) says that nobody knows how the row ended: the hub finishes a write it started
+       * whether or not the client stays.
        */
       const answerParts = async (asked: readonly ChatToolPart[], url: string, body: unknown): Promise<void> => {
-        let errorText = APPROVAL_OUTCOME_UNKNOWN;
+        let refusal: string | null = null;
         try {
           minted = (await streamFrom(url, body, ctrl, true)) || minted;
         } catch (err) {
-          if ((err as { name?: string })?.name !== 'AbortError' && !ctrl.signal.aborted) {
-            errorText = err instanceof Error ? err.message : 'An error occurred while processing your request.';
-          }
+          if (err instanceof RequestRefused) refusal = err.message;
         }
         flushDeltas();
         for (const part of unansweredParts(store?.getSnapshot(source).messages ?? [], asked)) {
           applyEntry({
-            chunks: [{ type: 'tool-output-error', toolCallId: part.toolCallId, dynamic: true, errorText }],
+            chunks: [
+              {
+                type: 'tool-output-error',
+                toolCallId: part.toolCallId,
+                dynamic: true,
+                errorText: refusal ?? APPROVAL_OUTCOME_UNKNOWN,
+                ...(refusal === null ? { toolMetadata: { outcomeUnknown: true } } : {}),
+              },
+            ],
           });
           ok = false;
         }

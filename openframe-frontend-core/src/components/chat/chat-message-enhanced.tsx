@@ -607,7 +607,15 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                               variant={approvalVariant}
                             />
                             {/* Approved and refused all the same (an expired proposal): the card stays, and says why. */}
-                            {part.state === 'output-error' && <ErrorMessageDisplay title={part.errorText} />}
+                            {part.state === 'output-error' && !part.toolMetadata?.outcomeUnknown && (
+                              <ErrorMessageDisplay title={part.errorText} />
+                            )}
+                            {/* Nobody knows how it ended: no error box, because it may have gone through. */}
+                            {part.state === 'output-error' && part.toolMetadata?.outcomeUnknown && (
+                              <p className="mb-[var(--spacing-system-xsf)] text-ods-text-secondary text-h6">
+                                {part.errorText}
+                              </p>
+                            )}
                           </React.Fragment>
                         );
                       }

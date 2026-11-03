@@ -141,6 +141,42 @@ describe('approvalBatchViewOf', () => {
     ).toBe('approved');
   });
 
+  describe('a row nobody knows the end of', () => {
+    const unknown = (id: string): ChatToolPart => ({
+      ...row(id),
+      state: 'output-error',
+      errorText: 'No answer.',
+      approval: { ...gate(id), approved: true },
+      toolMetadata: { outcomeUnknown: true },
+    });
+    const failed = (id: string): ChatToolPart => ({
+      ...row(id),
+      state: 'output-error',
+      errorText: 'Expired.',
+      approval: { ...gate(id), approved: true },
+    });
+
+    it('has no cross and no check, and the batch says so', () => {
+      const view = approvalBatchViewOf([unknown('p1'), unknown('p2')]);
+      expect(view.status).toBe('unknown');
+      expect(view.data.executions?.p1).toEqual({ status: 'done', outcomeUnknown: true, result: 'No answer.' });
+    });
+
+    it('beside a refused row the batch is unknown: Failed would be a claim about both', () => {
+      expect(approvalBatchViewOf([failed('p1'), unknown('p2')]).status).toBe('unknown');
+      expect(approvalBatchViewOf([unknown('p1'), failed('p2')]).status).toBe('unknown');
+    });
+
+    it('beside a row that ran the batch is approved, and the row keeps saying nobody knows', () => {
+      const view = approvalBatchViewOf([
+        { ...row('p1'), state: 'output-available', output: 'ok', approval: { ...gate('p1'), approved: true } },
+        unknown('p2'),
+      ]);
+      expect(view.status).toBe('approved');
+      expect(view.data.executions?.p2).toEqual({ status: 'done', outcomeUnknown: true, result: 'No answer.' });
+    });
+  });
+
   it('a row with no gate of its own never runs from its state: it follows its batch', () => {
     const view = approvalBatchViewOf([
       { ...row('p1'), state: 'output-denied', approval: { ...gate('p1'), approved: false } },

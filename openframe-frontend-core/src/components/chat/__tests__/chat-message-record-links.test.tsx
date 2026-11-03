@@ -624,6 +624,75 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
     expect(screen.getAllByRole('img', { name: 'Failed' })).toHaveLength(2);
   });
 
+  describe('an approved card nobody knows the end of', () => {
+    const notice = 'The answer stopped before saying how this ended.';
+    /** Each row holds it too, collapsed: the foot's is the one a reader sees with no row opened. */
+    const onTheFoot = () => screen.getAllByText(notice).filter(element => element.tagName === 'P');
+    const unknownPart = (id: string, batchId?: string) => ({
+      ...pendingPart(id, batchId),
+      state: 'output-error' as const,
+      errorText: notice,
+      approval: { id, approved: true as const, ...(batchId ? { descriptor: { batchId } } : {}) },
+      toolMetadata: { resolvedByName: 'Roman', outcomeUnknown: true },
+    });
+
+    it('a card of one says so, names no failure and no resolver, and shows why', () => {
+      render(<ChatMessageEnhanced role="assistant" parts={[unknownPart('p1')]} />);
+      expect(screen.getByText('Outcome unknown')).toBeTruthy();
+      expect(screen.queryByText('Failed')).toBeNull();
+      expect(screen.queryByText(/Approved/)).toBeNull();
+      expect(screen.queryByText(/Roman/)).toBeNull();
+      expect(screen.getByText(notice)).toBeTruthy();
+    });
+
+    it('a batch says so on its foot with no row opened, and no row has a cross or a check', () => {
+      render(
+        <ChatMessageEnhanced role="assistant" parts={[unknownPart('p1', 'batch:p1'), unknownPart('p2', 'batch:p1')]} />,
+      );
+      expect(screen.getByText('Outcome unknown')).toBeTruthy();
+      expect(onTheFoot()).toHaveLength(1);
+      expect(screen.queryByText('Failed')).toBeNull();
+      expect(screen.queryByText(/by Roman/)).toBeNull();
+      expect(screen.queryByRole('img', { name: 'Failed' })).toBeNull();
+      expect(screen.queryByRole('img', { name: 'Done' })).toBeNull();
+    });
+
+    it('for the end client too', () => {
+      render(
+        <ChatMessageEnhanced
+          role="assistant"
+          assistantType="fae"
+          approvalVariant="client"
+          parts={[unknownPart('p1', 'batch:p1'), unknownPart('p2', 'batch:p1')]}
+        />,
+      );
+      expect(screen.getByText('Outcome unknown')).toBeTruthy();
+      expect(screen.getByText(notice)).toBeTruthy();
+      expect(screen.queryByText('Failed')).toBeNull();
+    });
+
+    it('a batch that also ran says Approved, and the row it could not vouch for has no cross', () => {
+      render(
+        <ChatMessageEnhanced
+          role="assistant"
+          parts={[
+            {
+              ...pendingPart('p1', 'batch:p1'),
+              state: 'output-available',
+              output: { ok: true },
+              approval: { id: 'p1', approved: true, descriptor: { batchId: 'batch:p1' } },
+            },
+            unknownPart('p2', 'batch:p1'),
+          ]}
+        />,
+      );
+      expect(screen.getByText('Approved')).toBeTruthy();
+      expect(onTheFoot()).toHaveLength(1);
+      expect(screen.getAllByRole('img', { name: 'Done' })).toHaveLength(1);
+      expect(screen.queryByRole('img', { name: 'Failed' })).toBeNull();
+    });
+  });
+
   it('a card of one that failed reads the same for the end client, with no name on it', () => {
     render(
       <ChatMessageEnhanced

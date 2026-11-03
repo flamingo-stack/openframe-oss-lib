@@ -194,6 +194,8 @@ export type ChatToolMetadata = {
   resolvedByName?: string | null;
   /** The batch a row with no approval of its own belongs to. */
   batchId?: string;
+  /** Nothing said how this approved row ended: its stream was cut or stopped. The hub finishes a write it started, so it may have run. */
+  outcomeUnknown?: boolean;
 };
 
 /** The standard's opaque `approval.descriptor`: what the card draws. */
@@ -510,13 +512,16 @@ export const APPROVAL_CANCELLED = 'cancelled';
 /**
  * Where a tool part's approval stands, from its `state` and `approval` alone (no `cancelled` or `executing` flag
  * anywhere). Null for a tool part with no approval. An approval the server then refused, or whose tool failed, is
- * `failed`: nothing it was approved for happened, and a card must not say Approved above the reason.
+ * `failed`: nothing it was approved for happened, and a card must not say Approved above the reason. One whose answer never
+ * came is `unknown`: it may have run, so a card can say neither, and Failed invites sending the same write again.
  */
 export function approvalStatusOf(part: ChatToolPart): ChatApprovalPartStatus | null {
   const approval = 'approval' in part ? part.approval : undefined;
   if (!approval) return null;
   if (part.state === 'approval-requested') return 'pending';
-  if (approval.approved) return part.state === 'output-error' ? 'failed' : 'approved';
+  if (approval.approved && part.state === 'output-error')
+    return part.toolMetadata?.outcomeUnknown ? 'unknown' : 'failed';
+  if (approval.approved) return 'approved';
   return approval.reason === APPROVAL_CANCELLED ? 'cancelled' : 'rejected';
 }
 
