@@ -1,11 +1,13 @@
 package com.openframe.authz.service.sso.apple;
 
+import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
@@ -19,9 +21,10 @@ import static org.springframework.util.StringUtils.hasText;
 /**
  * Captures Apple's refresh token after a successful web SSO callback — Apple issues a fresh one
  * on every code exchange, and App Store guideline 5.1.1(v) obliges us to revoke it when the
- * account is deleted. One hook in the success handler covers plain login, registration,
- * invitation acceptance, and the email-less login alike; by the time it runs, every flow that
- * creates a user has created it, so a lookup by the authenticated email finds the owner.
+ * account is deleted. The hook in the success handler covers plain login, registration,
+ * invitation acceptance, and the email-less login alike; a flow parked on the consent page has
+ * no user yet, so SsoJoinController captures once it creates one. By the time either runs, the
+ * user exists, so a lookup by the bound account or the authenticated email finds the owner.
  * Best-effort by contract: a capture failure must never affect the sign-in.
  */
 @Slf4j
@@ -45,7 +48,10 @@ public class AppleWebTokenCapture {
             if (client == null || client.getRefreshToken() == null) {
                 return;
             }
-            String email = OidcUserUtils.resolveEmail(oidcUser);
+            // The authorized client above stays under the original principal; the owner is the
+            // account a flow bound the session to, which may differ from the IdP email.
+            String email = SessionPrincipalBinder.boundAccountEmail(SecurityContextHolder.getContext().getAuthentication())
+                    .orElseGet(() -> OidcUserUtils.resolveEmail(oidcUser));
             if (!hasText(email)) {
                 return;
             }
