@@ -60,12 +60,16 @@ public class OrganizationQueryService {
         long filteredCount = organizationRepository.countOrganizations(query);
 
         int limit = normalizedPagination.getLimit();
+        boolean backward = normalizedPagination.isBackward();
+        // A backward page (last/before) is the forward page in the opposite direction, read back in the requested order.
+        SortDirection fetchDirection = backward ? sortDirection.opposite() : sortDirection;
         List<Organization> raw = organizationRepository.findOrganizationsWithCursor(
-            query, normalizedPagination.getCursor(), limit + 1, sortField, sortDirection.name());
-        boolean hasNextPage = raw.size() > limit;
-        List<Organization> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
+            query, normalizedPagination.getCursor(), limit + 1, sortField, fetchDirection.name());
+        boolean hasMore = raw.size() > limit;
+        List<Organization> fetched = hasMore ? raw.subList(0, limit) : raw;
+        List<Organization> pageItems = backward ? fetched.reversed() : fetched;
 
-        PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor(), sortField);
+        PageInfo pageInfo = buildPageInfo(pageItems, hasMore, normalizedPagination, sortField);
 
         return CountedGenericQueryResult.<Organization>builder()
                 .items(pageItems)
@@ -74,30 +78,23 @@ public class OrganizationQueryService {
                 .build();
     }
 
-    private PageInfo buildPageInfo(List<Organization> pageItems, boolean hasNextPage, boolean hasPreviousPage,
-                                   String sortField) {
+    private PageInfo buildPageInfo(List<Organization> pageItems, boolean hasMore,
+                                   CursorPaginationCriteria pagination, String sortField) {
+        boolean backward = pagination.isBackward();
+        boolean hasCursor = pagination.hasCursor();
         String startCursor = pageItems.isEmpty() ? null : CursorCodec.encode(rawCursor(pageItems.getFirst(), sortField));
         String endCursor = pageItems.isEmpty() ? null : CursorCodec.encode(rawCursor(pageItems.getLast(), sortField));
 
         return PageInfo.builder()
-                .hasNextPage(hasNextPage)
-                .hasPreviousPage(hasPreviousPage)
+                .hasNextPage(backward ? hasCursor : hasMore)
+                .hasPreviousPage(backward ? hasMore : hasCursor)
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
     }
 
-    /**
-     * Raw cursor value for an organization, matching the active sort. Sorting by
-     * last activity uses a compound {@code (lastActivityAt, _id)} keyset; any
-     * other sort (e.g. the legacy {@code _id} default used by the REST surface)
-     * keeps the plain ObjectId cursor.
-     */
     private String rawCursor(Organization org, String sortField) {
-        if (OrganizationCursors.LAST_ACTIVITY_FIELD.equals(sortField)) {
-            return OrganizationCursors.lastActivity(org);
-        }
-        return org.getId();
+        return OrganizationCursors.forSort(org, sortField);
     }
 
     /**

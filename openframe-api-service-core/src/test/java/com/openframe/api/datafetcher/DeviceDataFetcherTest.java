@@ -7,6 +7,12 @@ import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
+import com.openframe.api.dataloader.UnreadNotificationDataLoader;
+import com.openframe.api.dataloader.UnreadNotificationKey;
+import com.openframe.api.dto.notification.NotificationRecipient;
+import com.openframe.api.service.NotificationRecipientResolver;
+import com.openframe.data.document.notification.NotificationEntityType;
+import com.openframe.data.document.notification.RecipientType;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.ToolConnection;
@@ -40,6 +46,7 @@ class DeviceDataFetcherTest {
     @Mock private TagService tagService;
     @Mock private GraphQLDeviceMapper mapper;
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
+    @Mock private NotificationRecipientResolver recipientResolver;
     @Mock private DgsDataFetchingEnvironment dfe;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
@@ -119,5 +126,25 @@ class DeviceDataFetcherTest {
 
         assertThat(result).isSameAs(mapped);
         verify(mapper).toEnrollment(machine, connections);
+    }
+
+    @Test
+    @DisplayName("unreadNotificationCount: loads the current user's count for (DEVICE, machineId) through the unread notification loader")
+    void unreadNotificationCount_loadsTheCurrentUsersDeviceCountThroughTheLoader() throws Exception {
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        when(dfe.getSource()).thenReturn(machine);
+        when(recipientResolver.current()).thenReturn(new NotificationRecipient("user-alice", RecipientType.USER));
+        @SuppressWarnings("unchecked")
+        DataLoader<UnreadNotificationKey, Integer> loader = mock(DataLoader.class);
+        doReturn(loader).when(dfe).getDataLoader(UnreadNotificationDataLoader.NAME);
+        UnreadNotificationKey expectedKey = new UnreadNotificationKey(
+                "user-alice", RecipientType.USER, NotificationEntityType.DEVICE, "m1");
+        when(loader.load(expectedKey)).thenReturn(CompletableFuture.completedFuture(3));
+
+        Integer result = fetcher.unreadNotificationCount(dfe).get();
+
+        assertThat(result).isEqualTo(3);
+        verify(loader).load(expectedKey);
     }
 }
