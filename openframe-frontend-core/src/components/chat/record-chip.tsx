@@ -12,9 +12,11 @@
 import { useChatRuntime, useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
 import { defaultTableIdForDocumentType, getSourceIconName } from '../../utils/source-icons';
+import { useMessageSourceOf } from './citation-chip';
 import { RecordNavWrap, recordMenuActions, recordMenuGroups, useRecordDestination } from './entity-cards/dispatch';
 import { InlineChip } from './inline-chip';
 import { RecordChipMenu, useRecordActions } from './record-actions';
+import { sourceRowInputOf } from './utils/cited-sources';
 import { resolveIcon } from './utils/icon-library';
 import { newTabAnchorAttrs } from './utils/nav-anchor-props';
 
@@ -50,9 +52,13 @@ export function RecordChip(props: RecordChipProps) {
 
 function LinkedRecordChip({ type, id, label }: RecordChipProps) {
   const runtime = useRequiredChatRuntime();
-  const { finalChatRef, hostRoute, isNewTab, path } = useRecordDestination({ type, id, title: label, url: null });
+  // The message's own source part says where the record lives, as it does for its card: a row this platform cannot
+  // read leaves the chip its link.
+  const source = useMessageSourceOf(type, id);
+  const url = source ? (sourceRowInputOf(source).externalUrl ?? null) : null;
+  const { finalChatRef, hostRoute, isNewTab, path } = useRecordDestination({ type, id, title: label, url });
   const handlers = useRecordActions();
-  const url = finalChatRef.url;
+  const href = finalChatRef.url;
   const menuGroups = recordMenuGroups(finalChatRef, recordMenuActions(finalChatRef, handlers, runtime));
   return (
     <InlineChip
@@ -60,22 +66,22 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
       // TODO(CU-17tkuw61kfy): a link that knows no name but the id (an old receipt's token) shows the name its row answers.
       label={finalChatRef.title || label}
       link={
-        url
+        href
           ? (content, anchor) => (
               <RecordNavWrap
-                href={url}
+                href={href}
                 path={path}
                 targetPlatform={finalChatRef.targetPlatform ?? null}
                 isNewTab={isNewTab}
                 hostRoute={hostRoute}
               >
                 <Link
-                  href={url}
+                  href={href}
                   aria-label={anchor.label}
                   aria-hidden={anchor.hidden || undefined}
                   tabIndex={anchor.hidden ? -1 : undefined}
                   className="text-inherit no-underline"
-                  {...newTabAnchorAttrs(isNewTab, url, finalChatRef.targetPlatform)}
+                  {...newTabAnchorAttrs(isNewTab, href, finalChatRef.targetPlatform)}
                 >
                   {content}
                 </Link>

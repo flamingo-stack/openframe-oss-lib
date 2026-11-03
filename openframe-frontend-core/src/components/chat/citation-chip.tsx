@@ -13,6 +13,7 @@
 import { createContext, useContext, useMemo } from 'react';
 import type { ChatPart, ChatSourcePart } from '../../chat-protocol/chat-message';
 import { citationNumbers } from '../../chat-protocol/citations';
+import { normalizeSourceId, recordHref } from '../../chat-protocol/record-link';
 import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { useStableShallow, useStableSources } from './hooks/use-stable-shallow';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
@@ -34,6 +35,13 @@ export function useMessageCitations(parts: readonly ChatPart[]): MessageCitation
   const sources = useStableSources(parts);
   const byId = useStableShallow(Object.fromEntries(citationNumbers(parts)));
   return useMemo(() => ({ sources, numbers: new Map(Object.entries(byId)) }), [sources, byId]);
+}
+
+/** The source part of the message a record link sits in, when the message has one. */
+export function useMessageSourceOf(type: string, id: string): ChatSourcePart | null {
+  const sources = useContext(MessageCitationsContext)?.sources;
+  const uri = recordHref(type, id);
+  return sources?.find(source => normalizeSourceId(source.sourceId) === uri) ?? null;
 }
 
 const CHIP_CLASS = 'text-ods-text-secondary no-underline text-h6 hover:text-ods-text-primary';

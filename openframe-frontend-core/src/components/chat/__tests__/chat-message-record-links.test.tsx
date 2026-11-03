@@ -5,9 +5,9 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type React from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyChunk, createWireState } from '../../../chat-protocol/apply-chunk';
 import type { ChatPart } from '../../../chat-protocol/chat-message';
 import { createMingoDecoder, messageOfStoredRow } from '../../../chat-protocol/message-decoder';
@@ -305,6 +305,53 @@ describe('ChatMessageEnhanced — a chip that knows only its id', () => {
     answersRow();
     render(answer('See [Mac guide](record://onboarding_guide/mac-guide) now.'));
     expect(await screen.findByRole('link', { name: 'Mac guide' })).toBeTruthy();
+  });
+});
+
+describe('ChatMessageEnhanced — a chip whose row cannot load', () => {
+  const runtime = {
+    endpoints: { chatStreamUrl: '/chat', buildListUrl: (type: string, ids: string[]) => `/api/${type}?ids=${ids}` },
+    navigation: { mode: 'host', navigate: vi.fn().mockReturnValue(true) },
+    source: 'flamingo',
+    composeContentUrl: ({ externalUrl }: { externalUrl?: string | null }) => ({ href: externalUrl ?? null }),
+  } as unknown as ChatRuntime;
+  const VENDOR_URI = 'record://vendor/299';
+  const VENDOR_URL = 'https://www.openmsp.ai/vendors/atera';
+  const answer = (sources: ChatPart[]) => (
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <ChatRuntimeContext.Provider value={runtime}>
+        <ChatMessageEnhanced
+          role="assistant"
+          parts={[...sources, { type: 'text', text: `Compare it with [Atera](${VENDOR_URI}).` }]}
+          NavLinkAnchor={NavLinkAnchor}
+        />
+      </ChatRuntimeContext.Provider>
+    </QueryClientProvider>
+  );
+  beforeEach(() =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ code: 'UNKNOWN_TYPE' }), { status: 404 }))),
+    ),
+  );
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('opens the address of the message`s own source part, as its card does', async () => {
+    render(answer([{ type: 'source-url', sourceId: VENDOR_URI, url: VENDOR_URL, title: 'Atera' }]));
+    expect(await screen.findByRole('link', { name: 'Atera' })).toHaveAttribute('href', VENDOR_URL);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(screen.getByRole('link', { name: 'Atera' })).toHaveAttribute('href', VENDOR_URL);
+  });
+
+  it('with no such source, or one with no page, it stays a chip with no link', async () => {
+    const { unmount } = render(answer([]));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(screen.getByTestId('inline-chip')).toHaveTextContent('Atera');
+    expect(screen.queryByRole('link', { name: 'Atera' })).toBeNull();
+    unmount();
+    render(answer([{ type: 'source-document', sourceId: VENDOR_URI, mediaType: 'text/plain', title: 'Atera' }]));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole('link', { name: 'Atera' })).toBeNull();
   });
 });
 
