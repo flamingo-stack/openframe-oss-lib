@@ -7,7 +7,7 @@
  *   - `messageOfStoredRow(row)`: a row of the hub's history.
  *
  * During the window older backends answer too, and `./old-wire` reads what they say.
- * TODO(CU-17tkuw61kfy): the branches that reach it go at the cleanup.
+ * TODO(CU-17tkuw635xx): the branches that reach it go at the cleanup.
  *
  * Server-safe: no React, no browser APIs beyond TextDecoder.
  */
@@ -65,7 +65,7 @@ function emptyBody(): ReadableStream<Uint8Array> {
  * The stream behind a response, recognised by its FIRST BYTES: a body starting `data: ` is the UI stream, anything else
  * the old frames, whatever its `content-type`. The old hub already labels its frames `text/event-stream` on two routes,
  * and the native shell calls the gateway cross-origin, where a header of our own would need exposing.
- * TODO(CU-17tkuw61kfy): the cleanup deletes the branch.
+ * TODO(CU-17tkuw635xx): the cleanup deletes the branch.
  */
 export async function createChatStreamReader(response: {
   body: ReadableStream<Uint8Array> | null;
@@ -119,7 +119,7 @@ export interface MingoDecoder {
    * whose thread now draws another copy of what this decoder was writing, the persisted row: that copy already says it,
    * and flushing it would write it a second time. The sequence stays, so a redelivery is still a redelivery.
    *
-   * TODO(CU-17tkuw61kfy): goes with the old text writer. With no old tokens, no tail is ever held.
+   * TODO(CU-17tkuw635xx): goes with the old text writer. With no old tokens, no tail is ever held.
    */
   discardHeld(): void;
   /**
@@ -128,7 +128,7 @@ export interface MingoDecoder {
    * holds would otherwise be written below the new message by the next chunk that closes it. No sequence: this comes off
    * no wire.
    *
-   * TODO(CU-17tkuw61kfy): goes with the old text writer, like `discardHeld`.
+   * TODO(CU-17tkuw635xx): goes with the old text writer, like `discardHeld`.
    */
   closeHeld(): ChatStreamEntry;
 }
@@ -190,30 +190,30 @@ function newSourcePart(row: Record<string, unknown>): ChatSourcePart | null {
   };
 }
 
-/** What a person said in a Mingo row or chunk. TODO(CU-17tkuw61kfy): an old composer's tokens go with the old rows. */
+/** What a person said in a Mingo row or chunk. TODO(CU-17tkuw635xx): an old composer's tokens go with the old rows. */
 export function mingoUserText(content: string): string {
   return oldMentionsToRecordLinks(content);
 }
 
-/** The approval a Mingo row or chunk names. TODO(CU-17tkuw61kfy): the old name goes with the old rows. */
+/** The approval a Mingo row or chunk names. TODO(CU-17tkuw635xx): the old name goes with the old rows. */
 export function mingoApprovalRequestId(raw: Record<string, unknown>): string | undefined {
   return nonEmpty(raw.approvalRequestId) ?? oldApprovalRequestId(raw);
 }
 
 export function createMingoDecoder(options: { now?: () => string } = {}): MingoDecoder {
   const now = options.now ?? (() => new Date().toISOString());
-  // TODO(CU-17tkuw61kfy): the old source names, and the old tokens in a text, go with the old rows; text is then plain.
+  // TODO(CU-17tkuw635xx): the old source names, and the old tokens in a text, go with the old rows; text is then plain.
   const sources = createOldSourceIndex();
   let nextId = 0;
   const mintId = (prefix: string): string => `${prefix}${++nextId}`;
   const writer = createOldTextWriter(sources, () => mintId('t'), { citations: false });
-  // TODO(CU-17tkuw61kfy): a tool row with no run id. Goes once the cleanup's sweep has given those rows ids.
+  // TODO(CU-17tkuw635xx): a tool row with no run id. Goes once the cleanup's sweep has given those rows ids.
   const oldRuns = createOldRunIds();
   let reasoningId: string | null = null;
   let compactionId: string | null = null;
   /**
    * The newest single approval still open: a tool only runs after its gate was granted.
-   * TODO(CU-17tkuw61kfy): only an approval row with no tool list has one.
+   * TODO(CU-17tkuw635xx): only an approval row with no tool list has one.
    */
   let pendingSingleApproval: string | null = null;
   const seenTools = new Set<string>();
@@ -242,7 +242,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       const part = newSourcePart(row);
       if (part) parts.push(part);
     }
-    // TODO(CU-17tkuw61kfy): a row in the old names, and the old video rows. An old row read through the tenant's normaliser
+    // TODO(CU-17tkuw635xx): a row in the old names, and the old video rows. An old row read through the tenant's normaliser
     // answers its sources in the new names and its text as it was, so its `[card://t:i]` takes its name from these too.
     parts.push(...sources.register(rows.filter(row => !nonEmpty(row.sourceId))), ...oldVideoParts(data.videos));
     sources.remember(parts);
@@ -283,7 +283,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
   }
 
   function approvalChunks(data: Record<string, unknown>, isRow: boolean, out: UiChunk[]): void {
-    // TODO(CU-17tkuw61kfy): the old name.
+    // TODO(CU-17tkuw635xx): the old name.
     const requestId = mingoApprovalRequestId(data) ?? '';
     const approvalType = nonEmpty(data.approvalType) ?? (isRow ? 'CLIENT' : 'USER');
     const calls = Array.isArray(data.toolCalls) ? data.toolCalls.filter(isRecord) : [];
@@ -321,7 +321,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       }
       return;
     }
-    // TODO(CU-17tkuw61kfy): a row with no tool list.
+    // TODO(CU-17tkuw635xx): a row with no tool list.
     if (!requestId) return;
     out.push(...oldSingleApprovalChunks(data, requestId, approvalType));
     pendingSingleApproval = requestId;
@@ -416,7 +416,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         out.push(...sourceChunks(raw));
         break;
 
-      // TODO(CU-17tkuw61kfy): the envelope `ATTACHMENTS` replaced.
+      // TODO(CU-17tkuw635xx): the envelope `ATTACHMENTS` replaced.
       case MESSAGE_TYPE.GUIDE: {
         const payload = oldGuidePayload(raw);
         if (payload) out.push(...sourceChunks(payload));
@@ -426,7 +426,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       case MESSAGE_TYPE.RECORD_CARDS: {
         closeOpen(out);
         const records = normalizeRecordUris(raw.records);
-        // TODO(CU-17tkuw61kfy): the old `cards` of a row on a dev cluster.
+        // TODO(CU-17tkuw635xx): the old `cards` of a row on a dev cluster.
         const all = records.length > 0 ? records : oldRecordCardsOf(raw);
         if (all.length > 0) out.push({ type: 'data-record-cards', data: { records: all } });
         break;
@@ -445,7 +445,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
 
       case MESSAGE_TYPE.EXECUTING_TOOL: {
         closeOpen(out);
-        // TODO(CU-17tkuw61kfy): a row with no run id.
+        // TODO(CU-17tkuw635xx): a row with no run id.
         const toolCallId = nonEmpty(raw.toolExecutionRequestId) ?? oldRuns.open(raw);
         out.push(...grantsOfRun(raw, toolCallId), toolInput(raw, toolCallId));
         break;
@@ -453,7 +453,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
 
       case MESSAGE_TYPE.EXECUTED_TOOL: {
         closeOpen(out);
-        // TODO(CU-17tkuw61kfy): a row with no run id.
+        // TODO(CU-17tkuw635xx): a row with no run id.
         const toolCallId = nonEmpty(raw.toolExecutionRequestId) ?? oldRuns.close(raw);
         out.push(...grantsOfRun(raw, toolCallId));
         // A result can be all that reached this reader: its row still has to exist to take it.
@@ -472,7 +472,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         break;
 
       case MESSAGE_TYPE.APPROVAL_RESULT: {
-        // TODO(CU-17tkuw61kfy): the old name.
+        // TODO(CU-17tkuw635xx): the old name.
         const approvalId = mingoApprovalRequestId(raw);
         if (!approvalId) break;
         const approved = raw.approved === true;
@@ -657,7 +657,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
 // A stored row of the hub
 // =============================================================================
 
-/** A row from before the move: it has `content`, `sources`, or a part in the old names. TODO(CU-17tkuw61kfy): the cut. */
+/** A row from before the move: it has `content`, `sources`, or a part in the old names. TODO(CU-17tkuw635xx): the cut. */
 function isOldStoredRow(row: Record<string, unknown>): boolean {
   if (typeof row.content === 'string' || Array.isArray(row.sources)) return true;
   return Array.isArray(row.parts) && row.parts.some(part => isRecord(part) && part.type === 'RECORD_CARDS');
@@ -666,7 +666,7 @@ function isOldStoredRow(row: Record<string, unknown>): boolean {
 /**
  * The message a row of `GET /api/docs/chat/history` draws, or null for a role the chat does not show. A user row the
  * chat never shows (the approval placeholder, the server's auto-continuation directive) is `hidden`.
- * TODO(CU-17tkuw61kfy): `fallbackId` names a row that has no id of its own (an old hub answers none).
+ * TODO(CU-17tkuw635xx): `fallbackId` names a row that has no id of its own (an old hub answers none).
  */
 export function messageOfStoredRow(row: unknown, fallbackId?: string): ChatMessage | null {
   if (!isRecord(row)) return null;
@@ -685,7 +685,7 @@ export function messageOfStoredRow(row: unknown, fallbackId?: string): ChatMessa
     ...(old ? oldStoredRowMetadata(row) : stored),
     ...(hidden ? { hidden: true } : {}),
   };
-  // TODO(CU-17tkuw61kfy): an old row's sequence is a column of its own, and only an old row has no id.
+  // TODO(CU-17tkuw635xx): an old row's sequence is a column of its own, and only an old row has no id.
   const seq = old ? row.seq : stored.seq;
   return {
     id: nonEmpty(row.id) ?? fallbackId ?? `hydrated-${String(seq ?? '')}`,
@@ -699,7 +699,7 @@ export function messageOfStoredRow(row: unknown, fallbackId?: string): ChatMessa
 // `/api/docs/search`
 // =============================================================================
 
-/** A search row's identity and address, in the new names, else the old. TODO(CU-17tkuw61kfy): the old go at the cleanup. */
+/** A search row's identity and address, in the new names, else the old. TODO(CU-17tkuw635xx): the old go at the cleanup. */
 export function docSearchFieldsOf(row: Record<string, unknown>): {
   sourceId: string | null;
   title: string;

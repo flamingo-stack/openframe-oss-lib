@@ -538,7 +538,7 @@ export function useSseChatAdapter(
 
   /**
    * What the last stream turned out to be: the hub that answered it answers the next approval.
-   * TODO(CU-17tkuw61kfy): `old` keeps the old POST to `approvalToolUrl`, and the branch goes at the cleanup. A card is never
+   * TODO(CU-17tkuw635xx): `old` keeps the old POST to `approvalToolUrl`, and the branch goes at the cleanup. A card is never
    * stored, so a card on screen always came with a stream that set this.
    */
   const wireRef = useRef<ChatStreamWire>('ui');
@@ -646,12 +646,12 @@ export function useSseChatAdapter(
             id: newClientId('user'),
             role: 'user',
             parts: [...(text.length > 0 ? [{ type: 'text', text }] : []), ...files],
-            // TODO(CU-17tkuw61kfy): the old hub reads the message's `content`, with the attachments as markdown in it.
+            // TODO(CU-17tkuw635xx): the old hub reads the message's `content`, with the attachments as markdown in it.
             content: text + attachments.map(att => formatChatAttachmentMarkdownForBubble(att, viewUrlPrefix)).join(''),
           },
         ],
         ...(commandOverride ? { commandOverride } : {}),
-        // TODO(CU-17tkuw61kfy): the old hub reads these, and the new one ignores them.
+        // TODO(CU-17tkuw635xx): the old hub reads these, and the new one ignores them.
         ...(attachments.length > 0 ? { pendingAttachments: attachments } : {}),
         ...(echoedConversationId ? { conversationId: echoedConversationId } : {}),
       };
@@ -786,7 +786,7 @@ export function useSseChatAdapter(
           return ok;
         }
 
-        // TODO(CU-17tkuw61kfy): the old hub resolves one proposal per request, and has a route for it. A batch runs serially,
+        // TODO(CU-17tkuw635xx): the old hub resolves one proposal per request, and has a route for it. A batch runs serially,
         // and each answer ends its turn, so the card's message is named again before the next.
         for (const part of parts) {
           const proposalId = 'approval' in part ? part.approval?.id : undefined;

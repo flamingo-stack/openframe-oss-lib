@@ -59,7 +59,7 @@ describe('ChatMessageEnhanced — record links', () => {
     expect(screen.queryByTestId('chat-record-cards')).toBeNull();
   });
 
-  // TODO(CU-17tkuw61kfy): goes with the old mention token, `old-wire.ts`.
+  // TODO(CU-17tkuw635xx): goes with the old mention token, `old-wire.ts`.
   describe('an old mention no host resolved', () => {
     it('reads as the raw token it was, for a word that names no record', () => {
       show('Connect to [@server:8080](record://server/8080) now.');

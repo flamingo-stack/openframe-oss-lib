@@ -1072,7 +1072,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
     pushOptimisticSend(text, hidden = false) {
       // Record the text so the backend's MESSAGE_REQUEST echo consumes this
       // send instead of rendering a duplicate row (cap keeps the list from
-      // growing if a backend never echoes). TODO(CU-17tkuw61kfy): the echo of an old composer's token reads as a link.
+      // growing if a backend never echoes). TODO(CU-17tkuw635xx): the echo of an old composer's token reads as a link.
       pendingEchoTexts.push({ text: mingoUserText(text), at: Date.now() });
       if (pendingEchoTexts.length > MAX_PENDING_ECHOES) pendingEchoTexts.shift();
       const placeholder = nextId('assistant');

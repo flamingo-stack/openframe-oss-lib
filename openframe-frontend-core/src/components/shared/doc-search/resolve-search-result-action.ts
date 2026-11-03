@@ -73,7 +73,7 @@ export function resolveSearchResultAction(
       ? { kind, href: target.href, targetPlatform: actionPlatform, hostRoute }
       : { kind, href: target.href, targetPlatform: actionPlatform };
   }
-  // TODO(CU-17tkuw61kfy): an old hub's document has no url and opens in the doc viewer by its tree path: no row of the
+  // TODO(CU-17tkuw635xx): an old hub's document has no url and opens in the doc viewer by its tree path: no row of the
   // chat can show it.
   if (result.path && record && (DOC_TABLE_TYPES as readonly string[]).includes(record.type)) {
     return { kind: 'route', path: result.path };

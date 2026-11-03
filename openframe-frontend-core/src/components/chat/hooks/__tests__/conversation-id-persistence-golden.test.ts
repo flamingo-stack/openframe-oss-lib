@@ -132,7 +132,7 @@ function mockRoutedFetch(options: { history?: unknown; streams: Array<Array<stri
  * out rather than left as `Record<string, unknown>` because the whole point of
  * the suite is WHICH keys the adapter sends: the newest message only, plus the
  * conversation the server has minted. `content` and `conversationId` are what
- * an older hub reads beside it (TODO(CU-17tkuw61kfy)).
+ * an older hub reads beside it (TODO(CU-17tkuw635xx)).
  */
 interface ChatStreamRequestBody {
   id: string;

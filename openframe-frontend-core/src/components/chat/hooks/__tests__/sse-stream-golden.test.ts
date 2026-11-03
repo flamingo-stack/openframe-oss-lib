@@ -2,7 +2,7 @@
  * GOLDEN CHARACTERIZATION: what `useSseChatAdapter` holds after a response, driven through the full public hook.
  *
  * Two wires reach it. The standard's (`data: <chunk>` events, ending `data: [DONE]`), and until the cleanup the old hub's
- * (TODO(CU-17tkuw61kfy)):
+ * (TODO(CU-17tkuw635xx)):
  *   [JSON frame]\0 [JSON frame]\0 …  \x1E  <raw UTF-8 answer deltas>  \x1F [JSON usage trailer]
  *
  * Each fixture feeds a mocked global fetch whose Response body is a ReadableStream of Uint8Array chunks, then snapshots the
@@ -1430,7 +1430,7 @@ describe('a failed request', () => {
   });
 });
 
-// TODO(CU-17tkuw61kfy): the old hub's wire. These go at the cleanup, with `old-wire.ts`.
+// TODO(CU-17tkuw635xx): the old hub's wire. These go at the cleanup, with `old-wire.ts`.
 describe('SSE wire decode — golden fixtures (full hook path)', () => {
   it('(a) normal turn: thinking frames → metadata → usage:start → \\x1E → text ×3 → \\x1F trailer', async () => {
     mockFetchStream([

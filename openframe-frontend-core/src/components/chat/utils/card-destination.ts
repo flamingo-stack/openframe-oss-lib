@@ -64,7 +64,7 @@ export function resolveCardDestination<Item = unknown>({
 }: CardDestinationInput<Item>): CardDestination {
   const url = chatRef.url ?? readFetchedCardUrl(item);
   const refPath = typeof chatRef.metadata?.path === 'string' && chatRef.metadata.path ? chatRef.metadata.path : null;
-  // TODO(CU-17tkuw61kfy): an old doc source arrives with no url, and its row's path is what a doc card opens.
+  // TODO(CU-17tkuw635xx): an old doc source arrives with no url, and its row's path is what a doc card opens.
   const path = refPath ?? (item ? readFetchedCardPath(item) : null);
   const cta = resolveSourceRowCTA(
     {
@@ -82,7 +82,7 @@ export function resolveCardDestination<Item = unknown>({
       url: cta.href,
       targetPlatform: cta.targetPlatform,
       path,
-      // TODO(CU-17tkuw61kfy): an old hub's row may answer a relative url, which a composer hands back as it came: the
+      // TODO(CU-17tkuw635xx): an old hub's row may answer a relative url, which a composer hands back as it came: the
       // content host's page, never a route of this host. Once every url is absolute, the first half alone.
       hostRoute: isRelativeHref(cta.href) && cta.href !== url,
     };
@@ -91,7 +91,7 @@ export function resolveCardDestination<Item = unknown>({
 }
 
 /**
- * TODO(CU-17tkuw61kfy): the old hub's page-shaped rows answer no url, and `resolveSourceRowCTA` calls the composer only
+ * TODO(CU-17tkuw635xx): the old hub's page-shaped rows answer no url, and `resolveSourceRowCTA` calls the composer only
  * with a url or a doc path. So the fetched row's own destination: an explicit host override, else the registry's
  * `fallbackHref`, else the composer's href. Only what the host composed can be a route of its own.
  */

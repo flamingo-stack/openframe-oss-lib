@@ -137,7 +137,7 @@ export interface ComposedContentUrl {
    * Optional and absent by default, so a hand-written composer (the hub's
    * cross-platform one) keeps the pre-existing "row url wins" behavior.
    *
-   * TODO(CU-17tkuw61kfy): only `pickFetchedCardHref` reads it, for an old hub's rows; it goes at the cleanup.
+   * TODO(CU-17tkuw635xx): only `pickFetchedCardHref` reads it, for an old hub's rows; it goes at the cleanup.
    */
   hostOverride?: boolean;
 }
@@ -228,7 +228,7 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
       // `https://hub/releases/` → `'releases'`), fall back to `identifier` instead
       // of emitting a nonsensical `/releases/releases`.
       //
-      // TODO(CU-17tkuw61kfy): `slug` (the explicit hint) sits between the two: an old
+      // TODO(CU-17tkuw635xx): `slug` (the explicit hint) sits between the two: an old
       // row's fetch-mode card has NO externalUrl to recover from but DOES know the
       // row's slug once it loads, and its `identifier` must stay the primary key so
       // `overrides` still deep-link correctly.

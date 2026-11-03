@@ -34,7 +34,7 @@ export function buildChatRuntime(navigate: ChatRuntime['navigation']['navigate']
       // hub lists the conversations of the identity the proxy's credentials
       // resolve to (the /debug page's key and act-as email).
       chatConversationsUrl: EP.chatConversations,
-      // TODO(CU-17tkuw61kfy): only an old hub's approvals use it.
+      // TODO(CU-17tkuw635xx): only an old hub's approvals use it.
       approvalToolUrl: EP.approval,
       commandsUrl: EP.commands,
       // Guide-mode empty-state config (greeting + enabled RAG tables + quick-action

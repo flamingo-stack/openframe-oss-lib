@@ -243,7 +243,7 @@ describe('makeComposeContentUrl: slugIsIdentifier', () => {
     expect(compose({ type: 'markdown', identifier: 'docs/a?x=1#y.md' }).href).toBe('/knowledge-base/docs/ax1y.md');
   });
 
-  // TODO(CU-17tkuw61kfy): an old doc source arrives with its tree path as the slug, and its row id as the identifier.
+  // TODO(CU-17tkuw635xx): an old doc source arrives with its tree path as the slug, and its row id as the identifier.
   it('the slug hint wins, for an old doc source', () => {
     expect(compose({ type: 'markdown', identifier: 'uuid-1', slug: 'docs/setup.md' }).href).toBe(
       '/knowledge-base/docs/setup.md',
