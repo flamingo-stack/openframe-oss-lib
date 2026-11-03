@@ -244,22 +244,25 @@ export function SoftwareUpdateSettingsFields({ value, onChange }: SoftwareUpdate
         </div>
       </div>
 
-      {/* Core Alert on the card surface, as a note: it is there from the start, nothing to announce. The icon sits in
-          a span so Alert's `[&>svg]` positioning does not apply. */}
-      <Alert
-        role="note"
-        className="flex items-center gap-[var(--spacing-system-m)] rounded-[6px] border-ods-border bg-ods-card p-[var(--spacing-system-m)]"
-      >
-        <span className="shrink-0 text-ods-text-secondary">
-          <InfoCircleIcon size={24} color="currentColor" />
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
-          <p className="text-ods-text-primary text-h3">Apps installed by hand get reinstalled</p>
-          <p className="text-ods-text-secondary text-h6">
-            On the first update, OpenFrame reinstalls them with Winget or Brew so it can keep them updated.
-          </p>
-        </div>
-      </Alert>
+      {/* Core Alert on the card surface, as a note: it comes with "Keep it auto-updated" and goes with it, since the
+          reinstall is what lets OpenFrame keep a hand-installed app updated, and a one-off update promises no more. The
+          icon sits in a span so Alert's `[&>svg]` positioning does not apply. */}
+      {value.autoUpdate && (
+        <Alert
+          role="note"
+          className="flex items-center gap-[var(--spacing-system-m)] rounded-[6px] border-ods-border bg-ods-card p-[var(--spacing-system-m)]"
+        >
+          <span className="shrink-0 text-ods-text-secondary">
+            <InfoCircleIcon size={24} color="currentColor" />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
+            <p className="text-ods-text-primary text-h3">Apps installed by hand get reinstalled</p>
+            <p className="text-ods-text-secondary text-h6">
+              On the first update, OpenFrame reinstalls them with Winget or Brew so it can keep them updated.
+            </p>
+          </div>
+        </Alert>
+      )}
     </section>
   );
 }

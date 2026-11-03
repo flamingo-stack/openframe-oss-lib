@@ -68,6 +68,8 @@ public class NotificationService {
                 .types(filter.types())
                 .severities(filter.severities())
                 .search(effectiveSearch)
+                .entityType(filter.entityType())
+                .entityId(filter.entityId())
                 .build();
         Sort.Direction direction = resolveSortDirection(sort);
 

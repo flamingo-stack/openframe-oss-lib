@@ -19,7 +19,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.IntStream;
@@ -226,5 +228,119 @@ class OrganizationQueryServiceTest {
                 SortInput.builder().field("_id").direction(SortDirection.DESC).build());
 
         assertThat(CursorCodec.decode(result.getPageInfo().getEndCursor())).isEqualTo("plain-id");
+    }
+
+    @Test
+    void queryOrganizations_backwardPage_fetchesOppositeDirectionAndKeepsRequestedOrder() {
+        // setup
+        when(repository.findOrganizationsWithCursor(any(), eq("300_id-3"), eq(3), eq("updatedAt"), eq("ASC")))
+                .thenReturn(List.of(org("id-2", 200), org("id-1", 100)));
+        CursorPaginationCriteria lastTwoBeforeThird = CursorPaginationCriteria.builder()
+                .limit(2).cursor("300_id-3").backward(true).build();
+
+        // execution
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(), lastTwoBeforeThird, null, lastActivity(SortDirection.DESC));
+
+        // verifications
+        assertThat(result.getItems()).extracting(Organization::getId).containsExactly("id-1", "id-2");
+        assertThat(result.getPageInfo())
+                .returns(true, PageInfo::isHasNextPage)
+                .returns(false, PageInfo::isHasPreviousPage);
+        assertThat(CursorCodec.decode(result.getPageInfo().getStartCursor())).isEqualTo("100_id-1");
+        assertThat(CursorCodec.decode(result.getPageInfo().getEndCursor())).isEqualTo("200_id-2");
+    }
+
+    @Test
+    void queryOrganizations_backwardPageWithMoreRows_dropsProbeRowAndFlagsPreviousPage() {
+        // setup
+        when(repository.findOrganizationsWithCursor(any(), eq("600_id-6"), eq(3), eq("updatedAt"), eq("DESC")))
+                .thenReturn(List.of(org("id-5", 500), org("id-4", 400), org("id-3", 300)));
+        CursorPaginationCriteria lastTwoBeforeSixth = CursorPaginationCriteria.builder()
+                .limit(2).cursor("600_id-6").backward(true).build();
+
+        // execution
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(), lastTwoBeforeSixth, null, lastActivity(SortDirection.ASC));
+
+        // verifications
+        assertThat(result.getItems()).extracting(Organization::getId).containsExactly("id-4", "id-5");
+        assertThat(result.getPageInfo())
+                .returns(true, PageInfo::isHasNextPage)
+                .returns(true, PageInfo::isHasPreviousPage);
+    }
+
+    @Test
+    void queryOrganizations_backwardPageOnIdSort_fetchesOppositeDirection() {
+        // setup
+        when(repository.findOrganizationsWithCursor(any(), eq("id-3"), eq(3), eq("_id"), eq("ASC")))
+                .thenReturn(List.of(org("id-2", 200), org("id-1", 100)));
+        CursorPaginationCriteria lastTwoBeforeThird = CursorPaginationCriteria.builder()
+                .limit(2).cursor("id-3").backward(true).build();
+
+        // execution
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(), lastTwoBeforeThird, null,
+                SortInput.builder().field("_id").direction(SortDirection.DESC).build());
+
+        // verifications
+        assertThat(result.getItems()).extracting(Organization::getId).containsExactly("id-1", "id-2");
+    }
+
+    @Test
+    void queryOrganizations_nameSort_pageCursorsCarryNameAndId() {
+        // setup
+        Organization first = Organization.builder().id("id-a").name("Acme_Corp").build();
+        Organization last = Organization.builder().id("id-z").name("Zeta").build();
+        when(repository.findOrganizationsWithCursor(any(), any(), anyInt(), eq("name"), eq("ASC")))
+                .thenReturn(List.of(first, last));
+        String encodedAcme = base64("Acme_Corp");
+        String encodedZeta = base64("Zeta");
+
+        // execution
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(), page(20), null,
+                SortInput.builder().field("name").direction(SortDirection.ASC).build());
+
+        // verifications
+        assertThat(CursorCodec.decode(result.getPageInfo().getStartCursor())).isEqualTo(encodedAcme + "_id-a");
+        assertThat(CursorCodec.decode(result.getPageInfo().getEndCursor())).isEqualTo(encodedZeta + "_id-z");
+    }
+
+    @Test
+    void queryOrganizations_organizationIdSort_pageCursorsCarryOrganizationIdAndId() {
+        // setup
+        Organization only = Organization.builder().id("id-o").organizationId("org_7").build();
+        when(repository.findOrganizationsWithCursor(any(), any(), anyInt(), eq("organizationId"), eq("DESC")))
+                .thenReturn(List.of(only));
+        String encodedOrganizationId = base64("org_7");
+
+        // execution
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(), page(20), null,
+                SortInput.builder().field("organizationId").direction(SortDirection.DESC).build());
+
+        // verifications
+        assertThat(CursorCodec.decode(result.getPageInfo().getEndCursor())).isEqualTo(encodedOrganizationId + "_id-o");
+    }
+
+    @Test
+    void queryOrganizations_createdAtSort_pageCursorsCarryCreatedAtMillisAndId() {
+        // setup
+        Organization only = Organization.builder().id("id-c").createdAt(Instant.ofEpochMilli(4200)).build();
+        when(repository.findOrganizationsWithCursor(any(), any(), anyInt(), eq("createdAt"), eq("DESC")))
+                .thenReturn(List.of(only));
+
+        // execution
+        CountedGenericQueryResult<Organization> result = service.queryOrganizations(
+                OrganizationFilterOptions.builder().build(), page(20), null,
+                SortInput.builder().field("createdAt").direction(SortDirection.DESC).build());
+
+        // verifications
+        assertThat(CursorCodec.decode(result.getPageInfo().getEndCursor())).isEqualTo("4200_id-c");
+    }
+
+    private static String base64(String value) {
+        return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 }

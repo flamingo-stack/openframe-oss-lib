@@ -11,7 +11,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +29,6 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
     private static final String SORT_DESC = "DESC";
     private static final String ID_FIELD = "_id";
     private static final String UPDATED_AT_FIELD = "updatedAt";
-    private static final String CURSOR_SEPARATOR = "_";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
     
     private static final List<String> SORTABLE_FIELDS = List.of(
@@ -146,24 +144,15 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
     @Override
     public List<Organization> findOrganizationsWithCursor(Query query, String cursor, int limit,
                                                           String sortField, String sortDirection) {
+        boolean ascending = !SORT_DESC.equalsIgnoreCase(sortDirection);
         if (cursor != null && !cursor.trim().isEmpty()) {
-            if (UPDATED_AT_FIELD.equals(sortField)) {
-                applyLastActivityKeyset(query, cursor, sortDirection);
-            } else {
-                try {
-                    ObjectId cursorId = new ObjectId(cursor);
-                    query.addCriteria(Criteria.where(ID_FIELD).lt(cursorId));
-                } catch (IllegalArgumentException ex) {
-                    log.warn("Invalid ObjectId cursor format: {}", cursor);
-                }
-            }
+            OrganizationKeysetCursor keyset = resolveCursor(cursor.trim(), sortField);
+            applyKeyset(query, keyset, sortField, ascending);
         }
 
         query.limit(limit);
 
-        Sort.Direction mongoSortDirection = SORT_DESC.equalsIgnoreCase(sortDirection) ?
-            Sort.Direction.DESC : Sort.Direction.ASC;
-
+        Sort.Direction mongoSortDirection = ascending ? Sort.Direction.ASC : Sort.Direction.DESC;
         if (ID_FIELD.equals(sortField)) {
             query.with(Sort.by(mongoSortDirection, ID_FIELD));
         } else {
@@ -177,39 +166,40 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
         return mongoTemplate.find(query, Organization.class);
     }
 
-    /**
-     * Keyset predicate for the compound {@code (updatedAt, _id)} sort. The cursor
-     * encodes {@code "lastActivityMillis_objectId"}; the comparison operator must
-     * match the active direction so paging is consistent across the whole
-     * dataset — DESC pages toward older activity ({@code <}), ASC toward newer
-     * ({@code >}). The {@code _id} tie-breaker uses the same operator as the sort.
-     */
-    private void applyLastActivityKeyset(Query query, String cursor, String sortDirection) {
-        String[] parts = cursor.split(CURSOR_SEPARATOR, 2);
-        if (parts.length != 2) {
-            log.warn("Invalid compound cursor format: {}", cursor);
+    // A cursor issued before the compound format carries only the row id; its sort value comes from that row.
+    private OrganizationKeysetCursor resolveCursor(String cursor, String sortField) {
+        boolean idOnlyUnderValueSort = !ID_FIELD.equals(sortField) && OrganizationKeysetCursor.isBareId(cursor);
+        if (!idOnlyUnderValueSort) {
+            return OrganizationKeysetCursor.parse(cursor, sortField);
+        }
+        Organization anchor = mongoTemplate.findById(cursor, Organization.class);
+        if (anchor == null) {
+            throw new IllegalArgumentException(OrganizationKeysetCursor.INVALID_CURSOR_MESSAGE);
+        }
+        String compoundCursor = OrganizationKeysetCursor.encode(anchor, sortField);
+        return OrganizationKeysetCursor.parse(compoundCursor, sortField);
+    }
+
+    // Keyset "past the cursor row" in the active direction: ASC pages upwards (>), DESC downwards (<),
+    // with _id as the tie-breaker so equal sort values never repeat or skip a row.
+    private void applyKeyset(Query query, OrganizationKeysetCursor keyset, String sortField, boolean ascending) {
+        ObjectId cursorId = keyset.getId();
+        Criteria pastId = ascending ? Criteria.where(ID_FIELD).gt(cursorId) : Criteria.where(ID_FIELD).lt(cursorId);
+        if (ID_FIELD.equals(sortField)) {
+            query.addCriteria(pastId);
             return;
         }
-        try {
-            Instant value = Instant.ofEpochMilli(Long.parseLong(parts[0]));
-            ObjectId cursorId = new ObjectId(parts[1]);
-            boolean ascending = !SORT_DESC.equalsIgnoreCase(sortDirection);
+        Object sortValue = keyset.getSortValue();
+        Criteria pastValue = ascending
+                ? Criteria.where(sortField).gt(sortValue)
+                : Criteria.where(sortField).lt(sortValue);
+        Criteria sameValuePastId = new Criteria().andOperator(Criteria.where(sortField).is(sortValue), pastId);
 
-            Criteria pastValue = ascending
-                    ? Criteria.where(UPDATED_AT_FIELD).gt(value)
-                    : Criteria.where(UPDATED_AT_FIELD).lt(value);
-            Criteria sameValuePastId = new Criteria().andOperator(
-                    Criteria.where(UPDATED_AT_FIELD).is(value),
-                    ascending ? Criteria.where(ID_FIELD).gt(cursorId) : Criteria.where(ID_FIELD).lt(cursorId));
-
-            // Use a $or-keyed criteria (not the keyless Criteria.orOperator) so it
-            // does not clash with the base filter's keyless $and — MongoDB Query
-            // rejects a second keyless criteria. Mirrors CustomMachineRepositoryImpl.
-            query.addCriteria(Criteria.where("$or").is(
-                    List.of(pastValue.getCriteriaObject(), sameValuePastId.getCriteriaObject())));
-        } catch (IllegalArgumentException ex) {
-            log.warn("Invalid compound cursor format: {}", cursor);
-        }
+        // Use a $or-keyed criteria (not the keyless Criteria.orOperator) so it
+        // does not clash with the base filter's keyless $and — MongoDB Query
+        // rejects a second keyless criteria. Mirrors CustomMachineRepositoryImpl.
+        query.addCriteria(Criteria.where("$or").is(
+                List.of(pastValue.getCriteriaObject(), sameValuePastId.getCriteriaObject())));
     }
 
     @Override
