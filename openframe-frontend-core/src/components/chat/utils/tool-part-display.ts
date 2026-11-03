@@ -125,8 +125,15 @@ export function approvalRequestDataOf(part: ChatToolPart): ApprovalRequestData |
   };
 }
 
+function isRunning(part: ChatToolPart): boolean {
+  return (
+    (part.state === 'approval-responded' && part.approval.approved) ||
+    (part.state === 'input-available' && part.toolMetadata?.started === true)
+  );
+}
+
 function executionOf(part: ChatToolPart): ApprovalBatchExecutionState | null {
-  if (part.state === 'approval-responded' && part.approval.approved) return { status: 'executing' };
+  if (isRunning(part)) return { status: 'executing' };
   if (part.state === 'output-available') {
     const result = resultTextOf(part.output);
     return { status: 'done', success: true, ...(result !== undefined ? { result } : {}) };
@@ -175,22 +182,24 @@ function batchRowOf(part: ChatToolPart): PendingToolCallData {
 }
 
 /**
- * The one card a run of parts with one `batchId` draws. Its status is its gates': a row with none follows them. Approved
- * while a row ran or runs; a row that failed beside it keeps its own cross. With every row refused or failed it is `failed`,
- * and `unknown` while any of them may have run.
+ * A batch's status is its gates', with one exception: a row with no gate of its own counts for what it did, because a gate
+ * that failed says nothing about it. Approved while any row ran or runs; a row that failed beside it keeps its own cross. With
+ * no row that ran it is `failed`, and `unknown` while a gated row may have.
  */
-export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBatchView {
+function batchStatusOf(parts: readonly ChatToolPart[]): ChatApprovalPartStatus {
   const statuses = parts.flatMap(part => {
     const status = approvalStatusOf(part);
     return status ? [status] : [];
   });
-  const status: ChatApprovalPartStatus = statuses.includes('pending')
-    ? 'pending'
-    : statuses.includes('approved')
-      ? 'approved'
-      : statuses.includes('unknown')
-        ? 'unknown'
-        : (statuses[0] ?? 'approved');
+  if (statuses.includes('pending')) return 'pending';
+  if (statuses.includes('approved')) return 'approved';
+  const answer = statuses.includes('unknown') ? 'unknown' : (statuses[0] ?? 'approved');
+  const anyRan = parts.some(part => part.state === 'output-available' || isRunning(part));
+  return (answer === 'failed' || answer === 'unknown') && anyRan ? 'approved' : answer;
+}
+
+/** The one card a run of parts with one `batchId` draws. */
+export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBatchView {
   const firstGate = parts.find(part => approvalStatusOf(part) !== null);
   const descriptor = firstGate && 'approval' in firstGate ? firstGate.approval?.descriptor : undefined;
   const executions: Record<string, ApprovalBatchExecutionState> = {};
@@ -200,7 +209,7 @@ export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBat
   }
   const resolvedByName = parts.find(part => part.toolMetadata?.resolvedByName)?.toolMetadata?.resolvedByName;
   return {
-    status,
+    status: batchStatusOf(parts),
     ...(resolvedByName ? { resolvedByName } : {}),
     data: {
       approvalRequestId: approvalBatchIdOf(parts[0]) ?? parts[0].toolCallId,

@@ -251,6 +251,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
 
   function toolInput(data: Record<string, unknown>, toolCallId: string): UiChunk {
     const metadata: ChatToolMetadata = {
+      started: true,
       ...(nonEmpty(data.integratedToolType) ? { integratedToolType: data.integratedToolType as string } : {}),
       ...(nonEmpty(data.toolExplanation) ? { toolExplanation: data.toolExplanation as string } : {}),
       ...(nonEmpty(data.statusLabel) ? { statusLabel: data.statusLabel as string } : {}),
@@ -264,7 +265,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       input: isRecord(data.parameters) ? data.parameters : {},
       dynamic: true,
       ...(title ? { title } : {}),
-      ...(Object.keys(metadata).length > 0 ? { toolMetadata: metadata } : {}),
+      toolMetadata: metadata,
     };
   }
 

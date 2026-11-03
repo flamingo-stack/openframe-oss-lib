@@ -693,6 +693,35 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
     });
   });
 
+  it('a mixed batch: the row with no gate that ran keeps the foot from saying Failed over its check', () => {
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        parts={[
+          {
+            ...pendingPart('p1', 'batch:p1'),
+            state: 'output-error',
+            errorText: 'boom',
+            approval: { id: 'p1', approved: true, descriptor: { batchId: 'batch:p1' } },
+          },
+          {
+            type: 'dynamic-tool',
+            toolName: 'read',
+            toolCallId: 'free',
+            input: {},
+            state: 'output-available',
+            output: 'ok',
+            toolMetadata: { batchId: 'batch:p1' },
+          },
+        ]}
+      />,
+    );
+    expect(screen.queryByText('Failed')).toBeNull();
+    expect(screen.getByText('Approved')).toBeTruthy();
+    expect(screen.getAllByRole('img', { name: 'Done' })).toHaveLength(1);
+    expect(screen.getAllByRole('img', { name: 'Failed' })).toHaveLength(1);
+  });
+
   it('a card of one that failed reads the same for the end client, with no name on it', () => {
     render(
       <ChatMessageEnhanced

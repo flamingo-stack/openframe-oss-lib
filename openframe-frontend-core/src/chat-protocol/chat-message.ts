@@ -194,6 +194,8 @@ export type ChatToolMetadata = {
   resolvedByName?: string | null;
   /** The batch a row with no approval of its own belongs to. */
   batchId?: string;
+  /** The server said this row began. A batch's row with no approval of its own has no state that says it runs. */
+  started?: boolean;
   /** Nothing said how this approved row ended: its stream was cut or stopped. The hub finishes a write it started, so it may have run. */
   outcomeUnknown?: boolean;
 };

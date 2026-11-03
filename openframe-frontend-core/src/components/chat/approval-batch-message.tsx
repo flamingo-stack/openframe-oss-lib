@@ -116,7 +116,7 @@ function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
  *  - done + success    → green check
  *  - done + failure    → red cross, in a failed batch too
  *  - nobody knows       → null: a cross would say it failed, and it may have gone through
- *  - failed, no exec   → null (a row with no gate of its own: nothing runs it now)
+ *  - failed, no exec   → null (a row with no gate of its own that never started: nothing runs it now)
  */
 function ExecutionStatusIcon({
   batchStatus,

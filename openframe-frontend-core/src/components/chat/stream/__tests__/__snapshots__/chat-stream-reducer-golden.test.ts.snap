@@ -210,6 +210,7 @@ exports[`chat stream reducer — what the thread holds after a wire > batch appr
           "toolMetadata": {
             "integratedToolType": "PSA",
             "resolvedByName": "Alice Client",
+            "started": true,
           },
           "toolName": "create_ticket",
           "type": "dynamic-tool",
@@ -411,6 +412,7 @@ exports[`chat stream reducer — what the thread holds after a wire > duplicate 
           "toolCallId": "exec-1",
           "toolMetadata": {
             "integratedToolType": "TACTICAL_RMM",
+            "started": true,
           },
           "toolName": "run_script",
           "type": "dynamic-tool",
@@ -612,6 +614,7 @@ exports[`chat stream reducer — what the thread holds after a wire > tool execu
           "toolCallId": "exec-1",
           "toolMetadata": {
             "integratedToolType": "TACTICAL_RMM",
+            "started": true,
           },
           "toolName": "run_script",
           "type": "dynamic-tool",
@@ -646,6 +649,7 @@ exports[`chat stream reducer — what the thread holds after a wire > tool execu
           "toolCallId": "exec-1",
           "toolMetadata": {
             "integratedToolType": "TACTICAL_RMM",
+            "started": true,
           },
           "toolName": "run_script",
           "type": "dynamic-tool",

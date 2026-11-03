@@ -172,6 +172,7 @@ exports[`processHistoricalMessages — golden corpus > processes the full record
         "toolCallId": "exec-1",
         "toolMetadata": {
           "integratedToolType": "TACTICAL_RMM",
+          "started": true,
         },
         "toolName": "run_script",
         "type": "dynamic-tool",
@@ -258,6 +259,7 @@ exports[`processHistoricalMessages — golden corpus > processes the full record
         "toolMetadata": {
           "integratedToolType": "PSA",
           "resolvedByName": "Alice Client",
+          "started": true,
         },
         "toolName": "create_ticket",
         "type": "dynamic-tool",

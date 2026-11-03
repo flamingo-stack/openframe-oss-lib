@@ -1187,7 +1187,7 @@ describe('createMingoDecoder: the table', () => {
         input: { a: 1 },
         dynamic: true,
         title: 'Run',
-        toolMetadata: { integratedToolType: 'MESHCENTRAL', toolExplanation: 'why' },
+        toolMetadata: { started: true, integratedToolType: 'MESHCENTRAL', toolExplanation: 'why' },
       },
     ]);
   });

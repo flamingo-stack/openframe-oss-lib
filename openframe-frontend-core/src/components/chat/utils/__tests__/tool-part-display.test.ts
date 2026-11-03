@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyChunkToMessages, createWireState } from '../../../../chat-protocol/apply-chunk';
 import type { ChatMessage, ChatToolPart } from '../../../../chat-protocol/chat-message';
 import { APPROVAL_CANCELLED, isToolPart } from '../../../../chat-protocol/chat-message';
+import { createMingoDecoder } from '../../../../chat-protocol/message-decoder';
 import { createOldFrameDecoder } from '../../../../chat-protocol/old-wire';
 import type { UiChunk } from '../../../../chat-protocol/ui-chunks';
 import {
@@ -174,6 +175,106 @@ describe('approvalBatchViewOf', () => {
       ]);
       expect(view.status).toBe('approved');
       expect(view.data.executions?.p2).toEqual({ status: 'done', outcomeUnknown: true, result: 'No answer.' });
+    });
+  });
+
+  describe('a mixed batch: a row with no gate of its own counts for what it did', () => {
+    const failedGate: ChatToolPart = {
+      ...row('gated'),
+      state: 'output-error',
+      errorText: 'Boom.',
+      approval: { ...gate('gated'), approved: true },
+    };
+    const free = (extra: Partial<ChatToolPart>): ChatToolPart =>
+      ({ ...row('free'), toolMetadata: { batchId }, ...extra }) as ChatToolPart;
+
+    it('a failed gate beside a row that ran: Approved, each row with its own mark', () => {
+      const view = approvalBatchViewOf([failedGate, free({ state: 'output-available', output: 'ok' })]);
+      expect(view.status).toBe('approved');
+      expect(view.data.executions).toEqual({
+        gated: { status: 'done', success: false, result: 'Boom.' },
+        free: { status: 'done', success: true, result: 'ok' },
+      });
+    });
+
+    it('a failed gate beside a row that runs: Approved, and the row shows it runs', () => {
+      const view = approvalBatchViewOf([
+        failedGate,
+        free({ state: 'input-available', toolMetadata: { batchId, started: true } }),
+      ]);
+      expect(view.status).toBe('approved');
+      expect(view.data.executions?.free).toEqual({ status: 'executing' });
+    });
+
+    it('a failed gate beside a row that never started: Failed, and nothing runs it', () => {
+      const view = approvalBatchViewOf([failedGate, free({ state: 'input-available' })]);
+      expect(view.status).toBe('failed');
+      expect(view.data.executions?.free).toBeUndefined();
+    });
+
+    it('every row failed: Failed', () => {
+      const view = approvalBatchViewOf([failedGate, free({ state: 'output-error', errorText: 'Boom.' })]);
+      expect(view.status).toBe('failed');
+    });
+
+    it('an unknown gate beside a row that ran: Approved', () => {
+      const unknown: ChatToolPart = { ...failedGate, toolMetadata: { outcomeUnknown: true } };
+      expect(approvalBatchViewOf([unknown, free({ state: 'output-available', output: 'ok' })]).status).toBe('approved');
+      expect(approvalBatchViewOf([unknown, free({ state: 'input-available' })]).status).toBe('unknown');
+    });
+
+    it('a rejected gate stays rejected, whatever ran beside it', () => {
+      const rejected: ChatToolPart = {
+        ...row('gated'),
+        state: 'output-denied',
+        approval: { ...gate('gated'), approved: false },
+      };
+      expect(approvalBatchViewOf([rejected, free({ state: 'output-available', output: 'ok' })]).status).toBe(
+        'rejected',
+      );
+    });
+
+    it('the Mingo wire says a row started, on a decoder that never saw its card too', () => {
+      const parts = (raws: readonly unknown[]): ChatToolPart[] => {
+        const decoder = createMingoDecoder();
+        const wire = createWireState();
+        let messages: ChatMessage[] = [];
+        for (const raw of raws) {
+          for (const chunk of decoder.decode(raw).chunks) messages = applyChunkToMessages(messages, chunk, wire);
+        }
+        return messages.flatMap(message => message.parts).filter(isToolPart);
+      };
+      const card = {
+        type: 'APPROVAL_REQUEST',
+        approvalRequestId: 'B1',
+        approvalType: 'ADMIN',
+        toolCalls: [
+          { toolExecutionRequestId: 'gated', toolName: 'wipe', requiresApproval: true, toolCallArguments: {} },
+          { toolExecutionRequestId: 'free', toolName: 'read', requiresApproval: false, toolCallArguments: {} },
+        ],
+      };
+      const approved = { type: 'APPROVAL_RESULT', approvalRequestId: 'B1', status: 'approved', approved: true };
+      const exec = (id: string) => ({ type: 'EXECUTING_TOOL', toolExecutionRequestId: id, toolFunction: id });
+      const done = (id: string, success: boolean) => ({
+        type: 'EXECUTED_TOOL',
+        toolExecutionRequestId: id,
+        toolFunction: id,
+        success,
+        result: success ? 'ok' : 'boom',
+      });
+      const head = [{ type: 'MESSAGE_START', messageId: 'm' }, card, approved];
+
+      const running = approvalBatchViewOf(parts([...head, exec('gated'), done('gated', false), exec('free')]));
+      expect(running.status).toBe('approved');
+      expect(running.data.executions?.free).toEqual({ status: 'executing' });
+
+      const ran = approvalBatchViewOf(
+        parts([...head, exec('free'), done('free', true), exec('gated'), done('gated', false)]),
+      );
+      expect(ran.status).toBe('approved');
+
+      const never = approvalBatchViewOf(parts([...head, exec('gated'), done('gated', false)]));
+      expect(never.status).toBe('failed');
     });
   });
 
