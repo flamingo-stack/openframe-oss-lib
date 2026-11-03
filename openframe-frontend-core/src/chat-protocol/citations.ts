@@ -383,13 +383,8 @@ function protectedRanges(text: string): ProtectedRange[] {
  * Lines the reader sees no text in, each of which stops being what it is with a chip on it: a table's delimiter row, a
  * thematic break, a setext underline, a link's reference definition, a quote's blank line.
  */
-const HOLDS_NOTHING: readonly RegExp[] = [
-  /^\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/,
-  THEMATIC_BREAK,
-  /^=+[ \t]*$/,
-  /^\[[^\]]+\]:/,
-  /^$/,
-];
+const TABLE_DELIMITER_ROW = /^\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+const HOLDS_NOTHING: readonly RegExp[] = [TABLE_DELIMITER_ROW, THEMATIC_BREAK, /^=+[ \t]*$/, /^\[[^\]]+\]:/, /^$/];
 const LINE_INDENT = /^[ \t]*(?:>[ \t]*)*/;
 const EMPHASIS_CHARS = new Set(['*', '_', '~']);
 
@@ -522,39 +517,83 @@ const SENTENCE_CLOSERS = new Set([
 ]);
 /** What ends a sentence where text follows with a space: Latin and Cyrillic, Arabic and Urdu, Devanagari, Armenian. */
 const SPACED_SENTENCE_MARKS = new Set(['.', '!', '?', '\u061F', '\u06D4', '\u0964', '\u0965', '\u0589']);
-/** What ends a sentence in Chinese and Japanese, where the next one follows with no space: the ideographic and full-width marks. */
+/** What ends a sentence in Chinese and Japanese, where the next one follows with no space. */
 const UNSPACED_SENTENCE_MARKS = new Set(['\u3002', '\uFF61', '\uFF01', '\uFF1F']);
-/** A full stop that ends a word and no sentence. */
-const ABBREVIATION = /(?:^|[\s(])(?:e\.g|i\.e|vs)\.$/i;
+/** Full stops that end a word and no sentence. */
+const NEVER_ENDS_A_SENTENCE = [/(?:^|[\s(])(?:e\.g|i\.e|vs|cf)\.$/i, /(?:^|[\s(])(?:Dr|Mr|Mrs|Ms|Prof)\.$/];
+/**
+ * One that does before a capital and not before a lower-case word: `the U.S. Next` and `U.S. dollars`. A wrong read costs
+ * only a number slightly early or late.
+ */
+const ENDS_ONE_BEFORE_A_CAPITAL = /(?:(?:^|[\s(])(?:etc|inc|ltd|co|corp|jr|sr)\.|(?:^|[\s(])(?:[a-z]\.){2,}|\.\.\.)$/i;
+/** One that does not before a number: `No. 5`, and `the answer is no. Next`. */
+const NUMBERS_WHAT_FOLLOWS = /(?:^|[\s(])(?:no|fig)\.$/i;
+const LINE_BREAK_TAG = /<br\s*\/?>/iy;
+
+function isAtLineBreakTag(text: string, at: number): boolean {
+  LINE_BREAK_TAG.lastIndex = at;
+  return LINE_BREAK_TAG.test(text);
+}
+
+function endsNoSentence(text: string, at: number, end: number): boolean {
+  const word = text.slice(Math.max(0, at - 8), at + 1);
+  if (NEVER_ENDS_A_SENTENCE.some(pattern => pattern.test(word))) return true;
+  const next = text.slice(end, end + 8).trimStart()[0] ?? '';
+  return (
+    (ENDS_ONE_BEFORE_A_CAPITAL.test(word) && /\p{Ll}/u.test(next)) ||
+    (NUMBERS_WHAT_FOLLOWS.test(word) && /\d/.test(next))
+  );
+}
 
 /**
  * Past the sentence the mark at `at` ends and what closes around it, or -1 when it ends none. Text right after it means
- * no end, which is what a decimal, a version and a domain are ($1.00, v1.2.3, flamingo.run).
+ * no end, which is what a decimal, a version and a domain are ($1.00, v1.2.3, flamingo.run), and a `<br>` is no text.
  */
 function sentenceEndAt(text: string, at: number): number {
   const unspaced = UNSPACED_SENTENCE_MARKS.has(text[at]);
-  if (!unspaced && !SPACED_SENTENCE_MARKS.has(text[at])) return -1;
+  if ((!unspaced && !SPACED_SENTENCE_MARKS.has(text[at])) || isEscaped(text, at)) return -1;
   let end = at + 1;
   while (end < text.length && SENTENCE_CLOSERS.has(text[end])) end++;
   if (unspaced) return end;
-  if (end < text.length && !/\s/.test(text[end])) return -1;
-  return ABBREVIATION.test(text.slice(Math.max(0, at - 4), at + 1)) ? -1 : end;
+  if (end < text.length && !/\s/.test(text[end]) && !isAtLineBreakTag(text, end)) return -1;
+  return endsNoSentence(text, at, end) ? -1 : end;
+}
+
+function isDelimiterRow(line: string): boolean {
+  return line.includes('|') && TABLE_DELIMITER_ROW.test(line.replace(LINE_INDENT, ''));
+}
+
+/** Whether a position's line is a table's: its delimiter row is right under it, or above it with no blank line between. */
+function isOnATableRow(text: string, position: number): boolean {
+  const end = lineEndOf(text, position);
+  if (end < text.length && isDelimiterRow(text.slice(end + 1, lineEndOf(text, end + 1)))) return true;
+  let at = lineStartOf(text, position);
+  while (at > 0) {
+    const above = lineStartOf(text, at - 1);
+    const line = text.slice(above, at - 1);
+    if (BLANK_LINE_OF_QUOTE.test(line)) return false;
+    if (isDelimiterRow(line)) return true;
+    at = above;
+  }
+  return false;
 }
 
 /**
  * The end of the sentence a position is in, so a number reads at the end of what it backs and never before a comma (an
  * API citation ends where its block ends, which is often mid-sentence). Never past the line, so a table's row and a list's
- * item stay whole; never past a table's cell; and a line with no end takes the chip at its own end. Code and links are
- * stepped over: a mark inside one ends nothing, and one that crosses a line ends the walk where it opens.
+ * item stay whole; never past a table's cell (a pipe in prose is text); and a line with no end takes the chip at its own
+ * end. Code and links are stepped over: a mark inside one ends nothing, and one that crosses a line ends the walk where it
+ * opens.
  */
 function endOfSentence(text: string, ranges: readonly ProtectedRange[], position: number): number {
-  if (text[position - 1] === '|') return position;
+  const lineEnd = lineEndOf(text, position);
+  const onARow = text.slice(lineStartOf(text, position), lineEnd).includes('|') && isOnATableRow(text, position);
+  if (onARow && text[position - 1] === '|') return position;
   let back = position - 1;
   while (back > 0 && SENTENCE_CLOSERS.has(text[back])) back--;
   const here = sentenceEndAt(text, back);
   if (here >= position) return here;
 
-  const lineEnd = lineEndOf(text, position);
   let at = position;
   let next = 0;
   while (at < lineEnd) {
@@ -568,7 +607,7 @@ function endOfSentence(text: string, ranges: readonly ProtectedRange[], position
       if (end !== -1) return end;
     } else if (text[at] === '\\') {
       at += 2;
-    } else if (text[at] === '|') {
+    } else if (onARow && text[at] === '|') {
       return backOverSpace(text, at);
     } else {
       const end = sentenceEndAt(text, at);

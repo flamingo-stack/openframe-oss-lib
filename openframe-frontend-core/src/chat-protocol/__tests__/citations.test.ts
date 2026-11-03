@@ -472,6 +472,54 @@ describe('textWithCitationChips', () => {
       expect(drawn(marked(text, 'a'))).toBe(expected);
     });
 
+    it.each([
+      ['an escaped mark, right after the citation', 'Item 1\\.^ stays. Next.', `Item 1\\. stays. ${chip(1)} Next.`],
+      ['initials', 'Priced in U.S.^ dollars today. Next.', `Priced in U.S. dollars today. ${chip(1)} Next.`],
+      ['a title', 'Ask^ Dr. Smith today. Next.', `Ask Dr. Smith today. ${chip(1)} Next.`],
+      ['a number sign', 'Ticket^ No. 5 is open. Next.', `Ticket No. 5 is open. ${chip(1)} Next.`],
+      ['a company', 'Acme^ Inc. is a customer. Next.', `Acme Inc. is a customer. ${chip(1)} Next.`],
+      ['etc. in a sentence', 'Tools^, etc. all work. Next.', `Tools, etc. all work. ${chip(1)} Next.`],
+      ['an ellipsis in a sentence', 'Wait^... what is this? Next.', `Wait... what is this? ${chip(1)} Next.`],
+      ['a pipe in prose', 'Options a^ | b, which both work.', `Options a | b, which both work. ${chip(1)}`],
+      ['right after a pipe in prose', 'Options a |^ b, which both work.', `Options a | b, which both work. ${chip(1)}`],
+    ])('%s: the sentence goes on', (_name, text, expected) => {
+      expect(drawn(marked(text, 'a'))).toBe(expected);
+    });
+
+    it.each([
+      ['initials', 'Sold^ in the U.S. Next one.', `Sold in the U.S. ${chip(1)} Next one.`],
+      ['a company', 'Ask^ Acme Inc. Next one.', `Ask Acme Inc. ${chip(1)} Next one.`],
+      ['etc.', 'Tools^, etc. Next one.', `Tools, etc. ${chip(1)} Next one.`],
+      ['an ellipsis', 'Wait^... What is this?', `Wait... ${chip(1)} What is this?`],
+      ['the word no', 'The answer^ is no. Next one.', `The answer is no. ${chip(1)} Next one.`],
+      ['a single letter', 'Take^ plan B. Next one.', `Take plan B. ${chip(1)} Next one.`],
+    ])('%s before a capital: the sentence ends', (_name, text, expected) => {
+      expect(drawn(marked(text, 'a'))).toBe(expected);
+    });
+
+    it('a table is what stops at a pipe: header, body, and with no outer pipes', () => {
+      expect(drawn(marked('One^ two | three.\n--|--\nc | d', 'a'))).toBe(`One two ${chip(1)} | three.\n--|--\nc | d`);
+      expect(drawn(marked('a | b\n--|--\nOne^ two | three.', 'a'))).toBe(`a | b\n--|--\nOne two ${chip(1)} | three.`);
+      expect(drawn(marked('> a | b\n> --|--\n> One^ two | three.', 'a'))).toBe(
+        `> a | b\n> --|--\n> One two ${chip(1)} | three.`,
+      );
+    });
+
+    it('a pipe in the paragraph under a table is prose: the table ended at the blank line', () => {
+      const table = '| a | b |\n|---|---|\n| c | d |';
+      expect(drawn(marked(`${table}\n\nOptions a^ | b, both. Next.`, 'a'))).toBe(
+        `${table}\n\nOptions a | b, both. ${chip(1)} Next.`,
+      );
+    });
+
+    it.each([
+      ['<br>', '| one^.<br>two. three |\n|---|\n| c |', `| one. ${chip(1)}<br>two. three |\n|---|\n| c |`],
+      ['<br/>', '| one^.<br/>two. |\n|---|\n| c |', `| one. ${chip(1)}<br/>two. |\n|---|\n| c |`],
+      ['<br />', 'One^.<br />Two.', `One. ${chip(1)}<br />Two.`],
+    ])('%s right after a mark ends the sentence', (_name, text, expected) => {
+      expect(drawn(marked(text, 'a'))).toBe(expected);
+    });
+
     describe('in other scripts', () => {
       it.each([
         [
