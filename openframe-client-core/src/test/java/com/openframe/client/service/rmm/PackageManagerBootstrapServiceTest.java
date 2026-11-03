@@ -1,5 +1,8 @@
 package com.openframe.client.service.rmm;
 
+import java.util.List;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.client.support.TestEncryption;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -54,7 +57,7 @@ class PackageManagerBootstrapServiceTest {
         scriptBootstrapNatsPublisher = mock(ScriptBootstrapNatsPublisher.class);
         service = new PackageManagerBootstrapService(
                 machineRepository, scriptRepository, scriptExecutionRepository,
-                scriptBootstrapNatsPublisher);
+                scriptBootstrapNatsPublisher, TestEncryption.SERVICE);
         ReflectionTestUtils.setField(service, "cooldownSeconds", COOLDOWN_SECONDS);
     }
 
@@ -98,6 +101,26 @@ class PackageManagerBootstrapServiceTest {
         when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
                 TENANT_ID, MACHINE_ID, SCRIPT_ID, ExecutionSource.SYSTEM_BOOTSTRAP))
                 .thenReturn(Optional.of(execution));
+    }
+
+    @Test
+    @DisplayName("a stored secret env var reaches the agent in the clear")
+    void storedSecret_sentInTheClear() {
+        givenMachine(DeviceStatus.ONLINE);
+        Script script = givenSeededScript();
+        ScriptEnvVar secret = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build();
+        ScriptEnvVar sealed = secret.sealed(TestEncryption.SERVICE::encrypt);
+        script.setEnvVars(List.of(sealed));
+        when(scriptExecutionRepository.findFirstByTenantIdAndMachineIdAndScriptIdAndSourceOrderByDispatchedAtDesc(
+                any(), any(), any(), any())).thenReturn(Optional.empty());
+
+        service.dispatchInstall(MACHINE_ID, PackageManagerType.WINGET);
+
+        ArgumentCaptor<ScriptMessage> message = ArgumentCaptor.forClass(ScriptMessage.class);
+        verify(scriptBootstrapNatsPublisher).publishBootstrapScript(anyString(), message.capture());
+        ScriptEnvVar sent = message.getValue().getEnvVars().get(0);
+        assertThat(sent.getValue()).isEqualTo("s3cr3t");
+        assertThat(sent.isEncrypted()).isFalse();
     }
 
     @Test
