@@ -480,8 +480,11 @@ function applyApprovalResponse(
   chunk: Extract<UiChunk, { type: 'tool-approval-response' }>,
 ): ChatPart[] {
   return updateToolParts(parts, chunk.approvalId, part => {
-    if (part.state !== 'approval-requested' && part.state !== 'approval-responded') return part;
     const toolMetadata = mergeMetadata(part.toolMetadata, chunk.toolMetadata);
+    if (part.state !== 'approval-requested' && part.state !== 'approval-responded') {
+      // Past its gate the answer stands, and who gave it is still news: the click here settled it, the server names them.
+      return approvalOf(part) ? { ...part, ...(toolMetadata !== undefined ? { toolMetadata } : {}) } : part;
+    }
     return {
       ...baseOf(part),
       ...(toolMetadata !== undefined ? { toolMetadata } : {}),

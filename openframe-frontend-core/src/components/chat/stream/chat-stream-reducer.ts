@@ -36,23 +36,27 @@
 
 import { applyChunkToMessages, createWireState, messageHoldingChunk } from '../../../chat-protocol/apply-chunk';
 import {
-  APPROVAL_CANCELLED,
-  approvalBatchIdOf,
   isSourcePart,
-  isToolPart,
   textOfParts,
   type ChatFilePart,
   type ChatMessage,
   type ChatMessageMetadata,
 } from '../../../chat-protocol/chat-message';
 import { mingoUserText } from '../../../chat-protocol/message-decoder';
-import type { ChatParticipantChunk, ChatStreamEntry, UiChunk } from '../../../chat-protocol/ui-chunks';
+import {
+  approvalStatusOfResponse,
+  isOwnRowGrant,
+  type ChatParticipantChunk,
+  type ChatStreamEntry,
+  type UiChunk,
+} from '../../../chat-protocol/ui-chunks';
 import { OWNER_TYPE, type ChatApprovalStatus } from '../types/chat.types';
 import type { DialogTokenUsage, StreamingPhase } from '../types/unified-chat-state.types';
 import {
   CONTENT_DEDUP_WINDOW,
   SYSTEM_DEDUP_WINDOW,
   hasRecentMessage,
+  knownApprovalAnswer,
   nextId,
   resolutionChunks,
 } from './message-mutations';
@@ -371,25 +375,6 @@ function signalsAgentBusy(chunks: readonly UiChunk[]): boolean {
     if (chunk.type === 'tool-input-available' && chunk.toolMetadata?.batchId === undefined) working = true;
   }
   return working;
-}
-
-function statusOfResponse(chunk: Extract<UiChunk, { type: 'tool-approval-response' }>): ChatApprovalStatus {
-  if (chunk.approved) return 'approved';
-  return chunk.reason === APPROVAL_CANCELLED ? 'cancelled' : 'rejected';
-}
-
-/** Is this the grant a tool's own run carries, in the entry that runs it? */
-function isOwnRowGrant(chunk: Extract<UiChunk, { type: 'tool-approval-response' }>, entry: ChatStreamEntry): boolean {
-  return chunk.approved && entry.chunks.some(other => 'toolCallId' in other && other.toolCallId === chunk.approvalId);
-}
-
-/** Does a card in this thread ask about `id`? */
-function holdsGate(messages: readonly ChatMessage[], id: string): boolean {
-  return messages.some(message =>
-    message.parts.some(
-      part => isToolPart(part) && 'approval' in part && (part.approval?.id === id || approvalBatchIdOf(part) === id),
-    ),
-  );
 }
 
 function nowIso(): string {
@@ -804,9 +789,12 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   }
 
   function applyParticipant(chunk: ChatParticipantChunk, seq: number | undefined): void {
+    const before = messages;
     if (chunk.data.kind === 'message-request') applyUserMessage(chunk.data, seq);
     else if (chunk.data.kind === 'direct-message') applyDirectMessage(chunk.data, seq);
     else applySystemMessage(chunk.data, seq);
+    // A row that lands between turns ends what a standalone chunk had gathered: the next one starts below it.
+    if (messages !== before && !isInStream) wire.setMessageId(null);
   }
 
   // ===========================================================================
@@ -880,21 +868,9 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         write(chunk, seq);
         break;
 
-      case 'tool-approval-request': {
-        write(chunk, seq);
-        // A card a replay shows again keeps the answer this client already knows.
-        const batchId = chunk.approvalDescriptor?.batchId;
-        const known =
-          approvalStatuses[chunk.approvalId] ?? (batchId !== undefined ? approvalStatuses[batchId] : undefined);
-        if (known !== undefined && known !== 'pending') resolve(chunk.approvalId, known);
-        break;
-      }
-
       case 'tool-approval-response':
-        // A tool that runs grants its own row through the same chunk an answer uses, and nothing asked about that row.
-        if (!isOwnRowGrant(chunk, entry) || holdsGate(messages, chunk.approvalId)) {
-          mirrorApprovalStatus(chunk.approvalId, statusOfResponse(chunk));
-        }
+        // A tool's report grants its own row through the same chunk an answer uses: nobody answered, whatever that row asked.
+        if (!isOwnRowGrant(chunk, entry)) mirrorApprovalStatus(chunk.approvalId, approvalStatusOfResponse(chunk));
         write(chunk, seq);
         break;
 
@@ -938,6 +914,18 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   // Public surface
   // ===========================================================================
 
+  /**
+   * A card a replay shows again keeps the answer this client already knows. The batch's answer comes first (it is what
+   * was answered, and it reaches the rows of the batch that ask nothing), and after the whole entry, so those rows are there.
+   */
+  function resolveKnownAnswers(entry: ChatStreamEntry): void {
+    for (const chunk of entry.chunks) {
+      if (chunk.type !== 'tool-approval-request') continue;
+      const known = knownApprovalAnswer(approvalStatuses, chunk);
+      if (known) resolve(known.id, known.status);
+    }
+  }
+
   function apply(entry: ChatStreamEntry): void {
     // seq-based idempotency: drop redelivered / out-of-order entries.
     if (typeof entry.seq === 'number') {
@@ -945,6 +933,7 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       lastAppliedSeq = entry.seq;
     }
     for (const chunk of entry.chunks) applyOne(chunk, entry);
+    resolveKnownAnswers(entry);
     if (!directModeFlag && !sawDirectMessage && signalsAgentBusy(entry.chunks)) agentBusyState();
   }
 

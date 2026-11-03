@@ -15,12 +15,11 @@ import { applyChunkToMessages, createWireState } from '../../../chat-protocol/ap
 import { isSourcePart, type ChatMessage } from '../../../chat-protocol/chat-message';
 import { createMingoDecoder, mingoUserText } from '../../../chat-protocol/message-decoder';
 import type { UiChunk } from '../../../chat-protocol/ui-chunks';
-import { resolutionChunks } from '../stream/message-mutations';
+import { isAnsweredStatus, knownApprovalAnswer, resolutionChunks } from '../stream/message-mutations';
 import {
   MESSAGE_TYPE,
   OWNER_TYPE,
   type AuthorType,
-  type ChatApprovalStatus,
   type HistoricalMessage,
   type MessageProcessingOptions,
   type MessageData,
@@ -62,13 +61,6 @@ function contextItemsOf(data: MessageData): Array<{ type: string; id: string; la
   return raw
     .filter(item => typeof item?.type === 'string' && typeof item?.id === 'string')
     .map(item => ({ type: item.type as string, id: item.id as string, label: item.id as string }));
-}
-
-/** Is this chunk's status already known, so that what the row says gives way to it? */
-function statusAnswered(chunk: UiChunk, known: Record<string, ChatApprovalStatus>): boolean {
-  if (chunk.type === 'tool-approval-response') return known[chunk.approvalId] !== undefined;
-  if (chunk.type === 'tool-output-denied') return known[chunk.toolCallId] !== undefined;
-  return false;
 }
 
 /** Result type for historical message processing */
@@ -219,22 +211,26 @@ export function processHistoricalMessages(
       for (const chunk of chunks) {
         // A row holds no turn boundary of its own: the rows around it say where its turn ends.
         if (chunk.type === 'start' || chunk.type === 'finish' || chunk.type === 'abort') continue;
-        if (statusAnswered(chunk, approvalStatuses)) continue;
+        // A status known from elsewhere overrules what the row says, and the row still says who gave the answer.
+        if (chunk.type === 'tool-approval-response' && isAnsweredStatus(approvalStatuses[chunk.approvalId])) {
+          const name = chunk.toolMetadata?.resolvedByName;
+          applyChunks(resolutionChunks(chunk.approvalId, approvalStatuses[chunk.approvalId], name));
+          continue;
+        }
+        if (chunk.type === 'tool-output-denied' && isAnsweredStatus(approvalStatuses[chunk.toolCallId])) continue;
         if (chunk.type === 'data-escalation-offer' && chunk.data.status === 'pending') {
           const known = escalationOfferStates[chunk.id];
           applyChunks([known !== undefined ? { ...chunk, data: { ...chunk.data, status: known } } : chunk]);
           continue;
         }
         applyChunks([chunk]);
-        if (chunk.type === 'tool-approval-request') {
-          // The resolution may already be known to the consumer while its APPROVAL_RESULT row is not on the fetched pages.
-          const batchId = chunk.approvalDescriptor?.batchId;
-          const known =
-            approvalStatuses[chunk.approvalId] ?? (batchId !== undefined ? approvalStatuses[batchId] : undefined);
-          if (known === 'approved' || known === 'rejected' || known === 'cancelled') {
-            applyChunks(resolutionChunks(chunk.approvalId, known));
-          }
-        }
+      }
+      // The resolution may be known to the consumer while its APPROVAL_RESULT row is not on the fetched pages. After the
+      // whole entry, so the rows of its batch that ask nothing are there to take it.
+      for (const chunk of chunks) {
+        if (chunk.type !== 'tool-approval-request') continue;
+        const known = knownApprovalAnswer(approvalStatuses, chunk);
+        if (known) applyChunks(resolutionChunks(known.id, known.status));
       }
     }
 

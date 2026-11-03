@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   APPROVAL_CANCELLED,
+  approvalIdOfPart,
   approvalRequestIdOf,
   approvalStatusOf,
   parseCitations,
@@ -345,6 +346,28 @@ describe('parseCitations', () => {
 
   it('never stores what a citation quoted', () => {
     expect(parseCitations([{ source, endIndex: 4, citedText: 'a whole record' }])).toEqual([{ source, endIndex: 4 }]);
+  });
+});
+
+describe('approvalIdOfPart', () => {
+  const part = (fields: object): ChatToolPart =>
+    ({
+      type: 'dynamic-tool',
+      toolName: 'run',
+      toolCallId: 'x1',
+      state: 'approval-requested',
+      input: {},
+      ...fields,
+    }) as ChatToolPart;
+
+  it('a row of a batch is answered by the batch, whether it asks or not', () => {
+    expect(approvalIdOfPart(part({ approval: { id: 'x1', descriptor: { batchId: 'b1' } } }))).toBe('b1');
+    expect(approvalIdOfPart(part({ state: 'input-available', toolMetadata: { batchId: 'b1' } }))).toBe('b1');
+  });
+
+  it('a card of one by its own id, and a plain run by none', () => {
+    expect(approvalIdOfPart(part({ approval: { id: 'x1' } }))).toBe('x1');
+    expect(approvalIdOfPart(part({ state: 'input-available' }))).toBeUndefined();
   });
 });
 

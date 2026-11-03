@@ -741,3 +741,53 @@ describe('createChatDialogStore — eviction safety', () => {
     expect(store.getSnapshot('d1', 'main').messages).toEqual([]);
   });
 });
+
+describe('createChatDialogStore: a tool that reports on its own row', () => {
+  const rejectedResult = (seq: number): ChatStreamEntry =>
+    entry(
+      seq,
+      { type: 'tool-approval-response', approvalId: 'req-1', approved: false },
+      { type: 'tool-output-denied', toolCallId: 'req-1' },
+    );
+  const refusedReport = (seq: number): ChatStreamEntry =>
+    entry(
+      seq,
+      { type: 'tool-approval-response', approvalId: 'exec-1', approved: true },
+      { type: 'tool-output-error', toolCallId: 'exec-1', errorText: 'Rejected by user' },
+    );
+
+  it('is no answer on either side: a rejected batch stays rejected, and no status names its row', () => {
+    const store = createChatDialogStore();
+    seedBothSides(store);
+
+    store.apply(DIALOG, 'main', rejectedResult(5));
+    store.apply(DIALOG, 'main', refusedReport(6));
+
+    for (const side of ['main', 'observer'] as const) {
+      const state = store.getSnapshot(DIALOG, side);
+      expect(state.approvalStatuses).toEqual({ 'req-1': 'rejected' });
+      const card = rowOf(state);
+      expect(card && approvalStatusOf(card)).toBe('rejected');
+      expect(card?.state).toBe('output-denied');
+    }
+  });
+
+  it('still moves the row on the other side when it runs', () => {
+    const store = createChatDialogStore();
+    seedBothSides(store);
+
+    store.apply(
+      DIALOG,
+      'main',
+      entry(
+        5,
+        { type: 'tool-approval-response', approvalId: 'exec-1', approved: true },
+        { type: 'tool-input-available', toolCallId: 'exec-1', toolName: 'run_command', input: {} },
+      ),
+    );
+
+    const observer = store.getSnapshot(DIALOG, 'observer');
+    expect(rowOf(observer)?.state).toBe('approval-responded');
+    expect(observer.approvalStatuses).toEqual({});
+  });
+});

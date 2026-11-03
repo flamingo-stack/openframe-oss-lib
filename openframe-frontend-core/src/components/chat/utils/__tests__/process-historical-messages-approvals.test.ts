@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { approvalStatusOf, isToolPart, type ChatMessage } from '../../../../chat-protocol/chat-message';
 import { createMingoDecoder } from '../../../../chat-protocol/message-decoder';
 import { createChatStreamReducer } from '../../stream/chat-stream-reducer';
-import type { HistoricalMessage } from '../../types';
+import type { ChatApprovalStatus, HistoricalMessage } from '../../types';
 import { approvalDisplaysInline } from '../approval-display';
 import { processHistoricalMessages } from '../process-historical-messages';
 
@@ -190,5 +190,80 @@ describe('a turn’s identity', () => {
       ['u1', undefined],
       ['a2', 50],
     ]);
+  });
+});
+
+describe('a rejected batch read back', () => {
+  const asking = {
+    type: 'APPROVAL_REQUEST',
+    approvalRequestId: 'req1',
+    approvalType: 'ADMIN',
+    toolCalls: [
+      { toolExecutionRequestId: 't1', toolName: 'run', toolTitle: 'Run ls', requiresApproval: true },
+      { toolExecutionRequestId: 't2', toolName: 'read', toolTitle: 'Read a log', requiresApproval: false },
+    ],
+  };
+  const rejected = { type: 'APPROVAL_RESULT', approvalRequestId: 'req1', approved: false, displayName: 'Bob Admin' };
+  const refused = (id: string) => ({
+    type: 'EXECUTED_TOOL',
+    toolExecutionRequestId: id,
+    integratedToolType: 'OPENFRAME',
+    toolFunction: 'run',
+    success: false,
+    result: 'Rejected by user',
+  });
+  const row = (id: string, messageData: unknown[]): HistoricalMessage =>
+    ({ id, createdAt: '2026-11-02T10:00:00Z', owner: { type: 'ASSISTANT' }, messageData }) as HistoricalMessage;
+  const page = [row('a1', [asking]), row('a2', [rejected]), row('a3', [refused('t1'), refused('t2')])];
+
+  it('reads as rejected whatever the map says about one of its rows', () => {
+    const { messages } = processHistoricalMessages(page, {
+      approvalStatuses: { req1: 'rejected', t1: 'approved', t2: 'approved' },
+    });
+    expect(cardsOf(messages).map(part => [part.toolCallId, part.state, approvalStatusOf(part)])).toEqual([
+      ['t1', 'output-denied', 'rejected'],
+      ['t2', 'output-denied', 'rejected'],
+    ]);
+  });
+
+  it('keeps who answered when the status was already known', () => {
+    const statuses: Array<Record<string, ChatApprovalStatus>> = [{}, { req1: 'rejected' }];
+    for (const approvalStatuses of statuses) {
+      const [gate] = cardsOf(processHistoricalMessages(page, { approvalStatuses }).messages);
+      expect(gate.toolMetadata?.resolvedByName).toBe('Bob Admin');
+      expect(approvalStatusOf(gate)).toBe('rejected');
+    }
+  });
+
+  it('keeps who approved when the status was already known', () => {
+    const approved = { ...rejected, approved: true, displayName: 'Ann Admin' };
+    const { messages } = processHistoricalMessages([row('a1', [asking]), row('a2', [approved])], {
+      approvalStatuses: { req1: 'approved' },
+    });
+    expect(cardsOf(messages)[0].toolMetadata?.resolvedByName).toBe('Ann Admin');
+    expect(approvalStatusOf(cardsOf(messages)[0])).toBe('approved');
+  });
+
+  it('denies the rows that ask nothing too, when only the map knows the answer', () => {
+    const { messages } = processHistoricalMessages([row('a1', [asking])], { approvalStatuses: { req1: 'rejected' } });
+    expect(cardsOf(messages).map(part => part.state)).toEqual(['output-denied', 'output-denied']);
+  });
+
+  it('a pending status says nothing: the row that answers stands', () => {
+    const { messages } = processHistoricalMessages([row('a1', [asking]), row('a2', [rejected])], {
+      approvalStatuses: { req1: 'pending' },
+    });
+    expect(cardsOf(messages).map(approvalStatusOf)).toEqual(['rejected', 'rejected']);
+  });
+
+  it('live then refetched, through the map the reducer leaves', () => {
+    const reducer = createChatStreamReducer();
+    const decoder = createMingoDecoder();
+    for (const raw of [{ type: 'MESSAGE_START' }, asking, rejected, refused('t1'), refused('t2')]) {
+      reducer.apply(decoder.decode(raw));
+    }
+    expect(reducer.state.approvalStatuses).toEqual({ req1: 'rejected' });
+    const { messages } = processHistoricalMessages(page, { approvalStatuses: reducer.state.approvalStatuses });
+    expect(cardsOf(messages).map(approvalStatusOf)).toEqual(['rejected', 'rejected']);
   });
 });

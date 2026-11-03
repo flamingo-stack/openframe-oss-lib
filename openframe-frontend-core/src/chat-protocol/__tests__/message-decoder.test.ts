@@ -1258,6 +1258,58 @@ describe('createMingoDecoder: the table', () => {
     });
   });
 
+  describe('discardHeld: another copy of the text is what is drawn now', () => {
+    const typesOf = (entry: ChatStreamEntry): string[] => entry.chunks.map(chunk => chunk.type);
+
+    it.each([
+      ['an open code span', 'Run `ls'],
+      ['an open bracket', 'See ['],
+      ['a card token not finished', 'See [card://blog'],
+      ['a mention not finished', 'ask @dev'],
+      ['the spaces at its end', 'Run '],
+    ])('%s is forgotten, and the next turn opens with nothing of it', (_name, said) => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'MESSAGE_START', streamSeq: 1 });
+      decoder.decode({ type: 'TEXT', text: said, streamSeq: 2 });
+      decoder.discardHeld();
+      expect(typesOf(decoder.decode({ type: 'MESSAGE_START', streamSeq: 3 }))).toEqual(['start']);
+    });
+
+    it('the answer goes on with what comes next, and nothing of what was held', () => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'MESSAGE_START', streamSeq: 1 });
+      decoder.decode({ type: 'TEXT', text: 'Run `ls', streamSeq: 2 });
+      decoder.discardHeld();
+      const entries = [
+        decoder.decode({ type: 'TEXT', text: 'Next line.', streamSeq: 3 }),
+        decoder.decode({ type: 'MESSAGE_END', streamSeq: 4 }),
+      ];
+      expect(textOfParts(partsOf(entries.flatMap(entry => entry.chunks)))).toBe('Next line.');
+    });
+
+    it('nothing of a code span it was inside carries over', () => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'TEXT', text: '```\ninside [card://blog_post:1]', streamSeq: 1 });
+      decoder.discardHeld();
+      const { chunks } = decoder.decode({ type: 'TEXT', text: 'See [card://blog_post:2]\n\nnext', streamSeq: 2 });
+      expect(chunks).toContainEqual(containing({ delta: expect.stringContaining('record://blog_post/2') }));
+    });
+
+    it('an open reasoning is forgotten', () => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'THINKING', text: 'hm', streamSeq: 1 });
+      decoder.discardHeld();
+      expect(typesOf(decoder.decode({ type: 'MESSAGE_END', streamSeq: 2 }))).toEqual(['finish']);
+    });
+
+    it('emits nothing, and a redelivery is still a redelivery', () => {
+      const decoder = createMingoDecoder();
+      decoder.decode({ type: 'TEXT', text: 'Run `ls', streamSeq: 5 });
+      decoder.discardHeld();
+      expect(decoder.decode({ type: 'TEXT', text: 'again', streamSeq: 5 })).toEqual({ seq: 5, chunks: [] });
+    });
+  });
+
   describe('a redelivery moves no state', () => {
     const textOf = (entries: readonly ChatStreamEntry[]): string =>
       textOfParts(partsOf(entries.flatMap(entry => entry.chunks)));

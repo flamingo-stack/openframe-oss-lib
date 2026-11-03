@@ -302,6 +302,8 @@ function createOldTextConverter(
 ): {
   push(slice: string): OldTextOp[];
   flush(): OldTextOp[];
+  /** Forgets everything held, emitting none of it. */
+  discard(): void;
 } {
   let pending = '';
   /** Written, and held back while it could still be the spaces before a chip. */
@@ -535,6 +537,15 @@ function createOldTextConverter(
     return ops;
   }
 
+  /** The text part ended, and each is a markdown document of its own: nothing about this line carries over. */
+  function forgetLine(): void {
+    previous = '';
+    previousSolid = '';
+    lineBlank = true;
+    fence = null;
+    swallowingSpace = false;
+  }
+
   return {
     push(slice) {
       pending += slice;
@@ -542,13 +553,14 @@ function createOldTextConverter(
     },
     flush() {
       const ops = run(true);
-      // The text part ended, and each is a markdown document of its own: nothing about this line carries over.
-      previous = '';
-      previousSolid = '';
-      lineBlank = true;
-      fence = null;
-      swallowingSpace = false;
+      forgetLine();
       return ops;
+    },
+    discard() {
+      pending = '';
+      carried = '';
+      heldCards = [];
+      forgetLine();
     },
   };
 }
@@ -581,6 +593,8 @@ export function createOldTextWriter(
   push(slice: string): UiChunk[];
   /** Flushes what is held and closes the wire id: what follows is drawn after this text. */
   close(): UiChunk[];
+  /** Forgets what is held and the wire id, with no chunk: another copy of this text is what is drawn now. */
+  discard(): void;
 } {
   const converter = createOldTextConverter(index.labelOf);
   let id: string | null = null;
@@ -624,6 +638,11 @@ export function createOldTextWriter(
   return {
     push: slice => chunksOf(converter.push(slice)),
     close: () => [...chunksOf(converter.flush()), ...closeId()],
+    discard() {
+      converter.discard();
+      id = null;
+      held = [];
+    },
   };
 }
 

@@ -4,11 +4,14 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
+import { APPROVAL_CANCELLED } from '../chat-message';
 import {
+  approvalStatusOfResponse,
   createUiChunkDecoder,
   encodeUiChunk,
   encodeUiDone,
   finishReasonOfStop,
+  isOwnRowGrant,
   readUiChunks,
   UI_MESSAGE_STREAM_HEADERS,
   type UiChunk,
@@ -391,6 +394,23 @@ describe('what a chunk may say', () => {
         messageMetadata: {},
       });
     });
+  });
+});
+
+describe('an answer on the stream', () => {
+  const answer = (fields: object) => ({ type: 'tool-approval-response', approvalId: 't1', ...fields }) as never;
+
+  it('says its status', () => {
+    expect(approvalStatusOfResponse(answer({ approved: true }))).toBe('approved');
+    expect(approvalStatusOfResponse(answer({ approved: false }))).toBe('rejected');
+    expect(approvalStatusOfResponse(answer({ approved: false, reason: APPROVAL_CANCELLED }))).toBe('cancelled');
+  });
+
+  it('a grant beside a chunk about its own row is that row reporting, and nobody answering', () => {
+    const report = { type: 'tool-output-error', toolCallId: 't1', errorText: 'Rejected by user' } as UiChunk;
+    expect(isOwnRowGrant(answer({ approved: true }), { chunks: [report] })).toBe(true);
+    expect(isOwnRowGrant(answer({ approved: true }), { chunks: [] })).toBe(false);
+    expect(isOwnRowGrant(answer({ approved: false }), { chunks: [report] })).toBe(false);
   });
 });
 

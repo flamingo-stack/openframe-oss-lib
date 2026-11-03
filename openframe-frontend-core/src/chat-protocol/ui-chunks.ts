@@ -12,7 +12,9 @@
  * Server-safe: no React, no browser APIs beyond TextEncoder/TextDecoder.
  */
 
+import type { ChatApprovalStatus } from '../components/chat/types/chat.types';
 import {
+  APPROVAL_CANCELLED,
   parseCitations,
   parseMessageMetadata,
   type ChatApprovalDescriptor,
@@ -166,6 +168,26 @@ export type UiChunk =
 export interface ChatStreamEntry {
   seq?: number;
   chunks: UiChunk[];
+}
+
+/** The status an answer on the stream says. */
+export function approvalStatusOfResponse(
+  chunk: Extract<UiChunk, { type: 'tool-approval-response' }>,
+): ChatApprovalStatus {
+  if (chunk.approved) return 'approved';
+  return chunk.reason === APPROVAL_CANCELLED ? 'cancelled' : 'rejected';
+}
+
+/**
+ * Is this the grant a tool's own row carries, in the entry that reports it? The chunk an answer uses, but nobody answered:
+ * it moves that row's state and is never a status. A rejected call is reported the same way, so read as an answer it
+ * would approve what was rejected.
+ */
+export function isOwnRowGrant(
+  chunk: Extract<UiChunk, { type: 'tool-approval-response' }>,
+  entry: ChatStreamEntry,
+): boolean {
+  return chunk.approved && entry.chunks.some(other => 'toolCallId' in other && other.toolCallId === chunk.approvalId);
 }
 
 // =============================================================================

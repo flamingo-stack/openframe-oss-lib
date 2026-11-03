@@ -180,7 +180,6 @@ exports[`chat stream reducer — what the thread holds after a wire > batch appr
 {
   "approvalStatuses": {
     "batch-1": "approved",
-    "exec-a": "approved",
   },
   "dialogTokenUsage": null,
   "liveModel": null,

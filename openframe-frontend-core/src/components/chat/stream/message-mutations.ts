@@ -36,6 +36,24 @@ export function hasRecentMessage(
   return false;
 }
 
+/** A status that answers: `pending` says nothing about what a row says. */
+export function isAnsweredStatus(status: ChatApprovalStatus | undefined): status is ChatApprovalStatus {
+  return status !== undefined && status !== 'pending';
+}
+
+/**
+ * What a client already knows about a card a replay or a history page shows: the batch's answer first, since a batch is
+ * what is answered, then the card's own.
+ */
+export function knownApprovalAnswer(
+  known: Readonly<Record<string, ChatApprovalStatus>>,
+  chunk: Extract<UiChunk, { type: 'tool-approval-request' }>,
+): { id: string; status: ChatApprovalStatus } | null {
+  const batchId = chunk.approvalDescriptor?.batchId;
+  if (batchId !== undefined && isAnsweredStatus(known[batchId])) return { id: batchId, status: known[batchId] };
+  return isAnsweredStatus(known[chunk.approvalId]) ? { id: chunk.approvalId, status: known[chunk.approvalId] } : null;
+}
+
 /**
  * The chunks a resolution stands for, when it was learned some other way than off the stream: a parked map, a persisted
  * status, another side of the same dialog. `id` names an approval or a whole batch; an escalation offer is a chunk of its

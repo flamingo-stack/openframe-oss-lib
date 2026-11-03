@@ -114,6 +114,12 @@ export interface MingoDecoder {
   decode(raw: unknown, options?: { row?: MingoRowContext }): ChatStreamEntry;
   /** A turn with no chunk of its own to say it ended (rows of history): what it left open stays in it. */
   endTurn(): void;
+  /**
+   * What is held back (a text tail that could still be a token, an open reasoning) is forgotten, with no chunk. For a host
+   * whose thread now draws another copy of what this decoder was writing, the persisted row: that copy already says it,
+   * and flushing it would write it a second time. The sequence stays, so a redelivery is still a redelivery.
+   */
+  discardHeld(): void;
 }
 
 function str(value: unknown): string | undefined {
@@ -622,6 +628,10 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
     decode,
     endTurn() {
       oldRuns.endTurn();
+    },
+    discardHeld() {
+      writer.discard();
+      reasoningId = null;
     },
   };
 }

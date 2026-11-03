@@ -1490,3 +1490,102 @@ describe('createChatStreamReducer — a thinking answer', () => {
     expect(r.state.streamingPhase).toBe('streaming');
   });
 });
+
+describe('createChatStreamReducer: what a replay shows again', () => {
+  const batch = {
+    type: 'APPROVAL_REQUEST',
+    approvalRequestId: 'req1',
+    approvalType: 'ADMIN',
+    toolCalls: [
+      { toolExecutionRequestId: 't1', toolName: 'run', requiresApproval: true },
+      { toolExecutionRequestId: 't2', toolName: 'read', requiresApproval: false },
+    ],
+  };
+  const rows = (r: ReturnType<typeof createChatStreamReducer>) =>
+    r.state.messages.flatMap(message => message.parts).filter(isToolPart);
+
+  it('reads the batch’s answer before a row’s, and it reaches the row that asks nothing', () => {
+    const { r, send } = onWire({ approvalStatuses: { req1: 'rejected', t1: 'approved' } });
+    send({ type: 'MESSAGE_START' }, batch);
+    expect(rows(r).map(part => [part.toolCallId, part.state])).toEqual([
+      ['t1', 'output-denied'],
+      ['t2', 'output-denied'],
+    ]);
+  });
+
+  it('keeps who rejected, when the click here settled it before the server named them', () => {
+    const { r, send } = onWire();
+    send({ type: 'MESSAGE_START' }, batch);
+    r.projectApprovalResolution('req1', 'rejected');
+    send({ type: 'APPROVAL_RESULT', approvalRequestId: 'req1', approved: false, displayName: 'Bob Admin' });
+    expect(rows(r).map(part => part.toolMetadata?.resolvedByName)).toEqual(['Bob Admin', 'Bob Admin']);
+    expect(rows(r).map(approvalStatusOf)).toEqual(['rejected', 'rejected']);
+  });
+
+  it('a tool’s report grants its row and tells nobody an answer, gate or no gate', () => {
+    const { r, send } = onWire();
+    send({ type: 'MESSAGE_START' }, batch);
+    send({ type: 'APPROVAL_RESULT', approvalRequestId: 'req1', approved: true });
+    send({
+      type: 'EXECUTED_TOOL',
+      toolExecutionRequestId: 't1',
+      integratedToolType: 'A',
+      toolFunction: 'run',
+      success: true,
+      result: 'ok',
+    });
+    expect(r.state.approvalStatuses).toEqual({ req1: 'approved' });
+    expect(rows(r)[0].state).toBe('output-available');
+  });
+});
+
+describe('createChatStreamReducer: a standalone chunk after a row between turns', () => {
+  const ticketEvent = (kind: string): ChatStreamEntry =>
+    chunks({ type: 'data-ticket-event', data: { kind, occurredAt: '2026-11-02T10:00:00Z' } });
+  const error = (title: string): ChatStreamEntry => chunks({ type: 'data-error', data: { title } });
+  const offer = (id: string): ChatStreamEntry =>
+    chunks({ type: 'data-escalation-offer', id, data: { text: 'Escalate?', status: 'pending' } });
+  const shape = (r: ReturnType<typeof createChatStreamReducer>) =>
+    r.state.messages.map(message => [message.role, message.parts.map(part => part.type).join(',')]);
+
+  it.each([
+    ['a ticket event', ticketEvent('ASSIGNED'), ticketEvent('RESOLVED'), 'data-ticket-event'],
+    ['an error', error('first'), error('second'), 'data-error'],
+    ['an offer', offer('o1'), offer('o2'), 'data-escalation-offer'],
+  ])('%s lands below that row, not in the bubble above it', (_name, first, second, type) => {
+    const r = createChatStreamReducer();
+    r.apply(participant({ text: 'one', seq: 1 }));
+    r.apply(first);
+    r.apply(participant({ text: 'two', seq: 2 }));
+    r.apply(second);
+    expect(shape(r)).toEqual([
+      ['user', 'text'],
+      ['assistant', type],
+      ['user', 'text'],
+      ['assistant', type],
+    ]);
+  });
+
+  it('standalone chunks with no row between them share a bubble', () => {
+    const r = createChatStreamReducer();
+    r.apply(participant({ text: 'one', seq: 1 }));
+    r.apply(ticketEvent('ASSIGNED'));
+    r.apply(ticketEvent('RESOLVED'));
+    expect(shape(r)).toEqual([
+      ['user', 'text'],
+      ['assistant', 'data-ticket-event,data-ticket-event'],
+    ]);
+  });
+
+  it('a row during an open stream leaves the answer in its bubble', () => {
+    const r = createChatStreamReducer();
+    r.apply(start(1));
+    r.apply(text('Hello', 2));
+    r.apply(participant({ text: 'wait', seq: 3 }));
+    r.apply(text(' there', 4));
+    expect(shape(r)).toEqual([
+      ['assistant', 'text'],
+      ['user', 'text'],
+    ]);
+  });
+});

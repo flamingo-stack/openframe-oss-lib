@@ -451,6 +451,63 @@ describe('tools', () => {
   });
 });
 
+describe('who answered, once the part is past its gate', () => {
+  const denied: ChatPart = {
+    type: 'dynamic-tool',
+    toolName: 'close',
+    toolCallId: 'p1',
+    state: 'output-denied',
+    input: {},
+    approval: { id: 'p1', approved: false },
+  };
+  const named: UiChunk = {
+    type: 'tool-approval-response',
+    approvalId: 'p1',
+    approved: false,
+    toolMetadata: { resolvedByName: 'Bob Admin' },
+  };
+
+  it('a denied part takes the name, and stays denied', () => {
+    const [part] = accumulate([named], [denied]);
+    expect(part).toMatchObject({ state: 'output-denied', toolMetadata: { resolvedByName: 'Bob Admin' } });
+  });
+
+  it('a part that ran takes the name, and keeps its output', () => {
+    const ran: ChatPart = {
+      type: 'dynamic-tool',
+      toolName: 'close',
+      toolCallId: 'p1',
+      state: 'output-available',
+      input: {},
+      output: 'ok',
+      approval: { id: 'p1', approved: true },
+    };
+    const [part] = accumulate([{ ...named, approved: true } as UiChunk], [ran]);
+    expect(part).toMatchObject({
+      state: 'output-available',
+      output: 'ok',
+      toolMetadata: { resolvedByName: 'Bob Admin' },
+    });
+  });
+
+  it('an answer that names nobody changes nothing, by reference', () => {
+    const parts = [denied];
+    expect(accumulate([{ type: 'tool-approval-response', approvalId: 'p1', approved: false }], parts)).toBe(parts);
+  });
+
+  it('a row that never had a gate is left alone', () => {
+    const row: ChatPart = {
+      type: 'dynamic-tool',
+      toolName: 'read',
+      toolCallId: 'p1',
+      state: 'input-available',
+      input: {},
+    };
+    const parts = [row];
+    expect(accumulate([named], parts)).toBe(parts);
+  });
+});
+
 describe('a rejection stands', () => {
   const rejected: ChatPart = {
     type: 'dynamic-tool',

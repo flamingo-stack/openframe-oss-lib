@@ -7,7 +7,7 @@
  * CROSS-SIDE PROJECTION: exactly two operations fan out across sides of the
  * same dialogId:
  *   1. approval RESOLUTION by its id (`tool-approval-response` chunks), and
- *   2. a tool's run, merged by its call id (`tool-input-*`, `tool-output-*` chunks),
+ *   2. a tool's run, merged by its call id (`tool-input-*`, `tool-output-*` chunks, and the grant of its own row),
  * implemented as idempotent pure projections over the other side's state
  * (recomputed from state, never re-injected into the other side's seq
  * stream; per-side seq gates stay untouched). Everything else (text,
@@ -45,8 +45,7 @@
  *      components mid-render. The notify is deferred to a microtask.
  */
 
-import { APPROVAL_CANCELLED } from '../../../chat-protocol/chat-message';
-import type { ChatStreamEntry } from '../../../chat-protocol/ui-chunks';
+import { approvalStatusOfResponse, isOwnRowGrant, type ChatStreamEntry } from '../../../chat-protocol/ui-chunks';
 import {
   createChatStreamReducer,
   type ChatReducerState,
@@ -409,7 +408,12 @@ export function createChatDialogStore(options: CreateChatDialogStoreOptions = {}
     for (const chunk of entry.chunks) {
       switch (chunk.type) {
         case 'tool-approval-response': {
-          const status = chunk.approved ? 'approved' : chunk.reason === APPROVAL_CANCELLED ? 'cancelled' : 'rejected';
+          // A tool's report grants its own row: that row's state crosses like the rest of the report, and no status does.
+          if (isOwnRowGrant(chunk, entry)) {
+            for (const other of otherSides(dialogId, side)) other.projectToolChunk(chunk);
+            break;
+          }
+          const status = approvalStatusOfResponse(chunk);
           for (const other of otherSides(dialogId, side)) {
             other.projectApprovalResolution(chunk.approvalId, status, chunk.toolMetadata?.resolvedByName);
           }

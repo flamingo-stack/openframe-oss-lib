@@ -353,6 +353,11 @@ export function approvalBatchIdOf(part: ChatToolPart): string | undefined {
   return approval?.descriptor?.batchId ?? part.toolMetadata?.batchId;
 }
 
+/** The id a tool part's approval is answered by: its batch's, or its own for a card of one. A plain tool run has none. */
+export function approvalIdOfPart(part: ChatToolPart): string | undefined {
+  return approvalBatchIdOf(part) ?? ('approval' in part ? part.approval?.id : undefined);
+}
+
 /**
  * The id the backend knows an approval by: one request can hold a batch of calls, and a card's button names the row. A
  * row that is in no batch is its own request.
