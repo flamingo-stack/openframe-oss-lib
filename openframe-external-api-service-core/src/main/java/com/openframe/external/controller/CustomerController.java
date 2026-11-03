@@ -17,6 +17,7 @@ import com.openframe.external.dto.customer.UpdateCustomerStatusRequest;
 import com.openframe.external.exception.CustomerNotFoundException;
 import com.openframe.external.mapper.CustomerMapper;
 import com.openframe.external.util.ExternalCursors;
+import com.openframe.external.util.ExternalSorts;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -80,7 +81,7 @@ public class CustomerController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer limit,
             @Parameter(description = "Cursor for pagination (from pageInfo.endCursor). An unreadable cursor is rejected with 400.")
             @RequestParam(required = false) String cursor,
-            @Parameter(description = "Field to sort by (name, createdAt, updatedAt)")
+            @Parameter(description = "Field to sort by (name, createdAt, updatedAt). Any other value is rejected with 400.")
             @RequestParam(required = false) String sortField,
             @Parameter(description = "Sort direction (ASC or DESC), default: DESC")
             @RequestParam(required = false) String sortDirection,
@@ -104,8 +105,8 @@ public class CustomerController {
                 .limit(limit)
                 .build();
 
-        var result = organizationQueryService.queryOrganizations(
-                filterOptions, pagination, search, SortInput.from(sortField, sortDirection));
+        SortInput sort = SortInput.from(ExternalSorts.requireCustomerSortField(sortField), sortDirection);
+        var result = organizationQueryService.queryOrganizations(filterOptions, pagination, search, sort);
         return customerMapper.toCustomersResponse(result);
     }
 

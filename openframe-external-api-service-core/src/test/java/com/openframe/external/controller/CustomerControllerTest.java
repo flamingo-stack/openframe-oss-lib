@@ -197,6 +197,52 @@ class CustomerControllerTest {
         verifyNoInteractions(organizationQueryService);
     }
 
+    @Test
+    void reproducesBug_CU_17tkuw62n59_unknownSortFieldIs400AndNeverReachesTheDomain() throws Exception {
+        mockMvc.perform(get(BASE).param("search", "MSP client").param("sortField", "foo"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("sortField"))
+                .andExpect(jsonPath("$.customers").doesNotExist());
+
+        verifyNoInteractions(organizationQueryService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Name", "organizationId", "_id"})
+    void undocumentedSortFieldIs400WithTheAllowedFieldsAndNeverReachesTheDomain(String sortField) throws Exception {
+        mockMvc.perform(get(BASE).param("sortField", sortField))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Unknown sort field: " + sortField))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("sortField"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("must be one of: name, createdAt, updatedAt"));
+
+        verifyNoInteractions(organizationQueryService);
+    }
+
+    @Test
+    void blankSortFieldKeepsTheDefaultOrder() throws Exception {
+        when(organizationQueryService.queryOrganizations(any(), any(), any(), any())).thenReturn(page());
+
+        mockMvc.perform(get(BASE).param("sortField", "  ").param("sortDirection", "ASC")).andExpect(status().isOk());
+
+        verify(organizationQueryService).queryOrganizations(any(), any(), isNull(), isNull());
+    }
+
+    @Test
+    void paddedDocumentedSortFieldIsAcceptedAndTrimmed() throws Exception {
+        when(organizationQueryService.queryOrganizations(any(), any(), any(), any())).thenReturn(page());
+
+        mockMvc.perform(get(BASE).param("sortField", " updatedAt ")).andExpect(status().isOk());
+
+        ArgumentCaptor<SortInput> sort = ArgumentCaptor.forClass(SortInput.class);
+        verify(organizationQueryService).queryOrganizations(any(), any(), isNull(), sort.capture());
+        assertEquals("updatedAt", sort.getValue().getField());
+        assertEquals(SortDirection.DESC, sort.getValue().getDirection());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"0", "-1", "101"})
     void limitOutOfRangeIs400AndNeverReachesTheDomain(String limit) throws Exception {
