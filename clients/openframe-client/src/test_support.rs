@@ -136,7 +136,7 @@ pub(crate) async fn mock_server(statuses: &[u16]) -> MockServer {
 }
 
 /// Same as [`mock_server`], with `body` in every response.
-pub(crate) async fn mock_server_with_body(statuses: &[u16], body: &str) -> MockServer {
+pub(crate) async fn mock_server_with_body(statuses: &[u16], body: impl AsRef<[u8]>) -> MockServer {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     let requests = Arc::new(Mutex::new(Vec::new()));
@@ -144,7 +144,7 @@ pub(crate) async fn mock_server_with_body(statuses: &[u16], body: &str) -> MockS
     let statuses = Arc::new(Mutex::new(
         statuses.iter().copied().collect::<VecDeque<_>>(),
     ));
-    let reply_body = body.to_string();
+    let reply_body = body.as_ref().to_vec();
     tokio::spawn(async move {
         while let Ok((mut socket, _)) = listener.accept().await {
             let recorder = recorder.clone();
@@ -186,11 +186,12 @@ pub(crate) async fn mock_server_with_body(statuses: &[u16], body: &str) -> MockS
                         *queue.front().unwrap()
                     }
                 };
-                let reply = format!(
-                    "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{reply_body}",
+                let reply_head = format!(
+                    "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                     reply_body.len()
                 );
-                let _ = socket.write_all(reply.as_bytes()).await;
+                let _ = socket.write_all(reply_head.as_bytes()).await;
+                let _ = socket.write_all(&reply_body).await;
                 let _ = socket.shutdown().await;
             });
         }
