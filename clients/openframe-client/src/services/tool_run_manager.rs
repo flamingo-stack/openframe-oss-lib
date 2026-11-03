@@ -215,7 +215,7 @@ impl ToolRunManager {
 
     pub fn mark_client_update_pending(&self) {
         self.client_update_pending.mark();
-        info!("Client update pending: new tool operations will be parked");
+        info!("Client update pending: new tool operations are refused as busy");
     }
 
     pub fn is_client_update_pending(&self) -> bool {
@@ -228,7 +228,7 @@ impl ToolRunManager {
 
     pub fn clear_client_update_pending(&self) {
         self.client_update_pending.clear();
-        info!("Client update no longer pending: parked tool operations released");
+        info!("Client update no longer pending: tool operations accepted again");
     }
 
     pub async fn run(&self) -> Result<()> {
@@ -339,16 +339,6 @@ impl ToolRunManager {
     pub async fn clear_running_tool(&self, tool_id: &str) {
         let mut set = self.running_tools.write().await;
         set.remove(tool_id);
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn supervise_for_test(&self, tool_id: &str) {
-        self.try_mark_running(tool_id).await;
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn is_supervised(&self, tool_id: &str) -> bool {
-        self.running_tools.read().await.contains(tool_id)
     }
 
     #[allow(unused_variables)]

@@ -87,14 +87,6 @@ impl OpenFrameClientUpdateService {
         }
     }
 
-    pub async fn process_update(
-        &self,
-        message: OpenFrameClientUpdateMessage,
-    ) -> Result<UpdateLaunch> {
-        let guard = self.reserve(&message)?;
-        self.apply(message, guard).await
-    }
-
     /// Takes the update slot and parks new tool operations, unless another update, a tool or a package upgrade holds them
     pub fn reserve(&self, message: &OpenFrameClientUpdateMessage) -> Result<UpdateGuard> {
         let requested_version = message.version.trim();

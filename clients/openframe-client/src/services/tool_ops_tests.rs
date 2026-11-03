@@ -1,6 +1,4 @@
 use super::ToolOps;
-use futures::{poll, FutureExt};
-use std::task::Poll;
 use std::time::Duration;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
@@ -16,7 +14,7 @@ fn assert_idle(ops: &ToolOps, tool: &str) {
 #[tokio::test]
 async fn marked_op_is_busy_until_dropped() {
     let ops = ToolOps::default();
-    let op = ops.lock(TOOL).await.mark_busy();
+    let op = ops.try_lock(TOOL).expect("free tool").mark_busy();
     assert!(ops.is_busy(TOOL));
 
     drop(op);
@@ -39,7 +37,7 @@ async fn held_lock_makes_try_lock_busy() {
 #[tokio::test]
 async fn locks_are_per_tool() {
     let ops = ToolOps::default();
-    let _op = ops.lock(TOOL).await.mark_busy();
+    let _op = ops.try_lock(TOOL).expect("free tool").mark_busy();
 
     assert!(ops.try_lock("tool-b").is_ok());
     assert!(!ops.is_busy("tool-b"));
@@ -50,8 +48,8 @@ async fn any_busy_follows_every_tool() {
     let ops = ToolOps::default();
     assert!(!ops.any_busy());
 
-    let a = ops.lock(TOOL).await.mark_busy();
-    let b = ops.lock("tool-b").await.mark_busy();
+    let a = ops.try_lock(TOOL).expect("free tool").mark_busy();
+    let b = ops.try_lock("tool-b").expect("free tool").mark_busy();
     drop(a);
     assert!(ops.any_busy());
 
@@ -64,7 +62,7 @@ async fn a_busy_tools_view_follows_ops_started_after_it() {
     let ops = ToolOps::default();
     let view = ops.busy_tools();
 
-    let op = ops.lock(TOOL).await.mark_busy();
+    let op = ops.try_lock(TOOL).expect("free tool").mark_busy();
     assert!(view.any());
 
     drop(op);
@@ -72,25 +70,11 @@ async fn a_busy_tools_view_follows_ops_started_after_it() {
 }
 
 #[tokio::test]
-async fn waiting_lock_sees_the_flag_cleared() {
-    let ops = ToolOps::default();
-    let op = ops.lock(TOOL).await.mark_busy();
-
-    let next = ops.lock(TOOL);
-    tokio::pin!(next);
-    assert!(matches!(poll!(&mut next), Poll::Pending));
-
-    drop(op);
-    let _lock = timeout(WAIT, next).await.expect("lock released");
-    assert!(!ops.is_busy(TOOL));
-}
-
-#[tokio::test]
 async fn finished_op_is_released_once() {
     let ops = ToolOps::default();
     assert!(!ops.is_released(TOOL));
 
-    drop(ops.lock(TOOL).await.mark_busy());
+    drop(ops.try_lock(TOOL).expect("free tool").mark_busy());
     assert!(ops.is_released(TOOL));
     assert!(ops.take_released(TOOL));
     assert!(!ops.take_released(TOOL));
@@ -100,7 +84,7 @@ async fn finished_op_is_released_once() {
 async fn unmarked_lock_is_neither_busy_nor_released() {
     let ops = ToolOps::default();
 
-    drop(ops.lock(TOOL).await);
+    drop(ops.try_lock(TOOL).expect("free tool"));
     assert!(!ops.is_released(TOOL));
     assert_idle(&ops, TOOL);
 }
@@ -112,7 +96,7 @@ async fn cancelled_op_clears_the_flag() {
     let task = tokio::spawn({
         let ops = ops.clone();
         async move {
-            let _op = ops.lock(TOOL).await.mark_busy();
+            let _op = ops.try_lock(TOOL).expect("free tool").mark_busy();
             let _ = started_tx.send(());
             std::future::pending::<()>().await;
         }
@@ -135,7 +119,7 @@ async fn panicked_op_clears_the_flag() {
     let task = tokio::spawn({
         let ops = ops.clone();
         async move {
-            let _op = ops.lock(TOOL).await.mark_busy();
+            let _op = ops.try_lock(TOOL).expect("free tool").mark_busy();
             panic!("op failed");
         }
     });
@@ -148,11 +132,7 @@ async fn panicked_op_clears_the_flag() {
 #[test]
 fn op_dropped_outside_the_runtime_clears_the_flag() {
     let ops = ToolOps::default();
-    let op = ops
-        .lock(TOOL)
-        .now_or_never()
-        .expect("free tool")
-        .mark_busy();
+    let op = ops.try_lock(TOOL).expect("free tool").mark_busy();
 
     std::thread::spawn(move || drop(op))
         .join()

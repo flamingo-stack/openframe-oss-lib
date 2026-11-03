@@ -44,19 +44,13 @@ use crate::config::update_config::{
     DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS, SELF_RESTART_EXIT_CODE,
     SELF_RESTART_HANDOFF_SECS,
 };
-use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::command::{
     ClientUninstallHandler, ClientUpdateHandler, CommandContext, CommandListener,
     FeatureFlagsHandler, PackageUpdateHandler, RestartGate, ToolInstallationHandler,
     ToolUpdateHandler,
 };
 use crate::listener::execution_listener::ExecutionListener;
-use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
-use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
-use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
-use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
-use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
 use crate::models::{
     BootstrapScriptMessage, CommandMessage, Feature, ScriptMessage, ScriptScheduleExecutionMessage,
@@ -100,7 +94,6 @@ use crate::services::tool_connection_message_publisher::ToolConnectionMessagePub
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_installation_service::ToolInstallationService;
 use crate::services::tool_restart_service::ToolRestartService;
-use crate::services::tool_uninstall_service::ToolUninstallService;
 use crate::services::InstalledToolsService;
 use crate::services::MachineIdService;
 use crate::services::{
@@ -185,13 +178,6 @@ pub struct Client {
     registration_processor: RegistrationProcessor,
     auth_processor: InitialAuthenticationProcessor,
     nats_connection_manager: NatsConnectionManager,
-    tool_installation_message_listener: ToolInstallationMessageListener,
-    tool_uninstall_message_listener: ToolUninstallMessageListener,
-    #[allow(dead_code)] // TODO: remove when tool-restart is implemented on backend
-    tool_restart_message_listener: ToolRestartMessageListener,
-    openframe_client_update_listener: OpenFrameClientUpdateListener,
-    tool_agent_update_listener: ToolAgentUpdateListener,
-    client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
     tool_installation_listener: CommandListener<ToolInstallationHandler>,
@@ -431,7 +417,7 @@ impl Client {
             directory_manager.clone(),
             installed_tools_service.clone(),
             tool_kill_service.clone(),
-            tool_restart_service.clone(),
+            tool_restart_service,
             initial_configuration_service.clone(),
             config_service.clone(),
             tool_ops.clone(),
@@ -498,7 +484,6 @@ impl Client {
             installed_tools_service.clone(),
             directory_manager.clone(),
             tool_run_manager.clone(),
-            tool_ops.clone(),
             tool_connection_processing_manager.clone(),
             config_service.clone(),
             installed_agent_message_publisher.clone(),
@@ -523,63 +508,10 @@ impl Client {
             installed_tools_service.clone(),
             tool_kill_service.clone(),
             tool_run_manager.clone(),
-            tool_ops.clone(),
             directory_manager.clone(),
             config_service.clone(),
             installed_agent_message_publisher.clone(),
             tool_command_params_resolver.clone(),
-        );
-
-        // Initialize tool installation message listener
-        let tool_installation_message_listener = ToolInstallationMessageListener::new(
-            nats_connection_manager.clone(),
-            tool_installation_service.clone(),
-            config_service.clone(),
-            tool_run_manager.clone(),
-        );
-
-        let tool_uninstall_service = ToolUninstallService::new(
-            installed_tools_service.clone(),
-            tool_command_params_resolver.clone(),
-            tool_kill_service.clone(),
-            directory_manager.clone(),
-        );
-        let tool_uninstall_message_listener = ToolUninstallMessageListener::new(
-            nats_connection_manager.clone(),
-            tool_run_manager.clone(),
-            tool_ops.clone(),
-            tool_uninstall_service,
-            config_service.clone(),
-        );
-
-        // Initialize tool restart listener (shares the restart service with mesh self-heal)
-        let tool_restart_message_listener = ToolRestartMessageListener::new(
-            nats_connection_manager.clone(),
-            tool_restart_service,
-            config_service.clone(),
-            tool_run_manager.clone(),
-        );
-
-        // Initialize OpenFrame client update listener
-        let openframe_client_update_listener = OpenFrameClientUpdateListener::new(
-            nats_connection_manager.clone(),
-            openframe_client_update_service.clone(),
-            config_service.clone(),
-        );
-
-        // Initialize tool agent update listener
-        let tool_agent_update_listener = ToolAgentUpdateListener::new(
-            nats_connection_manager.clone(),
-            tool_agent_update_service.clone(),
-            config_service.clone(),
-            tool_run_manager.clone(),
-        );
-
-        // Initialize client uninstall listener (dashboard-triggered device uninstall)
-        let client_uninstall_message_listener = ClientUninstallMessageListener::new(
-            nats_connection_manager.clone(),
-            deactivation_service.clone(),
-            config_service.clone(),
         );
 
         // Relaunches the chat app on remote-access traffic so sessions reach a device whose chat has exited
@@ -741,12 +673,6 @@ impl Client {
             registration_processor,
             auth_processor,
             nats_connection_manager,
-            tool_installation_message_listener,
-            tool_uninstall_message_listener,
-            tool_restart_message_listener,
-            openframe_client_update_listener,
-            tool_agent_update_listener,
-            client_uninstall_message_listener,
             remote_access_message_listener,
             feature_flags_listener,
             tool_installation_listener,
@@ -907,24 +833,6 @@ impl Client {
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
 
-        //Start tool installation message listener in background
-        self.tool_installation_message_listener.start().await?;
-
-        self.tool_uninstall_message_listener.start().await?;
-
-        // TODO: uncomment when implemented on backend
-        // self.tool_restart_message_listener.start().await?;
-
-        // Start OpenFrame client update listener in background
-        self.openframe_client_update_listener.start().await?;
-
-        // Start tool agent update listener in background
-        self.tool_agent_update_listener.start().await?;
-
-        // Start client uninstall listener in background
-        self.client_uninstall_message_listener.start().await?;
-
-        // Delivery-engine counterparts of the JetStream listeners above; the backend picks one path per type
         self.tool_installation_listener.start().await?;
         self.tool_update_listener.start().await?;
         self.client_update_listener.start().await?;
