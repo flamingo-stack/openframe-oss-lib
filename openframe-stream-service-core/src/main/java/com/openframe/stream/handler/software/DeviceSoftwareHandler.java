@@ -63,16 +63,29 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (hostId == null) {
             return;
         }
-        FleetHostRef host = fleetHostResolver.resolve(String.valueOf(hostId));
-        if (host == null) {
+        String fleetHostId = String.valueOf(hostId);
+        if (!fleetHostResolver.isResolvable(fleetHostId)) {
             log.debug("[software-cdc] host_software for unresolved Fleet host {} — skipping", hostId);
             return;
         }
-        reconcile(host, hostId);
+        FleetHostRef host = fleetHostResolver.resolve(fleetHostId);
+        long commitTs = commitTimestamp(payload);
+        reconcile(host, hostId, commitTs);
     }
 
-    private void reconcile(FleetHostRef host, Long hostId) {
-        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId);
+    // the source commit time: every row event of one Fleet commit shares it, so a burst re-reads Fleet once,
+    // and a later commit on the same host never gets the list fetched for an earlier one
+    private static long commitTimestamp(DebeziumMessage.Payload<JsonNode> payload) {
+        DebeziumMessage.Payload.Source source = payload.getSource();
+        if (source != null && source.getTimestamp() != null) {
+            return source.getTimestamp();
+        }
+        Long emitted = payload.getTimestamp();
+        return emitted == null ? 0L : emitted;
+    }
+
+    private void reconcile(FleetHostRef host, Long hostId, long commitTs) {
+        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId, commitTs);
         Instant now = Instant.now();
         Set<Long> present = new HashSet<>();
         Set<Long> affectedTitles = new HashSet<>();

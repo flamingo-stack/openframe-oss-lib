@@ -1,5 +1,6 @@
 package com.openframe.stream.handler.software;
 
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -9,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -50,7 +50,8 @@ public class SoftwareProjector {
                 .orElseGet(Software::new);
         software.setTenantId(tenantId);
         software.setSoftwareTitleId(softwareTitleId);
-        applyName(software, installed.get(0));
+        DeviceSoftware sample = installed.getFirst();
+        applyName(software, sample);
         software.setLatestVersion(latestVersion(installed));
         software.setInstallations(installations);
         software.setCveIds(List.copyOf(cveIds));
@@ -70,6 +71,7 @@ public class SoftwareProjector {
         return installed.stream()
                 .map(DeviceSoftware::getVersions).filter(Objects::nonNull)
                 .flatMap(List::stream).filter(Objects::nonNull)
-                .max(Comparator.naturalOrder()).orElse(null);
+                // numeric per segment: 10.0 is newer than 9.0
+                .max(SoftwareVersions::compare).orElse(null);
     }
 }

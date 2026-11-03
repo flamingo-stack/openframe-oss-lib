@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -29,40 +30,42 @@ class FleetHostResolverTest {
         return c;
     }
 
+    private void connected(String fleetHostId, ToolConnection connection) {
+        when(toolConnectionRepository.findFirstByAgentToolIdAndToolTypeOrderByConnectedAtDesc(fleetHostId, ToolType.FLEET_MDM))
+                .thenReturn(Optional.ofNullable(connection));
+    }
+
     @Test
-    void resolve_nullOrBlankId_returnsNullWithoutQuerying() {
-        assertThat(resolver.resolve(null)).isNull();
-        assertThat(resolver.resolve("   ")).isNull();
+    void nullOrBlankId_isNotResolvable_withoutQuerying() {
+        assertThat(resolver.isResolvable(null)).isFalse();
+        assertThat(resolver.isResolvable("   ")).isFalse();
         verifyNoInteractions(toolConnectionRepository);
     }
 
     @Test
-    void resolve_noConnection_returnsNull() {
-        when(toolConnectionRepository.findFirstByAgentToolIdAndToolTypeOrderByConnectedAtDesc("100", ToolType.FLEET_MDM))
-                .thenReturn(Optional.empty());
-        assertThat(resolver.resolve("100")).isNull();
+    void noConnection_isNotResolvable_andResolveThrows() {
+        connected("100", null);
+
+        assertThat(resolver.isResolvable("100")).isFalse();
+        assertThatThrownBy(() -> resolver.resolve("100")).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    void resolve_connection_mapsToTenantAndMachine() {
-        when(toolConnectionRepository.findFirstByAgentToolIdAndToolTypeOrderByConnectedAtDesc("100", ToolType.FLEET_MDM))
-                .thenReturn(Optional.of(connection("t1", "m1")));
+    void connection_isResolvable_andMapsToTenantAndMachine() {
+        connected("100", connection("t1", "m1"));
 
+        assertThat(resolver.isResolvable("100")).isTrue();
         FleetHostRef ref = resolver.resolve("100");
-
-        assertThat(ref).isNotNull();
         assertThat(ref.tenantId()).isEqualTo("t1");
         assertThat(ref.machineId()).isEqualTo("m1");
     }
 
     @Test
-    void resolve_connectionMissingTenantOrMachine_returnsNull() {
-        when(toolConnectionRepository.findFirstByAgentToolIdAndToolTypeOrderByConnectedAtDesc("100", ToolType.FLEET_MDM))
-                .thenReturn(Optional.of(connection(null, "m1")));
-        assertThat(resolver.resolve("100")).isNull();
+    void connectionMissingTenantOrMachine_isNotResolvable() {
+        connected("100", connection(null, "m1"));
+        connected("200", connection("t1", null));
 
-        when(toolConnectionRepository.findFirstByAgentToolIdAndToolTypeOrderByConnectedAtDesc("200", ToolType.FLEET_MDM))
-                .thenReturn(Optional.of(connection("t1", null)));
-        assertThat(resolver.resolve("200")).isNull();
+        assertThat(resolver.isResolvable("100")).isFalse();
+        assertThat(resolver.isResolvable("200")).isFalse();
     }
 }

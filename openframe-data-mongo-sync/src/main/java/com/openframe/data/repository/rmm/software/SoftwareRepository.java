@@ -14,6 +14,8 @@ public interface SoftwareRepository extends MongoRepository<Software, String> {
 
     Optional<Software> findByTenantIdAndSoftwareTitleId(String tenantId, Long softwareTitleId);
 
+    boolean existsByTenantIdAndSoftwareTitleId(String tenantId, Long softwareTitleId);
+
     void deleteByTenantIdAndSoftwareTitleId(String tenantId, Long softwareTitleId);
 
     List<Software> findByTenantIdAndInstallationsMachineId(String tenantId, String machineId);

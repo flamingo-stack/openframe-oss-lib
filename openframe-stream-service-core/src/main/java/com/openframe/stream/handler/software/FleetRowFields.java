@@ -8,15 +8,19 @@ import java.time.format.DateTimeParseException;
 
 final class FleetRowFields {
 
+    // Debezium's op code for a deleted row ("c" create, "u" update, "r" snapshot read)
+    private static final String DELETE_OPERATION = "d";
+
     private FleetRowFields() {
     }
 
     static boolean isDelete(String op) {
-        return "d".equals(op);
+        return DELETE_OPERATION.equals(op);
     }
 
     static boolean isGlobalStats(JsonNode row) {
-        return Boolean.TRUE.equals(boolOrNull(row, "global_stats"));
+        Boolean globalStats = boolOrNull(row, "global_stats");
+        return Boolean.TRUE.equals(globalStats);
     }
 
     static String str(JsonNode row, String field) {

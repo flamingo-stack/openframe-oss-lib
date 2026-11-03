@@ -1,4 +1,4 @@
-package com.openframe.api.util;
+package com.openframe.core.util;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

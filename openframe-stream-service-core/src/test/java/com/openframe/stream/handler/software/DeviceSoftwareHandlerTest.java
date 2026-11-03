@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 class DeviceSoftwareHandlerTest {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final long COMMIT_TS = 1_793_700_000_000L;
 
     @Mock private FleetHostResolver fleetHostResolver;
     @Mock private FleetHostSoftwareCache fleetHostSoftwareCache;
@@ -46,6 +47,9 @@ class DeviceSoftwareHandlerTest {
         payload.setOperation(op);
         payload.setBefore(before);
         payload.setAfter(after);
+        DebeziumMessage.Payload.Source source = new DebeziumMessage.Payload.Source();
+        source.setTimestamp(COMMIT_TS);
+        payload.setSource(source);
         DeserializedDebeziumMessage m = new DeserializedDebeziumMessage();
         m.setPayload(payload);
         return m;
@@ -96,7 +100,7 @@ class DeviceSoftwareHandlerTest {
 
     @Test
     void handle_unresolvedHost_skips() {
-        when(fleetHostResolver.resolve("100")).thenReturn(null);
+        when(fleetHostResolver.isResolvable("100")).thenReturn(false);
 
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
@@ -105,8 +109,9 @@ class DeviceSoftwareHandlerTest {
 
     @Test
     void handle_reconcile_upsertsSnapshotTitlesDeletesStaleAndProjects() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L)).thenReturn(List.of(
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(
                 title(42L, "Google Chrome", "apps", "1.0", "2.0")));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
                 .thenReturn(Optional.empty());
@@ -139,8 +144,9 @@ class DeviceSoftwareHandlerTest {
 
     @Test
     void handle_reconcile_setsVulnerabilitiesAndProjectsAffectedCves() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L)).thenReturn(List.of(
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(
                 titleWithCves(42L, "Google Chrome", "1.0", "CVE-1", "CVE-2")));
         when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
                 .thenReturn(Optional.empty());
@@ -159,8 +165,9 @@ class DeviceSoftwareHandlerTest {
 
     @Test
     void handle_deleteEvent_reReconcilesFromSnapshot() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(fleetHostSoftwareCache.hostSoftware("t1", 100L)).thenReturn(List.of());
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of());
         when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
                 DeviceSoftware.builder().tenantId("t1").machineId("m1").softwareTitleId(42L).build()));
 
@@ -169,5 +176,22 @@ class DeviceSoftwareHandlerTest {
         verify(deviceSoftwareRepository, never()).save(any());
         verify(deviceSoftwareRepository).delete(any(DeviceSoftware.class));
         verify(softwareProjector).project(eq("t1"), eq(42L));
+    }
+
+    // a later commit on the same host must not reuse the list fetched for an earlier one
+    @Test
+    void handle_eachCommitReadsFleetOnce_keyedByTheSourceCommitTime() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of());
+        DeserializedDebeziumMessage noSource = msg("c", null, row().put("host_id", 100));
+        noSource.getPayload().setSource(null);
+        noSource.getPayload().setTimestamp(555L);
+
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+        handler.handle(noSource, null);
+
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, 555L);
     }
 }

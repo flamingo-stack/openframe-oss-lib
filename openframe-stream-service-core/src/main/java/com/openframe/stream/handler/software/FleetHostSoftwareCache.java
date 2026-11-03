@@ -30,8 +30,9 @@ public class FleetHostSoftwareCache {
             .expireAfterWrite(TTL)
             .build();
 
-    public List<HostSoftwareTitle> hostSoftware(String tenantId, long hostId) {
-        String key = tenantId + ":" + hostId;
+    // keyed by the source commit as well: one Fleet commit writes many host_software rows, and each row is an event
+    public List<HostSoftwareTitle> hostSoftware(String tenantId, long hostId, long commitTs) {
+        String key = tenantId + ":" + hostId + ":" + commitTs;
         return cache.get(key, k -> load(tenantId, hostId));
     }
 

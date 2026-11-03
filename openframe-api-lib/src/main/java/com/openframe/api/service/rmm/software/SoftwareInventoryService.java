@@ -27,7 +27,7 @@ import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.api.service.rmm.fleet.HostInventory.CveHit;
 import com.openframe.api.service.rmm.vulnerability.FleetGlobalVulnerabilityMapper;
 import com.openframe.api.util.FleetSoftwareMapper;
-import com.openframe.api.util.SoftwareVersions;
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.api.util.FleetVulnerabilityMapper;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tag.TagAssignment;
@@ -136,7 +136,7 @@ public class SoftwareInventoryService {
 
     public Optional<SoftwareResponse> findById(String softwareId) {
         if (softwareReadModel) {
-            return tenantSoftwareReadModelQuery.findById(tenantIdProvider.getTenantId(), softwareId);
+            return readModelSoftware(softwareId);
         }
         return parseNumericId(softwareId)
                 .map(fleet()::getSoftwareTitle)
@@ -149,6 +149,18 @@ public class SoftwareInventoryService {
                     applyStatuses(rows);
                     return row;
                 });
+    }
+
+    // the same statuses as the Fleet path: the read model stores no auto-update or catalog state
+    private Optional<SoftwareResponse> readModelSoftware(String softwareId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        if (!tenantSoftwareReadModelQuery.exists(tenantId, softwareId)) {
+            return Optional.empty();
+        }
+        SoftwareResponse row = tenantSoftwareReadModelQuery.get(tenantId, softwareId);
+        List<SoftwareResponse> rows = List.of(row);
+        applyStatuses(rows);
+        return Optional.of(row);
     }
 
     public SoftwareResponse turnOffAutoUpdate(String softwareId, String actor) {
@@ -164,7 +176,8 @@ public class SoftwareInventoryService {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
         }
         if (softwareReadModel) {
-            return tenantSoftwareReadModelQuery.listSoftware(tenantIdProvider.getTenantId(), search, page, perPage, sort, vulnerable);
+            String tenantId = tenantIdProvider.getTenantId();
+            return withStatuses(tenantSoftwareReadModelQuery.listSoftware(tenantId, search, page, perPage, sort, vulnerable));
         }
         if (fleetPaging) {
             return withStatuses(softwarePageFromFleet(search, page, perPage, sort, vulnerable));
@@ -382,10 +395,6 @@ public class SoftwareInventoryService {
                                                                        SoftwareOnDeviceFilterInput filter,
                                                                        String search, int page, Integer perPage,
                                                                        SortInput sort) {
-        if (softwareReadModel) {
-            return tenantSoftwareReadModelQuery.listDevicesForSoftware(
-                    tenantIdProvider.getTenantId(), softwareId, filter, search, page, perPage);
-        }
         Comparator<SoftwareOnDeviceResponse> order = deviceOrder(sort);
         List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
         Set<String> tagged = taggedMachines(rows, filter);
@@ -398,8 +407,28 @@ public class SoftwareInventoryService {
 
     // the filters read auto-update, so it is set on every row, not only on the page
     private List<SoftwareOnDeviceResponse> devicesWithAutoUpdate(String softwareId, String search) {
-        List<SoftwareOnDeviceResponse> rows = allDevicesForSoftware(softwareId, search);
+        List<SoftwareOnDeviceResponse> rows = softwareReadModel
+                ? readModelDevicesForSoftware(softwareId, search)
+                : allDevicesForSoftware(softwareId, search);
         autoUpdateService.applyToDevices(softwareId, rows);
+        return rows;
+    }
+
+    private List<SoftwareOnDeviceResponse> readModelDevicesForSoftware(String softwareId, String search) {
+        String tenantId = tenantIdProvider.getTenantId();
+        if (!tenantSoftwareReadModelQuery.exists(tenantId, softwareId)) {
+            return List.of();
+        }
+        // the catalog's newest release when it carries the title, otherwise the highest version installed
+        SoftwareResponse titleRow = tenantSoftwareReadModelQuery.get(tenantId, softwareId);
+        List<SoftwareResponse> titleRows = List.of(titleRow);
+        catalogStatus.apply(titleRows);
+        String latestVersion = titleRow.getLatestVersion();
+        SoftwareSource source = titleRow.getSource();
+        SoftwareSource installedBy = source == SoftwareSource.UNMANAGED ? null : source;
+        List<SoftwareOnDeviceResponse> rows = tenantSoftwareReadModelQuery
+                .devicesForSoftwareRows(tenantId, softwareId, search, latestVersion);
+        rows.forEach(row -> row.setInstalledBy(installedBy));
         return rows;
     }
 
@@ -454,31 +483,32 @@ public class SoftwareInventoryService {
                                                               String search, int page, Integer perPage,
                                                               SortInput sort) {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
-        if (softwareReadModel) {
-            List<SoftwareResponse> rows = deviceSoftwareReadModelQuery
-                    .rowsForDevice(tenantIdProvider.getTenantId(), machineId, filter, search);
-            return paginateList(rows.stream().sorted(order).toList(), page, perPage);
-        }
-        HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
-        List<SoftwareResponse> rows = deviceSoftwareRows(inventory, filter, search);
+        List<SoftwareResponse> rows = deviceSoftware(machineId, filter, search);
         // the filter reads auto-update, so it is set on every row, not only on the page
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
         catalogStatus.apply(rows);
         List<SoftwareResponse> chosen = rows.stream()
                 .filter(row -> filter == null || selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate()))
                 .toList();
-        if (!fleetPaging) {
+        if (!softwareReadModel && !fleetPaging) {
             enrichDevicesCountFromHosts(chosen);
         }
         return paginateList(chosen.stream().sorted(order).toList(), page, perPage);
     }
 
-    public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
+    private List<SoftwareResponse> deviceSoftware(String machineId, SoftwareFilterInput filter, String search) {
         if (softwareReadModel) {
-            return softwareFilters(deviceSoftwareReadModelQuery.rowsForDevice(tenantIdProvider.getTenantId(), machineId, null, search));
+            String tenantId = tenantIdProvider.getTenantId();
+            return deviceSoftwareReadModelQuery.rowsForDevice(tenantId, machineId, search).stream()
+                    .filter(row -> matchesDeviceSoftwareFilter(row, filter))
+                    .toList();
         }
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
-        List<SoftwareResponse> rows = deviceSoftwareRows(inventory, null, search);
+        return deviceSoftwareRows(inventory, filter, search);
+    }
+
+    public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
+        List<SoftwareResponse> rows = deviceSoftware(machineId, null, search);
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
         catalogStatus.apply(rows);
         return softwareFilters(rows);
@@ -587,9 +617,7 @@ public class SoftwareInventoryService {
     }
 
     public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, String search) {
-        List<SoftwareOnDeviceResponse> rows = softwareReadModel
-                ? tenantSoftwareReadModelQuery.devicesForSoftwareRows(tenantIdProvider.getTenantId(), softwareId, search)
-                : devicesWithAutoUpdate(softwareId, search);
+        List<SoftwareOnDeviceResponse> rows = devicesWithAutoUpdate(softwareId, search);
         return SoftwareOnDeviceFilters.builder()
                 .statuses(facet(rows, SoftwareOnDeviceResponse::getStatus))
                 .installedBy(facet(rows, SoftwareOnDeviceResponse::getInstalledBy))
@@ -728,7 +756,10 @@ public class SoftwareInventoryService {
 
     public SoftwareFilters getSoftwareFilters(String search) {
         if (softwareReadModel) {
-            return softwareFilters(tenantSoftwareReadModelQuery.allForFilters(tenantIdProvider.getTenantId(), search));
+            String tenantId = tenantIdProvider.getTenantId();
+            List<SoftwareResponse> titles = tenantSoftwareReadModelQuery.allForFilters(tenantId, search);
+            applyStatuses(titles);
+            return softwareFilters(titles);
         }
         if (fleetPaging) {
             // counting facets would mean downloading the whole Fleet catalog; the UI reads only versionStatuses,

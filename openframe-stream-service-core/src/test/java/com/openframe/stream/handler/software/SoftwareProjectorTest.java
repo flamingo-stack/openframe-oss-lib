@@ -94,4 +94,19 @@ class SoftwareProjectorTest {
         assertThat(saved.getSource()).isEqualTo("programs");
         assertThat(saved.getCveCount()).isZero();
     }
+
+    // versions are compared per numeric segment, not as text: "10.0" sorts before "9.0" as a string
+    @Test
+    void project_latestVersion_isTheNumericMaximum() {
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
+                DeviceSoftware.builder().machineId("m1").versions(List.of("9.0")).name("jq").source("apps").build(),
+                DeviceSoftware.builder().machineId("m2").versions(List.of("10.0")).name("jq").source("apps").build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
+
+        projector.project("t1", 42L);
+
+        ArgumentCaptor<Software> saved = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(saved.capture());
+        assertThat(saved.getValue().getLatestVersion()).isEqualTo("10.0");
+    }
 }
