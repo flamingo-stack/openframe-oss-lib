@@ -2,10 +2,12 @@
 
 import { cloneElement, memo, type ReactElement, type ReactNode, type MouseEvent } from 'react';
 import Link from '../../embed-shims/next-link';
+import { useClippedLabelTooltip } from '../../hooks/ui/use-clipped-label-tooltip';
 import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { BUTTON_KIND_CLASS, Button } from '../ui/button';
+import { FloatingTooltip } from '../ui/floating-tooltip';
 import { useLoadingScope } from '../ui/loading-scope';
 import { NavigationItemBadge } from './navigation-item-badge';
 import { UnreadDot } from './unread-dot';
@@ -76,6 +78,11 @@ function LoadedNavigationSidebarItemButton({
   // The accessible name carries the stamp — "Devices (Beta)" — because `aria-label`
   // replaces the content; the rail's tooltip is the same string.
   const name = item.badge ? `${item.label} (${item.badge})` : item.label;
+  // A label the expanded sidebar clips (a narrow width, a long label): its full
+  // text in a tooltip over it, as `TruncateText` offers it — only while it IS
+  // clipped, since a label that fits would only repeat itself, and only where a
+  // pointer can hover. The rail's tooltip is the row's `title` below.
+  const { ref: labelRef, enabled: labelTooltip } = useClippedLabelTooltip<HTMLSpanElement>(item.label);
 
   const content: ReactNode = (
     <>
@@ -98,7 +105,17 @@ function LoadedNavigationSidebarItemButton({
         )}
         aria-hidden={!showLabel}
       >
-        <span className="min-w-0 truncate text-h4">{item.label}</span>
+        <FloatingTooltip
+          content={item.label}
+          side="top"
+          as="span"
+          disabled={!showLabel || !labelTooltip}
+          triggerClassName="min-w-0"
+        >
+          <span ref={labelRef} className="block min-w-0 truncate text-h4">
+            {item.label}
+          </span>
+        </FloatingTooltip>
         {item.badge && <NavigationItemBadge label={item.badge} className="ml-[var(--spacing-system-xs)] shrink-0" />}
       </span>
 

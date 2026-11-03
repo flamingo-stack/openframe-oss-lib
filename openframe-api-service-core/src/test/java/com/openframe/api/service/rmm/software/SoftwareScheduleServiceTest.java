@@ -185,6 +185,34 @@ class SoftwareScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("create: a brew package without a type is rejected, a winget one needs none")
+    void createBrewWithoutTypeRejected() {
+        createInput.setPackages(List.of(pkg(PackageManagerType.WINGET, "vscode", null), pkg(PackageManagerType.BREW, "slack", null)));
+
+        assertThatThrownBy(() -> service.create(createInput, ACTOR))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("[slack]");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: a brew package without a type is rejected")
+    void updateBrewWithoutTypeRejected() {
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existingActive()));
+        UpdateSoftwareScheduleInput input = new UpdateSoftwareScheduleInput();
+        input.setId(SCHEDULE_ID);
+        input.setName("Renamed");
+        input.setAction(SoftwareAction.UPDATE);
+        input.setPackages(List.of(pkg(PackageManagerType.BREW, "slack", null)));
+        input.setStartAt(Instant.parse("2026-09-16T03:30:00Z"));
+
+        assertThatThrownBy(() -> service.update(input, ACTOR))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("[slack]");
+        verify(scheduleRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("create: empty machineIds clears assignment without saving rows")
     void createNoDevices() {
         createInput.setMachineIds(List.of());

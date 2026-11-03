@@ -344,6 +344,21 @@ class PackageUpdateStatusProcessorTest {
     }
 
     @Test
+    void failedStatus_policyDecidedBeforeTheStateIsSaved() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.NOT_INSTALLED));
+
+        InOrder order = inOrder(autoUpdateRetry, deviceStateRepository);
+        order.verify(autoUpdateRetry).turnOffIfPackageRemoved(st, req);
+        order.verify(deviceStateRepository).save(st);
+    }
+
+    @Test
     void schedulingTheRetryFails_stateIsNotSaved_soTheRedeliveryDecidesAgain() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
