@@ -517,7 +517,9 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
           rows[move(Math.max(current, 0), rows.length)]?.focus();
         }}
         // Closed by its key, focus goes back to the button whatever the host asks after a pointer: it is the keyboard's
-        // way on, and in a panel that closes on Escape it is what lets the panel hear the next one.
+        // way on, and in a panel that closes on Escape it is what lets the panel hear the next one. A trigger inside a
+        // Tooltip shows its tooltip on that focus, as on any focus, for a mouse user too (the history section's two): there
+        // the next Escape closes the tooltip and the one after it the panel. Decided to keep as ordinary keyboard behaviour.
         onCloseAutoFocus={event => {
           if (closedByEscape.current) closedByEscape.current = false;
           else onCloseAutoFocus?.(event);
