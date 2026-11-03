@@ -1292,7 +1292,7 @@ describe('createMingoDecoder: the table', () => {
       decoder.decode({ type: 'TEXT', text: '```\ninside [card://blog_post:1]', streamSeq: 1 });
       decoder.discardHeld();
       const { chunks } = decoder.decode({ type: 'TEXT', text: 'See [card://blog_post:2]\n\nnext', streamSeq: 2 });
-      expect(chunks).toContainEqual(containing({ delta: expect.stringContaining('record://blog_post/2') }));
+      expect(chunks).toContainEqual(containing({ delta: expect.stringContaining('record://blog_post/2') as unknown }));
     });
 
     it('an open reasoning is forgotten', () => {

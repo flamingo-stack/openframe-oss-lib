@@ -552,7 +552,7 @@ describe('who answered, once the part is past its gate', () => {
       output: 'ok',
       approval: { id: 'p1', approved: true },
     };
-    const [part] = accumulate([{ ...named, approved: true } as UiChunk], [ran]);
+    const [part] = accumulate([{ ...named, approved: true }], [ran]);
     expect(part).toMatchObject({
       state: 'output-available',
       output: 'ok',

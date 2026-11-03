@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { textOfParts } from '../../../../chat-protocol/chat-message';
 import { useNatsChatAdapter } from '../use-nats-chat-adapter';
 
-const subscription = vi.hoisted(() => ({ onEvent: (() => {}) as (payload: unknown, messageType: string) => void }));
+const subscription = vi.hoisted(() => ({ onEvent: (_payload: unknown, _messageType: string): void => {} }));
 
 vi.mock('../use-nats-dialog-subscription', () => ({
   useNatsDialogSubscription: (options: { onEvent: typeof subscription.onEvent }) => {
