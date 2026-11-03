@@ -472,6 +472,32 @@ describe('textWithCitationChips', () => {
       expect(drawn(marked(text, 'a'))).toBe(expected);
     });
 
+    describe('in other scripts', () => {
+      it.each([
+        [
+          'Chinese, with no space after the mark',
+          'OpenFrame 每台1美元^，按月计费。它还提供试用^，无需信用卡。',
+          `OpenFrame 每台1美元，按月计费。${chip(1)}它还提供试用，无需信用卡。${chip(2)}`,
+        ],
+        ['a full-width question mark', '真的吗^？是的。', `真的吗？${chip(1)}是的。`],
+        ['a full-width exclamation mark', '太好了^！下句。', `太好了！${chip(1)}下句。`],
+        ['a closing corner bracket', '他说^「走。」然后。', `他说「走。」${chip(1)}然后。`],
+        ['an Arabic question mark', 'يكلف^ دولار؟ التالي.', `يكلف دولار؟ ${chip(1)} التالي.`],
+        ['a Devanagari danda', 'यह^ वाक्य । अगला ।', `यह वाक्य । ${chip(1)} अगला ।`],
+        ['Cyrillic, with a space', 'Цена^ 1. Далее.', `Цена 1. ${chip(1)} Далее.`],
+      ])('%s', (_name, text, expected) => {
+        expect(drawn(marked(text, 'a', 'b'))).toBe(expected);
+      });
+
+      it('a citation that ends on the mark stays', () => {
+        expect(drawn(marked('第一句。^第二句。', 'a'))).toBe(`第一句。${chip(1)}第二句。`);
+      });
+
+      it('a full-width comma ends nothing', () => {
+        expect(drawn(marked('一^，二', 'a'))).toBe(`一，二 ${chip(1)}`);
+      });
+    });
+
     it('a citation that already ends its sentence stays, closers and all', () => {
       expect(drawn(marked('He said "go.^" Next.', 'a'))).toBe(`He said "go." ${chip(1)} Next.`);
       expect(drawn(marked('He said "go."^ Next.', 'a'))).toBe(`He said "go." ${chip(1)} Next.`);
@@ -904,6 +930,8 @@ describe('a chip never breaks the block it lands near', () => {
       '- item\n\n    continued, no code\n- next',
       'a | b |\n--|--|\nc | d |',
       '> | a | b |\n> |---|---|\n> | c | d |',
+      '第一句，继续。第二句！第三句？',
+      'يكلف دولار؟ التالي.',
     ];
     let seed = 20261102;
     const next = (limit: number): number => {

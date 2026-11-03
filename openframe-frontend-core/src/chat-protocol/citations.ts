@@ -497,8 +497,33 @@ function opensABlock(text: string, ranges: readonly ProtectedRange[]): boolean {
   return LIST_ITEM_LINE.test(line) || ONE_LINE_BLOCK.test(line) || QUOTE_LINE.test(line) || holdsNothing(line);
 }
 
-/** What may close around a sentence's last mark: a quote, a bracket, emphasis. */
-const SENTENCE_CLOSERS = new Set(['"', "'", '”', '’', '»', ')', ']', '}', '*', '_', '~']);
+/** What may close around a sentence's last mark: a quote, a bracket, emphasis. CJK closers are full-width. */
+const SENTENCE_CLOSERS = new Set([
+  '"',
+  "'",
+  '”',
+  '’',
+  '»',
+  ')',
+  ']',
+  '}',
+  '*',
+  '_',
+  '~',
+  '\u300D',
+  '\u300F',
+  '\u3011',
+  '\u3015',
+  '\u3009',
+  '\u300B',
+  '\uFF09',
+  '\uFF3D',
+  '\uFF5D',
+]);
+/** What ends a sentence where text follows with a space: Latin and Cyrillic, Arabic and Urdu, Devanagari, Armenian. */
+const SPACED_SENTENCE_MARKS = new Set(['.', '!', '?', '\u061F', '\u06D4', '\u0964', '\u0965', '\u0589']);
+/** What ends a sentence in Chinese and Japanese, where the next one follows with no space: the ideographic and full-width marks. */
+const UNSPACED_SENTENCE_MARKS = new Set(['\u3002', '\uFF61', '\uFF01', '\uFF1F']);
 /** A full stop that ends a word and no sentence. */
 const ABBREVIATION = /(?:^|[\s(])(?:e\.g|i\.e|vs)\.$/i;
 
@@ -507,9 +532,11 @@ const ABBREVIATION = /(?:^|[\s(])(?:e\.g|i\.e|vs)\.$/i;
  * no end, which is what a decimal, a version and a domain are ($1.00, v1.2.3, flamingo.run).
  */
 function sentenceEndAt(text: string, at: number): number {
-  if (text[at] !== '.' && text[at] !== '!' && text[at] !== '?') return -1;
+  const unspaced = UNSPACED_SENTENCE_MARKS.has(text[at]);
+  if (!unspaced && !SPACED_SENTENCE_MARKS.has(text[at])) return -1;
   let end = at + 1;
   while (end < text.length && SENTENCE_CLOSERS.has(text[end])) end++;
+  if (unspaced) return end;
   if (end < text.length && !/\s/.test(text[end])) return -1;
   return ABBREVIATION.test(text.slice(Math.max(0, at - 4), at + 1)) ? -1 : end;
 }
@@ -608,6 +635,13 @@ function chipLineAfter(text: string, position: number, block: BlockEnd, chips: s
   return `${before}\n${prefix}${chips}${needsABreakAfterTheChip(nextLine, block.containers) ? '\n' : ''}`;
 }
 
+/** A chip stands against a Chinese or Japanese mark, the way the next sentence does. */
+function spaceBeforeChip(text: string, position: number): string {
+  let back = position - 1;
+  while (back > 0 && SENTENCE_CLOSERS.has(text[back])) back--;
+  return UNSPACED_SENTENCE_MARKS.has(text[back]) ? '' : ' ';
+}
+
 /**
  * The part's markdown with its citation chips in it, for drawing only: ` [n](#citation-n)` at the end of the sentence
  * each citation's `endIndex` is in, before trailing whitespace, moved past any code span, fence or link it would land in.
@@ -653,7 +687,7 @@ export function textWithCitationChips(part: ChatTextPart, numbers: ReadonlyMap<s
     } else if (insert.block) {
       out += chipLineAfter(text, position, insert.block, chips);
     } else {
-      out += ` ${chips}`;
+      out += `${spaceBeforeChip(text, position)}${chips}`;
     }
     at = position;
   }
