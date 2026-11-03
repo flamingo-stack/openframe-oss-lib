@@ -140,4 +140,24 @@ describe('Escape on an open menu', () => {
     // `fireEvent` answers false when a listener called `preventDefault`.
     expect(fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })).toBe(false);
   });
+
+  it('a menu left open as its subject starts loading draws nothing, so it takes no key', () => {
+    const onOpenChange = vi.fn();
+    const heard = vi.fn();
+    document.addEventListener('keydown', heard);
+    render(
+      <ActionsMenuDropdown
+        loading
+        open
+        onOpenChange={onOpenChange}
+        triggerAriaLabel="Record actions"
+        groups={[{ items: [{ id: 'ask', label: 'Ask Mingo', onClick: () => undefined }] }]}
+      />,
+    );
+    expect(screen.queryByRole('menu')).toBeNull();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    document.removeEventListener('keydown', heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
 });

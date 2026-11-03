@@ -453,7 +453,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
   // the key first, before the document does.
   const closedByEscape = React.useRef(false);
   React.useEffect(() => {
-    if (!open) return undefined;
+    if (!open || loading) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
@@ -463,7 +463,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
     };
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [open, setOpen]);
+  }, [open, loading, setOpen]);
 
   const handleItemClick = useCallback(
     (item: ActionsMenuItem) => {
