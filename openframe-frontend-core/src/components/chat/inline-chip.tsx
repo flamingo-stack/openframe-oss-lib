@@ -51,6 +51,10 @@ const INLINE_CHIP_NAME_CLASS = 'relative ps-[calc(1rem+var(--spacing-system-xxs)
  * A 16px muted lead icon in that padding, on the first line, ending 0.2em under the text's baseline: an inline box starts
  * at its font's ascent above the baseline, 0.99em in the chat's body font (measured against the inline version it
  * replaces: within 0.2px at 14, 16 and 18px, in Chromium and in WebKit).
+ *
+ * Left-to-right only in WebKit. There a right-to-left name that wraps from the middle of a line keeps the icon on its first
+ * line, 77 to 152px from the first letter: WebKit puts `start-0` at the edge of all the name's lines, not of the first. No
+ * placement tried holds it (a static position with a negative margin is worse). Chromium is right either way.
  */
 const INLINE_CHIP_ICON_CLASS = 'absolute start-0 top-[calc(1.19em-1rem)] size-4 text-ods-text-secondary [&_svg]:size-4';
 
