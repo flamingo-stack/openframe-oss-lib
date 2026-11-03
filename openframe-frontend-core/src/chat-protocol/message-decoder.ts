@@ -118,6 +118,8 @@ export interface MingoDecoder {
    * What is held back (a text tail that could still be a token, an open reasoning) is forgotten, with no chunk. For a host
    * whose thread now draws another copy of what this decoder was writing, the persisted row: that copy already says it,
    * and flushing it would write it a second time. The sequence stays, so a redelivery is still a redelivery.
+   *
+   * TODO(CU-17tkuw61kfy): goes with the old text writer. With no old tokens, no tail is ever held.
    */
   discardHeld(): void;
 }
