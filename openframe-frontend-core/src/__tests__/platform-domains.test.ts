@@ -12,6 +12,7 @@ import {
   resolveRedirectTarget,
   getPlatformByHostname,
   getAllPlatformBaseDomains,
+  getPlatformBaseDomains,
   hostOf,
   expandWwwApex,
   toRegistrableBaseDomain,
@@ -74,6 +75,30 @@ describe('🔒 cross-subdomain cookie sharing (the SSO invariant — must never 
     expect(bases).not.toContain('.flamingo.cx');
     expect(getPlatformByHostname('flamingo.cx')).toBe('flamingo');
   });
+  it('answers on a server, where there is no page to read, the same as a production page', () => {
+    const onPage = withProdWindow('www.flamingo.run', getAllPlatformBaseDomains);
+    vi.stubGlobal('window', undefined);
+    try {
+      expect(getAllPlatformBaseDomains()).toEqual([]);
+      expect(getPlatformBaseDomains()).toEqual(onPage);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    for (const must of [
+      '.flamingo.so',
+      '.flamingo.run',
+      '.openmsp.ai',
+      '.tmcg.miami',
+      '.openframe.ai',
+      '.mlg.soccer',
+    ]) {
+      expect(onPage).toContain(must);
+    }
+  });
+  it('matches a subdomain the registry does not list, under a base it does (content-api.openframe.ai)', () => {
+    expect(matchCookieDomain('content-api.openframe.ai', getPlatformBaseDomains())).toBe('.openframe.ai');
+    expect(matchCookieDomain('content-api.openframe.build', getPlatformBaseDomains())).toBeUndefined();
+  });
   it('returns [] for localhost and .vercel.app (host-only cookies)', () => {
     expect(withProdWindow('localhost', getAllPlatformBaseDomains)).toEqual([]);
     expect(withProdWindow('foo.vercel.app', getAllPlatformBaseDomains)).toEqual(['.vercel.app', 'vercel.app']);
@@ -132,6 +157,14 @@ describe('env override path', () => {
     expect(mod.getPlatformProductionUrl('tmcg')).toBe('https://sentinel-tmcg.example');
     // a non-sharing key is unaffected
     expect(mod.getPlatformProductionUrl('openmsp')).toBe('https://www.openmsp.ai');
+  });
+  it('a pseudo entry adds no cookie base: the product dashboard is not a site of ours', async () => {
+    const pseudo = PLATFORM_DOMAINS.find(entry => entry.pseudo);
+    if (!pseudo) throw new Error('the registry names no pseudo entry');
+    vi.stubEnv(pseudo.envVar, 'https://dashboard.sentinel-pseudo.example');
+    vi.resetModules();
+    const mod = await import('@/platform-domains');
+    expect(mod.getPlatformBaseDomains()).not.toContain('.sentinel-pseudo.example');
   });
   it('the shared NEXT_PUBLIC_FLAMINGO_URL drives both of its keys', async () => {
     vi.stubEnv('NEXT_PUBLIC_FLAMINGO_URL', 'https://sentinel-flamingo.example');
