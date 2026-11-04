@@ -47,7 +47,7 @@ public class SoftwareAutoUpdateService {
     }
 
     // A title Fleet does not list yet, named after the package its policies update.
-    public SoftwareResponse policyTitle(String softwareId) {
+    public SoftwareResponse titleFromPolicies(String softwareId) {
         String tenantId = tenantIdProvider.getTenantId();
         List<String> softwareIds = List.of(softwareId);
         String name = policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, softwareIds).stream()

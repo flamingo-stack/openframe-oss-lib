@@ -114,7 +114,7 @@ class SoftwareAutoUpdateServiceTest {
     }
 
     @Test
-    void policyTitle_namedAfterThePackage_orTheIdWithoutOne() {
+    void titleFromPolicies_namedAfterThePackage_orTheIdWithoutOne() {
         PackageAutoUpdatePolicy unnamed = policy("m1", "3522", false);
         PackageAutoUpdatePolicy named = policy("m2", "3522", false);
         named.setPackageName("7zip.7zip");
@@ -122,8 +122,8 @@ class SoftwareAutoUpdateServiceTest {
         when(policyRepository.findByTenantIdAndSoftwareIdIn(eq(TENANT), anyCollection()))
                 .thenReturn(policies).thenReturn(List.of());
 
-        SoftwareResponse title = service.policyTitle("3522");
-        SoftwareResponse bare = service.policyTitle("3522");
+        SoftwareResponse title = service.titleFromPolicies("3522");
+        SoftwareResponse bare = service.titleFromPolicies("3522");
 
         assertThat(title).extracting(SoftwareResponse::getId, SoftwareResponse::getName)
                 .containsExactly("3522", "7zip.7zip");
@@ -133,8 +133,10 @@ class SoftwareAutoUpdateServiceTest {
     @Test
     void hasPolicy_asksForTheTenantsPolicies() {
         when(policyRepository.existsByTenantIdAndSoftwareId(TENANT, "3522")).thenReturn(true);
+        when(policyRepository.existsByTenantIdAndSoftwareId(TENANT, "42")).thenReturn(false);
 
         assertThat(service.hasPolicy("3522")).isTrue();
+        assertThat(service.hasPolicy("42")).isFalse();
     }
 
     private static PackageAutoUpdatePolicy policy(String machineId, String softwareId, boolean enabled) {

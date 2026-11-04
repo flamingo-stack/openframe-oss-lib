@@ -147,14 +147,19 @@ public class SoftwareInventoryService {
     // while a policy already names it: the policy is enough to turn off, and nothing is written for an unknown id.
     public SoftwareResponse turnOffAutoUpdate(String softwareId, String actor) {
         Optional<SoftwareResponse> title = findById(softwareId);
-        if (title.isEmpty() && !autoUpdateService.hasPolicy(softwareId)) {
+        boolean inFleet = title.isPresent();
+        if (!isKnown(softwareId, inFleet)) {
             throw new NotFoundException("Software not found: " + softwareId);
         }
         autoUpdateService.turnOff(softwareId, actor);
-        SoftwareResponse software = title.orElseGet(() -> autoUpdateService.policyTitle(softwareId));
+        SoftwareResponse software = title.orElseGet(() -> autoUpdateService.titleFromPolicies(softwareId));
         List<SoftwareResponse> rows = List.of(software);
         applyStatuses(rows);
         return software;
+    }
+
+    private boolean isKnown(String softwareId, boolean inFleet) {
+        return inFleet || autoUpdateService.hasPolicy(softwareId);
     }
 
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,

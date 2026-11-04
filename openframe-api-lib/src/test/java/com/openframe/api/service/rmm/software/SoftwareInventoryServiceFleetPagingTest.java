@@ -116,7 +116,7 @@ class SoftwareInventoryServiceFleetPagingTest {
         // setup: on a device, so a policy names it, but not yet counted by Fleet
         when(autoUpdateService.hasPolicy("3522")).thenReturn(true);
         SoftwareResponse fromPolicy = SoftwareResponse.builder().id("3522").name("7zip.7zip").build();
-        when(autoUpdateService.policyTitle("3522")).thenReturn(fromPolicy);
+        when(autoUpdateService.titleFromPolicies("3522")).thenReturn(fromPolicy);
 
         // execution
         SoftwareResponse result = service.turnOffAutoUpdate("3522", "admin@x");
@@ -139,7 +139,7 @@ class SoftwareInventoryServiceFleetPagingTest {
         // verifications
         assertThat(result.getName()).isEqualTo("Chrome");
         verify(autoUpdateService).turnOff("42", "admin@x");
-        verify(autoUpdateService, never()).policyTitle(anyString());
+        verify(autoUpdateService, never()).titleFromPolicies(anyString());
     }
 
     @Test
