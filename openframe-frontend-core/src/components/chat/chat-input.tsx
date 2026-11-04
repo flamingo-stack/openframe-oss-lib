@@ -14,7 +14,7 @@ import {
   type MouseEvent,
 } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createRecordLinkScanner, parseRecordHref, recordLinkMarkdown } from '../../chat-protocol/record-link';
+import { extractRecordLinks, parseRecordHref, recordHref, recordLinkMarkdown } from '../../chat-protocol/record-link';
 import { cn } from '../../utils/cn';
 import { Send01Icon, StopCircleIcon } from '../icons-v2-generated';
 import { AvatarStack } from '../ui/avatar-stack';
@@ -46,13 +46,12 @@ type Segment = { kind: 'text'; text: string } | { kind: 'mention'; token: string
 function parseSegments(value: string, meta: Map<string, MentionMeta>): Segment[] {
   const segs: Segment[] = [];
   let last = 0;
-  for (const m of value.matchAll(createRecordLinkScanner())) {
-    const at = m.index ?? 0;
-    if (at > last) segs.push({ kind: 'text', text: value.slice(last, at) });
-    const token = m[2];
+  for (const link of extractRecordLinks(value)) {
+    if (link.start > last) segs.push({ kind: 'text', text: value.slice(last, link.start) });
+    const token = recordHref(link.type, link.id);
     const info = meta.get(token);
-    segs.push({ kind: 'mention', token, label: info?.label ?? m[1].replace(/\\(.)/g, '$1'), icon: info?.icon });
-    last = at + m[0].length;
+    segs.push({ kind: 'mention', token, label: info?.label ?? link.label, icon: info?.icon });
+    last = link.end;
   }
   if (last < value.length) segs.push({ kind: 'text', text: value.slice(last) });
   return segs;

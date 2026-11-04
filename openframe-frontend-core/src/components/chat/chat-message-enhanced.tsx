@@ -15,7 +15,7 @@ import {
   textOfParts,
 } from '../../chat-protocol/chat-message';
 import { parseCitationHref, textWithCitationChips } from '../../chat-protocol/citations';
-import { normalizeRecordUri, parseRecordHref, recordHref } from '../../chat-protocol/record-link';
+import { normalizeRecordUri, parseRecordHref, recordHref, recordLinksInParts } from '../../chat-protocol/record-link';
 import {
   CHAT_INTERRUPTED_AFTER_RUN_NOTICE,
   CHAT_INTERRUPTED_NOTICE,
@@ -56,7 +56,6 @@ import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
 import { RecordChipProvider } from './record-actions';
 import { RecordChip } from './record-chip';
-import { recordLinksInParts } from './record-links-in';
 import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
 import { ThinkingDisplay } from './thinking-display';

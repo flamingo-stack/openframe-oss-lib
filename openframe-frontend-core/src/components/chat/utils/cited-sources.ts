@@ -1,11 +1,15 @@
 import { type ChatPart, type ChatSourcePart, isSourcePart } from '../../../chat-protocol/chat-message';
 import { citationNumbers } from '../../../chat-protocol/citations';
-import { parseCollectionHref, parseRecordHref, recordHref } from '../../../chat-protocol/record-link';
+import {
+  parseCollectionHref,
+  parseRecordHref,
+  recordHref,
+  recordLinksInParts,
+} from '../../../chat-protocol/record-link';
 import { platformOfUrl } from '../../../platform-domains';
 import { canonicalContentRefType } from '../../../utils/list-url';
 import { groupSourcesByTable, type SourceGroup, type SourceRow } from '../../../utils/source-grouping';
 import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
-import { recordLinksInParts } from '../record-links-in';
 import type { SourceRowInput } from './source-row-cta';
 
 /** How many retrieved sources to show when the answer cited none of them. */

@@ -17,8 +17,9 @@ const CHIP = '\\[\\d{1,2}(?:\\s*,\\s*\\d{1,2})*\\]';
 export const CITATION_CHIP_RUN = `(?:${CHIP})+`;
 export const CITATION_CHIP_FOLLOW = '[\\s.,;:!?)\\]]';
 
-/** A run of chips standing apart from a word; group 1 is the whitespace (or nothing) before it. */
-function chipRunScanner(): RegExp {
+/** A run of chips standing apart from a word; group 1 is the whitespace (or nothing) before it. A fresh global
+ *  pattern per call, for a reader that finds the runs a text holds without rebuilding the grammar. */
+export function citationChipRunScanner(): RegExp {
   return new RegExp(`(^|\\s)${CITATION_CHIP_RUN}(?=${CITATION_CHIP_FOLLOW}|$)`, 'g');
 }
 
@@ -27,5 +28,7 @@ function chipRunScanner(): RegExp {
  * "the command." and "the guide [3] covers it" reads "the guide covers it"; a line break before a run stays.
  */
 export function stripCitationChips(text: string): string {
-  return text.replace(chipRunScanner(), (_run: string, lead: string) => (lead === ' ' || lead === '\t' ? '' : lead));
+  return text.replace(citationChipRunScanner(), (_run: string, lead: string) =>
+    lead === ' ' || lead === '\t' ? '' : lead,
+  );
 }

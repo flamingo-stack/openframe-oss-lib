@@ -1,9 +1,11 @@
 /**
  * The record link grammar: one markdown link per record (`[name](record://type/id)`). The hub and the Java agent
- * mirror it to check the links an answer writes, so its edges are pinned here.
+ * mirror it to check the links an answer writes; all three are held to the vectors the hub serves
+ * (`record-link-vectors.json`, read by `readRecordLinkVectors`), and the lib's own edges are pinned here.
  */
 
 import { describe, expect, it } from 'vitest';
+import { readRecordLinkVectors } from '../__fixtures__/hub-contracts';
 import {
   collectionHref,
   extractRecordLinks,
@@ -13,9 +15,12 @@ import {
   parseRecordHref,
   recordHref,
   recordLinkMarkdown,
+  recordLinksInParts,
+  replaceRecordLinks,
   unlinkUnknownRecords,
 } from '../record-link';
-import { RECORD_URI_VECTORS } from '../wire-fixtures';
+
+const VECTORS = await readRecordLinkVectors();
 
 const ID = '6aad91a3b776f95ad7491bd9';
 
@@ -73,16 +78,73 @@ describe('unlinkUnknownRecords', () => {
   });
 });
 
-describe('the record URI, pinned to the Java agent', () => {
-  it.each(RECORD_URI_VECTORS)('$type/$id', ({ type, id, href }) => {
+describe.skipIf(!VECTORS)("the hub's record-link vectors", () => {
+  const v = VECTORS ?? { uris: [], readHrefs: [], notRecords: [], collections: [], markdown: [], links: [] };
+
+  it.each(v.uris)('writes and reads $type/$id', ({ type, id, href }) => {
     expect(recordHref(type, id)).toBe(href);
     expect(parseRecordHref(href)).toEqual({ type, id });
   });
 
+  it.each(v.readHrefs)('reads $href leniently', ({ href, type, id }) => {
+    expect(parseRecordHref(href)).toEqual({ type, id });
+  });
+
+  it.each(v.notRecords)('names no record: %s', href => {
+    expect(parseRecordHref(href)).toBeNull();
+  });
+
+  it.each(v.collections)('reads the collection $href', ({ type, href }) => {
+    expect(collectionHref(type)).toBe(href);
+    expect(parseCollectionHref(href)).toEqual({ type });
+  });
+
+  it.each(v.markdown)('writes the link of $type/$id', ({ type, id, label, markdown }) => {
+    expect(recordLinkMarkdown({ type, id }, label)).toBe(markdown);
+    expect(extractRecordLinks(markdown)).toMatchObject([{ type, id, label }]);
+  });
+
+  it.each(v.links)('finds the links of $text', ({ text, links }) => {
+    expect(extractRecordLinks(text).map(({ type, id, label }) => ({ type, id, label }))).toEqual(links);
+  });
+});
+
+describe('record links in parentheses', () => {
   it('encodes parentheses, which a markdown destination cannot hold', () => {
     const markdown = recordLinkMarkdown({ type: 'blog', id: 'a (b)' }, 'A (b)');
     expect(markdown).toBe('[A (b)](record://blog/a%20%28b%29)');
     expect(extractRecordLinks(markdown)).toMatchObject([{ type: 'blog', id: 'a (b)', label: 'A (b)' }]);
+  });
+});
+
+describe('a record link is a link of the parsed markdown', () => {
+  const LINK = `[Patch script](record://script/${ID})`;
+
+  it('is text, not a link, in a code span or a code block', () => {
+    expect(extractRecordLinks(`\`${LINK}\` and\n\n\`\`\`\n${LINK}\n\`\`\``)).toEqual([]);
+    expect(unlinkUnknownRecords(`\`${LINK}\``, () => false)).toBe(`\`${LINK}\``);
+  });
+
+  it('keeps a name written with emphasis as written when it is unlinked', () => {
+    expect(unlinkUnknownRecords('[**Ghost** \\[x\\]](record://script/1) left', () => false)).toBe(
+      '**Ghost** \\[x\\] left',
+    );
+  });
+
+  it('replaces each link and leaves the text around it alone', () => {
+    const text = `a ${LINK} b [Other](record://blog/2) c`;
+    expect(replaceRecordLinks(text, link => `<${link.type}>`)).toBe('a <script> b <blog> c');
+  });
+
+  it('reads the links a message draws, once each, in the order they first appear', () => {
+    const parts = [
+      { type: 'text' as const, text: `${LINK} \`[Code](record://blog/9)\`` },
+      { type: 'text' as const, text: `[Again](record://script/${ID}) [Guide](record://onboarding_guide/mac)` },
+    ];
+    expect(recordLinksInParts(parts)).toEqual([
+      { type: 'script', id: ID, label: 'Patch script' },
+      { type: 'onboarding_guide', id: 'mac', label: 'Guide' },
+    ]);
   });
 });
 

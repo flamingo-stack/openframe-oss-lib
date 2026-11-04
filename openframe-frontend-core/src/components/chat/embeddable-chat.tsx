@@ -41,7 +41,7 @@ import { isIOS } from '@react-aria/utils';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { type ChatMessage, type ChatToolPart, writingMessageIndex } from '../../chat-protocol/chat-message';
-import { createRecordLinkScanner, recordHref } from '../../chat-protocol/record-link';
+import { recordHref, replaceRecordLinks } from '../../chat-protocol/record-link';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
@@ -626,7 +626,7 @@ const mentionTokenOf = (key: string, markerByType: Map<string, string>): string 
 
 /** The draft without the record link whose href is `href` (whatever name it shows). */
 const withoutRecordLink = (value: string, href: string): string =>
-  value.replace(createRecordLinkScanner(), (whole, _label: string, linked: string) => (linked === href ? '' : whole));
+  replaceRecordLinks(value, link => (recordHref(link.type, link.id) === href ? '' : value.slice(link.start, link.end)));
 
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';

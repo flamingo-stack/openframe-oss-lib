@@ -15,9 +15,21 @@
  * It replaced two private tokens a model typed into its text, one for a card and one for a chip. Those were not
  * markdown, so markdown broke them (a code span, a link, emphasis), and they carried no name.
  *
- * Server-safe: no React, no browser APIs. Mirrored by the Java agent (openframe-saas-tenant), and pinned by
- * `__tests__/record-link.test.ts`.
+ * A record link is found in the PARSED markdown (CommonMark + GFM, the chat body's own parser), never by a pattern over
+ * the text: a record link in a code span or a code block is text, not a link, so no reader counts it, the server's
+ * check included. THE one parser (`extractRecordLinks`, `replaceRecordLinks`, `recordLinksInParts`), for the chat's
+ * renderer, its composer and every server.
+ *
+ * Server-safe: no React, no browser APIs. Mirrored by the Java agent (openframe-saas-tenant); both are held to the
+ * record-link vectors the hub serves (`__tests__/record-link.test.ts`).
  */
+
+import type { Nodes, Root } from 'mdast';
+import remarkGfm from 'remark-gfm';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
+
+import type { ChatPart } from './chat-message';
 
 export const RECORD_LINK_SCHEME = 'record://';
 
@@ -30,11 +42,17 @@ export interface RecordLink {
   id: string;
 }
 
-/** A record link found in a text, with the name it shows and where it sits. */
-export interface RecordLinkMatch extends RecordLink {
+/** A record link as a message shows it: its record and the name it gives it. */
+export interface DrawnRecordLink extends RecordLink {
   label: string;
+}
+
+/** A record link found in a text, with the name it shows and where it sits (`text.slice(start, end)` is the link). */
+export interface RecordLinkMatch extends DrawnRecordLink {
   start: number;
   end: number;
+  /** The name as the markdown writes it (escapes and emphasis kept), what the link becomes when it is unlinked. */
+  labelSource: string;
 }
 
 /**
@@ -118,39 +136,74 @@ function safeDecode(value: string): string {
   }
 }
 
-/**
- * A record link in markdown SOURCE: `[label](record://type/id)`, the destination optionally in angle brackets. For a
- * server that has the raw text only (a stream filter, an MCP reply); the chat renderer reads the parsed markdown
- * instead. The label may hold escaped brackets; the destination is the href `recordHref` makes, which holds no space
- * and no parenthesis.
- */
-export function createRecordLinkScanner(): RegExp {
-  return /\[((?:\\.|[^\\[\]\n])*)\]\(<?(record:\/\/[^\s()<>]+)>?\)/g;
+/** Built on first use, never at import: the CommonJS build loads `unified` through an interop that is not ready
+ *  while this module is still being evaluated. */
+let parser: ReturnType<typeof createParser> | null = null;
+const createParser = () => unified().use(remarkParse).use(remarkGfm);
+
+/** The plain text a node shows. */
+function textOf(node: Nodes): string {
+  if ('value' in node && typeof node.value === 'string') return node.value;
+  if ('children' in node) return (node.children as Nodes[]).map(textOf).join('');
+  return '';
 }
 
-/** Every record link in a text, in order. */
+/** Every record link a text draws, in document order: what the parsed markdown holds as a link to a record. */
 export function extractRecordLinks(text: string): RecordLinkMatch[] {
-  if (!text.includes(RECORD_LINK_SCHEME)) return [];
-  const out: RecordLinkMatch[] = [];
-  for (const match of text.matchAll(createRecordLinkScanner())) {
-    const record = parseRecordHref(match[2]);
-    if (!record) continue;
-    const start = match.index ?? 0;
-    out.push({ ...record, label: match[1].replace(/\\(.)/g, '$1'), start, end: start + match[0].length });
+  if (!text || !text.includes(RECORD_LINK_SCHEME)) return [];
+  parser ??= createParser();
+  const tree = parser.runSync(parser.parse(text), text) as Root;
+  const found: RecordLinkMatch[] = [];
+  const visit = (node: Nodes) => {
+    if (node.type === 'link') {
+      const record = parseRecordHref(node.url);
+      const start = node.position?.start.offset;
+      const end = node.position?.end.offset;
+      if (record && start !== undefined && end !== undefined) {
+        const first = node.children[0]?.position?.start.offset;
+        const last = node.children[node.children.length - 1]?.position?.end.offset;
+        const labelSource = first !== undefined && last !== undefined ? text.slice(first, last) : '';
+        found.push({ ...record, label: textOf(node) || record.id, start, end, labelSource });
+      }
+      return;
+    }
+    if ('children' in node) for (const child of node.children as Nodes[]) visit(child);
+  };
+  visit(tree);
+  return found;
+}
+
+/** The text with each record link replaced by what `replace` answers for it; the rest of the text is untouched. */
+export function replaceRecordLinks(text: string, replace: (link: RecordLinkMatch) => string): string {
+  const links = extractRecordLinks(text);
+  let out = text;
+  for (let i = links.length - 1; i >= 0; i--) {
+    const link = links[i];
+    out = out.slice(0, link.start) + replace(link) + out.slice(link.end);
   }
   return out;
 }
 
 /**
- * The text with every record link the reader may not be shown turned into its plain label: the server's check before
- * an answer leaves it. `allowed` says whether a record was offered to the model this turn. A link with no label
+ * The text with every record link the reader may not be shown turned into its name as written: the server's check
+ * before an answer leaves it. `allowed` says whether a record was offered to the model this turn. A link with no label
  * becomes nothing.
  */
 export function unlinkUnknownRecords(text: string, allowed: (record: RecordLink) => boolean): string {
-  if (!text.includes(RECORD_LINK_SCHEME)) return text;
-  return text.replace(createRecordLinkScanner(), (whole, label: string, href: string) => {
-    const record = parseRecordHref(href);
-    if (record && allowed(record)) return whole;
-    return label;
-  });
+  return replaceRecordLinks(text, link =>
+    allowed({ type: link.type, id: link.id }) ? text.slice(link.start, link.end) : link.labelSource,
+  );
+}
+
+/** Every record a message's text parts link, once each, in the order they first link it, with the name given it. */
+export function recordLinksInParts(parts: readonly ChatPart[]): DrawnRecordLink[] {
+  const byKey = new Map<string, DrawnRecordLink>();
+  for (const part of parts) {
+    if (part.type !== 'text' || !part.text) continue;
+    for (const { type, id, label } of extractRecordLinks(part.text)) {
+      const key = `${type}/${id}`;
+      if (!byKey.has(key)) byKey.set(key, { type, id, label });
+    }
+  }
+  return [...byKey.values()];
 }
