@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import tools.jackson.databind.json.JsonMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
@@ -61,6 +62,8 @@ public class PinotConfigInitializer {
             new PinotConfig("logs","schema-logs.json","table-config-logs-realtime.json", null)
     );
 
+    // Two constructors and none marked: Spring would look for a no-arg one and fail.
+    @Autowired
     public PinotConfigInitializer(ResourceLoader resourceLoader, Environment environment) {
         this(resourceLoader, environment, new RestTemplate());
     }
