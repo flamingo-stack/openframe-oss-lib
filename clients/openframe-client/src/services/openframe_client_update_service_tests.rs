@@ -139,6 +139,11 @@ async fn an_attempt_that_fails_before_the_launch_leaves_no_update_state() {
     ];
 
     for (message, expected) in failures {
+        // a launch from an earlier attempt that never resolved
+        let mut stale = UpdateState::new("1.0.0".to_string());
+        stale.set_phase(UpdatePhase::UpdaterLaunched);
+        f.service.update_state_service.save(&stale).await.unwrap();
+
         let guard = f.service.reserve(&message).unwrap();
         let reason = format!("{:#}", f.service.apply(message, guard).await.err().unwrap());
 

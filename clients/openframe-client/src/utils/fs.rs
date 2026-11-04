@@ -83,17 +83,18 @@ mod held_target {
 
         match &result {
             Ok(()) => info!(
-                "Replaced {} by rename on attempt {} after the plain replace was denied",
+                "Replaced {} by rename on attempt {} after the plain replace failed",
                 path.display(),
                 attempts
             ),
             Err(e) => {
                 warn!(
-                    "Could not replace {} after {} rename attempts ({}); held by: {}",
+                    "Could not replace {} after {} rename attempts ({}); target held by: {}; temp file held by: {}",
                     path.display(),
                     attempts,
                     e,
-                    holders(path)
+                    holders(path),
+                    holders(&tmp_path)
                 );
                 if let Err(remove_err) = std::fs::remove_file(&tmp_path) {
                     warn!(

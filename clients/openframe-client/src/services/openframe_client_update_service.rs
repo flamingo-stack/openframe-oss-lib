@@ -230,7 +230,7 @@ impl OpenFrameClientUpdateService {
             .execute_update(&message, &requested_semver, &mut update_state, guard)
             .await;
 
-        // Handle errors: set status to Failed (cleanup already done in execute_update)
+        // Handle errors: set status to Failed and drop any update state (execute_update removed the staged binary)
         if let Err(ref e) = update_result {
             error!("Update failed: {:#}", e);
 
@@ -241,6 +241,11 @@ impl OpenFrameClientUpdateService {
                 .await
             {
                 error!("Failed to set update status to Failed: {:#}", status_err);
+            }
+
+            // a stale state from an earlier attempt would otherwise feed the boot crash-loop guard
+            if let Err(clear_err) = self.update_state_service.clear().await {
+                warn!("Failed to clear the update state: {:#}", clear_err);
             }
 
             info!("Update failed, NATS will retry");
@@ -288,6 +293,9 @@ impl OpenFrameClientUpdateService {
 
         self.tool_run_manager.mark_client_update_pending();
 
+        let current_exe =
+            std::env::current_exe().context("Failed to get current executable path")?;
+
         // 3. Stage the extracted binary for the updater script
         let staged_path = match self
             .stage_binary(&binary_bytes, &download_config.target_file_name)
@@ -310,9 +318,6 @@ impl OpenFrameClientUpdateService {
         }
 
         // 4. Launch update process (platform-specific)
-        let current_exe =
-            std::env::current_exe().context("Failed to get current executable path")?;
-
         let params = UpdaterParams {
             binary_path: staged_path.clone(),
             target_exe: current_exe,
@@ -355,7 +360,6 @@ impl OpenFrameClientUpdateService {
             Err(e) => {
                 error!("Failed to launch updater: {:#}", e);
                 Self::remove_staged_binary(&staged_path, "launch failure");
-                self.update_state_service.clear().await?;
                 return Err(e);
             }
         };
