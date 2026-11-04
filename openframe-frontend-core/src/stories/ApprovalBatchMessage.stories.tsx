@@ -2,7 +2,12 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type React from 'react';
 
 import { ApprovalBatchMessage } from '../components/chat/approval-batch-message';
-import type { ApprovalBatchData, ApprovalBatchExecutionState, PendingToolCallData } from '../components/chat/types';
+import type {
+  ApprovalBatchData,
+  ApprovalBatchExecutionState,
+  PendingToolCallData,
+  PolicyReviewData,
+} from '../components/chat/types';
 
 /**
  * The "Command Block" from Figma (open-design-system, node 1092-2807).
@@ -40,12 +45,38 @@ const toolCall: PendingToolCallData = {
   },
 };
 
-const makeData = (executions?: Record<string, ApprovalBatchExecutionState>): ApprovalBatchData => ({
+const makeData = (
+  executions?: Record<string, ApprovalBatchExecutionState>,
+  policyReview?: PolicyReviewData,
+): ApprovalBatchData => ({
   approvalRequestId: 'batch-1',
   approvalType: 'ADMIN',
-  toolCalls: [toolCall],
+  toolCalls: [policyReview ? { ...toolCall, policyReview } : toolCall],
   executions,
 });
+
+/** The AI review of a call the policy allows but a guardrail rule escalated to a technician (Figma 1374-105458). */
+const escalatedReview: PolicyReviewData = {
+  source: 'CLASSIFIER',
+  decision: 'DENY',
+  approvalLevel: 'ASK_TECHNICIAN',
+  policyLevel: 'ALLOW',
+  operationCodes: ['DELETE_FILES'],
+  matchedRules: [{ code: 'IRREVERSIBLE_LOCAL_DESTRUCTION', label: 'Irreversible local destruction' }],
+  reason:
+    'Recursively deletes the Downloads folder and then inspects its status; recursive deletion of user data triggers irreversible local destruction.',
+};
+
+/** The AI review of a call the policy itself sends to a technician: no rule matched. */
+const policyReview: PolicyReviewData = {
+  source: 'CLASSIFIER',
+  decision: 'POLICY',
+  approvalLevel: 'ASK_TECHNICIAN',
+  policyLevel: 'ASK_TECHNICIAN',
+  operationCodes: ['KILL_PROCESS', 'CHECK_PERFORMANCE'],
+  matchedRules: [],
+  reason: 'Quits the process, force-kills it if it remains running, and checks whether it closed.',
+};
 
 const executingData = makeData({ [REQUEST_ID]: { status: 'executing' } });
 const doneData = makeData({
@@ -85,6 +116,27 @@ type Story = StoryObj<typeof meta>;
 export const Pending: Story = {
   args: {
     data: makeData(),
+    status: 'pending',
+    onApprove: () => {},
+    onReject: () => {},
+  },
+};
+
+/** Pending, escalated by Mingo: a guardrail rule raised the call above the policy. The band says why before the row
+ *  is opened, and Approve takes the warning colour. Open the row for the policy's level and the operations. */
+export const PendingEscalated: Story = {
+  args: {
+    data: makeData(undefined, escalatedReview),
+    status: 'pending',
+    onApprove: () => {},
+    onReject: () => {},
+  },
+};
+
+/** Pending, by the policy: the review is in the row's body only. */
+export const PendingByPolicy: Story = {
+  args: {
+    data: makeData(undefined, policyReview),
     status: 'pending',
     onApprove: () => {},
     onReject: () => {},
@@ -136,6 +188,17 @@ export const AllStates: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <ApprovalBatchMessage data={makeData()} status="pending" onApprove={() => {}} onReject={() => {}} />
+      <ApprovalBatchMessage
+        data={makeData(undefined, escalatedReview)}
+        status="pending"
+        onApprove={() => {}}
+        onReject={() => {}}
+      />
+      <ApprovalBatchMessage
+        data={makeData({ [REQUEST_ID]: { status: 'done', result: RESULT, success: true } }, escalatedReview)}
+        status="approved"
+        resolvedByName="Michael Johnson"
+      />
       <ApprovalBatchMessage data={executingData} status="approved" resolvedByName="Michael Johnson" />
       <ApprovalBatchMessage data={doneData} status="approved" resolvedByName="Michael Johnson" />
       <ApprovalBatchMessage data={makeData()} status="rejected" resolvedByName="Michael Johnson" />

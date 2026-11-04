@@ -15,6 +15,7 @@
  * Framework-free: no React, no timers.
  */
 
+import { keptPolicyReview } from '../../../chat-protocol/policy-review';
 import type {
   ApprovalBatchExecutionState,
   ChatApprovalStatus,
@@ -381,6 +382,7 @@ function sameToolData(a: ToolExecutionData, b: ToolExecutionData): boolean {
     a.integratedToolType === b.integratedToolType &&
     a.toolFunction === b.toolFunction &&
     a.toolTitle === b.toolTitle &&
+    a.policyReview === b.policyReview &&
     a.result === b.result &&
     a.success === b.success &&
     a.toolExecutionRequestId === b.toolExecutionRequestId &&
@@ -479,6 +481,8 @@ export function mergeToolExecutionIfPresent(
         const mergedData: ToolExecutionData = {
           ...toolData,
           toolTitle: toolData.toolTitle ?? seg.data.toolTitle,
+          // The review rides the EXECUTING chunk only: the EXECUTED one keeps it.
+          ...keptPolicyReview(toolData.policyReview, seg.data.policyReview),
           parameters: toolData.parameters || seg.data.parameters,
         };
         // Value-level no-op (replayed duplicate) → prior references.

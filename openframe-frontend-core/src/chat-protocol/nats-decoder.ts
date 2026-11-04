@@ -20,6 +20,7 @@ import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import type { AskOptionData } from '../components/chat/types/message.types';
 import { ESCALATION_STATE, escalationResolvedStatus } from './events';
 import type { ApprovalToolCall, ChatStreamEvent } from './events';
+import { policyReviewField } from './policy-review';
 import { attachmentsEvent, sourceMetadataEvent } from './source-metadata';
 import { isRecord } from './wire-narrow';
 
@@ -48,16 +49,19 @@ function numOr(value: unknown, fallback = 0): number {
  *  non-object entries and defaulting every field. */
 function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isRecord).map(item => ({
-    toolExecutionRequestId: String(item.toolExecutionRequestId ?? ''),
-    toolName: String(item.toolName ?? ''),
-    toolTitle: typeof item.toolTitle === 'string' ? item.toolTitle : undefined,
-    toolExplanation: typeof item.toolExplanation === 'string' ? item.toolExplanation : undefined,
-    toolType: typeof item.toolType === 'string' ? item.toolType : undefined,
-    requiresApproval: item.requiresApproval === true,
-    approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
-    toolCallArguments: isRecord(item.toolCallArguments) ? item.toolCallArguments : null,
-  }));
+  return raw.filter(isRecord).map(item => {
+    return {
+      toolExecutionRequestId: String(item.toolExecutionRequestId ?? ''),
+      toolName: String(item.toolName ?? ''),
+      toolTitle: typeof item.toolTitle === 'string' ? item.toolTitle : undefined,
+      toolExplanation: typeof item.toolExplanation === 'string' ? item.toolExplanation : undefined,
+      toolType: typeof item.toolType === 'string' ? item.toolType : undefined,
+      requiresApproval: item.requiresApproval === true,
+      approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
+      toolCallArguments: isRecord(item.toolCallArguments) ? item.toolCallArguments : null,
+      ...policyReviewField(item.policyReview),
+    };
+  });
 }
 
 /** Coerce the wire's ask `options[]` into the card's row shape. Rows without a
@@ -166,6 +170,8 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
           // the EXECUTING segment held. Dropping it here therefore blanks the
           // card for the whole lifetime of the run.
           toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
+          // Rides the EXECUTING chunk only, like the explanation: the merge keeps it on the EXECUTED row.
+          ...policyReviewField(data.policyReview),
           parameters: isRecord(data.parameters) ? data.parameters : undefined,
           toolExecutionRequestId:
             typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,

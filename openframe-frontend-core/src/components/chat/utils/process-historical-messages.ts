@@ -34,6 +34,8 @@ import {
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
 import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+// The same review normalizer as the live decoder, for the same reason.
+import { policyReviewField } from '../../../chat-protocol/policy-review';
 import {
   attachmentsEvent,
   mergeSourceMetadata,
@@ -56,6 +58,12 @@ import {
 import { approvalDisplaysInline } from './approval-display';
 import { type MessageSegmentAccumulator, createMessageSegmentAccumulator } from './message-segment-accumulator';
 import { getCommandText } from './tool-call-helpers';
+
+/** A history tool call with its wire `policyReview` normalized (or dropped), as the live decoder does it. */
+function withNormalizedReview(call: PendingToolCallData): PendingToolCallData {
+  const { policyReview: raw, ...rest } = call;
+  return { ...rest, ...policyReviewField(raw) };
+}
 
 function getOwnerDisplayName(owner?: MessageOwner): string {
   if (owner?.type === OWNER_TYPE.ADMIN && owner.user) {
@@ -166,6 +174,7 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
             // EXECUTING chunk only, so a history replay that drops it renders
             // an empty tool card even though the live stream showed one.
             toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
+            ...policyReviewField(data.policyReview),
             parameters: data.parameters,
             toolExecutionRequestId: data.toolExecutionRequestId,
           },
@@ -199,7 +208,7 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
           approvalType: data.approvalType || 'CLIENT',
           command: data.command || '',
           explanation: data.explanation,
-          ...(Array.isArray(data.toolCalls) ? { toolCalls: data.toolCalls } : {}),
+          ...(Array.isArray(data.toolCalls) ? { toolCalls: data.toolCalls.map(withNormalizedReview) } : {}),
         };
       }
       return null;
