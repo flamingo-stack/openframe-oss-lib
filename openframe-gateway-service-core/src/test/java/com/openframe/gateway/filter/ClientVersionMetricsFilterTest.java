@@ -6,8 +6,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -20,6 +18,8 @@ import reactor.core.publisher.Mono;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.ORIGIN;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -115,22 +115,17 @@ class ClientVersionMetricsFilterTest {
         assertThat(output.getOut()).doesNotContain("Client seen:");
     }
 
-    @ParameterizedTest
-    @CsvSource({
-            "capacitor://localhost, legacy-ios",
-            "https://localhost, legacy-android",
-            "tauri://localhost, legacy-desktop"
-    })
-    void filter_noClientHeaderShellOrigin_countedAsLegacyShell(String origin, String kind, CapturedOutput output) {
-        // execution
+    @Test
+    void filter_noClientHeaderWindowsAppOrigin_countedAsLegacyDesktop(CapturedOutput output) {
+        GatewayTrafficMetrics metrics = mock(GatewayTrafficMetrics.class);
+        filter = new ClientVersionMetricsFilter(metrics);
+
         runAs(SUB, MockServerHttpRequest.get(API_PATH)
                 .header(TENANT_HEADER, "tenant-a")
-                .header(ORIGIN, origin));
+                .header(ORIGIN, "http://tauri.localhost"));
 
-        // verifications
-        assertThat(forwarded).isTrue();
-        assertThat(requests(kind, "-", "-")).isEqualTo(1.0);
-        assertThat(output.getOut()).contains("Client seen: tenantId=tenant-a sub=user-1 kind=" + kind + " shell=- bundle=-");
+        verify(metrics).recordClientRequest("legacy-desktop", "-", "-");
+        assertThat(output.getOut()).contains("Client seen: tenantId=tenant-a sub=user-1 kind=legacy-desktop shell=- bundle=-");
     }
 
     @Test

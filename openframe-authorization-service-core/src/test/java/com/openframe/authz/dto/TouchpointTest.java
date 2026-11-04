@@ -1,6 +1,10 @@
 package com.openframe.authz.dto;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -46,6 +50,7 @@ class TouchpointTest {
 
         assertThat(merged).isEqualTo(Touchpoint.builder()
                 .fbc("fb.1.1700000000.abc")
+                .fbp("cookie03")
                 .hutk("hutk-1")
                 .heardFrom("search")
                 .fbclid("cookie02")
@@ -90,14 +95,41 @@ class TouchpointTest {
     void merge_requestHasOnlyGclid_keepsItsOwnSource() {
         Touchpoint request = Touchpoint.builder().gclid("g-1").downloadId(DOWNLOAD_ID).build();
 
-        assertThat(Touchpoint.merge(request, everyField("cookie"))).isEqualTo(request);
+        assertThat(Touchpoint.merge(request, everyField("cookie")))
+                .isEqualTo(request.toBuilder().fbc("cookie01").fbp("cookie03").build());
     }
 
     @Test
     void merge_requestHasOnlyRef_keepsItsOwnSource() {
         Touchpoint request = Touchpoint.builder().ref("acme").downloadId(DOWNLOAD_ID).build();
 
-        assertThat(Touchpoint.merge(request, everyField("cookie"))).isEqualTo(request);
+        assertThat(Touchpoint.merge(request, everyField("cookie")))
+                .isEqualTo(request.toBuilder().fbc("cookie01").fbp("cookie03").build());
+    }
+
+    @ParameterizedTest
+    @MethodSource("requestsWithOnlyGbraidOrWbraid")
+    void merge_requestHasOnlyGbraidOrWbraid_keepsItsOwnSource(Touchpoint request) {
+        Touchpoint cookie = everyField("cookie").toBuilder().gbraid("cookie-gbraid").wbraid("cookie-wbraid").build();
+
+        assertThat(Touchpoint.merge(request, cookie))
+                .isEqualTo(request.toBuilder().fbc("cookie01").fbp("cookie03").downloadId("cookie17").build());
+    }
+
+    private static Stream<Touchpoint> requestsWithOnlyGbraidOrWbraid() {
+        return Stream.of(
+                Touchpoint.builder().gbraid("gb-1").build(),
+                Touchpoint.builder().wbraid("wb-1").build());
+    }
+
+    @Test
+    void merge_requestHasNoSourceSignal_takesGbraidAndWbraidFromCookie() {
+        Touchpoint request = Touchpoint.builder().hutk("hutk-1").build();
+        Touchpoint cookie = Touchpoint.builder().gbraid("gb-1").wbraid("wb-1").build();
+
+        assertThat(Touchpoint.merge(request, cookie))
+                .extracting(Touchpoint::getGbraid, Touchpoint::getWbraid)
+                .containsExactly("gb-1", "wb-1");
     }
 
     @Test
@@ -114,6 +146,53 @@ class TouchpointTest {
         Touchpoint cookie = Touchpoint.builder().downloadId(DOWNLOAD_ID).build();
 
         assertThat(Touchpoint.merge(request, cookie).getDownloadId()).isEqualTo(DOWNLOAD_ID);
+    }
+
+    @Test
+    void merge_bothHaveFbp_keepsRequestFbp() {
+        Touchpoint request = Touchpoint.builder().fbp("fb.1.1700000000.111").build();
+        Touchpoint cookie = Touchpoint.builder().fbp("fb.1.1600000000.222").build();
+
+        assertThat(Touchpoint.merge(request, cookie).getFbp()).isEqualTo("fb.1.1700000000.111");
+    }
+
+    @Test
+    void merge_requestFbcBlank_takesCookieFbc() {
+        Touchpoint request = Touchpoint.builder().fbc("  ").build();
+        Touchpoint cookie = Touchpoint.builder().fbc("fb.1.1700000000.abc").build();
+
+        assertThat(Touchpoint.merge(request, cookie).getFbc()).isEqualTo("fb.1.1700000000.abc");
+    }
+
+    @Test
+    void merge_requestFbpBlank_takesCookieFbp() {
+        Touchpoint request = Touchpoint.builder().fbp("  ").build();
+        Touchpoint cookie = Touchpoint.builder().fbp("fb.1.1600000000.222").build();
+
+        assertThat(Touchpoint.merge(request, cookie).getFbp()).isEqualTo("fb.1.1600000000.222");
+    }
+
+    @Test
+    void merge_bothHaveRdtUuid_keepsRequestRdtUuid() {
+        Touchpoint request = Touchpoint.builder().rdtUuid("request-uuid").build();
+        Touchpoint cookie = Touchpoint.builder().rdtUuid("cookie-uuid").build();
+
+        assertThat(Touchpoint.merge(request, cookie).getRdtUuid()).isEqualTo("request-uuid");
+    }
+
+    @Test
+    void merge_requestHasNoRdtUuid_takesCookieRdtUuid() {
+        Touchpoint cookie = Touchpoint.builder().rdtUuid("cookie-uuid").build();
+
+        assertThat(Touchpoint.merge(new Touchpoint(), cookie).getRdtUuid()).isEqualTo("cookie-uuid");
+    }
+
+    @Test
+    void merge_requestRdtUuidBlank_takesCookieRdtUuid() {
+        Touchpoint request = Touchpoint.builder().rdtUuid("  ").build();
+        Touchpoint cookie = Touchpoint.builder().rdtUuid("cookie-uuid").build();
+
+        assertThat(Touchpoint.merge(request, cookie).getRdtUuid()).isEqualTo("cookie-uuid");
     }
 
     @Test
@@ -146,5 +225,16 @@ class TouchpointTest {
                 .build();
 
         assertThat(attribution.totalLength()).isEqualTo(89);
+    }
+
+    @Test
+    void totalLength_gbraidWbraidAndRdtUuidSet_countsThem() {
+        Touchpoint attribution = Touchpoint.builder()
+                .gbraid("gb-1")
+                .wbraid("wb-12")
+                .rdtUuid("uuid-123")
+                .build();
+
+        assertThat(attribution.totalLength()).isEqualTo(17);
     }
 }

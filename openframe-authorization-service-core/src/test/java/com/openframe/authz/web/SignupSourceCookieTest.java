@@ -46,6 +46,22 @@ class SignupSourceCookieTest {
     }
 
     @Test
+    void read_gatewayCookieWithAdCookiesAndBraidIds_mapsThemAsWritten() {
+        Touchpoint attribution = SignupSourceCookie.read(withCookie("id=" + DOWNLOAD_ID
+                + "&gbraid=0AAAAApQxGbRaId&wbraid=CjkKCQjwWbRaId&fbc=fb.1.1729900000000.IwAR2FbClickId"
+                + "&fbp=fb.1.1729900000000.1234567890&rdt_uuid=1729900000000.6F1C2B3A-4d5e-6f70-8192-A3B4C5D6E7F8"));
+
+        assertThat(attribution).isEqualTo(Touchpoint.builder()
+                .downloadId(DOWNLOAD_ID)
+                .gbraid("0AAAAApQxGbRaId")
+                .wbraid("CjkKCQjwWbRaId")
+                .fbc("fb.1.1729900000000.IwAR2FbClickId")
+                .fbp("fb.1.1729900000000.1234567890")
+                .rdtUuid("1729900000000.6F1C2B3A-4d5e-6f70-8192-A3B4C5D6E7F8")
+                .build());
+    }
+
+    @Test
     void read_encodedValue_returnsItDecoded() {
         Touchpoint attribution = SignupSourceCookie.read(withCookie(
                 "landing_url=https%3A%2F%2Fopenframe.ai%2Fsignup%3Fplan%3Dpro%26q%3Dc%2B%2B%26promo%3D50%25+off"));

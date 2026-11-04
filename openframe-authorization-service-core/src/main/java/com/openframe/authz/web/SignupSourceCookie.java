@@ -14,11 +14,15 @@ import java.net.URLDecoder;
 
 import static com.openframe.core.constants.SignupSourceParams.COOKIE;
 import static com.openframe.core.constants.SignupSourceParams.DOWNLOAD_ID;
+import static com.openframe.core.constants.SignupSourceParams.FBC;
 import static com.openframe.core.constants.SignupSourceParams.FBCLID;
+import static com.openframe.core.constants.SignupSourceParams.FBP;
+import static com.openframe.core.constants.SignupSourceParams.GBRAID;
 import static com.openframe.core.constants.SignupSourceParams.GCLID;
 import static com.openframe.core.constants.SignupSourceParams.LANDING_URL;
 import static com.openframe.core.constants.SignupSourceParams.LI_FAT_ID;
 import static com.openframe.core.constants.SignupSourceParams.RDT_CID;
+import static com.openframe.core.constants.SignupSourceParams.RDT_UUID;
 import static com.openframe.core.constants.SignupSourceParams.REF;
 import static com.openframe.core.constants.SignupSourceParams.REFERRER;
 import static com.openframe.core.constants.SignupSourceParams.UTM_CAMPAIGN;
@@ -26,6 +30,7 @@ import static com.openframe.core.constants.SignupSourceParams.UTM_CONTENT;
 import static com.openframe.core.constants.SignupSourceParams.UTM_MEDIUM;
 import static com.openframe.core.constants.SignupSourceParams.UTM_SOURCE;
 import static com.openframe.core.constants.SignupSourceParams.UTM_TERM;
+import static com.openframe.core.constants.SignupSourceParams.WBRAID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 @Slf4j
@@ -50,8 +55,13 @@ public final class SignupSourceCookie {
                     .utmTerm(params.getFirst(UTM_TERM))
                     .fbclid(params.getFirst(FBCLID))
                     .gclid(params.getFirst(GCLID))
+                    .gbraid(params.getFirst(GBRAID))
+                    .wbraid(params.getFirst(WBRAID))
                     .rdtCid(params.getFirst(RDT_CID))
                     .liFatId(params.getFirst(LI_FAT_ID))
+                    .fbc(params.getFirst(FBC))
+                    .fbp(params.getFirst(FBP))
+                    .rdtUuid(params.getFirst(RDT_UUID))
                     .ref(params.getFirst(REF))
                     .referrer(params.getFirst(REFERRER))
                     .landingUrl(params.getFirst(LANDING_URL))

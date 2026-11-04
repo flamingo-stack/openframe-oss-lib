@@ -29,7 +29,13 @@ public class Touchpoint {
 
     private String gclid;
 
+    private String gbraid;
+
+    private String wbraid;
+
     private String rdtCid;
+
+    private String rdtUuid;
 
     private String liFatId;
 
@@ -68,7 +74,7 @@ public class Touchpoint {
     private String heardFromOther;
 
     public int totalLength() {
-        return Stream.of(fbc, fbclid, fbp, hutk, gclid, rdtCid, liFatId,
+        return Stream.of(fbc, fbclid, fbp, hutk, gclid, gbraid, wbraid, rdtCid, rdtUuid, liFatId,
                         utmSource, utmMedium, utmCampaign, utmContent, utmTerm, eventId, ref,
                         referrer, landingUrl, downloadId, heardFrom, heardFromOther)
                 .filter(Objects::nonNull)
@@ -83,8 +89,13 @@ public class Touchpoint {
         Touchpoint source = request.hasSourceSignal() ? request : cookie;
         return request.toBuilder()
                 .downloadId(StringUtils.hasText(request.getDownloadId()) ? request.getDownloadId() : cookie.getDownloadId())
+                .fbc(StringUtils.hasText(request.getFbc()) ? request.getFbc() : cookie.getFbc())
+                .fbp(StringUtils.hasText(request.getFbp()) ? request.getFbp() : cookie.getFbp())
+                .rdtUuid(StringUtils.hasText(request.getRdtUuid()) ? request.getRdtUuid() : cookie.getRdtUuid())
                 .fbclid(source.getFbclid())
                 .gclid(source.getGclid())
+                .gbraid(source.getGbraid())
+                .wbraid(source.getWbraid())
                 .rdtCid(source.getRdtCid())
                 .liFatId(source.getLiFatId())
                 .utmSource(source.getUtmSource())
@@ -99,7 +110,8 @@ public class Touchpoint {
     }
 
     private boolean hasSourceSignal() {
-        return Stream.of(fbclid, gclid, rdtCid, liFatId, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, ref)
+        return Stream.of(fbclid, gclid, gbraid, wbraid, rdtCid, liFatId, utmSource, utmMedium, utmCampaign, utmContent,
+                        utmTerm, ref)
                 .anyMatch(StringUtils::hasText);
     }
 }
