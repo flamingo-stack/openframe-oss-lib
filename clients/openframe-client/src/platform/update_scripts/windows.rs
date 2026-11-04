@@ -76,6 +76,22 @@ function Test-AgentUninstalled {
     return (-not $RollbackOnly) -and $UpdateStatePath -and (-not (Test-Path $UpdateStatePath))
 }
 
+# Start-Service keeps the actual Win32 reason (timeout, access denied) in the innermost inner exception
+function Get-ErrorReason {
+    param($ErrorRecord)
+    $reason = "$ErrorRecord"
+    try {
+        $inner = $ErrorRecord.Exception
+        while ($inner.InnerException) { $inner = $inner.InnerException }
+        $innerMessage = "$($inner.Message)".Trim()
+        if ($innerMessage -and -not $reason.Contains($innerMessage)) {
+            $reason = "$reason ($innerMessage)"
+        }
+    }
+    catch { }
+    return $reason
+}
+
 try {
     Write-Output "Updater starting: target version '$TargetVersion', target exe '$TargetExe', PowerShell $($PSVersionTable.PSVersion)"
 
@@ -180,7 +196,7 @@ try {
     exit 0
 }
 catch {
-    $failure = "$_"
+    $failure = Get-ErrorReason $_
     Write-Output "Updater failed: $failure"
 
     if (Test-AgentUninstalled) {
@@ -233,8 +249,9 @@ catch {
             Write-Output "Rollback complete, service restarted"
         }
         catch {
-            Write-Output "Rollback failed: $_"
-            Set-UpdatePhase -Phase "failed" -Reason "$failure; rollback failed: $_"
+            $rollbackFailure = Get-ErrorReason $_
+            Write-Output "Rollback failed: $rollbackFailure"
+            Set-UpdatePhase -Phase "failed" -Reason "$failure; rollback failed: $rollbackFailure"
             try {
                 if ((Get-Service -Name $ServiceName -ErrorAction Stop).Status -ne 'Running') {
                     Start-Service -Name $ServiceName -ErrorAction Stop
@@ -242,7 +259,7 @@ catch {
                 }
             }
             catch {
-                Write-Output "Failed to restart service after failed rollback: $_"
+                Write-Output "Failed to restart service after failed rollback: $(Get-ErrorReason $_)"
             }
         }
     }
@@ -257,7 +274,7 @@ catch {
             }
         }
         catch {
-            Write-Output "Failed to restart service after pre-swap failure: $_"
+            Write-Output "Failed to restart service after pre-swap failure: $(Get-ErrorReason $_)"
         }
     }
 

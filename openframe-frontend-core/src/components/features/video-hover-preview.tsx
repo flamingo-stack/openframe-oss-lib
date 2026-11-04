@@ -18,6 +18,12 @@
  *   - Player mount is controlled via `playerMounted` (the strip's shared gate)
  *     OR self-managed here via a two-way near-viewport observer (standalone
  *     editor cards). Exactly one path is ever active.
+ *   - Inside that gate the player waits for the visitor's first input: until then
+ *     the card is its poster, and a visitor who only reads the first screen loads
+ *     no player (the largest script a page can load, 1.1 MB to parse). From that
+ *     input on it mounts near the screen, because a hover must find a player with
+ *     its stream loaded: mounting on the first hover made the bites strip start
+ *     late and stutter, and was removed (CU-17tkuw5xp4q).
  */
 
 import type React from 'react';
@@ -30,7 +36,7 @@ import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fall
 import { toMuxPreviewUrl } from './mux-origins';
 import { Video } from './video';
 import { VideoPlayBadge } from './video-center-badge';
-import type { VideoPlayerHandle, VideoMutedFallbackState } from './video-shared';
+import { useVisitorActed, type VideoPlayerHandle, type VideoMutedFallbackState } from './video-shared';
 
 export interface VideoHoverPreviewSurfaceProps {
   /** Source URL (Mux HLS / Supabase mp4). Rendition-capped internally. */
@@ -126,6 +132,8 @@ export function VideoHoverPreviewSurface({
   }, [gateControlled]);
   // Continuation forces the media + player on regardless of hover/viewport gate.
   const showMedia = continuation || (gateControlled ? playerMounted : isNear);
+  const visitorActed = useVisitorActed();
+  const showPlayer = continuation || active || visitorActed;
 
   // Poster resolution — the shared entity-card cover fallback chain: the real
   // thumbnail, dropped on load error. Null → first-frame facade (unless the
@@ -160,43 +168,45 @@ export function VideoHoverPreviewSurface({
 
           {badge === 'play' && !active && !continuation && <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />}
 
-          <div
-            className="absolute inset-0"
-            style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
-          >
-            <Video
-              // Remount between modes: `startTime` + autoplay are LOAD-TIME
-              // props (playback-core binds them to one-shot durationchange /
-              // loadstart handlers), so re-propping an already-loaded element
-              // silently drops the seek. Only a Mux preview rewrite changed
-              // `src` before, which is why HLS resumed and plain MP4 did not.
-              key={continuation ? 'continuation' : 'preview'}
-              kind="file"
-              // Rendition-capped in BOTH modes: the cap was only skipped
-              // because changing `src` used to be the sole trigger for the
-              // seek; the explicit key handles that now, and a 320px mini
-              // player should never pull the uncapped manifest.
-              url={previewUrl}
-              poster={posterUrl}
-              {...(continuation
-                ? {
-                    startTime,
-                    autoPlay: autoPlay && startMuted,
-                    startMuted,
-                    autoPlayUnmuted: autoPlay && !startMuted,
-                  }
-                : { playWhenHovered: active })}
-              chromeless
-              layout="fill"
-              fit={fit}
-              preload={preload}
-              mutedIntent={mutedIntent}
-              hideMutedBadge={hideMutedBadge}
-              onMutedFallbackChange={onMutedFallbackChange}
-              onEnded={onEnded}
-              playerHandleRef={previewHandleRef}
-            />
-          </div>
+          {showPlayer && (
+            <div
+              className="absolute inset-0"
+              style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
+            >
+              <Video
+                // Remount between modes: `startTime` + autoplay are LOAD-TIME
+                // props (playback-core binds them to one-shot durationchange /
+                // loadstart handlers), so re-propping an already-loaded element
+                // silently drops the seek. Only a Mux preview rewrite changed
+                // `src` before, which is why HLS resumed and plain MP4 did not.
+                key={continuation ? 'continuation' : 'preview'}
+                kind="file"
+                // Rendition-capped in BOTH modes: the cap was only skipped
+                // because changing `src` used to be the sole trigger for the
+                // seek; the explicit key handles that now, and a 320px mini
+                // player should never pull the uncapped manifest.
+                url={previewUrl}
+                poster={posterUrl}
+                {...(continuation
+                  ? {
+                      startTime,
+                      autoPlay: autoPlay && startMuted,
+                      startMuted,
+                      autoPlayUnmuted: autoPlay && !startMuted,
+                    }
+                  : { playWhenHovered: active })}
+                chromeless
+                layout="fill"
+                fit={fit}
+                preload={preload}
+                mutedIntent={mutedIntent}
+                hideMutedBadge={hideMutedBadge}
+                onMutedFallbackChange={onMutedFallbackChange}
+                onEnded={onEnded}
+                playerHandleRef={previewHandleRef}
+              />
+            </div>
+          )}
         </>
       ) : (
         <div className="absolute inset-0 bg-ods-card" />

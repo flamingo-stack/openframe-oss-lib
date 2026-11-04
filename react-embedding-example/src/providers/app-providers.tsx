@@ -72,8 +72,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
               <AgentIdentityProvider endpoint={EP.aiAgents}>
                 <AssistantRuntimeProvider>
                   {/* The page's topic is its path, read from react-router's address by the FAQ block, its ask card
-                      and the chat's quick actions. This app's pages sit at the hub's own paths, so no mount. */}
-                  <PageTopicsProvider pathname={pathname}>
+                      and the chat's quick actions. This app's pages sit at the hub's own paths, so no mount.
+                      `showTopic`: every surface prints that path as a faint stamp, as on the hub and the product. */}
+                  <PageTopicsProvider pathname={pathname} showTopic>
                     <TicketLiveProvider>{children}</TicketLiveProvider>
                   </PageTopicsProvider>
                 </AssistantRuntimeProvider>

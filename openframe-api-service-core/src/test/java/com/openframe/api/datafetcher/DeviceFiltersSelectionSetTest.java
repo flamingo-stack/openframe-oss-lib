@@ -9,6 +9,7 @@ import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
+import com.openframe.api.service.NotificationRecipientResolver;
 import com.openframe.api.service.TagService;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import graphql.ExecutionResult;
@@ -89,7 +90,8 @@ class DeviceFiltersSelectionSetTest {
     @BeforeEach
     void setUp() {
         DeviceDataFetcher dataFetcher = new DeviceDataFetcher(deviceService, deviceFilterService, tagService,
-                fleetVulnerabilityStatusService, mapper, packageManagerAvailability, new RelayIdCodec());
+                fleetVulnerabilityStatusService, mapper, packageManagerAvailability, new RelayIdCodec(),
+                new NotificationRecipientResolver());
 
         TypeDefinitionRegistry registry = new SchemaParser().parse(SDL);
         RuntimeWiring wiring = RuntimeWiring.newRuntimeWiring()

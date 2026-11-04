@@ -98,6 +98,9 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     directoryUserIds: [String!]!
     """Display name of the user for PRIMARY; null otherwise. devices(search) also matches it."""
     directoryUserName: String
+    """The current user's unread notifications about this device (entity DEVICE, machineId). Counts the same
+    read states as unreadCountsByCategory, so a row and the sidebar badge agree. 0 when none."""
+    unreadNotificationCount: Int!
 }
 
 type DeviceEnrollment {

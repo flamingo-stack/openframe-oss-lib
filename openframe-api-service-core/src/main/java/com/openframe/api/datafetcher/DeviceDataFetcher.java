@@ -7,6 +7,9 @@ import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dataloader.OrganizationDataLoader;
+import com.openframe.api.dataloader.UnreadNotificationDataLoader;
+import com.openframe.api.dataloader.UnreadNotificationKey;
+import com.openframe.api.dto.notification.NotificationRecipient;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
@@ -24,6 +27,7 @@ import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
+import com.openframe.api.service.NotificationRecipientResolver;
 import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
@@ -34,6 +38,7 @@ import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import graphql.schema.DataFetchingFieldSelectionSet;
 import jakarta.validation.Valid;
@@ -64,6 +69,7 @@ public class DeviceDataFetcher {
     private final GraphQLDeviceMapper mapper;
     private final PackageManagerAvailability packageManagerAvailability;
     private final RelayIdCodec relayIdCodec;
+    private final NotificationRecipientResolver recipientResolver;
 
     @DgsQuery
     public CompletableFuture<DeviceFilters> deviceFilters(@InputArgument @Valid DeviceFilterInput filter,
@@ -219,6 +225,18 @@ public class DeviceDataFetcher {
     public List<String> directoryUserIds(DgsDataFetchingEnvironment dfe) {
         Machine machine = dfe.getSource();
         return mapper.toDirectoryUserIds(machine);
+    }
+
+    // The current user's unread notifications about this device, batched for the whole page: the
+    // same read states the sidebar badge counts, so a row and the badge agree.
+    @DgsData(parentType = "Machine")
+    public CompletableFuture<Integer> unreadNotificationCount(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        NotificationRecipient recipient = recipientResolver.current();
+        UnreadNotificationKey key = new UnreadNotificationKey(
+                recipient.id(), recipient.type(), NotificationEntityType.DEVICE, machine.getMachineId());
+        DataLoader<UnreadNotificationKey, Integer> loader = dfe.getDataLoader(UnreadNotificationDataLoader.NAME);
+        return loader.load(key);
     }
 
 }
