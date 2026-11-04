@@ -10,11 +10,11 @@
  * dropped — callers that want logging can wrap this helper).
  */
 
+import type { DocSearchResult } from '../../../chat-protocol/doc-search';
 import { parseRecordHref } from '../../../chat-protocol/record-link';
 import { recordCountLabel } from '../../../utils/source-grouping';
 import { defaultTableIdForDocumentType, getSourceLabel } from '../../../utils/source-icons';
 import type { SearchResult } from '../../ui/search-input';
-import type { DocSearchResult } from './types';
 
 /** Source tables that should be collapsed into grouped results in the search bar.
  *  A SEARCH rule, deliberately narrower than the chat strip's `groupsByTable`:

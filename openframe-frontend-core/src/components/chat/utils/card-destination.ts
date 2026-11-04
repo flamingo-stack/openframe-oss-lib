@@ -1,17 +1,27 @@
 /**
- * Where an inline chat card goes when clicked: THE one decision, pure.
+ * Where a record goes when clicked: THE one decision, pure, for every surface that shows a record (its card, its chip in
+ * a sentence, a citation, a row of the sources strip, a search result).
  *
- * A card and the source chip for the same row must land on the same page. The server answers every record's url: on its
- * source part (`chatRef.url`) or on the row the card fetched (`item.url`). The card asks the chip's resolver
- * (`resolveSourceRowCTA`) with it, and the host's composer decides where that type lives.
- *
- * `ChatCardLoader` calls this once per render; nothing else decides a card's href. No React, no DOM.
+ * Every surface must land on the same page. The server answers every record's url: on its source part (`chatRef.url`)
+ * or on the row the card fetched (`item.url`). The surface asks the row resolver (`resolveSourceRowCTA`) with it, the
+ * host's composer decides where that type lives, and a relative href is a route of the host's own (`hostRoute`), which
+ * the click router keeps on the host in every mode, embed included. `resolveRecordDestination` adds the new-tab
+ * decision (`navLinkTarget`) the anchor renders with; `RecordAnchor` (entity-cards/dispatch.tsx) opens it through
+ * `RecordNavWrap`. No React, no DOM.
  */
 
+import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { platformOfUrl } from '../../../platform-domains';
 import type { ChatRef } from '../chat-ref.types';
+import { navLinkTarget } from './nav-anchor-props';
 import { isRelativeHref } from './new-tab-rel';
-import { resolveSourceRowCTA, type SourceRowContext } from './source-row-cta';
+import {
+  resolveSourceRowCTA,
+  type SourceRowContext,
+  type SourceRowCTA,
+  type SourceRowInput,
+  sourceRowCtxFromRuntime,
+} from './source-row-cta';
 
 export interface CardDestination {
   url: string | null;
@@ -57,21 +67,71 @@ export function readFetchedCardTitle(item: unknown): string | null {
   return null;
 }
 
-/** Where the card opens: the source chip's resolver over the url the server answers. No url is no link. */
-export function resolveCardDestination({ chatRef, item, ctx }: CardDestinationInput): CardDestination {
+/** The row a card's ref and its fetched row describe, in the words the row resolver reads. */
+export function recordRowOf({ chatRef, item }: Pick<CardDestinationInput, 'chatRef' | 'item'>): SourceRowInput {
   const url = chatRef.url ?? readFetchedCardUrl(item);
   const path = typeof chatRef.metadata?.path === 'string' && chatRef.metadata.path ? chatRef.metadata.path : null;
-  const cta = resolveSourceRowCTA(
-    {
-      documentType: chatRef.type,
-      id: chatRef.id,
-      title: chatRef.title,
-      externalUrl: url,
-      targetPlatform: platformOfUrl(url),
-      path,
-    },
-    ctx,
-  );
-  if (!cta.href) return { url: null, targetPlatform: null, path, hostRoute: false };
-  return { url: cta.href, targetPlatform: cta.targetPlatform, path, hostRoute: isRelativeHref(cta.href) };
+  return {
+    documentType: chatRef.type,
+    id: chatRef.id,
+    title: chatRef.title,
+    externalUrl: url,
+    targetPlatform: platformOfUrl(url),
+    path,
+  };
+}
+
+function destinationOf(
+  row: SourceRowInput,
+  ctx: SourceRowContext,
+): { cta: SourceRowCTA; destination: CardDestination } {
+  const cta = resolveSourceRowCTA(row, ctx);
+  const path = row.path ?? null;
+  if (!cta.href) return { cta, destination: { url: null, targetPlatform: null, path, hostRoute: false } };
+  return {
+    cta,
+    destination: { url: cta.href, targetPlatform: cta.targetPlatform, path, hostRoute: isRelativeHref(cta.href) },
+  };
+}
+
+/** Where the card opens: the row resolver over the url the server answers. No url is no link. */
+export function resolveCardDestination({ chatRef, item, ctx }: CardDestinationInput): CardDestination {
+  return destinationOf(recordRowOf({ chatRef, item }), ctx).destination;
+}
+
+/** Where a record opens, and in which tab: what `RecordAnchor` renders, and the row's CTA (its icon, its Ask ref). */
+export interface RecordDestination extends CardDestination {
+  /** The new-tab decision, the one the anchor's `target` and the click router share (`navLinkTarget`). */
+  isNewTab: boolean;
+  cta: SourceRowCTA;
+}
+
+/**
+ * Where a record opens in this chat: THE resolver of every surface (card, record chip, citation, source row, search
+ * result), over the host's composer, with the new-tab decision made once with the same `hostRoute` the click router
+ * gets.
+ */
+export function resolveRecordDestination(row: SourceRowInput, runtime: ChatRuntime): RecordDestination {
+  const { cta, destination } = destinationOf(row, sourceRowCtxFromRuntime(runtime));
+  const isNewTab = destination.url
+    ? navLinkTarget(runtime, destination.url, destination.targetPlatform, { hostRoute: destination.hostRoute }).isNewTab
+    : false;
+  return { ...destination, isNewTab, cta };
+}
+
+/** What a record's anchor opens: a destination that has a url. */
+export interface RecordLinkTarget {
+  url: string;
+  targetPlatform: string | null;
+  path: string | null;
+  hostRoute: boolean;
+  isNewTab: boolean;
+}
+
+/** The anchor's target of a destination, or null when it opens nothing. */
+export function recordLinkTargetOf(
+  destination: Omit<RecordLinkTarget, 'url'> & { url: string | null },
+): RecordLinkTarget | null {
+  const { url, targetPlatform, path, hostRoute, isNewTab } = destination;
+  return url ? { url, targetPlatform, path, hostRoute, isNewTab } : null;
 }

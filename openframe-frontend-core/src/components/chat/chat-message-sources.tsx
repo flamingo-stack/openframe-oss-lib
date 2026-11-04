@@ -7,7 +7,6 @@
  * module so a transcript viewer draws it without loading the whole chat.
  */
 
-import { MessageSquare } from 'lucide-react';
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import type { ChatMessage } from '../../chat-protocol/chat-message';
@@ -17,8 +16,10 @@ import { Button } from '../ui/button';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
 import { loadingItemProps } from '../ui/loading-scope';
 import type { ChatRef } from './chat-ref.types';
-import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
+import { RecordAnchor, recordDiscussAction } from './entity-cards/dispatch';
+import { useRecordActions } from './record-actions';
 import { SourceActionButton } from './source-action-button';
+import { recordLinkTargetOf, resolveRecordDestination } from './utils/card-destination';
 import { chatChipClass } from './utils/chip-styles';
 import {
   FALLBACK_TOP_RETRIEVED,
@@ -27,13 +28,13 @@ import {
   sourceTitleOf,
   splitCitedSources,
 } from './utils/cited-sources';
-import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
 
 /**
- * Source chip — TWO affordances per the hub original:
- *  1. Open: click → chip's URL (in-app for docs, new-tab for external).
- *  2. Ask: small `MessageSquare` icon-button on the right → fires
- *     `onDiscuss(ref)` to drill into THIS row via `entityIdFilter`.
+ * A source's chip, two affordances:
+ *  1. Open: click → where the record's card and its citation open it (`resolveRecordDestination` through
+ *     `RecordAnchor`, so a route of the host's own stays on the host in every mode).
+ *  2. Ask: the record's "Ask Mingo"/"Display" (`recordDiscussAction`, the row its "⋯" menu offers), to drill into THIS
+ *     row.
  */
 function SourceChip(props: {
   group: SourceGroup;
@@ -44,43 +45,38 @@ function SourceChip(props: {
   const { group, onDiscuss } = props;
   const marks = loadingItemProps(props);
   const runtime = useRequiredChatRuntime();
-  const ctx = sourceRowCtxFromRuntime(runtime);
+  const chatHandlers = useRecordActions();
+  const handlers = onDiscuss ? { ...chatHandlers, onDiscuss } : chatHandlers;
   const [first] = group.rows;
-  // Single CTA resolver: same icon, same href chain, same ChatRef synthesis the inline card and search-result paths use.
-  const firstInput = sourceRowInputOf(first);
-  const cta = resolveSourceRowCTA(firstInput, ctx);
-  const Icon = cta.icon;
+  // The one record resolver: the same href, tab and icon the record's card and its citation get.
+  const firstDestination = resolveRecordDestination(sourceRowInputOf(first), runtime);
+  const Icon = firstDestination.cta.icon;
   const icon = <Icon className="h-3.5 w-3.5" />;
   const chipClass = chatChipClass({ tone: 'secondary' });
   const numbers = group.rows.flatMap(row => (row.number === undefined ? [] : [row.number]));
   // A number exists only for a citation: a chip of records nobody cited prints none.
   const numbered = (label: string) => (numbers.length > 0 ? `[${formatCitationIndices(numbers)}] ${label}` : label);
+  const actionOf = (ref: ChatRef | null) => (ref ? recordDiscussAction(ref, handlers) : undefined);
 
   // A table's chip: hover/click reveals a dropdown with Open + Ask per row.
   if (group.tableId) {
     const rowLabels = groupedRowLabels(group.rows);
+    const targets = new Map<string, NonNullable<ReturnType<typeof recordLinkTargetOf>>>();
     const dropdownItems: HoverDropdownItem[] = group.rows.map((row, i) => {
-      const input = sourceRowInputOf(row);
-      const itemCta = resolveSourceRowCTA(input, ctx);
-      const ItemIcon = itemCta.icon;
-      // Read out of the CTA before the `onClick` closure below is built: a
-      // property narrowing does not survive into a callback (the property
-      // could in principle be reassigned before it fires), so capturing the
-      // value is what keeps the handler assertion-free.
-      const itemChatRef = itemCta.chatRef;
+      const destination = resolveRecordDestination(sourceRowInputOf(row), runtime);
+      const target = recordLinkTargetOf(destination);
+      if (target) targets.set(target.url, target);
+      const ItemIcon = destination.cta.icon;
+      const action = actionOf(destination.cta.chatRef);
       return {
         label: rowLabels[i],
         icon: <ItemIcon className="h-3.5 w-3.5" />,
-        href: itemCta.href ?? undefined,
-        targetPlatform: itemCta.targetPlatform,
-        path: input.path ?? null,
+        href: target?.url,
+        targetPlatform: target?.targetPlatform ?? null,
+        path: target?.path ?? null,
         secondaryAction:
-          onDiscuss && itemCta.askable && itemChatRef
-            ? {
-                icon: <MessageSquare />,
-                label: `Ask about ${sourceTitleOf(row)}`,
-                onClick: () => onDiscuss(itemChatRef),
-              }
+          action && !action.disabled
+            ? { icon: action.icon, label: `${action.label}: ${sourceTitleOf(row)}`, onClick: action.run }
             : undefined,
       };
     });
@@ -89,16 +85,16 @@ function SourceChip(props: {
       <span className="inline-flex" {...marks}>
         <HoverDropdown
           items={dropdownItems}
-          renderAnchor={({ href, targetPlatform, path, className, children }) => (
-            <NavLinkAnchorViaRuntime
-              href={href}
-              targetPlatform={targetPlatform ?? null}
-              path={path}
-              className={className}
-            >
-              {children}
-            </NavLinkAnchorViaRuntime>
-          )}
+          renderAnchor={({ href, className, children }) => {
+            const target = targets.get(href);
+            return target ? (
+              <RecordAnchor destination={target} className={className}>
+                {children}
+              </RecordAnchor>
+            ) : (
+              <span className={className}>{children}</span>
+            );
+          }}
         >
           <span className={`${chipClass} cursor-pointer`}>
             {icon}
@@ -109,7 +105,7 @@ function SourceChip(props: {
     );
   }
 
-  // A row of no table: wrap whatever clickable element each branch produces with the trailing Ask `SourceActionButton`.
+  // A row of no table: wrap whatever clickable element each branch produces with the trailing Ask button.
   const chipBody = (
     <>
       {icon}
@@ -119,23 +115,27 @@ function SourceChip(props: {
   const wrapChip = (clickable: React.ReactNode) => (
     <span className="inline-flex items-center" {...marks}>
       {clickable}
-      <SourceActionButton chatRef={cta.chatRef} onDiscuss={onDiscuss} density="inline" className="-mr-1 ml-1" />
+      <SourceActionButton
+        action={actionOf(firstDestination.cta.chatRef)}
+        title={sourceTitleOf(first)}
+        density="inline"
+        className="-mr-1 ml-1"
+      />
     </span>
   );
 
-  // A chip that opens something is THE chat link (`NavLinkAnchorViaRuntime`): the one navigation decision, the one
-  // click executor, and the panel closing on a same-tab navigation, exactly as markdown links and cards.
-  if (cta.href) {
+  // A chip that opens something is THE record link (`RecordAnchor`): the one navigation decision, the one click router
+  // (`RecordNavWrap`), and the panel closing on a same-tab navigation, exactly as cards and record chips.
+  const target = recordLinkTargetOf(firstDestination);
+  if (target) {
     return wrapChip(
-      <NavLinkAnchorViaRuntime
-        href={cta.href}
-        path={firstInput.path ?? null}
-        targetPlatform={cta.targetPlatform ?? null}
+      <RecordAnchor
+        destination={target}
         className={chipClass}
-        title={firstInput.externalUrl ? undefined : group.label}
+        title={sourceRowInputOf(first).externalUrl ? undefined : group.label}
       >
         {chipBody}
-      </NavLinkAnchorViaRuntime>,
+      </RecordAnchor>,
     );
   }
 

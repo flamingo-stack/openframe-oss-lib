@@ -11,9 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import type { ChatRef } from '../chat-ref.types';
-import { recordMenuActions, recordMenuGroups, renderChatInlineEntityCard } from '../entity-cards/dispatch';
-import { InlineChip } from '../inline-chip';
-import { type RecordActionHandlers, RecordActionsProvider, RecordChipMenu, useRecordChipMenu } from '../record-actions';
+import { RecordChip, recordMenuActions, recordMenuGroups, renderChatInlineEntityCard } from '../entity-cards/dispatch';
+import { type RecordActionHandlers, RecordActionsProvider } from '../record-actions';
 
 class ResizeObserverStub {
   observe(): void {}
@@ -205,33 +204,52 @@ describe('a chip offers what its card offers', () => {
     expect(await menuRows('Actions for Patch policies')).toEqual(['Ask Mingo', 'Open Details']);
   });
 
-  it("a host's chip reads the same menu for the record its link names", async () => {
+  it("a host's chip (RecordChip with the host's href) reads the same menu for the record its link names", async () => {
     const onDiscuss = vi.fn();
-    function HostChip({ label }: { label: string }) {
-      const menuGroups = useRecordChipMenu({ href: '/devices/m-1' });
-      return (
-        <InlineChip
-          label={label}
-          link={content => <a href="/devices/m-1">{content}</a>}
-          trailing={menuGroups ? <RecordChipMenu menuGroups={menuGroups} label={label} /> : undefined}
-        />
-      );
-    }
     render(
       inChat(
         <ChatMessageEnhanced
           role="assistant"
           parts={[{ type: 'text', text: 'Restart [MacBook](record://device/m-1).' }]}
           renderEntityCard={() => null}
-          renderRecordChip={({ label }) => <HostChip label={label} />}
+          renderRecordChip={({ type, id, label }) => (
+            <RecordChip type={type} id={id} label={label} href="/devices/m-1" />
+          )}
           NavLinkAnchor={NavLinkAnchor}
         />,
         onDiscuss,
       ),
     );
     expect(await menuRows('Actions for MacBook')).toEqual(['Ask Mingo', 'Open Details']);
+    expect(screen.getByRole('link', { name: 'MacBook' }).getAttribute('href')).toBe('/devices/m-1');
     fireEvent.click(screen.getByRole('menuitem', { name: /Ask Mingo/ }));
     expect(onDiscuss).toHaveBeenCalledWith(expect.objectContaining({ type: 'device', id: 'm-1', title: 'MacBook' }));
+  });
+
+  it("a host's route opens on the host: the click goes to the runtime's navigation", () => {
+    const hosted = makeRuntime();
+    render(inChat(<RecordChip type="device" id="m-1" label="MacBook" href="/devices/m-1" />, vi.fn(), hosted));
+    fireEvent.click(screen.getByRole('link', { name: 'MacBook' }));
+    expect(hosted.navigation.navigate).toHaveBeenCalledWith(expect.objectContaining({ href: '/devices/m-1' }));
+  });
+
+  it('an attached context item offers a new tab, never the menu, and none where the window opens no tabs', () => {
+    const { unmount } = render(
+      inChat(<RecordChip type="device" id="m-1" label="MacBook" href="/devices/m-1" />, vi.fn()),
+    );
+    expect(screen.queryByRole('button', { name: 'Actions for MacBook' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Open in new tab' }).getAttribute('target')).toBe('_blank');
+    unmount();
+    render(
+      inChat(<RecordChip type="device" id="m-1" label="MacBook" href="/devices/m-1" />, vi.fn(), makeRuntime(false)),
+    );
+    expect(screen.queryByRole('link', { name: 'Open in new tab' })).toBeNull();
+  });
+
+  it("a chip whose name is still being read is the chip's own skeleton", () => {
+    render(inChat(<RecordChip type="device" id="m-1" label="" loading />, vi.fn()));
+    expect(screen.getByTestId('inline-chip')).toBeTruthy();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('a window that opens no tabs: neither the card nor the chip offers a new tab', async () => {

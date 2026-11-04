@@ -27,3 +27,5 @@ export * from './record-link';
 export * from './record-cards';
 // The `[N]` grammar: what a stream removes from a model's text.
 export * from './citation-chip';
+// One row of the docs search, as the hub writes it and the search bar reads it.
+export type { DocSearchResult } from './doc-search';

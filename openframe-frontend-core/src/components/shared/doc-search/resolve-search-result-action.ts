@@ -3,24 +3,23 @@
  * Returns one of four typed actions so the caller is a single switch.
  *
  * Resolution order:
- *  1. `url` present → resolve the href through the host's
- *     `composeContentUrl` seam (when wired), then THE navigation decision
- *     (`navLinkTarget`, the one every chat link uses) chooses same-tab vs new-tab.
- *  2. Row names a record (`sourceId`) → synth an Ask-AI action (entity drill-in
- *     via primary key, no URL).
+ *  1. `url` present → the record's destination from the one record resolver (`resolveRecordDestination`, the card's,
+ *     the chip's and the citation's), so a search row lands on the page its card opens, with the same new-tab decision.
+ *  2. Row names a record (`sourceId`) → synth an Ask-AI action (entity drill-in via primary key, no URL).
  *  3. Nothing actionable → noop.
  *
- * Lifted from the hub's `hooks/use-docs.ts:resolveSearchResultAction`.
- * Pure — no React, no telemetry.
+ * Pure: no React, no telemetry.
  */
 
 import { parseRecordHref } from '../../../chat-protocol/record-link';
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { platformOfUrl } from '../../../platform-domains';
 import type { ComposeContentUrl } from '../../../utils/content-href';
+import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
 import type { ChatRef } from '../../chat/chat-ref.types';
+import { resolveRecordDestination } from '../../chat/utils/card-destination';
+import { safeHref } from '../../chat/utils/compact-card-classes';
 import { navLinkTarget } from '../../chat/utils/nav-anchor-props';
-import { isRelativeHref } from '../../chat/utils/new-tab-rel';
 import type { SearchResult } from '../../ui/search-input';
 
 export type SearchResultAction =
@@ -34,40 +33,38 @@ export function resolveSearchResultAction(
   source: string,
   /** The chat runtime the search runs in; null outside one (same tab, the decision's no-runtime rule). */
   runtime: ChatRuntime | null | undefined,
-  /** The host's unified content-href seam (`runtime.composeContentUrl`).
-   *  When wired, a row's `url` is re-resolved through it, so a type the host
-   *  serves in-app (`hostedTypes`) or deep-links itself (`overrides`) lands on
-   *  the SAME href the catalog cards and chat cards use. Omitted → the url as
-   *  given. */
+  /** A composer that stands in for the runtime's own (`useDocSearch`'s `composeContentUrl` prop). */
   composeContentUrl?: ComposeContentUrl,
 ): SearchResultAction {
   const meta = result.metadata ?? {};
-  const url = meta.url as string | undefined;
+  const url = typeof meta.url === 'string' && meta.url ? meta.url : undefined;
   const record = parseRecordHref(meta.sourceId);
   if (url) {
-    const targetPlatform = platformOfUrl(url);
-    // Unified content-href seam: the same call `resolveSourceRowCTA` makes for chat rows. Hosted types relativize the
-    // slug out of `url`; everything else comes back verbatim, so an unwired host (or a row naming no record) gets the
-    // url as given.
-    const composed =
-      composeContentUrl && record
-        ? composeContentUrl({
-            type: record.type,
-            identifier: record.id,
-            externalUrl: url,
-            targetPlatform,
-          })
-        : null;
-    // THE navigation decision. A RELATIVE composed href is a route the host claimed as in-app (`hostRoute`): it stays
-    // in this window in every mode, never handed to `window.open`.
-    const hostRoute = !!composed?.href && isRelativeHref(composed.href);
-    const actionPlatform = composed ? composed.targetPlatform : targetPlatform;
-    const target = navLinkTarget(runtime, composed?.href || url, actionPlatform, { hostRoute });
-    const kind = target.isNewTab ? 'navigate-new-tab' : 'navigate-same-tab';
+    if (!runtime) {
+      // Outside a chat (nothing to route through): the url as given, and the navigation decision's no-runtime rule.
+      const safe = safeHref(url);
+      if (!safe) return { kind: 'noop' };
+      const targetPlatform = platformOfUrl(safe);
+      const { href, isNewTab } = navLinkTarget(null, safe, targetPlatform);
+      return { kind: isNewTab ? 'navigate-new-tab' : 'navigate-same-tab', href, targetPlatform };
+    }
+    const destination = resolveRecordDestination(
+      {
+        sourceRepo: record ? defaultTableIdForDocumentType(record.type) : null,
+        documentType: record?.type ?? null,
+        id: record?.id ?? null,
+        title: result.title,
+        externalUrl: url,
+        targetPlatform: platformOfUrl(url),
+      },
+      composeContentUrl ? { ...runtime, composeContentUrl } : runtime,
+    );
+    if (!destination.url) return { kind: 'noop' };
+    const { hostRoute, targetPlatform } = destination;
     // The executor decides again from these same inputs, so the click lands where this action says.
-    return hostRoute
-      ? { kind, href: target.href, targetPlatform: actionPlatform, hostRoute }
-      : { kind, href: target.href, targetPlatform: actionPlatform };
+    const { href } = navLinkTarget(runtime, destination.url, targetPlatform, { hostRoute });
+    const kind = destination.isNewTab ? 'navigate-new-tab' : 'navigate-same-tab';
+    return hostRoute ? { kind, href, targetPlatform, hostRoute } : { kind, href, targetPlatform };
   }
   if (record) {
     return {

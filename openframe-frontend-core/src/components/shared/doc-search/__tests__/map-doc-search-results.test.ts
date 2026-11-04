@@ -7,9 +7,9 @@
 
 import { describe, expect, it } from 'vitest';
 
+import type { DocSearchResult } from '../../../../chat-protocol/doc-search';
 import { defaultDocumentTypeForTableId, SOURCE_LABELS_BY_TABLE } from '../../../../utils/source-icons';
 import { mapDocSearchResults } from '../map-doc-search-results';
-import type { DocSearchResult } from '../types';
 
 const FOLDED_TABLES = [
   'financial-cap-table',

@@ -454,7 +454,10 @@ describe('ChatMessageEnhanced — citations', () => {
     const chip = screen.getByRole('link', { name: '[1]' });
     expect(chip.getAttribute('href')).toBe(source.url);
     expect(chip.getAttribute('title')).toBe('Pricing post');
-    expect(chip.parentElement?.textContent).toBe('Priced per device. [1] Second sentence.');
+    const paragraph = screen.getByText(
+      (_, element) => element?.tagName === 'P' && element.textContent === 'Priced per device. [1] Second sentence.',
+    );
+    expect(paragraph).toContainElement(chip);
   });
 
   it('a citation opening the text keeps the block that follows it, with the chip before it', () => {

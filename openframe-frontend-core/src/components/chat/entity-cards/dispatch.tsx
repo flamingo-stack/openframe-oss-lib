@@ -31,7 +31,7 @@
 
 import type React from 'react';
 import type { ReactNode } from 'react';
-import { type ChatRuntime, useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { type ChatRuntime, useChatRuntime, useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
@@ -72,6 +72,8 @@ import { FileContentIcon } from '../../icons-v2-generated/documents/file-content
 import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon';
 import { MicrophoneIcon } from '../../icons-v2-generated/household/microphone-icon';
 import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-triangle-icon';
+import { Ellipsis01Icon } from '../../icons-v2-generated/interface/ellipsis-01-icon';
+import { ExternalLinkIcon } from '../../icons-v2-generated/interface/external-link-icon';
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon';
 import { CompassIcon } from '../../icons-v2-generated/map-and-travel/compass-icon';
 import { MapIcon } from '../../icons-v2-generated/map-and-travel/map-icon';
@@ -85,25 +87,41 @@ import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/roc
 import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/truck-fast-icon';
 import type { LoadedProductReleaseCardProps } from '../../shared/product-release/product-release-card';
 import { ProductReleaseCard } from '../../shared/product-release/product-release-card';
-import type { ActionsMenuGroup } from '../../ui/actions-menu';
+import { ActionsMenuDropdown, type ActionsMenuGroup } from '../../ui/actions-menu';
+import { Button } from '../../ui/button';
+import { FloatingTooltip } from '../../ui/floating-tooltip';
 import { ExternalMediaNotice } from '../../ui/markdown/external-media-notice';
 import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
-import { useMessageSourceOf } from '../citation-chip';
 import { useChatCardItem } from '../hooks/use-chat-card-item';
-import { InlineChip } from '../inline-chip';
+import { InlineChip, type InlineChipAnchor } from '../inline-chip';
+import { useMessageSourceOf } from '../message-citations';
 import { MingoInfoCard, type MingoInfoCardStatus } from '../mingo-info-card';
-import type { RecordActionHandlers } from '../record-actions';
-import { SourceActionButton } from '../source-action-button';
+import { NavLinkAnchorViaRuntime } from '../nav-link-anchor-via-runtime';
+import {
+  MessageRecordLinkProvider,
+  type RecordActionHandlers,
+  useInMessageRecordLink,
+  useRecordActions,
+} from '../record-actions';
+import { type CardDiscussAction, SourceActionButton } from '../source-action-button';
 import type { PrReviewState, GitHubActivityKind } from '../types/entities/github-activity';
 import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
 import type { BaseProgramItem, ProgramConfig } from '../types/entities/program-types';
 import { getStatusColorScheme } from '../utils/agent-status-message';
-import { readFetchedCardTitle, resolveCardDestination } from '../utils/card-destination';
+import {
+  readFetchedCardTitle,
+  type RecordLinkTarget,
+  recordLinkTargetOf,
+  recordRowOf,
+  resolveRecordDestination,
+} from '../utils/card-destination';
+import { sourceRowInputOf } from '../utils/cited-sources';
 import { executeNavigation } from '../utils/execute-navigation';
 import { buildAnchorProps, navLinkTarget, newTabAnchorAttrs } from '../utils/nav-anchor-props';
-import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
+import { isRelativeHref } from '../utils/new-tab-rel';
+import { resolveSourceIcon } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
 import { BlogCard } from './blog-card';
 import { CaseStudyCard } from './case-study-card';
@@ -334,18 +352,6 @@ function GitHubChatCard({
       menuAriaLabel="Activity actions"
     />
   );
-}
-
-/** The host-provided "Ask Mingo" / "Display" affordance, resolved once per
- *  card in `ChatCardLoader` and threaded through `renderOpts.actions`. Mirrors
- *  the legacy `ChatCardWithDiscuss` source-row button, relocated into the "⋯"
- *  menu. */
-export interface CardDiscussAction {
-  label: string;
-  icon: React.ReactNode;
-  run: () => void;
-  /** Held while a turn runs: the row keeps its place, and the "⋯" that may hold nothing else stays. */
-  disabled?: boolean;
 }
 
 /** What a record's menu can do in this chat, the SAME for its card and its chip (`recordMenuActions`): the "Ask
@@ -783,17 +789,14 @@ function ChatInlineVideoPill({ chatRef }: { chatRef: ChatRef }) {
  *  — the visual contract here drove the lib refactor in the first place. */
 function ChatCardWithDiscuss({
   chatRef,
-  onDiscuss,
-  onDisplay,
-  displayAction,
+  action,
   footerAction,
   loading,
   children,
 }: {
   chatRef: ChatRef;
-  onDiscuss?: (ref: ChatRef) => void;
-  onDisplay?: (ref: ChatRef) => void;
-  displayAction?: boolean;
+  /** The record's "Ask Mingo"/"Display" (`recordDiscussAction`), the row its "⋯" menu offers too. */
+  action?: CardDiscussAction;
   /** A further action in the footer row, beside Ask (the card's "Watch video"). */
   footerAction?: React.ReactNode;
   /** The card is still loading: the footer row is drawn too, its actions in their loading form. */
@@ -805,20 +808,13 @@ function ChatCardWithDiscuss({
     documentType: chatRef.type,
   });
   const idDisplay = chatRef.id && (chatRef.id.length > 24 ? `${chatRef.id.slice(0, 24)}…` : chatRef.id);
-  const useDisplay = displayAction && !!onDisplay;
   const cardBody = <span className="block [&>*]:!my-0">{children}</span>;
   return (
     <span className="mb-2 mt-1.5 block w-full">
       {cardBody}
       <span className="mt-1 flex items-center justify-between gap-2 pl-0.5">
         <span className="flex items-center gap-3">
-          <SourceActionButton
-            chatRef={chatRef}
-            onDiscuss={useDisplay ? onDisplay : onDiscuss}
-            label={useDisplay ? 'Display' : undefined}
-            density="card"
-            loading={loading}
-          />
+          <SourceActionButton action={action} title={chatRef.title} density="card" loading={loading} />
           {footerAction}
         </span>
         {idDisplay ? (
@@ -1991,6 +1987,203 @@ export function recordMenuActions(
 }
 
 // =============================================================================
+// RecordAnchor and RecordChip — a record's link, and its chip in a sentence.
+// =============================================================================
+
+/**
+ * A record's link: the anchor every surface that opens a record draws (a citation, a row of the sources strip, a chip in
+ * a sentence, a search result), over the destination `resolveRecordDestination` answered. The card's own click router
+ * (`RecordNavWrap`) routes the primary click with the destination's `hostRoute`, so a route of the host's own stays on
+ * the host in every mode, embed included; the anchor's `target`/`rel` carry the same new-tab decision.
+ */
+export function RecordAnchor({
+  destination,
+  className,
+  title,
+  ariaLabel,
+  ariaHidden,
+  tabIndex,
+  children,
+}: {
+  destination: RecordLinkTarget;
+  className?: string;
+  title?: string;
+  ariaLabel?: string;
+  ariaHidden?: boolean;
+  tabIndex?: number;
+  children: ReactNode;
+}) {
+  const { url, targetPlatform, path, hostRoute, isNewTab } = destination;
+  return (
+    <RecordNavWrap href={url} path={path} targetPlatform={targetPlatform} isNewTab={isNewTab} hostRoute={hostRoute}>
+      <Link
+        href={url}
+        className={className}
+        title={title}
+        aria-label={ariaLabel}
+        aria-hidden={ariaHidden || undefined}
+        tabIndex={tabIndex}
+        {...newTabAnchorAttrs(isNewTab, url, targetPlatform)}
+      >
+        {children}
+      </Link>
+    </RecordNavWrap>
+  );
+}
+
+/**
+ * A record chip's "⋯": the button that opens the record's menu, set in the chip's `trailing` slot (`InlineChip`), so
+ * the name and its actions are one box. `label` names the record for the button's accessible name.
+ */
+function RecordChipMenu({ menuGroups, label }: { menuGroups: ActionsMenuGroup[]; label: string }) {
+  const ariaLabel = `Actions for ${label}`;
+  return (
+    <ActionsMenuDropdown
+      groups={menuGroups}
+      triggerAriaLabel={ariaLabel}
+      onCloseAutoFocus={event => event.preventDefault()}
+      customTrigger={
+        <Button
+          variant="transparent"
+          type="button"
+          aria-label={ariaLabel}
+          className="!h-auto !min-h-0 !w-auto !min-w-0 !p-0 align-[-0.2em] text-ods-text-secondary hover:bg-transparent hover:text-ods-text-primary"
+        >
+          <Ellipsis01Icon className="size-4" />
+        </Button>
+      }
+    />
+  );
+}
+
+export interface RecordChipProps {
+  type: string;
+  id: string;
+  label: string;
+  /**
+   * The host's own page for the record (a route of the host's: the product's device or script page). Absent, the chip
+   * opens the record where its card does (`useRecordDestination`); `null`, the host has no page for it.
+   */
+  href?: string | null;
+  /** The record's name is still being read: the chip's own skeleton. */
+  loading?: boolean;
+}
+
+/**
+ * THE chip of a record in a sentence, the lib's and a host's alike: the name in the chat's one inline box
+ * (`InlineChip`), opening the record through `RecordAnchor`. Its action, inside the same box: in an answer
+ * (`MessageRecordLinkProvider`), the record's "⋯" menu, the same rows as its card (`recordMenuGroups`); for an attached
+ * context item, a new-tab link where this window opens tabs (`navigation.opensTabs`). Outside a chat runtime (nothing to
+ * route through), and for a record no page shows, it is drawn without a link.
+ */
+export function RecordChip(props: RecordChipProps) {
+  const runtime = useChatRuntime();
+  if (props.loading) return <InlineChip label="" loading />;
+  if (!runtime) return <InlineChip label={props.label} />;
+  return props.href === undefined ? <ResolvedRecordChip {...props} /> : <HostRecordChip {...props} href={props.href} />;
+}
+
+/** The lib's chip: the record opens where its card opens (the card's row query, so a chip beside its card adds none). */
+function ResolvedRecordChip({ type, id, label }: RecordChipProps) {
+  const runtime = useRequiredChatRuntime();
+  // The message's own source part says where the record lives, as it does for its card: a row this platform cannot
+  // read leaves the chip its link.
+  const source = useMessageSourceOf(type, id);
+  const url = source ? (sourceRowInputOf(source).externalUrl ?? null) : null;
+  const { finalChatRef, hostRoute, isNewTab, path } = useRecordDestination({ type, id, title: label, url });
+  const href = finalChatRef.url ?? null;
+  return (
+    <RecordChipBox
+      record={finalChatRef}
+      label={label}
+      destination={recordLinkTargetOf({
+        url: href,
+        targetPlatform: finalChatRef.targetPlatform ?? null,
+        path,
+        hostRoute,
+        isNewTab,
+      })}
+      runtime={runtime}
+    />
+  );
+}
+
+/** A host's chip: the record opens on the host's own page for it. */
+function HostRecordChip({ type, id, label, href }: RecordChipProps & { href: string | null }) {
+  const runtime = useRequiredChatRuntime();
+  const hostRoute = !!href && isRelativeHref(href);
+  const destination = href
+    ? {
+        url: href,
+        targetPlatform: null,
+        path: null,
+        hostRoute,
+        isNewTab: navLinkTarget(runtime, href, null, { hostRoute }).isNewTab,
+      }
+    : null;
+  return (
+    <RecordChipBox
+      record={{ type, id, title: label, url: href }}
+      label={label}
+      destination={destination}
+      runtime={runtime}
+    />
+  );
+}
+
+function RecordChipBox({
+  record,
+  label,
+  destination,
+  runtime,
+}: {
+  record: ChatRef;
+  label: string;
+  destination: RecordLinkTarget | null;
+  runtime: ChatRuntime;
+}) {
+  const handlers = useRecordActions();
+  const inMessage = useInMessageRecordLink();
+  const menuGroups = inMessage ? recordMenuGroups(record, recordMenuActions(record, handlers, runtime)) : undefined;
+  const trailing = menuGroups ? (
+    <RecordChipMenu menuGroups={menuGroups} label={label} />
+  ) : !inMessage && destination && runtime.navigation.opensTabs !== false ? (
+    <FloatingTooltip content="Open in new tab" side="top" as="span">
+      <NavLinkAnchorViaRuntime
+        href={destination.url}
+        targetPlatform={destination.targetPlatform}
+        openIn="new-tab"
+        aria-label="Open in new tab"
+        className="text-inherit no-underline hover:text-ods-text-primary [&_svg]:inline [&_svg]:size-4 [&_svg]:align-[-0.2em]"
+      >
+        <ExternalLinkIcon />
+      </NavLinkAnchorViaRuntime>
+    </FloatingTooltip>
+  ) : undefined;
+  return (
+    <InlineChip
+      label={label}
+      link={
+        destination
+          ? (content: ReactNode, anchor: InlineChipAnchor) => (
+              <RecordAnchor
+                destination={destination}
+                className="text-inherit no-underline"
+                ariaLabel={anchor.label}
+                ariaHidden={anchor.hidden}
+                tabIndex={anchor.hidden ? -1 : undefined}
+              >
+                {content}
+              </RecordAnchor>
+            )
+          : undefined
+      }
+      trailing={trailing}
+    />
+  );
+}
+
+// =============================================================================
 // ChatCardLoader — fetch + skeleton + render for fetch-mode entries.
 // =============================================================================
 
@@ -2065,11 +2258,7 @@ export function useRecordDestination(chatRef: ChatRef) {
 
   // THE destination, decided in one place (`resolveCardDestination`): the source chip's resolver with the url the
   // server answers, on the ref or on the fetched row. Computed BEFORE `isNewTab` so the click sees the page it visits.
-  const destination = resolveCardDestination({
-    chatRef,
-    item: fetchEntry ? item : undefined,
-    ctx: sourceRowCtxFromRuntime(runtime),
-  });
+  const destination = resolveRecordDestination(recordRowOf({ chatRef, item: fetchEntry ? item : undefined }), runtime);
   const sourceRepo = chatRef.sourceRepo ?? defaultTableIdForDocumentType(chatRef.type);
   const clickupUrl = fetchEntry && typeof item?.clickupUrl === 'string' ? item.clickupUrl : null;
   const hrefResolvedChatRef: ChatRef = {
@@ -2092,12 +2281,9 @@ export function useRecordDestination(chatRef: ChatRef) {
       ? { ...hrefResolvedChatRef, title: fetchedTitle }
       : hrefResolvedChatRef;
 
-  // The new-tab decision, ONCE (the same rule chips use), so the rendered `<a target>` agrees with the runtime nav
-  // decision in `RecordNavWrap` + `executeNavigation`.
-  const { hostRoute } = destination;
-  const isNewTab = finalChatRef.url
-    ? navLinkTarget(runtime, finalChatRef.url, finalChatRef.targetPlatform, { hostRoute }).isNewTab
-    : false;
+  // The new-tab decision, ONCE (`resolveRecordDestination`, the rule every record surface uses), so the rendered
+  // `<a target>` agrees with the runtime nav decision in `RecordNavWrap` + `executeNavigation`.
+  const { hostRoute, isNewTab } = destination;
   const path = typeof finalChatRef.metadata?.path === 'string' ? finalChatRef.metadata.path : null;
   return { entry, fetchEntry, item, isLoading, isError, isFetched, notFound, finalChatRef, hostRoute, isNewTab, path };
 }
@@ -2150,9 +2336,7 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, held, extras }: 
     ) : (
       <ChatCardWithDiscuss
         chatRef={finalChatRef}
-        onDiscuss={onDiscuss}
-        onDisplay={onDisplay}
-        displayAction={entry.displayAction}
+        action={actions.discuss}
         footerAction={footerAction}
         loading={loading}
       >
@@ -2176,25 +2360,22 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, held, extras }: 
     // whose card route knows no such type), and the message says what it is and where it lives. That one answer makes the
     // card the record's link, the chip's rule. Anything else that left no row is a failure, source part or not, below.
     if (notFound && source) {
-      const href = finalChatRef.url;
       return (
-        <InlineChip
-          label={source.title ?? `${entry.label} ${chatRef.id}`}
-          link={
-            href
-              ? content =>
-                  navWrap(
-                    <Link
-                      href={href}
-                      className="text-inherit no-underline"
-                      {...newTabAnchorAttrs(isNewTab, href, finalChatRef.targetPlatform)}
-                    >
-                      {content}
-                    </Link>,
-                  )
-              : undefined
-          }
-        />
+        // The record's chip, from the destination this loader already resolved (no second request for the row).
+        <MessageRecordLinkProvider>
+          <RecordChipBox
+            record={finalChatRef}
+            label={source.title ?? `${entry.label} ${chatRef.id}`}
+            destination={recordLinkTargetOf({
+              url: finalChatRef.url ?? null,
+              targetPlatform: finalChatRef.targetPlatform ?? null,
+              path,
+              hostRoute,
+              isNewTab,
+            })}
+            runtime={runtime}
+          />
+        </MessageRecordLinkProvider>
       );
     }
     // FAIL LOUD (explicit product decision 2026-08-13): a card that

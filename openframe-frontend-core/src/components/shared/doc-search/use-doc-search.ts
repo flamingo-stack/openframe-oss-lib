@@ -38,6 +38,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import type { DocSearchResult } from '../../../chat-protocol/doc-search';
 import { docSearchFieldsOf } from '../../../chat-protocol/message-decoder';
 import { useChatRuntime } from '../../../contexts/chat-runtime-context';
 import { useDebounce } from '../../../hooks/ui/use-debounce';
@@ -48,7 +49,6 @@ import { executeNavigationImperative, executeNewTabNavigation } from '../../chat
 import type { SearchResult } from '../../ui/search-input';
 import { mapDocSearchResults } from './map-doc-search-results';
 import { resolveSearchResultAction } from './resolve-search-result-action';
-import type { DocSearchResult } from './types';
 
 export interface UseDocSearchConfig {
   /** Discriminator passed to `/api/docs/search?source=` (e.g.

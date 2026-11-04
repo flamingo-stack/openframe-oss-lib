@@ -48,14 +48,14 @@ import {
   CHAT_MESSAGE_USER_ROW_CLASS,
 } from './chat-message-layout';
 import type { ChatRef } from './chat-ref.types';
-import { CitationChip, MessageCitationsProvider, useMessageCitations } from './citation-chip';
+import { CitationChip } from './citation-chip';
 import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
-import { chatCardLabel } from './entity-cards/dispatch';
+import { chatCardLabel, RecordChip } from './entity-cards/dispatch';
 import { ErrorMessageDisplay } from './error-message-display';
 import { EscalationOfferMessage } from './escalation-offer-message';
-import { RecordChipProvider } from './record-actions';
-import { RecordChip } from './record-chip';
+import { MessageCitationsProvider, useMessageCitations } from './message-citations';
+import { MessageRecordLinkProvider } from './record-actions';
 import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
 import { ThinkingDisplay } from './thinking-display';
@@ -337,12 +337,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           if (record) {
             const label = textOf(children) || record.id;
             const hosted = renderRecordChip?.({ type: record.type, id: record.id, label });
-            // In its record's context, so the host's chip can offer the record's menu (`useRecordChipMenu`).
-            if (hosted != null)
-              return (
-                <RecordChipProvider value={{ type: record.type, id: record.id, label }}>{hosted}</RecordChipProvider>
-              );
-            return <RecordChip type={record.type} id={record.id} label={label} />;
+            // In an answer, so the chip (the host's `RecordChip` or the lib's) offers the record's menu.
+            return (
+              <MessageRecordLinkProvider>
+                {hosted ?? <RecordChip type={record.type} id={record.id} label={label} />}
+              </MessageRecordLinkProvider>
+            );
           }
           // The host's `NavLinkAnchor` draws the link (the lib's
           // `NavLinkAnchorViaRuntime`, or a host anchor over the same
