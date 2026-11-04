@@ -1,14 +1,13 @@
 package com.openframe.data.document.audit;
 
-import com.github.f4b6a3.ulid.UlidCreator;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -21,12 +20,11 @@ import java.util.Map;
 public class AuditEvent {
 
     public static final int SCHEMA_VERSION = 1;
-    private static final int RETENTION_SECONDS = 7 * 24 * 60 * 60;
+    public static final Duration RETENTION = Duration.ofDays(7);
 
     @Id
     private String id;
     private int schemaVersion;
-    @Indexed(name = "audit_events_ttl", expireAfterSeconds = RETENTION_SECONDS)
     private Instant occurredAt;
     private String action;
     private AuditOutcome outcome;
@@ -54,8 +52,4 @@ public class AuditEvent {
     private String targetName;
     private Map<String, Object> details;
     private Map<String, AuditChange> changes;
-
-    public static String newId() {
-        return UlidCreator.getUlid().toString();
-    }
 }

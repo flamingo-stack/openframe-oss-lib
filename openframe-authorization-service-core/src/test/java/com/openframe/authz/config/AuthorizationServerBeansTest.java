@@ -2,6 +2,7 @@ package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.data.document.audit.AuditRequestContext;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
 import org.junit.jupiter.api.AfterEach;
@@ -16,7 +17,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
@@ -73,6 +76,34 @@ class AuthorizationServerBeansTest {
         assertThat(claims.<String>getClaim("userId")).isEqualTo("user-1");
         assertThat(claims.<List<String>>getClaim("roles")).containsExactlyInAnyOrder("OWNER", "ADMIN");
         verify(userService, never()).touchLastLogin("owner@acme.com", TENANT);
+    }
+
+    @Test
+    void shouldAddTheSignInRecordIdAsSessionClaim() {
+        when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
+        RegisteredClient client = RegisteredClient.withId("rc-1").clientId("bff").redirectUri("https://app/cb")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).build();
+        OAuth2Authorization signIn = OAuth2Authorization.withRegisteredClient(client).id("sign-in-1")
+                .principalName("owner@acme.com")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .build();
+        JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.REFRESH_TOKEN,
+                "owner@acme.com").authorization(signIn).build();
+
+        config.tokenCustomizer(userService).customize(ctx);
+
+        assertThat(ctx.getClaims().build().<String>getClaim(AuditRequestContext.SESSION_CLAIM)).isEqualTo("sign-in-1");
+    }
+
+    @Test
+    void shouldLeaveSessionClaimOutWithoutSignInRecord() {
+        when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
+        JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.AUTHORIZATION_CODE,
+                "owner@acme.com").build();
+
+        config.tokenCustomizer(userService).customize(ctx);
+
+        assertThat(ctx.getClaims().build().getClaims()).doesNotContainKey(AuditRequestContext.SESSION_CLAIM);
     }
 
     @Test
