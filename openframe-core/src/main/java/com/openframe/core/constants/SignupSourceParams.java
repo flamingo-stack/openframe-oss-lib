@@ -31,4 +31,5 @@ public final class SignupSourceParams {
     public static final List<String> SOURCE = List.of(UTM_SOURCE, UTM_MEDIUM, UTM_CAMPAIGN, UTM_CONTENT, UTM_TERM,
             FBCLID, GCLID, GBRAID, WBRAID, RDT_CID, LI_FAT_ID, FBC, FBP, RDT_UUID, REF, REFERRER, LANDING_URL);
     public static final List<String> URLS = List.of(REFERRER, LANDING_URL);
+    public static final List<String> LONG_VALUES = List.of(REFERRER, LANDING_URL, FBC);
 }

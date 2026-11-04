@@ -89,7 +89,7 @@ public class Touchpoint {
         Touchpoint source = request.hasSourceSignal() ? request : cookie;
         return request.toBuilder()
                 .downloadId(StringUtils.hasText(request.getDownloadId()) ? request.getDownloadId() : cookie.getDownloadId())
-                .fbc(StringUtils.hasText(request.getFbc()) ? request.getFbc() : cookie.getFbc())
+                .fbc(source.getFbc())
                 .fbp(StringUtils.hasText(request.getFbp()) ? request.getFbp() : cookie.getFbp())
                 .rdtUuid(StringUtils.hasText(request.getRdtUuid()) ? request.getRdtUuid() : cookie.getRdtUuid())
                 .fbclid(source.getFbclid())
@@ -110,8 +110,8 @@ public class Touchpoint {
     }
 
     private boolean hasSourceSignal() {
-        return Stream.of(fbclid, gclid, gbraid, wbraid, rdtCid, liFatId, utmSource, utmMedium, utmCampaign, utmContent,
-                        utmTerm, ref)
+        return Stream.of(fbclid, fbc, gclid, gbraid, wbraid, rdtCid, liFatId, utmSource, utmMedium, utmCampaign,
+                        utmContent, utmTerm, ref)
                 .anyMatch(StringUtils::hasText);
     }
 }

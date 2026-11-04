@@ -34,7 +34,7 @@ class ClientVersionMetricsFilterTest {
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final AtomicBoolean forwarded = new AtomicBoolean(false);
-    private final GatewayFilterChain chain = exchange -> {
+    private final GatewayFilterChain chain = _ -> {
         forwarded.set(true);
         return Mono.empty();
     };
