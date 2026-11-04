@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, act } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { NO_CHAT_WIRE, readChatWire } from '../../../../chat-protocol/__fixtures__/hub-contracts';
 import {
   approvalAnswerInFlight,
   approvalBatchIdOf,
@@ -19,7 +20,13 @@ import {
   type ChatMessage,
 } from '../../../../chat-protocol/chat-message';
 import { encodeUiChunk, encodeUiDone, STREAM_CLOSE_GRACE_MS, type UiChunk } from '../../../../chat-protocol/ui-chunks';
-import {
+import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
+import { approvalBatchViewOf } from '../../utils/tool-part-display';
+import { APPROVAL_REFUSED, useSseChatAdapter } from '../use-sse-chat-adapter';
+
+// The chat wire the hub serves (`chat-wire.json`): the cases that read it are skipped when this run cannot read the hub.
+const WIRE = await readChatWire();
+const {
   ANSWER_STREAM,
   APPROVAL_BATCH_STREAM,
   APPROVAL_REFUSED_STREAM,
@@ -30,10 +37,7 @@ import {
   FIXTURE_ASSISTANT_ID,
   FIXTURE_CONVERSATION_ID,
   FIXTURE_PROPOSAL_ID,
-} from '../../../../chat-protocol/wire-fixtures';
-import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
-import { approvalBatchViewOf } from '../../utils/tool-part-display';
-import { APPROVAL_REFUSED, useSseChatAdapter } from '../use-sse-chat-adapter';
+} = WIRE ?? NO_CHAT_WIRE;
 
 // =============================================================================
 // Harness
@@ -221,7 +225,7 @@ describe('a live message shows the sources of the stream that drew it', () => {
   });
 });
 
-describe('the standard wire', () => {
+describe.skipIf(!WIRE)('the standard wire', () => {
   it('a whole answer: sources lead, then text and cards in stream order, and the metadata reaches the state', async () => {
     mockFetchStream(onUiWire(ANSWER_STREAM));
     const { result } = renderAdapter();
@@ -306,7 +310,7 @@ describe('the standard wire', () => {
   });
 });
 
-describe('the approval round trip', () => {
+describe.skipIf(!WIRE)('the approval round trip', () => {
   const lastMessage = (result: { current: ReturnType<typeof useSseChatAdapter> }) =>
     result.current.messages[result.current.messages.length - 1];
   const rows = (message: ChatMessage) => message.parts.filter(isToolPart);
@@ -415,7 +419,7 @@ describe('the approval round trip', () => {
   });
 });
 
-describe('an approval whose answer never came', () => {
+describe.skipIf(!WIRE)('an approval whose answer never came', () => {
   const outcomeUnknown: unknown = expect.stringMatching(/may or may not have gone through/);
   const toolsOf = (messages: readonly ChatMessage[]) => messages.flatMap(message => message.parts).filter(isToolPart);
   const statesOf = (messages: readonly ChatMessage[]) => toolsOf(messages).map(part => part.state);
@@ -792,7 +796,7 @@ describe('an approval whose answer never came', () => {
   });
 });
 
-describe('an approval while another stream is open', () => {
+describe.skipIf(!WIRE)('an approval while another stream is open', () => {
   const toolsOf = (messages: readonly ChatMessage[]) => messages.flatMap(message => message.parts).filter(isToolPart);
   const textsOf = (messages: readonly ChatMessage[]) => assistantsOf(messages).map(m => textOfParts(m.parts));
 

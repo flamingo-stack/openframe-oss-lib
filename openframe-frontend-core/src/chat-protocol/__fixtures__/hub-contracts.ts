@@ -133,3 +133,38 @@ export async function readChatWire(): Promise<ChatWire | null> {
 export function readRecordLinkVectors(): Promise<RecordLinkVectors | null> {
   return readHubContract<RecordLinkVectors>('record-link-vectors.json');
 }
+
+/**
+ * What a test file destructures when this run cannot read the hub: every value empty of its own shape, so a file that
+ * builds its cases from the wire still loads, and the cases that read it are skipped (`describe.skipIf(!WIRE)`).
+ */
+export const NO_CHAT_WIRE: ChatWire = {
+  FIXTURE_BLOG_URI: '',
+  FIXTURE_BLOG_URL: '',
+  FIXTURE_TICKET_URI: '',
+  FIXTURE_COLLECTION_URI: '',
+  FIXTURE_VIDEO_URI: '',
+  FIXTURE_TASK_URI: '',
+  FIXTURE_CONVERSATION_ID: '',
+  FIXTURE_ASSISTANT_ID: '',
+  FIXTURE_PROPOSAL_ID: '',
+  STORED_ANSWER_PARTS: [],
+  STORED_USER_PARTS: [],
+  STORED_RECEIPT_PARTS: [],
+  HISTORY_RESPONSE: { conversationId: '', found: false, messages: [] },
+  CHAT_REQUEST_BODY: { id: '', messages: [], commandOverride: {} },
+  ANSWER_STREAM: [],
+  COLLECTION_CITATION_STREAM: [],
+  TOOL_ERROR_STREAM: [],
+  TURN_FAILURE_STREAM: [],
+  ABORT_STREAM: [],
+  APPROVAL_STREAM: [],
+  APPROVAL_BATCH_STREAM: [],
+  APPROVAL_CARD_MESSAGE: { id: '', role: 'assistant', parts: [] },
+  APPROVAL_REQUEST_BODY: { id: '', trigger: 'submit-message', messages: [] },
+  APPROVAL_RESPONSE_STREAM: [],
+  APPROVAL_REJECT_STREAM: [],
+  APPROVAL_REFUSED_STREAM: [],
+  NEW_MESSAGE_STREAMS: {},
+  CARD_MESSAGE_STREAMS: {},
+};

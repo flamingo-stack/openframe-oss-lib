@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
+import { NO_CHAT_WIRE, readChatWire } from '../__fixtures__/hub-contracts';
 import { applyChunk, applyChunkToMessages, createWireState } from '../apply-chunk';
 import {
   approvalStatusOf,
@@ -18,7 +19,10 @@ import {
 import { citationNumbers } from '../citations';
 import type { UiChunk } from '../ui-chunks';
 import { createUiMessageWriter } from '../ui-writer';
-import {
+
+// The chat wire the hub serves (`chat-wire.json`): the cases that read it are skipped when this run cannot read the hub.
+const WIRE = await readChatWire();
+const {
   ANSWER_STREAM,
   APPROVAL_BATCH_STREAM,
   APPROVAL_CARD_MESSAGE,
@@ -31,7 +35,7 @@ import {
   FIXTURE_PROPOSAL_ID,
   NEW_MESSAGE_STREAMS,
   TOOL_ERROR_STREAM,
-} from '../wire-fixtures';
+} = WIRE ?? NO_CHAT_WIRE;
 
 const anyString: unknown = expect.any(String);
 const anyList: unknown = expect.any(Array);
@@ -62,7 +66,7 @@ function text(id: string, delta: string, citations?: ChatCitation[]): UiChunk[] 
   ];
 }
 
-describe('text', () => {
+describe.skipIf(!WIRE)('text', () => {
   it('coalesces wire ids into one part, never one per Anthropic block', () => {
     const parts = accumulate([...text('t1', 'One '), ...text('t2', 'two '), ...text('t3', 'three.')]);
     expect(parts).toEqual([{ type: 'text', text: 'One two three.', state: 'done' }]);
@@ -122,7 +126,7 @@ describe('text', () => {
   });
 });
 
-describe('a record URI enters in its one spelling', () => {
+describe.skipIf(!WIRE)('a record URI enters in its one spelling', () => {
   const unencoded = 'record://markdown/docs/a.md';
   const canonical = 'record://markdown/docs%2Fa.md';
 
@@ -177,7 +181,7 @@ describe('a record URI enters in its one spelling', () => {
   });
 });
 
-describe('sources', () => {
+describe.skipIf(!WIRE)('sources', () => {
   it('insert at the head of the body, in arrival order, and never split text', () => {
     const wire = createWireState();
     let parts = accumulate([{ type: 'source-url', sourceId: 'record://a/1', url: 'https://a.test' }]);
@@ -218,7 +222,7 @@ describe('sources', () => {
   });
 });
 
-describe('reasoning', () => {
+describe.skipIf(!WIRE)('reasoning', () => {
   const thinking = (id: string, delta: string): UiChunk[] => [
     { type: 'reasoning-start', id },
     { type: 'reasoning-delta', id, delta },
@@ -426,7 +430,7 @@ describe('data', () => {
   });
 });
 
-describe('tools', () => {
+describe.skipIf(!WIRE)('tools', () => {
   const input: UiChunk = {
     type: 'tool-input-available',
     toolCallId: 'p1',
@@ -639,7 +643,7 @@ describe('a rejection stands', () => {
   });
 });
 
-describe('copy-on-write', () => {
+describe.skipIf(!WIRE)('copy-on-write', () => {
   it('a delta keeps the identity of every other part', () => {
     const wire = createWireState();
     const before: ChatPart[] = [
@@ -713,7 +717,7 @@ describe('ending', () => {
   });
 });
 
-describe('applyChunkToMessages: the message being built', () => {
+describe.skipIf(!WIRE)('applyChunkToMessages: the message being built', () => {
   it('start with an id opens a new assistant message', () => {
     const user: ChatMessage = { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'hi' }] };
     const messages = thread([{ type: 'start', messageId: 'a1' }, ...text('t1', 'Hello')], [user]);
@@ -918,7 +922,7 @@ describe('applyChunkToMessages: a stage left running ends with its turn', () => 
   });
 });
 
-describe('applyChunkToMessages: a resolution finds its part across messages', () => {
+describe.skipIf(!WIRE)('applyChunkToMessages: a resolution finds its part across messages', () => {
   const card: ChatMessage = {
     id: 'card',
     role: 'assistant',
@@ -1051,7 +1055,7 @@ describe('applyChunkToMessages: a resolution finds its part across messages', ()
   });
 });
 
-describe('the hub accumulates what the lib accumulates', () => {
+describe.skipIf(!WIRE)('the hub accumulates what the lib accumulates', () => {
   it.each(Object.entries(NEW_MESSAGE_STREAMS))('%s', (_name, stream) => {
     const writer = createUiMessageWriter(() => undefined);
     for (const chunk of stream) writer.write(chunk);

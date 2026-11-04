@@ -4,6 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NO_CHAT_WIRE, readChatWire } from '../__fixtures__/hub-contracts';
 import { APPROVAL_CANCELLED } from '../chat-message';
 import {
   approvalStatusOfResponse,
@@ -17,7 +18,10 @@ import {
   UI_MESSAGE_STREAM_HEADERS,
   type UiChunk,
 } from '../ui-chunks';
-import {
+
+// The chat wire the hub serves (`chat-wire.json`): the cases that read it are skipped when this run cannot read the hub.
+const WIRE = await readChatWire();
+const {
   ANSWER_STREAM,
   APPROVAL_BATCH_STREAM,
   APPROVAL_REFUSED_STREAM,
@@ -28,7 +32,7 @@ import {
   COLLECTION_CITATION_STREAM,
   TOOL_ERROR_STREAM,
   TURN_FAILURE_STREAM,
-} from '../wire-fixtures';
+} = WIRE ?? NO_CHAT_WIRE;
 
 const encoder = new TextEncoder();
 
@@ -98,7 +102,7 @@ describe('encoding', () => {
   });
 });
 
-describe('every chunk of every stream', () => {
+describe.skipIf(!WIRE)('every chunk of every stream', () => {
   it.each(STREAMS)('%s comes back as it went out', (_name, stream) => {
     const decoder = createUiChunkDecoder();
     expect([...decoder.push(bytesOf(stream)), ...decoder.end()]).toEqual(stream);
@@ -219,7 +223,7 @@ describe('a stream that is cut', () => {
   });
 });
 
-describe('readUiChunks', () => {
+describe.skipIf(!WIRE)('readUiChunks', () => {
   it('reads a body, slices and all', async () => {
     const text = new TextDecoder().decode(bytesOf(ANSWER_STREAM));
     const middle = Math.floor(text.length / 2);

@@ -3,11 +3,15 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { NO_CHAT_WIRE, readChatWire } from '../__fixtures__/hub-contracts';
 import { applyChunk, applyChunkToMessages, createWireState } from '../apply-chunk';
 import { textOfParts, type ChatMessage, type ChatPart } from '../chat-message';
 import { createMingoDecoder, docSearchFieldsOf, messageOfStoredRow } from '../message-decoder';
 import type { ChatStreamEntry, UiChunk } from '../ui-chunks';
-import { HISTORY_RESPONSE, STORED_ANSWER_PARTS } from '../wire-fixtures';
+
+// The chat wire the hub serves (`chat-wire.json`): the cases that read it are skipped when this run cannot read the hub.
+const WIRE = await readChatWire();
+const { HISTORY_RESPONSE, STORED_ANSWER_PARTS } = WIRE ?? NO_CHAT_WIRE;
 
 function partsOf(chunks: readonly UiChunk[]): ChatPart[] {
   const wire = createWireState();
@@ -544,7 +548,7 @@ describe('createMingoDecoder: the table', () => {
   });
 });
 
-describe('messageOfStoredRow', () => {
+describe.skipIf(!WIRE)('messageOfStoredRow', () => {
   it('reads what a row says about itself field by field, and never a key this client keeps for itself', () => {
     const message = messageOfStoredRow({
       id: 'a',

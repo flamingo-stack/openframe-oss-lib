@@ -6,13 +6,17 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NO_CHAT_WIRE, readChatWire } from '../../../chat-protocol/__fixtures__/hub-contracts';
 import { encodeUiChunk, encodeUiDone, type UiChunk } from '../../../chat-protocol/ui-chunks';
-import { APPROVAL_STREAM, FIXTURE_PROPOSAL_ID } from '../../../chat-protocol/wire-fixtures';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
 import { useSseChatAdapter } from '../hooks/use-sse-chat-adapter';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 import { ASK_AI_OPEN_WITH_REF_EVENT } from '../utils/ask-ai-events';
+
+// The chat wire the hub serves (`chat-wire.json`): the cases that read it are skipped when this run cannot read the hub.
+const WIRE = await readChatWire();
+const { APPROVAL_STREAM, FIXTURE_PROPOSAL_ID } = WIRE ?? NO_CHAT_WIRE;
 
 const runtime: ChatRuntime = {
   source: 'hub',
@@ -136,7 +140,7 @@ async function askRowOfRecord(): Promise<'live' | 'disabled'> {
   return state;
 }
 
-describe('the thread`s Ask, across an answer', () => {
+describe.skipIf(!WIRE)('the thread`s Ask, across an answer', () => {
   it('is live until the click, disabled for the answer, and live again when its stream has closed', async () => {
     const chat = answerChat();
     let state: UnifiedChatState | undefined;
@@ -172,7 +176,7 @@ describe('the thread`s Ask, across an answer', () => {
   });
 });
 
-describe('a host`s launcher prompt during an answer', () => {
+describe.skipIf(!WIRE)('a host`s launcher prompt during an answer', () => {
   it('waits for the stream to close, and the host keeps it until it went out', async () => {
     const chat = answerChat();
     const consumed = vi.fn();
@@ -219,7 +223,7 @@ describe('a host`s launcher prompt during an answer', () => {
   });
 });
 
-describe('a page`s ask during an answer', () => {
+describe.skipIf(!WIRE)('a page`s ask during an answer', () => {
   const askFromThePage = (id: string, title: string) =>
     act(async () => {
       window.dispatchEvent(

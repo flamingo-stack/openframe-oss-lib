@@ -58,8 +58,8 @@ export interface RecordLinkMatch extends DrawnRecordLink {
 /**
  * The href of a record: `record://<type>/<id>`, the id percent-encoded so a slug, a path (`docs/setup.md`), a space or
  * a `)` can never end the markdown link early: `encodeURIComponent`, plus `(` and `)`, which it leaves alone and a
- * markdown destination cannot hold. The Java agent's `RecordKey` encodes the same, pinned by one fixture
- * (`RECORD_URI_VECTORS`). Every server that offers a record to a model hands it this exact href.
+ * markdown destination cannot hold. The Java agent's `RecordKey` encodes the same; both are held to the vectors the hub
+ * serves (`record-link-vectors.json`). Every server that offers a record to a model hands it this exact href.
  */
 export function recordHref(type: string, id: string): string {
   return `${RECORD_LINK_SCHEME}${type}/${encodeURIComponent(id).replace(/\(/g, '%28').replace(/\)/g, '%29')}`;

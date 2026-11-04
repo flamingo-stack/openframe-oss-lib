@@ -18,6 +18,7 @@ import {
 } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { parseWireCommandOverride } from '../../components/chat/utils/slash-dispatch-utils';
+import { NO_CHAT_WIRE, readChatWire } from '../__fixtures__/hub-contracts';
 import { applyChunk, applyChunkToMessages, createWireState } from '../apply-chunk';
 import {
   approvalStatusOf,
@@ -31,7 +32,10 @@ import {
 import { createMingoDecoder } from '../message-decoder';
 import { chatProgressChunk } from '../progress';
 import { encodeUiChunk, encodeUiDone, UI_MESSAGE_STREAM_HEADERS, type UiChunk } from '../ui-chunks';
-import {
+
+// The chat wire the hub serves (`chat-wire.json`): the cases that read it are skipped when this run cannot read the hub.
+const WIRE = await readChatWire();
+const {
   APPROVAL_CARD_MESSAGE,
   APPROVAL_REFUSED_STREAM,
   APPROVAL_REJECT_STREAM,
@@ -48,7 +52,7 @@ import {
   STORED_RECEIPT_PARTS,
   STORED_USER_PARTS,
   TURN_FAILURE_STREAM,
-} from '../wire-fixtures';
+} = WIRE ?? NO_CHAT_WIRE;
 
 const ALL_STREAMS: ReadonlyArray<[string, UiChunk[]]> = [
   ...Object.entries(NEW_MESSAGE_STREAMS),
@@ -88,7 +92,7 @@ function bytesOf(chunks: readonly UiChunk[]): ReadableStream<Uint8Array> {
   });
 }
 
-describe('the types are the standard`s', () => {
+describe.skipIf(!WIRE)('the types are the standard`s', () => {
   // These compile only while the lib's copy of the types is assignable to the SDK's: `tsc` is the assertion.
   const messageIsStandard = (message: ChatMessage): UIMessage<ChatMessageMetadata> => message;
   const partIsStandard = (part: ChatPart): UIMessage['parts'][number] => part;
@@ -101,7 +105,7 @@ describe('the types are the standard`s', () => {
   });
 });
 
-describe('uiMessageChunkSchema', () => {
+describe.skipIf(!WIRE)('uiMessageChunkSchema', () => {
   const schema = asSchema(uiMessageChunkSchema);
 
   it.each(ALL_STREAMS)('accepts every chunk of %s', async (_name, stream) => {
@@ -126,7 +130,7 @@ describe('uiMessageChunkSchema', () => {
   });
 });
 
-describe('the wire, through the SDK`s own event-stream parser', () => {
+describe.skipIf(!WIRE)('the wire, through the SDK`s own event-stream parser', () => {
   it.each(ALL_STREAMS)(
     '%s parses to the chunks that went out, on the transport a `useChat` client uses',
     async (_name, stream) => {
@@ -153,7 +157,7 @@ describe('the wire, through the SDK`s own event-stream parser', () => {
   });
 });
 
-describe('readUIMessageStream with terminateOnError', () => {
+describe.skipIf(!WIRE)('readUIMessageStream with terminateOnError', () => {
   it.each(Object.entries(NEW_MESSAGE_STREAMS))('reads %s to the end', async (_name, stream) => {
     await expect(standardMessage(stream)).resolves.toBeDefined();
   });
@@ -208,7 +212,7 @@ describe('readUIMessageStream with terminateOnError', () => {
   });
 });
 
-describe('validateUIMessages', () => {
+describe.skipIf(!WIRE)('validateUIMessages', () => {
   const validate = (messages: unknown) => validateUIMessages({ messages });
 
   it('accepts the stored parts, field for field', async () => {
@@ -298,7 +302,7 @@ describe('validateUIMessages', () => {
   });
 });
 
-describe('the stated deviations', () => {
+describe.skipIf(!WIRE)('the stated deviations', () => {
   it('D1: a NATS chunk keeps its uppercase `type`, and the one decoder hands the library standard chunks', async () => {
     const decoder = createMingoDecoder();
     const chunks = [

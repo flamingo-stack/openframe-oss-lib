@@ -7,12 +7,16 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NO_CHAT_WIRE, readChatWire } from '../../../chat-protocol/__fixtures__/hub-contracts';
 import { CHAT_INTERRUPTED_NOTICE, encodeUiChunk, encodeUiDone } from '../../../chat-protocol/ui-chunks';
-import { APPROVAL_STREAM } from '../../../chat-protocol/wire-fixtures';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
 import { APPROVAL_OUTCOME_UNKNOWN, useSseChatAdapter } from '../hooks/use-sse-chat-adapter';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
+
+// The chat wire the hub serves (`chat-wire.json`): the cases that read it are skipped when this run cannot read the hub.
+const WIRE = await readChatWire();
+const { APPROVAL_STREAM } = WIRE ?? NO_CHAT_WIRE;
 
 const THE_SENTENCE =
   'The answer stopped before saying how this ended, so it may or may not have gone through. Check before trying again.';
@@ -83,7 +87,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe('an approved card whose answer was cut, read from the wire', () => {
+describe.skipIf(!WIRE)('an approved card whose answer was cut, read from the wire', () => {
   it.each(['close', 'error'] as const)('(%s) says the whole sentence, and no second notice', async how => {
     answerChat(how);
     let state: UnifiedChatState | undefined;
