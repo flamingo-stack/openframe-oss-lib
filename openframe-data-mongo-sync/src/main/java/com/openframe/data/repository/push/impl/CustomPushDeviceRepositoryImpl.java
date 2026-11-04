@@ -25,6 +25,7 @@ import java.time.Instant;
 public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport implements CustomPushDeviceRepository {
 
     private static final String FIELD_TOKEN = "token";
+    private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_USER_ID = "userId";
     private static final String FIELD_PLATFORM = "platform";
     private static final String FIELD_APP_VERSION = "appVersion";
@@ -37,6 +38,10 @@ public class CustomPushDeviceRepositoryImpl extends TenantAwareRepositorySupport
 
     @Override
     public boolean registerToken(String userId, String token, PushPlatform platform, String appVersion) {
+        // Cross-tenant on purpose: the tenantId criterion keeps the template from adding the current tenant's filter.
+        mongoTemplate.remove(new Query(Criteria.where(FIELD_TOKEN).is(token).and(FIELD_TENANT_ID).ne(tenantId())),
+                PushDevice.class);
+
         Query byToken = new Query(Criteria.where(FIELD_TOKEN).is(token));
         Instant now = Instant.now();
 
