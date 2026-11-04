@@ -13,7 +13,7 @@ const BATCH_ROW: HistoricalMessage = {
   id: 'a1',
   createdAt: '2026-08-01T10:00:00Z',
   owner: { type: 'ASSISTANT' },
-  messageData: [
+  parts: [
     {
       type: 'APPROVAL_REQUEST',
       approvalRequestId: 'batch-1',

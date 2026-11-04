@@ -99,6 +99,9 @@ export * from './hooks';
 // + history replay).
 export * from './stream';
 
+// THE chat engine: one thread store, one chunk processor, one React binding, for every web chat.
+export * from './engine';
+
 // Chat utilities
 export * from './utils';
 

@@ -154,3 +154,11 @@ export function extractIncompleteTailState(
   for (let i = start; i < messages.length; i += 1) parts.push(...messages[i].parts);
   return incompleteStateOfParts(parts);
 }
+
+/** Whether a thread's last thing is a context compaction still running: it locks the composer. */
+export function isCompactingTail(messages: readonly ChatMessage[] | undefined): boolean {
+  const last = messages?.[messages.length - 1];
+  if (last?.role !== 'assistant') return false;
+  const tail = last.parts[last.parts.length - 1];
+  return tail?.type === 'data-context-compaction' && tail.data.status === 'started';
+}

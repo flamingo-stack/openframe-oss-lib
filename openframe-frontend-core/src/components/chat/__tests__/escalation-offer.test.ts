@@ -43,7 +43,7 @@ const historyRow = (id: string, data: Record<string, unknown>): HistoricalMessag
   id,
   createdAt: '2026-08-06T12:00:00Z',
   owner: { type: 'ASSISTANT' },
-  messageData: [data as never],
+  parts: [data as never],
 });
 
 const chunksOf = (raw: unknown) => createMingoDecoder().decode(raw).chunks;
@@ -184,7 +184,7 @@ describe('processHistoricalMessages — escalation offer', () => {
         id: 'm2',
         createdAt: '2026-08-06T12:01:00Z',
         owner: { type: 'CLIENT' },
-        messageData: [{ type: 'TEXT', text: 'actually, never mind' } as never],
+        parts: [{ type: 'TEXT', text: 'actually, never mind' } as never],
       },
       historyRow('m3', {
         type: 'ESCALATION_OFFER',

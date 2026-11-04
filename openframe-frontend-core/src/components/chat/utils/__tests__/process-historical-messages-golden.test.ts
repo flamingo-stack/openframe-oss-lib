@@ -1,7 +1,7 @@
 /**
  * GOLDEN CHARACTERIZATION: `processHistoricalMessages`, persisted rows as the thread they draw.
  *
- * A recorded corpus of messageData rows is processed and the FULL output array is snapshotted, so a change to what a reload
+ * A recorded corpus of persisted rows (their `parts`) is processed and the FULL output array is snapshotted, so a change to what a reload
  * shows is a diff to read.
  *
  * `process-historical-messages-approvals.test.ts` guards approvals and turn identity, and `-sources` the metadata rows. This
@@ -21,7 +21,7 @@ const CORPUS: HistoricalMessage[] = [
     createdAt: '2026-07-19T09:00:00Z',
     owner: { type: 'CLIENT', userId: 'user-42' },
     lastChunkStreamSeq: 10,
-    messageData: [
+    parts: [
       {
         type: 'TEXT',
         text: 'diagnose this device please',
@@ -40,7 +40,7 @@ const CORPUS: HistoricalMessage[] = [
     createdAt: '2026-07-19T09:00:05Z',
     owner: { type: 'ASSISTANT', model: 'claude-sonnet-x' },
     lastChunkStreamSeq: 20,
-    messageData: [
+    parts: [
       { type: 'THINKING', text: 'Checking device state… ' },
       { type: 'THINKING', text: 'looks like disk pressure.' },
       { type: 'TEXT', text: 'The device is low on disk. ' },
@@ -53,7 +53,7 @@ const CORPUS: HistoricalMessage[] = [
     createdAt: '2026-07-19T09:00:10Z',
     owner: { type: 'ASSISTANT' },
     lastChunkStreamSeq: 15, // lower than a1's — MAX (20) must win on the flushed turn
-    messageData: [
+    parts: [
       {
         type: 'EXECUTING_TOOL',
         integratedToolType: 'TACTICAL_RMM',
@@ -88,7 +88,7 @@ const CORPUS: HistoricalMessage[] = [
         image: { imageUrl: '/avatars/jane.png' },
       },
     },
-    messageData: [{ type: 'TEXT', text: 'please restart the broker' }],
+    parts: [{ type: 'TEXT', text: 'please restart the broker' }],
   },
   // 5. Assistant: single approval request + result (resolved in-history).
   {
@@ -97,7 +97,7 @@ const CORPUS: HistoricalMessage[] = [
     createdAt: '2026-07-19T09:01:05Z',
     owner: { type: 'ASSISTANT' },
     lastChunkStreamSeq: 30,
-    messageData: [
+    parts: [
       { type: 'TEXT', text: 'I need approval to restart it.' },
       {
         type: 'APPROVAL_REQUEST',
@@ -128,7 +128,7 @@ const CORPUS: HistoricalMessage[] = [
     chatType: 'CLIENT_CHAT',
     createdAt: '2026-07-19T09:02:00Z',
     owner: { type: 'ASSISTANT' },
-    messageData: [
+    parts: [
       {
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'batch-1',
@@ -179,7 +179,7 @@ const CORPUS: HistoricalMessage[] = [
     createdAt: '2026-07-19T09:03:00Z',
     owner: { type: 'ASSISTANT' },
     lastChunkStreamSeq: 40,
-    messageData: [{ type: 'SYSTEM', text: 'Technician joined the chat' }],
+    parts: [{ type: 'SYSTEM', text: 'Technician joined the chat' }],
   },
   // 8. DIRECT_MESSAGE row. CHARACTERIZATION: DIRECT_MESSAGE is a
   //    realtime-only concept — the history processors have NO branch for
@@ -192,7 +192,7 @@ const CORPUS: HistoricalMessage[] = [
     chatType: 'CLIENT_CHAT',
     createdAt: '2026-07-19T09:03:30Z',
     owner: { type: 'ADMIN', user: { id: 'admin-7', firstName: 'Jane' } },
-    messageData: [{ type: 'DIRECT_MESSAGE', text: 'Human here, taking over' }],
+    parts: [{ type: 'DIRECT_MESSAGE', text: 'Human here, taking over' }],
   },
   // 9. Error row inside an assistant turn.
   {
@@ -200,7 +200,7 @@ const CORPUS: HistoricalMessage[] = [
     chatType: 'CLIENT_CHAT',
     createdAt: '2026-07-19T09:04:00Z',
     owner: { type: 'ASSISTANT' },
-    messageData: [
+    parts: [
       { type: 'TEXT', text: 'Attempting one more thing… ' },
       { type: 'ERROR', error: 'Agent crashed', details: '{"error":{"message":"boom"}}' },
     ],
@@ -223,7 +223,7 @@ describe('processHistoricalMessages — golden corpus', () => {
         id: 'a1',
         createdAt: '2026-07-19T09:00:00Z',
         owner: { type: 'ASSISTANT' },
-        messageData: [
+        parts: [
           {
             type: 'APPROVAL_REQUEST',
             approvalRequestId: 'req-pending',
@@ -249,7 +249,7 @@ describe('processHistoricalMessages — golden corpus', () => {
         id: 'u-client',
         createdAt: '2026-07-19T09:00:00Z',
         owner: { type: 'CLIENT', userId: 'user-1' },
-        messageData: [{ type: 'TEXT', text: 'from client' }],
+        parts: [{ type: 'TEXT', text: 'from client' }],
       },
       {
         id: 'u-admin-named',
@@ -258,13 +258,13 @@ describe('processHistoricalMessages — golden corpus', () => {
           type: 'ADMIN',
           user: { id: 'adm', firstName: 'Jane', lastName: 'Admin', image: { imageUrl: '/a.png' } },
         },
-        messageData: [{ type: 'TEXT', text: 'from named admin' }],
+        parts: [{ type: 'TEXT', text: 'from named admin' }],
       },
       {
         id: 'u-admin-anon',
         createdAt: '2026-07-19T09:00:02Z',
         owner: { type: 'ADMIN' },
-        messageData: [{ type: 'TEXT', text: 'from anonymous admin' }],
+        parts: [{ type: 'TEXT', text: 'from anonymous admin' }],
       },
     ];
     expect(processHistoricalMessages(rows).messages).toMatchSnapshot();
@@ -277,14 +277,14 @@ describe('processHistoricalMessages — golden corpus', () => {
         chatType: 'CLIENT_CHAT',
         createdAt: '2026-07-19T09:00:00Z',
         owner: { type: 'CLIENT' },
-        messageData: [{ type: 'TEXT', text: 'visible' }],
+        parts: [{ type: 'TEXT', text: 'visible' }],
       },
       {
         id: 'u2',
         chatType: 'ADMIN_AI_CHAT',
         createdAt: '2026-07-19T09:00:01Z',
         owner: { type: 'CLIENT' },
-        messageData: [{ type: 'TEXT', text: 'filtered out' }],
+        parts: [{ type: 'TEXT', text: 'filtered out' }],
       },
     ];
     expect(processHistoricalMessages(rows, { chatTypeFilter: 'CLIENT_CHAT' }).messages).toMatchSnapshot();
@@ -307,13 +307,13 @@ describe('processHistoricalMessages — ASK rows', () => {
     ],
   };
 
-  const rowOf = (messageData: HistoricalMessage['messageData']): HistoricalMessage[] => [
+  const rowOf = (parts: HistoricalMessage['parts']): HistoricalMessage[] => [
     {
       id: 'a1',
       chatType: 'CLIENT_CHAT',
       createdAt: '2026-07-19T09:00:05Z',
       owner: { type: 'ASSISTANT' },
-      messageData,
+      parts,
     },
   ];
 

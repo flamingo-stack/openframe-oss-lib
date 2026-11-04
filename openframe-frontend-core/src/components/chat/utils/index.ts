@@ -11,7 +11,18 @@ export { approvalDisplaysInline } from './approval-display';
 export { processHistoricalMessages, type ProcessHistoricalMessagesResult } from './process-historical-messages';
 
 // Incomplete message state extraction
-export { extractIncompleteTailState } from './extract-incomplete-message-state';
+export { extractIncompleteTailState, isCompactingTail } from './extract-incomplete-message-state';
+export {
+  awaitsDecision,
+  awaitsOtherTier,
+  findLatestPendingId,
+  isForeignReply,
+  pendingApprovalIdOf,
+  pendingOfferIdOf,
+  threadForDisplay,
+  withThreadAuthor,
+  type ThreadAuthorNames,
+} from './thread-display';
 
 // History <-> realtime reconciliation
 export {

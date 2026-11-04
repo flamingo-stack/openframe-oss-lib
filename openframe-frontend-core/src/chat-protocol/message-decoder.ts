@@ -30,7 +30,7 @@ import { isRecord } from './wire-narrow';
 // Mingo
 // =============================================================================
 
-/** What a GraphQL row knows that its `messageData` entry does not. */
+/** What a GraphQL row knows that its `parts` entry does not. */
 export interface MingoRowContext {
   /** The row's `lastChunkStreamSeq`. Only an entry alone in its row may claim it. */
   seq?: number;

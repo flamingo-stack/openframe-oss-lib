@@ -199,7 +199,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       nameEveryTurn,
       appearance = CHAT_APPEARANCE.CLASSIC,
       assistantIcon,
-      pendingApprovals,
       hasNextPage,
       isFetchingNextPage,
       onLoadMore,
@@ -749,7 +748,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       if (el.scrollHeight === pinPrevHeightRef.current) return;
       pinPrevHeightRef.current = el.scrollHeight;
       el.scrollTop = el.scrollHeight;
-    }, [pinBottom, messages, isTyping, pendingApprovals, scrollRef]);
+    }, [pinBottom, messages, isTyping, scrollRef]);
 
     // ---- Prepend anchoring (load-older) ------------------------------
     // The library doesn't preserve user position when content grows ABOVE
@@ -1007,7 +1006,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     }
 
     // Footer-pinned streaming loader. Rendered OUTSIDE the scroller (a
-    // sibling of the scroll div, like the sticky approvals below) so it
+    // sibling of the scroll div) so it
     // stays put while messages stream and grow — no jitter from the
     // last-message height changing under it.
     //
@@ -1016,8 +1015,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // says what the turn is doing, and a second indicator under it only
     // repeats it. A tool that has answered says nothing of the kind.
     // Hidden too when the agent is PAUSED waiting on the user: the
-    // message's last part is a pending approval (inline), or
-    // there are escalated pending approvals shown in the sticky bar.
+    // message's last part is a pending approval.
     const writingIndex = writingMessageIndex(messages, writingMessageId);
     const writingMessage = messages[writingIndex];
     const writingPart = writingMessage?.parts[writingMessage.parts.length - 1];
@@ -1031,7 +1029,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       isTyping &&
       (!turnHasDrawn || leavesTurnUnsaid(writingPart)) &&
       !isPausedOnApproval &&
-      !(pendingApprovals && pendingApprovals.length > 0) &&
       !holdsAnswerInFlight(messages);
 
     return (
@@ -1201,36 +1198,6 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 ) : (
                   <CyclingPhrase words={STREAMING_WORDS} className="text-h6" />
                 )}
-              </div>
-            )}
-
-            {/* Sticky Pending Approvals — outside the scroller; same
-            structure as the v1 baseline. The library's RO watches
-            `contentRef` (INSIDE the scroller), so height changes to
-            this sibling don't trigger the library directly. If a
-            future UX requires snapping to bottom when approvals
-            appear, that hookup goes here. */}
-            {pendingApprovals && pendingApprovals.length > 0 && (
-              <div
-                className={cn(
-                  'border-t border-ods-border bg-ods-bg/95 backdrop-blur-sm',
-                  fullWidth ? 'w-full' : 'mx-auto w-full max-w-ods-content-narrow',
-                  contentClassName ?? 'px-[var(--spacing-system-m)]',
-                )}
-              >
-                <ChatMessageEnhanced
-                  role="assistant"
-                  name={assistantType === 'mingo' ? 'Mingo' : 'Fae'}
-                  parts={pendingApprovals}
-                  actions={actions}
-                  timestamp={new Date()}
-                  showAvatar={showAvatars}
-                  assistantType={assistantType}
-                  approvalVariant={approvalVariant}
-                  assistantIcon={assistantIcon}
-                  NavLinkAnchor={NavLinkAnchor}
-                  className="py-3"
-                />
               </div>
             )}
           </div>

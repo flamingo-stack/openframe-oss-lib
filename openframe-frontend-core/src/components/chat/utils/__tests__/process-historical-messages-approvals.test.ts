@@ -29,7 +29,7 @@ const adminApprovalMessage = (id: string): HistoricalMessage => ({
   id,
   createdAt: '2026-07-17T12:00:00Z',
   owner: { type: 'ASSISTANT' },
-  messageData: [adminRequest],
+  parts: [adminRequest],
 });
 
 const cardsOf = (messages: readonly ChatMessage[]) => messages.flatMap(message => message.parts).filter(isToolPart);
@@ -73,7 +73,7 @@ describe('an approval of a tier this side does not answer', () => {
       [
         {
           ...adminApprovalMessage('m1'),
-          messageData: [adminRequest, { type: 'APPROVAL_RESULT', approvalRequestId: 'req-m1', approved: false }],
+          parts: [adminRequest, { type: 'APPROVAL_RESULT', approvalRequestId: 'req-m1', approved: false }],
         },
       ],
       { approvalStatuses: { 'req-m1': 'approved' } },
@@ -93,20 +93,20 @@ describe('a turn’s identity', () => {
         createdAt: '2026-07-17T12:00:00Z',
         owner: { type: 'ASSISTANT' },
         lastChunkStreamSeq: 100,
-        messageData: [{ type: 'ATTACHMENTS', sources: [] }],
+        parts: [{ type: 'ATTACHMENTS', sources: [] }],
       },
       {
         id: 'u1',
         createdAt: '2026-07-17T12:00:01Z',
         owner: { type: 'CLIENT' },
-        messageData: [{ type: 'TEXT', text: 'hello' }],
+        parts: [{ type: 'TEXT', text: 'hello' }],
       },
       {
         id: 'a2',
         createdAt: '2026-07-17T12:00:02Z',
         owner: { type: 'ASSISTANT' },
         lastChunkStreamSeq: 50,
-        messageData: [{ type: 'TEXT', text: 'hi there' }],
+        parts: [{ type: 'TEXT', text: 'hi there' }],
       },
     ];
     const { messages: out } = processHistoricalMessages(messages);
@@ -121,14 +121,14 @@ describe('a turn’s identity', () => {
         id: 'u1',
         createdAt: '2026-07-17T12:00:01Z',
         owner: { type: 'CLIENT' },
-        messageData: [{ type: 'TEXT', text: 'hello' }],
+        parts: [{ type: 'TEXT', text: 'hello' }],
       },
       {
         id: 'a2',
         createdAt: '2026-07-17T12:00:02Z',
         owner: { type: 'ASSISTANT' },
         lastChunkStreamSeq: 50,
-        messageData: [{ type: 'TEXT', text: 'hi there' }],
+        parts: [{ type: 'TEXT', text: 'hi there' }],
       },
     ]);
     expect(messages.map(message => [message.id, message.metadata?.streamSeq])).toEqual([
@@ -158,8 +158,8 @@ describe('a rejected batch read back', () => {
     success: false,
     result: 'Rejected by user',
   });
-  const row = (id: string, messageData: unknown[]): HistoricalMessage =>
-    ({ id, createdAt: '2026-11-02T10:00:00Z', owner: { type: 'ASSISTANT' }, messageData }) as HistoricalMessage;
+  const row = (id: string, parts: unknown[]): HistoricalMessage =>
+    ({ id, createdAt: '2026-11-02T10:00:00Z', owner: { type: 'ASSISTANT' }, parts }) as HistoricalMessage;
   const page = [row('a1', [asking]), row('a2', [rejected]), row('a3', [refused('t1'), refused('t2')])];
 
   it('reads as rejected whatever the map says about one of its rows', () => {

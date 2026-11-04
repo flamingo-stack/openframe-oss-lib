@@ -1,14 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import {
-  approvalStatusOf,
-  isToolPart,
-  type ChatMessage,
-  type ChatMessageAuthor,
-  type ChatSuggestionGroup,
-} from '../../../chat-protocol/chat-message';
-import { approvalDisplaysInline } from '../utils/approval-display';
+import type { ChatMessage, ChatMessageAuthor, ChatSuggestionGroup } from '../../../chat-protocol/chat-message';
 
 /**
  * The "What to ask?" exchange: the question the user is shown asking, and the
@@ -156,23 +149,6 @@ function exchangeMessages(
       ],
     },
   ];
-}
-
-/**
- * Whether the thread waits on the user before it can go on: an approval or an
- * escalation offer nobody has answered. A "What to ask?" chip does not send
- * then: the conversation cannot take a message. A card of a tier the thread does
- * not draw waits on someone else.
- */
-export function awaitsDecision(messages: readonly ChatMessage[], displayApprovalTypes?: readonly string[]): boolean {
-  return messages.some(message =>
-    message.parts.some(part => {
-      if (part.type === 'data-escalation-offer') return part.data.status === 'pending';
-      if (!isToolPart(part) || approvalStatusOf(part) !== 'pending') return false;
-      const tier = 'approval' in part ? part.approval?.descriptor?.approvalType : undefined;
-      return tier === undefined || approvalDisplaysInline(tier, displayApprovalTypes);
-    }),
-  );
 }
 
 function timeOf(message: ChatMessage): number | undefined {

@@ -161,7 +161,7 @@ export type TicketEventKind = (typeof TICKET_EVENT_KIND)[keyof typeof TICKET_EVE
 
 /** Ticket lifecycle receipt (`TICKET_EVENT`) — the ticket was resolved,
  *  reopened, etc. Same field names live (NATS chunk) and persisted
- *  (GraphQL `TicketEventData` inside `messageData`), so ONE mapper covers
+ *  (GraphQL `TicketEventData` among a message's `parts`), so ONE mapper covers
  *  both paths. All actor fields are optional: the event stays renderable
  *  when the backend can't attribute it. */
 export interface TicketEventData {
@@ -445,7 +445,8 @@ export interface HistoricalMessage {
   chatType?: string;
   createdAt: string;
   owner?: MessageOwner;
-  messageData?: MessageData | MessageData[];
+  /** What the row holds, one entry per part, as the backend's `Message.parts` answers it. */
+  parts?: MessageData[];
   /** Persisted stream sequence of this row's last chunk (the backend's `lastChunkStreamSeq`). Passed through to the
    *  message's `metadata.streamSeq` so `mergeHistoryWithRealtime` can decide coverage per-role (a synthetic is covered
    *  only by a persisted row of its OWN role reaching its seq). Optional: absent for rows the backend doesn't stamp (e.g.

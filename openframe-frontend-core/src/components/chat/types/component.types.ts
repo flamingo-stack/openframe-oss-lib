@@ -3,7 +3,7 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
-import type { ChatMessage, ChatMessageMetadata, ChatPart, ChatToolPart } from '../../../chat-protocol/chat-message';
+import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-protocol/chat-message';
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
@@ -309,7 +309,6 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  `classic`; the Fae client passes `v2`. See `ChatAppearance`. */
   appearance?: ChatAppearance;
   assistantIcon?: ReactNode;
-  pendingApprovals?: ChatToolPart[];
   /** What the messages' controls do. Forwarded verbatim to every message's ChatMessageEnhanced. */
   actions?: ChatMessageActions;
   /** The approval tiers drawn while pending. Forwarded verbatim to every message's ChatMessageEnhanced. */

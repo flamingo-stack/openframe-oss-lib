@@ -109,19 +109,23 @@ function createMockMingoConfig(): UseNatsChatAdapterConfig {
             id: `${dialogId}-u1`,
             createdAt: new Date().toISOString(),
             owner: { type: 'CLIENT' },
-            messageData: {
-              type: 'TEXT',
-              text: 'Which devices have not sent any logs in the last 24 hours?',
-            },
+            parts: [
+              {
+                type: 'TEXT',
+                text: 'Which devices have not sent any logs in the last 24 hours?',
+              },
+            ],
           },
           {
             id: `${dialogId}-a1`,
             createdAt: new Date().toISOString(),
             owner: { type: 'ASSISTANT' },
-            messageData: {
-              type: 'TEXT',
-              text: 'Found 3 devices that have not reported in over 24 hours. Want me to run a full diagnostic?',
-            },
+            parts: [
+              {
+                type: 'TEXT',
+                text: 'Found 3 devices that have not reported in over 24 hours. Want me to run a full diagnostic?',
+              },
+            ],
           },
         ],
         nextCursor: null,

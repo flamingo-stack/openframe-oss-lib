@@ -10,8 +10,8 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { textOfParts, type ChatMessage, type ChatToolPart } from '../../../../chat-protocol/chat-message';
-import { awaitsDecision, mergeByTime, useWhatToAsk, type WhatToAskContent } from '../use-what-to-ask';
+import { textOfParts, type ChatMessage } from '../../../../chat-protocol/chat-message';
+import { mergeByTime, useWhatToAsk, type WhatToAskContent } from '../use-what-to-ask';
 
 const content: WhatToAskContent = {
   question: 'What can I ask you?',
@@ -139,49 +139,5 @@ describe('mergeByTime', () => {
   it('never moves a local message past a thread message without a time', () => {
     const untimed: ChatMessage = { id: 'u', role: 'assistant', parts: [{ type: 'text', text: 'u' }] };
     expect(ids(mergeByTime([untimed, message('b', 30)], [message('l', 20)]))).toEqual(['u', 'l', 'b']);
-  });
-});
-
-describe('awaitsDecision', () => {
-  const asked = (approvalType: string): ChatToolPart => ({
-    type: 'dynamic-tool',
-    toolName: 'command',
-    toolCallId: 'r',
-    state: 'approval-requested',
-    input: {},
-    approval: { id: 'r', descriptor: { approvalType } },
-  });
-  const answered: ChatToolPart = {
-    type: 'dynamic-tool',
-    toolName: 'command',
-    toolCallId: 'r',
-    state: 'approval-responded',
-    input: {},
-    approval: { id: 'r', approved: true },
-  };
-  const holding = (part: ChatToolPart): ChatMessage => ({ id: 'a', role: 'assistant', parts: [part] });
-
-  it('is true for an approval nobody has answered', () => {
-    expect(awaitsDecision([holding(asked('CLIENT'))])).toBe(true);
-  });
-
-  it('is false once it is answered, and for plain text', () => {
-    expect(awaitsDecision([holding(answered)])).toBe(false);
-    expect(awaitsDecision([message('a', 1)])).toBe(false);
-  });
-
-  it('a card of a tier this thread does not draw waits on someone else', () => {
-    expect(awaitsDecision([holding(asked('ADMIN'))], ['CLIENT'])).toBe(false);
-    expect(awaitsDecision([holding(asked('ADMIN'))], ['CLIENT', 'ADMIN'])).toBe(true);
-  });
-
-  it('a pending escalation offer waits on the user', () => {
-    const offer = (status: 'pending' | 'approved'): ChatMessage => ({
-      id: 'a',
-      role: 'assistant',
-      parts: [{ type: 'data-escalation-offer', id: 'o', data: { text: 'Hand off?', status } }],
-    });
-    expect(awaitsDecision([offer('pending')])).toBe(true);
-    expect(awaitsDecision([offer('approved')])).toBe(false);
   });
 });

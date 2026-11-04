@@ -42,7 +42,7 @@ function getOwnerAvatar(owner?: MessageOwner): string | undefined {
 }
 
 function entriesOf(row: HistoricalMessage): MessageData[] {
-  return Array.isArray(row.messageData) ? row.messageData : row.messageData ? [row.messageData] : [];
+  return row.parts ?? [];
 }
 
 function isUserRow(row: HistoricalMessage | undefined): boolean {

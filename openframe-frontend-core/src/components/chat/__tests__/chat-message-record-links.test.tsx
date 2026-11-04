@@ -1056,7 +1056,7 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
         id: 'a1',
         createdAt: '2026-11-02T10:00:00Z',
         owner: { type: 'ASSISTANT' },
-        messageData: [
+        parts: [
           {
             type: 'APPROVAL_REQUEST',
             approvalRequestId: 'req1',

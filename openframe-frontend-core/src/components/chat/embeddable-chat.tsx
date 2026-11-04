@@ -40,7 +40,7 @@ import { usePreventScroll } from '@react-aria/overlays';
 import { isIOS } from '@react-aria/utils';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { type ChatMessage, type ChatToolPart, writingMessageIndex } from '../../chat-protocol/chat-message';
+import { type ChatMessage, writingMessageIndex } from '../../chat-protocol/chat-message';
 import { recordHref, replaceRecordLinks } from '../../chat-protocol/record-link';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
@@ -89,7 +89,7 @@ import { useEmptyStateConfig } from './hooks/use-empty-state-config';
 import { fetchSlashCommands, useSlashCommandRegistry } from './hooks/use-slash-commands';
 import type { UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
-import { awaitsDecision, useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
+import { useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
 import { MingoChatHeader, type MingoChatHeaderAction } from './mingo-chat-header';
 import type { MingoDialogStatus } from './mingo-chat-list-shared';
@@ -113,6 +113,7 @@ import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens
 import { chatDayLabel } from './utils/chat-day-label';
 import { resolveIcon } from './utils/icon-library';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
+import { awaitsDecision } from './utils/thread-display';
 
 /**
  * Split (wide) Mingo layout metrics (Figma 113:60931 / 113:63630). The
@@ -236,18 +237,6 @@ export interface EmbeddableChatProps {
    * `modes.mingo` (Guide-mode wiring via `modes.guide` is unaffected).
    */
   mingoState?: UnifiedChatState;
-
-  /**
-   * Approval cards to pin as the sticky footer under the thread.
-   *
-   * Hosts that lift PENDING approvals out of the message list (mingo does:
-   * a pending card is filtered out of its bubble so an interrupted retry cannot
-   * render the same request twice) must hand them back here — otherwise the
-   * card exists in the reducer, is stripped on the way to the view, and is
-   * displayed nowhere at all. `ChatMessageList` renders them with the same
-   * component the inline path uses, and they reach the same `actions`.
-   */
-  pendingApprovals?: ChatToolPart[];
 
   /**
    * Dialog-management capabilities for injected Mingo mode (`mingoState`).
@@ -846,7 +835,6 @@ function EmbeddableChatInner({
   tableIdForDocumentType,
   modes,
   mingoState,
-  pendingApprovals,
   mingoDialogCapabilities,
   activeMode: controlledActiveMode,
   onActiveModeChange,
@@ -2141,7 +2129,6 @@ function EmbeddableChatInner({
     chatLoading ||
     activeDialogStatus === 'working' ||
     activeDialogStatus === 'approval' ||
-    (pendingApprovals?.length ?? 0) > 0 ||
     awaitsDecision(hostMessages, displayApprovalTypes);
 
   // "What to ask Mingo?" with `whatToAsk`: every click opens a new chat with
@@ -2534,9 +2521,6 @@ function EmbeddableChatInner({
                 appearance={appearance}
                 isTyping={chatLoading}
                 writingMessageId={writingMessageId}
-                // Sticky footer for approvals the host lifted out of the
-                // thread — see the prop's docblock.
-                pendingApprovals={pendingApprovals}
                 // Real drawer: the library's smart follow. Passive in-page
                 // demo (previewMode): deterministic hard pin instead — a
                 // scripted assistant-only stream from a cold mount never

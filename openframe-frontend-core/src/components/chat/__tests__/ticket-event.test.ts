@@ -6,7 +6,7 @@
  *   - the chunk arrives STANDALONE (no MESSAGE_START at all: resolution can fire from a PSA-side action with no turn open),
  *     so it must mint or append to the trailing bubble like `data-ticket-escalated` does;
  *   - dedupe identity is the stream sequence, with payload-equality as the fallback for the hydrate-then-catch-up overlap
- *     where the hydrated twin is seq-less (the persisted row's seq lives on the message, not in `messageData`);
+ *     where the hydrated twin is seq-less (the persisted row's seq lives on the message, not in its `parts`);
  *   - `kind` is OPEN: an unknown kind decodes and renders, only a missing kind is malformed.
  */
 
@@ -148,7 +148,7 @@ describe('processHistoricalMessages — ticket event', () => {
     id,
     createdAt: '2026-08-06T12:00:00Z',
     owner: { type: 'ASSISTANT' },
-    messageData: [data as never],
+    parts: [data as never],
   });
 
   it('replays the persisted row through the same decoder as the live path', () => {
@@ -194,7 +194,7 @@ describe('processHistoricalMessages — ticket event', () => {
       id,
       createdAt,
       owner: { type: 'ASSISTANT' },
-      messageData: [data as never],
+      parts: [data as never],
     });
     const { messages } = processHistoricalMessages([
       rowAt('m1', '2026-08-20T13:54:00.000Z', { type: 'TEXT', text: 'Hi! How can I help?' }),
@@ -228,7 +228,7 @@ describe('processHistoricalMessages — row stream sequence', () => {
         createdAt: '2026-08-31T00:54:00Z',
         owner: { type: 'ASSISTANT' },
         lastChunkStreamSeq: 412,
-        messageData: [{ type: 'TICKET_EVENT', kind: 'RESOLVED', actorType: 'AI' } as never],
+        parts: [{ type: 'TICKET_EVENT', kind: 'RESOLVED', actorType: 'AI' } as never],
       },
     ]);
     expect(eventsIn(messages)[0].id).toBe('412');
@@ -241,7 +241,7 @@ describe('processHistoricalMessages — row stream sequence', () => {
         createdAt: '2026-08-31T00:54:00Z',
         owner: { type: 'ASSISTANT' },
         lastChunkStreamSeq: 413,
-        messageData: [
+        parts: [
           { type: 'TICKET_EVENT', kind: 'RESOLVED', actorType: 'AI' } as never,
           { type: 'TEXT', text: 'trailing text' } as never,
         ],

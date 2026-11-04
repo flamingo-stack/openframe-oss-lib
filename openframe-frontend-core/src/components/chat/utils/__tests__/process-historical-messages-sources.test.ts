@@ -28,7 +28,7 @@ const metadataRow = (id: string, createdAt: string, sources: unknown[] = [SOURCE
   chatType: 'ADMIN_AI_CHAT',
   createdAt,
   owner: { type: 'ASSISTANT' },
-  messageData: [{ type: 'ATTACHMENTS', sources }],
+  parts: [{ type: 'ATTACHMENTS', sources }],
 });
 
 const answerRow = (id: string, createdAt: string, text: string): HistoricalMessage => ({
@@ -36,7 +36,7 @@ const answerRow = (id: string, createdAt: string, text: string): HistoricalMessa
   chatType: 'ADMIN_AI_CHAT',
   createdAt,
   owner: { type: 'ASSISTANT' },
-  messageData: [{ type: 'TEXT', text }],
+  parts: [{ type: 'TEXT', text }],
 });
 
 const userRow = (id: string, createdAt: string): HistoricalMessage => ({
@@ -44,7 +44,7 @@ const userRow = (id: string, createdAt: string): HistoricalMessage => ({
   chatType: 'ADMIN_AI_CHAT',
   createdAt,
   owner: { type: 'ADMIN' },
-  messageData: [{ type: 'TEXT', text: 'How do I install the agent?' }],
+  parts: [{ type: 'TEXT', text: 'How do I install the agent?' }],
 });
 
 const sourcesOf = (message: ChatMessage) => message.parts.filter(isSourcePart);
