@@ -27,7 +27,9 @@
  */
 
 import { byKey, getPlatformProductionUrl } from '../platform-domains';
+import { buildTicketOpenHref, DEV_SECTION_PARAM_KEYS } from './dev-sections/dev-section-param-keys';
 import { sanitizeDocPath } from './doc-path-utils';
+import { faqItemAnchor } from './faq-anchor';
 import { canonicalContentRefType } from './list-url';
 
 /**
@@ -247,6 +249,79 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
   };
 }
 
+/** The pages an embedder serves the hub's content on: each one it has is named, each one it has not is left out. */
+export interface EmbedderContentRoutes {
+  /** An onboarding guide's detail page, by its slug. */
+  onboardingGuide?: (slug: string) => string;
+  /** A product release's detail page, by its slug. */
+  release?: (slug: string) => string;
+  /** The docs viewer's base route: a product doc (`markdown`) opens there at its tree path. */
+  knowledgeBase?: string;
+  /** The roadmap list, opened filtered to the item (`?search=<id>`). */
+  roadmap?: string;
+  /** The bug fixes and enhancements list, opened filtered to the item. */
+  delivery?: string;
+  /** The FAQ page, opened at the question's anchor. */
+  faqs?: string;
+  /** The tickets list, opened with the ticket open (`buildTicketOpenHref`). */
+  tickets?: string;
+  /** The trust center page. */
+  trustCenter?: string;
+}
+
+/**
+ * THE composer of a host that embeds the hub's content (the OpenFrame app's Help Center, the embedding example): a record
+ * the host has a page for opens there (a relative route, so it soft-navigates and stays on the host in every mode);
+ * every other record opens the address the server answers, on the hub, in a new tab (`targetPlatform: null`: an
+ * embedder is never a hub platform, so the tab decision is the origin's). One factory, so two embedders never encode
+ * the same split twice; each names only its own pages.
+ */
+export function makeEmbedderComposeContentUrl({
+  contentOrigin,
+  routes,
+}: {
+  /** The hub's public origin, for a record with no address of its own. */
+  contentOrigin: string;
+  routes: EmbedderContentRoutes;
+}): ComposeContentUrl {
+  const search = (base: string, id: string) => `${base}?${DEV_SECTION_PARAM_KEYS.search}=${encodeURIComponent(id)}`;
+  const own = (href: string) => ({ href, targetPlatform: null });
+  const detail: Record<string, ((slug: string) => string) | undefined> = {
+    onboarding_guide: routes.onboardingGuide,
+    product_release: routes.release,
+  };
+  const overrides: NonNullable<ContentHrefOptions['overrides']> = {};
+  if (routes.roadmap) overrides.roadmap_item = id => own(search(routes.roadmap as string, id));
+  if (routes.delivery) overrides.delivery_item = id => own(search(routes.delivery as string, id));
+  if (routes.faqs) overrides.faq = id => own(`${routes.faqs}#${faqItemAnchor(id)}`);
+  if (routes.tickets) {
+    const ticket = (id: string) => own(buildTicketOpenHref(routes.tickets as string, id));
+    overrides.hubspot_ticket = ticket;
+    overrides.hubspot_ticket_self = ticket;
+  }
+  if (routes.trustCenter) overrides.trust_center = () => own(routes.trustCenter as string);
+  const hostedTypes = new Set(Object.keys(detail).filter(type => detail[type]));
+  if (routes.knowledgeBase) hostedTypes.add('markdown');
+  const base = makeComposeContentUrl({
+    hostedTypes,
+    contentOrigin,
+    // The hosted branch emits `/<suffix>/<slug>`; a detail route builder turns that into the host's own page below.
+    suffixes: {
+      ...DEFAULT_CONTENT_SUFFIXES,
+      ...(routes.knowledgeBase ? { markdown: routes.knowledgeBase.replace(/^\/+/, '') } : {}),
+    },
+    slugIsIdentifier: new Set(['markdown']),
+    overrides,
+  });
+  return input => {
+    const type = canonicalContentRefType(input.type);
+    const composed = base(input);
+    const build = detail[type];
+    if (build && hostedTypes.has(type)) return own(build(composed.href.slice(composed.href.lastIndexOf('/') + 1)));
+    return { href: composed.href, targetPlatform: null };
+  };
+}
+
 /**
  * Default href shape when `runtime.composeContentUrl` is NOT wired
  * (single-platform embedders without cross-platform topology). Shared by
@@ -266,9 +341,21 @@ export function buildDefaultHref(basePath: string, slug: string): { href: string
  */
 export function resolveContentHref(
   composeContentUrl: ComposeContentUrl | undefined,
-  args: { type: string; slug: string; basePath: string; platforms?: ComposeContentUrlInput['platforms'] },
+  args: {
+    type: string;
+    slug: string;
+    basePath: string;
+    platforms?: ComposeContentUrlInput['platforms'];
+    /** The record's address as the server answers it (a list row's `url`), the same the chat's cards open. */
+    url?: string | null;
+  },
 ): { href: string; targetPlatform: string | null } {
   return composeContentUrl
-    ? composeContentUrl({ type: args.type, identifier: args.slug, platforms: args.platforms })
+    ? composeContentUrl({
+        type: args.type,
+        identifier: args.slug,
+        platforms: args.platforms,
+        ...(args.url ? { externalUrl: args.url } : {}),
+      })
     : buildDefaultHref(args.basePath, args.slug);
 }

@@ -395,6 +395,8 @@ export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url'
 export {
   DEFAULT_CONTENT_SUFFIXES,
   makeComposeContentUrl,
+  makeEmbedderComposeContentUrl,
+  type EmbedderContentRoutes,
   buildDefaultHref,
   type ContentHrefOptions,
   type ComposeContentUrl,

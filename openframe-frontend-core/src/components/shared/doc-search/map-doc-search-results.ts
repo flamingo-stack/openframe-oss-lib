@@ -4,10 +4,8 @@
  * results so the dropdown lists ONE "Cap Table (12 records)" row
  * instead of 12 individual rows.
  *
- * Pure transform — no telemetry, no navigation, no React deps. Lifted
- * from the hub's `hooks/use-docs.ts:mapDocSearchResults` (the hub's
- * `traceCompose` call was hub-only telemetry and is intentionally
- * dropped — callers that want logging can wrap this helper).
+ * Pure transform: no telemetry, no navigation, no React deps. THE one mapper of a search row; where a row opens is
+ * `resolveSearchResultAction`'s (the one record resolver).
  */
 
 import type { DocSearchResult } from '../../../chat-protocol/doc-search';
