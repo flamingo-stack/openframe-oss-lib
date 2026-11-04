@@ -1,4 +1,5 @@
 pub mod app_close;
+pub mod binary_version;
 pub mod binary_writer;
 pub mod console;
 pub mod detached_process;

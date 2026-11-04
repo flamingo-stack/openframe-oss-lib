@@ -64,6 +64,8 @@ const SOCIAL_ICONS: Readonly<Record<string, IconRef>> = {
   instagram: { set: 'InstagramIcon', color: MARK },
   facebook: { set: 'FacebookIcon', color: MARK },
   tiktok: { lucide: 'music' },
+  // A site's own feed (`brand.feeds`, a share row). Like CopyIcon, its default fill is grey.
+  rss: { set: 'RssIcon', color: MARK },
   // CopyIcon's default fill is grey and would mismatch its row-mates.
   copy: { set: 'CopyIcon', color: MARK },
 };
