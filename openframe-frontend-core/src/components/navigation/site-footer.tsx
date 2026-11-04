@@ -155,9 +155,10 @@ export function SiteFooter({
 
   const columns = nav.footerColumns;
   const accordion = columns.length > ACCORDION_OVER;
+  // The site's feeds close the footer's row: the header draws `brand.social` alone.
+  const footerSocial = [...nav.brand.social, ...(nav.brand.feeds ?? [])];
   const socialRow =
-    social ??
-    (nav.brand.social.length > 0 ? <SocialIconRow compact links={siteNavSocialLinks(nav.brand.social)} /> : null);
+    social ?? (footerSocial.length > 0 ? <SocialIconRow compact links={siteNavSocialLinks(footerSocial)} /> : null);
 
   return (
     <footer
