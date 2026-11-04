@@ -553,7 +553,7 @@ input PackageUpdateSettingsInput {
     mode: PackageUpdateMode!
     "WAIT only, up to 2592000 (30 days); ignored for FORCE. Null = no deadline (\"Countdown after the deadline\" off)."
     deadlineSeconds: Long
-    "Up to 3600 (1 hour)."
+    "From 60 (1 minute) up to 1800 (30 minutes)."
     countdownSeconds: Int!
 }
 

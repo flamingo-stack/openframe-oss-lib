@@ -1,7 +1,8 @@
-use crate::config::update_config::ALLOW_DOWNGRADE;
+use crate::config::update_config::{ALLOW_DOWNGRADE, STAGED_VERSION_PROBE_TIMEOUT_SECS};
 use crate::models::openframe_client_info::ClientUpdateStatus;
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
 use crate::models::update_state::{UpdatePhase, UpdateState};
+use crate::platform::binary_version;
 use crate::platform::directories::get_update_staging_directory;
 use crate::platform::updater_launcher::{self, LaunchedUpdater, UpdaterParams};
 use crate::service::FULL_SERVICE_NAME;
@@ -21,6 +22,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -102,6 +104,11 @@ impl OpenFrameClientUpdateService {
         };
         info!("Acquired update lock for version: {}", requested_version);
 
+        // apply() skips the running version, so it neither parks tool operations nor waits for them
+        if Self::is_running_version(requested_version) {
+            return Ok(guard);
+        }
+
         self.tool_run_manager.mark_client_update_pending();
 
         if let Some(busy) = self.busy_with() {
@@ -143,7 +150,7 @@ impl OpenFrameClientUpdateService {
             .with_context(|| format!("Failed to parse requested version: {}", requested_version))?;
         let canonical_version = requested_semver.to_string();
 
-        if canonical_version == env!("OPENFRAME_VERSION") {
+        if Self::is_running_version(requested_version) {
             info!(
                 "Already running version {}, ignoring update request",
                 canonical_version
@@ -224,7 +231,7 @@ impl OpenFrameClientUpdateService {
 
         // Execute update with status rollback
         let update_result = self
-            .execute_update(&message, &mut update_state, guard)
+            .execute_update(&message, &requested_semver, &mut update_state, guard)
             .await;
 
         // Handle errors: set status to Failed (cleanup already done in execute_update)
@@ -250,6 +257,7 @@ impl OpenFrameClientUpdateService {
     async fn execute_update(
         &self,
         message: &OpenFrameClientUpdateMessage,
+        expected_version: &Version,
         update_state: &mut UpdateState,
         guard: UpdateGuard,
     ) -> Result<()> {
@@ -310,6 +318,19 @@ impl OpenFrameClientUpdateService {
         };
 
         info!("Update binary staged: {}", staged_path.display());
+
+        // Refused before the service stops, so a wrong build costs no restart; the delivery engine re-runs a failed update
+        if let Err(e) = Self::verify_staged_version(&staged_path, expected_version).await {
+            error!("Staged binary rejected: {:#}", e);
+            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
+                warn!(
+                    "Failed to remove staged binary after the version check: {}",
+                    cleanup_err
+                );
+            }
+            self.update_state_service.clear().await?;
+            return Err(e);
+        }
 
         // 5. Launch update process (platform-specific)
         update_state.set_phase(UpdatePhase::UpdaterLaunched);
@@ -497,6 +518,34 @@ impl OpenFrameClientUpdateService {
             .with_context(|| format!("Failed to parse version: {}", version))
     }
 
+    /// Refuses the staged binary only when it clearly reports another version; one that cannot tell is installed unverified
+    async fn verify_staged_version(staged_path: &Path, expected: &Version) -> Result<()> {
+        let limit = Duration::from_secs(STAGED_VERSION_PROBE_TIMEOUT_SECS);
+        let Some(reported) = binary_version::reported_version(staged_path, limit).await else {
+            warn!(
+                "Could not read the version of the staged binary, installing it unverified as {}",
+                expected
+            );
+            return Ok(());
+        };
+        if version_comparator::precedence(&reported, expected) != std::cmp::Ordering::Equal {
+            return Err(anyhow!(
+                "Downloaded binary reports version {}, expected {}; not installing it",
+                reported,
+                expected
+            ));
+        }
+        info!("Staged binary reports the expected version {}", reported);
+        Ok(())
+    }
+
+    /// The request names the version this binary was built as
+    fn is_running_version(version: &str) -> bool {
+        Self::is_valid_version(version)
+            && Self::parse_version(version)
+                .is_ok_and(|parsed| parsed.to_string() == env!("OPENFRAME_VERSION"))
+    }
+
     /// Validate version format (basic semver check)
     fn is_valid_version(version: &str) -> bool {
         !version.is_empty()
@@ -511,3 +560,7 @@ impl OpenFrameClientUpdateService {
                 .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+')
     }
 }
+
+#[cfg(test)]
+#[path = "openframe_client_update_service_tests.rs"]
+mod tests;
