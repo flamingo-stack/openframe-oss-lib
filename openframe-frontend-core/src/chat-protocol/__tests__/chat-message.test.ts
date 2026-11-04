@@ -15,6 +15,7 @@ import {
   parseCitations,
   parseMessageMetadata,
   parseStoredParts,
+  sourcePartOf,
   storablePartsOf,
   textOfParts,
   writingMessageIndex,
@@ -572,5 +573,35 @@ describe('usage on a turn', () => {
       parseMessageMetadata({ usage: { inputTokens: 81017, outputTokens: 500, contextTokens: 40600 } }, 'stream').usage,
     ).toEqual({ inputTokens: 81017, outputTokens: 500, contextTokens: 40600 });
     expect(parseMessageMetadata({ usage: { contextTokens: 'lots' } }, 'stream').usage).toEqual({});
+  });
+});
+
+describe('sourcePartOf', () => {
+  it('is a source-url with a url, and keeps a title only when there is one', () => {
+    expect(sourcePartOf({ sourceId: 'record://blog_post/1', url: 'https://x.test/b', title: ' A ' })).toEqual({
+      type: 'source-url',
+      sourceId: 'record://blog_post/1',
+      url: 'https://x.test/b',
+      title: 'A',
+    });
+    expect(sourcePartOf({ sourceId: 'record://blog_post/1', url: 'https://x.test/b', title: '' })).not.toHaveProperty(
+      'title',
+    );
+  });
+
+  it('is a source-document with none: text unless stated, titled by its id when it has no name', () => {
+    expect(sourcePartOf({ sourceId: 'record://faq/9' })).toEqual({
+      type: 'source-document',
+      sourceId: 'record://faq/9',
+      mediaType: 'text/plain',
+      title: '9',
+    });
+    expect(sourcePartOf({ sourceId: 'x', mediaType: 'text/markdown', filename: 'a.md', title: 'A' })).toEqual({
+      type: 'source-document',
+      sourceId: 'x',
+      mediaType: 'text/markdown',
+      title: 'A',
+      filename: 'a.md',
+    });
   });
 });

@@ -14,6 +14,7 @@ import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../components/chat/utils/aut
 import {
   parseMessageMetadata,
   parseStoredParts,
+  sourcePartOf,
   textOfParts,
   type ChatApprovalDescriptor,
   type ChatMessage,
@@ -21,7 +22,7 @@ import {
   type ChatSourcePart,
   type ChatToolMetadata,
 } from './chat-message';
-import { normalizeRecordUris, normalizeSourceId, parseRecordHref } from './record-link';
+import { normalizeRecordUris, normalizeSourceId } from './record-link';
 import type { ChatStreamEntry, UiChunk } from './ui-chunks';
 import { isRecord } from './wire-narrow';
 
@@ -88,23 +89,16 @@ function askOptionsOf(raw: unknown): Array<{ label: string; description?: string
 }
 
 /** A source row as a source part, or null for a row that names no record. GraphQL answers an unset field with null. */
-function sourcePartOf(row: Record<string, unknown>): ChatSourcePart | null {
+function sourcePartOfRow(row: Record<string, unknown>): ChatSourcePart | null {
   const named = nonEmpty(row.sourceId);
   if (!named) return null;
-  const sourceId = normalizeSourceId(named);
-  const title = nonEmpty(row.title);
-  const url = nonEmpty(row.url);
-  if (url && row.type !== 'source-document') {
-    return { type: 'source-url', sourceId, url, ...(title ? { title } : {}) };
-  }
-  const filename = nonEmpty(row.filename);
-  return {
-    type: 'source-document',
-    sourceId,
-    mediaType: nonEmpty(row.mediaType) ?? 'text/plain',
-    title: title ?? parseRecordHref(sourceId)?.id ?? sourceId,
-    ...(filename ? { filename } : {}),
-  };
+  return sourcePartOf({
+    sourceId: normalizeSourceId(named),
+    url: row.type === 'source-document' ? null : nonEmpty(row.url),
+    title: nonEmpty(row.title),
+    mediaType: nonEmpty(row.mediaType),
+    filename: nonEmpty(row.filename),
+  });
 }
 
 export function createMingoDecoder(options: { now?: () => string } = {}): MingoDecoder {
@@ -146,7 +140,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
 
   function sourceChunks(data: Record<string, unknown>): UiChunk[] {
     const rows = Array.isArray(data.sources) ? data.sources.filter(isRecord) : [];
-    return rows.map(sourcePartOf).filter((part): part is ChatSourcePart => part !== null);
+    return rows.map(sourcePartOfRow).filter((part): part is ChatSourcePart => part !== null);
   }
 
   function toolInput(data: Record<string, unknown>, toolCallId: string): UiChunk {

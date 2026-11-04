@@ -26,7 +26,7 @@ import type {
   TicketEventData,
 } from '../components/chat/types/message.types';
 import type { ChatProgress } from './progress';
-import { normalizeRecordUris, normalizeSourceId } from './record-link';
+import { normalizeRecordUris, normalizeSourceId, parseRecordHref } from './record-link';
 import { isRecord } from './wire-narrow';
 
 // =============================================================================
@@ -422,6 +422,31 @@ export function citationSourceOfPart(part: ChatSourcePart): ChatCitationSource {
     mediaType: part.mediaType,
     title: part.title,
     ...(part.filename !== undefined ? { filename: part.filename } : {}),
+  };
+}
+
+/**
+ * The source part of a record: with a url it is `source-url`; with none, for any type, `source-document`, where the
+ * standard requires a title (a record with no name is titled by its id) and `mediaType` is what the model was given
+ * (text unless stated). THE one builder, for the hub's servers and the chat's decoder.
+ */
+export function sourcePartOf(record: {
+  sourceId: string;
+  url?: string | null;
+  title?: string | null;
+  mediaType?: string | null;
+  filename?: string | null;
+}): ChatSourcePart {
+  const title = record.title?.trim() || null;
+  if (record.url) {
+    return { type: 'source-url', sourceId: record.sourceId, url: record.url, ...(title ? { title } : {}) };
+  }
+  return {
+    type: 'source-document',
+    sourceId: record.sourceId,
+    mediaType: record.mediaType || 'text/plain',
+    title: title ?? parseRecordHref(record.sourceId)?.id ?? record.sourceId,
+    ...(record.filename ? { filename: record.filename } : {}),
   };
 }
 
