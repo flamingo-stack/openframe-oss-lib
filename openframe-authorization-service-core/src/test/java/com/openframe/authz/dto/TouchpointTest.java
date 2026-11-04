@@ -39,7 +39,6 @@ class TouchpointTest {
     @Test
     void merge_requestHasNoSourceSignal_keepsItsOwnFieldsAndTakesDownloadIdAndSourceFromCookie() {
         Touchpoint request = Touchpoint.builder()
-                .fbc("fb.1.1700000000.abc")
                 .hutk("hutk-1")
                 .heardFrom("search")
                 .referrer("https://www.reddit.com/")
@@ -49,7 +48,7 @@ class TouchpointTest {
         Touchpoint merged = Touchpoint.merge(request, everyField("cookie"));
 
         assertThat(merged).isEqualTo(Touchpoint.builder()
-                .fbc("fb.1.1700000000.abc")
+                .fbc("cookie01")
                 .fbp("cookie03")
                 .hutk("hutk-1")
                 .heardFrom("search")
@@ -67,6 +66,18 @@ class TouchpointTest {
                 .landingUrl("cookie16")
                 .downloadId("cookie17")
                 .build());
+    }
+
+    @Test
+    void merge_requestHasOnlyFbc_keepsItsOwnSourceAndTakesDownloadIdAndFbpFromCookie() {
+        Touchpoint request = Touchpoint.builder()
+                .fbc("fb.1.1700000000.abc")
+                .hutk("hutk-1")
+                .referrer("https://www.reddit.com/")
+                .build();
+
+        assertThat(Touchpoint.merge(request, everyField("cookie")))
+                .isEqualTo(request.toBuilder().fbp("cookie03").downloadId("cookie17").build());
     }
 
     @Test
@@ -96,7 +107,7 @@ class TouchpointTest {
         Touchpoint request = Touchpoint.builder().gclid("g-1").downloadId(DOWNLOAD_ID).build();
 
         assertThat(Touchpoint.merge(request, everyField("cookie")))
-                .isEqualTo(request.toBuilder().fbc("cookie01").fbp("cookie03").build());
+                .isEqualTo(request.toBuilder().fbp("cookie03").build());
     }
 
     @Test
@@ -104,7 +115,7 @@ class TouchpointTest {
         Touchpoint request = Touchpoint.builder().ref("acme").downloadId(DOWNLOAD_ID).build();
 
         assertThat(Touchpoint.merge(request, everyField("cookie")))
-                .isEqualTo(request.toBuilder().fbc("cookie01").fbp("cookie03").build());
+                .isEqualTo(request.toBuilder().fbp("cookie03").build());
     }
 
     @ParameterizedTest
@@ -113,7 +124,7 @@ class TouchpointTest {
         Touchpoint cookie = everyField("cookie").toBuilder().gbraid("cookie-gbraid").wbraid("cookie-wbraid").build();
 
         assertThat(Touchpoint.merge(request, cookie))
-                .isEqualTo(request.toBuilder().fbc("cookie01").fbp("cookie03").downloadId("cookie17").build());
+                .isEqualTo(request.toBuilder().fbp("cookie03").downloadId("cookie17").build());
     }
 
     private static Stream<Touchpoint> requestsWithOnlyGbraidOrWbraid() {
