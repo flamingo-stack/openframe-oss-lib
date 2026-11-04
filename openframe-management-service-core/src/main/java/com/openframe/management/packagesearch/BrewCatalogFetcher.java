@@ -20,12 +20,18 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
 @Slf4j
 @Component
 public class BrewCatalogFetcher {
+
+    private static final String APP_ARTIFACT = "app";
+    private static final String TARGET = "target";
+    private static final char PATH_SEPARATOR = '/';
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -99,6 +105,7 @@ public class BrewCatalogFetcher {
         String displayName = names == null || names.isEmpty() ? token : names.getFirst();
         List<String> aliases = concat(cask.getOldTokens(), null);
         Integer popularity = installs.get(token);
+        List<String> appNames = appNamesOf(cask);
         return PackageCatalogEntry.builder()
                 .manager(PackageManagerType.BREW)
                 .packageId(token)
@@ -109,7 +116,42 @@ public class BrewCatalogFetcher {
                 .brewType(BrewPackageType.CASK)
                 .popularity(popularity)
                 .aliases(aliases)
+                .appNames(appNames)
                 .build();
+    }
+
+    static List<String> appNamesOf(BrewCaskJson cask) {
+        List<JsonNode> artifacts = cask.getArtifacts();
+        if (artifacts == null) {
+            return List.of();
+        }
+        return artifacts.stream()
+                .filter(artifact -> artifact.has(APP_ARTIFACT))
+                .flatMap(BrewCatalogFetcher::appPathsOf)
+                .map(BrewCatalogFetcher::appNameOf)
+                .distinct()
+                .toList();
+    }
+
+    // an app is listed by its path in the download; a "target" beside it or in its place is its installed name
+    private static Stream<String> appPathsOf(JsonNode artifact) {
+        JsonNode listed = artifact.path(APP_ARTIFACT);
+        JsonNode installedAs = artifact.path(TARGET);
+        Stream<JsonNode> listedPaths = listed.valueStream().map(BrewCatalogFetcher::targetOrSelf);
+        Stream<JsonNode> installedPath = Stream.of(installedAs);
+        return Stream.concat(listedPaths, installedPath)
+                .filter(JsonNode::isString)
+                .map(JsonNode::stringValue);
+    }
+
+    private static JsonNode targetOrSelf(JsonNode app) {
+        return app.isObject() ? app.path(TARGET) : app;
+    }
+
+    private static String appNameOf(String path) {
+        int nameStart = path.lastIndexOf(PATH_SEPARATOR) + 1;
+        String bundleName = path.substring(nameStart);
+        return bundleName.toLowerCase(Locale.ROOT);
     }
 
     private <T> T fetchJson(String path, TypeReference<T> type) {

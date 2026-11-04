@@ -437,11 +437,11 @@ public class SoftwareInventoryService {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, filter, search);
-        // the filter reads auto-update, so it is set on every row, not only on the page
+        // the filter reads source and auto-update, so they are set on every row, not only on the page
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
         catalogStatus.apply(rows);
         List<SoftwareResponse> chosen = rows.stream()
-                .filter(row -> filter == null || selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate()))
+                .filter(row -> matchesCatalogFilter(row, filter))
                 .toList();
         if (!fleetPaging) {
             enrichDevicesCountFromHosts(chosen);
@@ -500,6 +500,8 @@ public class SoftwareInventoryService {
                 .currentVersion(installedVersion(installed))
                 .olderVersionsCount(Math.max(0, installed.size() - 1))
                 .vulnerabilitySummary(summarizeDeviceSoftware(title, inventory))
+                .fleetSource(title.getSource())
+                .upgradeCode(title.getUpgradeCode())
                 .build();
     }
 
@@ -532,14 +534,13 @@ public class SoftwareInventoryService {
     }
 
     private static boolean matchesDeviceSoftwareFilter(SoftwareResponse row, SoftwareFilterInput filter) {
-        if (filter == null) {
-            return true;
-        }
-        return matchesSources(row, filter.getSources()) && meetsMinSeverity(row, filter.getMinSeverity());
+        return filter == null || meetsMinSeverity(row, filter.getMinSeverity());
     }
 
-    private static boolean matchesSources(SoftwareResponse row, List<SoftwareSource> sources) {
-        return isEmpty(sources) || sources.contains(row.getSource());
+    private static boolean matchesCatalogFilter(SoftwareResponse row, SoftwareFilterInput filter) {
+        return filter == null
+                || (selected(filter.getSources(), row.getSource())
+                && selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate()));
     }
 
     private static boolean meetsMinSeverity(SoftwareResponse row, SoftwareCveSeverity min) {

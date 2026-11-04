@@ -24,4 +24,7 @@ public class SoftwareResponse {
     private SoftwareVulnerabilitySummaryResponse vulnerabilitySummary;
     private Boolean cpeMatched;
     private SoftwareAutoUpdateStatus autoUpdate;
+    // not in the GraphQL schema: what the package catalog is matched by
+    private String fleetSource;
+    private String upgradeCode;
 }

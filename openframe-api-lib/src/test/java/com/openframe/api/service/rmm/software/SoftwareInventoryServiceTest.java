@@ -518,6 +518,24 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
+    void listSoftwareForDevice_sourcesFilter_readsTheSourceTheCatalogSets() {
+        // setup
+        stubInventory(
+                List.of(title(10L, "Google Chrome", "programs", "141.0"), title(11L, "Contoso Tool", "programs", "1.0")),
+                List.of());
+        catalogMatchesWinget("Google Chrome");
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setSources(List.of(SoftwareSource.WINGET));
+
+        // execution
+        PageResult<SoftwareResponse> result =
+                service.listSoftwareForDevice(MACHINE_ID, filter, null, FIRST_PAGE, PAGE_SIZE, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Google Chrome");
+    }
+
+    @Test
     void listSoftwareForDevice_minSeverityHigh_titlesBelowBandExcluded() {
         // setup
         stubInventory(
@@ -800,6 +818,14 @@ class SoftwareInventoryServiceTest {
         order.verify(catalogStatus).apply(anyList());
         order.verify(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
         order.verify(catalogStatus).apply(anyList());
+    }
+
+    private void catalogMatchesWinget(String name) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.stream().filter(row -> name.equals(row.getName())).forEach(row -> row.setSource(SoftwareSource.WINGET));
+            return null;
+        }).when(catalogStatus).apply(anyList());
     }
 
     // what SoftwareCatalogStatus does for a title the catalog carries: its newest release becomes the latest version
