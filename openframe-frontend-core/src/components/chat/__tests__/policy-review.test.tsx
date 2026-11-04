@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import { decodeNatsChunk } from '../../../chat-protocol/nats-decoder';
 import { normalizePolicyReview } from '../../../chat-protocol/policy-review';
+import { approvalMetaToBatchData } from '../../features/notifications/types';
 import { ApprovalBatchMessage } from '../approval-batch-message';
 import { isPolicyEscalated } from '../policy-review';
 import { mergeToolExecutionIfPresent } from '../stream/message-mutations';
@@ -136,6 +137,16 @@ describe('the review on the wire', () => {
       toolCalls: [{ ...call(), policyReview: wireEscalated }],
     });
     expect(event?.type === 'approval-request' && event.toolCalls?.[0]?.policyReview).toEqual(escalated);
+  });
+
+  it('rides an approval notification into the batch', () => {
+    const data = approvalMetaToBatchData({
+      approvalRequestId: 'req-1',
+      approvalType: 'ADMIN',
+      toolCalls: [{ toolName: 'runCommand', policyReview: wireEscalated }, { toolName: 'runCommand' }],
+    } as Parameters<typeof approvalMetaToBatchData>[0]);
+    expect(data.toolCalls[0]?.policyReview).toEqual(escalated);
+    expect('policyReview' in (data.toolCalls[1] ?? {})).toBe(false);
   });
 
   it('survives the merge into EXECUTED_TOOL on a history replay', () => {
