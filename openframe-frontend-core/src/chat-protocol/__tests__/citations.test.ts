@@ -1012,5 +1012,6 @@ describe('a chip never breaks the block it lands near', () => {
       places += expectChipsToLeaveItAlone(blocks.join('\n\n'));
     }
     expect(places).toBeGreaterThan(1000);
-  });
+    // 150 rounds through the markdown parser: about 14 s on a loaded CI runner, past the 5 s default.
+  }, 60_000);
 });
