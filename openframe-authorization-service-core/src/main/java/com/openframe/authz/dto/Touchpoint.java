@@ -92,6 +92,8 @@ public class Touchpoint {
                 .fbc(source.getFbc())
                 .fbp(StringUtils.hasText(request.getFbp()) ? request.getFbp() : cookie.getFbp())
                 .rdtUuid(StringUtils.hasText(request.getRdtUuid()) ? request.getRdtUuid() : cookie.getRdtUuid())
+                .eventId(StringUtils.hasText(request.getEventId()) ? request.getEventId() : cookie.getEventId())
+                .hutk(StringUtils.hasText(request.getHutk()) ? request.getHutk() : cookie.getHutk())
                 .fbclid(source.getFbclid())
                 .gclid(source.getGclid())
                 .gbraid(source.getGbraid())
