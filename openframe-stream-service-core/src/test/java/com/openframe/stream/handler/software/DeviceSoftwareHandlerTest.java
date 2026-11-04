@@ -127,7 +127,6 @@ class DeviceSoftwareHandlerTest {
         DeviceSoftware saved = captor.getValue();
         assertThat(saved.getTenantId()).isEqualTo("t1");
         assertThat(saved.getMachineId()).isEqualTo("m1");
-        assertThat(saved.getHostId()).isEqualTo(100L);
         assertThat(saved.getSoftwareTitleId()).isEqualTo(42L);
         assertThat(saved.getName()).isEqualTo("Google Chrome");
         assertThat(saved.getSource()).isEqualTo("apps");

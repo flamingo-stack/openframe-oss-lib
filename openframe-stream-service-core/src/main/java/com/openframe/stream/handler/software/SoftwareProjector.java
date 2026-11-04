@@ -40,7 +40,7 @@ public class SoftwareProjector {
 
         List<Software.Installation> installations = installed.stream()
                 .map(ds -> Software.Installation.builder()
-                        .machineId(ds.getMachineId()).hostId(ds.getHostId())
+                        .machineId(ds.getMachineId())
                         .versions(ds.getVersions()).build())
                 .toList();
         int devicesCount = (int) installations.stream()
@@ -54,7 +54,6 @@ public class SoftwareProjector {
         applyName(software, sample);
         software.setLatestVersion(latestVersion(installed));
         software.setInstallations(installations);
-        software.setCveIds(List.copyOf(cveIds));
         software.setDevicesCount(devicesCount);
         software.setCveCount(cveIds.size());
         software.setUpdatedAt(Instant.now());

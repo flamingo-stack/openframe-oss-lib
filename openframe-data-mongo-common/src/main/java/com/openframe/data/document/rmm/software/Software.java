@@ -37,8 +37,6 @@ public class Software implements TenantScoped {
 
     private String source;
 
-    private String browser;
-
     private String latestVersion;
 
     private int devicesCount;
@@ -46,8 +44,6 @@ public class Software implements TenantScoped {
     private int cveCount;
 
     private List<Installation> installations;
-
-    private List<String> cveIds;
 
     private Instant updatedAt;
 
@@ -57,8 +53,6 @@ public class Software implements TenantScoped {
     @AllArgsConstructor
     public static class Installation {
         private String machineId;
-        private Long hostId;
         private List<String> versions;
-        private Instant lastSeenAt;
     }
 }

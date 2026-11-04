@@ -50,10 +50,10 @@ class SoftwareProjectorTest {
     @Test
     void project_withInstalls_buildsAggregateFromEdgesWithDistinctDevices() {
         when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
-                DeviceSoftware.builder().machineId("m1").hostId(100L)
+                DeviceSoftware.builder().machineId("m1")
                         .versions(List.of("1.0", "2.0")).vulnerabilities(List.of("CVE-1", "CVE-2"))
                         .name("Google Chrome").source("apps").build(),
-                DeviceSoftware.builder().machineId("m2").hostId(101L)
+                DeviceSoftware.builder().machineId("m2")
                         .versions(List.of("1.5")).vulnerabilities(List.of("CVE-1"))  // duplicate across machines
                         .name("Google Chrome").source("apps").build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
@@ -72,7 +72,6 @@ class SoftwareProjectorTest {
         assertThat(saved.getInstallations()).hasSize(2);
         assertThat(saved.getInstallations().get(0).getVersions()).containsExactly("1.0", "2.0");
         assertThat(saved.getDevicesCount()).isEqualTo(2);                // m1, m2 distinct
-        assertThat(saved.getCveIds()).containsExactlyInAnyOrder("CVE-1", "CVE-2");
         assertThat(saved.getCveCount()).isEqualTo(2);
         assertThat(saved.getUpdatedAt()).isNotNull();
     }

@@ -39,8 +39,6 @@ public class DeviceSoftware implements TenantScoped {
 
     private String machineId;
 
-    private Long hostId;
-
     private Long softwareTitleId;
 
     private String name;

@@ -111,7 +111,6 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
                     .orElseGet(DeviceSoftware::new);
             deviceSoftware.setTenantId(host.tenantId());
             deviceSoftware.setMachineId(host.machineId());
-            deviceSoftware.setHostId(hostId);
             deviceSoftware.setSoftwareTitleId(titleId);
             deviceSoftware.setName(title.getName());
             deviceSoftware.setSource(title.getSource());
