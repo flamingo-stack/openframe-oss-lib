@@ -243,6 +243,18 @@ describe('makeComposeContentUrl: slugIsIdentifier', () => {
     expect(compose({ type: 'markdown', identifier: 'docs/a?x=1#y.md' }).href).toBe('/knowledge-base/docs/ax1y.md');
   });
 
+  it('never climbs out of the docs tree', () => {
+    expect(compose({ type: 'markdown', identifier: '../../admin/./x//y.md' }).href).toBe(
+      '/knowledge-base/admin/x/y.md',
+    );
+  });
+
+  it('strips the slug hint the same way', () => {
+    expect(compose({ type: 'markdown', identifier: 'uuid-1', slug: '../docs/a?x=1.md' }).href).toBe(
+      '/knowledge-base/docs/ax1.md',
+    );
+  });
+
   // TODO(CU-17tkuw61kfy): an old doc source arrives with its tree path as the slug, and its row id as the identifier.
   it('the slug hint wins, for an old doc source', () => {
     expect(compose({ type: 'markdown', identifier: 'uuid-1', slug: 'docs/setup.md' }).href).toBe(

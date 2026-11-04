@@ -235,7 +235,7 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
       //
       // `slugIsIdentifier`: the record's id IS its slug (a doc's tree path), and the url's last segment would lose it.
       if (opts.slugIsIdentifier?.has(type)) {
-        return { href: `/${seg}/${slugHint?.trim() || sanitizeDocPath(identifier)}`, targetPlatform: null };
+        return { href: `/${seg}/${sanitizeDocPath(slugHint?.trim() || identifier)}`, targetPlatform: null };
       }
       const recovered = externalUrl ? lastPathSegment(externalUrl) : null;
       const slug = recovered && recovered !== seg ? recovered : slugHint?.trim() || identifier;

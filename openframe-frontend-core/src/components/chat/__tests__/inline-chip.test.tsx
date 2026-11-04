@@ -18,6 +18,11 @@ describe('InlineChip', () => {
     expect(screen.getByTestId('inline-chip')).toHaveTextContent('Devices → Add Device');
   });
 
+  it('keeps its test id while it loads', () => {
+    render(<InlineChip label="Platform overview" loading />);
+    expect(screen.getByTestId('inline-chip')).toBeInTheDocument();
+  });
+
   it('draws no icon: a sentence of chips reads as text', () => {
     render(<InlineChip label="Platform overview" link={link} trailing={action} />);
     expect(screen.getByTestId('inline-chip').innerHTML).not.toContain('<svg');

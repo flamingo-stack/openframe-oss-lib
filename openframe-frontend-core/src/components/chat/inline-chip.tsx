@@ -66,7 +66,7 @@ export function InlineChip({
   trailing?: React.ReactNode;
 }): React.ReactElement {
   if (loading) {
-    return <Tag as="span" variant="badge" label="" loading className="align-middle" />;
+    return <Tag as="span" variant="badge" label="" loading className="align-middle" data-testid="inline-chip" />;
   }
   // A line must not break between the name and its action, or the "⋯" is left alone at the start of the next line.
   // Browsers allow a break before an inline button whatever `white-space` says, so the name's LAST FEW CHARACTERS and the

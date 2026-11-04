@@ -37,11 +37,15 @@ describe('HoverDropdown', () => {
     // Entering a row enters the panel that holds it (React computes enter and leave for every ancestor).
     const row = screen.getByText('What Is WSUS?');
     fireEvent.mouseEnter(row);
-    act(() => vi.advanceTimersByTime(500));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     expect(screen.getByText('What Is WSUS?')).toBeInTheDocument();
 
     fireEvent.mouseLeave(row);
-    act(() => vi.advanceTimersByTime(500));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
     expect(screen.queryByText('What Is WSUS?')).toBeNull();
   });
 });
