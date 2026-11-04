@@ -20,7 +20,6 @@ const THE_SENTENCE =
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',

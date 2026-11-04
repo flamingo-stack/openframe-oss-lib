@@ -150,7 +150,7 @@ Two lib surfaces still hardcode bare `/api` with no override prop today:
 prefixes to the hub. Everything else rides `/content`. The clean fix (recommended) is a small
 lib change so these read their base from the runtime — forward a `searchEndpoint` prop from
 `OnboardingGuidesCatalogView`, and derive the tickets paths from a single `agentBaseUrl` on
-`ChatRuntime.endpoints` (sibling of `approvalToolUrl`). After that, drop the fallback rules.
+`ChatRuntime.endpoints`. After that, drop the fallback rules.
 
 ## Configuring URL endpoints
 

@@ -70,7 +70,6 @@ describe('text after a turn ended', () => {
 });
 
 describe('a card a replay sends again', () => {
-  const request = { type: 'APPROVAL_REQUEST', approvalRequestId: 'req-1', approvalType: 'CLIENT', command: 'ls' };
   const batch = {
     type: 'APPROVAL_REQUEST',
     approvalRequestId: 'req-1',
@@ -78,12 +77,10 @@ describe('a card a replay sends again', () => {
     toolCalls: [{ toolExecutionRequestId: 'exec-1', toolName: 'run_command', requiresApproval: true }],
   };
 
-  it('stays one card, on either shape', () => {
-    for (const card of [request, batch]) {
-      const { reducer, send } = fromThread([assistant('a1', text('reply'))]);
-      send(card, card);
-      expect(reducer.state.messages[0].parts.filter(isToolPart)).toHaveLength(1);
-    }
+  it('stays one card', () => {
+    const { reducer, send } = fromThread([assistant('a1', text('reply'))]);
+    send(batch, batch);
+    expect(reducer.state.messages[0].parts.filter(isToolPart)).toHaveLength(1);
   });
 
   it('keeps the answer it had: a resolved card never comes back as actionable', () => {
@@ -151,14 +148,6 @@ describe('a tool’s run', () => {
     const before = reducer.state.messages;
     send(withId(EXECUTING, 'exec-1'));
     expect(reducer.state.messages).toBe(before);
-  });
-
-  it('pairs a result with its run when the wire names no id', () => {
-    const { reducer, send } = fromThread([assistant('a1', text('reply'))]);
-    send(EXECUTING, EXECUTED);
-    const rows = reducer.state.messages[0].parts.filter(isToolPart);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ state: 'output-available', output: 'ok', title: 'Run command' });
   });
 });
 

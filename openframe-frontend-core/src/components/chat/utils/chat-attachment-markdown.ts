@@ -114,24 +114,6 @@ export function escapeMarkdownInline(text: string): string {
 }
 
 /**
- * Format a single chat-attachment as a markdown line to append to the
- * user's bubble text BEFORE sending.
- *
- * Images (MIME in `ANTHROPIC_SUPPORTED_IMAGE_MIME`) emit the `![]()`
- * image form so the browser renders the attachment inline. Everything
- * else (HEIC, video, audio) emits the `[Attached: ...]` link form so the
- * bubble shows a clickable file pill instead of a broken-image icon.
- *
- * TODO(CU-17tkuw61kfy): only an old hub reads this markdown; a `file` part draws the attachment now.
- */
-export function formatChatAttachmentMarkdownForBubble(att: ChatAttachment, viewUrlPrefix: string): string {
-  const safeName = escapeMarkdownInline(att.fileName);
-  const url = buildChatAttachmentViewUrl(viewUrlPrefix, att.storagePath, att.viewToken);
-  const isImage = (ANTHROPIC_SUPPORTED_IMAGE_MIME as readonly string[]).includes(att.contentType);
-  return isImage ? `\n\n![${safeName}](${url})` : `\n\n[Attached: ${safeName}](${url})`;
-}
-
-/**
  * A `file` part's address on this host: the tail after `chat-attachments/` re-prefixed with the host's
  * `attachmentViewUrlPrefix`, so a proxied or preview host stays same-origin. A stored url is on the conversation
  * platform's canonical origin; with no prefix, or a url that is no view url, it is used as given.
@@ -142,7 +124,11 @@ function chatFilePartViewUrl(url: string, viewUrlPrefix: string | undefined): st
   return viewUrlPrefix && at !== -1 ? `${viewUrlPrefix}${url.slice(at + marker.length)}` : url;
 }
 
-/** A `file` part as the bubble draws it: the same two forms as {@link formatChatAttachmentMarkdownForBubble}. */
+/**
+ * A `file` part as the bubble draws it. Images (MIME in `ANTHROPIC_SUPPORTED_IMAGE_MIME`) are the `![]()` image form, so
+ * the browser renders them inline; everything else (HEIC, video, audio) is the `[Attached: ...]` link form, a file pill
+ * instead of a broken-image icon.
+ */
 export function chatFilePartMarkdown(
   part: { mediaType: string; filename?: string; url: string },
   viewUrlPrefix: string | undefined,

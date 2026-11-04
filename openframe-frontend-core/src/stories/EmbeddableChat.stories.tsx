@@ -72,7 +72,6 @@ function createMockRuntime(): ChatRuntime {
   return {
     endpoints: {
       chatStreamUrl: '/__story__/chat',
-      approvalToolUrl: '/__story__/confirm-tool',
       commandsUrl: COMMANDS_URL,
       buildListUrl: () => null,
       attachmentUploadUrl: '/__story__/upload',

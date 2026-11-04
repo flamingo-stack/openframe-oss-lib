@@ -3,7 +3,6 @@ import { applyChunkToMessages, createWireState } from '../../../../chat-protocol
 import type { ChatMessage, ChatToolPart } from '../../../../chat-protocol/chat-message';
 import { APPROVAL_CANCELLED, isToolPart } from '../../../../chat-protocol/chat-message';
 import { createMingoDecoder } from '../../../../chat-protocol/message-decoder';
-import { createOldFrameDecoder } from '../../../../chat-protocol/old-wire';
 import type { UiChunk } from '../../../../chat-protocol/ui-chunks';
 import {
   approvalBatchViewOf,
@@ -439,16 +438,6 @@ describe('a batch tells its rows apart by what each touches', () => {
     { proposalId: 'p1', toolName: 'delete_clickup_task', title: 'Delete task', fields: fields('Fix login', '86a') },
     { proposalId: 'p2', toolName: 'delete_clickup_task', title: 'Delete task', fields: fields('Fix logout', '86b') },
   ];
-
-  it('from an old hub`s batch frame, which sends no arguments', () => {
-    const decoder = createOldFrameDecoder();
-    const frame = `${JSON.stringify({ kind: 'approval_batch', batchId: 'batch:p1', proposals })}\0`;
-    const { toolCalls } = approvalBatchViewOf(
-      toolRows([...decoder.push(new TextEncoder().encode(frame)), ...decoder.end()]),
-    ).data;
-    expect(toolCalls.map(call => call.toolTitle)).toEqual(['Delete task: Fix login', 'Delete task: Fix logout']);
-    expect(toolCalls[0].toolCallArguments).toEqual({ Task: '86a', Name: 'Fix login' });
-  });
 
   it('from the UI stream, its labelled fields over its raw input', () => {
     const { toolCalls } = approvalBatchViewOf(

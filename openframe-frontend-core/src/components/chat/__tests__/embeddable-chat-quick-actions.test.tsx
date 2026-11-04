@@ -18,7 +18,6 @@ import type { UnifiedChatState } from '../types/unified-chat-state.types';
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',

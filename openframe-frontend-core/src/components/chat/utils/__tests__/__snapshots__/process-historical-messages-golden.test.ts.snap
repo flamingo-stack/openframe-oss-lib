@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`processHistoricalMessages — golden corpus > an unresolved single approval stays where it arrived, pending 1`] = `
+exports[`processHistoricalMessages — golden corpus > an unresolved approval stays where it arrived, pending 1`] = `
 [
   {
     "id": "a1",
@@ -17,6 +17,7 @@ exports[`processHistoricalMessages — golden corpus > an unresolved single appr
         "approval": {
           "descriptor": {
             "approvalType": "CLIENT",
+            "batchId": "req-pending",
           },
           "id": "req-pending",
         },
@@ -24,7 +25,7 @@ exports[`processHistoricalMessages — golden corpus > an unresolved single appr
         "state": "approval-requested",
         "title": "reboot server",
         "toolCallId": "req-pending",
-        "toolName": "command",
+        "toolName": "run_command",
         "type": "dynamic-tool",
       },
     ],
@@ -226,6 +227,7 @@ exports[`processHistoricalMessages — golden corpus > processes the full record
           "approved": true,
           "descriptor": {
             "approvalType": "CLIENT",
+            "batchId": "req-1",
           },
           "id": "req-1",
           "requestReason": "Restart the message broker",
@@ -236,8 +238,9 @@ exports[`processHistoricalMessages — golden corpus > processes the full record
         "toolCallId": "req-1",
         "toolMetadata": {
           "resolvedByName": "Jane Admin",
+          "toolExplanation": "Restart the message broker",
         },
-        "toolName": "command",
+        "toolName": "run_command",
         "type": "dynamic-tool",
       },
       {

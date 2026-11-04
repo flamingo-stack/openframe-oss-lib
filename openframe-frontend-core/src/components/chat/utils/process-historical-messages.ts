@@ -13,7 +13,7 @@
 
 import { applyChunkToMessages, createWireState } from '../../../chat-protocol/apply-chunk';
 import { isSourcePart, type ChatMessage } from '../../../chat-protocol/chat-message';
-import { createMingoDecoder, mingoUserText } from '../../../chat-protocol/message-decoder';
+import { createMingoDecoder } from '../../../chat-protocol/message-decoder';
 import type { UiChunk } from '../../../chat-protocol/ui-chunks';
 import { isAnsweredStatus, knownApprovalAnswer, resolutionChunks } from '../stream/message-mutations';
 import {
@@ -110,7 +110,6 @@ export function processHistoricalMessages(
     lastRowId = null;
     wire.setMessageId(null);
     wire.textOffsets.clear();
-    decoder.endTurn();
   };
 
   const openTurn = (row: HistoricalMessage): void => {
@@ -192,7 +191,7 @@ export function processHistoricalMessages(
               ...(contextItems.length > 0 ? { contextItems } : {}),
               ...(typeof row.lastChunkStreamSeq === 'number' ? { streamSeq: row.lastChunkStreamSeq } : {}),
             },
-            parts: [{ type: 'text', text: mingoUserText(data.text) }],
+            parts: [{ type: 'text', text: data.text }],
           },
         ];
       }

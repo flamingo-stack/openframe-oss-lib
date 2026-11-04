@@ -30,7 +30,6 @@ const CONVERSATIONS_URL = '/api/docs/chat/conversations';
 
 const baseEndpoints: ChatRuntime['endpoints'] = {
   chatStreamUrl: '/api/docs/chat',
-  approvalToolUrl: '/api/chat/agent/confirm-tool',
   commandsUrl: '/api/docs/commands',
   buildListUrl: () => null,
   attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -65,21 +64,32 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
     },
   });
 }
-const USAGE_END_TRAILER = '{"kind":"usage","stage":"end","input_tokens":10,"output_tokens":5,"hit_rate_pct":50}';
+/** A turn on the standard's wire, echoing a server-minted conversation id. */
 function wireTurn(conversationId: string, answer: string): string[] {
   return [
-    `{"modelLabel":"Claude Sonnet","provider":"anthropic","conversationId":"${conversationId}"}\0`,
-    '\x1E',
-    answer,
-    '\x1F' + USAGE_END_TRAILER,
-  ];
+    { type: 'start', messageId: 'a-1', messageMetadata: { conversationId } },
+    { type: 'text-delta', id: 't1', delta: answer },
+    { type: 'finish', finishReason: 'stop' },
+  ]
+    .map(chunk => `data: ${JSON.stringify(chunk)}\n\n`)
+    .concat('data: [DONE]\n\n');
 }
 
 const historyFor = (id: string) => ({
   data: {
     messages: [
-      { seq: 0, role: 'user', content: `q for ${id}`, created_at: '2026-09-01T09:00:00.000Z' },
-      { seq: 1, role: 'assistant', content: `a for ${id}`, created_at: '2026-09-01T09:00:05.000Z' },
+      {
+        id: `${id}-q`,
+        role: 'user',
+        metadata: { seq: 0, createdAt: '2026-09-01T09:00:00.000Z' },
+        parts: [{ type: 'text', text: `q for ${id}` }],
+      },
+      {
+        id: `${id}-a`,
+        role: 'assistant',
+        metadata: { seq: 1, createdAt: '2026-09-01T09:00:05.000Z' },
+        parts: [{ type: 'text', text: `a for ${id}` }],
+      },
     ],
   },
 });

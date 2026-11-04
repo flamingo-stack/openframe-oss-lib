@@ -13,7 +13,6 @@ import { type StoryRow, storyMessage, textPart } from './__fixtures__/chat-messa
 const RUNTIME: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/__story__/chat',
-    approvalToolUrl: '/__story__/confirm-tool',
     commandsUrl: '/__story__/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/__story__/upload',

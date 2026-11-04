@@ -103,8 +103,15 @@ const CORPUS: HistoricalMessage[] = [
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'req-1',
         approvalType: 'CLIENT',
-        command: 'systemctl restart nats',
-        explanation: 'Restart the message broker',
+        toolCalls: [
+          {
+            toolExecutionRequestId: 'req-1',
+            toolName: 'run_command',
+            toolTitle: 'systemctl restart nats',
+            toolExplanation: 'Restart the message broker',
+            requiresApproval: true,
+          },
+        ],
       },
       {
         type: 'APPROVAL_RESULT',
@@ -210,7 +217,7 @@ describe('processHistoricalMessages — golden corpus', () => {
     expect(result.messages).toMatchSnapshot();
   });
 
-  it('an unresolved single approval stays where it arrived, pending', () => {
+  it('an unresolved approval stays where it arrived, pending', () => {
     const result = processHistoricalMessages([
       {
         id: 'a1',
@@ -221,7 +228,14 @@ describe('processHistoricalMessages — golden corpus', () => {
             type: 'APPROVAL_REQUEST',
             approvalRequestId: 'req-pending',
             approvalType: 'CLIENT',
-            command: 'reboot server',
+            toolCalls: [
+              {
+                toolExecutionRequestId: 'req-pending',
+                toolName: 'run_command',
+                toolTitle: 'reboot server',
+                requiresApproval: true,
+              },
+            ],
           },
         ],
       },

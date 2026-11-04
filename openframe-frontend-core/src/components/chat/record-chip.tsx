@@ -11,7 +11,6 @@
 
 import { useChatRuntime, useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
-import { defaultTableIdForDocumentType } from '../../utils/source-icons';
 import { useMessageSourceOf } from './citation-chip';
 import { RecordNavWrap, recordMenuActions, recordMenuGroups, useRecordDestination } from './entity-cards/dispatch';
 import { InlineChip } from './inline-chip';
@@ -25,18 +24,8 @@ interface RecordChipProps {
   label: string;
 }
 
-/**
- * TODO(CU-17tkuw61kfy): goes with the old mention token. `old-wire.ts` writes `@word:value` as a record link labelled with
- * the token, and prose holds that shape too (`@redis:6379`). A token no host claimed, of a type that names no record the
- * lib knows, stays the raw text it was: a chip would dress it up as something that opens.
- */
-function isUnclaimedToken({ type, id, label }: RecordChipProps): boolean {
-  return label === `@${type}:${id}` && defaultTableIdForDocumentType(type) === null;
-}
-
 export function RecordChip(props: RecordChipProps) {
   const runtime = useChatRuntime();
-  if (isUnclaimedToken(props)) return <span className="text-ods-text-secondary opacity-60">{props.label}</span>;
   if (!runtime) return <InlineChip label={props.label} />;
   return <LinkedRecordChip {...props} />;
 }
@@ -53,8 +42,7 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
   const menuGroups = recordMenuGroups(finalChatRef, recordMenuActions(finalChatRef, handlers, runtime));
   return (
     <InlineChip
-      // TODO(CU-17tkuw61kfy): a link that knows no name but the id (an old receipt's token) shows the name its row answers.
-      label={finalChatRef.title || label}
+      label={label}
       link={
         href
           ? (content, anchor) => (
@@ -79,7 +67,7 @@ function LinkedRecordChip({ type, id, label }: RecordChipProps) {
             )
           : undefined
       }
-      trailing={menuGroups ? <RecordChipMenu menuGroups={menuGroups} label={finalChatRef.title || label} /> : undefined}
+      trailing={menuGroups ? <RecordChipMenu menuGroups={menuGroups} label={label} /> : undefined}
     />
   );
 }

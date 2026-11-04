@@ -275,7 +275,6 @@ export {
   escapeMarkdownInline,
   type ChatAttachment,
   buildChatAttachmentViewUrl,
-  formatChatAttachmentMarkdownForBubble,
   CHAT_ATTACHMENT_VIEW_URL_PREFIX,
   CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM,
   ANTHROPIC_SUPPORTED_IMAGE_MIME,

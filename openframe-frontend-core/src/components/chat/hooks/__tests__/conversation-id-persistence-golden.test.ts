@@ -7,14 +7,14 @@
  * (memory `project_chat_server_history_ssot`). The contract pinned here is
  * its replacement:
  *
- *   - conversation ids are SERVER-minted, captured from the leading
- *     metadata frame, and localStorage stores ONLY the echoed id
+ *   - conversation ids are SERVER-minted, captured from the stream's
+ *     message metadata, and localStorage stores ONLY the echoed id
  *     (`mingo-chat-<source>.conversation`);
- *   - the wire carries ONLY the newest user message (+ the echoed
- *     conversation id) — never a replay of client history;
+ *   - the wire carries ONLY the newest user message, under the echoed
+ *     conversation id, never a replay of client history;
  *   - mount-time history hydrates from `GET <chatStreamUrl>/history` and
  *     materializes THROUGH THE REDUCER (inline cards hydrate by id from the
- *     record links in the content, no per-row refs);
+ *     record links in the text, no per-row refs);
  *   - stale keys — other proxy-auth identities AND the retired v1
  *     full-history blobs — are swept on mount; a leftover v1 blob neither
  *     crashes the adapter nor resurrects its messages.
@@ -55,7 +55,6 @@ const readPersistedConversation = (): unknown => {
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -130,14 +129,12 @@ function mockRoutedFetch(options: { history?: unknown; streams: Array<Array<stri
 /**
  * The chat-stream POST body — the contract these goldens exist to pin. Written
  * out rather than left as `Record<string, unknown>` because the whole point of
- * the suite is WHICH keys the adapter sends: the newest message only, plus the
- * conversation the server has minted. `content` and `conversationId` are what
- * an older hub reads beside it (TODO(CU-17tkuw61kfy)).
+ * the suite is WHICH keys the adapter sends: the newest message only, under
+ * the conversation the server has minted.
  */
 interface ChatStreamRequestBody {
   id: string;
-  messages: Array<{ id: string; role: string; parts: unknown[]; content: string }>;
-  conversationId?: string;
+  messages: Array<{ id: string; role: string; parts: unknown[] }>;
 }
 
 /** The body of a send of `text`, under a client id or the conversation's. */
@@ -148,10 +145,8 @@ const sendOf = (text: string, conversationId?: string): ChatStreamRequestBody =>
       id: expect.stringMatching(/^user-/) as string,
       role: 'user',
       parts: [{ type: 'text', text }],
-      content: text,
     },
   ],
-  ...(conversationId !== undefined ? { conversationId } : {}),
 });
 
 /** POST bodies the mock received for the chat-stream endpoint only.
@@ -168,67 +163,46 @@ function chatBodies(fetchMock: ReturnType<typeof mockRoutedFetch>): ChatStreamRe
     );
 }
 
-const USAGE_END_TRAILER = '{"kind":"usage","stage":"end","input_tokens":10,"output_tokens":5,"hit_rate_pct":50}';
-
-/** Wire fixture: metadata frame echoing a server-minted conversation id. */
-function wireTurn(conversationId: string, answer: string): Array<string> {
-  return [
-    `{"modelLabel":"Claude Sonnet","provider":"anthropic","conversationId":"${conversationId}"}\0`,
-    '\x1E',
-    answer,
-    '\x1F' + USAGE_END_TRAILER,
-  ];
-}
-
-/** The same turn on the standard's wire. */
+/** A turn on the standard's wire, echoing a server-minted conversation id. */
+let turnCount = 0;
 function uiWireTurn(conversationId: string, answer: string): Uint8Array[] {
+  turnCount += 1;
   return [
-    encodeUiChunk({ type: 'start', messageId: 'a-1', messageMetadata: { conversationId } }),
+    encodeUiChunk({ type: 'start', messageId: `a-${turnCount}`, messageMetadata: { conversationId } }),
     encodeUiChunk({ type: 'text-delta', id: 't1', delta: answer }),
     encodeUiChunk({ type: 'finish', finishReason: 'stop', messageMetadata: { conversationId } }),
     encodeUiDone(),
   ];
 }
 
-/** Server transcript fixture — 2 turns. Turn #0's assistant row still
- *  carries a legacy `chat_refs` column (old transcripts persist it): the
- *  client must IGNORE it — cards hydrate by id from the record link
- *  marker in the content. */
+/** Server transcript fixture: 2 turns, each row its own id and parts. Cards hydrate by id from the record link in
+ *  the text. */
 const HISTORY_PAYLOAD = {
   data: {
     messages: [
       {
-        seq: 1,
+        id: 'h-1',
         role: 'user',
-        content: 'open a ticket for the broken printer',
-        created_at: '2026-07-19T09:00:00.000Z',
+        metadata: { seq: 1, createdAt: '2026-07-19T09:00:00.000Z' },
+        parts: [{ type: 'text', text: 'open a ticket for the broken printer' }],
       },
       {
-        seq: 2,
+        id: 'h-2',
         role: 'assistant',
-        content: '✅ Approved — ticket created: [77](record://ticket/77)',
-        created_at: '2026-07-19T09:00:12.000Z',
-        chat_refs: {
-          'ticket:77': {
-            type: 'ticket',
-            id: '77',
-            title: 'Broken printer',
-            url: null,
-            metadata: { status: 'OPEN' },
-          },
-        },
+        metadata: { seq: 2, createdAt: '2026-07-19T09:00:12.000Z' },
+        parts: [{ type: 'text', text: '✅ Approved — ticket created: [77](record://ticket/77)' }],
       },
       {
-        seq: 3,
+        id: 'h-3',
         role: 'user',
-        content: 'what is the pricing?',
-        created_at: '2026-07-19T09:01:40.000Z',
+        metadata: { seq: 3, createdAt: '2026-07-19T09:01:40.000Z' },
+        parts: [{ type: 'text', text: 'what is the pricing?' }],
       },
       {
-        seq: 4,
+        id: 'h-4',
         role: 'assistant',
-        content: 'Pricing starts at $99/month per site.',
-        created_at: '2026-07-19T09:01:45.000Z',
+        metadata: { seq: 4, createdAt: '2026-07-19T09:01:45.000Z' },
+        parts: [{ type: 'text', text: 'Pricing starts at $99/month per site.' }],
       },
     ],
   },
@@ -314,7 +288,7 @@ describe('stale-key pruning', () => {
 describe('server-minted conversation id (full hook path)', () => {
   it('captures the echoed id, persists id-only, and sends newest-message-only bodies', async () => {
     const fetchMock = mockRoutedFetch({
-      streams: [wireTurn('conv-golden-1', 'First answer.'), wireTurn('conv-golden-1', 'Second answer.')],
+      streams: [uiWireTurn('conv-golden-1', 'First answer.'), uiWireTurn('conv-golden-1', 'Second answer.')],
     });
     const { result } = renderHook(() => useSseChatAdapter(undefined, { active: false }), {
       wrapper,
@@ -360,7 +334,7 @@ describe('server-minted conversation id (full hook path)', () => {
 
   it('clearMessages drops the stored id so the next send is id-less (fresh conversation)', async () => {
     const fetchMock = mockRoutedFetch({
-      streams: [wireTurn('conv-golden-2', 'Answer.'), wireTurn('conv-golden-3', 'Fresh answer.')],
+      streams: [uiWireTurn('conv-golden-2', 'Answer.'), uiWireTurn('conv-golden-3', 'Fresh answer.')],
     });
     const { result } = renderHook(() => useSseChatAdapter(undefined, { active: false }), {
       wrapper,
@@ -391,20 +365,25 @@ describe('server-minted conversation id (full hook path)', () => {
 describe('server-history hydration (materializes through the reducer)', () => {
   it("a saved message keeps its own time and sources; a receipt has none of its answer's", async () => {
     window.localStorage.setItem(CONVERSATION_KEY, JSON.stringify({ conversationId: 'conv-h2' }));
-    const sources = [{ index: 1, name: 'Pricing overview', path: 'docs/pricing.md', documentType: 'markdown' }];
+    const source = {
+      type: 'source-document',
+      sourceId: 'record://markdown/docs%2Fpricing.md',
+      mediaType: 'text/markdown',
+      title: 'Pricing overview',
+    };
+    const row = (id: string, role: string, createdAt: string, parts: unknown[]) => ({
+      id,
+      role,
+      metadata: { createdAt },
+      parts,
+    });
     mockRoutedFetch({
       history: {
         found: true,
         messages: [
-          { seq: 0, role: 'user', content: 'create a task', created_at: '2026-07-19T09:00:00.000Z' },
-          { seq: 1, role: 'assistant', content: 'Proposal.', sources, created_at: '2026-07-19T09:00:05.000Z' },
-          {
-            seq: 2,
-            role: 'assistant',
-            content: 'Task created.',
-            sources: null,
-            created_at: '2026-07-19T09:01:00.000Z',
-          },
+          row('s-0', 'user', '2026-07-19T09:00:00.000Z', [{ type: 'text', text: 'create a task' }]),
+          row('s-1', 'assistant', '2026-07-19T09:00:05.000Z', [source, { type: 'text', text: 'Proposal.' }]),
+          row('s-2', 'assistant', '2026-07-19T09:01:00.000Z', [{ type: 'text', text: 'Task created.' }]),
         ],
       },
       streams: [],
@@ -424,12 +403,18 @@ describe('server-history hydration (materializes through the reducer)', () => {
     const fetchMock = mockRoutedFetch({
       history: HISTORY_PAYLOAD,
       streams: [
+        // The live turn after hydration carries sources: they must land on its own message.
         [
-          // The live turn after hydration carries sources: they must land on its own message.
-          '{"sources":[{"index":1,"name":"Pricing overview","path":"docs/pricing.md","documentType":"markdown"}],"conversationId":"conv-h1"}\0',
-          '\x1E',
-          'Live answer after hydration.',
-          '\x1F' + USAGE_END_TRAILER,
+          encodeUiChunk({ type: 'start', messageId: 'a-live', messageMetadata: { conversationId: 'conv-h1' } }),
+          encodeUiChunk({
+            type: 'source-document',
+            sourceId: 'record://markdown/docs%2Fpricing.md',
+            mediaType: 'text/markdown',
+            title: 'Pricing overview',
+          }),
+          encodeUiChunk({ type: 'text-delta', id: 't1', delta: 'Live answer after hydration.' }),
+          encodeUiChunk({ type: 'finish', finishReason: 'stop' }),
+          encodeUiDone(),
         ],
       ],
     });
@@ -445,9 +430,8 @@ describe('server-history hydration (materializes through the reducer)', () => {
     if (!historyCall) throw new Error('no /history request was issued for the stored conversation id');
     expect(String(historyCall[0])).toContain('conversationId=conv-h1');
 
-    // Full hydrated projection — messages, roles, hidden flags. The legacy
-    // `chat_refs` column on the transcript row is IGNORED: the record link
-    // marker in the content is the only card channel (hydrate-by-id).
+    // Full hydrated projection: messages, roles, hidden flags. The record link
+    // in the text is the only card channel (hydrate-by-id).
     expect(result.current.messages).toMatchSnapshot();
     const assistants = result.current.messages.filter(m => m.role === 'assistant');
     expect(textOfParts(assistants[0].parts)).toContain('[77](record://ticket/77)');
@@ -470,16 +454,15 @@ describe('server-history hydration (materializes through the reducer)', () => {
       history: {
         data: {
           messages: [
-            { seq: 1, role: 'user', content: 'open a ticket', created_at: '2026-07-19T09:00:00.000Z' },
-            { seq: 2, role: 'assistant', content: 'Done.', created_at: '2026-07-19T09:00:05.000Z' },
+            { id: 'm-1', role: 'user', parts: [{ type: 'text', text: 'open a ticket' }] },
+            { id: 'm-2', role: 'assistant', parts: [{ type: 'text', text: 'Done.' }] },
             // Approval placeholder ('') and the server-built directive are
             // LLM history, never rendered.
-            { seq: 3, role: 'user', content: '', created_at: '2026-07-19T09:00:10.000Z' },
+            { id: 'm-3', role: 'user', parts: [] },
             {
-              seq: 4,
+              id: 'm-4',
               role: 'user',
-              content: `${AUTO_CONTINUATION_DIRECTIVE_PREFIX} ask a follow-up.`,
-              created_at: '2026-07-19T09:00:11.000Z',
+              parts: [{ type: 'text', text: `${AUTO_CONTINUATION_DIRECTIVE_PREFIX} ask a follow-up.` }],
             },
           ],
         },

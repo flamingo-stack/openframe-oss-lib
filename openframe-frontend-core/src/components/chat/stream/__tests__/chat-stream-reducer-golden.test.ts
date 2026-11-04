@@ -161,8 +161,15 @@ describe('chat stream reducer — what the thread holds after a wire', () => {
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'req-1',
         approvalType: 'CLIENT',
-        command: 'systemctl restart nats',
-        explanation: 'Restart the broker',
+        toolCalls: [
+          {
+            toolExecutionRequestId: 'req-1',
+            toolName: 'run_command',
+            toolTitle: 'systemctl restart nats',
+            toolExplanation: 'Restart the broker',
+            requiresApproval: true,
+          },
+        ],
       },
       { type: 'MESSAGE_END' },
       {
@@ -184,7 +191,9 @@ describe('chat stream reducer — what the thread holds after a wire', () => {
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'req-1',
         approvalType: 'CLIENT',
-        command: 'reboot',
+        toolCalls: [
+          { toolExecutionRequestId: 'req-1', toolName: 'run_command', toolTitle: 'reboot', requiresApproval: true },
+        ],
       },
       {
         type: 'APPROVAL_RESULT',
@@ -204,7 +213,14 @@ describe('chat stream reducer — what the thread holds after a wire', () => {
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'req-adm',
         approvalType: 'ADMIN',
-        command: 'drop database prod',
+        toolCalls: [
+          {
+            toolExecutionRequestId: 'req-adm',
+            toolName: 'run_command',
+            toolTitle: 'drop database prod',
+            requiresApproval: true,
+          },
+        ],
       },
       { type: 'MESSAGE_END' },
     ]);

@@ -6,7 +6,7 @@
  * under /api/mingo-guide/* to hub.openframe.ai/api/*).
  *
  * Three concerns, one context:
- *   1. API endpoints: chatStreamUrl / approvalToolUrl / commandsUrl /
+ *   1. API endpoints: chatStreamUrl / commandsUrl /
  *      buildListUrl + attachment endpoints + chat-identity. The chat
  *      reads them from runtime; hub vs embedded app supply different
  *      strings via different providers.
@@ -47,9 +47,6 @@ export interface ChatRuntime {
   endpoints: {
     /** POST streaming chat. Hub: '/api/docs/chat'. */
     chatStreamUrl: string;
-    /** POST agent approve/reject on an old hub. Hub: '/api/chat/agent/confirm-tool'.
-     *  TODO(CU-17tkuw61kfy): the UI stream approves on `chatStreamUrl`; this goes at the cleanup. */
-    approvalToolUrl: string;
     /** Customer-ticket agent endpoints (Help Center). OPTIONAL — when unset,
      *  the ticket hooks fall back to the bare hub paths
      *  (`/api/chat/agent/{find-ticket,ticket-action,list-engagements}`).

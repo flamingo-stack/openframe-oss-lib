@@ -7,7 +7,7 @@
  *
  * The adapter owns no parser and no message merge. Raw response bytes flow
  *
- *   fetch body → createChatStreamReader → UiChunk → createChatStreamReducer, THE master reader
+ *   fetch body → readUiChunks → UiChunk → createChatStreamReducer, THE master reader
  *
  * and this file keeps only the transport wiring (fetch/abort, request bodies), the server-issued conversation-id
  * persistence (id ONLY, see below), the mount-time server-history hydration seam, and the public `UnifiedChatState` mapping.
@@ -45,9 +45,8 @@ import {
   type ChatMessageMetadata,
   type ChatToolPart,
 } from '../../../chat-protocol/chat-message';
-import { buildConfirmToolBody, readServerErrorMessage } from '../../../chat-protocol/confirm-tool';
-import { createChatStreamReader, type ChatStreamWire } from '../../../chat-protocol/message-decoder';
-import type { UiChunk } from '../../../chat-protocol/ui-chunks';
+import { readServerErrorMessage } from '../../../chat-protocol/server-error';
+import { readUiChunks, type UiChunk } from '../../../chat-protocol/ui-chunks';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
@@ -65,11 +64,7 @@ import type {
   UnifiedSendMessageOptions,
   UnifiedUsageBreakdown,
 } from '../types/unified-chat-state.types';
-import {
-  buildChatAttachmentViewUrl,
-  formatChatAttachmentMarkdownForBubble,
-  type ChatAttachment,
-} from '../utils/chat-attachment-markdown';
+import { buildChatAttachmentViewUrl, type ChatAttachment } from '../utils/chat-attachment-markdown';
 import { createChatConversationStorage, pruneStaleChatConversationStorage } from '../utils/chat-conversation-storage';
 import { createChatConversationsApi } from '../utils/chat-conversations-api';
 import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
@@ -536,13 +531,6 @@ export function useSseChatAdapter(
   const endpointsRef = useRef(runtime.endpoints);
   endpointsRef.current = runtime.endpoints;
 
-  /**
-   * What the last stream turned out to be: the hub that answered it answers the next approval.
-   * TODO(CU-17tkuw61kfy): `old` keeps the old POST to `approvalToolUrl`, and the branch goes at the cleanup. A card is never
-   * stored, so a card on screen always came with a stream that set this.
-   */
-  const wireRef = useRef<ChatStreamWire>('ui');
-
   /** Capture the SERVER-minted conversation id off a chunk. On the session's FIRST turn this is where the client learns
    *  its id: persist it so later turns and future visits continue the same conversation. */
   const captureConversationId = useCallback(
@@ -601,10 +589,8 @@ export function useSseChatAdapter(
 
       // The reader is per-request: a rapid send-stop-send sequence must never feed the second stream's first chunk into
       // the first stream's tail buffer.
-      const reader = await createChatStreamReader(response);
-      wireRef.current = reader.wire;
       let minted = false;
-      for await (const chunk of reader.chunks) {
+      for await (const chunk of readUiChunks(response.body)) {
         if (ctrl.signal.aborted) break;
         if (captureConversationId(chunk)) {
           minted = true;
@@ -646,14 +632,9 @@ export function useSseChatAdapter(
             id: newClientId('user'),
             role: 'user',
             parts: [...(text.length > 0 ? [{ type: 'text', text }] : []), ...files],
-            // TODO(CU-17tkuw61kfy): the old hub reads the message's `content`, with the attachments as markdown in it.
-            content: text + attachments.map(att => formatChatAttachmentMarkdownForBubble(att, viewUrlPrefix)).join(''),
           },
         ],
         ...(commandOverride ? { commandOverride } : {}),
-        // TODO(CU-17tkuw61kfy): the old hub reads these, and the new one ignores them.
-        ...(attachments.length > 0 ? { pendingAttachments: attachments } : {}),
-        ...(echoedConversationId ? { conversationId: echoedConversationId } : {}),
       };
 
       // Optimistic user bubble + assistant placeholder + phase 'thinking': one reducer command.
@@ -760,48 +741,28 @@ export function useSseChatAdapter(
       };
 
       try {
-        if (wireRef.current === 'ui') {
-          await answerParts(parts, endpointsRef.current.chatStreamUrl, {
-            id: conversationIdRef.current,
-            trigger: 'submit-message',
-            messages: [
-              {
-                id: message.id,
-                role: 'assistant',
-                parts: parts.map(part => ({
-                  type: 'dynamic-tool',
-                  toolName: part.toolName,
-                  toolCallId: part.toolCallId,
-                  state: 'approval-responded',
-                  input: part.input,
-                  approval: {
-                    id: 'approval' in part ? part.approval?.id : part.toolCallId,
-                    approved,
-                    ...(reason !== undefined ? { reason } : {}),
-                  },
-                })),
-              },
-            ],
-          });
-          return ok;
-        }
-
-        // TODO(CU-17tkuw61kfy): the old hub resolves one proposal per request, and has a route for it. A batch runs serially,
-        // and each answer ends its turn, so the card's message is named again before the next.
-        for (const part of parts) {
-          const proposalId = 'approval' in part ? part.approval?.id : undefined;
-          if (!proposalId) continue;
-          mutate(r => r.continueMessage(message.id));
-          await answerParts(
-            [part],
-            endpointsRef.current.approvalToolUrl,
-            buildConfirmToolBody({
-              proposalId,
-              action: approved ? 'approve' : 'reject',
-              conversationId: conversationIdRef.current,
-            }),
-          );
-        }
+        await answerParts(parts, endpointsRef.current.chatStreamUrl, {
+          id: conversationIdRef.current,
+          trigger: 'submit-message',
+          messages: [
+            {
+              id: message.id,
+              role: 'assistant',
+              parts: parts.map(part => ({
+                type: 'dynamic-tool',
+                toolName: part.toolName,
+                toolCallId: part.toolCallId,
+                state: 'approval-responded',
+                input: part.input,
+                approval: {
+                  id: 'approval' in part ? part.approval?.id : part.toolCallId,
+                  approved,
+                  ...(reason !== undefined ? { reason } : {}),
+                },
+              })),
+            },
+          ],
+        });
         return ok;
       } finally {
         const turnIsOurs = closeStream(ctrl);

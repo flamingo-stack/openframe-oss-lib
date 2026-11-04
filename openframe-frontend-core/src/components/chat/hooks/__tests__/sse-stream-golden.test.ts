@@ -1,13 +1,8 @@
 /**
  * GOLDEN CHARACTERIZATION: what `useSseChatAdapter` holds after a response, driven through the full public hook.
  *
- * Two wires reach it. The standard's (`data: <chunk>` events, ending `data: [DONE]`), and until the cleanup the old hub's
- * (TODO(CU-17tkuw61kfy)):
- *   [JSON frame]\0 [JSON frame]\0 …  \x1E  <raw UTF-8 answer deltas>  \x1F [JSON usage trailer]
- *
- * Each fixture feeds a mocked global fetch whose Response body is a ReadableStream of Uint8Array chunks, then snapshots the
- * resulting message state. Behaviors captured here, INCLUDING the sentinel-byte mis-framing in fixture (d), are the recorded
- * baseline. Do NOT "fix" them here.
+ * The wire is the standard's: `data: <chunk>` events, ending `data: [DONE]`. Each fixture feeds a mocked global fetch
+ * whose Response body is a ReadableStream of Uint8Array chunks, then reads the resulting message state.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -49,7 +44,6 @@ const SOURCE = 'goldensrc';
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -139,17 +133,6 @@ function snapshotState(result: { current: ReturnType<typeof useSseChatAdapter> }
   };
 }
 
-// Shared leading-frame fixtures (recorded wire shapes).
-const THINKING_STATUS = '{"status":"thinking"}\0';
-const THINKING_DELTA_1 = '{"kind":"thinking-delta","text":"Let me check the docs… "}\0';
-const THINKING_DELTA_2 = '{"kind":"thinking-delta","text":"found it."}\0';
-const METADATA_FRAME =
-  '{"sources":[{"index":1,"name":"Pricing overview","path":"docs/pricing.md","documentType":"markdown","sourceRepo":"markdown"}],"model":"claude-sonnet-x","modelLabel":"Claude Sonnet","provider":"anthropic","contextWindowMaxTokens":200000}\0';
-const ROUTING_FRAME = '{"kind":"routing","routedComplexity":"simple","routedThinkingBudget":0}\0';
-const USAGE_START_FRAME = '{"kind":"usage","stage":"start","input_tokens":1234}\0';
-const USAGE_END_TRAILER =
-  '{"kind":"usage","stage":"end","input_tokens":1234,"output_tokens":56,"hit_rate_pct":81.5,"breakdown":{"haikuRewriter":{"input":10,"output":4},"haikuClassifier":{"input":8,"output":1},"routedAnswer":{"model":"claude-sonnet-x","complexity":"simple","thinkingBudget":0}}}';
-
 const sourceTitles = (message: ChatMessage) => message.parts.filter(isSourcePart).map(source => source.title);
 const assistantsOf = (messages: readonly ChatMessage[]) => messages.filter(message => message.role === 'assistant');
 
@@ -175,22 +158,46 @@ function mockFetchResponses(responses: Array<Array<string | Uint8Array> | { stat
 }
 
 describe('a live message shows the sources of the stream that drew it', () => {
-  const sourcesFrame = (name: string) =>
-    `{"sources":[{"index":1,"name":"${name}","path":"docs/${name}.md","documentType":"markdown"}]}\0`;
-  const turn = (name: string | null, text: string, extra: string[] = []) => [
-    ...(name ? [sourcesFrame(name)] : []),
-    ...extra,
-    '\x1E',
-    text,
-    '\x1F' + USAGE_END_TRAILER,
+  let turnNumber = 0;
+  const turn = (name: string | null, text: string, extra: UiChunk[] = []) => {
+    turnNumber += 1;
+    return onUiWire([
+      // An approval's answer continues the card's message: its `start` names none.
+      name === null ? { type: 'start' } : { type: 'start', messageId: `a${turnNumber}` },
+      ...(name
+        ? [
+            {
+              type: 'source-document',
+              sourceId: `record://markdown/${name}`,
+              mediaType: 'text/markdown',
+              title: name,
+            } as const,
+          ]
+        : []),
+      ...extra,
+      { type: 'text-start', id: `t${turnNumber}` },
+      { type: 'text-delta', id: `t${turnNumber}`, delta: text },
+      { type: 'text-end', id: `t${turnNumber}` },
+      { type: 'finish', finishReason: 'stop' },
+    ]);
+  };
+  const CARD: UiChunk[] = [
+    {
+      type: 'tool-input-available',
+      toolCallId: 'p1',
+      toolName: 'create_task',
+      input: {},
+      dynamic: true,
+      title: 'Create task',
+    },
+    { type: 'tool-approval-request', approvalId: 'p1', toolCallId: 'p1' },
   ];
-  const CARD_FRAME = '{"kind":"approval_request","proposalId":"p1","toolName":"create_task","title":"Create task"}\0';
 
   it('an approval continues the message of its card: it shifts no later answer and its receipt repeats no strip', async () => {
     let now = 1_700_000_000_000;
     vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
     mockFetchResponses([
-      turn('first', 'Proposal.', [CARD_FRAME]),
+      turn('first', 'Proposal.', CARD),
       turn(null, 'Task created.'),
       turn('second', 'Answer two.'),
       turn('third', 'Answer three.'),
@@ -241,7 +248,7 @@ describe('the standard wire', () => {
     expect(await partsFrom(Array.from({ length: bytes.length }, (_, i) => bytes.slice(i, i + 1)))).toEqual(expected);
   });
 
-  it('a send states the standard’s request, and what an older hub still reads beside it', async () => {
+  it('a send states the standard’s request, and nothing beside it', async () => {
     const requests = mockFetchResponses([onUiWire(ANSWER_STREAM), onUiWire(ANSWER_STREAM)]);
     const { result } = renderAdapter();
     const attachment = {
@@ -261,8 +268,7 @@ describe('the standard wire', () => {
     const [first, second] = requests;
     expect(first.url).toBe('/api/docs/chat');
     expect(first.body.id).toEqual(expect.stringMatching(/^chat-/));
-    expect(first.body).not.toHaveProperty('conversationId');
-    expect(first.body.pendingAttachments).toEqual([attachment]);
+    expect(Object.keys(first.body).sort()).toEqual(['id', 'messages']);
     expect(first.body.messages).toEqual([
       {
         id: expect.stringMatching(/^user-/) as string,
@@ -276,12 +282,11 @@ describe('the standard wire', () => {
             url: '/api/storage/view/chat-attachments/u/a.png?t=t',
           },
         ],
-        content: expect.stringContaining('look') as string,
       },
     ]);
     // Every later send names the conversation the server minted, with the newest message only.
     expect(second.body.id).toBe(FIXTURE_CONVERSATION_ID);
-    expect(second.body.conversationId).toBe(FIXTURE_CONVERSATION_ID);
+    expect(Object.keys(second.body).sort()).toEqual(['id', 'messages']);
     expect((second.body.messages as unknown[]).length).toBe(1);
   });
 
@@ -407,27 +412,6 @@ describe('the approval round trip', () => {
       await expect(result.current.actions.approve?.('nobody')).resolves.toBe(false);
     });
     expect(requests).toHaveLength(1);
-  });
-
-  it('the old hub still answers an approval on its own route, one proposal per request', async () => {
-    const batch =
-      '{"kind":"approval_batch","batchId":"b1","proposals":[{"proposalId":"p1","toolName":"x","title":"X"},{"proposalId":"p2","toolName":"x","title":"Y"}]}\0';
-    const decided = (id: string) =>
-      `{"kind":"decision_resolved","proposalId":"${id}","ok":true,"action":"approved","willAutoContinue":false,"receiptText":"Done ${id}."}\0`;
-    const requests = mockFetchResponses([[batch], [decided('p1'), '\x1E'], [decided('p2'), '\x1E']]);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('do both');
-    });
-    await act(async () => {
-      await result.current.actions.approve?.('b1');
-    });
-    expect(requests.slice(1).map(request => [request.url, request.body.proposal_id])).toEqual([
-      ['/api/chat/agent/confirm-tool', 'p1'],
-      ['/api/chat/agent/confirm-tool', 'p2'],
-    ]);
-    expect(assistantsOf(result.current.messages)).toHaveLength(1);
-    expect(rows(lastMessage(result)).map(approvalStatusOf)).toEqual(['approved', 'approved']);
   });
 });
 
@@ -805,22 +789,6 @@ describe('an approval whose answer never came', () => {
     const rows = toolsOf(result.current.messages);
     expect(rows.map(approvalStatusOf)).toEqual(['rejected', 'rejected']);
     expect(approvalBatchViewOf(rows).status).toBe('rejected');
-  });
-
-  it('on the old hub too: a body that closes with no decision fails the row it was asked about', async () => {
-    const card = '{"kind":"approval_request","proposalId":"p1","toolName":"x","title":"X"}\0';
-    mockFetchResponses([[card], []]);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('do it');
-    });
-    await act(async () => {
-      await expect(result.current.actions.approve?.('p1')).resolves.toBe(false);
-    });
-    expect(toolsOf(result.current.messages)[0]).toMatchObject({
-      state: 'output-error',
-      errorText: outcomeUnknown,
-    });
   });
 });
 
@@ -1250,7 +1218,7 @@ describe('the context a turn leaves', () => {
     expect(result.current.currentInputTokens).toBe(81_017);
   });
 
-  it('is unknown from an older hub', async () => {
+  it('is unknown when the hub does not say it', async () => {
     mockFetchResponses([onUiWire(finishing({ inputTokens: 12, outputTokens: 3 }))]);
     const { result } = renderAdapter();
     await act(async () => {
@@ -1427,198 +1395,5 @@ describe('a failed request', () => {
       { type: 'data-error', data: { title: 'The server is busy.' } },
     ]);
     expect(result.current.streamingPhase).toBe('idle');
-  });
-});
-
-// TODO(CU-17tkuw61kfy): the old hub's wire. These go at the cleanup, with `old-wire.ts`.
-describe('SSE wire decode — golden fixtures (full hook path)', () => {
-  it('(a) normal turn: thinking frames → metadata → usage:start → \\x1E → text ×3 → \\x1F trailer', async () => {
-    mockFetchStream([
-      THINKING_STATUS,
-      THINKING_DELTA_1,
-      THINKING_DELTA_2,
-      METADATA_FRAME,
-      ROUTING_FRAME,
-      USAGE_START_FRAME,
-      '\x1E',
-      'Answer part one, ',
-      'part two, ',
-      'part three.',
-      '\x1F' + USAGE_END_TRAILER,
-    ]);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('what is the pricing?');
-    });
-    expect(snapshotState(result)).toMatchSnapshot();
-  });
-
-  it('(b) EVERYTHING in one single TCP chunk', async () => {
-    mockFetchStream([
-      THINKING_STATUS +
-        THINKING_DELTA_1 +
-        METADATA_FRAME +
-        USAGE_START_FRAME +
-        '\x1E' +
-        'One-chunk answer.' +
-        '\x1F' +
-        USAGE_END_TRAILER,
-    ]);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('one chunk please');
-    });
-    expect(snapshotState(result)).toMatchSnapshot();
-  });
-
-  it('(c) trailer split across two chunks arriving with stream done', async () => {
-    mockFetchStream([
-      METADATA_FRAME,
-      '\x1E',
-      'Split-trailer answer.',
-      '\x1F{"kind":"usage","stage":"end","input_to',
-      'kens":42,"output_tokens":9,"hit_rate_pct":12.5}',
-    ]);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('split the trailer');
-    });
-    expect(snapshotState(result)).toMatchSnapshot();
-  });
-
-  it('(d) answer text containing literal \\x1E/\\x1F/\\0 bytes', async () => {
-    // CHARACTERIZATION: current behavior, see unification plan.
-    //  - In text mode only \x1F is scanned: literal \0 and \x1E bytes in
-    //    the answer pass through into the rendered text unchanged.
-    //  - The FIRST literal \x1F flips the decoder into trailer mode:
-    //    everything after it (including later real text) is captured as
-    //    the trailer buffer, fails JSON.parse, and is SILENTLY DROPPED —
-    //    the real \x1F usage trailer is lost too (mis-framing/truncation).
-    mockFetchStream([
-      METADATA_FRAME,
-      '\x1E',
-      'has-nul[\0]and-rs[\x1E]still-text. ',
-      'now-us[\x1F]everything-after-is-swallowed',
-      ' including this and the real trailer:',
-      '\x1F' + USAGE_END_TRAILER,
-    ]);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('sentinel bytes in answer');
-    });
-    expect(snapshotState(result)).toMatchSnapshot();
-  });
-
-  it('(e) [x](record://blog/x) marker in the answer; a legacy refs frame is ignored', async () => {
-    // The refs data channel is GONE — cards hydrate by id from the marker.
-    // An old server still emitting a refs-bearing metadata frame must be
-    // harmless: the frame decodes as metadata-ish and contributes nothing.
-    const refsFrame =
-      '{"refs":{"blog:x":{"type":"blog","id":"x","title":"Post X","url":"/blog/x","metadata":{"slug":"post-x"}}}}\0';
-    mockFetchStream([
-      METADATA_FRAME,
-      refsFrame,
-      '\x1E',
-      'See [x](record://blog/x) for the full story.',
-      '\x1F' + USAGE_END_TRAILER,
-    ]);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('show me the post');
-    });
-    expect(snapshotState(result)).toMatchSnapshot();
-  });
-
-  it('(f) abort mid-stream via AbortController leaves the partial message in place', async () => {
-    // Manually-controlled stream: enqueue the leading frames + first text
-    // delta, keep the stream OPEN, then Stop. The mocked fetch honors the
-    // AbortSignal by erroring the stream with AbortError — same observable
-    // behavior as real fetch cancelling the body.
-    let ctrl!: ReadableStreamDefaultController<Uint8Array>;
-    const body = new ReadableStream<Uint8Array>({
-      start(c) {
-        ctrl = c;
-        c.enqueue(enc.encode(METADATA_FRAME));
-        c.enqueue(enc.encode('\x1E'));
-        c.enqueue(enc.encode('Partial ans'));
-      },
-    });
-    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
-      init?.signal?.addEventListener('abort', () => {
-        try {
-          ctrl.error(new DOMException('The operation was aborted.', 'AbortError'));
-        } catch {
-          /* already closed */
-        }
-      });
-      return Promise.resolve({ ok: true, status: 200, body } as unknown as Response);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { result } = renderAdapter();
-    let sendPromise!: Promise<void | boolean>;
-    act(() => {
-      sendPromise = result.current.sendMessage('will be aborted');
-    });
-    // Let the decoder consume the enqueued chunks.
-    await act(async () => {
-      await tick();
-      await tick();
-      await tick();
-    });
-    act(() => {
-      result.current.stopMessage();
-    });
-    await act(async () => {
-      await sendPromise;
-    });
-    expect(snapshotState(result)).toMatchSnapshot();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('(g) multi-byte UTF-8 character split across two chunks decodes intact', async () => {
-    // '🦩' = F0 9F A6 A9 — split 2+2 across chunk boundary. The decoder is
-    // created once per stream with {stream:true} reads, so the glyph
-    // survives the split. CHARACTERIZATION: current (correct) behavior.
-    const flamingo = enc.encode('🦩');
-    mockFetchStream([
-      METADATA_FRAME,
-      '\x1E',
-      'A wild ',
-      flamingo.slice(0, 2),
-      flamingo.slice(2),
-      ' appears',
-      '\x1F' + USAGE_END_TRAILER,
-    ]);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('emoji split');
-    });
-    expect(snapshotState(result)).toMatchSnapshot();
-  });
-
-  it('leading approval_request + text-leading frames yield a pending approval card', async () => {
-    mockFetchStream([
-      '{"kind":"text-leading","text":"I\'ll open a ticket for you."}\0',
-      '{"kind":"approval_request","proposalId":"prop-1","toolName":"create_ticket","title":"Create ticket","fields":[{"label":"Subject","value":"Printer down"},{"label":"Priority","value":"High"},{"bad":"missing label/value"}]}\0',
-      // Stream closes with NO \x1E answer body — the approval turn ends here.
-    ]);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('open a ticket');
-    });
-    expect(snapshotState(result)).toMatchSnapshot();
-  });
-
-  it('non-JSON leading buffer falls through to answer text (legacy no-frame stream)', async () => {
-    // CHARACTERIZATION: a frame-less response whose first \0-terminated
-    // block is not JSON flips straight into text mode and the buffer is
-    // emitted as answer text.
-    mockFetchStream(['plain text answer with no frames\0and more after the nul']);
-    const { result } = renderAdapter();
-    await act(async () => {
-      await result.current.sendMessage('legacy stream');
-    });
-    expect(snapshotState(result)).toMatchSnapshot();
   });
 });

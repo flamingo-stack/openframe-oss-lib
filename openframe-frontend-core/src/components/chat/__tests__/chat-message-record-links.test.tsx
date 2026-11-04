@@ -8,9 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyChunk, createWireState } from '../../../chat-protocol/apply-chunk';
 import type { ChatPart } from '../../../chat-protocol/chat-message';
-import { createMingoDecoder, messageOfStoredRow } from '../../../chat-protocol/message-decoder';
 import { recordHref } from '../../../chat-protocol/record-link';
 import {
   CHAT_INTERRUPTED_AFTER_RUN_NOTICE,
@@ -57,38 +55,6 @@ describe('ChatMessageEnhanced — record links', () => {
     show('Run [Patch script](record://script/6aad91a3b776f95ad7491bd9) again.');
     expect(screen.getByTestId('chip-script-6aad91a3b776f95ad7491bd9')).toBeTruthy();
     expect(screen.queryByTestId('chat-record-cards')).toBeNull();
-  });
-
-  // TODO(CU-17tkuw61kfy): goes with the old mention token, `old-wire.ts`.
-  describe('an old mention no host resolved', () => {
-    it('reads as the raw token it was, for a word that names no record', () => {
-      show('Connect to [@server:8080](record://server/8080) now.');
-      expect(screen.queryByTestId('inline-chip')).toBeNull();
-      const token = screen.getByText('@server:8080');
-      expect(token.tagName).toBe('SPAN');
-      expect(token.className).toContain('text-ods-text-secondary');
-      expect(screen.queryByText(/record:\/\//)).toBeNull();
-    });
-
-    it('still reads as a chip when the type is a record the lib can open', () => {
-      show('Read [@onboarding_guide:mac-guide](record://onboarding_guide/mac-guide) first.');
-      expect(within(screen.getByTestId('inline-chip')).getByText('@onboarding_guide:mac-guide')).toBeTruthy();
-    });
-
-    it('leaves the host its chip, and a name its chip, whatever the type', () => {
-      show('Run [@script:s1](record://script/s1) on [MacBook](record://device/abc).');
-      expect(screen.getByTestId('chip-script-s1')).toBeTruthy();
-      expect(within(screen.getByTestId('inline-chip')).getByText('MacBook')).toBeTruthy();
-    });
-
-    it('is what the decoder makes of a word followed by a port', () => {
-      const entry = createMingoDecoder().decode({ type: 'TEXT', text: 'Run @redis:6379 first.' }, { row: { seq: 1 } });
-      const wire = createWireState();
-      const parts = entry.chunks.reduce<ChatPart[]>((all, chunk) => applyChunk(all, chunk, wire), []);
-      render(<ChatMessageEnhanced role="assistant" parts={parts} NavLinkAnchor={NavLinkAnchor} />);
-      expect(screen.queryByTestId('inline-chip')).toBeNull();
-      expect(screen.getByText('@redis:6379').tagName).toBe('SPAN');
-    });
   });
 
   it('draws a linked record as a chip with its name in the sentence, and no card from the link', () => {
@@ -184,32 +150,6 @@ describe('ChatMessageEnhanced — record links', () => {
       expect(screen.getAllByTestId('card-7')).toHaveLength(1);
       expect(screen.getAllByTestId('card-8')).toHaveLength(1);
     });
-
-    it('an old Mingo row that names a record twice', () => {
-      const { messages } = processHistoricalMessages([
-        {
-          id: 'a1',
-          createdAt: '2026-01-01T00:00:01Z',
-          owner: { type: 'ASSISTANT' },
-          messageData: [
-            { type: 'TEXT', text: 'See [card://blog_post:7] first.\n\nMore.\n\n[card://blog_post:7]\n\nEnd.' },
-          ],
-        },
-      ] as never);
-      draw(messages[0].parts);
-      expect(screen.getAllByTestId('card-7')).toHaveLength(1);
-    });
-
-    it('an old hub`s row that names a record twice', () => {
-      const message = messageOfStoredRow({
-        seq: 2,
-        role: 'assistant',
-        content: '[card://blog_post:7]\n\nIntro.\n\n[card://blog_post:7]\n',
-        sources: [],
-      });
-      draw(message?.parts ?? []);
-      expect(screen.getAllByTestId('card-7')).toHaveLength(1);
-    });
   });
 
   it('whitespace between two cards draws no block of its own', () => {
@@ -277,7 +217,7 @@ describe('ChatMessageEnhanced — a record chip opens its record', () => {
   });
 });
 
-describe('ChatMessageEnhanced — a chip that knows only its id', () => {
+describe('ChatMessageEnhanced — a chip keeps the name the answer gave', () => {
   afterEach(() => vi.unstubAllGlobals());
   const runtime = {
     endpoints: { chatStreamUrl: '/chat', buildListUrl: (type: string, ids: string[]) => `/api/${type}?ids=${ids}` },
@@ -301,12 +241,6 @@ describe('ChatMessageEnhanced — a chip that knows only its id', () => {
         ),
       ),
     );
-
-  it('shows the name its row answers', async () => {
-    answersRow();
-    render(answer('See [mac-guide](record://onboarding_guide/mac-guide) now.'));
-    expect(await screen.findByRole('link', { name: 'Install on a Mac' })).toBeTruthy();
-  });
 
   it('a name the answer gave stays', async () => {
     answersRow();
@@ -505,16 +439,15 @@ describe('ChatMessageEnhanced — citations', () => {
     expect(chip.parentElement?.textContent).toBe('Priced per device. [1] Second sentence.');
   });
 
-  it('an old row opening with its `[N]` keeps the block that follows it, with the chip before it', () => {
-    const message = messageOfStoredRow({
-      seq: 1,
-      role: 'assistant',
-      content: '[1]\n\n# Heading\n\nBody',
-      sources: [{ index: 1, name: 'A', documentType: 'blog_post', id: '1', externalUrl: 'https://x.test/a' }],
-    });
+  it('a citation opening the text keeps the block that follows it, with the chip before it', () => {
+    const opening: ChatPart = {
+      type: 'text',
+      text: '# Heading\n\nBody',
+      citations: [{ source: { type: 'source', sourceType: 'url', id: source.sourceId, url: source.url }, endIndex: 0 }],
+    };
     render(
       <ChatRuntimeContext.Provider value={runtime}>
-        <ChatMessageEnhanced role="assistant" parts={message?.parts ?? []} NavLinkAnchor={NavLinkAnchor} />
+        <ChatMessageEnhanced role="assistant" parts={[source, opening]} NavLinkAnchor={NavLinkAnchor} />
       </ChatRuntimeContext.Provider>,
     );
     expect(screen.getByRole('heading', { name: 'Heading' })).toBeTruthy();

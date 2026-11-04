@@ -3,7 +3,7 @@
 exports[`server-history hydration (materializes through the reducer) > rebuilds the thread from the transcript 1`] = `
 [
   {
-    "id": "hydrated-1",
+    "id": "h-1",
     "metadata": {
       "createdAt": "2026-07-19T09:00:00.000Z",
       "seq": 1,
@@ -17,7 +17,7 @@ exports[`server-history hydration (materializes through the reducer) > rebuilds 
     "role": "user",
   },
   {
-    "id": "hydrated-2",
+    "id": "h-2",
     "metadata": {
       "createdAt": "2026-07-19T09:00:12.000Z",
       "seq": 2,
@@ -31,7 +31,7 @@ exports[`server-history hydration (materializes through the reducer) > rebuilds 
     "role": "assistant",
   },
   {
-    "id": "hydrated-3",
+    "id": "h-3",
     "metadata": {
       "createdAt": "2026-07-19T09:01:40.000Z",
       "seq": 3,
@@ -45,7 +45,7 @@ exports[`server-history hydration (materializes through the reducer) > rebuilds 
     "role": "user",
   },
   {
-    "id": "hydrated-4",
+    "id": "h-4",
     "metadata": {
       "createdAt": "2026-07-19T09:01:45.000Z",
       "seq": 4,

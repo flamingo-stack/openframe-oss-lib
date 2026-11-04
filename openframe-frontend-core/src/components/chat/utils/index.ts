@@ -98,7 +98,6 @@ export {
   type ChatAttachment,
   buildChatAttachmentViewUrl,
   escapeMarkdownInline,
-  formatChatAttachmentMarkdownForBubble,
   CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED,
   CHAT_ATTACHMENT_MARKDOWN_PATTERN,
   stripChatAttachmentMarkdown,

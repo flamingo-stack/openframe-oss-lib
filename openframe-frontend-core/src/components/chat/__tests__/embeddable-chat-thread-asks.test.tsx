@@ -18,7 +18,6 @@ const runtime: ChatRuntime = {
   source: 'hub',
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: (_type, ids) => `/api/cards?ids=${ids.join(',')}`,
     attachmentUploadUrl: '/api/storage/generate-upload-url',

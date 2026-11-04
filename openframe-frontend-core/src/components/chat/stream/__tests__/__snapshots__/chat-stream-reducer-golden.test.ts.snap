@@ -19,6 +19,7 @@ exports[`chat stream reducer — what the thread holds after a wire > a rejected
             "approved": false,
             "descriptor": {
               "approvalType": "CLIENT",
+              "batchId": "req-1",
             },
             "id": "req-1",
           },
@@ -26,7 +27,7 @@ exports[`chat stream reducer — what the thread holds after a wire > a rejected
           "state": "output-denied",
           "title": "reboot",
           "toolCallId": "req-1",
-          "toolName": "command",
+          "toolName": "run_command",
           "type": "dynamic-tool",
         },
       ],
@@ -80,6 +81,7 @@ exports[`chat stream reducer — what the thread holds after a wire > an approva
             "approval": {
               "descriptor": {
                 "approvalType": "ADMIN",
+                "batchId": "req-adm",
               },
               "id": "req-adm",
             },
@@ -87,7 +89,7 @@ exports[`chat stream reducer — what the thread holds after a wire > an approva
             "state": "approval-requested",
             "title": "drop database prod",
             "toolCallId": "req-adm",
-            "toolName": "command",
+            "toolName": "run_command",
             "type": "dynamic-tool",
           },
         ],
@@ -115,6 +117,7 @@ exports[`chat stream reducer — what the thread holds after a wire > an approva
               "approved": true,
               "descriptor": {
                 "approvalType": "ADMIN",
+                "batchId": "req-adm",
               },
               "id": "req-adm",
             },
@@ -122,7 +125,7 @@ exports[`chat stream reducer — what the thread holds after a wire > an approva
             "state": "approval-responded",
             "title": "drop database prod",
             "toolCallId": "req-adm",
-            "toolName": "command",
+            "toolName": "run_command",
             "type": "dynamic-tool",
           },
         ],
@@ -154,6 +157,7 @@ exports[`chat stream reducer — what the thread holds after a wire > approval r
             "approved": true,
             "descriptor": {
               "approvalType": "CLIENT",
+              "batchId": "req-1",
             },
             "id": "req-1",
             "requestReason": "Restart the broker",
@@ -164,8 +168,9 @@ exports[`chat stream reducer — what the thread holds after a wire > approval r
           "toolCallId": "req-1",
           "toolMetadata": {
             "resolvedByName": "Jane Admin",
+            "toolExplanation": "Restart the broker",
           },
-          "toolName": "command",
+          "toolName": "run_command",
           "type": "dynamic-tool",
         },
       ],

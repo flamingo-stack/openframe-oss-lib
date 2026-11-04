@@ -120,8 +120,7 @@ export function useChatHistoryHydration({
         }
         const hydrated: ChatMessage[] = [];
         for (const row of rows) {
-          // TODO(CU-17tkuw61kfy): an old hub's row has no id of its own.
-          const message = messageOfStoredRow(row, `hydrated-${String(row.seq ?? hydrated.length)}`);
+          const message = messageOfStoredRow(row);
           if (message) hydrated.push(message);
         }
         if (cancelled || hydrated.length === 0) return;

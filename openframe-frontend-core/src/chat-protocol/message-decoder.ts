@@ -2,12 +2,9 @@
  * The ONE decoder: every way a message reaches this library, read into the same `UiChunk`s and `ChatMessage`s, and
  * validated on the way in (a raw cast is how a rename used to fail silently).
  *
- *   - `createChatStreamReader(response)`: the hub's stream;
+ *   - `readUiChunks(body)` (`./ui-chunks`): the hub's stream;
  *   - `createMingoDecoder()`: a NATS chunk and a GraphQL row, one stateful decoder per dialog;
  *   - `messageOfStoredRow(row)`: a row of the hub's history.
- *
- * During the window older backends answer too, and `./old-wire` reads what they say.
- * TODO(CU-17tkuw61kfy): the branches that reach it go at the cleanup.
  *
  * Server-safe: no React, no browser APIs beyond TextDecoder.
  */
@@ -24,70 +21,9 @@ import {
   type ChatSourcePart,
   type ChatToolMetadata,
 } from './chat-message';
-import {
-  createOldFrameDecoder,
-  createOldRunIds,
-  createOldSourceIndex,
-  createOldTextWriter,
-  oldApprovalRequestId,
-  oldDocSearchFields,
-  oldGuidePayload,
-  oldMentionsToRecordLinks,
-  oldRecordCardsOf,
-  oldSingleApprovalChunks,
-  oldStoredRowMetadata,
-  oldStoredRowToParts,
-  oldVideoParts,
-} from './old-wire';
 import { normalizeRecordUris, normalizeSourceId, parseRecordHref } from './record-link';
-import { createUiChunkDecoder, drainChunks, type ChatStreamEntry, type UiChunk } from './ui-chunks';
+import type { ChatStreamEntry, UiChunk } from './ui-chunks';
 import { isRecord } from './wire-narrow';
-
-// =============================================================================
-// The hub's stream
-// =============================================================================
-
-/** What a body turned out to be. `old` keeps the old approval route: the old hub has no other. */
-export type ChatStreamWire = 'ui' | 'old';
-
-export interface ChatStreamReader {
-  wire: ChatStreamWire;
-  chunks: AsyncGenerator<UiChunk, void, undefined>;
-}
-
-const UI_STREAM_START = new TextEncoder().encode('data: ');
-
-function emptyBody(): ReadableStream<Uint8Array> {
-  return new ReadableStream<Uint8Array>({ start: controller => controller.close() });
-}
-
-/**
- * The stream behind a response, recognised by its FIRST BYTES: a body starting `data: ` is the UI stream, anything else
- * the old frames, whatever its `content-type`. The old hub already labels its frames `text/event-stream` on two routes,
- * and the native shell calls the gateway cross-origin, where a header of our own would need exposing.
- * TODO(CU-17tkuw61kfy): the cleanup deletes the branch.
- */
-export async function createChatStreamReader(response: {
-  body: ReadableStream<Uint8Array> | null;
-}): Promise<ChatStreamReader> {
-  const reader = (response.body ?? emptyBody()).getReader();
-  const head: Uint8Array[] = [];
-  let matched = 0;
-  while (matched < UI_STREAM_START.length) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value || value.length === 0) continue;
-    head.push(value);
-    for (const byte of value) {
-      if (matched === UI_STREAM_START.length) break;
-      if (byte !== UI_STREAM_START[matched]) {
-        return { wire: 'old', chunks: drainChunks(reader, createOldFrameDecoder(), head) };
-      }
-      matched++;
-    }
-  }
-  return { wire: 'ui', chunks: drainChunks(reader, createUiChunkDecoder(), head) };
-}
 
 // =============================================================================
 // Mingo
@@ -112,25 +48,6 @@ export interface MingoDecoder {
    * as long as its reducer's sequence does: a host that resets the reducer makes a new decoder.
    */
   decode(raw: unknown, options?: { row?: MingoRowContext }): ChatStreamEntry;
-  /** A turn with no chunk of its own to say it ended (rows of history): what it left open stays in it. */
-  endTurn(): void;
-  /**
-   * What is held back (a text tail that could still be a token, an open reasoning) is forgotten, with no chunk. For a host
-   * whose thread now draws another copy of what this decoder was writing, the persisted row: that copy already says it,
-   * and flushing it would write it a second time. The sequence stays, so a redelivery is still a redelivery.
-   *
-   * TODO(CU-17tkuw61kfy): goes with the old text writer. With no old tokens, no tail is ever held.
-   */
-  discardHeld(): void;
-  /**
-   * What is held back, written and closed: the entry a host applies before a send of its own. A send opens the next turn
-   * with no chunk to say so, and a turn can end with no `MESSAGE_END` (a crash, a lost chunk), so what this decoder still
-   * holds would otherwise be written below the new message by the next chunk that closes it. No sequence: this comes off
-   * no wire.
-   *
-   * TODO(CU-17tkuw61kfy): goes with the old text writer, like `discardHeld`.
-   */
-  closeHeld(): ChatStreamEntry;
 }
 
 function str(value: unknown): string | undefined {
@@ -170,8 +87,8 @@ function askOptionsOf(raw: unknown): Array<{ label: string; description?: string
     .map(({ label, description }) => ({ label, ...(description !== undefined ? { description } : {}) }));
 }
 
-/** A source row in the new names, or null when it is in the old ones. GraphQL answers an unset field with null. */
-function newSourcePart(row: Record<string, unknown>): ChatSourcePart | null {
+/** A source row as a source part, or null for a row that names no record. GraphQL answers an unset field with null. */
+function sourcePartOf(row: Record<string, unknown>): ChatSourcePart | null {
   const named = nonEmpty(row.sourceId);
   if (!named) return null;
   const sourceId = normalizeSourceId(named);
@@ -190,32 +107,14 @@ function newSourcePart(row: Record<string, unknown>): ChatSourcePart | null {
   };
 }
 
-/** What a person said in a Mingo row or chunk. TODO(CU-17tkuw61kfy): an old composer's tokens go with the old rows. */
-export function mingoUserText(content: string): string {
-  return oldMentionsToRecordLinks(content);
-}
-
-/** The approval a Mingo row or chunk names. TODO(CU-17tkuw61kfy): the old name goes with the old rows. */
-export function mingoApprovalRequestId(raw: Record<string, unknown>): string | undefined {
-  return nonEmpty(raw.approvalRequestId) ?? oldApprovalRequestId(raw);
-}
-
 export function createMingoDecoder(options: { now?: () => string } = {}): MingoDecoder {
   const now = options.now ?? (() => new Date().toISOString());
-  // TODO(CU-17tkuw61kfy): the old source names, and the old tokens in a text, go with the old rows; text is then plain.
-  const sources = createOldSourceIndex();
   let nextId = 0;
   const mintId = (prefix: string): string => `${prefix}${++nextId}`;
-  const writer = createOldTextWriter(sources, () => mintId('t'), { citations: false });
-  // TODO(CU-17tkuw61kfy): a tool row with no run id. Goes once the cleanup's sweep has given those rows ids.
-  const oldRuns = createOldRunIds();
+  /** The answer text's open id: one id across a turn's slices, until something that is not text follows. */
+  let textId: string | null = null;
   let reasoningId: string | null = null;
   let compactionId: string | null = null;
-  /**
-   * The newest single approval still open: a tool only runs after its gate was granted.
-   * TODO(CU-17tkuw61kfy): only an approval row with no tool list has one.
-   */
-  let pendingSingleApproval: string | null = null;
   const seenTools = new Set<string>();
   let lastSeq = Number.NEGATIVE_INFINITY;
 
@@ -224,7 +123,13 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       out.push({ type: 'reasoning-end', id: reasoningId });
       reasoningId = null;
     }
-    out.push(...writer.close());
+    closeText(out);
+  }
+
+  function closeText(out: UiChunk[]): void {
+    if (textId === null) return;
+    out.push({ type: 'text-end', id: textId });
+    textId = null;
   }
 
   function writeText(content: string, out: UiChunk[]): void {
@@ -232,21 +137,16 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       out.push({ type: 'reasoning-end', id: reasoningId });
       reasoningId = null;
     }
-    out.push(...writer.push(content));
+    if (textId === null) {
+      textId = mintId('t');
+      out.push({ type: 'text-start', id: textId });
+    }
+    out.push({ type: 'text-delta', id: textId, delta: content });
   }
 
   function sourceChunks(data: Record<string, unknown>): UiChunk[] {
-    const parts: ChatSourcePart[] = [];
     const rows = Array.isArray(data.sources) ? data.sources.filter(isRecord) : [];
-    for (const row of rows) {
-      const part = newSourcePart(row);
-      if (part) parts.push(part);
-    }
-    // TODO(CU-17tkuw61kfy): a row in the old names, and the old video rows. An old row read through the tenant's normaliser
-    // answers its sources in the new names and its text as it was, so its `[card://t:i]` takes its name from these too.
-    parts.push(...sources.register(rows.filter(row => !nonEmpty(row.sourceId))), ...oldVideoParts(data.videos));
-    sources.remember(parts);
-    return parts;
+    return rows.map(sourcePartOf).filter((part): part is ChatSourcePart => part !== null);
   }
 
   function toolInput(data: Record<string, unknown>, toolCallId: string): UiChunk {
@@ -269,62 +169,46 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
     };
   }
 
-  /** A running tool grants its own row's gate, and the newest single gate when it has none of its own. */
-  function grantsOfRun(data: Record<string, unknown>, toolCallId: string): UiChunk[] {
-    const out: UiChunk[] = [];
-    if (nonEmpty(data.toolExecutionRequestId)) {
-      out.push({ type: 'tool-approval-response', approvalId: toolCallId, approved: true });
-    }
-    if (pendingSingleApproval !== null) {
-      out.push({ type: 'tool-approval-response', approvalId: pendingSingleApproval, approved: true });
-      pendingSingleApproval = null;
-    }
-    return out;
+  /** A running tool grants its own gate: a tool only runs after its gate was granted. */
+  function grantOfRun(toolCallId: string): UiChunk {
+    return { type: 'tool-approval-response', approvalId: toolCallId, approved: true };
   }
 
   function approvalChunks(data: Record<string, unknown>, isRow: boolean, out: UiChunk[]): void {
-    // TODO(CU-17tkuw61kfy): the old name.
-    const requestId = mingoApprovalRequestId(data) ?? '';
+    const requestId = nonEmpty(data.approvalRequestId) ?? '';
     const approvalType = nonEmpty(data.approvalType) ?? (isRow ? 'CLIENT' : 'USER');
     const calls = Array.isArray(data.toolCalls) ? data.toolCalls.filter(isRecord) : [];
-    if (calls.length > 0) {
-      for (const call of calls) {
-        const id = nonEmpty(call.toolExecutionRequestId);
-        if (!id) continue;
-        const requiresApproval = call.requiresApproval === true;
-        const explanation = nonEmpty(call.toolExplanation);
-        const metadata: ChatToolMetadata = {
-          ...(nonEmpty(call.toolType) ? { integratedToolType: call.toolType as string } : {}),
-          ...(explanation ? { toolExplanation: explanation } : {}),
-          ...(requiresApproval ? {} : { batchId: requestId }),
-        };
-        const title = nonEmpty(call.toolTitle);
+    for (const call of calls) {
+      const id = nonEmpty(call.toolExecutionRequestId);
+      if (!id) continue;
+      const requiresApproval = call.requiresApproval === true;
+      const explanation = nonEmpty(call.toolExplanation);
+      const metadata: ChatToolMetadata = {
+        ...(nonEmpty(call.toolType) ? { integratedToolType: call.toolType as string } : {}),
+        ...(explanation ? { toolExplanation: explanation } : {}),
+        ...(requiresApproval ? {} : { batchId: requestId }),
+      };
+      const title = nonEmpty(call.toolTitle);
+      out.push({
+        type: 'tool-input-available',
+        toolCallId: id,
+        toolName: str(call.toolName) ?? '',
+        input: isRecord(call.toolCallArguments) ? call.toolCallArguments : {},
+        dynamic: true,
+        ...(title ? { title } : {}),
+        ...(Object.keys(metadata).length > 0 ? { toolMetadata: metadata } : {}),
+      });
+      if (requiresApproval) {
+        const descriptor: ChatApprovalDescriptor = { approvalType, batchId: requestId };
         out.push({
-          type: 'tool-input-available',
+          type: 'tool-approval-request',
+          approvalId: id,
           toolCallId: id,
-          toolName: str(call.toolName) ?? '',
-          input: isRecord(call.toolCallArguments) ? call.toolCallArguments : {},
-          dynamic: true,
-          ...(title ? { title } : {}),
-          ...(Object.keys(metadata).length > 0 ? { toolMetadata: metadata } : {}),
+          ...(explanation ? { reason: explanation } : {}),
+          approvalDescriptor: descriptor,
         });
-        if (requiresApproval) {
-          const descriptor: ChatApprovalDescriptor = { approvalType, batchId: requestId };
-          out.push({
-            type: 'tool-approval-request',
-            approvalId: id,
-            toolCallId: id,
-            ...(explanation ? { reason: explanation } : {}),
-            approvalDescriptor: descriptor,
-          });
-        }
       }
-      return;
     }
-    // TODO(CU-17tkuw61kfy): a row with no tool list.
-    if (!requestId) return;
-    out.push(...oldSingleApprovalChunks(data, requestId, approvalType));
-    pendingSingleApproval = requestId;
   }
 
   function escalationStatus(state: unknown): 'pending' | 'approved' | 'rejected' | 'cancelled' | null {
@@ -362,13 +246,11 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
     switch (raw.type) {
       case MESSAGE_TYPE.MESSAGE_START:
         closeOpen(out);
-        oldRuns.endTurn();
         out.push({ type: 'start', messageId: seq !== undefined ? `stream-${seq}` : mintId('stream-') });
         break;
 
       case MESSAGE_TYPE.MESSAGE_END:
         closeOpen(out);
-        oldRuns.endTurn();
         out.push({ type: 'finish', finishReason: 'stop' });
         break;
 
@@ -393,7 +275,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       case MESSAGE_TYPE.TEXT:
         if (typeof raw.text === 'string' && raw.text !== '') {
           writeText(raw.text, out);
-          if (isRow) out.push(...writer.close());
+          if (isRow) closeText(out);
         }
         break;
 
@@ -416,19 +298,10 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         out.push(...sourceChunks(raw));
         break;
 
-      // TODO(CU-17tkuw61kfy): the envelope `ATTACHMENTS` replaced.
-      case MESSAGE_TYPE.GUIDE: {
-        const payload = oldGuidePayload(raw);
-        if (payload) out.push(...sourceChunks(payload));
-        break;
-      }
-
       case MESSAGE_TYPE.RECORD_CARDS: {
         closeOpen(out);
         const records = normalizeRecordUris(raw.records);
-        // TODO(CU-17tkuw61kfy): the old `cards` of a row on a dev cluster.
-        const all = records.length > 0 ? records : oldRecordCardsOf(raw);
-        if (all.length > 0) out.push({ type: 'data-record-cards', data: { records: all } });
+        if (records.length > 0) out.push({ type: 'data-record-cards', data: { records } });
         break;
       }
 
@@ -444,18 +317,18 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       }
 
       case MESSAGE_TYPE.EXECUTING_TOOL: {
+        const toolCallId = nonEmpty(raw.toolExecutionRequestId);
+        if (!toolCallId) break;
         closeOpen(out);
-        // TODO(CU-17tkuw61kfy): a row with no run id.
-        const toolCallId = nonEmpty(raw.toolExecutionRequestId) ?? oldRuns.open(raw);
-        out.push(...grantsOfRun(raw, toolCallId), toolInput(raw, toolCallId));
+        out.push(grantOfRun(toolCallId), toolInput(raw, toolCallId));
         break;
       }
 
       case MESSAGE_TYPE.EXECUTED_TOOL: {
+        const toolCallId = nonEmpty(raw.toolExecutionRequestId);
+        if (!toolCallId) break;
         closeOpen(out);
-        // TODO(CU-17tkuw61kfy): a row with no run id.
-        const toolCallId = nonEmpty(raw.toolExecutionRequestId) ?? oldRuns.close(raw);
-        out.push(...grantsOfRun(raw, toolCallId));
+        out.push(grantOfRun(toolCallId));
         // A result can be all that reached this reader: its row still has to exist to take it.
         if (!seenTools.has(toolCallId)) out.push(toolInput(raw, toolCallId));
         if (raw.success === false) {
@@ -472,11 +345,9 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
         break;
 
       case MESSAGE_TYPE.APPROVAL_RESULT: {
-        // TODO(CU-17tkuw61kfy): the old name.
-        const approvalId = mingoApprovalRequestId(raw);
+        const approvalId = nonEmpty(raw.approvalRequestId);
         if (!approvalId) break;
         const approved = raw.approved === true;
-        if (pendingSingleApproval === approvalId) pendingSingleApproval = null;
         out.push({
           type: 'tool-approval-response',
           approvalId,
@@ -603,7 +474,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
           transient: true,
           data: {
             kind,
-            text: kind === 'system' ? said : mingoUserText(said),
+            text: said,
             ...(ownerType !== undefined ? { ownerType } : {}),
             ...(displayName !== undefined ? { displayName } : {}),
             ...(userId !== undefined ? { userId } : {}),
@@ -636,59 +507,34 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
     return { ...(seq !== undefined ? { seq } : {}), chunks: out };
   }
 
-  return {
-    decode,
-    endTurn() {
-      oldRuns.endTurn();
-    },
-    discardHeld() {
-      writer.discard();
-      reasoningId = null;
-    },
-    closeHeld() {
-      const chunks: UiChunk[] = [];
-      closeOpen(chunks);
-      return { chunks };
-    },
-  };
+  return { decode };
 }
 
 // =============================================================================
 // A stored row of the hub
 // =============================================================================
 
-/** A row from before the move: it has `content`, `sources`, or a part in the old names. TODO(CU-17tkuw61kfy): the cut. */
-function isOldStoredRow(row: Record<string, unknown>): boolean {
-  if (typeof row.content === 'string' || Array.isArray(row.sources)) return true;
-  return Array.isArray(row.parts) && row.parts.some(part => isRecord(part) && part.type === 'RECORD_CARDS');
-}
-
 /**
  * The message a row of `GET /api/docs/chat/history` draws, or null for a role the chat does not show. A user row the
- * chat never shows (the approval placeholder, the server's auto-continuation directive) is `hidden`.
- * TODO(CU-17tkuw61kfy): `fallbackId` names a row that has no id of its own (an old hub answers none).
+ * chat never shows (the approval placeholder, the server's auto-continuation directive) is `hidden`, and a row with no
+ * id is no message.
  */
-export function messageOfStoredRow(row: unknown, fallbackId?: string): ChatMessage | null {
+export function messageOfStoredRow(row: unknown): ChatMessage | null {
   if (!isRecord(row)) return null;
   const { role } = row;
-  if (role !== 'assistant' && role !== 'user') return null;
+  const id = nonEmpty(row.id);
+  if ((role !== 'assistant' && role !== 'user') || !id) return null;
 
-  const old = isOldStoredRow(row);
-  const parts = old ? oldStoredRowToParts(row) : parseStoredParts(row.parts);
+  const parts = parseStoredParts(row.parts);
   const stored = parseMessageMetadata(row.metadata, 'stored-row');
   const text = textOfParts(parts);
   const hidden =
     role === 'user' &&
     !parts.some(part => part.type === 'file') &&
     (text === '' || text.startsWith(AUTO_CONTINUATION_DIRECTIVE_PREFIX));
-  const metadata: ChatMessageMetadata = {
-    ...(old ? oldStoredRowMetadata(row) : stored),
-    ...(hidden ? { hidden: true } : {}),
-  };
-  // TODO(CU-17tkuw61kfy): an old row's sequence is a column of its own, and only an old row has no id.
-  const seq = old ? row.seq : stored.seq;
+  const metadata: ChatMessageMetadata = { ...stored, ...(hidden ? { hidden: true } : {}) };
   return {
-    id: nonEmpty(row.id) ?? fallbackId ?? `hydrated-${String(seq ?? '')}`,
+    id,
     role,
     ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     parts,
@@ -699,16 +545,11 @@ export function messageOfStoredRow(row: unknown, fallbackId?: string): ChatMessa
 // `/api/docs/search`
 // =============================================================================
 
-/** A search row's identity and address, in the new names, else the old. TODO(CU-17tkuw61kfy): the old go at the cleanup. */
+/** A search row's identity, title and address. */
 export function docSearchFieldsOf(row: Record<string, unknown>): {
   sourceId: string | null;
   title: string;
   url: string | null;
 } {
-  const old = oldDocSearchFields(row);
-  return {
-    sourceId: nonEmpty(row.sourceId) ?? old.sourceId,
-    title: nonEmpty(row.title) ?? old.title,
-    url: nonEmpty(row.url) ?? old.url,
-  };
+  return { sourceId: nonEmpty(row.sourceId) ?? null, title: nonEmpty(row.title) ?? '', url: nonEmpty(row.url) ?? null };
 }

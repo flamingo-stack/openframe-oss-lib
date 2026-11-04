@@ -176,19 +176,18 @@ describe('createChatStreamReducer — referential stability', () => {
 });
 
 describe('createChatStreamReducer — a tool that runs and a gate', () => {
-  it('a tool run on Mingo grants the newest single gate: it only runs after its gate was granted', () => {
+  it('a tool run on Mingo grants its own gate: it only runs after its gate was granted', () => {
     const { r, send } = onWire();
     send(
       { type: 'MESSAGE_START' },
       {
         type: 'APPROVAL_REQUEST',
-        approvalRequestId: 'req-1',
+        approvalRequestId: 'batch-1',
         approvalType: 'CLIENT',
-        command: 'systemctl restart nats',
-        explanation: 'Restart the broker',
+        toolCalls: [{ toolExecutionRequestId: 'req-1', toolName: 'run_command', requiresApproval: true }],
       },
       // Observer stream: EXECUTING arrives with NO APPROVAL_RESULT chunk.
-      executing(),
+      executing('req-1'),
     );
     const card = toolParts(trailing(r)).find(part => part.toolCallId === 'req-1');
     expect(card && approvalStatusOf(card)).toBe('approved');
@@ -525,11 +524,12 @@ describe('createChatStreamReducer — the message a stream builds', () => {
 });
 
 describe('createChatStreamReducer — what this client knows about a card', () => {
+  /** A card of one tool: its gate and its request share the id. */
   const card = (id: string, streamSeq?: number) => ({
     type: 'APPROVAL_REQUEST',
     approvalRequestId: id,
     approvalType: 'CLIENT',
-    command: 'reboot',
+    toolCalls: [{ toolExecutionRequestId: id, toolName: 'reboot', requiresApproval: true }],
     ...(streamSeq != null ? { streamSeq } : {}),
   });
 
@@ -558,10 +558,10 @@ describe('createChatStreamReducer — what this client knows about a card', () =
     expect(r.state.approvalStatuses).toEqual({ 'req-1': 'rejected' });
   });
 
-  it('a tool run is not remembered as an approval: only a gate it grants is', () => {
+  it('a tool run is never remembered as an approval: it moves its row, and nobody answered', () => {
     const { r, send } = onWire();
-    send(card('req-1'), executing('exec-1'));
-    expect(r.state.approvalStatuses).toEqual({ 'req-1': 'approved' });
+    send(card('req-1'), executing('req-1'));
+    expect(r.state.approvalStatuses).toEqual({});
   });
 
   it('projectApprovalResolution flips a card and an offer, whoever told it', () => {
@@ -1192,7 +1192,7 @@ describe('createChatStreamReducer — mergeApprovalStatuses precedence', () => {
     send({
       type: 'APPROVAL_REQUEST',
       approvalRequestId: 'req-2',
-      command: 'rm -rf /tmp/x',
+      toolCalls: [{ toolExecutionRequestId: 'req-2', toolName: 'run_command', requiresApproval: true }],
       approvalType: 'CLIENT',
       streamSeq: 1,
     });
@@ -1224,7 +1224,7 @@ describe('createChatStreamReducer — post-MESSAGE_END arrivals extend the bubbl
     type: 'APPROVAL_REQUEST',
     approvalRequestId: 'r1',
     approvalType: 'CLIENT',
-    command: 'systemctl restart nats',
+    toolCalls: [{ toolExecutionRequestId: 'r1', toolName: 'run_command', requiresApproval: true }],
     streamSeq,
   });
 

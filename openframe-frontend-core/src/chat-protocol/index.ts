@@ -13,8 +13,8 @@ export * from './citations';
 export * from './message-decoder';
 // The stages a turn reports before its first answer token, and their copy.
 export * from './progress';
-// The hub's error envelope, and the old approval route's request.
-export * from './confirm-tool';
+// The hub's error envelope.
+export * from './server-error';
 // Cross-repo IP bucket-key normalizer (producer app + consumer hub share it).
 export * from './ip-normalize';
 // Cross-repo env-flag predicate: the trust assertion that gates the IP forwarding above must be parsed IDENTICALLY on

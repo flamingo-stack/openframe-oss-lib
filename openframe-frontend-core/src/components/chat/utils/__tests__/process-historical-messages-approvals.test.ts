@@ -22,7 +22,7 @@ const adminRequest = {
   type: 'APPROVAL_REQUEST',
   approvalRequestId: 'req-m1',
   approvalType: 'ADMIN',
-  command: 'x',
+  toolCalls: [{ toolExecutionRequestId: 'req-m1', toolName: 'x', requiresApproval: true }],
 } as const;
 
 const adminApprovalMessage = (id: string): HistoricalMessage => ({
@@ -51,7 +51,7 @@ describe('an approval of a tier this side does not answer', () => {
       expect(card).toMatchObject({
         toolCallId: 'req-m1',
         state: 'approval-requested',
-        approval: { id: 'req-m1', descriptor: { approvalType: 'ADMIN' } },
+        approval: { id: 'req-m1', descriptor: { approvalType: 'ADMIN', batchId: 'req-m1' } },
       });
     }
   });
@@ -79,65 +79,6 @@ describe('an approval of a tier this side does not answer', () => {
       { approvalStatuses: { 'req-m1': 'approved' } },
     );
     expect(cardsOf(messages).map(approvalStatusOf)).toEqual(['approved']);
-  });
-});
-
-describe('tool rows with no run id', () => {
-  const user = (id: string, text: string): HistoricalMessage => ({
-    id,
-    createdAt: '2026-01-01T00:00:00Z',
-    owner: { type: 'ADMIN' },
-    messageData: [{ type: 'TEXT', text }],
-  });
-  const answer = (id: string, messageData: unknown[]): HistoricalMessage =>
-    ({ id, createdAt: '2026-01-01T00:00:01Z', owner: { type: 'ASSISTANT' }, messageData }) as HistoricalMessage;
-  const executing = (title: string) => ({
-    type: 'EXECUTING_TOOL',
-    integratedToolType: 'OPENFRAME',
-    toolFunction: 'search',
-    title,
-  });
-  const executed = (result: string) => ({
-    type: 'EXECUTED_TOOL',
-    integratedToolType: 'OPENFRAME',
-    toolFunction: 'search',
-    result,
-    success: true,
-  });
-  const outputsOf = (messages: readonly ChatMessage[], id: string) =>
-    messages
-      .find(message => message.id === id)
-      ?.parts.filter(isToolPart)
-      .map(part => (part.state === 'output-available' ? part.output : part.state));
-
-  it('each run keeps its own row across turns', () => {
-    const { messages } = processHistoricalMessages([
-      user('u1', 'first'),
-      answer('a1', [executing('first search'), executed('first result'), { type: 'TEXT', text: 'one' }]),
-      user('u2', 'second'),
-      answer('a2', [executing('second search'), executed('second result'), { type: 'TEXT', text: 'two' }]),
-    ]);
-    expect(outputsOf(messages, 'a1')).toEqual(['first result']);
-    expect(outputsOf(messages, 'a2')).toEqual(['second result']);
-  });
-
-  it('two runs in one turn are two rows, each with its own result', () => {
-    const { messages } = processHistoricalMessages([
-      user('u1', 'first'),
-      answer('a1', [executing('A'), executing('B'), executed('ra'), executed('rb'), { type: 'TEXT', text: 'done' }]),
-    ]);
-    expect(outputsOf(messages, 'a1')).toEqual(['ra', 'rb']);
-  });
-
-  it('a run a turn left open stays in its turn: the next turn`s result is the next turn`s', () => {
-    const { messages } = processHistoricalMessages([
-      user('u1', 'first'),
-      answer('a1', [{ type: 'TEXT', text: 'one' }, executing('cut off')]),
-      user('u2', 'second'),
-      answer('a2', [executing('second search'), executed('second result')]),
-    ]);
-    expect(outputsOf(messages, 'a1')).toEqual(['input-available']);
-    expect(outputsOf(messages, 'a2')).toEqual(['second result']);
   });
 });
 
@@ -256,31 +197,6 @@ describe('a rejected batch read back', () => {
     expect(gate.state).toBe('approval-responded');
     expect(approvalStatusOf(gate)).toBe('approved');
     expect(approvalAnswerInFlight(gate)).toBe(false);
-  });
-
-  it('nor an old row with no tool list, granted by a tool that ran after it', () => {
-    const old = {
-      type: 'APPROVAL_REQUEST',
-      approvalRequestId: 'req-old',
-      approvalType: 'CLIENT',
-      command: 'ls',
-    };
-    const ran = {
-      type: 'EXECUTED_TOOL',
-      integratedToolType: 'SHELL',
-      toolFunction: 'run',
-      toolExecutionRequestId: 'run-1',
-      success: true,
-      result: 'ok',
-    };
-    const { messages } = processHistoricalMessages([
-      row('a1', [old]),
-      row('a2', [{ type: 'APPROVAL_RESULT', approvalRequestId: 'req-old', approved: true }, ran]),
-    ]);
-    const gate = cardsOf(messages).find(part => part.toolCallId === 'req-old');
-    // Its tool reports on a row of its own, so this state is where it stays.
-    expect(gate?.state).toBe('approval-responded');
-    expect(gate && approvalStatusOf(gate)).toBe('approved');
   });
 
   it('nor a live one: its server answered, on the stream, and nothing here is waiting on that', () => {
