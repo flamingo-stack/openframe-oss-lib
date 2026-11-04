@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useRef, type ReactNode } from 'react';
 import type { DocNode } from '../../types/doc-source';
+import { docTreePathOfRoute } from '../../utils/doc-path-utils';
 
 // =============================================================================
 // Types
@@ -38,16 +39,6 @@ interface DocNavigationContextValue {
 
 const DocNavigationContext = createContext<DocNavigationContextValue | null>(null);
 
-/** The tree path a route's tail names: no query or fragment, and decoded as the tree keys it. */
-function treePathOfRoute(tail: string): string {
-  const path = tail.split(/[?#]/, 1)[0];
-  try {
-    return decodeURI(path);
-  } catch {
-    return path;
-  }
-}
-
 /**
  * Bridges `useDocumentTree` instances (deep in the page tree) to `GlobalAskAI`
  * (high up near the root) without global events or URL parsing.
@@ -80,7 +71,7 @@ export function DocNavigationProvider({ children }: { children: ReactNode }) {
     for (const baseRoute of baseRoutes) {
       if (pathOrRoute !== baseRoute && !pathOrRoute.startsWith(`${baseRoute}/`)) continue;
       const nav = navMap.current.get(baseRoute);
-      const node = nav?.findNodeByPath(treePathOfRoute(pathOrRoute.slice(baseRoute.length + 1)));
+      const node = nav?.findNodeByPath(docTreePathOfRoute(pathOrRoute.slice(baseRoute.length + 1)));
       if (!nav || !node) return false;
       nav.selectNode(node);
       return true;

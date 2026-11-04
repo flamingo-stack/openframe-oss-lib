@@ -21,7 +21,7 @@
 import { FileText } from 'lucide-react';
 import type React from 'react';
 import type { ComposeContentUrl } from '../../../utils/content-href';
-import { sanitizeDocPath as sanitizePath } from '../../../utils/doc-path';
+import { sanitizeDocPath as sanitizePath } from '../../../utils/doc-path-utils';
 import { canonicalContentRefType } from '../../../utils/list-url';
 import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
 import { getSourceIconName } from '../../../utils/source-icons';

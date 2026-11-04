@@ -27,7 +27,7 @@
  */
 
 import { byKey, getPlatformProductionUrl } from '../platform-domains';
-import { sanitizeDocPath } from './doc-path';
+import { sanitizeDocPath } from './doc-path-utils';
 import { canonicalContentRefType } from './list-url';
 
 /**
