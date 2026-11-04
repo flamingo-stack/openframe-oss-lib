@@ -6,10 +6,6 @@ use serde::de::DeserializeOwned;
 use tempfile::NamedTempFile;
 use tracing::warn;
 
-/// Waits between rename attempts when another process holds the target open on Windows (~1.5 s in all).
-#[cfg(windows)]
-const REPLACE_RETRY_DELAYS_MS: [u64; 5] = [0, 100, 200, 400, 800];
-
 /// Write `contents` to `path` atomically via a same-dir temp file + rename, so a concurrent
 /// writer or reader never observes a torn file.
 pub fn atomic_write(path: &Path, contents: impl AsRef<[u8]>) -> Result<()> {
@@ -31,53 +27,92 @@ pub fn atomic_write(path: &Path, contents: impl AsRef<[u8]>) -> Result<()> {
         .sync_all()
         .with_context(|| format!("failed to flush temp file for {}", path.display()))?;
     // persist() atomically replaces any existing file at `path` (MoveFileEx on Windows).
-    match tmp.persist(path) {
+    let persisted: Result<()> = match tmp.persist(path) {
         Ok(_) => Ok(()),
         #[cfg(windows)]
-        Err(e) if e.error.kind() == std::io::ErrorKind::PermissionDenied => {
-            drop(e);
-            replace_held_file(path, contents.as_ref())
+        Err(e) if held_target::is_held(&e.error) => {
+            held_target::replace(e.file, path).map_err(Into::into)
         }
-        Err(e) => {
-            Err(e).with_context(|| format!("failed to persist temp file to {}", path.display()))
-        }
-    }
+        Err(e) => Err(e.into()),
+    };
+    persisted.with_context(|| format!("failed to persist temp file to {}", path.display()))
 }
 
-/// MoveFileEx refuses a target another process holds open; std's rename (POSIX fallback) and the retries get past it
+/// Replacing a file that another process (an AV scan, a backup agent) briefly holds open.
 #[cfg(windows)]
-fn replace_held_file(path: &Path, contents: &[u8]) -> Result<()> {
-    let file_name = path.file_name().context("path has no file name")?;
-    // a plain file: tempfile marks its own copies as temporary
-    let staged = path.with_file_name(format!(
-        ".{}.{}.replace",
-        file_name.to_string_lossy(),
-        uuid::Uuid::new_v4()
-    ));
-    let written = std::fs::File::create(&staged).and_then(|mut file| {
-        file.write_all(contents)?;
-        file.sync_all()
-    });
-    if let Err(e) = written {
-        let _ = std::fs::remove_file(&staged);
-        return Err(e).with_context(|| format!("failed to stage {}", staged.display()));
+mod held_target {
+    use std::io;
+    use std::path::Path;
+    use std::time::Duration;
+
+    use tempfile::NamedTempFile;
+    use tracing::{info, warn};
+
+    use crate::platform::file_lock::{format_locking_processes, get_locking_processes};
+
+    /// About 3 s in all, to outlast a short exclusive hold; the caller's thread blocks meanwhile.
+    pub(super) const RETRY_DELAYS: [Duration; 5] = [
+        Duration::from_millis(100),
+        Duration::from_millis(200),
+        Duration::from_millis(400),
+        Duration::from_millis(800),
+        Duration::from_millis(1600),
+    ];
+
+    /// ERROR_ACCESS_DENIED or ERROR_SHARING_VIOLATION: another open handle is in the way.
+    pub(super) fn is_held(error: &io::Error) -> bool {
+        matches!(error.raw_os_error(), Some(5 | 32))
     }
 
-    let mut last_error = None;
-    for delay_ms in REPLACE_RETRY_DELAYS_MS {
-        std::thread::sleep(std::time::Duration::from_millis(delay_ms));
-        match std::fs::rename(&staged, path) {
-            Ok(()) => return Ok(()),
-            Err(e) => last_error = Some(e),
+    /// std's rename retries a denied replace with POSIX semantics, which works while the holder shares delete access.
+    pub(super) fn replace(tmp: NamedTempFile, path: &Path) -> io::Result<()> {
+        // Closes our handle and clears the FILE_ATTRIBUTE_TEMPORARY that the failed persist() put back.
+        let tmp_path = tmp.into_temp_path().keep().map_err(|e| e.error)?;
+
+        let mut attempts = 1;
+        let mut result = std::fs::rename(&tmp_path, path);
+        for delay in RETRY_DELAYS {
+            match &result {
+                Err(e) if is_held(e) => {}
+                _ => break,
+            }
+            std::thread::sleep(delay);
+            attempts += 1;
+            result = std::fs::rename(&tmp_path, path);
+        }
+
+        match &result {
+            Ok(()) => info!(
+                "Replaced {} by rename on attempt {} after the plain replace was denied",
+                path.display(),
+                attempts
+            ),
+            Err(e) => {
+                warn!(
+                    "Could not replace {} after {} rename attempts ({}); held by: {}",
+                    path.display(),
+                    attempts,
+                    e,
+                    holders(path)
+                );
+                if let Err(remove_err) = std::fs::remove_file(&tmp_path) {
+                    warn!(
+                        "Failed to remove temp file {}: {}",
+                        tmp_path.display(),
+                        remove_err
+                    );
+                }
+            }
+        }
+        result
+    }
+
+    pub(super) fn holders(path: &Path) -> String {
+        match get_locking_processes(&path.to_string_lossy()) {
+            Ok(processes) => format_locking_processes(&processes),
+            Err(e) => format!("unknown ({e})"),
         }
     }
-    let _ = std::fs::remove_file(&staged);
-    let holders = crate::platform::get_locking_processes(&path.to_string_lossy())
-        .map(|processes| crate::platform::format_locking_processes(&processes))
-        .unwrap_or_else(|e| format!("unknown ({e})"));
-    warn!(path = %path.display(), "Could not replace the file, held by: {}", holders);
-    Err(last_error.expect("at least one rename attempt"))
-        .with_context(|| format!("failed to persist temp file to {}", path.display()))
 }
 
 /// How a JSON file read back.

@@ -36,6 +36,119 @@ fn atomic_write_replaces_a_corrupt_file() {
     assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
 }
 
+#[cfg(windows)]
+mod held_target_replace {
+    use super::*;
+    use std::fs::{File, OpenOptions};
+    use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    const FILE_SHARE_READ: u32 = 0x1;
+    const FILE_SHARE_WRITE: u32 = 0x2;
+    const FILE_SHARE_DELETE: u32 = 0x4;
+    const FILE_ATTRIBUTE_TEMPORARY: u32 = 0x100;
+
+    fn hold(path: &Path, share_mode: u32) -> File {
+        OpenOptions::new()
+            .read(true)
+            .share_mode(share_mode)
+            .open(path)
+            .unwrap()
+    }
+
+    fn assert_only_file(dir: &Path, path: &Path, contents: &[u8]) {
+        assert_eq!(std::fs::read(path).unwrap(), contents);
+        assert_eq!(
+            std::fs::metadata(path).unwrap().file_attributes() & FILE_ATTRIBUTE_TEMPORARY,
+            0
+        );
+        assert_eq!(std::fs::read_dir(dir).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn a_holder_that_shares_delete_access_does_not_block_the_replace() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("update_state.json");
+        atomic_write(&path, b"first").unwrap();
+        let holder = hold(
+            &path,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        );
+
+        atomic_write(&path, b"second").unwrap();
+
+        drop(holder);
+        assert_only_file(dir.path(), &path, b"second");
+    }
+
+    #[test]
+    fn the_retries_outlast_a_short_exclusive_hold() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("update_state.json");
+        atomic_write(&path, b"first").unwrap();
+        let (held_tx, held_rx) = std::sync::mpsc::channel();
+        let holder = std::thread::spawn({
+            let path = path.clone();
+            move || {
+                let file = hold(&path, FILE_SHARE_READ | FILE_SHARE_WRITE);
+                held_tx.send(()).unwrap();
+                std::thread::sleep(Duration::from_millis(300));
+                let released_at = Instant::now();
+                drop(file);
+                released_at
+            }
+        });
+        held_rx.recv().unwrap();
+
+        atomic_write(&path, b"second").unwrap();
+
+        let written_at = Instant::now();
+        assert!(written_at >= holder.join().unwrap());
+        assert_only_file(dir.path(), &path, b"second");
+    }
+
+    #[test]
+    fn a_long_exclusive_hold_fails_with_the_original_error_and_leaves_no_temp_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("update_state.json");
+        atomic_write(&path, b"first").unwrap();
+        let holder = hold(&path, FILE_SHARE_READ | FILE_SHARE_WRITE);
+        let started = Instant::now();
+
+        let err = format!("{:#}", atomic_write(&path, b"second").unwrap_err());
+
+        assert!(started.elapsed() >= held_target::RETRY_DELAYS.iter().sum::<Duration>());
+        drop(holder);
+        let wording = format!("failed to persist temp file to {}", path.display());
+        assert!(err.contains(&wording), "{err}");
+        assert!(err.contains("os error 5"), "{err}");
+        assert_only_file(dir.path(), &path, b"first");
+    }
+
+    #[test]
+    fn holders_name_the_process_that_has_the_file_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let image = dir.path().join("held.exe");
+        let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        std::fs::copy(Path::new(&system_root).join(r"System32\PING.EXE"), &image).unwrap();
+        let mut child = Command::new(&image)
+            .args(["-n", "60", "127.0.0.1"])
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
+
+        let holders = held_target::holders(&image);
+
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(
+            holders.contains(&format!("(PID: {})", child.id())),
+            "{holders}"
+        );
+    }
+}
+
 #[derive(serde::Deserialize, Debug, PartialEq)]
 struct Sample {
     a: u32,
@@ -110,85 +223,4 @@ fn read_json_or_quarantine_replaces_an_older_quarantined_copy() {
         std::fs::read(dir.path().join("bad.json.corrupt")).unwrap(),
         b"new garbage"
     );
-}
-
-#[cfg(windows)]
-mod windows_held_target {
-    use super::*;
-    use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
-    use std::time::{Duration, Instant};
-
-    const SHARE_READ_WRITE: u32 = 0x1 | 0x2;
-    const SHARE_DELETE: u32 = 0x4;
-    const FILE_ATTRIBUTE_TEMPORARY: u32 = 0x100;
-
-    /// Holds `path` open the way an on-access scanner does.
-    fn hold(path: &Path, share: u32) -> std::fs::File {
-        std::fs::OpenOptions::new()
-            .read(true)
-            .share_mode(share)
-            .open(path)
-            .unwrap()
-    }
-
-    fn files_in(dir: &Path) -> Vec<String> {
-        std::fs::read_dir(dir)
-            .unwrap()
-            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
-            .collect()
-    }
-
-    #[test]
-    fn a_target_held_with_delete_sharing_is_replaced() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("update_state.json");
-        atomic_write(&path, "first").unwrap();
-        let holder = hold(&path, SHARE_READ_WRITE | SHARE_DELETE);
-
-        atomic_write(&path, "second").unwrap();
-        drop(holder);
-
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "second");
-        let attributes = std::fs::metadata(&path).unwrap().file_attributes();
-        assert_eq!(attributes & FILE_ATTRIBUTE_TEMPORARY, 0);
-        assert_eq!(files_in(dir.path()), ["update_state.json"]);
-    }
-
-    #[test]
-    fn a_short_exclusive_hold_is_waited_out() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("update_state.json");
-        atomic_write(&path, "first").unwrap();
-        let holder = hold(&path, SHARE_READ_WRITE);
-        let release = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(300));
-            drop(holder);
-        });
-
-        atomic_write(&path, "second").unwrap();
-        release.join().unwrap();
-
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "second");
-    }
-
-    #[test]
-    fn a_target_held_exclusively_fails_after_the_retries_and_leaves_no_staged_copy() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("update_state.json");
-        atomic_write(&path, "first").unwrap();
-        let holder = hold(&path, SHARE_READ_WRITE);
-
-        let started = Instant::now();
-        let err = atomic_write(&path, "second").unwrap_err();
-        let waited = started.elapsed();
-        drop(holder);
-
-        assert!(format!("{err:#}").contains("os error 5"), "{err:#}");
-        assert!(
-            waited >= Duration::from_millis(1400),
-            "gave up after {waited:?}"
-        );
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), "first");
-        assert_eq!(files_in(dir.path()), ["update_state.json"]);
-    }
 }

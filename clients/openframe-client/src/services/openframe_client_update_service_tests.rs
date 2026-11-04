@@ -1,5 +1,6 @@
 use super::*;
 use crate::clients::AuthClient;
+use crate::models::DownloadConfiguration;
 use crate::platform::DmgExtractor;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
@@ -13,7 +14,7 @@ use crate::services::{
     AgentAuthService, AgentConfigurationService, DeactivationService, InitialConfigurationService,
     InstalledToolsService, MachineIdService, ToolCommandParamsResolver, ToolKillService,
 };
-use crate::test_support::directories;
+use crate::test_support::{directories, mock_server_with_body};
 use crate::utils::in_progress::InProgress;
 use tempfile::TempDir;
 
@@ -102,6 +103,57 @@ fn update(version: &str) -> OpenFrameClientUpdateMessage {
     }
 }
 
+fn update_from(
+    version: &str,
+    link: String,
+    target_file_name: &str,
+) -> OpenFrameClientUpdateMessage {
+    OpenFrameClientUpdateMessage {
+        version: version.to_string(),
+        download_configurations: vec![DownloadConfiguration {
+            os: std::env::consts::OS.to_string(),
+            file_name: "openframe-client.tar.gz".to_string(),
+            target_file_name: target_file_name.to_string(),
+            link,
+            installation_type: Default::default(),
+            bundle_id: None,
+            service_name: None,
+        }],
+    }
+}
+
+#[tokio::test]
+async fn an_attempt_that_fails_before_the_launch_leaves_no_update_state() {
+    let f = fixture();
+    let server = mock_server_with_body(&[200], "too small to be a release").await;
+    let failures = [
+        (update(OTHER), "No download configuration found"),
+        (
+            update_from(
+                OTHER,
+                format!("{}/openframe-client.tar.gz", server.url),
+                "openframe-client",
+            ),
+            "Failed to download and extract update",
+        ),
+    ];
+
+    for (message, expected) in failures {
+        let guard = f.service.reserve(&message).unwrap();
+        let reason = format!("{:#}", f.service.apply(message, guard).await.err().unwrap());
+
+        assert!(reason.contains(expected), "{reason}");
+        assert!(matches!(
+            f.service.update_state_service.read_state().await.unwrap(),
+            JsonFile::Missing
+        ));
+        assert_eq!(
+            f.service.client_info_service.get().await.unwrap().status,
+            ClientUpdateStatus::Failed
+        );
+    }
+}
+
 #[tokio::test]
 async fn only_an_update_to_another_version_waits_for_busy_tools_and_parks_them() {
     let f = fixture();
@@ -129,24 +181,9 @@ async fn only_an_update_to_another_version_waits_for_busy_tools_and_parks_them()
     );
 }
 
-#[tokio::test]
-async fn an_attempt_that_fails_before_launch_leaves_no_state_file() {
-    let f = fixture();
-    let guard = f.service.reserve(&update(OTHER)).unwrap();
-
-    assert!(f.service.apply(update(OTHER), guard).await.is_err());
-
-    assert!(matches!(
-        f.service.update_state_service.read_state().await.unwrap(),
-        JsonFile::Missing
-    ));
-}
-
 #[cfg(unix)]
 mod staged_version_check {
     use super::*;
-    use crate::models::DownloadConfiguration;
-    use crate::test_support::mock_server_with_body;
     use std::io::Write;
 
     /// A tar.gz holding a script that answers `--version` with `reported`, padded and stored uncompressed past the minimum download size.
@@ -205,18 +242,7 @@ mod staged_version_check {
         let server =
             mock_server_with_body(&[200], release_archive(&target_file_name, "1.5.103")).await;
         let link = format!("{}/openframe-client.tar.gz", server.url);
-        let message = OpenFrameClientUpdateMessage {
-            version: "1.5.107".to_string(),
-            download_configurations: vec![DownloadConfiguration {
-                os: std::env::consts::OS.to_string(),
-                file_name: "openframe-client.tar.gz".to_string(),
-                target_file_name: target_file_name.clone(),
-                link,
-                installation_type: Default::default(),
-                bundle_id: None,
-                service_name: None,
-            }],
-        };
+        let message = update_from("1.5.107", link, &target_file_name);
 
         let guard = f.service.reserve(&message).unwrap();
         // should the check let the build through, the late busy check still stops it before an updater launches

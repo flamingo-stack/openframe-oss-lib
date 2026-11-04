@@ -208,7 +208,7 @@ impl OpenFrameClientUpdateService {
             ),
         }
 
-        // Saved once, right before the updater launches: replacing a just-written file trips Windows scanners
+        // 5. Track the update; it is saved once, right before the updater launches
         let mut update_state = UpdateState::new(canonical_version.clone());
 
         // 6. Set update status to updating; bookkeeping only, so a failure must not block the update
@@ -305,12 +305,7 @@ impl OpenFrameClientUpdateService {
         // Refused before the service stops, so a wrong build costs no restart; the delivery engine re-runs a failed update
         if let Err(e) = Self::verify_staged_version(&staged_path, expected_version).await {
             error!("Staged binary rejected: {:#}", e);
-            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
-                warn!(
-                    "Failed to remove staged binary after the version check: {}",
-                    cleanup_err
-                );
-            }
+            Self::remove_staged_binary(&staged_path, "the version check");
             return Err(e);
         }
 
@@ -340,27 +335,17 @@ impl OpenFrameClientUpdateService {
                 "{} started during client download, deferring client update (will redeliver)",
                 busy
             );
-            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
-                warn!(
-                    "Failed to remove staged binary after deferring: {}",
-                    cleanup_err
-                );
-            }
+            Self::remove_staged_binary(&staged_path, "deferring");
             return Err(anyhow!(
                 "{} started during download, deferring client update",
                 busy
             ));
         }
 
-        // The updater script and the next start read the outcome from this state
+        // The updater script needs the state file; any earlier failure leaves none behind
         update_state.set_phase(UpdatePhase::UpdaterLaunched);
         if let Err(e) = self.update_state_service.save(update_state).await {
-            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
-                warn!(
-                    "Failed to remove staged binary after the state save failed: {}",
-                    cleanup_err
-                );
-            }
+            Self::remove_staged_binary(&staged_path, "the state save failure");
             return Err(e);
         }
 
@@ -369,12 +354,7 @@ impl OpenFrameClientUpdateService {
             Ok(launched) => launched,
             Err(e) => {
                 error!("Failed to launch updater: {:#}", e);
-                if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
-                    warn!(
-                        "Failed to remove staged binary after launch failure: {}",
-                        cleanup_err
-                    );
-                }
+                Self::remove_staged_binary(&staged_path, "launch failure");
                 self.update_state_service.clear().await?;
                 return Err(e);
             }
@@ -499,6 +479,12 @@ impl OpenFrameClientUpdateService {
             .await
             .context("Failed to write staged binary")?;
         Ok(binary_path)
+    }
+
+    fn remove_staged_binary(staged_path: &Path, after: &str) {
+        if let Err(e) = std::fs::remove_file(staged_path) {
+            warn!("Failed to remove staged binary after {}: {}", after, e);
+        }
     }
 
     /// Parse version string into semver Version
