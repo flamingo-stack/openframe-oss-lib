@@ -3,6 +3,7 @@ use super::{AppIdentity, MainImages, Undetermined, RESOLVE_TIMEOUT_SECS};
 use crate::executor::{execute_script, Privilege, ScriptParams};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use tracing::warn;
 
 /// Emits raw facts only; every choice is made in Rust. Runs as the console user.
 const IDENTITY_SCRIPT: &str = r#"$ErrorActionPreference = 'Stop'
@@ -58,7 +59,10 @@ function Get-MsiShortcutTargets($codes) {
                     if ($path) { $path }
                 }
                 [void](Invoke-Com $view 'Close' 'InvokeMethod' @())
-            } catch { }
+            } catch {
+                # not fatal: the other sources may still find the app, so the reason goes to stderr for the log
+                [Console]::Error.WriteLine("MSI shortcuts of ${code}: $($_.Exception.Message)")
+            }
         }
     )
 }
@@ -177,6 +181,10 @@ async fn run(ids: &[String]) -> Result<Output, Undetermined> {
             result.retcode,
             result.stderr.trim()
         )));
+    }
+    let problems = result.stderr.trim();
+    if !problems.is_empty() {
+        warn!(%problems, "Update gate identity script reported problems");
     }
     serde_json::from_str(result.stdout.trim())
         .map_err(|e| Undetermined::Resolver(format!("unparseable output: {e}")))
