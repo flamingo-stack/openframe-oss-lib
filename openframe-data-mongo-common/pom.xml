@@ -28,6 +28,11 @@
             <artifactId>spring-data-mongodb</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.github.f4b6a3</groupId>
+            <artifactId>ulid-creator</artifactId>
+        </dependency>
+
         <!-- For @Service on ToolUrlService -->
         <dependency>
             <groupId>org.springframework</groupId>
