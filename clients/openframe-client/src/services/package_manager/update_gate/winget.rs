@@ -34,6 +34,35 @@ function Get-ArpValue($codes, $name) {
     return ''
 }
 
+function Invoke-Com($target, $member, $kind, $arguments) {
+    $target.GetType().InvokeMember($member, $kind, $null, $target, $arguments)
+}
+
+# An MSI that leaves InstallLocation and DisplayIcon empty still knows where its shortcuts point: the key file of
+# each shortcut's component, read from the cached package.
+function Get-MsiShortcutTargets($codes) {
+    $msi = New-Object -ComObject WindowsInstaller.Installer
+    $query = 'SELECT `Component`.`ComponentId` FROM `Shortcut`, `Component` WHERE `Shortcut`.`Component_` = `Component`.`Component`'
+    @(
+        foreach ($code in $codes) {
+            if ($code -notmatch '^\{[0-9A-Fa-f-]{36}\}$') { continue }
+            try {
+                $package = [string](Invoke-Com $msi 'ProductInfo' 'GetProperty' @($code, 'LocalPackage'))
+                if (-not $package) { continue }
+                $database = Invoke-Com $msi 'OpenDatabase' 'InvokeMethod' @($package, 0)
+                $view = Invoke-Com $database 'OpenView' 'InvokeMethod' @($query)
+                [void](Invoke-Com $view 'Execute' 'InvokeMethod' @())
+                while ($record = Invoke-Com $view 'Fetch' 'InvokeMethod' @()) {
+                    $component = [string](Invoke-Com $record 'StringData' 'GetProperty' @(1))
+                    $path = [string](Invoke-Com $msi 'ComponentPath' 'GetProperty' @($code, $component))
+                    if ($path) { $path }
+                }
+                [void](Invoke-Com $view 'Close' 'InvokeMethod' @())
+            } catch { }
+        }
+    )
+}
+
 $rows = @(Get-WinGetPackage)
 $packages = @(
     foreach ($id in $args) {
@@ -59,6 +88,7 @@ $packages = @(
             uninstallCommand = [string]$version.GetMetadata([Enum]::Parse($field, 'StandardUninstallCommand'))
             arpInstallLocation = Get-ArpValue $codes 'InstallLocation'
             arpDisplayIcon = Get-ArpValue $codes 'DisplayIcon'
+            msiShortcutTargets = @(Get-MsiShortcutTargets $codes)
             appxApplications = $applications
         }
     }
@@ -105,6 +135,9 @@ struct Package {
     arp_display_icon: Option<String>,
     #[serde(default)]
     appx_applications: Vec<AppxApplication>,
+    /// Key files of the MSI's shortcut components, for an MSI that records no install location.
+    #[serde(default)]
+    msi_shortcut_targets: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -154,6 +187,11 @@ fn identity(package: &Package, shortcuts: &[Shortcut]) -> Result<AppIdentity, Un
         return Err(Undetermined::NotInstalled);
     }
 
+    let msi_images: Vec<PathBuf> = package
+        .msi_shortcut_targets
+        .iter()
+        .filter_map(|target| command_image(target))
+        .collect();
     let install_dir = [
         package.installed_location.as_deref().map(PathBuf::from),
         package
@@ -170,6 +208,11 @@ fn identity(package: &Package, shortcuts: &[Shortcut]) -> Result<AppIdentity, Un
     ]
     .into_iter()
     .flatten()
+    .chain(
+        msi_images
+            .iter()
+            .filter_map(|image| image.parent().map(Path::to_path_buf)),
+    )
     .find(|dir| is_app_dir(dir))
     .ok_or(Undetermined::NoInstallLocation)?;
 
@@ -184,6 +227,12 @@ fn identity(package: &Package, shortcuts: &[Shortcut]) -> Result<AppIdentity, Un
                     .and_then(command_image)
                     .filter(|image| is_under(image, &install_dir))
                     .and_then(|image| file_name(&image)),
+            )
+            .chain(
+                msi_images
+                    .iter()
+                    .filter(|image| is_under(image, &install_dir))
+                    .filter_map(|image| file_name(image)),
             )
             .collect()
     } else {
