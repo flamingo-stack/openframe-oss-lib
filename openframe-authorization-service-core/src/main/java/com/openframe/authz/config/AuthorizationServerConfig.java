@@ -18,6 +18,7 @@ import com.openframe.authz.service.sso.apple.AppleTokenService;
 import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.data.document.audit.AuditRequestContext;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
 import lombok.extern.slf4j.Slf4j;
@@ -196,6 +197,9 @@ public class AuthorizationServerConfig {
 
                     claims.put("roles", UserRole.effective(user.getRoles()).stream()
                             .map(UserRole::name).toList());
+                    if (context.getAuthorization() != null) {
+                        claims.put(AuditRequestContext.SESSION_CLAIM, context.getAuthorization().getId());
+                    }
                 });
             }
         };

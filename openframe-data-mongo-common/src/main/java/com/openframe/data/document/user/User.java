@@ -1,19 +1,25 @@
 package com.openframe.data.document.user;
+
 import com.openframe.data.document.TenantScoped;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.experimental.SuperBuilder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.util.StringUtils;
+
 import java.time.LocalDateTime;
-import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 @Data
 @SuperBuilder
 @NoArgsConstructor
@@ -54,5 +60,12 @@ public class User implements TenantScoped {
 
     public void setEmail(String email) {
         this.email = email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public String fullName() {
+        String name = Stream.of(firstName, lastName)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining(" "));
+        return name.isEmpty() ? null : name;
     }
 }

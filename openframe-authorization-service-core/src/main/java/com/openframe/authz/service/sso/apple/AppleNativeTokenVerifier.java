@@ -1,6 +1,7 @@
 package com.openframe.authz.service.sso.apple;
 
 import com.openframe.authz.config.oidc.AppleSSOProperties;
+import com.openframe.core.util.Sha256;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -14,9 +15,6 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 import java.util.List;
 
 import static com.openframe.authz.service.auth.strategy.AppleClientSecretFactory.APPLE_ISSUER;
@@ -77,7 +75,7 @@ public class AppleNativeTokenVerifier {
         if (rawNonce == null || rawNonce.isBlank()) {
             throw invalidGrant("Nonce is required.");
         }
-        if (tokenNonce == null || !tokenNonce.equals(sha256Hex(rawNonce))) {
+        if (tokenNonce == null || !tokenNonce.equals(Sha256.hex(rawNonce))) {
             log.warn("Apple native identity token nonce mismatch");
             throw invalidGrant("Apple identity token nonce mismatch.");
         }
@@ -107,15 +105,6 @@ public class AppleNativeTokenVerifier {
     /** Audience is validated against the configured list in {@link #verify}, not by the decoder. */
     private static OAuth2TokenValidator<Jwt> alwaysValid() {
         return token -> OAuth2TokenValidatorResult.success();
-    }
-
-    private static String sha256Hex(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
-        }
     }
 
     private static OAuth2AuthenticationException invalidGrant(String description) {
