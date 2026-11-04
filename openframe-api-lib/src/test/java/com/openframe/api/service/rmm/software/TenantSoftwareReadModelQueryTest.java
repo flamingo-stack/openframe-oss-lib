@@ -87,8 +87,11 @@ class TenantSoftwareReadModelQueryTest {
 
     @Test
     void get_mapsTheTitleLikeTheFleetPath() {
-        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L,
-                "homebrew_packages", installation("m1", "1.6"), installation("m2", "1.7"), installation("m3", "1.7"))));
+        Software.Installation onM1 = installation("m1", "1.6");
+        Software.Installation onM2 = installation("m2", "1.7");
+        Software.Installation onM3 = installation("m3", "1.7");
+        Software jq = software(42L, "homebrew_packages", onM1, onM2, onM3);
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(jq));
 
         SoftwareResponse row = query.get(TENANT, "42");
 
@@ -164,11 +167,16 @@ class TenantSoftwareReadModelQueryTest {
 
     @Test
     void devicesForSoftwareRows_statusAgainstTheGivenLatest_allVersionsMustReachIt() {
-        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps",
-                installation("m1", "10.0"), installation("m2", "9.0"), installation("m3", "10.0", "9.0"),
-                installation("gone", "10.0"))));
-        when(machineRepository.findByMachineIdIn(anyList())).thenReturn(List.of(
-                machine("m1", "alpha"), machine("m2", "beta"), machine("m3", "gamma")));
+        Software.Installation latest = installation("m1", "10.0");
+        Software.Installation older = installation("m2", "9.0");
+        Software.Installation both = installation("m3", "10.0", "9.0");
+        Software.Installation onAGoneMachine = installation("gone", "10.0");
+        Software app = software(42L, "apps", latest, older, both, onAGoneMachine);
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(app));
+        Machine alpha = machine("m1", "alpha");
+        Machine beta = machine("m2", "beta");
+        Machine gamma = machine("m3", "gamma");
+        when(machineRepository.findByMachineIdIn(anyList())).thenReturn(List.of(alpha, beta, gamma));
 
         List<SoftwareOnDeviceResponse> rows = query.devicesForSoftwareRows(TENANT, "42", null, "10.0");
 
