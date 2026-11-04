@@ -129,6 +129,19 @@ async fn only_an_update_to_another_version_waits_for_busy_tools_and_parks_them()
     );
 }
 
+#[tokio::test]
+async fn an_attempt_that_fails_before_launch_leaves_no_state_file() {
+    let f = fixture();
+    let guard = f.service.reserve(&update(OTHER)).unwrap();
+
+    assert!(f.service.apply(update(OTHER), guard).await.is_err());
+
+    assert!(matches!(
+        f.service.update_state_service.read_state().await.unwrap(),
+        JsonFile::Missing
+    ));
+}
+
 #[cfg(unix)]
 mod staged_version_check {
     use super::*;
