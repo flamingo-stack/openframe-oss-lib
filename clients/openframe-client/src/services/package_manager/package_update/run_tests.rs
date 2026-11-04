@@ -320,30 +320,6 @@ async fn a_wait_order_holds_while_the_app_runs_and_installs_once_it_is_closed() 
 }
 
 #[tokio::test]
-async fn an_app_the_gate_cannot_locate_holds_a_wait_order_and_a_force_order_installs() {
-    let f = Fixture::new();
-    f.device().identity = Err(Undetermined::NoInstallLocation);
-    let wait = f.submit("req-1", UpdateMode::Wait, 0);
-    let mut p = Progress::default();
-
-    assert!(!f.look(&wait, &mut p, NOW).await);
-    assert!(!f.look(&wait, &mut p, NOW + POLL_SECS).await);
-    assert_eq!(
-        waiting(&f.last()),
-        (WaitReason::AppRunning, WaitPhase::Prompt)
-    );
-    assert!(f.last().waiting.unwrap().holders.is_empty());
-    assert_eq!(f.calls(), [Call::Probe]);
-
-    let force = f.submit("req-1", UpdateMode::Force, 60);
-    assert!(f.look(&force, &mut p, NOW + 2 * POLL_SECS).await);
-
-    assert_eq!(f.last().state, UpdateStatus::Done);
-    assert!(f.calls().contains(&Call::Upgrade));
-    assert!(!f.calls().iter().any(|call| matches!(call, Call::Close(_))));
-}
-
-#[tokio::test]
 async fn a_force_order_counts_down_closes_the_app_installs_and_relaunches_it() {
     let f = Fixture::new();
     f.app_runs(APP);

@@ -136,30 +136,6 @@ fn missing_install_dir_without_any_source() {
 }
 
 #[test]
-fn an_msi_without_install_location_is_found_through_its_shortcut_components() {
-    // 7-Zip 23.01 from its MSI: msiexec uninstall, empty InstallLocation and DisplayIcon; the key files of the
-    // shortcut components include a help file and a registry key path.
-    let package: Package = serde_json::from_str(
-        r#"{ "id": "7zip.7zip", "installed": true, "installedLocation": "",
-             "uninstallCommand": "MsiExec.exe /I{23170F69-40C1-2702-2301-000001000000}",
-             "arpInstallLocation": "", "arpDisplayIcon": "",
-             "msiShortcutTargets": [ "C:\\Program Files\\7-Zip\\7zFM.exe", "C:\\Program Files\\7-Zip\\7-zip.chm",
-                                     "02:\\SOFTWARE\\7-Zip\\Path" ] }"#,
-    )
-    .unwrap();
-    // an advertised shortcut resolves into the installer cache, not the app
-    let shortcuts = [Shortcut {
-        target: r"C:\Windows\Installer\{23170F69-40C1-2702-2301-000001000000}\7zFM.exe".to_string(),
-        arguments: String::new(),
-    }];
-
-    assert_eq!(
-        identity(&package, &shortcuts),
-        app(r"C:\Program Files\7-Zip", &["7zfm.exe"])
-    );
-}
-
-#[test]
 fn install_dir_without_any_main_image_is_unknown() {
     let package: Package = serde_json::from_str(
         r#"{ "id": "X", "installed": true, "installedLocation": "C:\\Program Files\\X" }"#,

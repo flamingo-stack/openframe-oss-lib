@@ -247,30 +247,10 @@ impl Worker {
         reason: Undetermined,
     ) -> Verdict {
         match reason {
-            Undetermined::NotInstalled | Undetermined::ManagerUnsupported => {
+            Undetermined::NotInstalled
+            | Undetermined::ManagerUnsupported
+            | Undetermined::NoInstallLocation => {
                 info!(request_id = %order.request_id, %reason, "Nothing to hold the update, installing");
-                self.install(machine_id, order, p, now, None).await
-            }
-            // The app may be open where the gate cannot look: WAIT holds it as running until its deadline turns the
-            // order into FORCE, and FORCE, with nothing it could close, installs.
-            Undetermined::NoInstallLocation if order.mode == UpdateMode::Wait => {
-                info!(request_id = %order.request_id, %reason, "Cannot see whether the app is open, waiting for the deadline");
-                self.report_waiting(
-                    machine_id,
-                    order,
-                    p,
-                    WaitReason::AppRunning,
-                    WaitPhase::Prompt,
-                    &[],
-                    None,
-                )
-                .await;
-                Verdict::Continue {
-                    next_at: now + POLL_SECS,
-                }
-            }
-            Undetermined::NoInstallLocation => {
-                info!(request_id = %order.request_id, %reason, "Nothing the update could close, installing");
                 self.install(machine_id, order, p, now, None).await
             }
             reason => {
