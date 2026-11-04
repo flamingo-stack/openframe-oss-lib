@@ -100,7 +100,14 @@ export interface SiteNav {
   primaryCta: SiteNavPrimaryCta;
   closingBand?: { heading: string; subheading: string; secondary?: NavLink };
   legal: { company: string; notes: string[]; links: NavLink[] };
-  brand: { name: string; tagline: string; social: NavLink[]; statusUrl?: string };
+  brand: {
+    name: string;
+    tagline: string;
+    social: NavLink[];
+    /** The site's own RSS feeds (`iconName: 'rss'`). Drawn at the end of the FOOTER's social row only, never in the header. */
+    feeds?: NavLink[];
+    statusUrl?: string;
+  };
 }
 
 /**
