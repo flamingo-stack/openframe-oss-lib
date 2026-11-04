@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum UpdatePhase {
+    // The client no longer saves the phases before UpdaterLaunched; older clients' state files still carry them.
     Validating,
     Downloading,
     Extracting,

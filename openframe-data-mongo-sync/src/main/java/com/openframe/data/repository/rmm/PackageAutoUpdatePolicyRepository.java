@@ -19,6 +19,8 @@ public interface PackageAutoUpdatePolicyRepository extends MongoRepository<Packa
 
     List<PackageAutoUpdatePolicy> findByTenantIdAndSoftwareIdIn(String tenantId, Collection<String> softwareIds);
 
+    boolean existsByTenantIdAndSoftwareId(String tenantId, String softwareId);
+
     List<PackageAutoUpdatePolicy> findByTenantIdAndMachineIdAndSoftwareIdIn(String tenantId, String machineId,
                                                                             Collection<String> softwareIds);
 
