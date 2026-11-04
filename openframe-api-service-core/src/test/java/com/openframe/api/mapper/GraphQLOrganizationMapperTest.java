@@ -7,7 +7,9 @@ import com.openframe.api.dto.organization.OrganizationFilterInput;
 import com.openframe.api.dto.organization.OrganizationFilterOptions;
 import com.openframe.api.dto.organization.OrganizationSortField;
 import com.openframe.api.dto.organization.OrganizationSortInput;
+import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
@@ -19,6 +21,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Unit tests for {@link GraphQLOrganizationMapper} — the orderBy conversion,
@@ -79,5 +82,46 @@ class GraphQLOrganizationMapperTest {
         assertThat(connection.getFilteredCount()).isEqualTo(99);
         assertThat(connection.getEdges()).hasSize(1);
         assertThat(CursorCodec.decode(connection.getEdges().get(0).getCursor())).isEqualTo("1234_the-id");
+    }
+
+    @Test
+    void toCursorPaginationCriteria_undecodableAfter_throwsIllegalArgument() {
+        // setup
+        ConnectionArgs args = ConnectionArgs.builder().first(2).after("not-a-cursor").build();
+
+        // execution
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> mapper.toCursorPaginationCriteria(args));
+
+        // verifications
+        assertThat(ex.getMessage()).contains("Invalid cursor");
+    }
+
+    @Test
+    void toCursorPaginationCriteria_undecodableBefore_throwsIllegalArgument() {
+        // setup
+        ConnectionArgs args = ConnectionArgs.builder().last(2).before("not-a-cursor").build();
+
+        // execution
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> mapper.toCursorPaginationCriteria(args));
+
+        // verifications
+        assertThat(ex.getMessage()).contains("Invalid cursor");
+    }
+
+    @Test
+    void toCursorPaginationCriteria_lastAndBefore_backwardCriteriaWithDecodedCursor() {
+        // setup
+        ConnectionArgs args = ConnectionArgs.builder().last(2).before(CursorCodec.encode("300_id-3")).build();
+
+        // execution
+        CursorPaginationCriteria criteria = mapper.toCursorPaginationCriteria(args);
+
+        // verifications
+        assertThat(criteria)
+                .returns(true, CursorPaginationCriteria::isBackward)
+                .returns(2, CursorPaginationCriteria::getLimit)
+                .returns("300_id-3", CursorPaginationCriteria::getCursor);
     }
 }

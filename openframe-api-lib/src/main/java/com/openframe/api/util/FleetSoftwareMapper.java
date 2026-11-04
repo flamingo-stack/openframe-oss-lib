@@ -3,6 +3,7 @@ package com.openframe.api.util;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
+import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import lombok.experimental.UtilityClass;
@@ -24,6 +25,7 @@ public class FleetSoftwareMapper {
                 .id(Objects.toString(title.getId(), null))
                 .name(title.getName())
                 .source(FleetSoftwareCategory.of(title.getSource()).source())
+                .type(FleetSoftwareType.of(title.getSource()))
                 .currentVersion(current == null ? null : current.getVersion())
                 .latestVersion(latestVersion(versions))
                 .olderVersionsCount(olderVersionsCount(versions))

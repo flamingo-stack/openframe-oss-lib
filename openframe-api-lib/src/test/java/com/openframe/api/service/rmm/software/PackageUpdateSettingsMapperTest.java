@@ -79,12 +79,12 @@ class PackageUpdateSettingsMapperTest {
     @DisplayName("auto-update on with settings: its own settings, read by the same rules as the update's")
     void autoUpdate_enabledWithSettings_ownSettings() {
         SoftwareAutoUpdate autoUpdate = PackageUpdateSettingsMapper.autoUpdate(SoftwareAction.UPDATE,
-                autoUpdate(true, settings(PackageUpdateMode.FORCE, 3_600L, 30)));
+                autoUpdate(true, settings(PackageUpdateMode.FORCE, 3_600L, 90)));
 
         assertThat(autoUpdate.isEnabled()).isTrue();
         assertThat(autoUpdate.getSettings().getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(autoUpdate.getSettings().getDeadlineSeconds()).isNull();
-        assertThat(autoUpdate.getSettings().getCountdownSeconds()).isEqualTo(30);
+        assertThat(autoUpdate.getSettings().getCountdownSeconds()).isEqualTo(90);
     }
 
     @Test

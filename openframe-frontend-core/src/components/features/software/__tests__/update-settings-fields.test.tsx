@@ -77,6 +77,15 @@ describe('SoftwareUpdateSettingsFields', () => {
     expect(screen.queryByRole('checkbox', { name: /Same settings for auto-update/ })).toBeNull();
     expect(screen.queryByText('For auto-updates')).toBeNull();
   });
+
+  it('the reinstall note comes and goes with auto-update', () => {
+    render(<Harness />);
+    expect(screen.getByRole('note').textContent).toContain('Apps installed by hand get reinstalled');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Keep it auto-updated/ }));
+    expect(screen.queryByRole('note')).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Keep it auto-updated/ }));
+    expect(screen.getByRole('note')).toBeTruthy();
+  });
 });
 
 describe('SoftwareActionForm update settings', () => {
