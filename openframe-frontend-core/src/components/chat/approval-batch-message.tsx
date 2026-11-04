@@ -13,7 +13,7 @@ import { StatusLine } from '../ui/status-line';
 import { CHAT_BLOCK_CLASS, CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
-import { PolicyEscalationAlert, PolicyReviewRows, isPolicyEscalated } from './policy-review';
+import { PolicyEscalationAlert, PolicyReviewRows, hasPolicyReviewRows, isPolicyEscalated } from './policy-review';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
 import type {
   ApprovalBlockVariant,
@@ -152,7 +152,8 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
   const result = execution?.status === 'done' ? execution.result : undefined;
   const review = call.policyReview;
   const escalated = isPolicyEscalated(review);
-  const hasExpandableBody = args.length > 0 || !!review || (typeof result === 'string' && result.length > 0);
+  const reviewRows = hasPolicyReviewRows(review);
+  const hasExpandableBody = args.length > 0 || reviewRows || (typeof result === 'string' && result.length > 0);
 
   return (
     <div className="flex w-full flex-col items-start border-b border-ods-border bg-ods-card last:border-b-0">
@@ -191,7 +192,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
               {args.map(([key, value]) => (
                 <ArgRow key={key} argKey={key} value={value} />
               ))}
-              {review && (
+              {reviewRows && (
                 <PolicyReviewRows
                   review={review}
                   className={args.length > 0 ? 'mt-[var(--spacing-system-xsf)]' : undefined}
@@ -200,7 +201,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
               {result && (
                 <ResultBlock
                   result={result}
-                  className={args.length > 0 || review ? 'mt-[var(--spacing-system-xsf)]' : undefined}
+                  className={args.length > 0 || reviewRows ? 'mt-[var(--spacing-system-xsf)]' : undefined}
                 />
               )}
             </div>

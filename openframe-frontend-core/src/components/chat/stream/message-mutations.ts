@@ -382,7 +382,7 @@ function sameToolData(a: ToolExecutionData, b: ToolExecutionData): boolean {
     a.integratedToolType === b.integratedToolType &&
     a.toolFunction === b.toolFunction &&
     a.toolTitle === b.toolTitle &&
-    a.policyReview === b.policyReview &&
+    (a.policyReview === b.policyReview || JSON.stringify(a.policyReview) === JSON.stringify(b.policyReview)) &&
     a.result === b.result &&
     a.success === b.success &&
     a.toolExecutionRequestId === b.toolExecutionRequestId &&

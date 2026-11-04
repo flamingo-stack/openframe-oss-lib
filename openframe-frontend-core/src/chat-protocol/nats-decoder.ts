@@ -49,19 +49,17 @@ function numOr(value: unknown, fallback = 0): number {
  *  non-object entries and defaulting every field. */
 function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isRecord).map(item => {
-    return {
-      toolExecutionRequestId: String(item.toolExecutionRequestId ?? ''),
-      toolName: String(item.toolName ?? ''),
-      toolTitle: typeof item.toolTitle === 'string' ? item.toolTitle : undefined,
-      toolExplanation: typeof item.toolExplanation === 'string' ? item.toolExplanation : undefined,
-      toolType: typeof item.toolType === 'string' ? item.toolType : undefined,
-      requiresApproval: item.requiresApproval === true,
-      approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
-      toolCallArguments: isRecord(item.toolCallArguments) ? item.toolCallArguments : null,
-      ...policyReviewField(item.policyReview),
-    };
-  });
+  return raw.filter(isRecord).map(item => ({
+    toolExecutionRequestId: String(item.toolExecutionRequestId ?? ''),
+    toolName: String(item.toolName ?? ''),
+    toolTitle: typeof item.toolTitle === 'string' ? item.toolTitle : undefined,
+    toolExplanation: typeof item.toolExplanation === 'string' ? item.toolExplanation : undefined,
+    toolType: typeof item.toolType === 'string' ? item.toolType : undefined,
+    requiresApproval: item.requiresApproval === true,
+    approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
+    toolCallArguments: isRecord(item.toolCallArguments) ? item.toolCallArguments : null,
+    ...policyReviewField(item.policyReview),
+  }));
 }
 
 /** Coerce the wire's ask `options[]` into the card's row shape. Rows without a

@@ -95,13 +95,19 @@ describe('normalizePolicyReview', () => {
     expect(normalizePolicyReview(null)).toBeUndefined();
     expect(normalizePolicyReview('POLICY')).toBeUndefined();
   });
+
+  it('is undefined when nothing in the review survives', () => {
+    expect(normalizePolicyReview({})).toBeUndefined();
+    expect(normalizePolicyReview({ source: 'REGEX', operationCodes: [' '], matchedRules: [{}] })).toBeUndefined();
+  });
 });
 
 describe('isPolicyEscalated', () => {
-  it('is a matched rule or a deny decision, either alone', () => {
-    expect(isPolicyEscalated({ ...allowed, decision: undefined, matchedRules: [{ code: 'R', label: 'R' }] })).toBe(
-      true,
-    );
+  it('follows the decision, and the matched rules only when there is no decision', () => {
+    const rule = [{ code: 'R', label: 'R' }];
+    expect(isPolicyEscalated({ ...allowed, decision: undefined, matchedRules: rule })).toBe(true);
+    expect(isPolicyEscalated({ ...allowed, decision: 'POLICY', matchedRules: rule })).toBe(false);
+    expect(isPolicyEscalated({ ...allowed, decision: 'DENY' })).toBe(true);
     expect(isPolicyEscalated({ ...allowed, decision: 'SOFT_DENY' })).toBe(true);
     expect(isPolicyEscalated({ ...allowed, decision: 'HARD_DENY' })).toBe(true);
     expect(isPolicyEscalated(allowed)).toBe(false);
@@ -259,5 +265,48 @@ describe('ToolExecutionDisplay with a review', () => {
   it('never shows the review on the end-client row', () => {
     render(<ToolExecutionDisplay message={ran(escalated)} variant="client" />);
     expect(screen.queryByText('Mingo Escalated')).toBeNull();
+  });
+
+  it('opens no empty body for a review without rows', () => {
+    const rowless: PolicyReviewData = { decision: 'POLICY', operationCodes: [], matchedRules: [] };
+    render(<ToolExecutionDisplay message={{ ...ran(rowless), result: undefined }} />);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('does not credit an escalated level to the policy', () => {
+    render(<ToolExecutionDisplay message={ran({ ...escalated, policyLevel: undefined })} />);
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.queryByText('Guardrail Policy:')).toBeNull();
+    expect(screen.getByText('DELETE_FILES')).toBeTruthy();
+  });
+
+  it('keeps the escalation on a remote tool that has nothing else to show', () => {
+    const remote: ToolExecutionData = {
+      type: 'EXECUTED_TOOL',
+      integratedToolType: '',
+      toolFunction: 'remote_write',
+      toolTitle: 'Updating the record',
+      success: true,
+      policyReview: { decision: 'DENY', operationCodes: [], matchedRules: [], reason: 'Writes outside the tenant.' },
+    };
+    render(<ToolExecutionDisplay message={remote} />);
+    expect(screen.getByText('Mingo Escalated')).toBeTruthy();
+  });
+});
+
+describe('a redelivered chunk', () => {
+  it('with an equal review is a no-op in the live thread', () => {
+    const executing: ToolExecutionData = {
+      type: 'EXECUTING_TOOL',
+      integratedToolType: 'OPENFRAME',
+      toolFunction: 'runCommand',
+      toolExecutionRequestId: 'exec-1',
+      policyReview: allowed,
+    };
+    const thread: UnifiedChatMessage[] = [
+      { id: 'a1', role: 'assistant', segments: [{ type: 'tool_execution', data: executing }] } as UnifiedChatMessage,
+    ];
+    const replayed = { ...executing, policyReview: structuredClone(allowed) };
+    expect(mergeToolExecutionIfPresent(thread, { type: 'tool_execution', data: replayed })).toBe(thread);
   });
 });

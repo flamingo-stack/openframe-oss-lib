@@ -69,7 +69,7 @@ export interface PolicyReviewRuleData {
  * Why the security policy gave a tool call its approval level (ai-agent `PolicyReview`). Sent only while
  * the semantic guardrail is on, on approval tool calls and on `EXECUTING_TOOL`. Enum values stay open
  * strings: the backend is narrowing `decision` (`SOFT_DENY` / `HARD_DENY` become `DENY`), and a value
- * this build does not know must not drop the review. Read it through `utils/policy-review`.
+ * this build does not know must not drop the review. Normalized by `chat-protocol/policy-review`.
  */
 export interface PolicyReviewData {
   /** `CLASSIFIER` (the AI review) or `REGEX`. */
@@ -579,8 +579,8 @@ export interface ApprovalRequestMessageData extends MessageDataBase {
   approvalType?: string;
   command?: string;
   explanation?: string;
-  /** Present when the approval is a batch of tool calls (new format). */
-  toolCalls?: PendingToolCallData[];
+  /** Present when the approval is a batch of tool calls (new format). WIRE shape: the review is normalized on replay. */
+  toolCalls?: Array<Omit<PendingToolCallData, 'policyReview'> & { policyReview?: unknown }>;
 }
 
 export interface ApprovalResultMessageData extends MessageDataBase {

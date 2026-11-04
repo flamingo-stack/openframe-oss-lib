@@ -60,7 +60,9 @@ import { type MessageSegmentAccumulator, createMessageSegmentAccumulator } from 
 import { getCommandText } from './tool-call-helpers';
 
 /** A history tool call with its wire `policyReview` normalized (or dropped), as the live decoder does it. */
-function withNormalizedReview(call: PendingToolCallData): PendingToolCallData {
+function withNormalizedReview(
+  call: Omit<PendingToolCallData, 'policyReview'> & { policyReview?: unknown },
+): PendingToolCallData {
   const { policyReview: raw, ...rest } = call;
   return { ...rest, ...policyReviewField(raw) };
 }
@@ -114,8 +116,8 @@ function pushStandaloneMessages(
  *     the resolver's name as `displayName`);
  *   - `approvalType` defaults to 'CLIENT' (legacy history parity;
  *     realtime defaults APPROVAL_REQUEST to 'USER');
- *   - batch `toolCalls` pass through verbatim (already the persisted
- *     `PendingToolCallData` shape — no normalization pass).
+ *   - batch `toolCalls` pass through as persisted, except `policyReview`,
+ *     normalized as the live decoder does it.
  *
  * Returns `null` for rows the assistant-turn path doesn't decode (SYSTEM
  * is handled by the envelope's standalone path; user TEXT rows are handled

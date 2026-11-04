@@ -11,12 +11,13 @@ import type { PolicyReviewData } from './types';
 const RULE_DECISIONS: ReadonlySet<string> = new Set(['DENY', 'SOFT_DENY', 'HARD_DENY']);
 
 /**
- * Whether Mingo escalated the call: a guardrail rule matched and raised it above what the policy says. The one test
- * behind the alert, the row's warning icon and the warning Approve.
+ * Whether Mingo escalated the call: a guardrail rule, not the policy, set its level. The decision says so; matched rules
+ * stand in only when a backend sends no decision. The one test behind the alert, the row's warning icon and the warning
+ * Approve.
  */
 export function isPolicyEscalated(review: PolicyReviewData | undefined): boolean {
   if (!review) return false;
-  return review.matchedRules.length > 0 || (!!review.decision && RULE_DECISIONS.has(review.decision));
+  return review.decision ? RULE_DECISIONS.has(review.decision) : review.matchedRules.length > 0;
 }
 
 /**
@@ -24,10 +25,16 @@ export function isPolicyEscalated(review: PolicyReviewData | undefined): boolean
  * settings call "Unmatched Actions".
  */
 function policyLevelText(review: PolicyReviewData): string | undefined {
-  const level = review.policyLevel ?? review.approvalLevel;
+  // The level in force is the policy's only when no rule raised it.
+  const level = review.policyLevel ?? (isPolicyEscalated(review) ? undefined : review.approvalLevel);
   if (!level) return undefined;
   const label = APPROVAL_LEVEL_META[level].label;
   return review.decision === 'FALLBACK' ? `${label} (Unmatched Actions)` : label;
+}
+
+/** Whether {@link PolicyReviewRows} draws anything: a body opens only onto rows it has. */
+export function hasPolicyReviewRows(review: PolicyReviewData | undefined): review is PolicyReviewData {
+  return !!review && (!!policyLevelText(review) || review.operationCodes.length > 0);
 }
 
 /**
@@ -37,9 +44,10 @@ function policyLevelText(review: PolicyReviewData): string | undefined {
  */
 export function PolicyReviewRows({ review, className }: { review: PolicyReviewData; className?: string }) {
   const level = policyLevelText(review);
-  if (!level && review.operationCodes.length === 0) return null;
+  if (!hasPolicyReviewRows(review)) return null;
   return (
-    <div className={cn('flex w-full flex-col items-start', className)}>
+    // A plain block: the rows stack on their own, and a nested flex column costs WebKit a layout pass (WEBVIEW-001).
+    <div className={cn('w-full', className)}>
       {level && <ArgRow argKey="Guardrail Policy" value={level} />}
       {review.operationCodes.length > 0 && <ArgRow argKey="Operations" value={review.operationCodes.join(', ')} />}
     </div>
@@ -73,7 +81,7 @@ export function PolicyEscalationAlert({
       <span className="flex shrink-0" aria-hidden>
         <AlertTriangleIcon size={20} />
       </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-[var(--spacing-system-xxs)]">
         <p className="break-words text-h3">Mingo Escalated</p>
         {description && <p className="break-words text-h6">{description}</p>}
       </div>

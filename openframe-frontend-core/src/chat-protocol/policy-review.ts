@@ -44,7 +44,7 @@ export function keptPolicyReview(...reviews: Array<PolicyReviewData | undefined>
 /**
  * The wire's `policyReview` (NATS chunk or history row) as the chat reads it, or `undefined` when there is none.
  * Rules without a name and blank operation codes are dropped; an approval level this build does not know is dropped
- * alone, not the review. `decision` and `source` stay open strings (the backend is folding the two deny kinds into
+ * alone, not the review; a review with nothing left in it is `undefined`. `decision` and `source` stay open strings (the backend is folding the two deny kinds into
  * one `DENY`).
  */
 export function normalizePolicyReview(raw: unknown): PolicyReviewData | undefined {
@@ -54,13 +54,18 @@ export function normalizePolicyReview(raw: unknown): PolicyReviewData | undefine
   const approvalLevel = level(raw.approvalLevel);
   const policyLevel = level(raw.policyLevel);
   const reason = text(raw.reason);
+  const operationCodes = codes(raw.operationCodes);
+  const matchedRules = rules(raw.matchedRules);
+  if (!decision && !approvalLevel && !policyLevel && !reason && !operationCodes.length && !matchedRules.length) {
+    return undefined;
+  }
   return {
     ...(source ? { source } : {}),
     ...(decision ? { decision } : {}),
     ...(approvalLevel ? { approvalLevel } : {}),
     ...(policyLevel ? { policyLevel } : {}),
-    operationCodes: codes(raw.operationCodes),
-    matchedRules: rules(raw.matchedRules),
+    operationCodes,
+    matchedRules,
     ...(reason ? { reason } : {}),
   };
 }
