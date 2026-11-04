@@ -37,10 +37,10 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { filePartOfAttachment } from '../../../chat-protocol/attachment';
 import {
   approvalStatusOf,
   isToolPart,
-  type ChatFilePart,
   type ChatMessage,
   type ChatMessageMetadata,
   type ChatToolPart,
@@ -64,7 +64,6 @@ import type {
   UnifiedSendMessageOptions,
   UnifiedUsageBreakdown,
 } from '../types/unified-chat-state.types';
-import { buildChatAttachmentViewUrl, type ChatAttachment } from '../utils/chat-attachment-markdown';
 import { createChatConversationStorage, pruneStaleChatConversationStorage } from '../utils/chat-conversation-storage';
 import { createChatConversationsApi } from '../utils/chat-conversations-api';
 import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
@@ -207,16 +206,6 @@ function conversationIdOfChunk(chunk: UiChunk): string | null {
 /** A client id the server does not know: it means a new conversation (the standard's `id` is always there). */
 function newClientId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-/** An attachment as the part it rides in. Its url is the view proxy, through the host's own prefix. */
-function filePartOfAttachment(attachment: ChatAttachment, viewUrlPrefix: string): ChatFilePart {
-  return {
-    type: 'file',
-    mediaType: attachment.contentType,
-    filename: attachment.fileName,
-    url: buildChatAttachmentViewUrl(viewUrlPrefix, attachment.storagePath, attachment.viewToken),
-  };
 }
 
 /** The parts of one approval: the row it names, and when that row is in a batch, the whole batch. Only what still waits. */

@@ -273,14 +273,7 @@ export {
 // stays intact for client consumers via components/chat barrel.
 export {
   escapeMarkdownInline,
-  type ChatAttachment,
-  buildChatAttachmentViewUrl,
-  CHAT_ATTACHMENT_VIEW_URL_PREFIX,
-  CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM,
-  ANTHROPIC_SUPPORTED_IMAGE_MIME,
   CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED,
-  CHAT_ATTACHMENT_MARKDOWN_PATTERN,
-  stripChatAttachmentMarkdown,
 } from '../components/chat/utils/chat-attachment-markdown';
 export {
   AUTO_CONTINUATION_DIRECTIVE_PREFIX,

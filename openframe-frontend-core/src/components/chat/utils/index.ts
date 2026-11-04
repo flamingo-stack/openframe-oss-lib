@@ -90,18 +90,9 @@ export {
   buildDiscussAddendum,
 } from './slash-dispatch-utils';
 
-// Chat-attachment markdown formatter + strip parser
-export {
-  CHAT_ATTACHMENT_VIEW_URL_PREFIX,
-  CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM,
-  ANTHROPIC_SUPPORTED_IMAGE_MIME,
-  type ChatAttachment,
-  buildChatAttachmentViewUrl,
-  escapeMarkdownInline,
-  CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED,
-  CHAT_ATTACHMENT_MARKDOWN_PATTERN,
-  stripChatAttachmentMarkdown,
-} from './chat-attachment-markdown';
+// Chat-attachment markdown: the bubble's form of a `file` part, and the escape for a file name (the attachment
+// itself is chat-protocol/attachment.ts).
+export { escapeMarkdownInline, CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED } from './chat-attachment-markdown';
 
 // External app deep-links (chat surfaces)
 export { clickupTaskUrl } from './external-app-urls';

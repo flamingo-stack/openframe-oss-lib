@@ -31,10 +31,10 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChatAttachment } from '../../../chat-protocol/attachment';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { randomId } from '../../../utils/random-id';
-import type { ChatAttachment } from '../../chat/utils/chat-attachment-markdown';
 import { useOptionalTicketLive } from '../ticket-live-provider';
 import {
   type MappedTicketActionError,

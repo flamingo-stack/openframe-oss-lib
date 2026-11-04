@@ -83,9 +83,6 @@ export {
   ChatAttachmentChipStrip,
   type ChatAttachmentAddButtonProps,
   type ChatAttachmentChipStripProps,
-  type StagedAttachment,
-  CHAT_ATTACHMENT_MIME_TYPES,
-  CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER,
 } from './chat-attachment-bar';
 
 // Entity-cards (12 refactored + 4 moved + supporting primitives)

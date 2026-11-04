@@ -29,3 +29,5 @@ export * from './record-cards';
 export * from './citation-chip';
 // One row of the docs search, as the hub writes it and the search bar reads it.
 export type { DocSearchResult } from './doc-search';
+// A chat attachment: its constants, its shape and its `file` part, for the hub's routes and the lib's composer.
+export * from './attachment';

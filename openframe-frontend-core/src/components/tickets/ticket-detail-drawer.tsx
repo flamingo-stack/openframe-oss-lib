@@ -23,12 +23,12 @@
 
 import { useEffect, useRef } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
+import type { ChatAttachment } from '../../chat-protocol/attachment';
 import { type ChatRuntime, useChatRuntime } from '../../contexts/chat-runtime-context';
 import { LoadingRegion } from '../loading/loading-region';
 import { formatRelativeTime } from './../../utils/date-utils';
 import { ChatMessageRow } from './../chat/chat-message-row';
 import { useChatIdentity } from './../chat/hooks/use-chat-identity';
-import type { ChatAttachment } from './../chat/utils/chat-attachment-markdown';
 import { executeNewTabNavigation } from './../chat/utils/execute-navigation';
 import { EmptyState } from './../empty-state';
 import { Button } from './../ui/button';

@@ -15,9 +15,9 @@
  * LLM metadata is SSE-only). In the off-mode they're null.
  */
 
+import type { ChatAttachment } from '../../../chat-protocol/attachment';
 import type { ChatMessage } from '../../../chat-protocol/chat-message';
 import type { ChatRef } from '../chat-ref.types';
-import type { ChatAttachment } from '../utils/chat-attachment-markdown';
 import type { DialogItem } from './component.types';
 import type { ChatContextItem } from './context-item.types';
 import type { ChatMessageActions } from './message.types';
