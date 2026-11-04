@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import Link from '../../embed-shims/next-link';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { Button } from './button';
@@ -83,7 +84,11 @@ interface HoverDropdownProps {
  * Generic hover dropdown — shows a list of clickable items on hover.
  *
  * Uses fixed positioning with getBoundingClientRect for proper placement
- * inside containers with overflow hidden (e.g., Sheet, modals).
+ * inside containers with overflow hidden (e.g., Sheet, modals), and is drawn in
+ * a portal on the page body: inside the chat's message list a `fixed` panel
+ * stays in that list's stacking context whatever its z-index, and the composer
+ * below the list painted over it (2026-11-04). The panel keeps the hover open
+ * itself, since it is no longer inside the trigger.
  *
  * Usage:
  *   <HoverDropdown items={[{ label: 'Blog Post', href: '/blog/1' }]}>
@@ -181,95 +186,100 @@ export function HoverDropdown({
   return (
     <div ref={containerRef} className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onClick={toggle}>
       {children}
-      {open && (
-        <div
-          className={`fixed z-[9999] max-h-[420px] min-w-[220px] max-w-[340px] overflow-y-auto rounded-lg border border-ods-border bg-ods-card p-1 shadow-xl ${className || ''}`}
-          // `left`/`top` are intentionally absent here — the layout effect above
-          // owns them, because both values are live DOM measurements.
-          ref={panelRef}
-        >
-          {items.map((item, i) => {
-            const content = (
-              <>
-                {item.icon && <span className="flex-shrink-0 [&_svg]:size-3.5">{item.icon}</span>}
-                <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              </>
-            );
-
-            // Each row is a flex container: primary action (link or button)
-            // occupies the left expanding region; the optional secondary
-            // action ("Ask") sits at the right as a sibling icon-button so
-            // its click is independent of the primary navigation.
-            const rowClass =
-              'group flex w-full items-center gap-1.5 pl-2 pr-1 py-1.5 rounded text-h6 text-ods-text-secondary hover:bg-ods-accent/10 transition-colors text-left';
-            const primaryClass =
-              'flex flex-1 items-center gap-1.5 min-w-0 hover:text-ods-accent cursor-pointer no-underline';
-
-            // Bound before the JSX: the `onClick` handler fires long after this
-            // render, so the `item.secondaryAction` narrowing does not reach
-            // inside it — the local does.
-            const secondaryAction = item.secondaryAction;
-            const secondary = secondaryAction ? (
-              <Button
-                variant="bare"
-                size="icon-sm"
-                type="button"
-                onClick={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  secondaryAction.onClick();
-                }}
-                aria-label={secondaryAction.label}
-                title={secondaryAction.label}
-                className="shrink-0"
-              >
-                {secondaryAction.icon}
-              </Button>
-            ) : null;
-
-            if (item.href) {
-              // Caller supplies the anchor renderer (defaults to plain <a>).
-              // Chat consumers wire `NavLinkAnchorViaRuntime` here so clicks
-              // route through the chat runtime.
-              return (
-                <div key={i} className={rowClass}>
-                  {renderAnchorFn({
-                    href: item.href,
-                    targetPlatform: item.targetPlatform,
-                    path: item.path,
-                    alwaysNewTab: item.alwaysNewTab,
-                    className: primaryClass,
-                    children: content,
-                  })}
-                  {secondary}
-                </div>
+      {open &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            onMouseEnter={show}
+            onMouseLeave={hide}
+            className={`fixed z-[9999] max-h-[420px] min-w-[220px] max-w-[340px] overflow-y-auto rounded-lg border border-ods-border bg-ods-card p-1 shadow-xl ${className || ''}`}
+            // `left`/`top` are intentionally absent here — the layout effect above
+            // owns them, because both values are live DOM measurements.
+            ref={panelRef}
+          >
+            {items.map((item, i) => {
+              const content = (
+                <>
+                  {item.icon && <span className="flex-shrink-0 [&_svg]:size-3.5">{item.icon}</span>}
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                </>
               );
-            }
 
-            // Item has no primary action — render the label as a
-            // non-interactive span. The secondary Ask button remains
-            // active, so the row is still useful for rows that have no
-            // public viewer URL but DO have a working Ask drill-in.
-            if (!item.onClick) {
-              return (
-                <div key={i} className={rowClass}>
-                  <span className={`${primaryClass} cursor-default hover:!text-ods-text-secondary`}>{content}</span>
-                  {secondary}
-                </div>
-              );
-            }
+              // Each row is a flex container: primary action (link or button)
+              // occupies the left expanding region; the optional secondary
+              // action ("Ask") sits at the right as a sibling icon-button so
+              // its click is independent of the primary navigation.
+              const rowClass =
+                'group flex w-full items-center gap-1.5 pl-2 pr-1 py-1.5 rounded text-h6 text-ods-text-secondary hover:bg-ods-accent/10 transition-colors text-left';
+              const primaryClass =
+                'flex flex-1 items-center gap-1.5 min-w-0 hover:text-ods-accent cursor-pointer no-underline';
 
-            return (
-              <div key={i} className={rowClass}>
-                <Button variant="row" type="button" onClick={item.onClick} className="min-w-0 flex-1">
-                  {content}
+              // Bound before the JSX: the `onClick` handler fires long after this
+              // render, so the `item.secondaryAction` narrowing does not reach
+              // inside it — the local does.
+              const secondaryAction = item.secondaryAction;
+              const secondary = secondaryAction ? (
+                <Button
+                  variant="bare"
+                  size="icon-sm"
+                  type="button"
+                  onClick={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    secondaryAction.onClick();
+                  }}
+                  aria-label={secondaryAction.label}
+                  title={secondaryAction.label}
+                  className="shrink-0"
+                >
+                  {secondaryAction.icon}
                 </Button>
-                {secondary}
-              </div>
-            );
-          })}
-        </div>
-      )}
+              ) : null;
+
+              if (item.href) {
+                // Caller supplies the anchor renderer (defaults to plain <a>).
+                // Chat consumers wire `NavLinkAnchorViaRuntime` here so clicks
+                // route through the chat runtime.
+                return (
+                  <div key={i} className={rowClass}>
+                    {renderAnchorFn({
+                      href: item.href,
+                      targetPlatform: item.targetPlatform,
+                      path: item.path,
+                      alwaysNewTab: item.alwaysNewTab,
+                      className: primaryClass,
+                      children: content,
+                    })}
+                    {secondary}
+                  </div>
+                );
+              }
+
+              // Item has no primary action — render the label as a
+              // non-interactive span. The secondary Ask button remains
+              // active, so the row is still useful for rows that have no
+              // public viewer URL but DO have a working Ask drill-in.
+              if (!item.onClick) {
+                return (
+                  <div key={i} className={rowClass}>
+                    <span className={`${primaryClass} cursor-default hover:!text-ods-text-secondary`}>{content}</span>
+                    {secondary}
+                  </div>
+                );
+              }
+
+              return (
+                <div key={i} className={rowClass}>
+                  <Button variant="row" type="button" onClick={item.onClick} className="min-w-0 flex-1">
+                    {content}
+                  </Button>
+                  {secondary}
+                </div>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

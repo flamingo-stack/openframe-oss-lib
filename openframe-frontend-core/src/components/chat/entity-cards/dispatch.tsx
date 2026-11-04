@@ -1466,8 +1466,7 @@ interface GlyphCardConfig {
    * ONLY for a type whose records carry their own mark (a vendor's logo, a
    * page's menu icon): it is handed the hydrated ref and draws that mark.
    * Every other type leaves it out and gets its SOURCE's icon
-   * (`sourceGlyph`): the one `SOURCE_ICON_NAMES` entry its chip draws too, so
-   * a card and its chip can never show different icons.
+   * (`sourceGlyph`), the one `SOURCE_ICON_NAMES` entry for its type.
    */
   icon?: (ref?: ChatRef) => React.ReactNode;
   /**
@@ -2246,7 +2245,6 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, held, extras }: 
       const href = finalChatRef.url;
       return (
         <InlineChip
-          icon={sourceGlyph(chatRef.type)}
           label={source.title ?? `${entry.label} ${chatRef.id}`}
           link={
             href

@@ -14,17 +14,12 @@
  * repeat on every line it spans (`box-decoration-break: clone`), and an unbroken name (an id, a host name, a name in
  * Chinese) breaks anywhere rather than run out of its column, with an action or without one.
  *
- * The icon never ends a line on its own. It stands in the start padding of the box that holds the name, out of flow:
- * beside the text as an inline block it was a place a line could break, and a line did ("per the" and the icon alone,
- * with the name on the next line). An inline box's padding goes where its first letter goes and a word does not break,
- * so the icon stays with the first word, for any label, and the rest wraps with the line.
- *
  * It READS as text: the sentence's own font, size and case (`font: inherit`), never monospace or capitals, set apart
- * by a light tint, its icon and a hover tint, the way an inline smart link or a mention is (body type, a tint and an
- * icon, never a typeface of its own). A border, mono capitals and a visible action after every name made a sentence
- * of several chips hard to read (2026-11-01).
+ * only by a light tint and a hover tint, the way an inline mention is. It draws NO icon: a sentence of several chips was
+ * too crowded with one before each name (2026-11-04), as it was with a border, mono capitals and a visible action after
+ * every name (2026-11-01). The record's type is on its card and in its menu.
  *
- * `link` wraps the icon and the name in the chip's link (the host's anchor, or the record's); a chip with a link
+ * `link` wraps the name in the chip's link (the host's anchor, or the record's); a chip with a link
  * tints on hover. `trailing` is an action inside the SAME box, after the name (the record's "⋯" menu, a new-tab
  * link): faint until the chip is hovered or focused, so a sentence of chips stays quiet and the action is still there
  * to see and reach by keyboard, without the text moving. `loading` draws the lib `Tag`'s own skeleton.
@@ -44,20 +39,6 @@ const INLINE_CHIP_CLASS = cn(
 /** A chip with a link: its tint deepens on hover (applied with `link`; a chip inside its anchor passes it as `className`). */
 export const INLINE_CHIP_LINKED_CLASS = 'hover:bg-ods-bg-surface-hover';
 
-/** The box that holds the name and, in its start padding, the icon. */
-const INLINE_CHIP_NAME_CLASS = 'relative ps-[calc(1rem+var(--spacing-system-xxs))]';
-
-/**
- * A 16px muted lead icon in that padding, on the first line, ending 0.2em under the text's baseline: an inline box starts
- * at its font's ascent above the baseline, 0.99em in the chat's body font (measured against the inline version it
- * replaces: within 0.2px at 14, 16 and 18px, in Chromium and in WebKit).
- *
- * Left-to-right only in WebKit. There a right-to-left name that wraps from the middle of a line keeps the icon on its first
- * line, 77 to 152px from the first letter: WebKit puts `start-0` at the edge of all the name's lines, not of the first. No
- * placement tried holds it (a static position with a negative margin is worse). Chromium is right either way.
- */
-const INLINE_CHIP_ICON_CLASS = 'absolute start-0 top-[calc(1.19em-1rem)] size-4 text-ods-text-secondary [&_svg]:size-4';
-
 /** The action after the name: faint, full on the chip's hover or keyboard focus. */
 const INLINE_CHIP_TRAILING_CLASS = cn(
   'ml-[var(--spacing-system-xxs)] text-ods-text-secondary opacity-50 transition-opacity',
@@ -70,14 +51,12 @@ export interface InlineChipAnchor {
 }
 
 export function InlineChip({
-  icon,
   label,
   className,
   loading,
   link,
   trailing,
 }: {
-  icon?: React.ReactNode;
   label: React.ReactNode;
   className?: string;
   loading?: boolean;
@@ -87,18 +66,8 @@ export function InlineChip({
   trailing?: React.ReactNode;
 }): React.ReactElement {
   if (loading) {
-    return <Tag as="span" variant="badge" icon={icon} label="" loading className="align-middle" />;
+    return <Tag as="span" variant="badge" label="" loading className="align-middle" />;
   }
-  /** The name with the icon held to it (see the header). */
-  const named = (name: React.ReactNode) =>
-    icon ? (
-      <span className={INLINE_CHIP_NAME_CLASS}>
-        <span className={INLINE_CHIP_ICON_CLASS}>{icon}</span>
-        {name}
-      </span>
-    ) : (
-      name
-    );
   // A line must not break between the name and its action, or the "⋯" is left alone at the start of the next line.
   // Browsers allow a break before an inline button whatever `white-space` says, so the name's LAST FEW CHARACTERS and the
   // action share one `nowrap` box; the rest of the name wraps freely. Only those few: a whole last word held there ran out
@@ -112,15 +81,15 @@ export function InlineChip({
     const wrap = (content: React.ReactNode, anchor: InlineChipAnchor) => (link ? link(content, anchor) : content);
     return (
       <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, link && INLINE_CHIP_LINKED_CLASS, className)}>
-        {split.head ? wrap(named(split.head), { label: label as string }) : null}
+        {split.head ? wrap(split.head, { label: label as string }) : null}
         <span className="whitespace-nowrap">
-          {split.head ? wrap(split.end, { hidden: true }) : wrap(named(split.end), {})}
+          {split.head ? wrap(split.end, { hidden: true }) : wrap(split.end, {})}
           <span className={INLINE_CHIP_TRAILING_CLASS}>{trailing}</span>
         </span>
       </span>
     );
   }
-  const content = named(label);
+  const content = label;
   return (
     <span data-testid="inline-chip" className={cn(INLINE_CHIP_CLASS, link && INLINE_CHIP_LINKED_CLASS, className)}>
       {link ? link(content, {}) : content}
