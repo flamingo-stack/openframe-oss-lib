@@ -1,0 +1,267 @@
+package com.openframe.audit;
+
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditActorType;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditEvent;
+import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.audit.AuditRequestContext;
+import com.openframe.data.document.audit.AuditTargetType;
+import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.user.User;
+import com.openframe.data.repository.audit.AuditEventRepository;
+import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.user.UserRepository;
+import com.openframe.data.service.TenantIdProvider;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import tools.jackson.databind.ObjectMapper;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class AuditRecorderTest {
+
+    private static final String SUPER_TENANT_ID = "super-tenant";
+    private static final String SERVED_TENANT_ID = "tenant-1";
+    private static final String USER_ID = "user-1";
+    private static final String MACHINE_ID = "machine-1";
+
+    @Mock private AuditEventRepository auditEventRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private MachineRepository machineRepository;
+    @Mock private TenantIdProvider tenantIdProvider;
+    @Captor private ArgumentCaptor<AuditEvent> eventCaptor;
+
+    private AuditRecorder recorder;
+
+    @BeforeEach
+    void setUp() {
+        recorder = new AuditRecorder(auditEventRepository, userRepository, machineRepository, tenantIdProvider,
+                new ObjectMapper(), SUPER_TENANT_ID);
+    }
+
+    @AfterEach
+    void clearContexts() {
+        SecurityContextHolder.clearContext();
+        RequestContextHolder.resetRequestAttributes();
+    }
+
+    @Test
+    void recordsTechnicianActionWithTokenAndHeaders() {
+        signIn(jwt(USER_ID, "anna@acme.com", List.of("ADMIN"), SERVED_TENANT_ID, null, "session-1"));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(AuditRequestContext.CLIENT_IP_HEADER, "203.0.113.24");
+        request.addHeader("User-Agent", "Chrome");
+        request.addHeader(AuditRequestContext.REQUEST_ID_HEADER, "request-1");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user("Anna", "Kowalski")));
+        Instant before = Instant.now();
+
+        recorder.record(AuditEntry.builder()
+                .action(AuditAction.TICKET_ARCHIVE)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId("ticket-1")
+                .targetName("Printer offline")
+                .organizationId("org-1")
+                .deviceId("device-1")
+                .parentEventId("parent-1")
+                .details(Map.of("statusKind", "RESOLVED"))
+                .changes(Map.of("status", new AuditChange("OPEN", "ARCHIVED")))
+                .build());
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getId()).hasSize(26);
+        assertThat(event.getSchemaVersion()).isEqualTo(AuditEvent.SCHEMA_VERSION);
+        assertThat(event.getOccurredAt()).isBetween(before, Instant.now());
+        assertThat(event.getAction()).isEqualTo("ticket.archive");
+        assertThat(event.getOutcome()).isEqualTo(AuditOutcome.SUCCESS);
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.USER);
+        assertThat(event.getActorId()).isEqualTo(USER_ID);
+        assertThat(event.getActorName()).isEqualTo("Anna Kowalski");
+        assertThat(event.getActorEmail()).isEqualTo("anna@acme.com");
+        assertThat(event.getRoleSnapshot()).containsExactly("ADMIN");
+        assertThat(event.getSourceIp()).isEqualTo("203.0.113.24");
+        assertThat(event.getUserAgent()).isEqualTo("Chrome");
+        assertThat(event.getSessionId()).isEqualTo("session-1");
+        assertThat(event.getCorrelationId()).isEqualTo("request-1");
+        assertThat(event.getParentEventId()).isEqualTo("parent-1");
+        assertThat(event.getTenantId()).isEqualTo(SERVED_TENANT_ID);
+        assertThat(event.getOrganizationId()).isEqualTo("org-1");
+        assertThat(event.getDeviceId()).isEqualTo("device-1");
+        assertThat(event.getTargetType()).isEqualTo(AuditTargetType.TICKET);
+        assertThat(event.getTargetId()).isEqualTo("ticket-1");
+        assertThat(event.getTargetName()).isEqualTo("Printer offline");
+        assertThat(event.getDetails()).containsEntry("statusKind", "RESOLVED");
+        assertThat(event.getChanges()).containsEntry("status", new AuditChange("OPEN", "ARCHIVED"));
+    }
+
+    @Test
+    void recordsStaffUnderTheServedTenant() {
+        signIn(jwt("staff-1", "staff@flamingo.cx", List.of("ADMIN"), SUPER_TENANT_ID, null, null));
+        when(userRepository.findById("staff-1")).thenReturn(Optional.of(user("John", null)));
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+
+        recorder.record(entry(AuditAction.TICKET_ARCHIVE));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.STAFF);
+        assertThat(event.getActorName()).isEqualTo("John");
+        assertThat(event.getTenantId()).isEqualTo(SERVED_TENANT_ID);
+    }
+
+    @Test
+    void recordsDeviceWithItsHostname() {
+        signIn(jwt(MACHINE_ID, null, List.of("AGENT"), SERVED_TENANT_ID, MACHINE_ID, null));
+        Machine machine = new Machine();
+        machine.setHostname("LAPTOP-7F3A");
+        when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
+
+        recorder.record(entry(AuditAction.DEVICE_REGISTER));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.DEVICE);
+        assertThat(event.getActorId()).isEqualTo(MACHINE_ID);
+        assertThat(event.getActorName()).isEqualTo("LAPTOP-7F3A");
+        assertThat(event.getActorEmail()).isNull();
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void recordsSystemWhenThereIsNoToken() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+
+        recorder.record(entry(AuditAction.TICKET_ARCHIVE));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.SYSTEM);
+        assertThat(event.getActorId()).isNull();
+        assertThat(event.getActorName()).isNull();
+        assertThat(event.getRoleSnapshot()).isEmpty();
+        assertThat(event.getSourceIp()).isNull();
+        assertThat(event.getSessionId()).isNull();
+        assertThat(event.getTenantId()).isEqualTo(SERVED_TENANT_ID);
+        verifyNoInteractions(userRepository, machineRepository);
+    }
+
+    @Test
+    void leavesNameEmptyWhenUserRecordIsGone() {
+        signIn(jwt(USER_ID, "anna@acme.com", List.of("ADMIN"), SERVED_TENANT_ID, null, null));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        recorder.record(entry(AuditAction.TICKET_ARCHIVE));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorId()).isEqualTo(USER_ID);
+        assertThat(event.getActorEmail()).isEqualTo("anna@acme.com");
+        assertThat(event.getActorName()).isNull();
+    }
+
+    @Test
+    void prefersTheTenantTheCallerPasses() {
+        signIn(jwt(USER_ID, "anna@acme.com", List.of("ADMIN"), SERVED_TENANT_ID, null, null));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user("Anna", "Kowalski")));
+
+        recorder.record(AuditEntry.builder()
+                .action(AuditAction.TICKET_ARCHIVE)
+                .outcome(AuditOutcome.SUCCESS)
+                .tenantId("tenant-2")
+                .build());
+
+        assertThat(savedEvent().getTenantId()).isEqualTo("tenant-2");
+    }
+
+    @Test
+    void takesTheTargetTypeFromTheEntryWhenTheActionHasNone() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+
+        recorder.record(AuditEntry.builder()
+                .action(AuditAction.LINK_CREATE)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetType(AuditTargetType.KB_ARTICLE)
+                .build());
+
+        assertThat(savedEvent().getTargetType()).isEqualTo(AuditTargetType.KB_ARTICLE);
+    }
+
+    @Test
+    void logsAndReturnsWhenTheInsertFails() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+        when(auditEventRepository.insert(any(AuditEvent.class)))
+                .thenThrow(new DataAccessResourceFailureException("mongo down"));
+
+        recorder.record(entry(AuditAction.TICKET_ARCHIVE));
+
+        verify(auditEventRepository).insert(any(AuditEvent.class));
+    }
+
+    @Test
+    void refusesAnEntryWithoutAction() {
+        assertThatThrownBy(() -> recorder.record(AuditEntry.builder().outcome(AuditOutcome.SUCCESS).build()))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(auditEventRepository);
+    }
+
+    private AuditEvent savedEvent() {
+        verify(auditEventRepository).insert(eventCaptor.capture());
+        return eventCaptor.getValue();
+    }
+
+    private static AuditEntry entry(AuditAction action) {
+        return AuditEntry.builder().action(action).outcome(AuditOutcome.SUCCESS).build();
+    }
+
+    private static User user(String firstName, String lastName) {
+        User user = new User();
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        return user;
+    }
+
+    private static void signIn(Jwt jwt) {
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+    }
+
+    private static Jwt jwt(String subject, String email, List<String> roles, String tenantId, String machineId,
+                           String sessionId) {
+        Jwt.Builder builder = Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .subject(subject)
+                .claim("roles", roles)
+                .claim("tenant_id", tenantId);
+        if (email != null) {
+            builder.claim("email", email);
+        }
+        if (machineId != null) {
+            builder.claim("machine_id", machineId);
+        }
+        if (sessionId != null) {
+            builder.claim(AuditRequestContext.SESSION_CLAIM, sessionId);
+        }
+        return builder.build();
+    }
+}

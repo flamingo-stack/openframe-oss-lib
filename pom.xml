@@ -24,6 +24,7 @@
         <revision>7.0.48</revision>
         <java.version>25</java.version>
         <lombok.version>1.18.48</lombok.version>
+        <ulid-creator.version>5.2.4</ulid-creator.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <spring-data-mongodb.version>4.2.0</spring-data-mongodb.version>
@@ -76,6 +77,7 @@
         <module>openframe-data-timeentry-aspect</module>
         <module>openframe-tool-agent-nats-installation</module>
         <module>openframe-security-core</module>
+        <module>openframe-audit</module>
         <module>openframe-authorization-service-core</module>
         <module>openframe-client-core</module>
         <module>openframe-api-service-core</module>
@@ -229,6 +231,16 @@
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-security-core</artifactId>
                 <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-audit</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.f4b6a3</groupId>
+                <artifactId>ulid-creator</artifactId>
+                <version>${ulid-creator.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.openframe.oss</groupId>
