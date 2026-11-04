@@ -188,9 +188,6 @@ describe('makeComposeContentUrl (unified single-object seam)', () => {
     expect(c({ type: 'product_release', identifier: 'v2', externalUrl: `${HUB}/releases/v2` })).toEqual({
       href: '/custom/v2',
       targetPlatform: 'openframe',
-      // Only this branch is flagged — fetch-mode cards rank it above the
-      // fetched row's own url (`pickFetchedCardHref`).
-      hostOverride: true,
     });
   });
 
@@ -255,8 +252,7 @@ describe('makeComposeContentUrl: slugIsIdentifier', () => {
     );
   });
 
-  // TODO(CU-17tkuw61kfy): an old doc source arrives with its tree path as the slug, and its row id as the identifier.
-  it('the slug hint wins, for an old doc source', () => {
+  it('a doc`s tree path, passed as the slug, wins over its row id', () => {
     expect(compose({ type: 'markdown', identifier: 'uuid-1', slug: 'docs/setup.md' }).href).toBe(
       '/knowledge-base/docs/setup.md',
     );

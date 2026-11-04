@@ -31,7 +31,11 @@ const makeRuntime = (opensTabs?: boolean) =>
       ...(opensTabs === undefined ? {} : { opensTabs }),
     },
     source: 'flamingo',
-    composeContentUrl: ({ id }: { id?: string | null }) => ({ href: `/roadmap#${id}` }),
+    // The host's composer: a record the server gave a url to opens on its route here.
+    composeContentUrl: ({ identifier, externalUrl }: { identifier: string; externalUrl?: string | null }) => ({
+      href: externalUrl ? `/roadmap#${identifier}` : '',
+      targetPlatform: null,
+    }),
   }) as unknown as ChatRuntime;
 
 const runtime = makeRuntime();
@@ -61,11 +65,13 @@ async function menuRows(name: string | RegExp): Promise<string[]> {
     .map(row => row.textContent?.trim() ?? '');
 }
 
-/** A roadmap row as the hub answers it: the address of the task in ClickUp is the server's, never composed from the id. */
+/** A roadmap row as the hub answers it: its address and the task's in ClickUp are the server's, never composed from the
+ *  id. */
 const ROADMAP_ROW = {
   id: '86ad3qvv5',
   title: 'Patch policies',
   status: 'working',
+  url: 'https://www.flamingo.run/roadmap?search=86ad3qvv5',
   clickupUrl: 'https://app.clickup.com/t/from-the-row',
 };
 

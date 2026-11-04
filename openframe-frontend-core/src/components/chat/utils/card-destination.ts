@@ -9,17 +9,14 @@
  */
 
 import { platformOfUrl } from '../../../platform-domains';
-import type { ComposeContentUrl } from '../../../utils/content-href';
 import type { ChatRef } from '../chat-ref.types';
-import { safeHref } from './compact-card-classes';
 import { isRelativeHref } from './new-tab-rel';
-import { pickFetchedCardHref, readFetchedCardPath, resolveFetchedCardHref } from './resolve-fetched-card-href';
 import { resolveSourceRowCTA, type SourceRowContext } from './source-row-cta';
 
 export interface CardDestination {
   url: string | null;
   targetPlatform: string | null;
-  /** Doc-tree path, from the ref or the fetched row. The click router uses it for in-app doc navigation. */
+  /** Doc-tree path, from the ref. The click router uses it for in-app doc navigation. */
   path: string | null;
   /**
    * The url is a route of the host's own. The server's url is always absolute, so a relative href the composer made of it
@@ -28,24 +25,13 @@ export interface CardDestination {
   hostRoute: boolean;
 }
 
-/** The routing fields of a card registry entry, generic over the row type the entry reads. */
-export interface CardDestinationEntry<Item> {
-  contentRefType?: string;
-  fallbackHref?: (item: Item) => string | null;
-  noComposedHref?: boolean;
-}
-
-export interface CardDestinationInput<Item = unknown> {
+export interface CardDestinationInput {
   /** The ref the card was mounted with: described by a source part, or a bare record (`url: null`). */
   chatRef: ChatRef;
   /** The row the card fetched; undefined while loading and for ref-only types. */
-  item?: Item;
-  /** The registry entry's routing fields. */
-  entry?: CardDestinationEntry<Item> | null;
+  item?: unknown;
   /** `sourceRowCtxFromRuntime(runtime)`, the same context a source chip is resolved with. */
   ctx: SourceRowContext;
-  /** The host's content-href seam (`runtime.composeContentUrl`). */
-  composeContentUrl?: ComposeContentUrl;
 }
 
 /** The url the fetched row answers (the one rule on the server), or null. */
@@ -55,17 +41,26 @@ function readFetchedCardUrl(item: unknown): string | null {
   return typeof url === 'string' && url ? url : null;
 }
 
-export function resolveCardDestination<Item = unknown>({
-  chatRef,
-  item,
-  entry,
-  ctx,
-  composeContentUrl,
-}: CardDestinationInput<Item>): CardDestination {
+/**
+ * Human title of a fetched row: `title`, else `name`, else null.
+ *
+ * A bare record ref carries no title of its own. Everything downstream that prints or sends the title (the "Ask Mingo"
+ * prompt, host renderers falling back to `ref.title`) would otherwise say `86ad3qvv5`. Once the row loads, this is the
+ * real title.
+ */
+export function readFetchedCardTitle(item: unknown): string | null {
+  if (!item || typeof item !== 'object') return null;
+  for (const key of ['title', 'name'] as const) {
+    const value = (item as Record<string, unknown>)[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+/** Where the card opens: the source chip's resolver over the url the server answers. No url is no link. */
+export function resolveCardDestination({ chatRef, item, ctx }: CardDestinationInput): CardDestination {
   const url = chatRef.url ?? readFetchedCardUrl(item);
-  const refPath = typeof chatRef.metadata?.path === 'string' && chatRef.metadata.path ? chatRef.metadata.path : null;
-  // TODO(CU-17tkuw61kfy): an old doc source arrives with no url, and its row's path is what a doc card opens.
-  const path = refPath ?? (item ? readFetchedCardPath(item) : null);
+  const path = typeof chatRef.metadata?.path === 'string' && chatRef.metadata.path ? chatRef.metadata.path : null;
   const cta = resolveSourceRowCTA(
     {
       documentType: chatRef.type,
@@ -77,53 +72,6 @@ export function resolveCardDestination<Item = unknown>({
     },
     ctx,
   );
-  if (cta.href) {
-    return {
-      url: cta.href,
-      targetPlatform: cta.targetPlatform,
-      path,
-      // TODO(CU-17tkuw61kfy): an old hub's row may answer a relative url, which a composer hands back as it came: the
-      // content host's page, never a route of this host. Once every url is absolute, the first half alone.
-      hostRoute: isRelativeHref(cta.href) && cta.href !== url,
-    };
-  }
-  return legacyCardDestination({ chatRef, item, entry, composeContentUrl, path });
-}
-
-/**
- * TODO(CU-17tkuw61kfy): the old hub's page-shaped rows answer no url, and `resolveSourceRowCTA` calls the composer only
- * with a url or a doc path. So the fetched row's own destination: an explicit host override, else the registry's
- * `fallbackHref`, else the composer's href. Only what the host composed can be a route of its own.
- */
-function legacyCardDestination<Item>({
-  chatRef,
-  item,
-  entry,
-  composeContentUrl,
-  path,
-}: Pick<CardDestinationInput<Item>, 'chatRef' | 'item' | 'entry' | 'composeContentUrl'> & {
-  path: string | null;
-}): CardDestination {
-  if (entry?.contentRefType && item) {
-    const choice = pickFetchedCardHref({
-      composed: resolveFetchedCardHref({
-        contentRefType: entry.contentRefType,
-        id: chatRef.id,
-        item,
-        composeContentUrl,
-      }),
-      itemHref: entry.fallbackHref?.(item) ?? null,
-      allowComposed: !entry.noComposedHref,
-    });
-    const url = choice ? (safeHref(choice.href) ?? null) : null;
-    if (choice && url) {
-      return {
-        url,
-        targetPlatform: choice.targetPlatform ?? null,
-        path,
-        hostRoute: choice.source !== 'item' && isRelativeHref(url),
-      };
-    }
-  }
-  return { url: null, targetPlatform: null, path, hostRoute: false };
+  if (!cta.href) return { url: null, targetPlatform: null, path, hostRoute: false };
+  return { url: cta.href, targetPlatform: cta.targetPlatform, path, hostRoute: isRelativeHref(cta.href) };
 }

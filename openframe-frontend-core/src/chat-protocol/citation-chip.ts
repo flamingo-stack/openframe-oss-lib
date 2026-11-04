@@ -1,7 +1,7 @@
 /**
  * The `[N]` citation chip grammar: a model may type a number into its text, and nothing stores one. A citation is
  * structured data on a text part (`./chat-message`), and its number is drawn from reading order (`./citations`). This is
- * what the server's stream and the fill of old rows remove, and what `./old-wire` reads off an older backend.
+ * what the server's stream removes.
  *
  * A chip names a retrieved source by its number: `[1]`, a comma list in one bracket (`[2, 3]`), or a run of them
  * (`[1][2]`). A run counts as citations only when it stands apart from a word: whitespace or the start before it,

@@ -14,16 +14,16 @@ import {
 } from '../../../../chat-protocol/chat-message';
 import { createMingoDecoder } from '../../../../chat-protocol/message-decoder';
 import { createChatStreamReducer } from '../../stream/chat-stream-reducer';
-import type { ChatApprovalStatus, HistoricalMessage } from '../../types';
+import type { ApprovalRequestMessageData, ChatApprovalStatus, HistoricalMessage } from '../../types';
 import { approvalDisplaysInline } from '../approval-display';
 import { processHistoricalMessages } from '../process-historical-messages';
 
-const adminRequest = {
+const adminRequest: ApprovalRequestMessageData = {
   type: 'APPROVAL_REQUEST',
   approvalRequestId: 'req-m1',
   approvalType: 'ADMIN',
   toolCalls: [{ toolExecutionRequestId: 'req-m1', toolName: 'x', requiresApproval: true }],
-} as const;
+};
 
 const adminApprovalMessage = (id: string): HistoricalMessage => ({
   id,

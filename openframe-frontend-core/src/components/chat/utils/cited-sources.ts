@@ -101,8 +101,6 @@ export function sourceRowInputOf(source: ChatSourcePart): SourceRowInput {
     title: sourceTitleOf(source),
     externalUrl: url,
     targetPlatform: platformOfUrl(url),
-    // TODO(CU-17tkuw61kfy): an old doc source arrives with no url and its tree path as `filename`.
-    path: source.type === 'source-document' ? (source.filename ?? null) : null,
   };
 }
 

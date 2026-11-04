@@ -219,7 +219,6 @@ function DocViewerContent({
     source: chatSource,
     baseRoute,
     searchEndpoint,
-    onNavigate: path => navigateToDoc(path, { fromInternalLink: true }),
     onInPageSwap: path => docNav.navigate(path),
   });
 

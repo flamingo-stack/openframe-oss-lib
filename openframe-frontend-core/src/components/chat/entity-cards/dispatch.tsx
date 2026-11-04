@@ -38,7 +38,6 @@ import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
 import {
   TRUST_CENTER_DOCUMENT_TYPE,
-  TRUST_CENTER_PAGE_PATH,
   TRUST_CENTER_TAGLINE,
   TRUST_CENTER_TITLE,
   trustFrameworkBadge,
@@ -54,7 +53,6 @@ import {
   designDocReadiness,
   formatCompletionLabel,
 } from '../../../utils/design-doc-readiness';
-import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
@@ -102,11 +100,9 @@ import type { PrReviewState, GitHubActivityKind } from '../types/entities/github
 import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
 import type { BaseProgramItem, ProgramConfig } from '../types/entities/program-types';
 import { getStatusColorScheme } from '../utils/agent-status-message';
-import { resolveCardDestination } from '../utils/card-destination';
+import { readFetchedCardTitle, resolveCardDestination } from '../utils/card-destination';
 import { executeNavigation } from '../utils/execute-navigation';
-import { clickupTaskUrl } from '../utils/external-app-urls';
 import { buildAnchorProps, navLinkTarget, newTabAnchorAttrs } from '../utils/nav-anchor-props';
-import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
 import { BlogCard } from './blog-card';
@@ -533,8 +529,8 @@ function CardLoadFailure({ label, id, detail }: { label: string; id: string; det
  *  item — the item IS a ChatRef (minted server-side by the per-object
  *  ref-building SSOTs), so the API is the single display-data
  *  layer. The record's ref contributes ONLY the loader-resolved
- *  `url`/`targetPlatform` (embed-origin prefixing of the item's own url
- *  via `fallbackHref`) — never titles/previews/metadata. */
+ *  `url`/`targetPlatform` (what the host's composer made of the item's
+ *  own url) — never titles/previews/metadata. */
 function fetchedItemDisplayRef(item: unknown, chatRef: ChatRef): ChatRef {
   const it = item as ChatRef;
   return {
@@ -876,11 +872,9 @@ function ProductReleaseChatCard({
   );
 }
 
-/** Anchor-wrapped marketing-campaign card. Campaigns have no public
- *  viewer; the registry entry's `fallbackHref` synthesizes the admin
- *  URL upstream in `ChatCardLoader`, so by the time we render here
- *  `chatRef.url` is guaranteed non-null AND the parent's `isNewTab`
- *  reflects the actual destination. */
+/** Anchor-wrapped marketing-campaign card. Its destination is the url its
+ *  row answers (`resolveCardDestination`), and the parent's `isNewTab`
+ *  reflects it. */
 function CampaignChatCard({
   item,
   chatRef,
@@ -1333,34 +1327,6 @@ interface ChatCardRegistryEntry {
   /** `item` is the fetched row (`undefined` only on the ref-only render
    *  path — `deleted_data` / `video`). */
   render: (item: ChatCardItem | undefined, chatRef: ChatRef, opts: ChatCardRenderOptions) => React.ReactNode;
-  /** Optional post-fetch URL synthesizer. When `chatRef.url` is null
-   *  AFTER `resolveSourceRowCTA`, the loader runs this against the
-   *  hydrated item to produce a fallback URL (e.g.
-   *  `/admin/campaigns/${item.id}` for marketing campaigns; `item.url`
-   *  for ChatRef-shaped items). Result is validated via `safeHref`
-   *  before being attached to the resolved ref — so the wrapper sees a
-   *  non-null `href`, the pre-computed `isNewTab` reflects the actual
-   *  destination, and the click goes through `executeNavigation` (no
-   *  silent bypass of embed-mode / close-on-nav). Takes precedence over
-   *  the `composeContentUrl` fallback below — but NOT over an explicit
-   *  host `override` for the type (see `pickFetchedCardHref`).
-   *
-   *  TODO(CU-17tkuw61kfy): for an old hub's rows, which answer no url. Goes
-   *  at the cleanup, from every entry. */
-  fallbackHref?: (item: ChatCardItem) => string | null;
-  /** Opt OUT of the post-fetch `composeContentUrl` SYNTHESIS (see
-   *  `resolveFetchedCardHref`). Set for types with NO public destination
-   *  — the seam would otherwise synthesize `<contentOrigin>/<type>/<id>`
-   *  from its default branch and hand the user a 404.
-   *
-   *  It does NOT opt out of the seam itself: an explicit host `override`
-   *  for the type still wins (`pickFetchedCardHref`). That split is the
-   *  point — a host that re-homes a type must be able to say so even when
-   *  the row already carries the content host's own url.
-   *
-   *  TODO(CU-17tkuw61kfy): for an old hub's rows, which answer no url. Goes
-   *  at the cleanup, from every entry. */
-  noComposedHref?: boolean;
 }
 
 /**
@@ -1368,16 +1334,9 @@ interface ChatCardRegistryEntry {
  * (`/api/github/commits`, `/api/slack-community/messages`, …;
  * `hubspot_ticket_self` via `/api/tickets`) — the fetched item IS a
  * `ChatRef`, and the API is the SINGLE display-data layer
- * (`fetchedItemDisplayRef`): `item.url` is the canonical destination
- * (`fallbackHref`), no `<origin>/<type>/<id>` synthesis
- * (`noComposedHref`). Loading shows the skeleton, exactly like every
- * other fetch card.
- *
- * NOTE `item.url` is minted by the CONTENT host for its OWN surface, so an
- * embedder that serves the same rows elsewhere overrides the type in its
- * `composeContentUrl` config and that wins here — see `pickFetchedCardHref`.
- * (Observed: hub tickets are `/tickets?ticket=…`, which in the OpenFrame
- * console resolved against its own unrelated `/tickets` board.)
+ * (`fetchedItemDisplayRef`): `item.url` is the canonical destination,
+ * through the host's composer like every card (`resolveCardDestination`).
+ * Loading shows the skeleton, exactly like every other fetch card.
  */
 function refHydratedEntry(
   docType: string,
@@ -1388,8 +1347,6 @@ function refHydratedEntry(
     label,
     bareInline: true,
     contentRefType: docType,
-    noComposedHref: true,
-    fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
     skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => renderRef(fetchedItemDisplayRef(item, chatRef), opts),
   };
@@ -1642,10 +1599,6 @@ interface RoadmapEntryConfig {
   label: string;
   cardType: RoadmapCardType;
   contentRefType: string;
-  /** See `ChatCardRegistryEntry.noComposedHref`. TODO(CU-17tkuw61kfy): goes with it. */
-  noComposedHref?: boolean;
-  /** See `ChatCardRegistryEntry.fallbackHref`. TODO(CU-17tkuw61kfy): goes with it. */
-  fallbackHref?: (item: ChatCardItem) => string | null;
 }
 const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
   roadmap_item: { label: 'Roadmap item', cardType: 'roadmap_item', contentRefType: 'roadmap_item' },
@@ -1658,12 +1611,6 @@ const ROADMAP_CARD_CONFIGS: Record<string, RoadmapEntryConfig> = {
     label: 'Internal task',
     cardType: 'internal_task',
     contentRefType: 'internal_task',
-    // Internal ClickUp work has no public destination on any platform — the
-    // seam's default branch would synthesize `<hub>/internal_task/<id>`.
-    // The card's destination IS the ClickUp deep link, derived from the
-    // task id post-fetch.
-    noComposedHref: true,
-    fallbackHref: (item: { id?: unknown }) => (item?.id != null ? clickupTaskUrl(String(item.id)) : null),
   },
 };
 function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
@@ -1671,8 +1618,6 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
-    ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
-    ...(cfg.fallbackHref ? { fallbackHref: cfg.fallbackHref } : {}),
     skeleton: () => <RoadmapCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <RoadmapChatCard
@@ -1724,8 +1669,6 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'FAQ',
     bareInline: true,
     contentRefType: 'faq',
-    noComposedHref: true,
-    fallbackHref: (item: ChatCardItem) => (item?.id != null ? `/faqs#${faqItemAnchor(item.id)}` : null),
     skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} actions={opts.actions} />
@@ -1739,8 +1682,6 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Trust center',
     bareInline: true,
     contentRefType: TRUST_CENTER_DOCUMENT_TYPE,
-    noComposedHref: true,
-    fallbackHref: () => TRUST_CENTER_PAGE_PATH,
     skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <TrustCenterChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} actions={opts.actions} />
@@ -1811,8 +1752,6 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Design doc',
     contentRefType: 'design_doc',
     bareInline: true,
-    noComposedHref: true,
-    fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
     skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <DesignDocChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} actions={opts.actions} />
@@ -1899,9 +1838,6 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     contentRefType: 'marketing_campaign',
     bareInline: true,
     skeleton: () => <MingoInfoCard loading title="" />,
-    // No public viewer — synthesize the hub-internal admin URL post-fetch
-    // so the wrapper + isNewTab computation see the actual destination.
-    fallbackHref: (item: ChatCardItem) => (item?.id ? `/admin/campaigns/${encodeURIComponent(String(item.id))}` : null),
     render: (item, chatRef, opts) => (
       <CampaignChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} actions={opts.actions} />
     ),
@@ -2132,9 +2068,7 @@ export function useRecordDestination(chatRef: ChatRef) {
   const destination = resolveCardDestination({
     chatRef,
     item: fetchEntry ? item : undefined,
-    entry: fetchEntry,
     ctx: sourceRowCtxFromRuntime(runtime),
-    composeContentUrl: runtime.composeContentUrl,
   });
   const sourceRepo = chatRef.sourceRepo ?? defaultTableIdForDocumentType(chatRef.type);
   const clickupUrl = fetchEntry && typeof item?.clickupUrl === 'string' ? item.clickupUrl : null;

@@ -18,8 +18,7 @@
  *     `onInPageSwap?: (path: string) => boolean` config callback. When
  *     present and returns true, the hook treats a same-origin result
  *     click as "handled in-page"; when absent or returns false, the
- *     hook falls back to `onNavigate(path)` (`router.push` on hub,
- *     `window.location.assign` on bare embedders).
+ *     click goes through the one navigation executor.
  *   - `traceCompose` (hub-only telemetry) → dropped. The lib has no
  *     equivalent runtime-context yet; bring it back when there is one.
  *
@@ -61,10 +60,6 @@ export interface UseDocSearchConfig {
    *  attempts the optional in-page swap path before falling through
    *  to a full nav. */
   baseRoute: string;
-  /** Imperative navigation fallback. Called when no override
-   *  (in-page swap, new-tab) applies. Hub callers pass
-   *  `(path) => router.push(path)`; embedders pass an equivalent. */
-  onNavigate: (path: string) => void;
   /** Optional `RagTableConfig.id` list to narrow the search to specific
    *  tables (e.g. `['onboarding-guides']`). Forwarded to
    *  `/api/docs/search?tableIds=…` which intersects with the source's
@@ -124,7 +119,6 @@ function toDocSearchResults(payload: unknown): DocSearchResult[] | null {
     if (!isRecord(entry)) continue;
     const { sourceId, title, url } = docSearchFieldsOf(entry);
     if (!title) continue;
-    const path = readString(entry, 'path');
     rows.push({
       sourceId,
       title,
@@ -132,14 +126,13 @@ function toDocSearchResults(payload: unknown): DocSearchResult[] | null {
       type: entry.type === 'folder' ? 'folder' : 'file',
       snippet: readString(entry, 'snippet') ?? '',
       matchType: entry.matchType === 'title' ? 'title' : 'content',
-      ...(path ? { path } : {}),
     });
   }
   return rows;
 }
 
 export function useDocSearch(config: UseDocSearchConfig) {
-  const { source, baseRoute, onNavigate, tableIds, onInPageSwap, searchEndpoint, composeContentUrl } = config;
+  const { source, baseRoute, tableIds, onInPageSwap, searchEndpoint, composeContentUrl } = config;
   const tableIdsKey = tableIds && tableIds.length > 0 ? tableIds.join(',') : '';
 
   // Optional chat-runtime read — when present and mode='embed' the
@@ -292,17 +285,11 @@ export function useDocSearch(config: UseDocSearchConfig) {
           setKeepOpen(false);
           window.dispatchEvent(new CustomEvent(ASK_AI_OPEN_WITH_REF_EVENT, { detail: action.detail }));
           return;
-        case 'route':
-          // Final fallback: legacy navigation by path. Hits when a row
-          // has neither URL nor pk metadata — a mapper/API regression.
-          setKeepOpen(false);
-          onNavigate(action.path);
-          return;
         case 'noop':
           return;
       }
     },
-    [onNavigate, source, baseRoute, onInPageSwap, runtime, resolvedComposeContentUrl],
+    [source, baseRoute, onInPageSwap, runtime, resolvedComposeContentUrl],
   );
 
   // Reset keepOpen when query changes. Adjusted while rendering, not from an

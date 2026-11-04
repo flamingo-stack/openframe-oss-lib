@@ -111,7 +111,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     });
   });
 
-  it('no url → ask-ai / route / noop fallbacks', () => {
+  it('no url → ask-ai / noop fallbacks', () => {
     expect(
       resolveSearchResultAction(
         {
@@ -130,29 +130,6 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
         ref: { type: 'cap_table', id: 'row-9', title: 'Cap Table', url: null },
       },
     });
-
-    expect(
-      resolveSearchResultAction(
-        {
-          id: 'doc',
-          title: 'Doc',
-          path: 'repo/architecture/api.md',
-          metadata: { sourceId: 'record://markdown/repo%2Farchitecture%2Fapi.md' },
-        },
-        'openframe',
-        runtimeIn('host'),
-        helpCenterCompose,
-      ),
-    ).toEqual({ kind: 'route', path: 'repo/architecture/api.md' });
-
-    expect(
-      resolveSearchResultAction(
-        { id: 'doc', title: 'Doc', path: 'repo/architecture/api.md' },
-        'openframe',
-        runtimeIn('host'),
-        helpCenterCompose,
-      ),
-    ).toEqual({ kind: 'route', path: 'repo/architecture/api.md' });
 
     expect(
       resolveSearchResultAction({ id: 'empty', title: 'Empty' }, 'openframe', runtimeIn('host'), helpCenterCompose),

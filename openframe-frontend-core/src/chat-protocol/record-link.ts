@@ -13,8 +13,7 @@
  * can never become a chip or a card (`parseRecordHref` answers null for it).
  *
  * It replaced two private tokens a model typed into its text, one for a card and one for a chip. Those were not
- * markdown, so markdown broke them (a code span, a link, emphasis), and they carried no name. Only `./old-wire` still
- * reads them, for backends and rows from before the move.
+ * markdown, so markdown broke them (a code span, a link, emphasis), and they carried no name.
  *
  * Server-safe: no React, no browser APIs. Mirrored by the Java agent (openframe-saas-tenant), and pinned by
  * `__tests__/record-link.test.ts`.

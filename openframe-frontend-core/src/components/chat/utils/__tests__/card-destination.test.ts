@@ -80,12 +80,7 @@ describe('resolveCardDestination: the server contract', () => {
     expect(CHAT_CARD_REGISTRY[type].contentRefType, 'a linkable card type must be fetchable').toBeTruthy();
     expect(buildListUrl(CHAT_CARD_REGISTRY[type].contentRefType ?? '', ['1']), 'and have a list endpoint').toBeTruthy();
     const onRef = resolveCardDestination({ chatRef: { ...bare(type, id), url }, ctx });
-    const onRow = resolveCardDestination({
-      chatRef: bare(type, id),
-      item: { url },
-      entry: CHAT_CARD_REGISTRY[type],
-      ctx,
-    });
+    const onRow = resolveCardDestination({ chatRef: bare(type, id), item: { url }, ctx });
     expect(onRef).toEqual({ url, targetPlatform: 'flamingo', path: null, hostRoute: false });
     expect(onRow).toEqual(onRef);
   });
@@ -100,7 +95,9 @@ describe('resolveCardDestination: the server contract', () => {
     expect(out.url).toBe(`${FLAMINGO}/admin/financials`);
   });
 
-  it('a record with no url has no destination', () => {
+  it('a record with no url has no destination, before its row loads and after', () => {
+    expect(resolveCardDestination({ chatRef: bare('onboarding_guide', 'g'), ctx }).url).toBeNull();
+    expect(resolveCardDestination({ chatRef: bare('faq', '7'), item: { id: 7 }, ctx }).url).toBeNull();
     expect(
       resolveCardDestination({ chatRef: bare('hubspot_ticket_anon', '1'), item: { url: null }, ctx }).url,
     ).toBeNull();
@@ -139,14 +136,8 @@ describe.each([
       { documentType: type, id, title: 'T', externalUrl: url, targetPlatform: platformOfUrl(url) },
       ctx,
     );
-    const onRef = resolveCardDestination({ chatRef: { ...bare(type, id), url }, ctx, composeContentUrl });
-    const onRow = resolveCardDestination({
-      chatRef: bare(type, id),
-      item: { url },
-      entry: CHAT_CARD_REGISTRY[type],
-      ctx,
-      composeContentUrl,
-    });
+    const onRef = resolveCardDestination({ chatRef: { ...bare(type, id), url }, ctx });
+    const onRow = resolveCardDestination({ chatRef: bare(type, id), item: { url }, ctx });
     expect(chip.href).toBeTruthy();
     expect(onRef.url).toBe(chip.href);
     expect(onRow.url).toBe(chip.href);
@@ -195,74 +186,5 @@ describe('resolveCardDestination: what a host claims', () => {
       ctx: { composeContentUrl: hubCompose },
     });
     expect(out).toMatchObject({ url: '/blog/a', targetPlatform: 'flamingo', hostRoute: true });
-  });
-});
-
-// TODO(CU-17tkuw61kfy): the old hub's page-shaped rows answer no url.
-describe('legacyCardDestination', () => {
-  const composeContentUrl = makeComposeContentUrl({
-    hostedTypes: new Set(['onboarding_guide', 'data_room_doc']),
-    contentOrigin: FLAMINGO,
-    suffixes: { onboarding_guide: 'guides', data_room_doc: 'data-room' },
-  });
-  const ctx: SourceRowContext = { composeContentUrl };
-
-  it('nothing to open before the row loads, and the composer once it has', () => {
-    const entry = CHAT_CARD_REGISTRY.onboarding_guide;
-    expect(
-      resolveCardDestination({ chatRef: bare('onboarding_guide', 'g'), entry, ctx, composeContentUrl }).url,
-    ).toBeNull();
-    const out = resolveCardDestination({
-      chatRef: bare('onboarding_guide', 'g'),
-      item: { slug: 'mac' },
-      entry,
-      ctx,
-      composeContentUrl,
-    });
-    expect(out).toMatchObject({ url: '/guides/mac', hostRoute: true });
-  });
-
-  it('a relative url an old row answered, which the composer hands back, is the content host’s page too', () => {
-    const destination = resolveCardDestination({
-      chatRef: bare('vendor', 'v'),
-      item: { url: '/vendors/v' },
-      ctx: { composeContentUrl: appCompose },
-      composeContentUrl: appCompose,
-    });
-    expect(destination).toEqual({ url: '/vendors/v', targetPlatform: null, path: null, hostRoute: false });
-  });
-
-  it('a relative url the composer turned into a route of its own is one', () => {
-    const destination = resolveCardDestination({
-      chatRef: bare('product_release', 'r'),
-      item: { url: '/releases/r' },
-      ctx: { composeContentUrl: appCompose },
-      composeContentUrl: appCompose,
-    });
-    expect(destination).toMatchObject({ url: '/help-center/releases/r', hostRoute: true });
-  });
-
-  it('a relative `fallbackHref` is the content host’s page, never a route of this host', () => {
-    const out = resolveCardDestination({
-      chatRef: bare('faq', '7'),
-      item: { id: 7 },
-      entry: CHAT_CARD_REGISTRY.faq,
-      ctx,
-      composeContentUrl,
-    });
-    expect(out.url).toMatch(/^\/faqs#/);
-    expect(out.hostRoute).toBe(false);
-  });
-
-  it('a doc card takes the tree path from its row', () => {
-    const entry = { contentRefType: 'data_room_doc', noComposedHref: true, fallbackHref: () => null };
-    const out = resolveCardDestination({
-      chatRef: bare('data_room_doc', 'd-1'),
-      item: { id: 'd-1', url: null, metadata: { path: 'legal/ein-cp-575' } },
-      entry,
-      ctx,
-      composeContentUrl,
-    });
-    expect(out).toMatchObject({ url: '/data-room/legal/ein-cp-575', path: 'legal/ein-cp-575', hostRoute: true });
   });
 });

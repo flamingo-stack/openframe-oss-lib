@@ -211,15 +211,11 @@ export function McpPlaygroundPage() {
       const s = result.structured as {
         conversationId?: string
         parts?: Array<{ type: string }>
-        // TODO(CU-17tkuw61kfy): an old hub's source list.
-        citations?: unknown[]
         pendingApprovals?: PendingApproval[]
       } | null
       if (s?.conversationId) setConversationId(s.conversationId)
       setCitationCount(
-        s?.parts?.filter(part => part.type === 'source-url' || part.type === 'source-document').length ??
-          s?.citations?.length ??
-          0,
+        s?.parts?.filter(part => part.type === 'source-url' || part.type === 'source-document').length ?? 0,
       )
       if (s?.pendingApprovals?.length) {
         setPending(prev => [

@@ -67,7 +67,6 @@ export function mapDocSearchResults(docs: DocSearchResult[]): SearchResult[] {
         id: `group-${entry.table}`,
         // Same table label and count as the chat's grouped chip: one owner each.
         title: `${getSourceLabel(entry.table)} ${recordCountLabel(rows.length)}`,
-        path: rows[0].path,
         type: 'file',
         metadata: {
           ...(rows[0].url ? { url: rows[0].url } : {}),
@@ -80,7 +79,7 @@ export function mapDocSearchResults(docs: DocSearchResult[]): SearchResult[] {
       const record = parseRecordHref(doc.sourceId);
       const isNonMarkdown = !!record && record.type !== 'markdown';
       // A doc is keyed by its tree path, which is what its row shows under the title.
-      const path = doc.path ?? (record?.type === 'markdown' ? record.id : undefined);
+      const path = record?.type === 'markdown' ? record.id : undefined;
       results.push({
         id: doc.sourceId ?? path ?? doc.title,
         title: doc.title,

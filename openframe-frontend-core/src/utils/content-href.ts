@@ -74,12 +74,9 @@ export interface ComposeContentUrlInput {
   /** Content identifier. Page views pass the slug; chat rows pass the
    *  primary-key id (the slug is recovered from `externalUrl` when hosted). */
   identifier: string;
-  /** Preferred path segment for HOSTED types when there is no `externalUrl`
-   *  to recover the slug from — the Mingo/NATS transport ships bare
-   *  record links (`record://type/id`) with no ref metadata, so a fetch-mode card
-   *  knows the row's slug only AFTER it loads the row. `identifier` must stay
-   *  the primary key (that is what `overrides` deep-link on), hence a separate
-   *  field rather than overloading it. Ignored for non-hosted types. */
+  /** Path segment when there is no `externalUrl` to recover the slug from: a doc's tree path, which
+   *  `resolveSourceRowCTA` passes for a doc row with no url. `identifier` must stay the primary key (that is what
+   *  `overrides` deep-link on), hence a separate field rather than overloading it. */
   slug?: string | null;
   /** Hydrated platform junction from the list APIs. `hostedTypes` membership
    *  still decides in-app vs out; this decides WHICH origin an out-link points
@@ -120,26 +117,6 @@ export interface ContentHrefOptions {
 export interface ComposedContentUrl {
   href: string;
   targetPlatform: string | null;
-  /**
-   * Set ONLY when the href came from the host's EXPLICIT per-type `overrides`
-   * entry — i.e. the host stated where this type lives in ITS app, rather than
-   * the composer falling through to a hosted-suffix or `<origin>/<type>/<id>`
-   * synthesis.
-   *
-   * The distinction is load-bearing for fetch-mode chat cards whose fetched row
-   * already carries a destination (`refHydratedEntry`'s `item.url`, minted by
-   * the CONTENT HOST for its OWN surface). That url must beat a synthesized
-   * guess, but must NOT beat a host that has explicitly re-homed the type:
-   * a HubSpot ticket's `item.url` is the hub's `/tickets?ticket=…`, which in an
-   * embedder that serves the same ticket at `/help-center/tickets` silently
-   * resolves against the embedder's own unrelated `/tickets` route.
-   *
-   * Optional and absent by default, so a hand-written composer (the hub's
-   * cross-platform one) keeps the pre-existing "row url wins" behavior.
-   *
-   * TODO(CU-17tkuw61kfy): only `pickFetchedCardHref` reads it, for an old hub's rows; it goes at the cleanup.
-   */
-  hostOverride?: boolean;
 }
 
 /** The unified `composeContentUrl` seam shape on `ChatRuntime`. ALWAYS returns
@@ -192,8 +169,7 @@ function lastPathSegment(url: string): string | null {
  * Build the embedder's `composeContentUrl` for the unified seam.
  *
  * Resolution order (the merged rule used by BOTH page views and chat cards):
- *   1. `overrides[type]` — explicit per-type href, returned with
- *      `hostOverride: true` (the only branch that sets it).
+ *   1. `overrides[type]` — explicit per-type href.
  *   2. `hostedTypes.has(type)` → relative `/<suffix>/<slug>` (in-app, soft-nav).
  *      Chat rows carry the hub URL not the slug, so the slug is recovered from
  *      `externalUrl`; page views pass the slug as `identifier`.
@@ -215,9 +191,7 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
     const type = canonicalContentRefType(rawType);
     const override =
       opts.overrides && Object.prototype.hasOwnProperty.call(opts.overrides, type) ? opts.overrides[type] : undefined;
-    // Flagged as an explicit host decision — see `ComposedContentUrl.hostOverride`
-    // for why a fetch-mode card has to tell this apart from the branches below.
-    if (override) return { ...override(identifier), hostOverride: true };
+    if (override) return override(identifier);
 
     const seg = (Object.prototype.hasOwnProperty.call(suffixes, type) ? suffixes[type] : undefined) ?? type;
 
@@ -226,12 +200,8 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
       // page views already pass the slug as `identifier`. Guard: if the recovered
       // segment is the type's OWN suffix (e.g. a malformed/list externalUrl like
       // `https://hub/releases/` → `'releases'`), fall back to `identifier` instead
-      // of emitting a nonsensical `/releases/releases`.
-      //
-      // TODO(CU-17tkuw61kfy): `slug` (the explicit hint) sits between the two: an old
-      // row's fetch-mode card has NO externalUrl to recover from but DOES know the
-      // row's slug once it loads, and its `identifier` must stay the primary key so
-      // `overrides` still deep-link correctly.
+      // of emitting a nonsensical `/releases/releases`. A doc with no url names its tree path as the `slug`
+      // (`resolveSourceRowCTA`), and `identifier` stays the primary key so `overrides` still deep-link correctly.
       //
       // `slugIsIdentifier`: the record's id IS its slug (a doc's tree path), and the url's last segment would lose it.
       if (opts.slugIsIdentifier?.has(type)) {
@@ -265,8 +235,7 @@ export function makeComposeContentUrl(opts: ContentHrefOptions): ComposeContentU
     const owner = claimedOwner && byKey(claimedOwner) ? claimedOwner : null;
     const origin = owner ? getPlatformProductionUrl(owner) : opts.contentOrigin;
     // The hub's public detail routes are SLUG-based, so the `slug` hint wins
-    // over `identifier` here too — a Mingo fetch-mode card knows the row's slug
-    // but its `identifier` is the record's primary key, which would 404.
+    // over `identifier` here too: `identifier` is the record's primary key, which would 404.
     return {
       href: `${origin.replace(/\/+$/, '')}/${seg}/${slugHint?.trim() || identifier}`,
       // Report the owner so `decideNewTab` can compare it against the current

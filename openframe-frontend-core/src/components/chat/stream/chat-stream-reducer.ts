@@ -1,7 +1,7 @@
 /**
  * createChatStreamReducer: THE master chat-stream reader. One accumulation path for every source:
  *
- *   the hub's stream  → createChatStreamReader ─┐
+ *   the hub's stream  → readUiChunks           ─┐
  *   a NATS chunk      → createMingoDecoder      ─┼→ { seq, chunks } → reducer.apply() → applyChunkToMessages
  *   history           → processHistoricalMessages → reducer.initializeWithState()
  *

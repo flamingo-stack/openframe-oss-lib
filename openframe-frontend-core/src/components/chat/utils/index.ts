@@ -164,20 +164,8 @@ export {
   resolveSourceIcon,
 } from './source-row-cta';
 
-// Post-fetch enrichment for the minimal ChatRef descriptor a
-// record link (`record://type/id`) produces (the wire ships no card metadata).
-export {
-  resolveCardDestination,
-  type CardDestination,
-  type CardDestinationEntry,
-  type CardDestinationInput,
-} from './card-destination';
-export {
-  resolveFetchedCardHref,
-  readFetchedCardPath,
-  readFetchedCardTitle,
-  type FetchedCardHrefInput,
-} from './resolve-fetched-card-href';
+// Where a card opens.
+export { resolveCardDestination, type CardDestination, type CardDestinationInput } from './card-destination';
 
 // The ONE "Ask Mingo" prompt builder — shared by the SSE adapter, the NATS
 // adapter, and hosts that inject their own Mingo state (openframe-frontend).

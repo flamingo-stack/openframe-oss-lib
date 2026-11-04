@@ -1,16 +1,14 @@
 /**
  * Resolve what should happen when the user picks a search result.
- * Returns one of five typed actions so the caller is a single switch.
+ * Returns one of four typed actions so the caller is a single switch.
  *
  * Resolution order:
  *  1. `url` present → resolve the href through the host's
  *     `composeContentUrl` seam (when wired), then THE navigation decision
  *     (`navLinkTarget`, the one every chat link uses) chooses same-tab vs new-tab.
- *  2. A document (`DOC_TABLE_TYPES`) with a tree path → its viewer.
- *  3. Row names a record (`sourceId`) → synth an Ask-AI action (entity drill-in
+ *  2. Row names a record (`sourceId`) → synth an Ask-AI action (entity drill-in
  *     via primary key, no URL).
- *  4. Row has only `path` → legacy navigation fallback.
- *  5. Nothing actionable → noop.
+ *  3. Nothing actionable → noop.
  *
  * Lifted from the hub's `hooks/use-docs.ts:resolveSearchResultAction`.
  * Pure — no React, no telemetry.
@@ -20,7 +18,6 @@ import { parseRecordHref } from '../../../chat-protocol/record-link';
 import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { platformOfUrl } from '../../../platform-domains';
 import type { ComposeContentUrl } from '../../../utils/content-href';
-import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
 import type { ChatRef } from '../../chat/chat-ref.types';
 import { navLinkTarget } from '../../chat/utils/nav-anchor-props';
 import { isRelativeHref } from '../../chat/utils/new-tab-rel';
@@ -30,7 +27,6 @@ export type SearchResultAction =
   | { kind: 'navigate-same-tab'; href: string; targetPlatform: string | null; hostRoute?: boolean }
   | { kind: 'navigate-new-tab'; href: string; targetPlatform: string | null; hostRoute?: boolean }
   | { kind: 'ask-ai'; detail: { source: string; ref: ChatRef } }
-  | { kind: 'route'; path: string }
   | { kind: 'noop' };
 
 export function resolveSearchResultAction(
@@ -73,11 +69,6 @@ export function resolveSearchResultAction(
       ? { kind, href: target.href, targetPlatform: actionPlatform, hostRoute }
       : { kind, href: target.href, targetPlatform: actionPlatform };
   }
-  // TODO(CU-17tkuw61kfy): an old hub's document has no url and opens in the doc viewer by its tree path: no row of the
-  // chat can show it.
-  if (result.path && record && (DOC_TABLE_TYPES as readonly string[]).includes(record.type)) {
-    return { kind: 'route', path: result.path };
-  }
   if (record) {
     return {
       kind: 'ask-ai',
@@ -86,9 +77,6 @@ export function resolveSearchResultAction(
         ref: { type: record.type, id: record.id, title: result.title, url: null },
       },
     };
-  }
-  if (result.path) {
-    return { kind: 'route', path: result.path };
   }
   return { kind: 'noop' };
 }

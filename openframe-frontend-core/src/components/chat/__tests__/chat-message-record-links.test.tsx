@@ -188,7 +188,13 @@ describe('ChatMessageEnhanced — a record chip opens its record', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() =>
-        Promise.resolve(new Response(JSON.stringify({ items: [{ id: 'mac-guide', slug: 'install-on-mac' }] }))),
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              items: [{ id: 'mac-guide', url: 'https://www.flamingo.run/onboarding-guides/install-on-mac' }],
+            }),
+          ),
+        ),
       ),
     );
     const navigate = vi.fn().mockReturnValue(true);
@@ -196,7 +202,10 @@ describe('ChatMessageEnhanced — a record chip opens its record', () => {
       endpoints: { chatStreamUrl: '/chat', buildListUrl: (type: string, ids: string[]) => `/api/${type}?ids=${ids}` },
       navigation: { mode: 'host', navigate },
       source: 'flamingo',
-      composeContentUrl: ({ slug }: { slug?: string | null }) => ({ href: `/onboarding-guides/${slug}` }),
+      composeContentUrl: ({ externalUrl }: { externalUrl?: string | null }) => ({
+        href: externalUrl ? new URL(externalUrl).pathname : '',
+        targetPlatform: null,
+      }),
     } as unknown as ChatRuntime;
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -223,7 +232,10 @@ describe('ChatMessageEnhanced — a chip keeps the name the answer gave', () => 
     endpoints: { chatStreamUrl: '/chat', buildListUrl: (type: string, ids: string[]) => `/api/${type}?ids=${ids}` },
     navigation: { mode: 'host', navigate: vi.fn().mockReturnValue(true) },
     source: 'flamingo',
-    composeContentUrl: ({ slug }: { slug?: string | null }) => ({ href: `/onboarding-guides/${slug}` }),
+    composeContentUrl: ({ externalUrl }: { externalUrl?: string | null }) => ({
+      href: externalUrl ? new URL(externalUrl).pathname : '',
+      targetPlatform: null,
+    }),
   } as unknown as ChatRuntime;
   const answer = (text: string) => (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -237,7 +249,13 @@ describe('ChatMessageEnhanced — a chip keeps the name the answer gave', () => 
       'fetch',
       vi.fn(() =>
         Promise.resolve(
-          new Response(JSON.stringify({ items: [{ id: 'mac-guide', slug: 'mac', title: 'Install on a Mac' }] })),
+          new Response(
+            JSON.stringify({
+              items: [
+                { id: 'mac-guide', title: 'Install on a Mac', url: 'https://www.flamingo.run/onboarding-guides/mac' },
+              ],
+            }),
+          ),
         ),
       ),
     );

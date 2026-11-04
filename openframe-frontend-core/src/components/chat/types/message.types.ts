@@ -12,10 +12,8 @@ export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
   ASK: 'ASK',
-  /** The records an answer was given: `sources` on the entry, what becomes its source parts. TODO(CU-17tkuw61kfy):
-   *  `GUIDE` is the envelope it replaced, the same arrays under `payload`, read by `old-wire` only. */
+  /** The records an answer was given: `sources` on the entry, what becomes its source parts. */
   ATTACHMENTS: 'ATTACHMENTS',
-  GUIDE: 'GUIDE',
   /** The records the answer shows as cards, chosen by the model's `show_records`
    *  tool call and checked by the server: a part of the message of its own, drawn
    *  where the call was made. A record named in the text is a chip, never a card. */
@@ -274,27 +272,16 @@ export interface ThinkingMessageData extends MessageDataBase {
 }
 
 /** Persisted attachments row (GraphQL `AttachmentsData`): the same array the live chunk carries, so history and realtime
- *  share one decoder. Left untyped: it is unvalidated wire data, and `createMingoDecoder` turns it into source parts.
- *  TODO(CU-17tkuw61kfy): `videos` and `cards` are old rows' only. */
+ *  share one decoder. Left untyped: it is unvalidated wire data, and `createMingoDecoder` turns it into source parts. */
 export interface AttachmentsMessageData extends MessageDataBase {
   type: 'ATTACHMENTS';
   sources?: unknown;
-  videos?: unknown;
-  cards?: unknown;
 }
 
-/** Persisted `RECORD_CARDS` row (GraphQL `RecordCardsData`); the live chunk has the same shape. TODO(CU-17tkuw61kfy):
- *  `cards` is a dev cluster's old rows' only. */
+/** Persisted `RECORD_CARDS` row (GraphQL `RecordCardsData`); the live chunk has the same shape. */
 export interface RecordCardsMessageData extends MessageDataBase {
   type: 'RECORD_CARDS';
   records?: unknown;
-  cards?: unknown;
-}
-
-/** TODO(CU-17tkuw61kfy): the envelope `ATTACHMENTS` replaced, the same arrays under `payload`. */
-export interface SourceMetadataMessageData extends MessageDataBase {
-  type: 'GUIDE';
-  payload?: unknown;
 }
 
 /** Persisted `ASK` row (GraphQL `AskData`). `text` is the intro sentence, ordinary answer text ahead of the card: the
@@ -436,7 +423,6 @@ export type MessageData =
   | AskMessageData
   | AttachmentsMessageData
   | RecordCardsMessageData
-  | SourceMetadataMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
   | ApprovalRequestMessageData

@@ -212,7 +212,6 @@ describe('sourceRowInputOf: the standard names, in the words the resolver reads'
       title: 'Post a',
       externalUrl: 'https://www.flamingo.run/blog/a',
       targetPlatform: 'flamingo',
-      path: null,
     });
   });
 
@@ -227,17 +226,6 @@ describe('sourceRowInputOf: the standard names, in the words the resolver reads'
       targetPlatform: null,
       title: '1',
     });
-  });
-
-  it('an old doc source opens by its tree path', () => {
-    const doc: ChatSourcePart = {
-      type: 'source-document',
-      sourceId: 'record://markdown/docs%2Fsetup.md',
-      mediaType: 'text/plain',
-      title: 'Setup',
-      filename: 'docs/setup.md',
-    };
-    expect(sourceRowInputOf(doc)).toMatchObject({ id: 'docs/setup.md', externalUrl: null, path: 'docs/setup.md' });
   });
 });
 

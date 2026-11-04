@@ -199,7 +199,6 @@ export function OnboardingGuidesCatalogView({
   const docSearch = useDocSearch({
     source,
     baseRoute: basePath,
-    onNavigate: path => router.push(path),
     tableIds: ['onboarding-guides'],
   });
 
