@@ -1,5 +1,6 @@
 package com.openframe.authz.service.sso;
 
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.auth.SsoIdentity;
 import com.openframe.data.repository.auth.SsoIdentityRepository;
@@ -32,6 +33,7 @@ public class SsoIdentityService {
 
     private final SsoIdentityRepository ssoIdentityRepository;
     private final MongoTemplate mongoTemplate;
+    private final AuthAuditor authAuditor;
 
     /**
      * Provider-stable subject. Microsoft's {@code sub} is pairwise per app registration and
@@ -107,6 +109,7 @@ public class SsoIdentityService {
             var result = mongoTemplate.upsert(query, update, SsoIdentity.class);
             if (result.getUpsertedId() != null) {
                 log.info("event=sso-identity-linked provider={} user={}", provider, user.getId());
+                authAuditor.recordIdentityLinked(user, provider);
             }
         } catch (DuplicateKeyException e) {
             log.warn("event=sso-identity-link-duplicate provider={} subject={} user={} — link already present (concurrent first login, or subject bound to another user)",

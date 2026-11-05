@@ -1,5 +1,7 @@
 package com.openframe.authz.config;
 
+import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.authz.security.AuthSuccessHandler;
 import com.openframe.authz.security.SsoAuthorizationRequestResolver;
 import com.openframe.authz.security.SsoCookieCodec;
@@ -31,6 +33,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -55,6 +58,9 @@ import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 @Slf4j
 public class SecurityConfig {
 
+    private static final String LOGIN_FAILED_URL = "/login?error";
+    private static final String USERNAME_PARAMETER = "username";
+
     @Bean
     @Order(2)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
@@ -64,7 +70,8 @@ public class SecurityConfig {
                                                           SsoCookieCodec ssoCookieCodec,
                                                           AuthenticationFailureHandler oauth2LoginFailureHandler,
                                                           JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory,
-                                                          SsoProviderRegistry ssoProviderRegistry) throws Exception {
+                                                          SsoProviderRegistry ssoProviderRegistry,
+                                                          AuthAuditor authAuditor) throws Exception {
         return http
                 // Scoped to the one cookie-authenticated form POST on this chain. Everything else is
                 // either OAuth (client-authenticated or GET) or JSON-only, which a cross-site form
@@ -96,6 +103,7 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .successHandler(authSuccessHandler)
+                        .failureHandler(passwordLoginFailureHandler(authAuditor))
                         .permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
@@ -119,7 +127,17 @@ public class SecurityConfig {
     @Bean
     public AuthenticationFailureHandler oauth2LoginFailureHandler(AuthErrorResponder authErrorResponder) {
         return (HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) ->
-                authErrorResponder.send(response, request, "oauth2-login", exception, SSO_LOGIN_FAILED);
+                authErrorResponder.sendLoginFailure(response, request, "oauth2-login", exception, SSO_LOGIN_FAILED,
+                        null);
+    }
+
+    private static AuthenticationFailureHandler passwordLoginFailureHandler(AuthAuditor authAuditor) {
+        SimpleUrlAuthenticationFailureHandler redirect = new SimpleUrlAuthenticationFailureHandler(LOGIN_FAILED_URL);
+        return (request, response, exception) -> {
+            authAuditor.recordLoginFailure(request.getParameter(USERNAME_PARAMETER), TenantContext.getTenantId(),
+                    exception.getClass().getSimpleName(), Map.of("provider", AuthAuditor.PASSWORD_PROVIDER));
+            redirect.onAuthenticationFailure(request, response, exception);
+        };
     }
 
     /** One entry per distinct SSO config (its cache key), NOT per login — bounded by active configs. */

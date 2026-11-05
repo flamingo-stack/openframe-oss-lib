@@ -90,7 +90,7 @@ public class SsoLoginController {
 
             seeOther(httpResponse, data.redirectPath());
         } catch (Exception e) {
-            authErrorResponder.send(httpResponse, httpRequest, "sso-login-init", e, SSO_LOGIN_FAILED);
+            authErrorResponder.sendLoginFailure(httpResponse, httpRequest, "sso-login-init", e, SSO_LOGIN_FAILED, null);
         }
     }
 

@@ -1,11 +1,12 @@
 package com.openframe.authz.security.grant;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleAuthorizationCodeClient;
-import com.openframe.authz.service.sso.apple.AppleTokenService;
 import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
+import com.openframe.authz.service.sso.apple.AppleTokenService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.AuthUserPrincipals;
 import com.openframe.authz.util.OidcUserUtils;
@@ -56,6 +57,7 @@ public class AppleNativeGrantAuthenticationProvider extends AbstractTokenMinting
     private final SsoIdentityService ssoIdentityService;
     private final SsoOidcUserService ssoOidcUserService;
     private final UserService userService;
+    private final AuthAuditor authAuditor;
 
     public AppleNativeGrantAuthenticationProvider(AppleNativeTokenVerifier tokenVerifier,
                                                   AppleAuthorizationCodeClient codeClient,
@@ -63,6 +65,7 @@ public class AppleNativeGrantAuthenticationProvider extends AbstractTokenMinting
                                                   SsoIdentityService ssoIdentityService,
                                                   SsoOidcUserService ssoOidcUserService,
                                                   UserService userService,
+                                                  AuthAuditor authAuditor,
                                                   OAuth2AuthorizationService authorizationService,
                                                   OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
         super(authorizationService, tokenGenerator);
@@ -72,6 +75,7 @@ public class AppleNativeGrantAuthenticationProvider extends AbstractTokenMinting
         this.ssoIdentityService = ssoIdentityService;
         this.ssoOidcUserService = ssoOidcUserService;
         this.userService = userService;
+        this.authAuditor = authAuditor;
     }
 
     @Override
@@ -90,6 +94,18 @@ public class AppleNativeGrantAuthenticationProvider extends AbstractTokenMinting
             throw error(OAuth2ErrorCodes.INVALID_REQUEST, "Tenant could not be resolved from the token endpoint path.");
         }
 
+        try {
+            return exchange(request, clientPrincipal, registeredClient, tenantId);
+        } catch (AuthenticationException e) {
+            authAuditor.recordLoginFailure(null, tenantId, e.getMessage(), Map.of("provider", APPLE));
+            throw e;
+        }
+    }
+
+    private OAuth2AccessTokenAuthenticationToken exchange(AppleNativeGrantAuthenticationToken request,
+                                                          OAuth2ClientAuthenticationToken clientPrincipal,
+                                                          RegisteredClient registeredClient,
+                                                          String tenantId) {
         Jwt identityToken = tokenVerifier.verify(request.getIdentityToken(), request.getNonce());
         String bundleId = identityToken.getAudience().get(0);
         String appleRefreshToken = codeClient.redeemAndVerify(bundleId, request.getAuthorizationCode(), identityToken.getSubject(), tenantId);
@@ -108,7 +124,7 @@ public class AppleNativeGrantAuthenticationProvider extends AbstractTokenMinting
         ssoIdentityService.link(APPLE, identityToken.getClaims(), user);
 
         if (OidcUserUtils.emailVerifiedClaimAllows(identityToken.getClaims())) {
-            userService.markEmailVerified(user.getId());
+            userService.markEmailVerified(user.getId(), APPLE);
         }
         userService.touchLastLogin(user.getEmail(), tenantId);
 
@@ -119,6 +135,7 @@ public class AppleNativeGrantAuthenticationProvider extends AbstractTokenMinting
                 registeredClient, clientPrincipal, userPrincipal,
                 AppleNativeGrantAuthenticationToken.GRANT_TYPE, request);
         log.info("Native Apple exchange succeeded: tenantId={}, userId={}", tenantId, user.getId());
+        authAuditor.recordLogin(user, APPLE);
         return result;
     }
 

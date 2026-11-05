@@ -1,9 +1,12 @@
 package com.openframe.authz.service.sso.apple;
 
+import com.openframe.audit.AuditRecorder;
 import com.openframe.authz.config.oidc.AppleSSOProperties;
 import com.openframe.authz.service.auth.strategy.AppleClientSecretFactory;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.core.crypto.service.EncryptionService;
+import com.openframe.data.document.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.auth.AppleUserToken;
 import com.openframe.data.document.sso.SSOConfig;
 import com.openframe.data.repository.auth.AppleUserTokenRepository;
@@ -15,10 +18,14 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.authz.config.oidc.AppleSSOProperties.APPLE;
 import static com.openframe.authz.service.auth.strategy.AppleClientSecretFactory.APPLE_ISSUER;
+import static com.openframe.data.document.audit.AuditAction.USER_APPLE_TOKEN_REVOKE;
+import static com.openframe.data.document.audit.AuditOutcome.FAILURE;
+import static com.openframe.data.document.audit.AuditOutcome.SUCCESS;
 import static org.springframework.util.StringUtils.hasText;
 
 /**
@@ -37,19 +44,22 @@ public class AppleTokenService {
     private final AppleClientSecretFactory clientSecretFactory;
     private final AppleSSOProperties appleProps;
     private final RestClient restClient;
+    private final AuditRecorder auditRecorder;
 
     public AppleTokenService(AppleUserTokenRepository tokenRepository,
                              EncryptionService encryptionService,
                              SSOConfigService ssoConfigService,
                              AppleClientSecretFactory clientSecretFactory,
                              AppleSSOProperties appleProps,
-                             RestClient.Builder restClientBuilder) {
+                             RestClient.Builder restClientBuilder,
+                             AuditRecorder auditRecorder) {
         this.tokenRepository = tokenRepository;
         this.encryptionService = encryptionService;
         this.ssoConfigService = ssoConfigService;
         this.clientSecretFactory = clientSecretFactory;
         this.appleProps = appleProps;
         this.restClient = restClientBuilder.build();
+        this.auditRecorder = auditRecorder;
     }
 
     /**
@@ -85,6 +95,7 @@ public class AppleTokenService {
                 // No Apple key material — nothing we can do; drop the token rather than retry forever.
                 log.warn("event=apple-token-revocation-skipped user={} reason=no-apple-config", token.getUserId());
                 tokenRepository.delete(token);
+                recordRevoke(token, SUCCESS, null, false);
                 return true;
             }
             String pem = ssoConfigService.getDecryptedClientSecret(cfg);
@@ -105,11 +116,24 @@ public class AppleTokenService {
 
             tokenRepository.delete(token);
             log.info("event=apple-token-revoked user={}", token.getUserId());
+            recordRevoke(token, SUCCESS, null, true);
             return true;
         } catch (Exception e) {
             log.warn("event=apple-token-revocation-failed user={} msg={}", token.getUserId(), e.getMessage());
+            recordRevoke(token, FAILURE, e.getClass().getSimpleName(), false);
             return false;
         }
+    }
+
+    private void recordRevoke(AppleUserToken token, AuditOutcome outcome, String reason, boolean revokedWithApple) {
+        auditRecorder.record(AuditEntry.builder()
+                .action(USER_APPLE_TOKEN_REVOKE)
+                .outcome(outcome)
+                .reason(reason)
+                .targetId(token.getUserId())
+                .tenantId(token.getTenantId())
+                .details(Map.of("revokedWithApple", revokedWithApple))
+                .build());
     }
 
     public Optional<AppleUserToken> findByUserId(String userId) {

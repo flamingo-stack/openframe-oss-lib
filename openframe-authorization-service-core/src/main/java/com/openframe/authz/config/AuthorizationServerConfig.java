@@ -5,6 +5,8 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.openframe.authz.keys.TenantKeyService;
+import com.openframe.authz.security.AuthAuditor;
+import com.openframe.authz.security.LogoutAuditHandler;
 import com.openframe.authz.security.ProviderAwareAuthenticationEntryPoint;
 import com.openframe.authz.security.grant.AppleNativeGrantAuthenticationConverter;
 import com.openframe.authz.security.grant.AppleNativeGrantAuthenticationProvider;
@@ -18,6 +20,7 @@ import com.openframe.authz.service.sso.apple.AppleTokenService;
 import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.data.document.audit.AuditRequestContext;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
 import lombok.extern.slf4j.Slf4j;
@@ -81,6 +84,8 @@ public class AuthorizationServerConfig {
             SsoIdentityService ssoIdentityService,
             SsoOidcUserService ssoOidcUserService,
             UserService userService,
+            AuthAuditor authAuditor,
+            LogoutAuditHandler logoutAuditHandler,
             OAuth2AuthorizationService authorizationService,
             OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) throws Exception {
 
@@ -90,9 +95,10 @@ public class AuthorizationServerConfig {
         // with an instant ProviderNotFoundException.
         var appleNativeGrantAuthenticationProvider = new AppleNativeGrantAuthenticationProvider(
                 appleNativeTokenVerifier, appleAuthorizationCodeClient, appleTokenService,
-                ssoIdentityService, ssoOidcUserService, userService, authorizationService, tokenGenerator);
+                ssoIdentityService, ssoOidcUserService, userService, authAuditor, authorizationService,
+                tokenGenerator);
         var signupTicketGrantAuthenticationProvider = new SignupTicketGrantAuthenticationProvider(
-                signupTicketService, userService, authorizationService, tokenGenerator);
+                signupTicketService, userService, authAuditor, authorizationService, tokenGenerator);
 
         var as = new OAuth2AuthorizationServerConfigurer();
         AuthorizationServerSettings settings = AuthorizationServerSettings
@@ -111,6 +117,7 @@ public class AuthorizationServerConfig {
                     .authenticationProvider(appleNativeGrantAuthenticationProvider)
                     .accessTokenRequestConverter(new SignupTicketGrantAuthenticationConverter())
                     .authenticationProvider(signupTicketGrantAuthenticationProvider));
+            config.tokenRevocationEndpoint(revocation -> revocation.revocationResponseHandler(logoutAuditHandler));
         });
         var endpoints = as.getEndpointsMatcher();
 
@@ -196,6 +203,9 @@ public class AuthorizationServerConfig {
 
                     claims.put("roles", UserRole.effective(user.getRoles()).stream()
                             .map(UserRole::name).toList());
+                    if (context.getAuthorization() != null) {
+                        claims.put(AuditRequestContext.SESSION_CLAIM, context.getAuthorization().getId());
+                    }
                 });
             }
         };

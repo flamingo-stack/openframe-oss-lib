@@ -503,7 +503,7 @@ public class OAuthBffService {
         return effectiveRedirect;
     }
 
-    public Mono<Void> revokeRefreshToken(String tenantId, String refreshToken) {
+    public Mono<Void> revokeRefreshToken(String tenantId, String refreshToken, ServerHttpRequest request) {
         if (!hasText(refreshToken)) {
             return Mono.empty();
         }
@@ -515,6 +515,7 @@ public class OAuthBffService {
                 .post()
                 .uri(String.format("%s/%s/oauth2/revoke", authServerUrl, tenantId))
                 .header(AUTHORIZATION, basicAuth(clientId, clientSecret))
+                .headers(h -> headersContributor.contribute(h, request))
                 .body(BodyInserters.fromFormData(form))
                 .retrieve()
                 .bodyToMono(Void.class)
@@ -527,7 +528,7 @@ public class OAuthBffService {
      * Looks up the OAuth2 authorization by refresh token in MongoDB and extracts the tenant id from the saved
      * authorizationUri (e.g. ".../{tenantId}/oauth2/authorize"). If lookup/parsing fails, it becomes a no-op.
      */
-    public Mono<Void> revokeRefreshTokenByLookup(String refreshToken) {
+    public Mono<Void> revokeRefreshTokenByLookup(String refreshToken, ServerHttpRequest request) {
         if (!hasText(refreshToken)) {
             return Mono.empty();
         }
@@ -537,7 +538,7 @@ public class OAuthBffService {
                 .flatMap(auth -> {
                     String tenantId = extractTenantIdFromAuthorizationUri(auth.getArAuthorizationUri()).orElse(null);
                     if (!hasText(tenantId)) return Mono.empty();
-                    return revokeRefreshToken(tenantId, refreshToken);
+                    return revokeRefreshToken(tenantId, refreshToken, request);
                 })
                 .onErrorResume(e -> Mono.empty());
     }

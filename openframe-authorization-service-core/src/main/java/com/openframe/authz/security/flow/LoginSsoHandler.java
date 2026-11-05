@@ -3,6 +3,7 @@ package com.openframe.authz.security.flow;
 import com.openframe.core.constants.SsoFlowCookieNames;
 
 import com.openframe.authz.security.EmailTrustPolicy;
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
@@ -62,6 +63,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
     private final TenantService tenantService;
     private final SSOConfigService ssoConfigService;
     private final SessionPrincipalBinder sessionPrincipalBinder;
+    private final AuthAuditor authAuditor;
 
     /**
      * Frontend page that continues an unknown SSO identity into registration (org name + domain).
@@ -146,6 +148,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
         ssoIdentityService.link(provider, user.getClaims(), authUser);
         // A link-first match may be an account whose email differs from the one the IdP asserts now.
         sessionPrincipalBinder.bind(authentication, authUser, request, response);
+        authAuditor.recordLogin(authUser, provider);
 
         clearFlowCookieAndRedirect(response, cookie, tenantId, payload.redirectTo(), payload.authMobile());
     }

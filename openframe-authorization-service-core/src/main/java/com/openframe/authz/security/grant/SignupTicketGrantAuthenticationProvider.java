@@ -1,8 +1,9 @@
 package com.openframe.authz.security.grant;
 
 import com.openframe.authz.config.tenant.TenantContext;
-import com.openframe.authz.service.sso.SignupTicketService;
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.authz.service.sso.SignupTicketService.PendingSignup;
+import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.AuthUserPrincipals;
 import com.openframe.data.document.auth.AuthUser;
@@ -18,6 +19,8 @@ import org.springframework.security.oauth2.server.authorization.authentication.O
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 
+import java.util.Map;
+
 /**
  * Session-less mint for the mobile SSO signup: the BFF redeems a signup ticket that the
  * completion step bound to a freshly registered user. Trust comes from three things — the ticket
@@ -28,16 +31,21 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 @Slf4j
 public class SignupTicketGrantAuthenticationProvider extends AbstractTokenMintingGrantProvider {
 
+    private static final String SIGNUP_TICKET_PROVIDER = "signup-ticket";
+
     private final SignupTicketService signupTicketService;
     private final UserService userService;
+    private final AuthAuditor authAuditor;
 
     public SignupTicketGrantAuthenticationProvider(SignupTicketService signupTicketService,
                                                    UserService userService,
+                                                   AuthAuditor authAuditor,
                                                    OAuth2AuthorizationService authorizationService,
                                                    OAuth2TokenGenerator<? extends OAuth2Token> tokenGenerator) {
         super(authorizationService, tokenGenerator);
         this.signupTicketService = signupTicketService;
         this.userService = userService;
+        this.authAuditor = authAuditor;
     }
 
     @Override
@@ -56,6 +64,18 @@ public class SignupTicketGrantAuthenticationProvider extends AbstractTokenMintin
             throw error(OAuth2ErrorCodes.INVALID_REQUEST, "Tenant could not be resolved from the token endpoint path.");
         }
 
+        try {
+            return redeem(request, clientPrincipal, registeredClient, tenantId);
+        } catch (AuthenticationException e) {
+            authAuditor.recordLoginFailure(null, tenantId, e.getMessage(), Map.of("provider", SIGNUP_TICKET_PROVIDER));
+            throw e;
+        }
+    }
+
+    private OAuth2AccessTokenAuthenticationToken redeem(SignupTicketGrantAuthenticationToken request,
+                                                        OAuth2ClientAuthenticationToken clientPrincipal,
+                                                        RegisteredClient registeredClient,
+                                                        String tenantId) {
         PendingSignup pendingSignup = signupTicketService.consume(request.getTicket())
                 .orElseThrow(() -> error(OAuth2ErrorCodes.INVALID_GRANT, "Unknown or expired signup ticket."));
         if (!pendingSignup.bound()) {
@@ -78,6 +98,7 @@ public class SignupTicketGrantAuthenticationProvider extends AbstractTokenMintin
                 registeredClient, clientPrincipal, userPrincipal,
                 SignupTicketGrantAuthenticationToken.GRANT_TYPE, request);
         log.info("Signup ticket redeemed: tenantId={}, userId={}", tenantId, user.getId());
+        authAuditor.recordLogin(user, SIGNUP_TICKET_PROVIDER);
         return result;
     }
 

@@ -35,6 +35,10 @@
             <artifactId>openframe-data-redis</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-audit</artifactId>
+        </dependency>
+        <dependency>
             <!-- Spring Boot 4 auto-configures Spring Session only through its own module; the bare
                  spring-session-data-redis would silently leave sessions in Tomcat memory -->
             <groupId>org.springframework.boot</groupId>

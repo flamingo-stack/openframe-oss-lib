@@ -1,5 +1,6 @@
 package com.openframe.authz.service.user;
 
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.authz.service.auth.MongoAuthorizationService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
@@ -12,6 +13,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 
 import static com.openframe.authz.util.ResetTokenUtil.generateResetToken;
 
@@ -26,12 +28,14 @@ public class PasswordResetService {
     private final UserService userService;
     private final EmailService emailService;
     private final MongoAuthorizationService authorizationService;
+    private final AuthAuditor authAuditor;
 
     @Value("${openframe.password-reset.ttlMinutes:30}")
     private int ttlMinutes;
 
     public void createResetToken(String email) {
-        if (!userService.existsActiveByEmail(email)) {
+        List<AuthUser> users = userService.findAllActiveByEmail(email);
+        if (users.isEmpty()) {
             log.warn("Password reset requested for non-existing email: {}", email);
             return;
         }
@@ -41,6 +45,7 @@ public class PasswordResetService {
         redisTemplate.opsForValue().set(key, email, Duration.ofMinutes(ttlMinutes));
 
         emailService.sendPasswordResetEmail(email, token);
+        users.forEach(authAuditor::recordPasswordResetRequest);
     }
 
     public void resetPassword(String token, String newPassword) {
@@ -60,6 +65,7 @@ public class PasswordResetService {
         log.info("Revoked {} refresh token(s) after password reset for user {}", revoked, user.getId());
 
         redisTemplate.delete(key);
+        authAuditor.recordPasswordChange(user, revoked);
     }
 }
 

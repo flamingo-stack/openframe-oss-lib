@@ -4,20 +4,15 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import com.openframe.delivery.spec.DeliveryPayload;
+import com.openframe.core.util.Sha256;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 
 @Component
 @RequiredArgsConstructor
 public class DeliveryPayloadJson {
 
     private static final String DELIVERY_FIELD = "delivery";
-    private static final String HASH_ALGORITHM = "SHA-256";
 
     private final ObjectMapper objectMapper;
 
@@ -35,7 +30,7 @@ public class DeliveryPayloadJson {
         ObjectNode node = objectMapper.valueToTree(payload);
         node.remove(DELIVERY_FIELD);
         String json = write(node);
-        return new DeliveryPayloadBody(json, hash(json));
+        return new DeliveryPayloadBody(json, Sha256.hex(json));
     }
 
     private String write(ObjectNode node) {
@@ -43,16 +38,6 @@ public class DeliveryPayloadJson {
             return objectMapper.writeValueAsString(node);
         } catch (JacksonException e) {
             throw new IllegalArgumentException("Delivery payload body is not serializable", e);
-        }
-    }
-
-    private static String hash(String json) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance(HASH_ALGORITHM);
-            byte[] hashed = digest.digest(json.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hashed);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(HASH_ALGORITHM + " is not available", e);
         }
     }
 

@@ -1,8 +1,11 @@
 package com.openframe.authz.security;
 
+import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.security.flow.LoginSsoHandler;
 import com.openframe.authz.security.flow.SsoFlowHandler;
 import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
+import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.web.AuthStateUtils;
 import com.openframe.core.exception.AuthFlowException;
@@ -17,7 +20,9 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
 import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
 import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
@@ -40,6 +45,8 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
     private final MicrosoftLoginEmailGate microsoftLoginEmailGate;
     private final SsoIdentityCapture ssoIdentityCapture;
     private final SsoOidcUserService ssoOidcUserService;
+    private final UserService userService;
+    private final AuthAuditor authAuditor;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -58,7 +65,8 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                 try {
                     microsoftLoginEmailGate.require(authentication);
                 } catch (IllegalStateException e) {
-                    authErrorResponder.send(response, request, "sso-login-unverified-email", e, EMAIL_NOT_VERIFIED);
+                    authErrorResponder.sendLoginFailure(response, request, "sso-login-unverified-email", e,
+                            EMAIL_NOT_VERIFIED, AuthAuditor.emailOf(authentication));
                     return;
                 }
                 // Only a plain login may auto-provision: an invitation or registration callback
@@ -68,9 +76,11 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                 try {
                     ssoOidcUserService.autoProvisionForTenantLogin(authentication);
                 } catch (AuthFlowException e) {
-                    authErrorResponder.send(response, request, "sso-login-auto-provision", e, SSO_LOGIN_FAILED);
+                    authErrorResponder.sendLoginFailure(response, request, "sso-login-auto-provision", e,
+                            SSO_LOGIN_FAILED, AuthAuditor.emailOf(authentication));
                     return;
                 }
+                AuthAuditor.safely(() -> recordLogin(authentication));
                 super.onAuthenticationSuccess(request, response, authentication);
                 appleWebTokenCapture.captureIfApple(request, authentication);
                 ssoIdentityCapture.capture(authentication);
@@ -80,9 +90,9 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
             // an expired or tampered payload, or a replayed callback. Drop the leftovers so they
             // cannot also steal the next attempt.
             AuthStateUtils.clearSsoFlowCookies(response);
-            authErrorResponder.send(response, request, "sso-flow-state-mismatch",
+            authErrorResponder.sendLoginFailure(response, request, "sso-flow-state-mismatch",
                     new AuthFlowException(SSO_SESSION_EXPIRED, "SSO session expired. Please try again."),
-                    SSO_SESSION_EXPIRED);
+                    SSO_SESSION_EXPIRED, AuthAuditor.emailOf(authentication));
             return;
         }
 
@@ -94,8 +104,23 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
             appleWebTokenCapture.captureIfApple(request, authentication);
         } catch (Exception e) {
             AuthStateUtils.clearSsoFlowCookies(response);
-            authErrorResponder.send(response, request, "sso-flow-finalize", e, REGISTRATION_FAILED);
+            if (handler instanceof LoginSsoHandler) {
+                authErrorResponder.sendLoginFailure(response, request, "sso-flow-finalize", e, REGISTRATION_FAILED,
+                        AuthAuditor.emailOf(authentication));
+            } else {
+                authErrorResponder.send(response, request, "sso-flow-finalize", e, REGISTRATION_FAILED);
+            }
         }
+    }
+
+    private void recordLogin(Authentication authentication) {
+        String tenantId = TenantContext.getTenantId();
+        String email = AuthAuditor.emailOf(authentication);
+        String provider = AuthAuditor.providerOf(authentication);
+        userService.findActiveByEmailAndTenant(email, tenantId).ifPresentOrElse(
+                user -> authAuditor.recordLogin(user, provider),
+                () -> authAuditor.recordLoginFailure(email, tenantId, ACCOUNT_NOT_FOUND.name(),
+                        Map.of("provider", provider)));
     }
 
 }

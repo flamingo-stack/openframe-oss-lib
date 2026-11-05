@@ -3,6 +3,7 @@ package com.openframe.authz.service.user;
 import com.openframe.authz.dto.InvitationRegistrationRequest;
 import com.openframe.authz.exception.OwnerCannotSwitchTenantException;
 import com.openframe.authz.exception.UserActiveInAnotherTenantException;
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.processor.UserDeactivationProcessor;
@@ -23,12 +24,15 @@ import static java.lang.Boolean.TRUE;
 @RequiredArgsConstructor
 public class InvitationRegistrationService {
 
+    private static final String INVITATION_VERIFICATION = "invitation";
+
     private final UserService userService;
     private final AuthInvitationRepository invitationRepository;
     private final RegistrationProcessor registrationProcessor;
     private final UserDeactivationProcessor userDeactivationProcessor;
     private final InvitationValidator invitationValidator;
     private final SsoIdentityService ssoIdentityService;
+    private final AuthAuditor authAuditor;
 
     /**
      * Whether accepting this invitation would CREATE a user in the target tenant (vs an existing
@@ -40,7 +44,19 @@ public class InvitationRegistrationService {
     }
 
     public AuthUser registerByInvitation(InvitationRegistrationRequest request) {
-        AuthInvitation invitation = invitationValidator.loadAndEnsureAcceptable(request.getInvitationId());
+        AuthInvitation invitation = invitationValidator.load(request.getInvitationId());
+        try {
+            invitationValidator.ensureAcceptable(invitation);
+            AuthUser user = accept(invitation, request);
+            authAuditor.recordInvitationAccepted(invitation, user);
+            return user;
+        } catch (RuntimeException e) {
+            authAuditor.recordInvitationNotAccepted(invitation, e);
+            throw e;
+        }
+    }
+
+    private AuthUser accept(AuthInvitation invitation, InvitationRegistrationRequest request) {
         String targetTenantId = invitation.getTenantId();
 
         var existing = userService.findActiveByEmail(invitation.getEmail());
@@ -76,6 +92,7 @@ public class InvitationRegistrationService {
                 throw new OwnerCannotSwitchTenantException(invitation.getEmail());
             }
             userService.deactivateUser(user);
+            authAuditor.recordTenantMove(user, targetTenantId);
             // Tenant switch is an explicit lifecycle action — the one context where touching links
             // is allowed. Drop the departing (now-deactivated) user's links so the identity binds
             // cleanly to the new tenant's account on first login instead of dead-ending on a
@@ -110,7 +127,7 @@ public class InvitationRegistrationService {
 
     private void markVerifiedQuietly(AuthUser user) {
         try {
-            userService.markEmailVerified(user.getId());
+            userService.markEmailVerified(user.getId(), INVITATION_VERIFICATION);
         } catch (Exception ignored) {
             // Do not block invitation acceptance if verification update fails
         }

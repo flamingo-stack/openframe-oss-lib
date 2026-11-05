@@ -183,8 +183,8 @@ public class OAuthBffController {
         cookieService.addClearAuthCookies(headers);
         String refreshToken = hasText(refreshCookie) ? refreshCookie : request.getHeaders().getFirst(REFRESH_TOKEN_HEADER);
         Mono<Void> revoke = hasText(tenantId)
-                ? oauthBffService.revokeRefreshToken(tenantId, refreshToken)
-                : oauthBffService.revokeRefreshTokenByLookup(refreshToken);
+                ? oauthBffService.revokeRefreshToken(tenantId, refreshToken, request)
+                : oauthBffService.revokeRefreshTokenByLookup(refreshToken, request);
         return revoke.then(Mono.just(ResponseEntity.noContent().headers(headers).build()));
     }
 

@@ -18,9 +18,13 @@ public class InvitationValidator {
 
     private final AuthInvitationRepository invitationRepository;
 
-    public AuthInvitation loadAndEnsureAcceptable(String invitationId) {
-        AuthInvitation inv = invitationRepository.findById(invitationId)
+    public AuthInvitation load(String invitationId) {
+        return invitationRepository.findById(invitationId)
                 .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
+    }
+
+    public AuthInvitation loadAndEnsureAcceptable(String invitationId) {
+        AuthInvitation inv = load(invitationId);
         ensureAcceptable(inv);
         return inv;
     }

@@ -4,6 +4,7 @@ import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.repository.auth.AuthUserRepository;
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.authz.service.processor.UserEmailVerifiedProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
+import static com.openframe.data.document.audit.AuditAction.USER_CREATE;
+import static com.openframe.data.document.audit.AuditAction.USER_RESTORE;
 import static com.openframe.data.document.user.UserStatus.ACTIVE;
 import static com.openframe.data.document.user.UserStatus.DELETED;
 import static java.util.UUID.randomUUID;
@@ -31,9 +34,12 @@ import static java.util.UUID.randomUUID;
 @RequiredArgsConstructor
 public class UserService {
 
+    public static final String VIA_REGISTRATION = "registration";
+
     private final AuthUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserEmailVerifiedProcessor userEmailVerifiedProcessor;
+    private final AuthAuditor authAuditor;
 
     public Optional<AuthUser> findById(String userId) {
         return userRepository.findById(userId);
@@ -76,7 +82,11 @@ public class UserService {
     }
 
     public boolean existsActiveByEmail(String email) {
-        return !userRepository.findAllByEmailAndStatus(email, ACTIVE).isEmpty();
+        return !findAllActiveByEmail(email).isEmpty();
+    }
+
+    public List<AuthUser> findAllActiveByEmail(String email) {
+        return userRepository.findAllByEmailAndStatus(email, ACTIVE);
     }
 
     public Optional<AuthUser> findActiveByEmailAndTenant(String email, String tenantId) {
@@ -99,7 +109,9 @@ public class UserService {
                     if (u.getStatus() == ACTIVE) {
                         throw new IllegalArgumentException("User with this email already exists in this tenant");
                     }
-                    return reactivateUser(u, firstName, lastName, password, roles);
+                    AuthUser restored = reactivateUser(u, firstName, lastName, password, roles);
+                    authAuditor.recordProvisioned(USER_RESTORE, restored, VIA_REGISTRATION);
+                    return restored;
                 })
                 .orElseGet(() -> createUser(tenantId, email, firstName, lastName, password, roles));
     }
@@ -116,7 +128,9 @@ public class UserService {
                                          List<UserRole> roles) {
         AuthUser user = registerUser(tenantId, email, firstName, lastName, password, roles);
         user.setEmailVerified(true);
-        return userRepository.save(user);
+        AuthUser saved = userRepository.save(user);
+        authAuditor.recordEmailVerified(saved, VIA_REGISTRATION);
+        return saved;
     }
 
     /**
@@ -197,10 +211,15 @@ public class UserService {
         return existing
                 .map(u -> {
                     if (u.getStatus() == ACTIVE) {
+                        boolean newlyVerified = !u.isEmailVerified();
                         u.setEmailVerified(true);
                         u.setLoginProvider(providerRegistrationId);
                         backfillNameIfBlank(u, firstName, lastName);
-                        return userRepository.save(u);
+                        AuthUser saved = userRepository.save(u);
+                        if (newlyVerified) {
+                            authAuditor.recordEmailVerified(saved, providerRegistrationId);
+                        }
+                        return saved;
                     }
                     return reactivateUserFromSso(u, firstName, lastName, roles, providerRegistrationId);
                 })
@@ -237,7 +256,10 @@ public class UserService {
         user.setStatus(ACTIVE);
         user.setEmailVerified(true);
         user.setLoginProvider(providerRegistrationId);
-        return userRepository.save(user);
+        AuthUser saved = userRepository.save(user);
+        authAuditor.recordProvisioned(USER_RESTORE, saved, providerRegistrationId);
+        authAuditor.recordEmailVerified(saved, providerRegistrationId);
+        return saved;
     }
 
     private AuthUser createUserFromSso(String tenantId,
@@ -261,7 +283,10 @@ public class UserService {
                 .roles(roles)
                 .loginProvider(providerRegistrationId)
                 .build();
-        return userRepository.save(user);
+        AuthUser saved = userRepository.save(user);
+        authAuditor.recordProvisioned(USER_CREATE, saved, providerRegistrationId);
+        authAuditor.recordEmailVerified(saved, providerRegistrationId);
+        return saved;
     }
 
     /**
@@ -282,7 +307,7 @@ public class UserService {
     /**
      * Mark user's email as verified.
      */
-    public void markEmailVerified(String userId) {
+    public void markEmailVerified(String userId, String via) {
         if (userId == null || userId.isBlank()) {
             return;
         }
@@ -294,6 +319,7 @@ public class UserService {
             AuthUser saved = userRepository.save(user);
             if (saved.isEmailVerified()) {
                 userEmailVerifiedProcessor.postProcessEmailVerified(saved);
+                authAuditor.recordEmailVerified(saved, via);
             }
         });
     }

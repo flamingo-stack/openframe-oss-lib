@@ -1,5 +1,6 @@
 package com.openframe.audit;
 
+import com.openframe.data.document.apikey.ApiKey;
 import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditActorType;
 import com.openframe.data.document.audit.AuditChange;
@@ -10,6 +11,8 @@ import com.openframe.data.document.audit.AuditRequestContext;
 import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.user.User;
+import com.openframe.data.mapper.AuditEventMapperImpl;
+import com.openframe.data.repository.apikey.ApiKeyRepository;
 import com.openframe.data.repository.audit.AuditEventRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.user.UserRepository;
@@ -36,6 +39,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.core.constants.HttpHeaders.X_API_KEY_ID;
+import static com.openframe.core.constants.HttpHeaders.X_USER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -54,6 +59,7 @@ class AuditRecorderTest {
     @Mock private AuditEventRepository auditEventRepository;
     @Mock private UserRepository userRepository;
     @Mock private MachineRepository machineRepository;
+    @Mock private ApiKeyRepository apiKeyRepository;
     @Mock private TenantIdProvider tenantIdProvider;
     @Captor private ArgumentCaptor<AuditEvent> eventCaptor;
 
@@ -61,8 +67,7 @@ class AuditRecorderTest {
 
     @BeforeEach
     void setUp() {
-        recorder = new AuditRecorder(auditEventRepository, userRepository, machineRepository, tenantIdProvider,
-                new ObjectMapper(), SUPER_TENANT_ID);
+        recorder = recorder(SUPER_TENANT_ID, true);
     }
 
     @AfterEach
@@ -105,6 +110,7 @@ class AuditRecorderTest {
         assertThat(event.getActorName()).isEqualTo("Anna Kowalski");
         assertThat(event.getActorEmail()).isEqualTo("anna@acme.com");
         assertThat(event.getRoleSnapshot()).containsExactly("ADMIN");
+        assertThat(event.getOnBehalfOfId()).isNull();
         assertThat(event.getSourceIp()).isEqualTo("203.0.113.24");
         assertThat(event.getUserAgent()).isEqualTo("Chrome");
         assertThat(event.getSessionId()).isEqualTo("session-1");
@@ -152,7 +158,49 @@ class AuditRecorderTest {
     }
 
     @Test
-    void recordsSystemWhenThereIsNoToken() {
+    void recordsApiKeyCallWithTheKeyAndItsOwner() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(X_API_KEY_ID, "key-1");
+        request.addHeader(X_USER_ID, USER_ID);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        ApiKey key = ApiKey.builder().keyId("key-1").name("Billing sync").roles(List.of("ADMIN")).build();
+        when(apiKeyRepository.findById("key-1")).thenReturn(Optional.of(key));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user("Anna", "Kowalski")));
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+
+        recorder.record(entry(AuditAction.TICKET_ARCHIVE));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.API_KEY);
+        assertThat(event.getActorId()).isEqualTo("key-1");
+        assertThat(event.getActorName()).isEqualTo("Billing sync");
+        assertThat(event.getRoleSnapshot()).containsExactly("ADMIN");
+        assertThat(event.getOnBehalfOfId()).isEqualTo(USER_ID);
+        assertThat(event.getOnBehalfOfName()).isEqualTo("Anna Kowalski");
+        assertThat(event.getSessionId()).isNull();
+        assertThat(event.getTenantId()).isEqualTo(SERVED_TENANT_ID);
+    }
+
+    @Test
+    void recordsAnUnknownApiKeyByItsId() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(X_API_KEY_ID, "key-9");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        when(apiKeyRepository.findById("key-9")).thenReturn(Optional.empty());
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+
+        recorder.record(entry(AuditAction.TICKET_ARCHIVE));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.API_KEY);
+        assertThat(event.getActorId()).isEqualTo("key-9");
+        assertThat(event.getActorName()).isNull();
+        assertThat(event.getRoleSnapshot()).isEmpty();
+        assertThat(event.getOnBehalfOfId()).isNull();
+    }
+
+    @Test
+    void recordsSystemWhenThereIsNoTokenAndNoApiKey() {
         when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
 
         recorder.record(entry(AuditAction.TICKET_ARCHIVE));
@@ -165,7 +213,7 @@ class AuditRecorderTest {
         assertThat(event.getSourceIp()).isNull();
         assertThat(event.getSessionId()).isNull();
         assertThat(event.getTenantId()).isEqualTo(SERVED_TENANT_ID);
-        verifyNoInteractions(userRepository, machineRepository);
+        verifyNoInteractions(userRepository, machineRepository, apiKeyRepository);
     }
 
     @Test
@@ -179,6 +227,23 @@ class AuditRecorderTest {
         assertThat(event.getActorId()).isEqualTo(USER_ID);
         assertThat(event.getActorEmail()).isEqualTo("anna@acme.com");
         assertThat(event.getActorName()).isNull();
+    }
+
+    @Test
+    void recordsUnderThePlatformTenantInASharedService() {
+        recorder(SUPER_TENANT_ID, false).record(entry(AuditAction.AUTH_LOGIN_FAIL));
+
+        assertThat(savedEvent().getTenantId()).isEqualTo(SUPER_TENANT_ID);
+        verifyNoInteractions(tenantIdProvider);
+    }
+
+    @Test
+    void recordsUnderTheServedTenantWhereNoSuperTenantIsConfigured() {
+        when(tenantIdProvider.getTenantId()).thenReturn("oss");
+
+        recorder("", false).record(entry(AuditAction.AUTH_LOGIN_FAIL));
+
+        assertThat(savedEvent().getTenantId()).isEqualTo("oss");
     }
 
     @Test
@@ -220,10 +285,15 @@ class AuditRecorderTest {
     }
 
     @Test
-    void refusesAnEntryWithoutAction() {
-        assertThatThrownBy(() -> recorder.record(AuditEntry.builder().outcome(AuditOutcome.SUCCESS).build()))
-                .isInstanceOf(IllegalArgumentException.class);
+    void refusesAnEntryWithoutOutcome() {
+        assertThatThrownBy(() -> recorder.record(AuditEntry.builder().action(AuditAction.TICKET_ARCHIVE).build()))
+                .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(auditEventRepository);
+    }
+
+    private AuditRecorder recorder(String superTenantId, boolean servesOneTenant) {
+        return new AuditRecorder(auditEventRepository, userRepository, machineRepository, apiKeyRepository,
+                tenantIdProvider, new AuditEventMapperImpl(), new ObjectMapper(), superTenantId, servesOneTenant);
     }
 
     private AuditEvent savedEvent() {

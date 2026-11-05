@@ -1,6 +1,7 @@
 package com.openframe.authz.service.sso;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.authz.util.AppleUserParam;
 import com.openframe.authz.util.SsoAuthentication;
 import com.openframe.authz.service.policy.GlobalDomainPolicyLookup;
@@ -56,6 +57,7 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
     private final UserService userService;
     private final GlobalDomainPolicyLookup globalDomainPolicyLookup;
     private final RegistrationProcessor registrationProcessor;
+    private final AuthAuditor authAuditor;
 
     private final OidcUserService delegate = new OidcUserService();
 
@@ -116,6 +118,7 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
             // Non-blocking, but never silent: if it hit a NEW user, the symptom is a login that then
             // fails at token issuance because the user does not exist in the tenant.
             log.warn("SSO auto-provisioning failed. tenantId={}, provider={}: {}", tenantId, provider, e.getMessage(), e);
+            authAuditor.recordProvisioningFailure(email.toLowerCase(ROOT), tenantId, provider, e);
         }
     }
 

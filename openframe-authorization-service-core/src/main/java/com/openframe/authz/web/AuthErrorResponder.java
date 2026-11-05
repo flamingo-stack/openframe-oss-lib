@@ -1,6 +1,7 @@
 package com.openframe.authz.web;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.authz.service.auth.AuthErrorDetailStore;
 import com.openframe.core.exception.AuthErrorCode;
 import com.openframe.core.exception.AuthFlowException;
@@ -14,6 +15,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.Map;
 
 import static com.openframe.core.exception.AuthErrorCode.PROVIDER_ACCESS_DENIED;
 import static com.openframe.core.exception.AuthErrorCode.PROVIDER_CONSENT_REQUIRED;
@@ -41,6 +43,7 @@ public class AuthErrorResponder {
     private static final String INVALID_STATE_PARAMETER = "invalid_state_parameter";
 
     private final AuthErrorDetailStore detailStore;
+    private final AuthAuditor authAuditor;
 
     @Value("${openframe.auth.error-url}")
     private String authErrorUrl;
@@ -55,6 +58,13 @@ public class AuthErrorResponder {
         String reference = reference(code, e);
         String target = authErrorUrl + "?ref=" + reference;
         response.sendRedirect(target);
+    }
+
+    public void sendLoginFailure(HttpServletResponse response, HttpServletRequest request, String event, Exception e,
+                                 AuthErrorCode fallbackCode, String email) throws IOException {
+        authAuditor.recordLoginFailure(email, TenantContext.getTenantId(), resolveCode(e, fallbackCode).name(),
+                Map.of("event", event));
+        send(response, request, event, e, fallbackCode);
     }
 
     private AuthErrorCode resolveCode(Exception e, AuthErrorCode fallbackCode) {

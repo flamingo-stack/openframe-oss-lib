@@ -1,6 +1,7 @@
 package com.openframe.authz.service.tenant;
 
 import com.openframe.authz.dto.TenantRegistrationRequest;
+import com.openframe.authz.security.AuthAuditor;
 import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.core.email.EmailDomainPolicy;
@@ -26,9 +27,18 @@ public class TenantRegistrationService {
     private final RegistrationProcessor registrationProcessor;
     private final EmailDomainPolicy emailDomainPolicy;
     private final OrganizationService organizationService;
+    private final AuthAuditor authAuditor;
 
     public Tenant registerTenant(TenantRegistrationRequest request) {
+        try {
+            return register(request);
+        } catch (RuntimeException e) {
+            authAuditor.recordRegistrationRefused(request.getEmail(), e);
+            throw e;
+        }
+    }
 
+    private Tenant register(TenantRegistrationRequest request) {
         registrationProcessor.preProcessTenantRegistration(request);
 
         String tenantDomain = request.getTenantDomain().toLowerCase(ROOT);
@@ -64,6 +74,7 @@ public class TenantRegistrationService {
         organizationService.createDefaultOrganization(savedTenant.getId());
 
         registrationProcessor.postProcessTenantRegistration(savedTenant, user, request);
+        authAuditor.recordTenantRegistered(savedTenant, user);
 
         return savedTenant;
     }

@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
@@ -19,8 +18,6 @@ import java.io.IOException;
 import java.util.Locale;
 
 import com.openframe.authz.util.OidcUserUtils;
-
-import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 
 /**
  * Authentication success handler that:
@@ -42,7 +39,7 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
                                         Authentication authentication) throws IOException, ServletException {
         try {
             String tenantId = TenantContext.getTenantId();
-            String email = extractEmail(authentication);
+            String email = AuthAuditor.emailOf(authentication);
             if (tenantId != null && email != null && !email.isBlank()) {
                 userService.touchLastLogin(email, tenantId);
                 maybeMarkEmailVerifiedFromSso(authentication, tenantId, email);
@@ -74,18 +71,7 @@ public class AuthSuccessHandler extends SavedRequestAwareAuthenticationSuccessHa
         }
 
         userService.findActiveByEmailAndTenant(email.trim().toLowerCase(Locale.ROOT), tenantId)
-                .ifPresent(u -> userService.markEmailVerified(u.getId()));
-    }
-
-    private String extractEmail(Authentication authentication) {
-        Object principal = authentication.getPrincipal();
-        if (principal instanceof OidcUser oidcUser) {
-            return resolveEmail(oidcUser);
-        }
-        if (principal instanceof UserDetails userDetails) {
-            return userDetails.getUsername();
-        }
-        return authentication.getName();
+                .ifPresent(u -> userService.markEmailVerified(u.getId(), provider));
     }
 }
 
