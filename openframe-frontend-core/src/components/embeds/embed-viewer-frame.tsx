@@ -66,6 +66,8 @@ export interface EmbedViewerFrameProps {
    *  button (the Figma player) and some cannot (a self-hosted Claude
    *  artifact mirror) — the shell provides the affordance uniformly. */
   fullscreenControl?: boolean;
+  /** The embedded app draws its own loading state (Figma, Google Sheets): see `EmbedIframe`. */
+  drawsOwnLoading?: boolean;
 }
 
 export function EmbedViewerFrame({
@@ -84,6 +86,7 @@ export function EmbedViewerFrame({
   sandbox,
   className,
   fullscreenControl,
+  drawsOwnLoading,
 }: EmbedViewerFrameProps) {
   // ONE switch: a page's loading scope, or the viewer still resolving where its frame points.
   const isLoading = useLoadingScope() || !!isLoadingGiven;
@@ -171,6 +174,7 @@ export function EmbedViewerFrame({
           allowFullScreen={allowFullScreen}
           loading={loading}
           sandbox={sandbox}
+          drawsOwnLoading={drawsOwnLoading}
         />
       ) : isLoading ? (
         // The EXACT skeleton every embed shows while its iframe loads

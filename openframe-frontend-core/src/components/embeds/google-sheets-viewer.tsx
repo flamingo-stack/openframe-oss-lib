@@ -45,6 +45,8 @@ export function GoogleSheetsViewer({ externalUrl, fileName, height }: GoogleShee
       }
       src={toGoogleSheetsEmbedUrl(externalUrl)}
       height={height}
+      // Google Sheets draws its own loader inside the frame: it is the only loading state.
+      drawsOwnLoading
     />
   );
 }

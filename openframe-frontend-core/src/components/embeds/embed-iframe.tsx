@@ -57,6 +57,12 @@ export interface EmbedIframeProps {
    * `allow-same-origin` grants the frame its own origin, never the host's.
    */
   sandbox?: string;
+  /**
+   * The embedded app draws its own loading state inside the frame (Figma, Google Sheets): the frame is shown at full
+   * size from the start, so theirs is the only loading state, never ours and then theirs. Leave it off for a frame
+   * that shows nothing while it loads (a PDF in the browser's viewer, a Claude artifact).
+   */
+  drawsOwnLoading?: boolean;
 }
 
 /**
@@ -77,6 +83,7 @@ export function EmbedIframe({
   loading,
   allowFullScreen,
   sandbox,
+  drawsOwnLoading = false,
 }: EmbedIframeProps) {
   // Which src finished loading, rather than a bare "loaded" flag reset from an
   // effect on every src change. Same information, but the reset is implicit:
@@ -84,7 +91,8 @@ export function EmbedIframe({
   // render that changed the src instead of one commit later — which is exactly
   // the frame that used to show the previous embed under the new src.
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
-  const isLoaded = loadedSrc === src;
+  // An app that draws its own loading state is shown at once (`drawsOwnLoading`).
+  const isLoaded = drawsOwnLoading || loadedSrc === src;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const handleLoad = useCallback(() => setLoadedSrc(src), [src]);
   const held = useLoadingScope();
@@ -111,7 +119,7 @@ export function EmbedIframe({
     <>
       {!isLoaded && <EmbedLoadingSkeleton height={resolvedHeight} />}
       <div
-        className={`w-full overflow-hidden rounded-lg border border-ods-border ${!isLoaded ? 'h-0 overflow-hidden' : ''} ${className || ''}`}
+        className={`w-full overflow-hidden rounded-lg border border-ods-border bg-ods-card ${!isLoaded ? 'h-0 overflow-hidden' : ''} ${className || ''}`}
         style={isLoaded ? { height: resolvedHeight } : undefined}
       >
         <iframe

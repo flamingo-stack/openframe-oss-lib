@@ -88,6 +88,13 @@ export interface DocViewerProps {
   /** Initial doc path (URL `[...path]`). */
   docPath?: string;
 
+  /**
+   * The type of the document at `docPath`, when the page knows it before the tree is read (the host read it on the
+   * server). The content's loading state takes its shape from it on a page's first load (a Figma deck draws the embed
+   * skeleton, not a text page); once the tree is read, the selected node's own type decides.
+   */
+  initialDocumentType?: DocNode['documentType'];
+
   /** Sidebar header copy (`'DOCUMENTATION'`, `'DATA ROOM'`). */
   sidebarLabel?: string;
 
@@ -154,6 +161,7 @@ function DocViewerContent({
   className = '',
   shell = true,
   docPath,
+  initialDocumentType,
   sidebarLabel = 'DOCUMENTATION',
   structureEndpoint,
   contentEndpoint,
@@ -246,8 +254,13 @@ function DocViewerContent({
   //   - the article max-width + sticky-nav visibility (markdown only)
   // `undefined` documentType is treated as `'markdown'` (per the DocNode
   // discriminator's documented default).
+  // Before the tree is read, the host's `initialDocumentType` (the page's own document) stands in.
   const selectedNodeDocType =
-    selectedPath && structure.length > 0 ? findDocNodeByPath(selectedPath, structure)?.documentType : undefined;
+    structure.length > 0
+      ? selectedPath
+        ? findDocNodeByPath(selectedPath, structure)?.documentType
+        : undefined
+      : initialDocumentType;
   // During loading, the in-flight content's type isn't known yet — fall back
   // to the selected node's type (or markdown if neither is set).
   const activeDocType = content?.documentType ?? selectedNodeDocType;

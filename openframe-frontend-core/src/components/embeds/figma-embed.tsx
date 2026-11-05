@@ -127,6 +127,8 @@ export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedP
       loading={loading}
       height={height}
       allowFullScreen
+      // Figma draws its own loader inside the frame: it is the only loading state.
+      drawsOwnLoading
       emptyIcon={<FigmaIcon className="mb-4 h-16 w-16 text-ods-text-secondary" />}
       emptyMessage="Figma URL not configured"
     />
