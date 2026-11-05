@@ -11,7 +11,7 @@ import type React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChatSourcePart } from '../../../chat-protocol/chat-message';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
-import { makeComposeContentUrl } from '../../../utils/content-href';
+import { makeEmbedderComposeContentUrl } from '../../../utils/content-href';
 import { resolveSearchResultAction } from '../../shared/doc-search/resolve-search-result-action';
 import { ChatMessageEnhanced } from '../chat-message-enhanced';
 import { ChatMessageSources } from '../chat-message-sources';
@@ -22,10 +22,9 @@ const FLAMINGO = 'https://www.flamingo.run';
 const GUIDE_URL = `${FLAMINGO}/onboarding-guides/mac-guide`;
 const BLOG_URL = `${FLAMINGO}/blog/openframe-vs-atera`;
 
-const appCompose = makeComposeContentUrl({
-  hostedTypes: new Set(['onboarding_guide']),
+const appCompose = makeEmbedderComposeContentUrl({
   contentOrigin: FLAMINGO,
-  suffixes: { onboarding_guide: 'help-center/onboarding-guides' },
+  routes: { onboardingGuide: slug => `/help-center/onboarding-guides/${slug}` },
 });
 
 const runtimeOf = (mode: 'host' | 'embed', compose = appCompose): ChatRuntime =>

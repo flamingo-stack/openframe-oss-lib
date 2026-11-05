@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { platformOfUrl } from '../../../../platform-domains';
-import { type ComposeContentUrl, makeComposeContentUrl } from '../../../../utils/content-href';
+import { type ComposeContentUrl, makeEmbedderComposeContentUrl } from '../../../../utils/content-href';
 import { buildListUrl } from '../../../../utils/list-url';
 import { DOC_TABLE_TYPES } from '../../../../utils/source-grouping';
 import type { ChatRef } from '../../chat-ref.types';
@@ -44,27 +44,25 @@ const hubCompose: ComposeContentUrl = ({ externalUrl }) => {
 };
 
 /** The OpenFrame app: hosted types, a doc by its tree path, a deep link of its own, the rest out. */
-const appCompose = makeComposeContentUrl({
-  hostedTypes: new Set(['onboarding_guide', 'product_release', 'markdown']),
+const appCompose = makeEmbedderComposeContentUrl({
   contentOrigin: FLAMINGO,
-  suffixes: {
-    onboarding_guide: 'help-center/onboarding-guides',
-    product_release: 'help-center/releases',
-    markdown: 'help-center/knowledge-base',
-  },
-  slugIsIdentifier: new Set(['markdown']),
-  overrides: {
-    delivery_item: id => ({ href: `/help-center/bug-fixes?search=${id}`, targetPlatform: null }),
-    hubspot_ticket_self: id => ({ href: `/help-center/tickets?ticket=${id}`, targetPlatform: null }),
+  routes: {
+    onboardingGuide: slug => `/help-center/onboarding-guides/${slug}`,
+    release: slug => `/help-center/releases/${slug}`,
+    knowledgeBase: '/help-center/knowledge-base',
+    delivery: '/help-center/bug-fixes',
+    tickets: '/help-center/tickets',
   },
 });
 
 /** The embedding example. */
-const embedCompose = makeComposeContentUrl({
-  hostedTypes: new Set(['onboarding_guide', 'product_release', 'markdown']),
+const embedCompose = makeEmbedderComposeContentUrl({
   contentOrigin: FLAMINGO,
-  suffixes: { onboarding_guide: 'onboarding-guides', product_release: 'releases', markdown: 'docs' },
-  slugIsIdentifier: new Set(['markdown']),
+  routes: {
+    onboardingGuide: slug => `/onboarding-guides/${slug}`,
+    release: slug => `/releases/${slug}`,
+    knowledgeBase: '/docs',
+  },
 });
 
 describe('resolveCardDestination: the server contract', () => {
@@ -167,7 +165,7 @@ describe('resolveCardDestination: what a host claims', () => {
       chatRef: { ...bare('blog_post', '1108'), url },
       ctx: { composeContentUrl: appCompose },
     });
-    expect(out).toEqual({ url, targetPlatform: 'flamingo', path: null, hostRoute: false });
+    expect(out).toEqual({ url, targetPlatform: null, path: null, hostRoute: false });
   });
 
   it('a deep link of the host is its route', () => {

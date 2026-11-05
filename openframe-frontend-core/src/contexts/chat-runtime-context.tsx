@@ -239,7 +239,7 @@ export interface ChatRuntime {
    *  views (onboarding catalog/detail, releases) AND chat cards / chips /
    *  search results all resolve content links through this one seam, so a
    *  given type lands in the SAME place regardless of where it's rendered.
-   *  Embedders wire `makeComposeContentUrl({ hostedTypes, contentOrigin })`;
+   *  Embedders wire `makeEmbedderComposeContentUrl({ contentOrigin, routes })`;
    *  omit it and lib views fall back to a same-origin relative path
    *  (`buildDefaultHref`).
    *

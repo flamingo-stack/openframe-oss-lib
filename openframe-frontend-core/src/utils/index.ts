@@ -389,16 +389,12 @@ export { extractItems, extractItemId, extractCardItems } from './extract-items';
 export { FullscreenSwitchController, type FullscreenSwitchOptions } from './fullscreen-switch';
 export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url';
 
-// Embedder-configurable content-URL composer for the existing
-// `runtime.composeContentUrl` seam — relative href for host-served types,
-// hub origin for the rest. Pure + server-safe.
+// The one embedder composer for the `runtime.composeContentUrl` seam: the host's own page for a record it has one
+// for, the server's address for every other. Pure + server-safe.
 export {
-  DEFAULT_CONTENT_SUFFIXES,
-  makeComposeContentUrl,
   makeEmbedderComposeContentUrl,
   type EmbedderContentRoutes,
   buildDefaultHref,
-  type ContentHrefOptions,
   type ComposeContentUrl,
   type ComposedContentUrl,
 } from './content-href';

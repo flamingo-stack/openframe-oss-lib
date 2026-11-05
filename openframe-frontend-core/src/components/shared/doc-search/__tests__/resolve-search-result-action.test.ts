@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatRuntime } from '../../../../contexts/chat-runtime-context';
-import { makeComposeContentUrl } from '../../../../utils/content-href';
+import { makeEmbedderComposeContentUrl } from '../../../../utils/content-href';
 import type { SearchResult } from '../../../ui/search-input';
 import { resolveSearchResultAction } from '../resolve-search-result-action';
 
@@ -23,16 +23,12 @@ const guideRow: SearchResult = {
 
 /** The OpenFrame Help Center seam: the two hosted types live under
  *  `/help-center/...`, list-filter types deep-link with `?search=<id>`. */
-const helpCenterCompose = makeComposeContentUrl({
-  hostedTypes: new Set(['onboarding_guide', 'product_release']),
+const helpCenterCompose = makeEmbedderComposeContentUrl({
   contentOrigin: HUB,
-  suffixes: {
-    onboarding_guide: 'help-center/onboarding-guides',
-    product_release: 'help-center/releases',
-    blog_post: 'blog',
-  },
-  overrides: {
-    delivery_item: id => ({ href: `/help-center/bug-fixes?search=${id}`, targetPlatform: null }),
+  routes: {
+    onboardingGuide: slug => `/help-center/onboarding-guides/${slug}`,
+    release: slug => `/help-center/releases/${slug}`,
+    delivery: '/help-center/bug-fixes',
   },
 });
 
@@ -82,7 +78,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     });
   });
 
-  it('non-hosted type → the seam returns the url verbatim, opens out', () => {
+  it('non-hosted type → the seam returns the url verbatim, opens out, naming no platform (an embedder is none)', () => {
     const row: SearchResult = {
       id: 'blog-1',
       title: 'Hello',
@@ -94,7 +90,7 @@ describe('resolveSearchResultAction — composeContentUrl seam', () => {
     expect(resolveSearchResultAction(row, 'openframe', runtimeIn('host'), helpCenterCompose)).toEqual({
       kind: 'navigate-new-tab',
       href: `${HUB}/blog/hello`,
-      targetPlatform: 'flamingo',
+      targetPlatform: null,
     });
   });
 
