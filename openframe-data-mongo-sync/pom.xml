@@ -22,6 +22,12 @@
             <artifactId>openframe-data-mongo-common</artifactId>
         </dependency>
 
+        <!-- BlockedEmailDomainSource, which StoredBlockedEmailDomainSource implements -->
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-core</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-core</artifactId>
