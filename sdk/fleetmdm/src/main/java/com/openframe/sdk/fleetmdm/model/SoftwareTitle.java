@@ -30,4 +30,6 @@ public class SoftwareTitle {
 
     @JsonProperty("counts_updated_at")
     private String countsUpdatedAt;
+    @JsonProperty("upgrade_code")
+    private String upgradeCode;
 }

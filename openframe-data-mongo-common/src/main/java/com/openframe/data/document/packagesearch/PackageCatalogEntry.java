@@ -37,6 +37,13 @@ public class PackageCatalogEntry {
     private String hashPrefix;
     private Integer popularity;
     private List<String> aliases;
+    // winget: the DisplayVersion Windows lists for the latest release, set only where it differs from version
+    private String displayVersion;
+    // winget: lower-case keys it matches an installed program by, as its index keeps them
+    private List<String> productCodes;
+    private List<String> upgradeCodes;
+    private List<String> normalizedNames;
+    private List<String> normalizedPublishers;
     private Instant updatedAt;
 
 }

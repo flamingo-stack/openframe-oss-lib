@@ -14,5 +14,12 @@ public interface PackageCatalogRepository extends MongoRepository<PackageCatalog
 
     List<PackageCatalogEntry> findByManagerAndPackageIdIn(PackageManagerType manager, Collection<String> packageIds);
 
+    List<PackageCatalogEntry> findByManagerAndProductCodesIn(PackageManagerType manager, Collection<String> productCodes);
+
+    List<PackageCatalogEntry> findByManagerAndUpgradeCodesIn(PackageManagerType manager, Collection<String> upgradeCodes);
+
+    List<PackageCatalogEntry> findByManagerAndNormalizedNamesIn(PackageManagerType manager,
+                                                                Collection<String> normalizedNames);
+
     long deleteByManagerAndUpdatedAtBefore(PackageManagerType manager, Instant updatedAt);
 }
