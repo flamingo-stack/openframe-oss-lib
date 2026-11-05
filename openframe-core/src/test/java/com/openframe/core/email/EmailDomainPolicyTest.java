@@ -5,10 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 
+import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,8 +23,6 @@ class EmailDomainPolicyTest {
     @Mock
     private DisposableDomainChecker disposableDomainChecker;
     @Mock
-    private ObjectProvider<BlockedEmailDomainSource> sources;
-    @Mock
     private BlockedEmailDomainSource databaseList;
 
     private EmailDomainPolicyProperties properties;
@@ -36,8 +33,7 @@ class EmailDomainPolicyTest {
         properties = new EmailDomainPolicyProperties();
         properties.setBlockedDomains(Set.of("Proton.me"));
         properties.setAllowedDomains(Set.of("allowed.example"));
-        lenient().when(sources.orderedStream()).thenAnswer(invocation -> Stream.of(databaseList));
-        policy = new EmailDomainPolicy(properties, disposableDomainChecker, sources);
+        policy = new EmailDomainPolicy(properties, disposableDomainChecker, List.of(databaseList));
     }
 
     @Test

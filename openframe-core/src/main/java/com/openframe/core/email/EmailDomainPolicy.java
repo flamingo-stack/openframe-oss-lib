@@ -2,10 +2,10 @@ package com.openframe.core.email;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -25,8 +25,8 @@ public class EmailDomainPolicy {
 
     private final EmailDomainPolicyProperties properties;
     private final DisposableDomainChecker disposableDomainChecker;
-    /** Resolved lazily, so a deployment without a source bean still gets the policy. */
-    private final ObjectProvider<BlockedEmailDomainSource> blockedDomainSources;
+    /** Every source bean in {@code @Order}; empty when a deployment has none. */
+    private final List<BlockedEmailDomainSource> blockedDomainSources;
 
     /** @throws IllegalArgumentException if the address uses a blocked domain */
     public void ensureEmailAllowed(String email) {
@@ -96,7 +96,7 @@ public class EmailDomainPolicy {
             log.debug("Domain '{}' blocked by the configured list", normalized);
             return true;
         }
-        return blockedDomainSources.orderedStream().anyMatch(source -> blockedBy(source, normalized));
+        return blockedDomainSources.stream().anyMatch(source -> blockedBy(source, normalized));
     }
 
     private static boolean blockedBy(BlockedEmailDomainSource source, String normalized) {
