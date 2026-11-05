@@ -1,6 +1,5 @@
 'use client';
 
-import { ChevronDown, Shield } from 'lucide-react';
 import type { FC } from 'react';
 import { useState } from 'react';
 import type {
@@ -11,17 +10,15 @@ import type {
 } from '../../types/permissions';
 import { cn } from '../../utils/cn';
 import { useCollapsible } from '../chat/hooks/use-collapsible';
+import { Chevron02DownIcon, ShieldIcon } from '../icons-v2-generated';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { ToolIcon } from '../tool-icon';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
-import { APPROVAL_LEVEL_META, APPROVAL_LEVELS } from './approval-level';
+import { APPROVAL_LEVEL_META, APPROVAL_LEVELS, ApprovalLevelView } from './approval-level';
 
-const approvalLevelOptions = APPROVAL_LEVELS.map(value => ({ value, label: APPROVAL_LEVEL_META[value].label }));
-
-const POLICY_LEVEL_WIDTH = 'w-[180px]';
-const CATEGORY_LEVEL_WIDTH = 'w-[256px]';
+const CATEGORY_LEVEL_WIDTH = 'w-[296px]';
 
 /** How many collapsed category rows the panel draws while loading when the host passes no categories. */
 export const POLICY_CONFIGURATION_PANEL_SKELETON_CATEGORIES = 4;
@@ -42,7 +39,16 @@ const CATEGORY_LEVEL_COLUMN_CLASS = cn(
 /** The expand / collapse control's chevron. */
 const CHEVRON_CLASS = 'h-6 w-6 text-ods-text-primary transition-transform duration-300';
 
-const getApprovalLevelLabel = (level: ApprovalLevel): string => APPROVAL_LEVEL_META[level]?.label ?? level;
+/** A level as the dropdown writes it: its icon in its colour, then its name. */
+const LevelOption: FC<{ level: ApprovalLevel }> = ({ level }) => {
+  const { label, Icon, toneClassName } = APPROVAL_LEVEL_META[level];
+  return (
+    <span className="inline-flex min-w-0 items-center gap-[var(--spacing-system-xsf)]">
+      <Icon size={16} className={cn('shrink-0', toneClassName)} aria-hidden />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+};
 
 const ApprovalLevelDropdown: FC<{
   value: ApprovalLevel | undefined;
@@ -58,14 +64,14 @@ const ApprovalLevelDropdown: FC<{
       <Button
         variant="outline"
         disabled={disabled}
-        rightIcon={<ChevronDown className="h-6 w-6 text-ods-text-secondary" />}
+        rightIcon={<Chevron02DownIcon className="h-6 w-6 text-ods-text-secondary" />}
         className={cn(
           'flex h-auto items-center justify-between gap-[var(--spacing-system-xsf)] rounded-md border border-ods-border bg-ods-card !px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xsf)] transition-colors !text-h6 hover:bg-ods-bg-hover',
           value ? 'text-ods-text-primary' : 'text-ods-text-secondary',
           triggerClassName,
         )}
       >
-        {value ? getApprovalLevelLabel(value) : 'Set Global Permission'}
+        {value ? <LevelOption level={value} /> : 'Set Global Permission'}
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" className={contentClassName}>
@@ -74,9 +80,9 @@ const ApprovalLevelDropdown: FC<{
           Clear Global Permission
         </DropdownMenuItem>
       )}
-      {approvalLevelOptions.map(option => (
-        <DropdownMenuItem key={option.value} onClick={() => onChange(option.value)} className="text-h6">
-          {option.label}
+      {APPROVAL_LEVELS.map(level => (
+        <DropdownMenuItem key={level} onClick={() => onChange(level)} className="text-h6">
+          <LevelOption level={level} />
         </DropdownMenuItem>
       ))}
     </DropdownMenuContent>
@@ -89,9 +95,17 @@ const PolicyRow: FC<{
   editMode: boolean;
   onPermissionChange: (categoryId: string, policyId: string, level: ApprovalLevel) => void;
 }> = ({ policy, categoryId, editMode, onPermissionChange }) => {
-  const handleChange = (level: ApprovalLevel | undefined) => {
-    if (level) onPermissionChange(categoryId, policy.id, level);
-  };
+  const nameId = `policy-${categoryId}-${policy.id}`;
+  // The level as every guardrail surface draws it (Figma 4365-22663): its name in its colour, then its icon, or the
+  // four levels' icons to pick from while editing.
+  const level = policy.approvalLevel ? (
+    <ApprovalLevelView
+      value={policy.approvalLevel}
+      editable={editMode}
+      onChange={next => onPermissionChange(categoryId, policy.id, next)}
+      aria-labelledby={nameId}
+    />
+  ) : null;
 
   return (
     <div className="flex items-start gap-[var(--spacing-system-m)] border-b border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] last:border-b-0 content-md:items-center">
@@ -102,43 +116,17 @@ const PolicyRow: FC<{
 
       {/* Policy Info — on mobile the approval level stacks below the pattern */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <p className="truncate text-ods-text-primary text-h4" title={policy.name}>
+        <p id={nameId} className="truncate text-ods-text-primary text-h4" title={policy.name}>
           {policy.name}
         </p>
-        <p className="break-all text-ods-text-secondary text-h6">{policy.commandPattern}</p>
-        {editMode ? (
-          <div className="mt-[var(--spacing-system-xsf)] content-md:hidden">
-            <ApprovalLevelDropdown
-              value={policy.approvalLevel}
-              onChange={handleChange}
-              triggerClassName="w-full"
-              contentClassName={POLICY_LEVEL_WIDTH}
-            />
-          </div>
-        ) : policy.approvalLevel ? (
-          <span className="text-ods-text-primary text-h4 content-md:hidden">
-            {getApprovalLevelLabel(policy.approvalLevel)}
-          </span>
-        ) : null}
+        <p className="truncate text-ods-text-secondary text-h6" title={policy.commandPattern}>
+          {policy.commandPattern}
+        </p>
+        {level && <div className="mt-[var(--spacing-system-xsf)] content-md:hidden">{level}</div>}
       </div>
 
       {/* Approval Level column (desktop only) */}
-      <div className="hidden shrink-0 content-md:block">
-        {editMode ? (
-          <ApprovalLevelDropdown
-            value={policy.approvalLevel}
-            onChange={handleChange}
-            triggerClassName={POLICY_LEVEL_WIDTH}
-            contentClassName={POLICY_LEVEL_WIDTH}
-          />
-        ) : (
-          <div className={cn('px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)]', POLICY_LEVEL_WIDTH)}>
-            {policy.approvalLevel && (
-              <span className="text-ods-text-primary text-h4">{getApprovalLevelLabel(policy.approvalLevel)}</span>
-            )}
-          </div>
-        )}
-      </div>
+      {level && <div className="hidden shrink-0 content-md:block">{level}</div>}
     </div>
   );
 };
@@ -191,7 +179,7 @@ const CategorySection: FC<{
       >
         {/* Category Icon (static: the host's, else the default shield) */}
         <div className={ICON_TILE_CLASS}>
-          <div className="text-ods-text-secondary">{category.icon ?? <Shield className="h-4 w-4" />}</div>
+          <div className="text-ods-text-secondary">{category.icon ?? <ShieldIcon size={16} />}</div>
         </div>
 
         {/* Category Info — on mobile the bulk dropdown stacks below the count */}
@@ -247,7 +235,7 @@ const CategorySection: FC<{
             e.stopPropagation();
             onToggle(category.id);
           }}
-          leftIcon={<ChevronDown className={cn(CHEVRON_CLASS, isExpanded && 'rotate-180')} />}
+          leftIcon={<Chevron02DownIcon className={cn(CHEVRON_CLASS, isExpanded && 'rotate-180')} />}
           className="h-auto w-auto shrink-0 rounded-md"
           aria-label={isExpanded ? 'Collapse' : 'Expand'}
         />
