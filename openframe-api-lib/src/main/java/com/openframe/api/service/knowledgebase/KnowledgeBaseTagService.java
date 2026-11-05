@@ -24,6 +24,12 @@ import java.util.stream.Collectors;
 
 import static org.springframework.util.CollectionUtils.isEmpty;
 
+import com.openframe.audit.AuditCapture;
+import com.openframe.data.document.audit.AuditTargetType;
+import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
+import static com.openframe.data.document.audit.AuditAction.KB_ITEM_TAG_ADD;
+import static com.openframe.data.document.audit.AuditAction.KB_ITEM_TAG_REMOVE;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -33,6 +39,7 @@ public class KnowledgeBaseTagService {
     private static final TagEntityType ENTITY_TYPE = TagEntityType.KNOWLEDGE_ARTICLE;
 
     private final TagRepository tagRepository;
+    private final AuditCapture auditCapture;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final KnowledgeBaseItemRepository itemRepository;
 
@@ -88,6 +95,11 @@ public class KnowledgeBaseTagService {
     public void addTagToItem(String itemId, String tagId) {
         log.info("Adding tag {} to KB item {}", tagId, itemId);
         requireExistingTag(tagId);
+        auditCapture.runWithoutCompare(KB_ITEM_TAG_ADD, targetTypeOf(itemId), itemId, Map.of("tagId", tagId),
+                () -> assignTag(itemId, tagId));
+    }
+
+    private void assignTag(String itemId, String tagId) {
         if (tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE).isPresent()) {
             return;
         }
@@ -97,6 +109,13 @@ public class KnowledgeBaseTagService {
                 .entityType(ENTITY_TYPE)
                 .build();
         tagAssignmentRepository.save(assignment);
+    }
+
+    private AuditTargetType targetTypeOf(String itemId) {
+        boolean folder = itemRepository.findById(itemId)
+                .map(item -> item.getType() == KnowledgeBaseItemType.FOLDER)
+                .orElse(false);
+        return folder ? AuditTargetType.KB_FOLDER : AuditTargetType.KB_ARTICLE;
     }
 
     public void requireExistingTags(List<String> tagIds) {
@@ -115,7 +134,8 @@ public class KnowledgeBaseTagService {
     @Transactional
     public void removeTagFromItem(String itemId, String tagId) {
         log.info("Removing tag {} from KB item {}", tagId, itemId);
-        tagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE);
+        auditCapture.runWithoutCompare(KB_ITEM_TAG_REMOVE, targetTypeOf(itemId), itemId, Map.of("tagId", tagId),
+                () -> tagAssignmentRepository.deleteByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE));
     }
 
     /** Makes the item's tags exactly {@code tagIds}: adds the missing ones and removes the rest. */

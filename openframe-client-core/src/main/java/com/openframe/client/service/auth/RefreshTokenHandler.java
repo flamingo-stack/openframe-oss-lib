@@ -1,5 +1,6 @@
 package com.openframe.client.service.auth;
 
+import com.openframe.audit.Audited;
 import com.openframe.client.dto.AgentTokenResponse;
 import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 import static com.openframe.client.service.AgentAuthService.REFRESH_TOKEN_GRANT_TYPE;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_AUTH_FAIL;
 import static org.springframework.security.oauth2.core.OAuth2TokenIntrospectionClaimNames.TOKEN_TYPE;
 
 @Component
@@ -24,6 +26,7 @@ public class RefreshTokenHandler {
     private final AccessTokenGenerator accessTokenGenerator;
     private final RefreshTokenGenerator refreshTokenGenerator;
 
+    @Audited(action = DEVICE_AUTH_FAIL, condition = "false", details = "grantType='refresh_token'")
     public AgentTokenResponse handle(String refreshToken) {
         Jwt jwt = jwtService.decodeToken(refreshToken);
 

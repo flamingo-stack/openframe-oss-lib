@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.schedule;
 
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.DeviceStatus;
@@ -33,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_DEVICES_ADD;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_DEVICES_REMOVE;
 import static java.util.stream.Collectors.toSet;
 
 @Slf4j
@@ -99,6 +102,7 @@ public class ScheduleScriptDeviceService {
      * Platform-validated: rejects devices whose OS doesn't match the schedule's supportedPlatforms.
      */
     @Transactional
+    @Audited(action = SCRIPT_SCHEDULE_DEVICES_ADD, targetId = "#scheduleId", details = "machineIds=#machineIds")
     public void addDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
         ScheduleScript schedule = requireVisibleSchedule(tenantId, scheduleId);
@@ -132,6 +136,7 @@ public class ScheduleScriptDeviceService {
 
     /** Incrementally unassign devices from a schedule (missing ids are simply no-ops). */
     @Transactional
+    @Audited(action = SCRIPT_SCHEDULE_DEVICES_REMOVE, targetId = "#scheduleId", details = "machineIds=#machineIds")
     public void removeDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
         requireVisibleSchedule(tenantId, scheduleId);

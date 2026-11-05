@@ -21,6 +21,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.MutationDeleteInput;
 import com.openframe.api.dto.shared.MutationDeletePayload;
 import com.openframe.api.mapper.GraphQLKnowledgeBaseMapper;
+import com.openframe.audit.Audited;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseAttachmentService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseTempAttachmentService;
@@ -47,6 +48,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_ADD;
 import static com.openframe.graphql.relay.NodeType.KNOWLEDGE_BASE_ITEM;
 import static com.openframe.graphql.relay.NodeType.TAG;
 
@@ -160,6 +162,7 @@ public class KnowledgeBaseDataFetcher {
     public KnowledgeBaseItem updateArticle(@InputArgument @Valid UpdateArticleInput input) {
         String currentUserId = getCurrentUserId();
         log.info("Updating article: {} by user: {}", input.getId(), currentUserId);
+        String rawId = relayIdCodec.decode(input.getId(), KNOWLEDGE_BASE_ITEM);
         return knowledgeBaseService.updateArticle(currentUserId, mapper.toUpdateCommand(input));
     }
 
@@ -241,7 +244,8 @@ public class KnowledgeBaseDataFetcher {
     @DgsQuery
     public String knowledgeBaseAttachmentDownloadUrl(@InputArgument @NotBlank String attachmentId) {
         log.info("Generating download URL for Knowledge Base attachment: {}", attachmentId);
-        return knowledgeBaseAttachmentService.generateDownloadUrl(attachmentId);
+        KnowledgeBaseItemAttachment attachment = knowledgeBaseAttachmentService.getAttachment(attachmentId);
+        return knowledgeBaseAttachmentService.generateDownloadUrl(attachment);
     }
 
     @DgsMutation
@@ -270,6 +274,7 @@ public class KnowledgeBaseDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = KB_ATTACHMENT_ADD, targetId = "rawId(#input.articleId)", details = "tempIds=#input.tempIds")
     public List<KnowledgeBaseItemAttachment> linkKnowledgeBaseTempAttachmentsToArticle(@InputArgument @Valid LinkKnowledgeBaseTempAttachmentsInput input) {
         String currentUserId = getCurrentUserId();
         String articleId = input.getArticleId();
@@ -297,7 +302,8 @@ public class KnowledgeBaseDataFetcher {
         log.info("Deleting Knowledge Base attachment: {}", input.getId());
         return executeMutation(
                 () -> {
-                    knowledgeBaseAttachmentService.deleteAttachment(input.getId());
+                    KnowledgeBaseItemAttachment attachment = knowledgeBaseAttachmentService.getAttachment(input.getId());
+                    knowledgeBaseAttachmentService.deleteAttachment(attachment);
                     return input.getId();
                 },
                 MutationDeletePayload::success,
@@ -354,6 +360,7 @@ public class KnowledgeBaseDataFetcher {
         DataLoader<String, UserResponse> loader = dfe.getDataLoader("userDataLoader");
         return loader.load(userId);
     }
+
 
     private String getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

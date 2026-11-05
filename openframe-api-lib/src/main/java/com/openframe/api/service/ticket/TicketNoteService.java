@@ -21,6 +21,13 @@ import java.util.stream.Collectors;
 
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
 
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.Audited;
+import static com.openframe.data.document.audit.AuditAction.TICKET_NOTE_ADD;
+import static com.openframe.data.document.audit.AuditAction.TICKET_NOTE_DELETE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_NOTE_UPDATE;
+import static com.openframe.data.document.audit.AuditTargetType.TICKET;
+
 @Service
 @Slf4j
 @Validated
@@ -30,8 +37,10 @@ public class TicketNoteService {
 
     private final TicketNoteRepository noteRepository;
     private final TicketRepository ticketRepository;
+    private final AuditCapture auditCapture;
 
     @Transactional
+    @Audited(action = TICKET_NOTE_ADD, targetId = "#ticketId", compare = false, details = "noteId=#result.id")
     public TicketNote addNote(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String content) {
         validateAdminAccess(principal);
         validateTicketExists(ticketId);
@@ -48,26 +57,36 @@ public class TicketNoteService {
     public TicketNote updateNote(AuthPrincipal principal, @NotBlank String noteId, @NotBlank String content) {
         validateAdminAccess(principal);
         log.info("Updating note {} by: {}", noteId, principal.getDisplayName());
-        TicketNote note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.TICKET_NOTE_NOT_FOUND, "Note not found: " + noteId));
-        if (!note.getAuthorId().equals(principal.getId())) {
-            throw new ForbiddenException(ErrorCode.OPERATION_NOT_ALLOWED, "Only the author can update this note");
-        }
-        note.setContent(content);
-        return noteRepository.save(note);
+        TicketNote note = requireNote(noteId);
+        return auditCapture.runWithoutCompare(TICKET_NOTE_UPDATE, TICKET, note.getTicketId(),
+                Map.of("noteId", noteId), () -> {
+                    requireAuthor(note, principal, "Only the author can update this note");
+                    note.setContent(content);
+                    return noteRepository.save(note);
+                });
     }
 
     @Transactional
     public void deleteNote(AuthPrincipal principal, @NotBlank String noteId) {
         validateAdminAccess(principal);
         log.info("Deleting note {} by: {}", noteId, principal.getDisplayName());
-        TicketNote note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.TICKET_NOTE_NOT_FOUND, "Note not found: " + noteId));
-        if (!note.getAuthorId().equals(principal.getId())) {
-            throw new ForbiddenException(ErrorCode.OPERATION_NOT_ALLOWED, "Only the author can delete this note");
-        }
-        noteRepository.delete(note);
+        TicketNote note = requireNote(noteId);
+        auditCapture.runWithoutCompare(TICKET_NOTE_DELETE, TICKET, note.getTicketId(), Map.of("noteId", noteId), () -> {
+            requireAuthor(note, principal, "Only the author can delete this note");
+            noteRepository.delete(note);
+        });
         log.info("Note deleted: {}", noteId);
+    }
+
+    private TicketNote requireNote(String noteId) {
+        return noteRepository.findById(noteId)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.TICKET_NOTE_NOT_FOUND, "Note not found: " + noteId));
+    }
+
+    private static void requireAuthor(TicketNote note, AuthPrincipal principal, String message) {
+        if (!note.getAuthorId().equals(principal.getId())) {
+            throw new ForbiddenException(ErrorCode.OPERATION_NOT_ALLOWED, message);
+        }
     }
 
     public List<List<TicketNote>> getNotesByTicketIds(List<String> ticketIds) {

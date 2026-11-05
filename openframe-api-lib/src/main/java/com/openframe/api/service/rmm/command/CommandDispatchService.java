@@ -6,6 +6,7 @@ import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.TestRunPolicy;
+import com.openframe.audit.Audited;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
@@ -16,6 +17,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+
+import static com.openframe.data.document.audit.AuditAction.COMMAND_RUN;
 
 @Slf4j
 @Service
@@ -28,6 +31,9 @@ public class CommandDispatchService {
     private final CommandExecutionService commandExecutionService;
     private final TestRunPolicy testRunPolicy;
 
+    @Audited(action = COMMAND_RUN, targetId = "rawId(#input.machineId)", compare = false,
+            details = {"command=#input.command", "shell=#input.shell", "privilegeLevel=#input.privilegeLevel",
+                    "executionId=#result.executionId"})
     public DispatchResponse runCommand(RunCommandInput input, String initiatedBy) {
         deviceService.verifyDispatchable(input.getMachineId());
 
@@ -60,6 +66,9 @@ public class CommandDispatchService {
      * {@code executionId}, persisting one RUNNING {@code CommandExecution} row per
      * machine first ({@code initiatedBy} attributes the dispatch).
      */
+    @Audited(action = COMMAND_RUN, compare = false,
+            details = {"machineIds=#input.machineIds", "command=#input.command", "shell=#input.shell",
+                    "privilegeLevel=#input.privilegeLevel", "executionId=#result.executionId"})
     public DispatchResponse batchRunCommand(BatchRunCommandInput input, String initiatedBy) {
         List<String> machineIds = input.getMachineIds().stream().distinct().toList();
 

@@ -2,6 +2,7 @@ package com.openframe.external.controller;
 
 import com.openframe.api.service.LogDetailsService;
 import com.openframe.api.service.LogService;
+import com.openframe.audit.Audited;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.audit.LogsResponse;
@@ -31,6 +32,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
+import static com.openframe.data.document.audit.AuditAction.AUDIT_LOG_EVENT_VIEW;
+import static com.openframe.data.document.audit.AuditAction.AUDIT_LOG_VIEW;
 import static org.springframework.http.HttpStatus.*;
 
 @RestController
@@ -47,6 +50,9 @@ public class LogController {
     @Operation(summary = "Get logs", description = "Retrieve logs with optional filtering, search, and pagination")
     @GetMapping
     @ResponseStatus(OK)
+    @Audited(action = AUDIT_LOG_VIEW, condition = "#cursor == null", details = {"startDate=#startDate", "endDate=#endDate",
+            "toolTypes=#toolTypes", "eventTypes=#eventTypes", "severities=#severities", "customerIds=#customerIds",
+            "deviceId=#deviceId", "search=#search"})
     public LogsResponse getLogs(
             @Parameter(description = "Start date in YYYY-MM-DD format")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -143,6 +149,8 @@ public class LogController {
     })
     @GetMapping("/details")
     @ResponseStatus(OK)
+    @Audited(action = AUDIT_LOG_EVENT_VIEW, targetId = "#toolEventId",
+            details = {"ingestDay=#ingestDay", "toolType=#toolType", "eventType=#eventType"})
     public LogDetailsResponse getLogDetails(
             @Parameter(description = "Ingest day of the log entry", required = true)
             @RequestParam String ingestDay,

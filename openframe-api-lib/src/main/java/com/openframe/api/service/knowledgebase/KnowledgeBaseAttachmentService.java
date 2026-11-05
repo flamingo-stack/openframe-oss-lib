@@ -1,6 +1,7 @@
 package com.openframe.api.service.knowledgebase;
 
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseAttachmentUpload;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
 import com.openframe.data.repository.knowledgebase.KnowledgeBaseItemAttachmentRepository;
@@ -17,6 +18,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_ADD;
+import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_DELETE;
+import static com.openframe.data.document.audit.AuditAction.KB_ATTACHMENT_DOWNLOAD;
 
 /**
  * Service for Knowledge Base attachments.
@@ -52,11 +57,19 @@ public class KnowledgeBaseAttachmentService {
                 .toList();
     }
 
-    public String generateDownloadUrl(String attachmentId) {
-        KnowledgeBaseItemAttachment attachment = attachmentRepository.findById(attachmentId)
+    public KnowledgeBaseItemAttachment getAttachment(String attachmentId) {
+        return attachmentRepository.findById(attachmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Attachment not found: " + attachmentId));
+    }
 
-        log.info("Generating download URL for Knowledge Base attachment: {}", attachmentId);
+    public String generateDownloadUrl(String attachmentId) {
+        return generateDownloadUrl(getAttachment(attachmentId));
+    }
+
+    @Audited(action = KB_ATTACHMENT_DOWNLOAD, targetId = "#attachment.itemId",
+            details = {"attachmentId=#attachment.id", "fileName=#attachment.fileName"})
+    public String generateDownloadUrl(KnowledgeBaseItemAttachment attachment) {
+        log.info("Generating download URL for Knowledge Base attachment: {}", attachment.getId());
 
         return gcsPresignedUrlService.generateDownloadUrl(
                 attachment.getStoragePath(),
@@ -65,6 +78,8 @@ public class KnowledgeBaseAttachmentService {
     }
 
     @Transactional
+    @Audited(action = KB_ATTACHMENT_ADD, targetId = "#articleId",
+            details = {"fileName=#fileName", "attachmentId=#result.attachment?.id"})
     public KnowledgeBaseAttachmentUpload createUploadUrl(String uploaderId,
                                                          String articleId,
                                                          String fileName,
@@ -105,14 +120,17 @@ public class KnowledgeBaseAttachmentService {
 
     @Transactional
     public void deleteAttachment(String attachmentId) {
-        log.info("Deleting Knowledge Base attachment: {}", attachmentId);
+        deleteAttachment(getAttachment(attachmentId));
+    }
 
-        KnowledgeBaseItemAttachment attachment = attachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new IllegalArgumentException("Attachment not found: " + attachmentId));
-
+    @Transactional
+    @Audited(action = KB_ATTACHMENT_DELETE, targetId = "#attachment.itemId",
+            details = {"attachmentId=#attachment.id", "fileName=#attachment.fileName"})
+    public void deleteAttachment(KnowledgeBaseItemAttachment attachment) {
+        log.info("Deleting Knowledge Base attachment: {}", attachment.getId());
         gcsPresignedUrlService.deleteFile(attachment.getStoragePath());
         attachmentRepository.delete(attachment);
-        log.info("Knowledge Base Attachment deleted: {}", attachmentId);
+        log.info("Knowledge Base Attachment deleted: {}", attachment.getId());
     }
 
     /**

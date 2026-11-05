@@ -41,6 +41,15 @@ import static com.openframe.data.document.ticket.TicketStatusKind.AI_ASSISTANCE;
 import static com.openframe.data.document.ticket.TicketStatusKind.RESOLVED;
 import static org.springframework.util.StringUtils.hasText;
 
+import com.openframe.audit.AuditCapture;
+import java.util.HashMap;
+import java.util.Map;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CHANGE;
+
+import com.openframe.audit.AuditCall;
+import com.openframe.data.document.audit.AuditTargetType;
+import static com.openframe.data.document.audit.AuditAction.TICKET_ARCHIVE;
+
 /**
  * Lifecycle operations for custom-status tickets.
  */
@@ -63,6 +72,7 @@ public class TicketLifecycleService {
     private final TicketResolverStamp ticketResolverStamp;
     private final TicketStatusHistoryService historyService;
     private final List<TicketEventListener> listeners;
+    private final AuditCapture auditCapture;
 
     @Transactional
     public Ticket transition(AuthPrincipal principal, @Valid TransitionTicketInput input) {
@@ -75,6 +85,16 @@ public class TicketLifecycleService {
      * {@code this} (the proxy would be bypassed and its settings silently ignored).
      */
     private Ticket doTransition(AuthPrincipal principal, TransitionTicketInput input, TransitionSource source) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("toStatusId", input.getToStatusId());
+        details.put("reason", input.getReason());
+        details.put("reopenReason", input.getReopenReason());
+        details.put("source", source);
+        return auditCapture.run(TICKET_STATUS_CHANGE, input.getTicketId(), details,
+                () -> transitionTicket(principal, input, source));
+    }
+
+    private Ticket transitionTicket(AuthPrincipal principal, TransitionTicketInput input, TransitionSource source) {
         TransitionContext context = loadContext(input.getTicketId());
         Ticket ticket = context.ticket();
         TicketStatusDefinition target = transitionPolicy.validateAndResolve(ticket, input.getToStatusId());
@@ -214,6 +234,19 @@ public class TicketLifecycleService {
 
     @Transactional
     public List<String> archiveResolvedTickets(AuthPrincipal principal, TicketFilterInput filterInput) {
+        AuditCall call = new AuditCall(TICKET_ARCHIVE, AuditTargetType.TICKET, () -> null, _ -> null, false,
+                archived -> archiveDetails(filterInput, archived), false, _ -> true, _ -> null, _ -> null);
+        return auditCapture.capture(call, () -> archiveResolved(principal, filterInput));
+    }
+
+    private static Map<String, Object> archiveDetails(TicketFilterInput filterInput, Object archivedIds) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("filter", filterInput);
+        details.put("ticketIds", archivedIds);
+        return details;
+    }
+
+    private List<String> archiveResolved(AuthPrincipal principal, TicketFilterInput filterInput) {
         TicketStatusDefinition resolved = requireByKind(TicketStatusKind.RESOLVED);
         TicketStatusDefinition archived = requireByKind(TicketStatusKind.ARCHIVED);
 

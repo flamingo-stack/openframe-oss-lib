@@ -4,6 +4,8 @@ import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponse;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponseItem;
 import com.openframe.api.dto.update.ForceClientUpdateRequest;
+import com.openframe.audit.AuditCapture;
+import com.openframe.core.exception.InternalException;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.nats.delivery.ClientUpdateDeliverySeed;
@@ -14,8 +16,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_CLIENT_UPDATE;
 import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Service
@@ -26,6 +31,7 @@ public class ForceClientUpdateService {
     private final OpenFrameClientConfigurationRepository clientConfigurationRepository;
     private final MachineRepository machineRepository;
     private final DeliveryRouter deliveryRouter;
+    private final AuditCapture auditCapture;
 
     public ForceClientUpdateResponse process(ForceClientUpdateRequest request) {
         List<String> machineIds = request.getMachineId();
@@ -52,7 +58,7 @@ public class ForceClientUpdateService {
                 .toList();
         log.info("Found {} machines to process", machineIds.size());
 
-        ForceAgentStatus outcome = sendToEveryMachine();
+        ForceAgentStatus outcome = sendToEveryMachine(machineIds.size());
         List<ForceClientUpdateResponseItem> responseItems = machineIds.stream()
                 .map(machineId -> buildResponseItem(machineId, outcome))
                 .toList();
@@ -62,15 +68,22 @@ public class ForceClientUpdateService {
         return response;
     }
 
-    private ForceAgentStatus sendToEveryMachine() {
+    private ForceAgentStatus sendToEveryMachine(int machines) {
         try {
             OpenFrameClientConfiguration configuration = loadConfiguration();
-            ClientUpdateDeliverySeed seed = ClientUpdateDeliverySeed.forEveryMachine(configuration);
-            boolean carried = deliveryRouter.dispatch(seed);
-            return outcomeOf(carried);
-        } catch (Exception e) {
+            Map<String, Object> details = versionDetails(configuration);
+            details.put("machines", machines);
+            auditCapture.run(DEVICE_CLIENT_UPDATE, null, details, () -> sendToEveryMachine(configuration));
+            return ForceAgentStatus.PROCESSED;
+        } catch (RuntimeException e) {
             log.error("Failed to send the client update to every machine", e);
             return ForceAgentStatus.FAILED;
+        }
+    }
+
+    private void sendToEveryMachine(OpenFrameClientConfiguration configuration) {
+        if (!deliveryRouter.dispatch(ClientUpdateDeliverySeed.forEveryMachine(configuration))) {
+            throw new InternalException("Client update not carried to every machine");
         }
     }
 
@@ -83,23 +96,30 @@ public class ForceClientUpdateService {
     private ForceClientUpdateResponseItem processMachine(String machineId) {
         try {
             OpenFrameClientConfiguration configuration = loadConfiguration();
-            ClientUpdateDeliverySeed seed = ClientUpdateDeliverySeed.forMachine(machineId, configuration);
-            boolean carried = deliveryRouter.dispatch(seed);
-            ForceAgentStatus outcome = outcomeOf(carried);
-            return buildResponseItem(machineId, outcome);
-        } catch (Exception e) {
+            auditCapture.run(DEVICE_CLIENT_UPDATE, machineId, versionDetails(configuration),
+                    () -> sendToMachine(machineId, configuration));
+            return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
+        } catch (RuntimeException e) {
             log.error("Failed to process force client update message for machine {}", machineId, e);
             return buildResponseItem(machineId, ForceAgentStatus.FAILED);
         }
     }
 
+    private void sendToMachine(String machineId, OpenFrameClientConfiguration configuration) {
+        if (!deliveryRouter.dispatch(ClientUpdateDeliverySeed.forMachine(machineId, configuration))) {
+            throw new InternalException("Client update not carried for machine " + machineId);
+        }
+    }
+
+    private static Map<String, Object> versionDetails(OpenFrameClientConfiguration configuration) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("version", configuration.getVersion());
+        return details;
+    }
+
     private OpenFrameClientConfiguration loadConfiguration() {
         return clientConfigurationRepository.findFirstByOrderByCreatedAtDesc()
                 .orElseThrow(() -> new IllegalStateException("Not found client configuration"));
-    }
-
-    private static ForceAgentStatus outcomeOf(boolean carried) {
-        return carried ? ForceAgentStatus.PROCESSED : ForceAgentStatus.FAILED;
     }
 
     private ForceClientUpdateResponseItem buildResponseItem(String machineId, ForceAgentStatus status) {

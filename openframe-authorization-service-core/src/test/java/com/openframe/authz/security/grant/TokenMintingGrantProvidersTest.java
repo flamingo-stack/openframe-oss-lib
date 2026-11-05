@@ -53,6 +53,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -154,6 +155,24 @@ class TokenMintingGrantProvidersTest {
         verify(authorizationService).save(saved.capture());
         assertThat(saved.getValue().getPrincipalName()).isEqualTo("ada@acme.com");
         verify(userService).touchLastLogin("ada@acme.com", TENANT);
+    }
+
+    @Test
+    void shouldMintTokensForTheSignInRecordThatIsSaved() {
+        when(signupTicketService.consume("t-1")).thenReturn(Optional.of(ticket("user-1", TENANT)));
+        when(userService.findActiveById("user-1")).thenReturn(Optional.of(user));
+
+        signupProvider.authenticate(new SignupTicketGrantAuthenticationToken(
+                client(SignupTicketGrantAuthenticationToken.GRANT_TYPE, AuthorizationGrantType.REFRESH_TOKEN), "t-1"));
+
+        ArgumentCaptor<OAuth2TokenContext> tokenContexts = ArgumentCaptor.forClass(OAuth2TokenContext.class);
+        verify(tokenGenerator, times(2)).generate(tokenContexts.capture());
+        ArgumentCaptor<OAuth2Authorization> saved = ArgumentCaptor.forClass(OAuth2Authorization.class);
+        verify(authorizationService).save(saved.capture());
+        assertThat(saved.getValue().getId()).isNotBlank();
+        assertThat(tokenContexts.getAllValues())
+                .extracting(context -> context.getAuthorization().getId())
+                .containsOnly(saved.getValue().getId());
     }
 
     @Test

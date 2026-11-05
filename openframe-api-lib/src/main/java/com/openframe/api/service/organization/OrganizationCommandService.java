@@ -6,6 +6,7 @@ import com.openframe.api.dto.organization.UpdateOrganizationStatusRequest;
 import com.openframe.api.mapper.OrganizationMapper;
 import com.openframe.api.validation.ContractPeriodValidator;
 import com.openframe.api.validation.ValidContractPeriod;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
@@ -15,6 +16,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+
+import static com.openframe.data.document.audit.AuditAction.ORGANIZATION_CREATE;
+import static com.openframe.data.document.audit.AuditAction.ORGANIZATION_STATUS_CHANGE;
+import static com.openframe.data.document.audit.AuditAction.ORGANIZATION_UPDATE;
 
 /**
  * Facade service for organization command operations (Create, Update, Delete).
@@ -36,6 +41,7 @@ public class OrganizationCommandService {
      * @param request create organization request
      * @return created organization
      */
+    @Audited(action = ORGANIZATION_CREATE, targetId = "#result.organizationId")
     public Organization createOrganization(CreateOrganizationRequest request) {
         log.debug("Creating organization from request: {}", request.name());
         
@@ -51,6 +57,7 @@ public class OrganizationCommandService {
      * @param request update organization request
      * @return updated organization
      */
+    @Audited(action = ORGANIZATION_UPDATE, targetId = "#id")
     public Organization updateOrganization(String id, UpdateOrganizationRequest request) {
         log.debug("Updating organization {} from request", id);
         
@@ -81,6 +88,7 @@ public class OrganizationCommandService {
      * @param id organization database ID
      * @param request status update request
      */
+    @Audited(action = ORGANIZATION_STATUS_CHANGE, targetId = "#id", details = "status=#request.status")
     public void updateOrganizationStatus(String id, UpdateOrganizationStatusRequest request) {
         var newStatus = OrganizationStatus.valueOf(request.status().name());
         log.debug("Updating organization {} status to {}", id, newStatus);

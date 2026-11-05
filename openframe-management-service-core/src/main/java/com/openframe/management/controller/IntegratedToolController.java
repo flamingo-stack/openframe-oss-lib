@@ -1,5 +1,6 @@
 package com.openframe.management.controller;
 
+import com.openframe.audit.Audited;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.IntegratedToolService;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.data.document.audit.AuditAction.TOOL_CREDENTIALS_VIEW;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
 @Slf4j
@@ -29,6 +31,7 @@ public class IntegratedToolController {
     private final List<IntegratedToolPostSaveHook> postSaveHooks;
 
     @GetMapping
+    @Audited(action = TOOL_CREDENTIALS_VIEW, details = "toolKeys=#result['tools'].![key]")
     public Map<String, Object> getTools() {
         return Map.of(
             "status", "success",
@@ -37,6 +40,7 @@ public class IntegratedToolController {
     }
 
     @GetMapping("/{id}")
+    @Audited(action = TOOL_CREDENTIALS_VIEW, targetId = "#id", condition = "#result['status'] == 'success'")
     public Map<String, Object> getTool(@PathVariable String id) {
         return toolService.getTool(id)
             .map(tool -> Map.of("status", "success", "tool", tool))

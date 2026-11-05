@@ -38,6 +38,7 @@ import org.dataloader.DataLoader;
 
 import java.util.concurrent.CompletableFuture;
 
+
 @DgsComponent
 @Slf4j
 @Validated
@@ -159,6 +160,9 @@ public class AssignmentDataFetcher {
             case KNOWLEDGE_ARTICLE -> dfe.<String, KnowledgeBaseItem>getDataLoader("knowledgeBaseItemDataLoader").load(targetId);
         };
     }
+
+
+
 
     private String decodeAssignableItemId(String itemId) {
         return relayIdCodec.decodeOneOf(itemId, ASSIGNABLE_ITEM_TYPES);

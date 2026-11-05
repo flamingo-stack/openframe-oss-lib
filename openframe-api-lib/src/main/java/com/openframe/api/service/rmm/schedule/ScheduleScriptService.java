@@ -15,6 +15,7 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -45,6 +46,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_CREATE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_DELETE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_UPDATE;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -68,6 +73,7 @@ public class ScheduleScriptService {
      *
      * @throws ConflictException if a schedule with the same name already exists.
      */
+    @Audited(action = SCRIPT_SCHEDULE_CREATE, targetId = "#result.id")
     public ScriptScheduleResponse create(CreateScriptScheduleInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
 
@@ -189,6 +195,7 @@ public class ScheduleScriptService {
                 .build();
     }
 
+    @Audited(action = SCRIPT_SCHEDULE_UPDATE, targetId = "#input.id")
     public ScriptScheduleResponse update(UpdateScriptScheduleInput input) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
@@ -257,6 +264,7 @@ public class ScheduleScriptService {
      * @return the id of the deleted schedule.
      * @throws NotFoundException if the id does not exist in the tenant.
      */
+    @Audited(action = SCRIPT_SCHEDULE_DELETE, targetId = "#id")
     public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         ScheduleScript existing = loadOrThrow(tenantId, id);

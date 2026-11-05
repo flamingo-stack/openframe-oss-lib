@@ -4,6 +4,8 @@ import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceToolAgentUpdateResponseItem;
 import com.openframe.api.dto.update.ForceToolAgentUpdateRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateResponse;
+import com.openframe.audit.AuditCapture;
+import com.openframe.core.exception.InternalException;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.nats.delivery.ToolUpdateDeliverySeed;
@@ -14,8 +16,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_TOOL_AGENT_UPDATE;
 import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -27,6 +32,7 @@ public class ForceToolAgentUpdateService {
     private final IntegratedToolAgentRepository toolAgentRepository;
     private final MachineRepository machineRepository;
     private final DeliveryRouter deliveryRouter;
+    private final AuditCapture auditCapture;
 
     public ForceToolAgentUpdateResponse process(ForceToolAgentUpdateRequest request) {
         String toolAgentId = request.getToolAgentId();
@@ -70,10 +76,10 @@ public class ForceToolAgentUpdateService {
     private ForceAgentStatus sendToEveryMachine(String toolAgentId) {
         try {
             IntegratedToolAgent toolAgent = loadToolAgent(toolAgentId);
-            ToolUpdateDeliverySeed seed = ToolUpdateDeliverySeed.forEveryMachine(toolAgent);
-            boolean carried = deliveryRouter.dispatch(seed);
-            return outcomeOf(carried);
-        } catch (Exception e) {
+            auditCapture.run(DEVICE_TOOL_AGENT_UPDATE, null, details(toolAgent, "all"),
+                    () -> dispatch(ToolUpdateDeliverySeed.forEveryMachine(toolAgent), "every machine"));
+            return ForceAgentStatus.PROCESSED;
+        } catch (RuntimeException e) {
             log.error("Failed to send the tool agent {} update to every machine", toolAgentId, e);
             return ForceAgentStatus.FAILED;
         }
@@ -94,23 +100,32 @@ public class ForceToolAgentUpdateService {
     private ForceToolAgentUpdateResponseItem processMachine(String machineId, String toolAgentId) {
         try {
             IntegratedToolAgent toolAgent = loadToolAgent(toolAgentId);
-            ToolUpdateDeliverySeed seed = ToolUpdateDeliverySeed.forMachine(machineId, toolAgent);
-            boolean carried = deliveryRouter.dispatch(seed);
-            ForceAgentStatus outcome = outcomeOf(carried);
-            return buildResponseItem(machineId, toolAgentId, outcome);
-        } catch (Exception e) {
+            auditCapture.run(DEVICE_TOOL_AGENT_UPDATE, machineId, details(toolAgent, machineId),
+                    () -> dispatch(ToolUpdateDeliverySeed.forMachine(machineId, toolAgent), "machine " + machineId));
+            return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.PROCESSED);
+        } catch (RuntimeException e) {
             log.error("Failed to process force tool agent {} update message for machine {}", toolAgentId, machineId, e);
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.FAILED);
         }
     }
 
+    private void dispatch(ToolUpdateDeliverySeed seed, String recipient) {
+        if (!deliveryRouter.dispatch(seed)) {
+            throw new InternalException("Tool agent update not carried to " + recipient);
+        }
+    }
+
+    private static Map<String, Object> details(IntegratedToolAgent toolAgent, String machines) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("toolAgent", toolAgent.getKey());
+        details.put("version", toolAgent.getVersion());
+        details.put("machines", machines);
+        return details;
+    }
+
     private IntegratedToolAgent loadToolAgent(String toolAgentId) {
         return toolAgentRepository.findByKey(toolAgentId)
                 .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
-    }
-
-    private static ForceAgentStatus outcomeOf(boolean carried) {
-        return carried ? ForceAgentStatus.PROCESSED : ForceAgentStatus.FAILED;
     }
 
     private ForceToolAgentUpdateResponseItem buildResponseItem(String machineId, String toolAgentId, ForceAgentStatus status) {

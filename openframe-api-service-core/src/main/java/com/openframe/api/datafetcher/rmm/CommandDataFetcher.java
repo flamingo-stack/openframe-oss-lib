@@ -8,6 +8,7 @@ import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.service.rmm.command.CommandDispatchService;
+import com.openframe.audit.Audited;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
+
+import static com.openframe.data.document.audit.AuditAction.EXECUTION_CANCEL;
 
 /**
  * GraphQL resolver for RMM ad-hoc command dispatch.
@@ -39,6 +42,7 @@ public class CommandDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = EXECUTION_CANCEL, targetId = "#input.executionId", details = "machineId=#input.machineId")
     public DispatchResponse cancelExecution(@InputArgument @Valid CancelExecutionInput input) {
         return commandDispatchService.cancelExecution(input);
     }

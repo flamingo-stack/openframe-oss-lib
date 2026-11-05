@@ -1,5 +1,7 @@
 package com.openframe.external.service;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditCapture;
 import com.openframe.core.service.ProxyUrlResolver;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolApiKey;
@@ -45,13 +47,19 @@ public class RestProxyService {
     private final ProxyUrlResolver proxyUrlResolver;
     private final ToolUrlService toolUrlService;
     private final CloseableHttpClient httpClient;
+    private final AuditCapture auditCapture;
+    private final ProxyAuditCalls auditCalls;
 
     public RestProxyService(IntegratedToolRepository toolRepository,
                            ProxyUrlResolver proxyUrlResolver,
-                           ToolUrlService toolUrlService) {
+                           ToolUrlService toolUrlService,
+                           AuditCapture auditCapture,
+                           ProxyAuditCalls auditCalls) {
         this.toolRepository = toolRepository;
         this.proxyUrlResolver = proxyUrlResolver;
         this.toolUrlService = toolUrlService;
+        this.auditCapture = auditCapture;
+        this.auditCalls = auditCalls;
         this.httpClient = createHttpClient();
     }
 
@@ -73,6 +81,11 @@ public class RestProxyService {
             return ResponseEntity.badRequest().body("Tool " + tool.getName() + " is not enabled");
         }
 
+        AuditCall call = auditCalls.of(tool, request.getMethod(), request.getRequestURI(), body);
+        return auditCapture.capture(call, () -> forward(tool, toolId, request, body));
+    }
+
+    private ResponseEntity<String> forward(IntegratedTool tool, String toolId, HttpServletRequest request, String body) {
         try {
             URI originalUri = new URI(request.getRequestURL().toString());
             if (request.getQueryString() != null) {

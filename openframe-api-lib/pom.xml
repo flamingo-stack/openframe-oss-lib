@@ -86,6 +86,10 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-audit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-core-crypto</artifactId>
         </dependency>
         <!-- LexoRank ordering for ticket board columns and custom statuses -->

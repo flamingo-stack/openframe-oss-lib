@@ -18,6 +18,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLScriptExecutionMapper;
+import com.openframe.audit.Audited;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.rmm.script.ScriptExecutionFilterService;
@@ -35,6 +36,8 @@ import org.dataloader.DataLoader;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_OUTPUT_VIEW;
+import static com.openframe.data.document.audit.AuditTargetType.EXECUTION;
 import static com.openframe.graphql.relay.NodeType.SCRIPT;
 import static com.openframe.graphql.relay.NodeType.SCRIPT_EXECUTION;
 import static com.openframe.graphql.relay.NodeType.SCRIPT_SCHEDULE;
@@ -64,8 +67,6 @@ public class ScriptExecutionDataFetcher {
     private final ScriptExecutionFilterService scriptExecutionFilterService;
     private final GraphQLScriptExecutionMapper executionMapper;
     private final RelayIdCodec relayIdCodec;
-
-    /** Relay global id (Base64 "ScriptExecution:&lt;rawId&gt;") for the {@code id} field — the opaque node handle. */
 
     @DgsQuery
     public ScriptExecutionResponse scriptExecution(@InputArgument @NotBlank String id) {
@@ -228,5 +229,13 @@ public class ScriptExecutionDataFetcher {
         }
         DataLoader<String, Machine> loader = dfe.getDataLoader("machineDataLoader");
         return loader.load(execution.getMachineId());
+    }
+
+    @DgsData(parentType = "ScriptExecution", field = "stdout")
+    @DgsData(parentType = "ScriptExecution", field = "stderr")
+    @Audited(action = SCRIPT_OUTPUT_VIEW, targetType = EXECUTION, targetId = "#dfe.source.executionId")
+    public String output(DgsDataFetchingEnvironment dfe) {
+        ScriptExecutionResponse execution = dfe.getSource();
+        return "stdout".equals(dfe.getField().getName()) ? execution.getStdout() : execution.getStderr();
     }
 }

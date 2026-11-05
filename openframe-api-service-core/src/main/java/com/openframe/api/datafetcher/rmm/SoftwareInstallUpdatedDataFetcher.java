@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import com.openframe.audit.Audited;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.InputArgument;
@@ -19,6 +20,9 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
+
 @DgsComponent
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -29,11 +33,15 @@ public class SoftwareInstallUpdatedDataFetcher {
     private final SoftwareInstallUpdateManagementService softwareInstallUpdateManagementService;
 
     @DgsMutation
+    @Audited(action = SOFTWARE_INSTALL, compare = false,
+            details = {"machineIds=#input.machineIds", "packages=#input.packages"})
     public List<SoftwareDispatchResult> installSoftware(@InputArgument @Valid SoftwareManagementInput input) {
         return softwareInstallUpdateManagementService.install(input, getCurrentUserId(), ExecutionSource.PACKAGE_INSTALLATION);
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_UPDATE, compare = false,
+            details = {"machineIds=#input.machineIds", "packages=#input.packages"})
     public List<SoftwareDispatchResult> updateSoftware(@InputArgument @Valid SoftwareManagementInput input) {
         return softwareInstallUpdateManagementService.update(input, getCurrentUserId(), ExecutionSource.PACKAGE_UPDATE);
     }

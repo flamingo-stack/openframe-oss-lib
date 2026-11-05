@@ -29,6 +29,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.openframe.audit.AuditCapture;
+import com.openframe.data.document.audit.AuditTargetType;
+import static com.openframe.data.document.audit.AuditAction.LINK_CREATE;
+import static com.openframe.data.document.audit.AuditAction.LINK_DELETE;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -36,6 +41,7 @@ import java.util.stream.Collectors;
 public class AssignmentService {
 
     private final ItemAssignmentRepository repository;
+    private final AuditCapture auditCapture;
     private final OrganizationRepository organizationRepository;
     private final MachineRepository machineRepository;
     private final TicketRepository ticketRepository;
@@ -109,6 +115,24 @@ public class AssignmentService {
     @Transactional
     public ItemAssignment assignItem(String itemId, AssignmentItemType itemType,
                                       AssignmentTargetType targetType, String targetId) {
+        return auditCapture.runWithoutCompare(LINK_CREATE, targetTypeOf(itemType), itemId,
+                linkDetails(targetType, targetId), () -> createAssignment(itemId, itemType, targetType, targetId));
+    }
+
+    private static Map<String, Object> linkDetails(AssignmentTargetType targetType, String targetId) {
+        return Map.of("targetType", targetType, "targetId", targetId);
+    }
+
+    private static AuditTargetType targetTypeOf(AssignmentItemType itemType) {
+        return switch (itemType) {
+            case TICKET -> AuditTargetType.TICKET;
+            case INSIGHT -> AuditTargetType.INSIGHT;
+            default -> AuditTargetType.KB_ARTICLE;
+        };
+    }
+
+    private ItemAssignment createAssignment(String itemId, AssignmentItemType itemType,
+                                            AssignmentTargetType targetType, String targetId) {
         String displayName = resolveDisplayName(targetType, targetId);
         log.info("Assigning {}:{} ({}) to {} {}", targetType, targetId, displayName, itemType, itemId);
         ItemAssignment assignment = ItemAssignment.builder()
@@ -130,7 +154,12 @@ public class AssignmentService {
     @Transactional
     public void unassignItem(String itemId, AssignmentTargetType targetType, String targetId) {
         log.info("Unassigning {}:{} from item {}", targetType, targetId, itemId);
-        repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId);
+        repository.findByItemIdAndTargetType(itemId, targetType).stream()
+                .filter(assignment -> targetId.equals(assignment.getTargetId()))
+                .findFirst()
+                .ifPresent(assignment -> auditCapture.runWithoutCompare(LINK_DELETE,
+                        targetTypeOf(assignment.getItemType()), itemId, linkDetails(targetType, targetId),
+                        () -> repository.deleteByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)));
     }
 
     /**
@@ -170,7 +199,14 @@ public class AssignmentService {
     @Transactional
     public void unassignAllByType(String itemId, AssignmentTargetType targetType) {
         log.info("Unassigning all {} from item {}", targetType, itemId);
-        repository.deleteByItemIdAndTargetType(itemId, targetType);
+        List<ItemAssignment> links = repository.findByItemIdAndTargetType(itemId, targetType);
+        if (links.isEmpty()) {
+            return;
+        }
+        Map<String, Object> details = Map.of("targetType", targetType,
+                "targetIds", links.stream().map(ItemAssignment::getTargetId).toList());
+        auditCapture.runWithoutCompare(LINK_DELETE, targetTypeOf(links.getFirst().getItemType()), itemId, details,
+                () -> repository.deleteByItemIdAndTargetType(itemId, targetType));
     }
 
     private String resolveDisplayName(AssignmentTargetType type, String targetId) {

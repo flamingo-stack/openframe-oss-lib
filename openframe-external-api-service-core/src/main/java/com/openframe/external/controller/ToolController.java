@@ -2,6 +2,7 @@ package com.openframe.external.controller;
 
 import com.openframe.api.service.ToolService;
 import com.openframe.api.dto.tool.ToolFilterCriteria;
+import com.openframe.audit.Audited;
 import com.openframe.external.web.ApiCaller;
 import com.openframe.external.dto.tool.ToolFilterResponse;
 import com.openframe.external.dto.tool.ToolsResponse;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
+import static com.openframe.data.document.audit.AuditAction.TOOL_CREDENTIALS_VIEW;
 import static org.springframework.http.HttpStatus.*;
 
 @RestController
@@ -29,6 +31,7 @@ public class ToolController {
     @Operation(summary = "Get integrated tools", description = "Retrieve integrated tools with optional filtering")
     @GetMapping
     @ResponseStatus(OK)
+    @Audited(action = TOOL_CREDENTIALS_VIEW, details = "toolIds=#result.tools.![id]")
     public ToolsResponse getTools(
             @Parameter(description = "Filter by enabled status")
             @RequestParam(required = false) Boolean enabled,

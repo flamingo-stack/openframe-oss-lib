@@ -4,6 +4,9 @@ import com.openframe.api.dto.force.request.ForceToolInstallationRequest;
 import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponse;
 import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponseItem;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
+import com.openframe.audit.AuditCapture;
+import com.openframe.core.exception.InternalException;
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.repository.device.MachineRepository;
@@ -14,7 +17,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_TOOL_AGENT_INSTALL;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_TOOL_AGENT_REINSTALL;
 import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -25,6 +31,7 @@ public class ForceToolInstallationService {
 
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolInstallationService toolInstallationService;
+    private final AuditCapture auditCapture;
     private final MachineRepository machineRepository;
 
     public ForceToolAgentInstallationResponse process(ForceToolInstallationRequest request) {
@@ -117,14 +124,22 @@ public class ForceToolInstallationService {
 
     private ForceToolAgentInstallationResponseItem processMachine(String machineId, String toolAgentId, boolean reinstall) {
         try {
-            IntegratedToolAgent toolAgent = integratedToolAgentService.findByKey(toolAgentId)
-                    .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
-            toolInstallationService.process(machineId, toolAgent, reinstall);
-
+            AuditAction action = reinstall ? DEVICE_TOOL_AGENT_REINSTALL : DEVICE_TOOL_AGENT_INSTALL;
+            auditCapture.run(action, machineId, Map.of("toolAgent", toolAgentId),
+                    () -> install(machineId, toolAgentId, reinstall));
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.PROCESSED);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             log.error("Failed to process force tool {} installation message for machine {}", toolAgentId, machineId, e);
             return buildResponseItem(machineId, toolAgentId, ForceAgentStatus.FAILED);
+        }
+    }
+
+    private void install(String machineId, String toolAgentId, boolean reinstall) {
+        IntegratedToolAgent toolAgent = integratedToolAgentService.findByKey(toolAgentId)
+                .orElseThrow(() -> new IllegalStateException("Not found tool agent configuration for " + toolAgentId));
+        if (!toolInstallationService.process(machineId, toolAgent, reinstall)) {
+            throw new InternalException(
+                    "Tool agent " + toolAgentId + " installation not carried for machine " + machineId);
         }
     }
 

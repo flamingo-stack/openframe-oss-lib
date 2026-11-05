@@ -27,6 +27,10 @@ import java.util.stream.Collectors;
 
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
 
+import com.openframe.audit.Audited;
+import static com.openframe.data.document.audit.AuditAction.TICKET_TAG_ADD;
+import static com.openframe.data.document.audit.AuditAction.TICKET_TAG_REMOVE;
+
 @Service
 @Slf4j
 @Validated
@@ -58,6 +62,7 @@ public class TicketTagService {
     }
 
     @Transactional
+    @Audited(action = TICKET_TAG_ADD, targetId = "#ticketId", compare = false, details = "tagId=#tagId")
     public void addTagToTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String tagId) {
         validateAdminAccess(principal);
         validateTicketExists(ticketId);
@@ -73,6 +78,7 @@ public class TicketTagService {
     }
 
     @Transactional
+    @Audited(action = TICKET_TAG_REMOVE, targetId = "#ticketId", compare = false, details = "tagId=#tagId")
     public void removeTagFromTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String tagId) {
         validateAdminAccess(principal);
         validateTicketExists(ticketId);

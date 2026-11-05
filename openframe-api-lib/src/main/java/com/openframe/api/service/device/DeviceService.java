@@ -12,6 +12,7 @@ import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -47,6 +48,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_RENAME;
+import static com.openframe.data.document.audit.AuditAction.DEVICE_STATUS_CHANGE;
 import static com.openframe.data.service.machine.MachineFields.NICKNAME;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
@@ -341,6 +344,7 @@ public class DeviceService {
                 .collect(Collectors.toList());
     }
 
+    @Audited(action = DEVICE_STATUS_CHANGE, targetId = "#machineId", details = "status=#status")
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
         Machine machine = machineRepository.findByMachineId(machineId)
@@ -365,6 +369,7 @@ public class DeviceService {
         }
     }
 
+    @Audited(action = DEVICE_RENAME, targetId = "#machineId")
     public Machine updateNickname(@NotBlank String machineId, String nickname) {
         log.info("Updating device nickname. machineId={}", machineId);
         MachineWriteResult result = machineWriter

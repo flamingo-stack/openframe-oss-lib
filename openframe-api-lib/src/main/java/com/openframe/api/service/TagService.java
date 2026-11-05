@@ -9,6 +9,7 @@ import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.audit.Audited;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.openframe.data.document.audit.AuditAction.TAG_CREATE;
+import static com.openframe.data.document.audit.AuditAction.TAG_DELETE;
+import static com.openframe.data.document.audit.AuditAction.TAG_UPDATE;
 
 @Service
 @Slf4j
@@ -208,6 +213,7 @@ public class TagService {
     }
 
     @Transactional
+    @Audited(action = TAG_CREATE, targetId = "#result.id", details = "entityType=#entityType")
     public Tag createTag(String key, TagEntityType entityType, String description, String color) {
         log.info("Creating tag '{}' with entityType: {}", key, entityType);
 
@@ -232,6 +238,7 @@ public class TagService {
     }
 
     @Transactional
+    @Audited(action = TAG_UPDATE, targetId = "#tagId")
     public Tag updateTag(String tagId, String key, String description, String color) {
         log.info("Updating tag: {}", tagId);
 
@@ -257,6 +264,7 @@ public class TagService {
     }
 
     @Transactional
+    @Audited(action = TAG_DELETE, targetId = "#tagId")
     public void deleteTag(String tagId) {
         log.info("Deleting tag: {}", tagId);
 

@@ -31,6 +31,17 @@ import static com.openframe.api.exception.ticket.TicketStatusOperation.*;
 import static com.openframe.api.util.AuthPrincipalUtils.validateAdminAccess;
 import static com.openframe.data.document.ticket.TicketStatusKind.*;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.Audited;
+import com.openframe.data.document.audit.AuditTargetType;
+import java.util.HashMap;
+import java.util.Map;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_CREATE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_DELETE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_MOVE;
+import static com.openframe.data.document.audit.AuditAction.TICKET_STATUS_UPDATE;
+
 /**
  * Tenant ticket status definitions: the seeded system statuses plus custom ones managed by admins.
  */
@@ -42,6 +53,7 @@ import static com.openframe.data.document.ticket.TicketStatusKind.*;
 public class TicketStatusService {
 
     private final TicketStatusDefinitionRepository statusRepository;
+    private final AuditCapture auditCapture;
     private final TicketRepository ticketRepository;
     private final TicketTransitionPolicyValidator transitionPolicy;
 
@@ -50,6 +62,7 @@ public class TicketStatusService {
     }
 
     @Transactional
+    @Audited(action = TICKET_STATUS_CREATE, targetId = "#result.id")
     public TicketStatusDefinition create(AuthPrincipal principal, @Valid CreateTicketStatusInput input) {
         validateAdminAccess(principal);
         ensureUniqueName(input.getName());
@@ -68,6 +81,7 @@ public class TicketStatusService {
     }
 
     @Transactional
+    @Audited(action = TICKET_STATUS_UPDATE, targetId = "#input.id")
     public TicketStatusDefinition update(AuthPrincipal principal, @Valid UpdateTicketStatusInput input) {
         validateAdminAccess(principal);
         TicketStatusDefinition status = requireStatus(input.getId());
@@ -82,21 +96,37 @@ public class TicketStatusService {
     @Transactional
     public boolean delete(AuthPrincipal principal, @Valid DeleteTicketStatusInput input) {
         validateAdminAccess(principal);
+        AuditCall call = new AuditCall(TICKET_STATUS_DELETE, AuditTargetType.TICKET_STATUS, input::getId, _ -> null,
+                false, moved -> deleteDetails(input, moved), true, _ -> true, _ -> null, _ -> null);
+        auditCapture.capture(call, () -> deleteStatus(input));
+        return true;
+    }
+
+    private static Map<String, Object> deleteDetails(DeleteTicketStatusInput input, Object ticketsMoved) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("replacementStatusId", input.getReplacementStatusId());
+        details.put("ticketsMoved", ticketsMoved);
+        return details;
+    }
+
+    private long deleteStatus(DeleteTicketStatusInput input) {
         TicketStatusDefinition status = requireStatus(input.getId());
         ensureCustomStatus(status, DELETE);
 
         long inUseCount = ticketRepository.countByStatusId(status.getId());
         if (inUseCount > 0) {
             deleteWithReplacement(status, input.getReplacementStatusId(), inUseCount);
-            return true;
+            return inUseCount;
         }
 
         statusRepository.delete(status);
         log.info("Deleted custom status {}", status.getId());
-        return true;
+        return inUseCount;
     }
 
     @Transactional
+    @Audited(action = TICKET_STATUS_MOVE, targetId = "#input.id",
+            details = {"afterStatusId=#input.afterStatusId", "beforeStatusId=#input.beforeStatusId"})
     public TicketStatusDefinition reorder(AuthPrincipal principal, @Valid ReorderTicketStatusInput input) {
         validateAdminAccess(principal);
         TicketStatusDefinition status = requireStatus(input.getId());

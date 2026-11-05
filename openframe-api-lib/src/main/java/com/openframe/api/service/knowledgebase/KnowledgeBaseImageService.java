@@ -2,6 +2,7 @@ package com.openframe.api.service.knowledgebase;
 
 import com.openframe.api.config.KnowledgeBaseImageProperties;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseImageUpload;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseImage;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.UUID;
 
+import static com.openframe.data.document.audit.AuditAction.KB_IMAGE_ADD;
 import static java.util.stream.Collectors.joining;
 
 /**
@@ -38,6 +40,8 @@ public class KnowledgeBaseImageService {
     private final GcsPresignedUrlService gcsPresignedUrlService;
     private final KnowledgeBaseImageProperties imageProperties;
 
+    @Audited(action = KB_IMAGE_ADD, targetId = "#result.image.id",
+            details = {"fileName=#fileName", "contentType=#contentType", "fileSize=#fileSize"})
     public KnowledgeBaseImageUpload createUpload(String uploaderId, String fileName, String contentType, Long fileSize) {
         long maxSizeBytes = imageProperties.getMaxSizeBytes();
         String extension = validateAndResolveExtension(contentType, fileSize, maxSizeBytes);

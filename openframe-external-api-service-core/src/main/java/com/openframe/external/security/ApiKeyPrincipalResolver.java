@@ -1,5 +1,6 @@
 package com.openframe.external.security;
 
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.ForbiddenException;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.data.document.user.User;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+import static com.openframe.data.document.audit.AuditAction.API_KEY_AUTH_FAIL;
 import static org.springframework.util.StringUtils.hasText;
 
 /**
@@ -28,6 +30,7 @@ public class ApiKeyPrincipalResolver {
     private final UserRepository userRepository;
     private final TenantIdProvider tenantIdProvider;
 
+    @Audited(action = API_KEY_AUTH_FAIL, condition = "false", details = "userId=#userId")
     public AuthPrincipal resolve(String userId) {
         if (!hasText(userId)) {
             throw new UnauthorizedException("API key is not bound to a user");

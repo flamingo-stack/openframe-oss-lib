@@ -23,11 +23,11 @@ public class ToolInstallationService {
     private final ToolCommandParamsResolver toolCommandParamsResolver;
     private final DeliveryRouter deliveryRouter;
 
-    public void process(String machineId, IntegratedToolAgent toolAgent) {
-        process(machineId, toolAgent, false);
+    public boolean process(String machineId, IntegratedToolAgent toolAgent) {
+        return process(machineId, toolAgent, false);
     }
 
-    public void process(String machineId, IntegratedToolAgent toolAgent, boolean reinstall) {
+    public boolean process(String machineId, IntegratedToolAgent toolAgent, boolean reinstall) {
         String toolId = toolAgent.getToolId();
         try {
             IntegratedTool tool = getIntegratedToolData(toolId);
@@ -47,9 +47,10 @@ public class ToolInstallationService {
             if (carried) {
                 log.info("Published {} agent installation message for machine {}", toolId, machineId);
             }
+            return carried;
         } catch (Exception e) {
-            // TODO: add fallback mechanism
             log.error("Failed to publish {} agent installation message for machine {}", toolId, machineId, e);
+            return false;
         }
     }
 

@@ -7,8 +7,11 @@ import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareSchedulePackageInput;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
+import com.openframe.audit.AuditCapture;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
@@ -46,6 +49,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CREATE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
+
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -61,6 +68,7 @@ public class SoftwareBundleService {
     private final MachinePlatformResolver machinePlatformResolver;
     private final TenantIdProvider tenantIdProvider;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final AuditCapture auditCapture;
 
     @Value("${openframe.rmm.software.bundle.pending-ttl}")
     private Duration pendingTtl;
@@ -121,6 +129,18 @@ public class SoftwareBundleService {
     }
 
     public SoftwareBundleResponse submit(SubmitSoftwareBundleInput input, String actor) {
+        Map<String, Object> details = Map.of("bundleId", input.getId(), "softwareAction", input.getAction());
+        return auditCapture.run(submitAction(input), null, details, () -> doSubmit(input, actor));
+    }
+
+    private static AuditAction submitAction(SubmitSoftwareBundleInput input) {
+        if (input.getSchedule() != null) {
+            return SOFTWARE_SCHEDULE_CREATE;
+        }
+        return input.getAction() == SoftwareAction.INSTALL ? SOFTWARE_INSTALL : SOFTWARE_UPDATE;
+    }
+
+    private SoftwareBundleResponse doSubmit(SubmitSoftwareBundleInput input, String actor) {
         SoftwareBundle entity = loadOrThrow(input.getId());
         if (entity.getStatus() == SoftwareBundleStatus.COMPLETED) {
             log.info("submitSoftwareBundle id={} already COMPLETED — returning unchanged", input.getId());

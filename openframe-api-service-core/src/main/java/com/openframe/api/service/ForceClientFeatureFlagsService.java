@@ -4,6 +4,8 @@ import com.openframe.api.dto.force.request.ForceClientFeatureFlagsRequest;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientFeatureFlagsResponse;
 import com.openframe.api.dto.force.response.ForceClientFeatureFlagsResponseItem;
+import com.openframe.audit.AuditCapture;
+import com.openframe.core.exception.InternalException;
 import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.delivery.DeliveryType;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_FEATURE_FLAGS_SET;
 import static java.util.Objects.requireNonNullElse;
 import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 
@@ -30,6 +33,7 @@ public class ForceClientFeatureFlagsService {
     private final OpenFrameClientConfigurationService clientConfigurationService;
     private final DeliveryProperties deliveryProperties;
     private final DeliveryRouter deliveryRouter;
+    private final AuditCapture auditCapture;
 
     public ForceClientFeatureFlagsResponse process(ForceClientFeatureFlagsRequest request) {
         List<String> machineIds = request.getMachineIds();
@@ -53,13 +57,17 @@ public class ForceClientFeatureFlagsService {
 
     private ForceClientFeatureFlagsResponseItem processMachine(String machineId, Map<String, ClientFeatureFlag> flags) {
         try {
-            ClientFeatureFlagsDeliverySeed seed = ClientFeatureFlagsDeliverySeed.forMachine(machineId, flags);
-            boolean carried = deliveryRouter.dispatch(seed);
-            ForceAgentStatus outcome = outcomeOf(carried);
-            return buildResponseItem(machineId, outcome);
-        } catch (Exception e) {
+            auditCapture.run(DEVICE_FEATURE_FLAGS_SET, machineId, Map.of("flags", flags), () -> send(machineId, flags));
+            return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
+        } catch (RuntimeException e) {
             log.error("Failed to send the client feature flags to machine {}", machineId, e);
             return buildResponseItem(machineId, ForceAgentStatus.FAILED);
+        }
+    }
+
+    private void send(String machineId, Map<String, ClientFeatureFlag> flags) {
+        if (!deliveryRouter.dispatch(ClientFeatureFlagsDeliverySeed.forMachine(machineId, flags))) {
+            throw new InternalException("Client feature flags not carried for machine " + machineId);
         }
     }
 
@@ -76,10 +84,6 @@ public class ForceClientFeatureFlagsService {
         if (isEmpty(machineIds)) {
             throw new IllegalArgumentException("No machine ids provided");
         }
-    }
-
-    private static ForceAgentStatus outcomeOf(boolean carried) {
-        return carried ? ForceAgentStatus.PROCESSED : ForceAgentStatus.FAILED;
     }
 
     private ForceClientFeatureFlagsResponseItem buildResponseItem(String machineId, ForceAgentStatus status) {

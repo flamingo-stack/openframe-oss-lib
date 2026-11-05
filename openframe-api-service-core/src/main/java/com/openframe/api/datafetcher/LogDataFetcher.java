@@ -10,6 +10,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLLogMapper;
 import com.openframe.api.service.LogDetailsService;
 import com.openframe.api.service.LogService;
+import com.openframe.audit.Audited;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -19,6 +20,9 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Instant;
 import java.util.Optional;
+
+import static com.openframe.data.document.audit.AuditAction.AUDIT_LOG_EVENT_VIEW;
+import static com.openframe.data.document.audit.AuditAction.AUDIT_LOG_VIEW;
 
 @DgsComponent
 @Slf4j
@@ -40,6 +44,7 @@ public class LogDataFetcher {
     }
 
     @DgsQuery
+    @Audited(action = AUDIT_LOG_VIEW, details = {"filter=#filter", "search=#search"})
     public GenericConnection<GenericEdge<LogEvent>> logs(
             @InputArgument @Valid LogFilterInput filter,
             @InputArgument Integer first,
@@ -66,6 +71,8 @@ public class LogDataFetcher {
     }
 
     @DgsQuery
+    @Audited(action = AUDIT_LOG_EVENT_VIEW, targetId = "#toolEventId",
+            details = {"toolType=#toolType", "eventType=#eventType", "ingestDay=#ingestDay"})
     public LogDetails logDetails(
             @InputArgument @NotBlank String ingestDay,
             @InputArgument @NotBlank String toolType,

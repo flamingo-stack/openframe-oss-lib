@@ -4,10 +4,15 @@ import com.openframe.api.dto.invitation.CreateInvitationRequest;
 import com.openframe.api.dto.invitation.InvitationPageResponse;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.service.user.InvitationService;
+import com.openframe.audit.Audited;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import static com.openframe.data.document.audit.AuditAction.INVITATION_CREATE;
+import static com.openframe.data.document.audit.AuditAction.INVITATION_RESEND;
+import static com.openframe.data.document.audit.AuditAction.INVITATION_REVOKE;
 
 @RestController
 @RequestMapping("/invitations")
@@ -18,6 +23,7 @@ public class InvitationController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Audited(action = INVITATION_CREATE, targetId = "#result.id")
     public InvitationResponse createInvitation(@Valid @RequestBody CreateInvitationRequest request) {
         return invitationService.createInvitation(request);
     }
@@ -33,12 +39,15 @@ public class InvitationController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Audited(action = INVITATION_REVOKE, targetId = "#id")
     public void revokeInvitation(@PathVariable String id) {
         invitationService.revokeInvitation(id);
     }
 
     @PostMapping("/{id}/resend")
     @ResponseStatus(HttpStatus.CREATED)
+    @Audited(action = INVITATION_RESEND, targetId = "#id",
+            details = "newInvitationId=T(com.openframe.core.util.Sha256).hex(#result.id)")
     public InvitationResponse resendInvitation(@PathVariable String id) {
         return invitationService.renewInvitation(id);
     }

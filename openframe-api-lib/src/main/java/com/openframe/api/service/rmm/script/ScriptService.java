@@ -12,6 +12,7 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
 import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.ForbiddenException;
@@ -35,6 +36,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_CREATE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_DELETE;
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_UPDATE;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -51,6 +56,7 @@ public class ScriptService {
     private final ScriptPrivilegeValidator privilegeValidator;
     private final ScheduleDeliveryRefresher deliveryRefresher;
 
+    @Audited(action = SCRIPT_CREATE, targetId = "#result.id", details = "creationSource=#creationSource")
     public ScriptResponse create(CreateScriptInput input, String createdBy, ScriptCreationSource creationSource) {
         String tenantId = tenantIdProvider.getTenantId();
 
@@ -180,6 +186,7 @@ public class ScriptService {
                 .build();
     }
 
+    @Audited(action = SCRIPT_UPDATE, targetId = "#input.id", details = "tagIds=#input.tagIds")
     public ScriptResponse update(UpdateScriptInput input) {
         String id = input.getId();
         String tenantId = tenantIdProvider.getTenantId();
@@ -205,6 +212,7 @@ public class ScriptService {
         return scriptMapper.toResponse(saved);
     }
 
+    @Audited(action = SCRIPT_DELETE, targetId = "#id")
     public String delete(String id) {
         String tenantId = tenantIdProvider.getTenantId();
         Script existing = loadOrThrow(tenantId, id);

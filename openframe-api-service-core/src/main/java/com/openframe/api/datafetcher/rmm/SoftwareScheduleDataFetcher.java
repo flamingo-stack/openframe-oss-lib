@@ -1,6 +1,7 @@
 package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import com.openframe.audit.Audited;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.netflix.graphql.dgs.DgsData;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
@@ -44,6 +45,15 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_ARCHIVE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CREATE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_CRITERIA_SET;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DELETE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_ADD;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_REMOVE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_DEVICES_SET;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_UNARCHIVE;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_UPDATE;
 import static com.openframe.graphql.relay.NodeType.MACHINE;
 import static com.openframe.graphql.relay.NodeType.SOFTWARE_SCHEDULE;
 
@@ -72,6 +82,7 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_SCHEDULE_CREATE, targetId = "rawId(#result.id)")
     public SoftwareScheduleResponse createSoftwareSchedule(@InputArgument @Valid CreateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
         List<String> machineGlobalIds = input.getMachineIds();
@@ -82,6 +93,7 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_SCHEDULE_UPDATE, targetId = "rawId(#input.id)")
     public SoftwareScheduleResponse updateSoftwareSchedule(@InputArgument @Valid UpdateSoftwareScheduleInput input,
                                                            @AuthenticationPrincipal AuthPrincipal principal) {
         String scheduleGlobalId = input.getId();
@@ -95,24 +107,29 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_SCHEDULE_DELETE, targetId = "rawId(#id)")
     public String deleteSoftwareSchedule(@InputArgument @NotBlank String id) {
         String scheduleId = relayIdCodec.decode(id, SOFTWARE_SCHEDULE);
         return scheduleService.delete(scheduleId);
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_SCHEDULE_ARCHIVE, targetId = "rawId(#id)")
     public SoftwareScheduleResponse archiveSoftwareSchedule(@InputArgument @NotBlank String id) {
         String scheduleId = relayIdCodec.decode(id, SOFTWARE_SCHEDULE);
         return scheduleService.archive(scheduleId);
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_SCHEDULE_UNARCHIVE, targetId = "rawId(#id)")
     public SoftwareScheduleResponse unarchiveSoftwareSchedule(@InputArgument @NotBlank String id) {
         String scheduleId = relayIdCodec.decode(id, SOFTWARE_SCHEDULE);
         return scheduleService.unarchive(scheduleId);
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_SCHEDULE_DEVICES_SET, targetId = "rawId(#scheduleId)",
+            details = "machineIds=#machineIds.![#root.rawId(#this)]")
     public SoftwareScheduleResponse setSoftwareScheduleDevices(@InputArgument @NotBlank String scheduleId,
                                                               @InputArgument List<String> machineIds,
                                                               @AuthenticationPrincipal AuthPrincipal principal) {
@@ -123,6 +140,8 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_SCHEDULE_DEVICES_ADD, targetId = "rawId(#scheduleId)",
+            details = "machineIds=#machineIds.![#root.rawId(#this)]")
     public SoftwareScheduleResponse addDevicesToSoftwareSchedule(@InputArgument @NotBlank String scheduleId,
                                                                 @InputArgument List<String> machineIds,
                                                                 @AuthenticationPrincipal AuthPrincipal principal) {
@@ -134,6 +153,8 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_SCHEDULE_DEVICES_REMOVE, targetId = "rawId(#scheduleId)",
+            details = "machineIds=#machineIds.![#root.rawId(#this)]")
     public SoftwareScheduleResponse removeDevicesFromSoftwareSchedule(@InputArgument @NotBlank String scheduleId,
                                                                      @InputArgument List<String> machineIds,
                                                                      @AuthenticationPrincipal AuthPrincipal principal) {
@@ -145,6 +166,7 @@ public class SoftwareScheduleDataFetcher {
     }
 
     @DgsMutation
+    @Audited(action = SOFTWARE_SCHEDULE_CRITERIA_SET, targetId = "rawId(#scheduleId)", details = "criteria=#criteria")
     public SoftwareScheduleResponse setSoftwareScheduleDeviceCriteria(@InputArgument @NotBlank String scheduleId,
                                                                      @InputArgument @Valid ScheduleDeviceCriteriaInput criteria,
                                                                      @AuthenticationPrincipal AuthPrincipal principal) {

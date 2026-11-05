@@ -11,6 +11,7 @@ import com.openframe.api.mapper.ScriptSecretSealer;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
+import com.openframe.audit.Audited;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
@@ -41,6 +42,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_RUN;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -71,6 +74,9 @@ public class ScriptDispatchService {
     private final ScriptTimeoutValidator timeoutValidator;
     private final ObjectProvider<ScriptSecretSealer> secretSealer;
 
+    @Audited(action = SCRIPT_RUN, targetId = "#input.scriptId", compare = false,
+            details = {"machineId=#input.machineId", "privilegeLevel=#input.privilegeLevel", "source=#source",
+                    "envVarNames=#input.envVars?.![name]", "executionId=#result.executionId"})
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
         ScriptEnvVarMapper.validate(input.getEnvVars());
@@ -107,6 +113,9 @@ public class ScriptDispatchService {
                 .build();
     }
 
+    @Audited(action = SCRIPT_RUN, targetId = "#input.scriptId", compare = false,
+            details = {"machineIds=#input.machineIds", "privilegeLevel=#input.privilegeLevel", "source=#source",
+                    "envVarNames=#input.envVars?.![name]", "executionId=#result.executionId"})
     public DispatchResponse batchRunScript(BatchRunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
         ScriptEnvVarMapper.validate(input.getEnvVars());

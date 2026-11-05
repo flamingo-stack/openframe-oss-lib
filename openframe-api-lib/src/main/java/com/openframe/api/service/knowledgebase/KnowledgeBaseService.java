@@ -45,6 +45,21 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.Audited;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditTargetType;
+import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_ARCHIVE;
+import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_CREATE;
+import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_PUBLISH;
+import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_UNARCHIVE;
+import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_UNPUBLISH;
+import static com.openframe.data.document.audit.AuditAction.KB_ARTICLE_UPDATE;
+import static com.openframe.data.document.audit.AuditAction.KB_FOLDER_CREATE;
+import static com.openframe.data.document.audit.AuditAction.KB_FOLDER_DELETE;
+import static com.openframe.data.document.audit.AuditAction.KB_FOLDER_RENAME;
+import static com.openframe.data.document.audit.AuditAction.KB_ITEM_MOVE;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -52,6 +67,7 @@ import java.util.stream.Stream;
 public class KnowledgeBaseService {
 
     private final KnowledgeBaseItemRepository repository;
+    private final AuditCapture auditCapture;
     private final KnowledgeBaseTagService knowledgeBaseTagService;
     private final AssignmentService assignmentService;
     private final KnowledgeBaseTempAttachmentService knowledgeBaseTempAttachmentService;
@@ -179,6 +195,7 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
+    @Audited(action = KB_FOLDER_CREATE, targetId = "#result.id", details = "parentId=#parentId")
     public KnowledgeBaseItem createFolder(String name, String parentId) {
         log.info("Creating folder: {} under parent: {}", name, parentId);
         validateParentIsFolder(parentId);
@@ -191,6 +208,7 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
+    @Audited(action = KB_FOLDER_RENAME, targetId = "#id")
     public KnowledgeBaseItem renameFolder(String id, String name) {
         log.info("Renaming folder {} to {}", id, name);
         KnowledgeBaseItem folder = getById(id);
@@ -205,6 +223,8 @@ public class KnowledgeBaseService {
      * action may be null only when the folder is empty.
      */
     @Transactional
+    @Audited(action = KB_FOLDER_DELETE, targetId = "#id",
+            details = {"childrenAction=#action", "moveTargetFolderId=#moveTargetFolderId"})
     public void deleteFolder(String id, FolderChildrenAction action, String moveTargetFolderId) {
         log.info("Deleting folder {} (childrenAction={}, moveTarget={})", id, action, moveTargetFolderId);
         KnowledgeBaseItem folder = getById(id);
@@ -229,6 +249,12 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
+    @Audited(action = KB_ARTICLE_CREATE, targetId = "#result.id",
+            details = {"parentId=#cmd.parentId", "status=#cmd.status", "tagIds=#cmd.tagIds",
+                    "assignedOrganizationIds=#cmd.assignedOrganizationIds", "assignedDeviceIds=#cmd.assignedDeviceIds",
+                    "assignedTicketIds=#cmd.assignedTicketIds",
+                    "assignedKnowledgeArticleIds=#cmd.assignedKnowledgeArticleIds",
+                    "attachmentTempIds=#cmd.attachmentTempIds"})
     public KnowledgeBaseItem createArticle(String currentUserId, CreateArticleCommand cmd) {
         log.info("Creating article: {} by user: {} under parent: {}", cmd.getName(), currentUserId, cmd.getParentId());
         validateParentIsFolder(cmd.getParentId());
@@ -274,7 +300,27 @@ public class KnowledgeBaseService {
     public KnowledgeBaseItem updateArticle(String currentUserId, UpdateArticleCommand cmd) {
         log.info("Updating article {} by user {}", cmd.getId(), currentUserId);
         KnowledgeBaseItem article = getById(cmd.getId());
+        AuditAction action = article.getType() == KnowledgeBaseItemType.FOLDER ? KB_FOLDER_RENAME : KB_ARTICLE_UPDATE;
+        return auditCapture.run(action, cmd.getId(), updateDetails(cmd),
+                () -> applyArticleUpdate(currentUserId, cmd, article));
+    }
 
+    private static Map<String, Object> updateDetails(UpdateArticleCommand cmd) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("parentId", cmd.getParentId());
+        details.put("moveToRoot", cmd.isMoveToRoot());
+        details.put("status", cmd.getStatus());
+        details.put("tagIds", cmd.getTagIds());
+        details.put("assignedOrganizationIds", cmd.getAssignedOrganizationIds());
+        details.put("assignedDeviceIds", cmd.getAssignedDeviceIds());
+        details.put("assignedTicketIds", cmd.getAssignedTicketIds());
+        details.put("assignedKnowledgeArticleIds", cmd.getAssignedKnowledgeArticleIds());
+        details.put("attachmentTempIds", cmd.getAttachmentTempIds());
+        details.put("deleteAttachmentIds", cmd.getDeleteAttachmentIds());
+        return details;
+    }
+
+    private KnowledgeBaseItem applyArticleUpdate(String currentUserId, UpdateArticleCommand cmd, KnowledgeBaseItem article) {
         if (cmd.getParentId() != null) {
             if (cmd.isMoveToRoot()) {
                 throw new ValidationException("parentId and moveToRoot cannot both be set.");
@@ -340,6 +386,7 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
+    @Audited(action = KB_ARTICLE_PUBLISH, targetId = "#id")
     public KnowledgeBaseItem publishArticle(String id) {
         log.info("Publishing article {}", id);
         KnowledgeBaseItem article = getById(id);
@@ -351,6 +398,7 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
+    @Audited(action = KB_ARTICLE_UNPUBLISH, targetId = "#id")
     public KnowledgeBaseItem unpublishArticle(String id) {
         log.info("Unpublishing article {}", id);
         KnowledgeBaseItem article = getById(id);
@@ -362,6 +410,7 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
+    @Audited(action = KB_ARTICLE_ARCHIVE, targetId = "#id")
     public KnowledgeBaseItem archiveArticle(String id) {
         log.info("Archiving article {}", id);
         KnowledgeBaseItem item = getById(id);
@@ -373,6 +422,7 @@ public class KnowledgeBaseService {
     }
 
     @Transactional
+    @Audited(action = KB_ARTICLE_UNARCHIVE, targetId = "#id", details = "parentId=#parentId")
     public KnowledgeBaseItem unarchiveArticle(String id, String parentId) {
         log.info("Unarchiving article {} into folder {}", id, parentId);
         KnowledgeBaseItem item = getById(id);
@@ -392,7 +442,17 @@ public class KnowledgeBaseService {
     public KnowledgeBaseItem moveToFolder(String id, String parentId) {
         log.info("Moving item {} to folder {}", id, parentId);
         KnowledgeBaseItem item = getById(id);
+        Map<String, Object> details = new HashMap<>();
+        details.put("parentId", parentId);
+        return auditCapture.run(KB_ITEM_MOVE, targetTypeOf(item), id, details, () -> move(item, parentId));
+    }
 
+    private static AuditTargetType targetTypeOf(KnowledgeBaseItem item) {
+        return item.getType() == KnowledgeBaseItemType.FOLDER ? AuditTargetType.KB_FOLDER : AuditTargetType.KB_ARTICLE;
+    }
+
+    private KnowledgeBaseItem move(KnowledgeBaseItem item, String parentId) {
+        String id = item.getId();
         if (parentId != null) {
             if (parentId.equals(id)) {
                 throw new ValidationException("Cannot move item to itself.");

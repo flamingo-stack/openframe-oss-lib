@@ -1,6 +1,7 @@
 package com.openframe.api.dto.knowledgebase;
 
 import com.openframe.api.dto.shared.MutationError;
+import com.openframe.core.dto.HasUserErrors;
 import com.openframe.data.document.ticket.TempAttachment;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,7 +14,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class KnowledgeBaseTempAttachmentPayload {
+public class KnowledgeBaseTempAttachmentPayload implements HasUserErrors {
     private TempAttachment tempAttachment;
     @Builder.Default
     private List<MutationError> userErrors = List.of();
@@ -28,5 +29,10 @@ public class KnowledgeBaseTempAttachmentPayload {
         return KnowledgeBaseTempAttachmentPayload.builder()
                 .userErrors(List.of(MutationError.builder().message(message).build()))
                 .build();
+    }
+
+    @Override
+    public List<String> userErrorMessages() {
+        return userErrors.stream().map(MutationError::getMessage).toList();
     }
 }
