@@ -25,7 +25,11 @@ public class BlockedEmailDomain {
 
     public static final String COLLECTION = "blocked_email_domains";
 
-    /** The domain itself, trimmed and lowercase, so the collection cannot hold it twice. */
+    /**
+     * The domain itself, in the {@code EmailDomainPolicy.normalizeDomain} form: trimmed and lowercase, no local
+     * part. The lookup is an exact match on this id, so an entry inserted by hand as {@code Rogue.Example} or with
+     * spaces never matches. Keeping it the id also means the collection cannot hold a domain twice.
+     */
     @Id
     private String domain;
 
