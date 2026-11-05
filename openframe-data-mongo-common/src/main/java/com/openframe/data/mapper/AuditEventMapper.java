@@ -14,10 +14,11 @@ import java.time.Instant;
 import java.util.Objects;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR,
-        imports = {UlidCreator.class, Instant.class, AuditEvent.class})
+        imports = {Instant.class, AuditEvent.class})
 public interface AuditEventMapper {
 
-    @Mapping(target = "id", expression = "java(UlidCreator.getUlid().toString())")
+    @Mapping(target = "id", expression = "java(idOf(entry))")
+    @Mapping(target = "parentEventId", expression = "java(parentEventIdOf(entry, parentEventId))")
     @Mapping(target = "schemaVersion", expression = "java(AuditEvent.SCHEMA_VERSION)")
     @Mapping(target = "occurredAt", expression = "java(Instant.now())")
     @Mapping(target = "action", source = "entry.action.name")
@@ -33,7 +34,15 @@ public interface AuditEventMapper {
     @Mapping(target = "actorName", ignore = true)
     @Mapping(target = "onBehalfOfName", ignore = true)
     @Mapping(target = "approverName", ignore = true)
-    AuditEvent toEvent(AuditEntry entry, AuditActor actor, AuditSource source, String tenantId);
+    AuditEvent toEvent(AuditEntry entry, AuditActor actor, AuditSource source, String tenantId, String parentEventId);
+
+    default String idOf(AuditEntry entry) {
+        return Objects.requireNonNullElseGet(entry.getId(), () -> UlidCreator.getUlid().toString());
+    }
+
+    default String parentEventIdOf(AuditEntry entry, String parentEventId) {
+        return entry.getParentEventId() != null ? entry.getParentEventId() : parentEventId;
+    }
 
     default AuditTargetType targetTypeOf(AuditEntry entry) {
         return Objects.requireNonNullElse(entry.getTargetType(), entry.getAction().getTargetType());

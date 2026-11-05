@@ -33,6 +33,7 @@ public class AuditAspect {
         String idExpression = audited.targetId();
         String condition = audited.condition();
         String tenantExpression = audited.tenantId();
+        String nameExpression = audited.targetName();
         boolean idFromResult = expressions.readsResult(idExpression);
         boolean idFromArguments = StringUtils.hasText(idExpression) && !idFromResult;
         AuditTargetType targetType = audited.targetType().length > 0
@@ -48,7 +49,8 @@ public class AuditAspect {
                 result -> expressions.details(audited.details(), method, arguments, result),
                 audited.compare(),
                 result -> records(condition, method, arguments, result),
-                result -> tenantIdOf(tenantExpression, method, arguments, result));
+                result -> valueAfterCall(tenantExpression, method, arguments, result),
+                result -> valueAfterCall(nameExpression, method, arguments, result));
         return auditCapture.capture(call, joinPoint::proceed);
     }
 
@@ -60,9 +62,8 @@ public class AuditAspect {
         return !unknown && expressions.test(condition, method, arguments, result);
     }
 
-    private String tenantIdOf(String tenantExpression, Method method, Object[] arguments, Object result) {
-        boolean unknown = !StringUtils.hasText(tenantExpression)
-                || result == null && expressions.readsResult(tenantExpression);
-        return unknown ? null : expressions.evaluate(tenantExpression, method, arguments, result);
+    private String valueAfterCall(String expression, Method method, Object[] arguments, Object result) {
+        boolean unknown = !StringUtils.hasText(expression) || result == null && expressions.readsResult(expression);
+        return unknown ? null : expressions.evaluate(expression, method, arguments, result);
     }
 }
