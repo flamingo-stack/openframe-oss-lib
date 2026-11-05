@@ -79,41 +79,29 @@ export function PersonCell({
   if (useLoadingScope() || loading) return <PersonCellSkeleton size={size} lines={lines} />;
   const displayName = name || fallbackName;
   const scale = PERSON_CELL_SIZE[size];
-  if (lines === 1) {
-    const oneLine = (
-      <div className={`${PERSON_ROW_CLASS} ${scale.gap}`}>
-        <SquareAvatar size={scale.avatar} src={avatarUrl ?? undefined} alt={displayName} fallback={displayName} />
-        <TruncateText variant={scale.primary} className="min-w-0 flex-1">
-          {displayName}
-        </TruncateText>
-      </div>
-    );
-    return secondary ? (
-      <FloatingTooltip content={`${displayName} · ${secondary}`} triggerClassName="min-w-0 max-w-full">
-        {oneLine}
-      </FloatingTooltip>
-    ) : (
-      oneLine
-    );
-  }
+  const nameLine = (
+    <TruncateText
+      variant={scale.primary}
+      className={onClick ? 'text-ods-accent group-hover/person-cell:underline' : undefined}
+    >
+      {displayName}
+    </TruncateText>
+  );
   const row = (
     <div className={`group/person-cell ${PERSON_ROW_CLASS} ${scale.gap}`}>
       <SquareAvatar size={scale.avatar} src={avatarUrl ?? undefined} alt={displayName} fallback={displayName} />
       <div className="min-w-0 flex-1">
-        <TruncateText
-          variant={scale.primary}
-          className={onClick ? 'text-ods-accent group-hover/person-cell:underline' : undefined}
-        >
-          {displayName}
-        </TruncateText>
-        <TruncateText variant="h6" tone="secondary">
-          {secondary === undefined ? ' ' : secondary || '·'}
-        </TruncateText>
+        {nameLine}
+        {lines === 2 ? (
+          <TruncateText variant="h6" tone="secondary">
+            {secondary === undefined ? ' ' : secondary || '·'}
+          </TruncateText>
+        ) : null}
       </div>
     </div>
   );
-  if (!onClick) return row;
-  return (
+  // A clickable cell is a button in both layouts, so `onClick` and `actionTitle` are never dropped by `lines`.
+  const cell = onClick ? (
     <Button
       variant="transparent"
       onClick={onClick}
@@ -124,6 +112,16 @@ export function PersonCell({
     >
       {row}
     </Button>
+  ) : (
+    row
+  );
+  // One line: the second line is not drawn, so it is the cell's tooltip.
+  return lines === 1 && secondary ? (
+    <FloatingTooltip content={`${displayName} · ${secondary}`} triggerClassName="min-w-0 max-w-full">
+      {cell}
+    </FloatingTooltip>
+  ) : (
+    cell
   );
 }
 

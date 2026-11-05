@@ -47,6 +47,15 @@ describe('PersonCell', () => {
     render(<PersonCell name="Ada" onClick={() => {}} actionTitle="Filter by Ada" />);
     expect(screen.getByRole('button', { name: /Ada/ }).getAttribute('title')).toBe('Filter by Ada');
   });
+  it('one line: the name alone, the second line kept for the tooltip', () => {
+    render(<PersonCell name="Ada Lovelace" secondary="Engineer" lines={1} />);
+    expect(screen.getByText('Ada Lovelace')).toBeTruthy();
+    expect(screen.queryByText('Engineer')).toBeNull();
+  });
+  it('one line stays a button when clickable', () => {
+    render(<PersonCell name="Ada" secondary="Engineer" lines={1} onClick={() => {}} actionTitle="Filter by Ada" />);
+    expect(screen.getByRole('button', { name: /Ada/ }).getAttribute('title')).toBe('Filter by Ada');
+  });
   it('sm stays the dense cell; lg swaps the primary line to body scale', () => {
     const { container: dense } = render(<PersonCell name="Ada" secondary="Engineer" />);
     const { container: explicit } = render(<PersonCell name="Ada" secondary="Engineer" size="sm" />);
