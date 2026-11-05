@@ -4,7 +4,6 @@
 import { createElement, forwardRef, lazy, Suspense, useEffect, useState } from 'react';
 import type { EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
 import { ASK_AI_OPEN_EVENTS, askAiOpenIsHeld, holdAskAiOpens, onAskAiIntent } from './utils/ask-ai-events';
-export * from './approval-request-message';
 export * from './approval-batch-message';
 export * from './escalation-offer-message';
 export * from './ticket-escalated-message';

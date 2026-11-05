@@ -6,7 +6,6 @@ import { createMingoDecoder } from '../../../../chat-protocol/message-decoder';
 import type { UiChunk } from '../../../../chat-protocol/ui-chunks';
 import {
   approvalBatchViewOf,
-  approvalRequestDataOf,
   failedBeforeRunning,
   holdsApprovalThatRan,
   progressExecutionDataOf,
@@ -62,10 +61,11 @@ describe('failedBeforeRunning', () => {
   });
 });
 
-describe('approvalRequestDataOf', () => {
-  it('draws the title, the reason and the descriptor, and is null with no approval', () => {
+describe('approvalBatchViewOf, a single approval', () => {
+  it('is a batch of one, answered under its approval id, with the descriptor on its row', () => {
     const part: ChatToolPart = {
       ...base,
+      toolCallId: 'call-1',
       state: 'approval-requested',
       title: 'Close ticket',
       approval: {
@@ -74,14 +74,29 @@ describe('approvalRequestDataOf', () => {
         descriptor: { approvalType: 'ADMIN', fields: [{ label: 'Subject', value: 'x' }] },
       },
     };
-    expect(approvalRequestDataOf(part)).toEqual({
-      command: 'Close ticket',
-      requestId: 'p1',
-      explanation: 'Why',
-      approvalType: 'ADMIN',
-      fields: [{ label: 'Subject', value: 'x' }],
-    });
-    expect(approvalRequestDataOf({ ...base, state: 'input-available' })).toBeNull();
+    const view = approvalBatchViewOf([part]);
+    expect(view.status).toBe('pending');
+    expect(view.data.approvalRequestId).toBe('p1');
+    expect(view.data.approvalType).toBe('ADMIN');
+    expect(view.data.toolCalls).toEqual([
+      expect.objectContaining({
+        toolExecutionRequestId: 'call-1',
+        toolTitle: 'Close ticket: x',
+        toolExplanation: 'Why',
+        requiresApproval: true,
+        toolCallArguments: { Subject: 'x' },
+      }),
+    ]);
+  });
+
+  it('a failed single approval is failed, with its reason on its row', () => {
+    const view = approvalBatchViewOf([
+      { ...base, state: 'output-error', errorText: 'Expired.', approval: { id: 'p1', approved: true } },
+    ]);
+    expect(view.status).toBe('failed');
+    expect(Object.values(view.data.executions ?? {})).toEqual([
+      { status: 'done', success: false, result: 'Expired.', refused: true },
+    ]);
   });
 });
 
@@ -109,7 +124,7 @@ describe('approvalBatchViewOf', () => {
     expect(view.status).toBe('approved');
     expect(view.data.executions).toEqual({
       p1: { status: 'done', success: true, result: 'ok' },
-      p2: { status: 'done', success: false, result: 'Expired.' },
+      p2: { status: 'done', success: false, result: 'Expired.', refused: true },
       p3: { status: 'executing' },
     });
   });
@@ -125,8 +140,8 @@ describe('approvalBatchViewOf', () => {
     const view = approvalBatchViewOf([failed('p1'), failed('p2')]);
     expect(view.status).toBe('failed');
     expect(view.data.executions).toEqual({
-      p1: { status: 'done', success: false, result: 'Expired.' },
-      p2: { status: 'done', success: false, result: 'Expired.' },
+      p1: { status: 'done', success: false, result: 'Expired.', refused: true },
+      p2: { status: 'done', success: false, result: 'Expired.', refused: true },
     });
     expect(
       approvalBatchViewOf([
@@ -315,7 +330,7 @@ describe('approvalBatchViewOf', () => {
       const view = approvalBatchViewOf([failedGate, free({ state: 'output-available', output: 'ok' })]);
       expect(view.status).toBe('approved');
       expect(view.data.executions).toEqual({
-        gated: { status: 'done', success: false, result: 'Boom.' },
+        gated: { status: 'done', success: false, result: 'Boom.', refused: true },
         free: { status: 'done', success: true, result: 'ok' },
       });
     });

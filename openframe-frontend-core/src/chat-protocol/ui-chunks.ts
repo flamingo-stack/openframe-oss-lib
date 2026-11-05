@@ -213,11 +213,6 @@ export function saysStreamEnded(text: string): boolean {
   );
 }
 
-/** The text as it reads under an approval that ran: an older hub's notice in it would invite running the request twice. */
-export function withAfterRunNotice(text: string): string {
-  return text.replace(CHAT_INTERRUPTED_NOTICE, CHAT_INTERRUPTED_AFTER_RUN_NOTICE);
-}
-
 /**
  * The stream's response headers. `no-transform` goes beyond the standard's `no-cache`: a buffering intermediary breaks
  * a stream that streams, and every hub SSE response has always sent it.

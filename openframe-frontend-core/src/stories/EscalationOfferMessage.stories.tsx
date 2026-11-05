@@ -8,7 +8,7 @@ import { EscalationOfferMessage } from '../components/chat/escalation-offer-mess
  * handoff to a human technician (Figma: fae chat › "escalation to admin").
  *
  * Renders THROUGH the client approval card rather than reimplementing it, so
- * it is pixel-identical to `Chat/Client/ApprovalRequestMessage` down to the
+ * it is the client `ApprovalBatchMessage` (a card of one row), down to the
  * Approve/Reject labels and the resolved pill. What differs is the wiring:
  * approve/reject call the ticket-escalation GraphQL mutations, never the
  * tool-approval endpoint — which is why it is a distinct part type.

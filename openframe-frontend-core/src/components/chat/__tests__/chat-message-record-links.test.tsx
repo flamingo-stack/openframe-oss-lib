@@ -700,7 +700,7 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
       expect(screen.queryByText('Failed')).toBeNull();
       expect(screen.queryByText(/Approved/)).toBeNull();
       expect(screen.queryByText(/Roman/)).toBeNull();
-      expect(screen.getByText(notice)).toBeTruthy();
+      expect(onTheFoot()).toHaveLength(1);
     });
 
     it('a batch says so on its foot with no row opened, and no row has a cross or a check', () => {
@@ -831,7 +831,7 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
       expect(screen.getByText('Failed')).toBeTruthy();
       expect(screen.queryByText(/Approv/)).toBeNull();
       noRowCheck();
-      const reason = screen.getByText(REASON);
+      const [reason] = reasonOnTheFoot();
       expect(reason.tagName).toBe('P');
       expect(reason.className).toContain('text-h6');
       expect(reason.className).not.toContain('truncate');
@@ -1095,7 +1095,7 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
     it('is not drawn under an approval nobody knows the end of: Outcome unknown is the one thing said', () => {
       render(<ChatMessageEnhanced role="assistant" interrupted parts={[unknown]} />);
       expect(screen.getByText('Outcome unknown')).toBeTruthy();
-      expect(screen.getByText(unknown.errorText)).toBeTruthy();
+      expect(screen.getAllByText(unknown.errorText).filter(element => element.tagName === 'P')).toHaveLength(1);
       expect(screen.queryByText(NOTICE)).toBeNull();
     });
 
@@ -1168,18 +1168,6 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
         approval: { id: 'p1', approved: true as const },
       };
       const notices = (...sentences: string[]) => sentences.map(sentence => screen.queryAllByText(sentence).length);
-
-      it('an older hub`s, under a card that ran, reads as the one that does not invite a second run', () => {
-        render(
-          <ChatMessageEnhanced
-            role="assistant"
-            interrupted
-            parts={[ran, { type: 'text', text: `Was the agent off\n\n_${CHAT_INTERRUPTED_NOTICE}_` }]}
-          />,
-        );
-        expect(notices(CHAT_INTERRUPTED_NOTICE, CHAT_INTERRUPTED_AFTER_RUN_NOTICE)).toEqual([0, 1]);
-        expect(screen.getByText(/Was the agent off/)).toBeTruthy();
-      });
 
       it('under no card that ran, it stays: asking again repeats nothing', () => {
         render(
@@ -1297,7 +1285,8 @@ describe('ChatMessageEnhanced — tool and approval parts', () => {
     );
     expect(screen.queryByText('Approved')).toBeNull();
     expect(screen.getByText('Failed')).toBeTruthy();
-    expect(screen.getByText('This approval expired, ask again to get a fresh one.')).toBeTruthy();
+    const reason = screen.getAllByText('This approval expired, ask again to get a fresh one.');
+    expect(reason.filter(element => element.tagName === 'P')).toHaveLength(1);
   });
 
   it('draws tool-input-error as the error row, with no run to put a cross on', () => {

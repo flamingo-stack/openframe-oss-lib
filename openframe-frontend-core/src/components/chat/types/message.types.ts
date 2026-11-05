@@ -95,21 +95,6 @@ export interface ApprovalRequestField {
   value: string;
 }
 
-export interface ApprovalRequestData {
-  command: string;
-  /** Structured field list — preferred over `explanation`. When set,
-   *  the approval card renders a vertical label/value stack with
-   *  proper spacing. Falls back to `explanation` (a single paragraph)
-   *  when omitted. Keep BOTH when you want hosts on older lib
-   *  versions to still see the prose; new hosts should send only
-   *  `fields`. */
-  fields?: ApprovalRequestField[];
-  explanation?: string;
-  requestId?: string;
-  approvalRequestId?: string;
-  approvalType?: string;
-}
-
 export interface ApprovalResultData {
   approvalRequestId: string;
   approved: boolean;

@@ -183,7 +183,7 @@ describe.skipIf(!WIRE)('readUIMessageStream with terminateOnError', () => {
     const tool = (message: UIMessage) => message.parts.find(part => part.type === 'dynamic-tool');
     expect(tool(await standardMessage(APPROVAL_RESPONSE_STREAM, APPROVAL_CARD_MESSAGE))).toMatchObject({
       state: 'output-available',
-      output: { ticket_id: '4858', status: 'CLOSED' },
+      output: { status: 'executed', entityId: '4858', entityStatus: 'CLOSED' },
       toolCallId: FIXTURE_PROPOSAL_ID,
     });
     expect(tool(await standardMessage(APPROVAL_REJECT_STREAM, APPROVAL_CARD_MESSAGE))).toMatchObject({

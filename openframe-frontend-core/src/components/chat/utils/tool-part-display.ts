@@ -8,6 +8,7 @@
 import {
   approvalAnswerInFlight,
   approvalBatchIdOf,
+  approvalIdOfPart,
   approvalStatusOf,
   isToolPart,
   type ChatPart,
@@ -20,7 +21,6 @@ import type { ChatApprovalPartStatus } from '../types/chat.types';
 import type {
   ApprovalBatchData,
   ApprovalBatchExecutionState,
-  ApprovalRequestData,
   PendingToolCallData,
   ToolExecutionData,
 } from '../types/message.types';
@@ -125,20 +125,6 @@ export function holdsApprovalThatRan(parts: readonly ChatPart[]): boolean {
   );
 }
 
-/** The card a single approval draws, or null for a part with no approval. */
-export function approvalRequestDataOf(part: ChatToolPart): ApprovalRequestData | null {
-  const approval = 'approval' in part ? part.approval : undefined;
-  if (!approval) return null;
-  const { descriptor } = approval;
-  return {
-    command: part.title ?? part.toolName,
-    requestId: approval.id,
-    ...(approval.requestReason !== undefined ? { explanation: approval.requestReason } : {}),
-    ...(descriptor?.fields !== undefined ? { fields: descriptor.fields } : {}),
-    ...(descriptor?.approvalType !== undefined ? { approvalType: descriptor.approvalType } : {}),
-  };
-}
-
 function isRunning(part: ChatToolPart): boolean {
   return (
     (part.state === 'approval-responded' && part.approval.approved) ||
@@ -154,12 +140,10 @@ function executionOf(part: ChatToolPart): ApprovalBatchExecutionState | null {
   }
   if (part.state === 'output-error') {
     if (part.toolMetadata?.outcomeUnknown) return { status: 'done', outcomeUnknown: true, result: part.errorText };
-    return {
-      status: 'done',
-      success: false,
-      result: part.errorText,
-      ...(part.toolMetadata?.answerSent ? { refused: true } : {}),
-    };
+    // The server's sentence to a person, not a tool's output: the answer sent from here was refused, or no tool ran
+    // (a tool that ran names its type).
+    const refused = !!part.toolMetadata?.answerSent || !part.toolMetadata?.integratedToolType;
+    return { status: 'done', success: false, result: part.errorText, ...(refused ? { refused: true } : {}) };
   }
   return null;
 }
@@ -222,7 +206,10 @@ function batchStatusOf(parts: readonly ChatToolPart[]): ChatApprovalPartStatus {
   return (answer === 'failed' || answer === 'unknown') && anyRan ? 'approved' : answer;
 }
 
-/** The one card a run of parts with one `batchId` draws. */
+/**
+ * The one card an approval draws: a run of parts with one `batchId`, or a single gated part, which is a batch of one.
+ * The card answers under the approval's id (its batch's, or its own).
+ */
 export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBatchView {
   const firstGate = parts.find(part => approvalStatusOf(part) !== null);
   const descriptor = firstGate && 'approval' in firstGate ? firstGate.approval?.descriptor : undefined;
@@ -237,7 +224,7 @@ export function approvalBatchViewOf(parts: readonly ChatToolPart[]): ApprovalBat
     answerPending: parts.some(approvalAnswerInFlight),
     ...(resolvedByName ? { resolvedByName } : {}),
     data: {
-      approvalRequestId: approvalBatchIdOf(parts[0]) ?? parts[0].toolCallId,
+      approvalRequestId: approvalIdOfPart(parts[0]) ?? parts[0].toolCallId,
       approvalType: descriptor?.approvalType ?? '',
       executions,
       toolCalls: parts.map(batchRowOf),

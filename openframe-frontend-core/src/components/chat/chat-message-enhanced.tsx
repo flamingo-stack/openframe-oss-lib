@@ -7,7 +7,6 @@ import {
   type ChatPart,
   type ChatSourcePart,
   type ChatToolPart,
-  approvalAnswerInFlight,
   approvalBatchIdOf,
   approvalStatusOf,
   isSourcePart,
@@ -20,7 +19,6 @@ import {
   CHAT_INTERRUPTED_AFTER_RUN_NOTICE,
   CHAT_INTERRUPTED_NOTICE,
   saysStreamEnded,
-  withAfterRunNotice,
 } from '../../chat-protocol/ui-chunks';
 import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
@@ -32,7 +30,6 @@ import type { MdRenderProps } from '../ui/markdown/base-components';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ApprovalBatchMessage } from './approval-batch-message';
-import { ApprovalRequestMessage } from './approval-request-message';
 import { AskDisplay } from './ask-display';
 import { ChatAppearanceContext, useChatAppearance } from './chat-appearance-context';
 import { ChatContextChipStrip } from './chat-context-picker';
@@ -69,7 +66,6 @@ import { chatFilePartMarkdown } from './utils/chat-attachment-markdown';
 import { sourceRowInputOf, sourceTitleOf } from './utils/cited-sources';
 import {
   approvalBatchViewOf,
-  approvalRequestDataOf,
   failedBeforeRunning,
   holdsApprovalThatRan,
   progressExecutionDataOf,
@@ -554,7 +550,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                         const answer = textWithCitationChips(part, numbers);
                         return (
                           <div key={index} className={cn(CHAT_MESSAGE_TEXT_CLASS, 'text-ods-text-primary')}>
-                            {renderTextBody(approvalRan ? withAfterRunNotice(answer) : answer, partIsStreaming)}
+                            {renderTextBody(answer, partIsStreaming)}
                             {index === lastTextIndex && files.length > 0 && (
                               <ChatFileParts files={files} componentOverrides={cardComponentOverrides} />
                             )}
@@ -580,28 +576,14 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                       case 'data-suggestions':
                         return <SuggestionsDisplay key={index} data={part.data} onPick={actions?.pickSuggestion} />;
                       case 'dynamic-tool': {
-                        if (approvalBatchIdOf(part) !== undefined) {
-                          const batch = batches.get(index);
-                          if (!batch || batch.some(row => waitsOnAnotherTier(row, displayApprovalTypes))) return null;
-                          const view = approvalBatchViewOf(batch);
-                          return (
-                            <ApprovalBatchMessage
-                              key={index}
-                              data={view.data}
-                              status={view.status}
-                              answerPending={view.answerPending}
-                              resolvedByName={view.resolvedByName}
-                              {...approvalHandlers(actions, view.data.approvalRequestId)}
-                              assistantType={assistantType}
-                              variant={approvalVariant}
-                            />
-                          );
-                        }
-                        if (failedBeforeRunning(part) && part.state === 'output-error') {
+                        // ONE approval card: a run of parts with one `batchId`, or a single gated part as a batch of one.
+                        const batched = approvalBatchIdOf(part) !== undefined;
+                        const approvalRows = batched ? batches.get(index) : approvalStatusOf(part) ? [part] : undefined;
+                        if (batched && !approvalRows) return null;
+                        if (!approvalRows && failedBeforeRunning(part) && part.state === 'output-error') {
                           return <ErrorMessageDisplay key={index} title={part.errorText} />;
                         }
-                        const approval = approvalRequestDataOf(part);
-                        if (!approval) {
+                        if (!approvalRows) {
                           return (
                             <ToolExecutionDisplay
                               key={index}
@@ -611,19 +593,16 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                             />
                           );
                         }
-                        if (waitsOnAnotherTier(part, displayApprovalTypes)) return null;
+                        if (approvalRows.some(row => waitsOnAnotherTier(row, displayApprovalTypes))) return null;
+                        const view = approvalBatchViewOf(approvalRows);
                         return (
-                          <ApprovalRequestMessage
+                          <ApprovalBatchMessage
                             key={index}
-                            data={approval}
-                            status={approvalStatusOf(part) ?? undefined}
-                            answerPending={approvalAnswerInFlight(part)}
-                            // Approved and refused all the same (an expired proposal), or nobody knows how it ended: the
-                            // card stays, and says why, whole. The error box cuts its one line, and this sentence is all
-                            // a reader has to go on.
-                            notice={part.state === 'output-error' ? part.errorText : undefined}
-                            resolvedByName={part.toolMetadata?.resolvedByName}
-                            {...approvalHandlers(actions, approval.requestId ?? part.toolCallId)}
+                            data={view.data}
+                            status={view.status}
+                            answerPending={view.answerPending}
+                            resolvedByName={view.resolvedByName}
+                            {...approvalHandlers(actions, view.data.approvalRequestId)}
                             assistantType={assistantType}
                             variant={approvalVariant}
                           />

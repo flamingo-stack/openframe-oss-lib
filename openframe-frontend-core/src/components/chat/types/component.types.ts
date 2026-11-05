@@ -7,22 +7,9 @@ import type { ChatMessage, ChatMessageMetadata, ChatPart } from '../../../chat-p
 import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
-import type {
-  ApprovalBlockVariant,
-  AssistantType,
-  AuthorType,
-  ChatAppearance,
-  ChatApprovalPartStatus,
-  ConnectionStatus,
-} from './chat.types';
+import type { ApprovalBlockVariant, AssistantType, AuthorType, ChatAppearance, ConnectionStatus } from './chat.types';
 import type { ChatContextItem } from './context-item.types';
-import type {
-  ApprovalRequestData,
-  AskOptionData,
-  ChatMessageActions,
-  ToolExecutionData,
-  ApprovalResolutionHandler,
-} from './message.types';
+import type { AskOptionData, ChatMessageActions, ToolExecutionData } from './message.types';
 
 /**
  * Anchor component supplied by the host (or the lib's
@@ -149,7 +136,7 @@ export interface ChatMessageEnhancedProps extends HTMLAttributes<HTMLDivElement>
   /** Viewer variant for approval blocks in this message's parts.
    *  `'admin'` (default) = full command block; `'client'` = end-client
    *  (Fae desktop app) title-only card. Forwarded to
-   *  ApprovalRequestMessage / ApprovalBatchMessage. */
+   *  the one approval card, ApprovalBatchMessage. */
   approvalVariant?: ApprovalBlockVariant;
   /** Visual generation of the row. Omit to inherit the thread's
    *  (`ChatMessageList.appearance`); `classic` outside a list. */
@@ -595,34 +582,6 @@ export interface ToolExecutionDisplayProps extends HTMLAttributes<HTMLDivElement
    *  `'admin'` (default — every dashboard surface, incl. a ticket's Fae client
    *  tab) shows the concise `toolTitle`. */
   variant?: ApprovalBlockVariant;
-}
-
-// ========== Approval Request Message Props ==========
-
-export interface ApprovalRequestMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: ApprovalRequestData;
-  onApprove?: ApprovalResolutionHandler;
-  onReject?: ApprovalResolutionHandler;
-  status?: ChatApprovalPartStatus;
-  /** The answer was sent and the server has not said how it went: the buttons stay, inert, so the click moves nothing. */
-  answerPending?: boolean;
-  /** Why it stands as it does (a refusal, an outcome nobody knows), whole, on the foot beside its status. */
-  notice?: string;
-  disabled?: boolean;
-  /** Chat identity. Accepted for parity with the batch card; does NOT drive
-   *  the styling — use `variant`. */
-  assistantType?: AssistantType;
-  /** Viewer variant. `'admin'` (default) = full card with the raw command;
-   *  `'client'` = end-client (Fae desktop app) card with only the
-   *  BE-generated title (`explanation`) + actions/status pill. */
-  variant?: ApprovalBlockVariant;
-  /** Render the footer Approve/Reject row (or the resolved-status tag).
-   *  Turn off when the viewer cannot resolve this card — matches
-   *  `ApprovalBatchMessageProps.showFooterActions`. Default true. */
-  showFooterActions?: boolean;
-  /** Display name of the user who resolved the request; baked into the
-   *  client variant's full-text status pill ("Approved by {name}"). */
-  resolvedByName?: string | null;
 }
 
 // ========== Error Message Display Props ==========

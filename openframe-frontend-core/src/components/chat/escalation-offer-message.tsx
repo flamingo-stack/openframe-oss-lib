@@ -2,9 +2,9 @@
 
 import { forwardRef, type HTMLAttributes } from 'react';
 import { cn } from '../../utils/cn';
-import { ApprovalRequestMessage } from './approval-request-message';
+import { ApprovalBatchMessage } from './approval-batch-message';
 import type { ChatApprovalStatus } from './types/chat.types';
-import type { ApprovalResolutionHandler, EscalationOfferData } from './types/message.types';
+import type { ApprovalBatchData, ApprovalResolutionHandler, EscalationOfferData } from './types/message.types';
 
 export interface EscalationOfferMessageProps extends HTMLAttributes<HTMLDivElement> {
   data: EscalationOfferData;
@@ -17,7 +17,7 @@ export interface EscalationOfferMessageProps extends HTMLAttributes<HTMLDivEleme
 /**
  * Ticket-escalation offer block.
  *
- * Renders THROUGH the client approval card rather than reimplementing it:
+ * Renders THROUGH the one approval card, as a client card of one row, rather than reimplementing it:
  * per Figma (fae chat › "escalation to admin") the offer is that exact
  * component, down to the Approve/Reject labels and the resolved
  * "Approved by {name}" pill. Only the wiring differs — approve/reject call
@@ -28,10 +28,25 @@ export interface EscalationOfferMessageProps extends HTMLAttributes<HTMLDivEleme
  * own `TICKET_ESCALATED` block on the wire, which also covers the inactivity
  * auto-escalation — a path that raises no offer to infer from.
  */
+function offerBatchOf(data: EscalationOfferData): ApprovalBatchData {
+  return {
+    approvalRequestId: data.offerId,
+    approvalType: '',
+    toolCalls: [
+      {
+        toolExecutionRequestId: data.offerId,
+        toolName: 'escalate_ticket',
+        requiresApproval: true,
+        ...(data.text ? { toolExplanation: data.text } : {}),
+      },
+    ],
+  };
+}
+
 const EscalationOfferMessage = forwardRef<HTMLDivElement, EscalationOfferMessageProps>(
   ({ className, data, status = 'pending', resolvedByName, onApprove, onReject, ...props }, ref) => (
     <div ref={ref} className={cn('flex flex-col', className)} {...props}>
-      <ApprovalRequestMessage
+      <ApprovalBatchMessage
         variant="client"
         // Only the client may resolve an offer — the backend rejects every
         // other actor — so a viewer without BOTH handlers wired (the admin
@@ -39,9 +54,8 @@ const EscalationOfferMessage = forwardRef<HTMLDivElement, EscalationOfferMessage
         // card renders Approve and Reject as a pair, so one handler is not a
         // usable state. A resolved offer still shows its pill for everyone.
         showFooterActions={(!!onApprove && !!onReject) || status !== 'pending'}
-        // The client card renders `explanation` as its body and never shows
-        // `command`; the offer's whole payload is that one backend-fixed line.
-        data={{ command: '', explanation: data.text, requestId: data.offerId }}
+        showExecutionStatus={false}
+        data={offerBatchOf(data)}
         status={status}
         resolvedByName={resolvedByName}
         onApprove={onApprove}

@@ -24,6 +24,10 @@ import type {
 } from './types';
 import { COMMAND_BODY_ARG_KEYS, getCommandText } from './utils/tool-call-helpers';
 
+/**
+ * THE approval card: every approval a chat, a board or a notification draws. A single gated call is a batch of one, and a
+ * ticket-escalation offer is a client card of one row (`EscalationOfferMessage`).
+ */
 export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement> {
   /** The batch. `null` is a batch still being read (a list's loading row): the block draws its own loading form, as
    *  it does in a loading scope. */
@@ -143,7 +147,7 @@ function footTitleOf(call: PendingToolCallData): string | undefined {
 }
 
 /**
- * What a batch's foot says with no row opened, once however many rows it is about. A tool's own output stays in its row: it
+ * What a card's foot says with no row opened, once however many rows it is about. A tool's own output stays in its row: it
  * can be long, and an end client must not see it. Two different sentences each name their rows, or "this one" has no referent
  * and "ask again" reads as being about the row that may have run.
  */
