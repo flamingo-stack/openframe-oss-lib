@@ -9,6 +9,7 @@ import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.ToolUrlService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmNotFoundException;
 import com.openframe.sdk.fleetmdm.model.Host;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,7 +110,7 @@ class FleetMdmAgentIdTransformerTest {
         stubTool();
         when(fleetClient.searchHosts(HARDWARE_UUID, 0, 2))
                 .thenReturn(List.of(host(10L, HARDWARE_UUID, HARDWARE_UUID, null, ENROLLED_JANUARY)));
-        when(fleetClient.getHostByIdentifier(HARDWARE_UUID)).thenReturn(null);
+        when(fleetClient.getHostByIdentifier(HARDWARE_UUID)).thenThrow(new FleetMdmNotFoundException("Fleet host not found: " + HARDWARE_UUID, ""));
 
         // execution
         IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -201,7 +202,7 @@ class FleetMdmAgentIdTransformerTest {
         // setup
         stubTool();
         when(fleetClient.searchHosts(INSTANCE_ID, 0, 2)).thenReturn(List.of());
-        when(fleetClient.getHostByIdentifier(INSTANCE_ID)).thenReturn(null);
+        when(fleetClient.getHostByIdentifier(INSTANCE_ID)).thenThrow(new FleetMdmNotFoundException("Fleet host not found: " + INSTANCE_ID, ""));
 
         // execution
         IllegalStateException ex = assertThrows(IllegalStateException.class,

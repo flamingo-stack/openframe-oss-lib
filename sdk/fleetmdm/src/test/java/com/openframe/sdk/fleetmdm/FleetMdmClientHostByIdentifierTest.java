@@ -2,6 +2,7 @@ package com.openframe.sdk.fleetmdm;
 
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmArgumentException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmNotFoundException;
 import com.openframe.sdk.fleetmdm.model.Host;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,15 +70,16 @@ class FleetMdmClientHostByIdentifierTest {
     }
 
     @Test
-    void getHostByIdentifier_notFound_returnsNull() throws IOException, InterruptedException {
+    void getHostByIdentifier_notFound_throwsNotFound() throws IOException, InterruptedException {
         // setup
         stubStatus(404);
 
         // execution
-        Host host = client.getHostByIdentifier(INSTANCE_ID);
+        FleetMdmNotFoundException ex = assertThrows(FleetMdmNotFoundException.class, () -> client.getHostByIdentifier(INSTANCE_ID));
 
         // verifications
-        assertThat(host).isNull();
+        assertThat(ex.getMessage()).contains(INSTANCE_ID);
+        assertThat(ex.getStatusCode()).isEqualTo(404);
     }
 
     @Test
@@ -121,7 +123,9 @@ class FleetMdmClientHostByIdentifierTest {
     @Test
     void getHostByIdentifier_reservedCharacters_identifierEncodedInPath() throws IOException, InterruptedException {
         // setup
-        stubStatus(404);
+        stubResponse(200, """
+                { "host": { "id": 7 } }
+                """);
 
         // execution
         client.getHostByIdentifier("a/b#c");
