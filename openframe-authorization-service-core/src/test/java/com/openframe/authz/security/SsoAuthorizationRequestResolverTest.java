@@ -105,7 +105,7 @@ class SsoAuthorizationRequestResolverTest {
 
     @Test
     void shouldSkipBlankFlowCookieAndUseTheNextValidOne() {
-        Cookie blank = new Cookie(SsoFlowCookieNames.OF_SSO_REG, "");
+        Cookie blank = new Cookie(SsoFlowCookieNames.OF_SSO_INVITE, "");
         Cookie valid = new Cookie(SsoFlowCookieNames.OF_SSO_LOGIN, loginCookie("second-state", inTenMinutes()));
 
         assertThat(resolver.resolve(request(blank, valid), "google").getState()).isEqualTo("second-state");
