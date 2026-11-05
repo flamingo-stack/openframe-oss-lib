@@ -5,7 +5,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.core.clientversion.AppShellOrigins;
 import com.openframe.core.clientversion.ClientIdentity;
 import com.openframe.core.clientversion.ClientIdentityParser;
-import com.openframe.core.clientversion.ClientKind;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +20,6 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.Optional;
 
 import static com.openframe.core.constants.HttpHeaders.X_OPENFRAME_CLIENT;
 import static com.openframe.core.clientversion.ClientIdentity.UNKNOWN_VERSION;
@@ -89,12 +87,9 @@ public class ClientVersionMetricsFilter implements GlobalFilter, Ordered {
             record(request, sub, identity.getKind().getLabel(), identity.getShellVersion(), identity.getBundleVersion());
             return;
         }
-        Optional<ClientKind> legacyShell = AppShellOrigins.kindOf(request.getHeaders().getFirst(ORIGIN));
-        if (legacyShell.isPresent()) {
-            record(request, sub, LEGACY_KIND_PREFIX + legacyShell.get().getLabel(), UNKNOWN_VERSION, UNKNOWN_VERSION);
-            return;
-        }
-        metrics.recordClientRequest(NO_HEADER_KIND, UNKNOWN_VERSION, UNKNOWN_VERSION);
+        AppShellOrigins.kindOf(request.getHeaders().getFirst(ORIGIN)).ifPresentOrElse(
+                shell -> record(request, sub, LEGACY_KIND_PREFIX + shell.getLabel(), UNKNOWN_VERSION, UNKNOWN_VERSION),
+                () -> metrics.recordClientRequest(NO_HEADER_KIND, UNKNOWN_VERSION, UNKNOWN_VERSION));
     }
 
     private void record(ServerHttpRequest request, String sub, String kind, String shellVersion, String bundleVersion) {
