@@ -3,8 +3,10 @@
  * lib's design-doc cards).
  *
  * Two fields, one displayed state:
- *   - READINESS is derived: "Ready to build" once every department section is signed off and no blocking comment is
- *     open, "Blocked" while a section asks for changes or a blocking comment is open, else "Not ready".
+ *   - READINESS is derived from the sign-offs: "Ready to build" once every department section is signed off and no
+ *     blocking comment is open, "In active work" once at least one section is signed off, else "Not ready" (nothing
+ *     signed off yet). "Blocked" is shown over the last two while a section asks for changes or a blocking comment is
+ *     open.
  *   - A LIFECYCLE status is set by a person (postponed, shipped, archived; vocabulary rows, resolved by the hub into
  *     `doc.lifecycle`). While one is set it is what the doc shows; cleared, the readiness shows again.
  *
@@ -13,27 +15,33 @@
  */
 import type { DesignDoc, DesignDocCompletion } from '../types/design-doc';
 
-export const DESIGN_DOC_READINESS = ['ready', 'not_ready'] as const;
+export const DESIGN_DOC_READINESS = ['ready', 'in_progress', 'not_ready'] as const;
 export type DesignDocReadiness = (typeof DESIGN_DOC_READINESS)[number];
 
 /**
  * Each readiness's label and badge colour (a `StatusBadge` scheme). Ready is the soft cyan of information, never the
- * green of success: green is Shipped, so the two can never look alike.
+ * green of success: green is Shipped, so the two can never look alike. In active work is the soft pink no status a
+ * person sets uses (Postponed is warning, Shipped success, Archived default).
  */
 export const DESIGN_DOC_READINESS_DISPLAY: Record<
   DesignDocReadiness,
-  { label: string; scheme: 'cyanSoft' | 'default' }
+  { label: string; scheme: 'cyanSoft' | 'pinkSoft' | 'default' }
 > = {
   ready: { label: 'Ready to build', scheme: 'cyanSoft' },
+  in_progress: { label: 'In active work', scheme: 'pinkSoft' },
   not_ready: { label: 'Not ready', scheme: 'default' },
 };
 
 /** A not-ready doc that something is holding back: a section asking for changes or an open blocking comment. */
 export const DESIGN_DOC_BLOCKED_DISPLAY = { label: 'Blocked', scheme: 'error' } as const;
 
-/** Ready to build ⇔ `completion.isComplete` (every section signed off, no open blocking comment). */
-export const designDocReadiness = (completion: Pick<DesignDocCompletion, 'isComplete'>): DesignDocReadiness =>
-  completion.isComplete ? 'ready' : 'not_ready';
+/**
+ * Ready to build ⇔ `completion.isComplete` (every section signed off, no open blocking comment); In active work ⇔ at
+ * least one section signed off; Not ready ⇔ none yet.
+ */
+export const designDocReadiness = (
+  completion: Pick<DesignDocCompletion, 'isComplete' | 'completed'>,
+): DesignDocReadiness => (completion.isComplete ? 'ready' : completion.completed > 0 ? 'in_progress' : 'not_ready');
 
 /** What the doc's status badge says: its lifecycle status when a person set one, else its readiness. */
 export function designDocStatusDisplay(doc: Pick<DesignDoc, 'completion' | 'lifecycle'>): {

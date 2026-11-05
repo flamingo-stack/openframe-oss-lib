@@ -30,7 +30,16 @@ describe('designDocStatusDisplay', () => {
     expect(designDocStatusDisplay({ completion: completion({ isComplete: true }), lifecycle: null })).toEqual(
       DESIGN_DOC_READINESS_DISPLAY.ready,
     );
-    expect(designDocStatusDisplay({ completion: completion(), lifecycle: undefined })).toEqual(
+    expect(designDocStatusDisplay({ completion: completion({ completed: 0 }), lifecycle: undefined })).toEqual(
+      DESIGN_DOC_READINESS_DISPLAY.not_ready,
+    );
+  });
+
+  it('calls a doc with at least one sign-off in active work', () => {
+    expect(designDocStatusDisplay({ completion: completion({ completed: 1 }), lifecycle: null })).toEqual(
+      DESIGN_DOC_READINESS_DISPLAY.in_progress,
+    );
+    expect(designDocStatusDisplay({ completion: completion({ completed: 0 }), lifecycle: null })).toEqual(
       DESIGN_DOC_READINESS_DISPLAY.not_ready,
     );
   });
