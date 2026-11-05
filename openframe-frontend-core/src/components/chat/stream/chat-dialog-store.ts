@@ -2,7 +2,7 @@
  * createChatDialogStore: framework-free registry of `ChatStreamReducer`
  * instances keyed by `(dialogId, side)`. Reducer state PERSISTS across
  * component unmounts (the store outlives React), and the store is the
- * `useSyncExternalStore` source for the `useChatStreamReducer` wrapper.
+ * `useSyncExternalStore` source for the thread store's `useChatThread`.
  *
  * CROSS-SIDE PROJECTION: exactly two operations fan out across sides of the
  * same dialogId:
@@ -23,7 +23,7 @@
  *
  * EVICTION SAFETY (LRU recency alone is NOT liveness):
  *   1. RETAINED keys are never evicted. `retain(dialogId, side)` returns a
- *      release fn; the `useChatStreamReducer` hook calls it for as long as it
+ *      release fn; `useChatThread` calls it for as long as it
  *      is mounted, so a quiet-but-visible panel can't be dropped just because
  *      ten other keys were touched. NON-React hosts must call it too.
  *      Because the hook retains in an EFFECT but takes its reducer during
@@ -246,7 +246,7 @@ export function createChatDialogStore(options: CreateChatDialogStoreOptions = {}
    * yet. ALL of them are protected from eviction, not just the one being
    * inserted right now.
    *
-   * `useChatStreamReducer` calls `getReducer` during RENDER (to hand the
+   * A host can call `getReducer` during RENDER (to hand a
    * component its reducer) and `retain()` in an EFFECT, so React can render N
    * panels with N distinct keys before a single retain lands. Protecting only
    * the key being inserted let render #(cap+1) evict the key render #1 had
@@ -446,8 +446,7 @@ export function createChatDialogStore(options: CreateChatDialogStoreOptions = {}
   /** PURE read — deliberately does NOT go through `getReducer`, which would
    *  insert into the module-lived map on every miss (unbounded growth under
    *  SSR) and make a React snapshot read mutate the store. Callers that need
-   *  a reducer to exist call `getReducer` explicitly first (the
-   *  `useChatStreamReducer` hook does exactly that, during render). */
+   *  a reducer to exist call `getReducer` explicitly first. */
   function getSnapshot(dialogId: string, side: ChatDialogSide = DEFAULT_DIALOG_SIDE): ChatReducerState {
     return reducers.get(keyOf(dialogId, side))?.state ?? EMPTY_STATE;
   }

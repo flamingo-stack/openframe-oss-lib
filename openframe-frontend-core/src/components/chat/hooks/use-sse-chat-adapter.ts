@@ -46,15 +46,15 @@ import {
   type ChatToolPart,
 } from '../../../chat-protocol/chat-message';
 import { readServerErrorMessage } from '../../../chat-protocol/server-error';
-import { readUiChunks, type UiChunk } from '../../../chat-protocol/ui-chunks';
+import { readUiChunks, type ChatStreamEntry, type UiChunk } from '../../../chat-protocol/ui-chunks';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
 import type { ChatRef } from '../chat-ref.types';
+import { createChatThreadStore } from '../engine/chat-thread-store';
+import { useChatThread } from '../engine/use-chat-thread';
 import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
-import { createChatDialogStore } from '../stream/chat-dialog-store';
-import type { ChatDialogStore } from '../stream/chat-dialog-store';
-import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
+import type { ChatStreamReducer } from '../stream/chat-stream-reducer';
 import type { SlashCommandSummary } from '../types/component.types';
 import type { ChatMessageActions } from '../types/message.types';
 import type {
@@ -280,16 +280,18 @@ export function useSseChatAdapter(
   const source = runtime.source || DEFAULT_CHAT_SOURCE;
   const tableIdForDocumentType = options?.tableIdForDocumentType ?? defaultTableIdForDocumentType;
 
-  // ─── Reducer wiring ────────────────────────────────────────────────────────
-  // One store per hook instance; one reducer keyed by the source.
+  // ─── The thread ───────────────────────────────────────────────────────────
+  // The one thread store every chat runs on (`engine/chat-thread-store`): one per hook instance, one thread keyed by the
+  // source. Deltas are batched there, and every other entry lands at once.
 
-  const storeRef = useRef<ChatDialogStore | null>(null);
-  if (storeRef.current === null) storeRef.current = createChatDialogStore();
-
-  const { state, applyEntry, flushDeltas, mutate } = useChatStreamReducer({
-    store: storeRef.current,
-    dialogId: source,
-  });
+  const [store] = useState(() => createChatThreadStore<string>());
+  const { state } = useChatThread(store, source);
+  const applyEntry = useCallback((entry: ChatStreamEntry) => store.bind(source).apply(entry), [store, source]);
+  const flushDeltas = useCallback(() => store.flush(), [store]);
+  const mutate = useCallback(
+    <T>(fn: (reducer: ChatStreamReducer) => T): T => store.mutate(source, fn),
+    [store, source],
+  );
 
   // ─── Conversation identity: server-minted id, restored once on mount ─────
   // Null = no conversation yet: the FIRST send goes out with a client id, the
@@ -671,8 +673,7 @@ export function useSseChatAdapter(
     async (id: string, approved: boolean, reason?: string): Promise<boolean> => {
       if (isStreamWriting()) return false;
       flushDeltas();
-      const store = storeRef.current;
-      const card = store ? cardOfApproval(store.getSnapshot(source).messages, id) : null;
+      const card = cardOfApproval(store.snapshotOf(source).messages, id);
       if (!card) return false;
       const { message, parts } = card;
 
@@ -713,7 +714,7 @@ export function useSseChatAdapter(
           if (err instanceof RequestRefused) refusal = err.serverMessage ?? APPROVAL_REFUSED;
         }
         flushDeltas();
-        for (const part of unansweredParts(store?.getSnapshot(source).messages ?? [], asked)) {
+        for (const part of unansweredParts(store.snapshotOf(source).messages, asked)) {
           applyEntry({
             chunks: [
               {
@@ -760,7 +761,18 @@ export function useSseChatAdapter(
         settleDialogList(minted, ctrl);
       }
     },
-    [applyEntry, flushDeltas, mutate, settleDialogList, source, streamFrom, openStream, closeStream, isStreamWriting],
+    [
+      applyEntry,
+      flushDeltas,
+      mutate,
+      settleDialogList,
+      source,
+      store,
+      streamFrom,
+      openStream,
+      closeStream,
+      isStreamWriting,
+    ],
   );
 
   const stopMessage = useCallback(() => {

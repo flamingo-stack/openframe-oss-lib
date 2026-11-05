@@ -22,9 +22,9 @@
  * statuses and no sequence cursor, so a resolved approval would re-render actionable and a catch-up replay would apply
  * events twice. Parking is unconditional for that reason.
  *
- * DELTA BATCHING is the lib's framework-free `createDeltaBatcher`, the one implementation (shared with
- * `useChatStreamReducer`): consecutive same-type deltas coalesce and land about once per frame. `push` returns false for a
- * non-delta entry, which the store then flushes and applies itself, so ordering is preserved.
+ * DELTA BATCHING is the lib's framework-free `createDeltaBatcher`, the one implementation: consecutive same-type deltas
+ * coalesce and land about once per frame. `push` returns false for a non-delta entry, which the store then flushes and
+ * applies itself, so ordering is preserved.
  */
 
 import type { ChatMessage } from '../../../chat-protocol/chat-message';

@@ -521,8 +521,8 @@ describe('createChatDialogStore — eviction safety', () => {
 
   /**
    * REGRESSION (round 10): the round-3 guard protected only the ONE key
-   * `getReducer` was inserting. `useChatStreamReducer` calls `getReducer`
-   * during RENDER and `retain()` in an EFFECT, so React renders every panel of
+   * `getReducer` was inserting. A host may call `getReducer`
+   * during RENDER and `retain()` in an EFFECT, and React renders every panel of
    * a commit before ANY retain lands — mounting `maxReducers + 1` panels with
    * distinct dialogIds in one commit let render #(cap+1) evict the key render
    * #1 had just created. Panel #1 kept its reducer object, but `getSnapshot`

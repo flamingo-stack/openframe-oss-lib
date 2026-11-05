@@ -3,7 +3,7 @@
  *
  * WHY THIS IS SHARED (and not a hook-private detail): every host that drives a
  * `ChatStreamReducer` from a raw transport needs the SAME batching, and a
- * copy-paste of it drifts. The React wrapper (`useChatStreamReducer`) and any
+ * copy-paste of it drifts. The thread store (`engine/chat-thread-store`) and any
  * non-React mirror in a product app both consume this one implementation.
  *
  * Behaviour:
