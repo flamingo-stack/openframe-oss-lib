@@ -173,6 +173,21 @@ export function extractRecordLinks(text: string): RecordLinkMatch[] {
   return found;
 }
 
+/**
+ * The record links a text OPENS with (one after another, only space between them), and what follows them: a prompt
+ * that names the records it is about first ("Fix with Mingo": the incident, then its device), then asks.
+ */
+export function leadingRecordLinks(text: string): { links: RecordLinkMatch[]; rest: string } {
+  const links: RecordLinkMatch[] = [];
+  let cursor = 0;
+  for (const link of extractRecordLinks(text)) {
+    if (text.slice(cursor, link.start).trim() !== '') break;
+    links.push(link);
+    cursor = link.end;
+  }
+  return { links, rest: text.slice(cursor).trim() };
+}
+
 /** The text with each record link replaced by what `replace` answers for it; the rest of the text is untouched. */
 export function replaceRecordLinks(text: string, replace: (link: RecordLinkMatch) => string): string {
   const links = extractRecordLinks(text);

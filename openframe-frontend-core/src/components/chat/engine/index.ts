@@ -28,3 +28,8 @@ export {
   type UseChatChunkProcessorOptions,
 } from './use-chat-chunk-processor';
 export { useChatThread } from './use-chat-thread';
+export {
+  createMingoGraphqlHistory,
+  type MingoGraphqlHistoryOptions,
+  type MingoGraphqlPost,
+} from './mingo-graphql-history';

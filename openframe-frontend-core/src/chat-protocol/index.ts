@@ -31,3 +31,9 @@ export * from './citation-chip';
 export type { DocSearchResult } from './doc-search';
 // A chat attachment: its constants, its shape and its `file` part, for the hub's routes and the lib's composer.
 export * from './attachment';
+// OpenFrame's chat history document (selecting `Message.parts`) and the read of its answer.
+export * from './mingo-graphql';
+// OpenFrame's record types: the kind a context item carries and the type its record link writes.
+export * from './openframe-record-types';
+// A chat between people read as lines: a remote session's side chat, live and from history.
+export * from './participant-lines';

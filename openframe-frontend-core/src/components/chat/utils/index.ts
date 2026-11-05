@@ -23,6 +23,13 @@ export {
   withThreadAuthor,
   type ThreadAuthorNames,
 } from './thread-display';
+export {
+  TICKET_CREATION_SOURCE,
+  ticketHasReceipt,
+  ticketReceiptMessage,
+  ticketReceiptText,
+  type ChatTicketReceipt,
+} from './ticket-receipt';
 
 // History <-> realtime reconciliation
 export {
