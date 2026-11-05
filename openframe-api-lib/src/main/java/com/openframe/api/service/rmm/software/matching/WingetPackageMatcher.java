@@ -49,13 +49,11 @@ public class WingetPackageMatcher implements PackageMatcher {
         Set<String> productCodes = keys(programs, ProgramKeys::getProductCodes);
         Set<String> upgradeCodes = keys(programs, ProgramKeys::getUpgradeCodes);
         Set<String> names = keys(programs, ProgramKeys::getNames);
-        List<PackageCatalogEntry> byProductCode = productCodes.isEmpty() ? List.of()
-                : catalogRepository.findByManagerAndProductCodesIn(getManager(), productCodes);
-        List<PackageCatalogEntry> byUpgradeCode = upgradeCodes.isEmpty() ? List.of()
-                : catalogRepository.findByManagerAndUpgradeCodesIn(getManager(), upgradeCodes);
-        List<PackageCatalogEntry> byName = names.isEmpty() ? List.of()
-                : catalogRepository.findByManagerAndNormalizedNamesIn(getManager(), names);
-        return new CatalogLookup(byProductCode, byUpgradeCode, byName);
+        if (productCodes.isEmpty() && upgradeCodes.isEmpty() && names.isEmpty()) {
+            return new CatalogLookup(List.of());
+        }
+        return new CatalogLookup(catalogRepository.findByManagerAndAnyMatchingKey(getManager(), productCodes,
+                upgradeCodes, names));
     }
 
     private static Set<String> keys(List<ProgramKeys> programs, Function<ProgramKeys, List<String>> keysOf) {
@@ -64,15 +62,10 @@ public class WingetPackageMatcher implements PackageMatcher {
 
     private static final class CatalogLookup {
 
-        private final List<PackageCatalogEntry> byProductCode;
-        private final List<PackageCatalogEntry> byUpgradeCode;
-        private final List<PackageCatalogEntry> byName;
+        private final List<PackageCatalogEntry> entries;
 
-        private CatalogLookup(List<PackageCatalogEntry> byProductCode, List<PackageCatalogEntry> byUpgradeCode,
-                              List<PackageCatalogEntry> byName) {
-            this.byProductCode = byProductCode;
-            this.byUpgradeCode = byUpgradeCode;
-            this.byName = byName;
+        private CatalogLookup(List<PackageCatalogEntry> entries) {
+            this.entries = entries;
         }
 
         PackageMatch matchOf(ProgramKeys program) {
@@ -88,15 +81,14 @@ public class WingetPackageMatcher implements PackageMatcher {
 
         private Map<String, Candidate> candidates(ProgramKeys program, String name) {
             Map<String, Candidate> candidates = new LinkedHashMap<>();
-            byProductCode.stream()
-                    .filter(entry -> containsAny(entry.getProductCodes(), program.getProductCodes()))
-                    .forEach(entry -> add(candidates, entry, true));
-            byUpgradeCode.stream()
-                    .filter(entry -> containsAny(entry.getUpgradeCodes(), program.getUpgradeCodes()))
-                    .forEach(entry -> add(candidates, entry, true));
-            byName.stream()
-                    .filter(entry -> program.hasPublisher() && hasNameAndPublisher(entry, name, program.getPublisher()))
-                    .forEach(entry -> add(candidates, entry, false));
+            for (PackageCatalogEntry entry : entries) {
+                if (containsAny(entry.getProductCodes(), program.getProductCodes())
+                        || containsAny(entry.getUpgradeCodes(), program.getUpgradeCodes())) {
+                    candidates.put(entry.getPackageId(), new Candidate(entry, true));
+                } else if (program.hasPublisher() && hasNameAndPublisher(entry, name, program.getPublisher())) {
+                    candidates.putIfAbsent(entry.getPackageId(), new Candidate(entry, false));
+                }
+            }
             return candidates;
         }
 
@@ -110,11 +102,6 @@ public class WingetPackageMatcher implements PackageMatcher {
             }
             List<Candidate> strong = candidates.values().stream().filter(Candidate::isStrong).toList();
             return strong.size() == 1 ? PackageMatch.of(strong.getFirst().getEntry()) : PackageMatch.ambiguous();
-        }
-
-        private static void add(Map<String, Candidate> candidates, PackageCatalogEntry entry, boolean byCode) {
-            Candidate found = new Candidate(entry, byCode);
-            candidates.merge(entry.getPackageId(), found, Candidate::strongerOf);
         }
 
         private static boolean hasNameAndPublisher(PackageCatalogEntry entry, String name, String publisher) {
@@ -136,10 +123,6 @@ public class WingetPackageMatcher implements PackageMatcher {
     private static final class Candidate {
         private final PackageCatalogEntry entry;
         private final boolean strong;
-
-        Candidate strongerOf(Candidate other) {
-            return strong ? this : other;
-        }
     }
 
     // a program's keys as winget folds and normalizes them

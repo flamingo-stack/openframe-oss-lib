@@ -3,6 +3,7 @@ package com.openframe.data.repository.packagesearch;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -14,12 +15,11 @@ public interface PackageCatalogRepository extends MongoRepository<PackageCatalog
 
     List<PackageCatalogEntry> findByManagerAndPackageIdIn(PackageManagerType manager, Collection<String> packageIds);
 
-    List<PackageCatalogEntry> findByManagerAndProductCodesIn(PackageManagerType manager, Collection<String> productCodes);
-
-    List<PackageCatalogEntry> findByManagerAndUpgradeCodesIn(PackageManagerType manager, Collection<String> upgradeCodes);
-
-    List<PackageCatalogEntry> findByManagerAndNormalizedNamesIn(PackageManagerType manager,
-                                                                Collection<String> normalizedNames);
+    @Query("{ 'manager': ?0, '$or': [ { 'productCodes': { '$in': ?1 } }, { 'upgradeCodes': { '$in': ?2 } },"
+            + " { 'normalizedNames': { '$in': ?3 } } ] }")
+    List<PackageCatalogEntry> findByManagerAndAnyMatchingKey(PackageManagerType manager, Collection<String> productCodes,
+                                                             Collection<String> upgradeCodes,
+                                                             Collection<String> normalizedNames);
 
     long deleteByManagerAndUpdatedAtBefore(PackageManagerType manager, Instant updatedAt);
 }

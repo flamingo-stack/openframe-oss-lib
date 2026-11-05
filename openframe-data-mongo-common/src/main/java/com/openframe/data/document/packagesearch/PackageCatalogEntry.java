@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.TypeAlias;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -19,6 +21,11 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "package_catalog")
+@CompoundIndexes({
+        @CompoundIndex(name = "manager_productCodes", def = "{'manager': 1, 'productCodes': 1}"),
+        @CompoundIndex(name = "manager_upgradeCodes", def = "{'manager': 1, 'upgradeCodes': 1}"),
+        @CompoundIndex(name = "manager_normalizedNames", def = "{'manager': 1, 'normalizedNames': 1}")
+})
 @TypeAlias("packageCatalogEntry")
 public class PackageCatalogEntry {
 

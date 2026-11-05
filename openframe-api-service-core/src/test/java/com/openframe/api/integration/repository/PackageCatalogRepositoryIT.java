@@ -8,7 +8,14 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.packagesearch.PackageCatalogHit;
 import com.openframe.data.repository.packagesearch.PackageCatalogOrder;
 import com.openframe.data.repository.packagesearch.PackageCatalogPage;
+import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepositoryImpl;
+import org.bson.Document;
+import org.springframework.data.mongodb.core.index.IndexOperations;
+import org.springframework.data.mongodb.core.index.MongoPersistentEntityIndexResolver;
+import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
+import org.springframework.data.mongodb.repository.support.MongoRepositoryFactory;
+import org.springframework.data.repository.core.support.RepositoryComposition.RepositoryFragments;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -229,6 +236,55 @@ class PackageCatalogRepositoryIT {
         // verifications
         assertThat(page.getHits()).isEmpty();
         assertThat(page.getTotal()).isZero();
+    }
+
+    @Test
+    void findByManagerAndAnyMatchingKey_anyOfTheThreeKeys_onePackageOnce() {
+        // setup
+        PackageCatalogRepository catalog = springRepository();
+        PackageCatalogEntry chrome = winget("Google.Chrome", "Google Chrome");
+        chrome.setProductCodes(List.of("google chrome"));
+        chrome.setNormalizedNames(List.of("googlechrome"));
+        PackageCatalogEntry acrobat = winget("Adobe.Acrobat.Reader.64-bit", "Adobe Acrobat");
+        acrobat.setUpgradeCodes(List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"));
+        PackageCatalogEntry git = winget("Git.Git", "Git");
+        git.setNormalizedNames(List.of("git"));
+        PackageCatalogEntry brewGit = brew("git", "git", 1, null);
+        brewGit.setNormalizedNames(List.of("git"));
+        repository.upsertAll(List.of(chrome, acrobat, git, brewGit));
+
+        // execution
+        List<PackageCatalogEntry> found = catalog.findByManagerAndAnyMatchingKey(WINGET, List.of("google chrome"),
+                List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"), List.of("googlechrome", "git"));
+
+        // verifications
+        assertThat(found)
+                .extracting(PackageCatalogEntry::getPackageId)
+                .containsExactlyInAnyOrder("Google.Chrome", "Adobe.Acrobat.Reader.64-bit", "Git.Git");
+    }
+
+    @Test
+    void findByManagerAndAnyMatchingKey_withEntityIndexes_noCollectionScan() {
+        // setup
+        MongoMappingContext mappingContext = (MongoMappingContext) mongoTemplate.getConverter().getMappingContext();
+        IndexOperations indexes = mongoTemplate.indexOps(PackageCatalogEntry.class);
+        new MongoPersistentEntityIndexResolver(mappingContext).resolveIndexFor(PackageCatalogEntry.class)
+                .forEach(indexes::ensureIndex);
+        Document query = Document.parse("{ 'manager': 'WINGET', '$or': [ { 'productCodes': { '$in': ['a'] } },"
+                + " { 'upgradeCodes': { '$in': ['b'] } }, { 'normalizedNames': { '$in': ['c'] } } ] }");
+
+        // execution
+        Document plan = mongoTemplate.getDb().runCommand(new Document("explain",
+                new Document("find", "package_catalog").append("filter", query)));
+
+        // verifications
+        assertThat(plan.toJson()).doesNotContain("COLLSCAN").contains("manager_productCodes",
+                "manager_upgradeCodes", "manager_normalizedNames");
+    }
+
+    private static PackageCatalogRepository springRepository() {
+        return new MongoRepositoryFactory(mongoTemplate)
+                .getRepository(PackageCatalogRepository.class, RepositoryFragments.just(repository));
     }
 
     private static String lastCursor(PackageCatalogPage page) {
