@@ -35,7 +35,11 @@ import type { PluggableList } from 'unified';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import { readAppOrigins, SERVER_APP_ORIGINS, subscribeAppOrigins } from '../../../utils/app-origins';
 import { cn } from '../../../utils/cn';
-import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import {
+  TextLineSkeleton,
+  TextLinesByBreakpointSkeleton,
+  type TextLinesByBreakpoint,
+} from '../../loading/unified-skeleton';
 import { LoadingItems, useLoadingScope } from '../loading-scope';
 import { buildBaseComponents, MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
 import { MarkdownMediaOriginsContext } from './external-media-notice';
@@ -193,8 +197,11 @@ export interface MarkdownEngineProps {
    * sections, each a heading and its paragraphs. Unset, one paragraph of `skeletonLines` lines.
    */
   skeletonSections?: number;
-  /** Lines of the one paragraph a loading body draws when it names no sections. Default 3. */
-  skeletonLines?: number;
+  /**
+   * Lines of the one paragraph a loading body draws when it names no sections. Default 3. A text whose length changes
+   * the lines it wraps to at each width (a summary) gives its typical lines per breakpoint instead.
+   */
+  skeletonLines?: number | TextLinesByBreakpoint;
   /** A loading body opens with its own `# ` title (a legal document's): its title row is drawn first. */
   skeletonTitle?: boolean;
   /** The content is still being read: the body draws its skeleton (the `skeleton*` shape). A loading scope does the
@@ -467,11 +474,15 @@ export const MarkdownEngine = memo(function MarkdownEngineGate(props: MarkdownEn
   return <MarkdownEngineImpl {...props} />;
 });
 
-/** A paragraph of `lines` lines at the body's own paragraph type, as one bar of its line height. */
-function ParagraphBar({ lines, className }: { lines: number; className: string }) {
+/** A paragraph of `lines` lines (or its lines per breakpoint) at the body's own paragraph type. */
+function ParagraphBar({ lines, className }: { lines: number | TextLinesByBreakpoint; className: string }) {
   return (
     <div className={className}>
-      <TextLineSkeleton type="inherit" lines={lines} className="w-full" />
+      {typeof lines === 'number' ? (
+        <TextLineSkeleton type="inherit" lines={lines} className="w-full" />
+      ) : (
+        <TextLinesByBreakpointSkeleton lines={lines} />
+      )}
     </div>
   );
 }
@@ -506,7 +517,7 @@ export function MarkdownEngineSkeleton({
   className = '',
 }: {
   sections?: number;
-  lines?: number;
+  lines?: number | TextLinesByBreakpoint;
   textSize?: TextSizeConfig;
   /** The body opens with its own `# ` title (a legal document's, demoted to an `h2`): its H1 row is drawn first. */
   title?: boolean;
