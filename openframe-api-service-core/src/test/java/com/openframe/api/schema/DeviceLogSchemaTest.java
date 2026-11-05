@@ -22,8 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Builds an executable schema from {@code device-log.graphqls} alone, with stand-ins for the shared types it
- * references. The DGS context builds the whole schema only at startup, so without this a schema mistake - an
- * argument the spec forbids deprecating, a type that no longer resolves - would first show up as a failing pod.
+ * references. The DGS context builds the whole schema only at startup, so without this a schema mistake - a type that
+ * no longer resolves - would first show up as a failing pod.
  */
 class DeviceLogSchemaTest {
 
@@ -54,13 +54,8 @@ class DeviceLogSchemaTest {
     }
 
     @Test
-    void keepsTheSingleDeviceArgumentUsableWhileMarkingItDeprecated() {
-        GraphQLArgument machineId = deviceLogs().getArgument("machineId");
-
-        assertThat(machineId.isDeprecated()).isTrue();
-        // The spec forbids deprecating a required argument, so this must stay nullable - and a client that
-        // still sends it keeps working
-        assertThat(machineId.getType()).isNotInstanceOf(GraphQLNonNull.class);
+    void namesDevicesOnlyByTheList() {
+        assertThat(deviceLogs().getArgument("machineId")).isNull();
     }
 
     @Test

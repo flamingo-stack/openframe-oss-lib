@@ -16,7 +16,7 @@ public class NotificationQueries {
                 title
                 description
                 createdAt
-                read
+                status
                 category
                 type
                 attributes

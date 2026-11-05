@@ -18,11 +18,9 @@ import org.mockito.quality.Strictness;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,47 +41,23 @@ class DeviceLogDataFetcherTest {
     }
 
     @Test
-    @DisplayName("the deprecated single-device argument still selects exactly that device")
-    void passesTheLegacyArgumentThroughAsASingleDevice() {
-        fetcher.deviceLogs("machine-1", null, null, null, null, null);
-
-        assertThat(captureDevices()).containsExactly("machine-1");
-    }
-
-    @Test
     void passesAListOfDevicesThrough() {
-        fetcher.deviceLogs(null, List.of("machine-1", "machine-2"), null, null, null, null);
+        fetcher.deviceLogs(List.of("machine-1", "machine-2"), null, null, null, null);
 
         assertThat(captureDevices()).containsExactly("machine-1", "machine-2");
     }
 
     @Test
-    void mergesTheLegacyArgumentIntoTheList() {
-        fetcher.deviceLogs("machine-1", List.of("machine-2"), null, null, null, null);
-
-        assertThat(captureDevices()).containsExactly("machine-1", "machine-2");
-    }
-
-    @Test
-    @DisplayName("neither argument asks for every device of the tenant")
-    void passesNoDevicesWhenNeitherArgumentIsGiven() {
-        fetcher.deviceLogs(null, null, null, null, null, null);
+    @DisplayName("no devices named asks for every device of the tenant")
+    void passesNoDevicesWhenNoneAreNamed() {
+        fetcher.deviceLogs(null, null, null, null, null);
 
         assertThat(captureDevices()).isNull();
     }
 
     @Test
-    @DisplayName("a blank machineId is still rejected rather than silently widening to the whole tenant")
-    void rejectsABlankLegacyArgument() {
-        assertThatThrownBy(() -> fetcher.deviceLogs("  ", null, null, null, null, null))
-                .isInstanceOf(IllegalArgumentException.class);
-
-        verifyNoInteractions(deviceLogService);
-    }
-
-    @Test
     void passesOrganizationsThroughAlongsideDevices() {
-        fetcher.deviceLogs(null, List.of("machine-1"), List.of("org-1"), null, null, null);
+        fetcher.deviceLogs(List.of("machine-1"), List.of("org-1"), null, null, null);
 
         verify(deviceLogService).queryLogs(eq(List.of("machine-1")), eq(List.of("org-1")), any(), any());
     }

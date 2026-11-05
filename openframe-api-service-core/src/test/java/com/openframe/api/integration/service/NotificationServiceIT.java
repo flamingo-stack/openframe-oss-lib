@@ -67,7 +67,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given a notification with a READ read_state for the user, when list is called, then the NotificationView is returned with read=true (status derived from the read_state row, not from filter)")
+    @DisplayName("Given a notification with a READ read_state for the user, when list is called, then the NotificationView is returned with status READ (derived from the read_state row, not from filter)")
     void list_user_with_read_flag() {
         Notification n = mongoTemplate.save(NotificationFixtures.basic("welcome"));
         readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, "title", U, Set.of(ALICE));
@@ -76,7 +76,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         GenericQueryResult<NotificationView> result = notificationService.list(ALICE, U, NotificationFilter.EMPTY, page10());
 
         assertThat(result.getItems()).hasSize(1);
-        assertThat(result.getItems().get(0).read()).isTrue();
+        assertThat(result.getItems().get(0).status()).isEqualTo(ReadStatus.READ);
     }
 
     @Test

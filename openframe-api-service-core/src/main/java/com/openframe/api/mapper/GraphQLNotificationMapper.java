@@ -42,7 +42,6 @@ public class GraphQLNotificationMapper {
                 .category(category)
                 .type(notification.getType())
                 .attributes(notification.getAttributes())
-                .read(status == ReadStatus.READ || status == ReadStatus.ARCHIVED)
                 .status(status)
                 .build();
     }
