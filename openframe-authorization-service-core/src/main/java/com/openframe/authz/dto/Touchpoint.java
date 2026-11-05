@@ -7,7 +7,6 @@ import java.util.stream.Stream;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.util.StringUtils;
 
 /**
  * One visit to our site and where it came from, as the link and browser sent it: UTMs, ad click ids, Meta and HubSpot
@@ -80,40 +79,5 @@ public class Touchpoint {
                 .filter(Objects::nonNull)
                 .mapToInt(String::length)
                 .sum();
-    }
-
-    public static Touchpoint merge(Touchpoint request, Touchpoint cookie) {
-        if (request == null || cookie == null) {
-            return request != null ? request : cookie;
-        }
-        Touchpoint source = request.hasSourceSignal() ? request : cookie;
-        return request.toBuilder()
-                .downloadId(StringUtils.hasText(request.getDownloadId()) ? request.getDownloadId() : cookie.getDownloadId())
-                .fbc(source.getFbc())
-                .fbp(StringUtils.hasText(request.getFbp()) ? request.getFbp() : cookie.getFbp())
-                .rdtUuid(StringUtils.hasText(request.getRdtUuid()) ? request.getRdtUuid() : cookie.getRdtUuid())
-                .eventId(StringUtils.hasText(request.getEventId()) ? request.getEventId() : cookie.getEventId())
-                .hutk(StringUtils.hasText(request.getHutk()) ? request.getHutk() : cookie.getHutk())
-                .fbclid(source.getFbclid())
-                .gclid(source.getGclid())
-                .gbraid(source.getGbraid())
-                .wbraid(source.getWbraid())
-                .rdtCid(source.getRdtCid())
-                .liFatId(source.getLiFatId())
-                .utmSource(source.getUtmSource())
-                .utmMedium(source.getUtmMedium())
-                .utmCampaign(source.getUtmCampaign())
-                .utmContent(source.getUtmContent())
-                .utmTerm(source.getUtmTerm())
-                .ref(source.getRef())
-                .referrer(source.getReferrer())
-                .landingUrl(source.getLandingUrl())
-                .build();
-    }
-
-    private boolean hasSourceSignal() {
-        return Stream.of(fbclid, fbc, gclid, gbraid, wbraid, rdtCid, liFatId, utmSource, utmMedium, utmCampaign,
-                        utmContent, utmTerm, ref)
-                .anyMatch(StringUtils::hasText);
     }
 }

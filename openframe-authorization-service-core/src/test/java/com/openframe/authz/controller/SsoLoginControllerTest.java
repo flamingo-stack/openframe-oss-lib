@@ -301,27 +301,25 @@ class SsoLoginControllerTest {
     }
 
     @Test
-    void completeSsoRegistrationByTicket_appAndTicketCarrySource_registersAppFieldsOverTicketCookie() {
-        ticketPeeks(new PendingSignup("Founder@NewCo.com", "Fo", "Under", "google", true, null, null, null,
-                Touchpoint.builder()
-                        .downloadId("download-from-cookie")
-                        .utmSource("google")
-                        .gclid("gclid-1")
-                        .build()));
+    void completeSsoRegistrationByTicket_appAndTicketCarrySource_registersTheAppsOwnFieldsAndTheTicketsCookieApart() {
+        Touchpoint ticketCookie = Touchpoint.builder()
+                .downloadId("download-from-cookie")
+                .utmSource("google")
+                .gclid("gclid-1")
+                .build();
+        Touchpoint appFields = Touchpoint.builder()
+                .downloadId("download-from-app")
+                .heardFrom("search")
+                .build();
+        ticketPeeks(new PendingSignup("Founder@NewCo.com", "Fo", "Under", "google", true, null, null, null, ticketCookie));
         registrationSucceeds();
 
         controller.completeSsoRegistrationByTicket(new SsoLoginController.SignupTicketCompleteRequest("tk", "New Co", "NewCo",
-                Touchpoint.builder()
-                        .downloadId("download-from-app")
-                        .heardFrom("search")
-                        .build()));
+                appFields));
 
-        assertThat(registeredRequest().getAttribution()).isEqualTo(Touchpoint.builder()
-                .downloadId("download-from-app")
-                .heardFrom("search")
-                .utmSource("google")
-                .gclid("gclid-1")
-                .build());
+        assertThat(registeredRequest())
+                .returns(appFields, TenantRegistrationRequest::getAttribution)
+                .returns(ticketCookie, TenantRegistrationRequest::getSourceCookie);
     }
 
     private void ticketPeeks(PendingSignup pendingSignup) {
