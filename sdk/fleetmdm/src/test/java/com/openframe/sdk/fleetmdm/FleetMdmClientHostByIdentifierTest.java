@@ -136,6 +136,22 @@ class FleetMdmClientHostByIdentifierTest {
                 .hasToString(BASE_URL + "/api/v1/fleet/hosts/identifier/a%2Fb%23c?exclude_software=true");
     }
 
+    @Test
+    void getHostByIdentifier_space_encodedAsPercentTwenty() throws IOException, InterruptedException {
+        // setup
+        stubResponse(200, """
+                { "host": { "id": 7 } }
+                """);
+
+        // execution
+        client.getHostByIdentifier("a b");
+
+        // verifications
+        verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(requestCaptor.getValue().uri())
+                .hasToString(BASE_URL + "/api/v1/fleet/hosts/identifier/a%20b?exclude_software=true");
+    }
+
     private void stubStatus(int status) throws IOException, InterruptedException {
         when(httpResponse.statusCode()).thenReturn(status);
         when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);

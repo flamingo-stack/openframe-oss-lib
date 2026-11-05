@@ -9,6 +9,7 @@ import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.ToolUrlService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmNotFoundException;
 import com.openframe.sdk.fleetmdm.model.Host;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,12 +106,12 @@ class FleetMdmAgentIdTransformerTest {
     }
 
     @Test
-    void transform_uuidHostWithoutOsqueryVersion_identifierLookupMissesAndThrows() {
+    void transform_uuidHostWithoutOsqueryVersion_rejectedOnBothPathsAndThrows() {
         // setup
         stubTool();
-        when(fleetClient.searchHosts(HARDWARE_UUID, 0, 2))
-                .thenReturn(List.of(host(10L, HARDWARE_UUID, HARDWARE_UUID, null, ENROLLED_JANUARY)));
-        when(fleetClient.getHostByIdentifier(HARDWARE_UUID)).thenThrow(new FleetMdmNotFoundException("Fleet host not found: " + HARDWARE_UUID, ""));
+        Host withoutVersion = host(10L, HARDWARE_UUID, HARDWARE_UUID, null, ENROLLED_JANUARY);
+        when(fleetClient.searchHosts(HARDWARE_UUID, 0, 2)).thenReturn(List.of(withoutVersion));
+        when(fleetClient.getHostByIdentifier(HARDWARE_UUID)).thenReturn(withoutVersion);
 
         // execution
         IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -118,6 +119,7 @@ class FleetMdmAgentIdTransformerTest {
 
         // verifications
         assertThat(ex.getMessage()).contains(TRANSFORM_FAILED);
+        assertThat(ex.getCause().getMessage()).contains("No valid fleetmdm-agent mdm host found");
     }
 
     @Test
@@ -165,6 +167,7 @@ class FleetMdmAgentIdTransformerTest {
 
         // verifications
         assertThat(ex.getMessage()).contains(TRANSFORM_FAILED);
+        assertThat(ex.getCause().getMessage()).contains("No valid fleetmdm-agent mdm host found");
     }
 
     @Test
@@ -210,6 +213,24 @@ class FleetMdmAgentIdTransformerTest {
 
         // verifications
         assertThat(ex.getMessage()).contains(TRANSFORM_FAILED);
+        assertThat(ex.getCause().getMessage()).contains("No valid fleetmdm-agent mdm host found");
+    }
+
+    @Test
+    void transform_identifierLookupFails_throwsIllegalStateWithFleetCause() {
+        // setup
+        stubTool();
+        when(fleetClient.searchHosts(INSTANCE_ID, 0, 2)).thenReturn(List.of());
+        FleetMdmApiException fleetFailure = new FleetMdmApiException("Failed to fetch host", 500, "boom");
+        when(fleetClient.getHostByIdentifier(INSTANCE_ID)).thenThrow(fleetFailure);
+
+        // execution
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> transformer.transform(MACHINE_ID, INSTANCE_ID, true));
+
+        // verifications
+        assertThat(ex.getMessage()).contains(TRANSFORM_FAILED);
+        assertThat(ex.getCause()).isSameAs(fleetFailure);
     }
 
     @ParameterizedTest
