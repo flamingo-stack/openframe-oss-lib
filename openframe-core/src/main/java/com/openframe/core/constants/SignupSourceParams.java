@@ -27,9 +27,15 @@ public final class SignupSourceParams {
     public static final String REF = "ref";
     public static final String REFERRER = "referrer";
     public static final String LANDING_URL = "landing_url";
+    public static final String LANDED_AT = "landed_at";
+    public static final String CLICKED_AT = "clicked_at";
+    public static final String FIRST_VISIT = "first_visit";
+    public static final String LAST_VISIT = "last_visit";
+    public static final String LATEST_CLICKS = "latest_clicks";
+    public static final String LATEST_CLICKS_META = LATEST_CLICKS + ".meta";
+    public static final String LATEST_CLICKS_GOOGLE = LATEST_CLICKS + ".google";
+    public static final String LATEST_CLICKS_REDDIT = LATEST_CLICKS + ".reddit";
+    public static final String LATEST_CLICKS_LINKEDIN = LATEST_CLICKS + ".linkedin";
 
-    public static final List<String> SOURCE = List.of(UTM_SOURCE, UTM_MEDIUM, UTM_CAMPAIGN, UTM_CONTENT, UTM_TERM,
-            FBCLID, GCLID, GBRAID, WBRAID, RDT_CID, LI_FAT_ID, FBC, FBP, RDT_UUID, REF, REFERRER, LANDING_URL);
     public static final List<String> URLS = List.of(REFERRER, LANDING_URL);
-    public static final List<String> LONG_VALUES = List.of(REFERRER, LANDING_URL, FBC);
 }

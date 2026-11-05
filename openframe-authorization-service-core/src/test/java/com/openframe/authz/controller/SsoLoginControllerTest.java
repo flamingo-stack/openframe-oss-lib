@@ -1,6 +1,7 @@
 package com.openframe.authz.controller;
 
  import com.openframe.authz.dto.Touchpoint;
+import com.openframe.authz.dto.Visit;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoFlowCookies;
@@ -304,8 +305,7 @@ class SsoLoginControllerTest {
     void completeSsoRegistrationByTicket_appAndTicketCarrySource_registersTheAppsOwnFieldsAndTheTicketsCookieApart() {
         Touchpoint ticketCookie = Touchpoint.builder()
                 .downloadId("download-from-cookie")
-                .utmSource("google")
-                .gclid("gclid-1")
+                .lastVisit(Visit.builder().utmSource("google").gclid("gclid-1").build())
                 .build();
         Touchpoint appFields = Touchpoint.builder()
                 .downloadId("download-from-app")

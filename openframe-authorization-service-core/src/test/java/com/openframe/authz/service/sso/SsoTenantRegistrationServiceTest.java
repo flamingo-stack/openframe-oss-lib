@@ -1,7 +1,10 @@
 package com.openframe.authz.service.sso;
 
+import com.openframe.authz.dto.Click;
+import com.openframe.authz.dto.LatestClicks;
 import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.dto.SsoTenantRegistrationInitRequest;
+import com.openframe.authz.dto.Visit;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
 import com.openframe.authz.service.processor.RegistrationProcessor;
@@ -63,6 +66,16 @@ class SsoTenantRegistrationServiceTest {
         assertThat(bounded).isNull();
     }
 
+    @Test
+    void startRegistration_largeFirstVisitAndClicks_cookieCarriesOnlyTheLastVisit() {
+        Touchpoint full = attribution(100).toBuilder()
+                .firstVisit(Visit.builder().utmCampaign("c".repeat(3000)).build())
+                .latestClicks(LatestClicks.builder().meta(Click.builder().fbclid("fb-1").build()).build())
+                .build();
+
+        assertThat(cookieAttribution(full)).isEqualTo(attribution(100));
+    }
+
     private Touchpoint cookieAttribution(Touchpoint attribution) {
         service.startRegistration(new SsoTenantRegistrationInitRequest(
                 "a@acme.com", "Acme", "acme", "google", null, false, attribution));
@@ -72,17 +85,19 @@ class SsoTenantRegistrationServiceTest {
     }
 
     private static Touchpoint attribution(int lengthWithoutUrls) {
-        return withoutUrls(lengthWithoutUrls).toBuilder()
-                .referrer(REFERRER)
-                .landingUrl(LANDING_URL)
+        Touchpoint withoutUrls = withoutUrls(lengthWithoutUrls);
+        return withoutUrls.toBuilder()
+                .lastVisit(withoutUrls.getLastVisit().toBuilder().referrer(REFERRER).landingUrl(LANDING_URL).build())
                 .build();
     }
 
     private static Touchpoint withoutUrls(int length) {
         return Touchpoint.builder()
-                .utmSource(UTM_SOURCE)
                 .downloadId(DOWNLOAD_ID)
-                .utmCampaign("c".repeat(length - UTM_SOURCE.length() - DOWNLOAD_ID.length()))
+                .lastVisit(Visit.builder()
+                        .utmSource(UTM_SOURCE)
+                        .utmCampaign("c".repeat(length - UTM_SOURCE.length() - DOWNLOAD_ID.length()))
+                        .build())
                 .build();
     }
 }

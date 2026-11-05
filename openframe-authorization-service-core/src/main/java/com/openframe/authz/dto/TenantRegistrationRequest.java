@@ -52,6 +52,7 @@ public class TenantRegistrationRequest extends CoreUserRequest {
 
     private Touchpoint attribution;
 
+    @JsonIgnore
     private Touchpoint sourceCookie;
 
     /**

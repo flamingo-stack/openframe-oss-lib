@@ -1,16 +1,18 @@
 package com.openframe.authz.dto;
 
 import lombok.AllArgsConstructor;
-
-import java.util.Objects;
-import java.util.stream.Stream;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Objects;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+
 /**
- * One visit to our site and where it came from, as the link and browser sent it: UTMs, ad click ids, Meta and HubSpot
- * cookies. A signup can have two: the download visit and the signup visit; SignupAttribution decides which one counts.
+ * What a browser tells about where the visitor came from: its first and its last visit, each ad platform's latest
+ * click, and the Meta, Reddit and HubSpot cookies. A signup can have several: the signup request, the download and
+ * the "email me the link" request; SignupAttribution merges them by time.
  */
 @Data
 @Builder(toBuilder = true)
@@ -18,31 +20,19 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class Touchpoint {
 
-    private String fbc;
+    private Visit firstVisit;
 
-    private String fbclid;
+    private Visit lastVisit;
+
+    private LatestClicks latestClicks;
+
+    private String fbc;
 
     private String fbp;
 
     private String hutk;
 
-    private String gclid;
-
-    private String gbraid;
-
-    private String wbraid;
-
-    private String rdtCid;
-
     private String rdtUuid;
-
-    private String liFatId;
-
-    private String utmSource;
-    private String utmMedium;
-    private String utmCampaign;
-    private String utmContent;
-    private String utmTerm;
 
     private String eventId;
 
@@ -51,14 +41,6 @@ public class Touchpoint {
      * the channel {@code partner}.
      */
     private String ref;
-
-    /**
-     * The page the browser came from ({@code https://www.google.com/}). The frontend reads it from the browser and
-     * sends it. Google → organic search, chatgpt.com → AI search, another site → referral.
-     */
-    private String referrer;
-
-    private String landingUrl;
 
     private String downloadId;
 
@@ -73,11 +55,18 @@ public class Touchpoint {
     private String heardFromOther;
 
     public int totalLength() {
-        return Stream.of(fbc, fbclid, fbp, hutk, gclid, gbraid, wbraid, rdtCid, rdtUuid, liFatId,
-                        utmSource, utmMedium, utmCampaign, utmContent, utmTerm, eventId, ref,
-                        referrer, landingUrl, downloadId, heardFrom, heardFromOther)
+        int flat = Stream.of(fbc, fbp, hutk, rdtUuid, eventId, ref, downloadId, heardFrom, heardFromOther)
                 .filter(Objects::nonNull)
                 .mapToInt(String::length)
                 .sum();
+        return IntStream.of(flat,
+                        firstVisit == null ? 0 : firstVisit.totalLength(),
+                        lastVisit == null ? 0 : lastVisit.totalLength(),
+                        latestClicks == null ? 0 : latestClicks.totalLength())
+                .sum();
+    }
+
+    public Touchpoint withoutUrls() {
+        return toBuilder().lastVisit(lastVisit == null ? null : lastVisit.withoutUrls()).build();
     }
 }

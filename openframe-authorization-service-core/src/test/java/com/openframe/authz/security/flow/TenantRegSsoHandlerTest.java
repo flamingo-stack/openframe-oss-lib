@@ -1,6 +1,7 @@
 package com.openframe.authz.security.flow;
 
 import com.openframe.authz.dto.Touchpoint;
+import com.openframe.authz.dto.Visit;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
@@ -75,7 +76,8 @@ class TenantRegSsoHandlerTest {
 
     private static SsoTenantRegCookiePayload payload(String formEmail, String name, String domain) {
         return new SsoTenantRegCookiePayload("reg-state", formEmail, name, domain, "google",
-                "/welcome", false, Touchpoint.builder().utmSource("ads").build(), 1L, inTenMinutes());
+                "/welcome", false, Touchpoint.builder().lastVisit(Visit.builder().utmSource("ads").build()).build(), 1L,
+                inTenMinutes());
     }
 
     @Test
@@ -101,7 +103,7 @@ class TenantRegSsoHandlerTest {
         assertThat(reg.getValue().getTenantName()).isEqualTo("Acme");
         assertThat(reg.getValue().getTenantDomain()).isEqualTo("acme");
         assertThat(reg.getValue().isEmailPreVerified()).isTrue();
-        assertThat(reg.getValue().getAttribution().getUtmSource()).isEqualTo("ads");
+        assertThat(reg.getValue().getAttribution().getLastVisit().getUtmSource()).isEqualTo("ads");
         assertThat(reg.getValue().getPassword()).isNotBlank();
         assertThat(response.getHeader("Location"))
                 .isEqualTo("https://auth.example.com/oauth/continue?tenantId=new-tenant&redirectTo=%2Fwelcome");

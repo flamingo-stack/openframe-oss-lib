@@ -1,6 +1,7 @@
 package com.openframe.authz.web;
 
 import com.openframe.authz.dto.Touchpoint;
+import com.openframe.authz.dto.Visit;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import static com.openframe.core.constants.SignupSourceParams.FBCLID;
 import static com.openframe.core.constants.SignupSourceParams.FBP;
 import static com.openframe.core.constants.SignupSourceParams.GBRAID;
 import static com.openframe.core.constants.SignupSourceParams.GCLID;
+import static com.openframe.core.constants.SignupSourceParams.LANDED_AT;
 import static com.openframe.core.constants.SignupSourceParams.LANDING_URL;
 import static com.openframe.core.constants.SignupSourceParams.LI_FAT_ID;
 import static com.openframe.core.constants.SignupSourceParams.RDT_CID;
@@ -48,28 +50,35 @@ public final class SignupSourceCookie {
             MultiValueMap<String, String> params = parse(cookie.getValue());
             return Touchpoint.builder()
                     .downloadId(params.getFirst(DOWNLOAD_ID))
-                    .utmSource(params.getFirst(UTM_SOURCE))
-                    .utmMedium(params.getFirst(UTM_MEDIUM))
-                    .utmCampaign(params.getFirst(UTM_CAMPAIGN))
-                    .utmContent(params.getFirst(UTM_CONTENT))
-                    .utmTerm(params.getFirst(UTM_TERM))
-                    .fbclid(params.getFirst(FBCLID))
-                    .gclid(params.getFirst(GCLID))
-                    .gbraid(params.getFirst(GBRAID))
-                    .wbraid(params.getFirst(WBRAID))
-                    .rdtCid(params.getFirst(RDT_CID))
-                    .liFatId(params.getFirst(LI_FAT_ID))
+                    .lastVisit(Visit.builder()
+                            .utmSource(params.getFirst(UTM_SOURCE))
+                            .utmMedium(params.getFirst(UTM_MEDIUM))
+                            .utmCampaign(params.getFirst(UTM_CAMPAIGN))
+                            .utmContent(params.getFirst(UTM_CONTENT))
+                            .utmTerm(params.getFirst(UTM_TERM))
+                            .fbclid(params.getFirst(FBCLID))
+                            .gclid(params.getFirst(GCLID))
+                            .gbraid(params.getFirst(GBRAID))
+                            .wbraid(params.getFirst(WBRAID))
+                            .rdtCid(params.getFirst(RDT_CID))
+                            .liFatId(params.getFirst(LI_FAT_ID))
+                            .referrer(params.getFirst(REFERRER))
+                            .landingUrl(params.getFirst(LANDING_URL))
+                            .landedAt(landedAt(params.getFirst(LANDED_AT)))
+                            .build())
                     .fbc(params.getFirst(FBC))
                     .fbp(params.getFirst(FBP))
                     .rdtUuid(params.getFirst(RDT_UUID))
                     .ref(params.getFirst(REF))
-                    .referrer(params.getFirst(REFERRER))
-                    .landingUrl(params.getFirst(LANDING_URL))
                     .build();
         } catch (IllegalArgumentException e) {
             log.warn("Unreadable {} cookie, ignoring it: {}", COOKIE, e.getMessage());
             return null;
         }
+    }
+
+    private static Long landedAt(String value) {
+        return value == null ? null : Long.valueOf(value);
     }
 
     private static MultiValueMap<String, String> parse(String query) {

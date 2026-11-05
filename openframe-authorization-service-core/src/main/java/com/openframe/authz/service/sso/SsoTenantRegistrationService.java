@@ -84,11 +84,15 @@ public class SsoTenantRegistrationService {
         );
     }
 
-    private Touchpoint boundedAttribution(Touchpoint attribution) {
-        if (attribution == null || attribution.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
+    private Touchpoint boundedAttribution(Touchpoint full) {
+        if (full == null) {
+            return null;
+        }
+        Touchpoint attribution = full.toBuilder().firstVisit(null).latestClicks(null).build();
+        if (attribution.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
             return attribution;
         }
-        Touchpoint withoutUrls = attribution.toBuilder().referrer(null).landingUrl(null).build();
+        Touchpoint withoutUrls = attribution.withoutUrls();
         if (withoutUrls.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
             log.warn("Attribution too large for the SSO cookie ({} chars) — dropping its referrer and landing URL",
                     attribution.totalLength());
