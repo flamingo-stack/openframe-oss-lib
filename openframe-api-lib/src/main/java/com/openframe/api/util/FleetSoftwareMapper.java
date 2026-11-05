@@ -31,6 +31,7 @@ public class FleetSoftwareMapper {
                 .olderVersionsCount(olderVersionsCount(versions))
                 .devicesCount(title.getHostsCount())
                 .vulnerabilitySummary(rollUpVulnerabilities(versions))
+                .fleetSource(title.getSource())
                 .build();
     }
 

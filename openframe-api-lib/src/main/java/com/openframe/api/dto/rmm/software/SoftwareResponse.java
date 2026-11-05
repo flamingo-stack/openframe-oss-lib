@@ -24,4 +24,6 @@ public class SoftwareResponse {
     private SoftwareVulnerabilitySummaryResponse vulnerabilitySummary;
     private Boolean cpeMatched;
     private SoftwareAutoUpdateStatus autoUpdate;
+    // not in the GraphQL schema: the osquery table Fleet took the row from, picks the package matcher
+    private String fleetSource;
 }

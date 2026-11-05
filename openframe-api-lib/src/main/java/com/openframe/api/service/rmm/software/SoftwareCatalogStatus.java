@@ -3,6 +3,8 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
+import com.openframe.api.service.rmm.software.matching.PackageMatch;
+import com.openframe.api.service.rmm.software.matching.SoftwarePackageMatcher;
 import com.openframe.api.util.SoftwareVersions;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
@@ -24,48 +26,80 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
-/**
- * What the package catalog says about software rows: the newest release, whether a row is behind it, and whether
- * auto-update can keep it. Fleet names a Homebrew formula by its token, so only those rows map onto the catalog; for
- * every other row the newest release known is the highest version on the tenant's devices.
- */
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class SoftwareCatalogStatus {
+
+    private static final String CASK_BUILD_SEPARATOR = ",";
+    private static final String UNVERSIONED_CASK = "latest";
+    private static final Map<PackageManagerType, SoftwareSource> SOURCE_BY_MANAGER =
+            Map.of(PackageManagerType.WINGET, SoftwareSource.WINGET);
 
     // a formula and a cask can share a token: the title is taken as the formula then
     private static final Comparator<PackageCatalogEntry> FORMULA_FIRST =
             Comparator.comparing(entry -> entry.getBrewType() != BrewPackageType.FORMULA);
 
     private final PackageCatalogRepository catalogRepository;
+    private final SoftwarePackageMatcher packageMatcher;
 
     // Runs after SoftwareAutoUpdateService: a policy's ON / OFF stays, a row without one gets what the catalog allows.
     public void apply(List<SoftwareResponse> rows) {
         if (rows == null || rows.isEmpty()) {
             return;
         }
-        Map<String, String> latest = latestBrewVersions(rows);
-        for (SoftwareResponse row : rows) {
-            String catalogLatest = catalogLatest(row, latest);
-            apply(row, catalogLatest);
+        Map<String, PackageCatalogEntry> brewPackages = brewPackagesByToken(rows);
+        Map<SoftwareResponse, PackageMatch> matches = packageMatcher.match(rows);
+        rows.forEach(row -> apply(row, brewPackages, matches));
+    }
+
+    private static void apply(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages,
+                              Map<SoftwareResponse, PackageMatch> matches) {
+        PackageMatch match = matches.get(row);
+        if (isBrewPackage(row)) {
+            applyBrewPackage(row, brewPackages);
+        } else if (match != null) {
+            applyMatch(row, match);
+        } else {
+            applyLatest(row, null);
         }
     }
 
-    private static String catalogLatest(SoftwareResponse row, Map<String, String> latest) {
-        String token = brewToken(row);
-        return token == null ? null : latest.get(token);
+    private static void applyBrewPackage(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages) {
+        String token = brewTokenOf(row);
+        PackageCatalogEntry entry = token == null ? null : brewPackages.get(token);
+        String latest = entry == null ? null : brewVersionOf(entry);
+        applyLatest(row, latest);
+        if (row.getAutoUpdate() == null) {
+            row.setAutoUpdate(entry != null ? SoftwareAutoUpdateStatus.OFF : SoftwareAutoUpdateStatus.NO_PACKAGE);
+        }
     }
 
-    private static void apply(SoftwareResponse row, String catalogLatest) {
+    // winget updates a program it matches whoever installed it, so a match alone makes the program manageable
+    private static void applyMatch(SoftwareResponse row, PackageMatch match) {
+        PackageCatalogEntry entry = match.getEntry();
+        String latest = match.isMatched() ? versionOf(entry) : null;
+        applyLatest(row, latest);
+        if (match.isMatched()) {
+            SoftwareSource source = SOURCE_BY_MANAGER.get(entry.getManager());
+            row.setSource(source);
+        }
+        if (row.getAutoUpdate() != null) {
+            return;
+        }
+        if (match.isMatched()) {
+            row.setAutoUpdate(SoftwareAutoUpdateStatus.OFF);
+        } else if (match.hasNoPackage()) {
+            row.setAutoUpdate(SoftwareAutoUpdateStatus.NO_PACKAGE);
+        }
+    }
+
+    private static void applyLatest(SoftwareResponse row, String catalogLatest) {
         if (catalogLatest != null) {
             row.setLatestVersion(catalogLatest);
         }
         SoftwareVersionStatus status = versionStatus(row, catalogLatest);
         row.setVersionStatus(status);
-        if (row.getAutoUpdate() == null && row.getSource() == SoftwareSource.BREW) {
-            row.setAutoUpdate(catalogLatest != null ? SoftwareAutoUpdateStatus.OFF : SoftwareAutoUpdateStatus.NO_PACKAGE);
-        }
     }
 
     // Devices behind each other are outdated whatever the catalog says; with one version everywhere only the catalog
@@ -83,8 +117,12 @@ public class SoftwareCatalogStatus {
                 ? SoftwareVersionStatus.UP_TO_DATE : SoftwareVersionStatus.OUTDATED;
     }
 
-    private Map<String, String> latestBrewVersions(List<SoftwareResponse> rows) {
-        Set<String> tokens = rows.stream().map(SoftwareCatalogStatus::brewToken).filter(Objects::nonNull).collect(toSet());
+    private Map<String, PackageCatalogEntry> brewPackagesByToken(List<SoftwareResponse> rows) {
+        Set<String> tokens = rows.stream()
+                .filter(SoftwareCatalogStatus::isBrewPackage)
+                .map(SoftwareCatalogStatus::brewTokenOf)
+                .filter(Objects::nonNull)
+                .collect(toSet());
         if (tokens.isEmpty()) {
             return Map.of();
         }
@@ -92,14 +130,28 @@ public class SoftwareCatalogStatus {
                 .filter(entry -> entry.getPackageId() != null && entry.getVersion() != null)
                 .collect(groupingBy(entry -> entry.getPackageId().toLowerCase(Locale.ROOT)))
                 .entrySet().stream()
-                .collect(toMap(Map.Entry::getKey,
-                        e -> e.getValue().stream().min(FORMULA_FIRST).orElseThrow().getVersion()));
+                .collect(toMap(Map.Entry::getKey, e -> e.getValue().stream().min(FORMULA_FIRST).orElseThrow()));
     }
 
-    private static String brewToken(SoftwareResponse row) {
-        if (row.getSource() != SoftwareSource.BREW || row.getName() == null) {
+    private static String versionOf(PackageCatalogEntry entry) {
+        return entry.getVersion();
+    }
+
+    // a cask version may end in a build after a comma (3.3.3,5004) that the app does not report, or be "latest"
+    private static String brewVersionOf(PackageCatalogEntry entry) {
+        String version = entry.getVersion();
+        if (UNVERSIONED_CASK.equals(version)) {
             return null;
         }
-        return row.getName().toLowerCase(Locale.ROOT);
+        int build = version.indexOf(CASK_BUILD_SEPARATOR);
+        return build < 0 ? version : version.substring(0, build);
+    }
+
+    private static boolean isBrewPackage(SoftwareResponse row) {
+        return row.getSource() == SoftwareSource.BREW;
+    }
+
+    private static String brewTokenOf(SoftwareResponse row) {
+        return row.getName() == null ? null : row.getName().toLowerCase(Locale.ROOT);
     }
 }
