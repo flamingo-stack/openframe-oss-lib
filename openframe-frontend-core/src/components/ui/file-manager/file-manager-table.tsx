@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { cn } from '../../../utils/cn';
 import { Checkbox } from '../checkbox';
 import { LoadingItems, useLoadingScope } from '../loading-scope';
@@ -45,45 +45,6 @@ export function FileManagerTable({
     return selectedFiles.length > 0 && selectedFiles.length < files.length;
   }, [files.length, selectedFiles.length]);
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [measuredHeight, setTableHeight] = useState<number | null>(null);
-  // There is nothing to size while the skeleton or the empty state is showing,
-  // and that is knowable during render — masking it here means the effect no
-  // longer has to write `null` back into state (a second render pass) every
-  // time a fetch starts or a filter empties the list.
-  const tableHeight = loading || files.length === 0 ? null : measuredHeight;
-
-  useLayoutEffect(() => {
-    if (loading || files.length === 0) return undefined;
-
-    const handleResize = () => {
-      const node = containerRef.current;
-      if (!node) return;
-      const rect = node.getBoundingClientRect();
-      const availableHeight = window.innerHeight - rect.top;
-      setTableHeight(availableHeight > 0 ? availableHeight : null);
-    };
-
-    handleResize();
-
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('scroll', handleResize, true);
-
-    const resizeObserver = new ResizeObserver(handleResize);
-    const parent = containerRef.current?.parentElement;
-    if (parent) {
-      resizeObserver.observe(parent);
-    } else if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
-    }
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('scroll', handleResize, true);
-      resizeObserver.disconnect();
-    };
-  }, [loading, files.length]);
-
   const handleSelectAll = (checked: boolean) => {
     onSelectAll?.(checked);
   };
@@ -93,14 +54,18 @@ export function FileManagerTable({
   }
 
   return (
+    // The height its parent gives it, both forms: the rows scroll inside, under the header. Not
+    // the window's: whatever is below the parent (a docked composer, a page's padding) would
+    // hide the last rows under it. A parent of no definite height lets the table grow with its rows.
+    // `overflow-hidden` rounds the header and the rows at the border's inner curve: a child rounded
+    // to the frame's own radius sits 1px inside it and leaves a sliver of the frame's fill at each
+    // corner. Nothing floats out of the table (the row menu is portalled).
     <div
-      ref={containerRef}
-      className={cn('flex flex-col rounded-lg border border-ods-border bg-ods-bg', className)}
-      style={tableHeight ? { height: `${tableHeight}px` } : undefined}
+      className={cn('flex h-full flex-col overflow-hidden rounded-lg border border-ods-border bg-ods-bg', className)}
     >
       {/* ONE header in both forms: the column labels are copy, and while the folder is read the select-all box is the
           real checkbox, inert. */}
-      <div className="flex h-12 items-center rounded-t-lg border-b border-ods-border bg-ods-bg-surface px-4">
+      <div className="flex h-12 items-center border-b border-ods-border bg-ods-bg-surface px-4">
         {showCheckboxes && (
           <div
             className={FILE_MANAGER_CHECKBOX_CELL_CLASS}
@@ -124,7 +89,7 @@ export function FileManagerTable({
         <div className={FILE_MANAGER_ACTIONS_CELL_BOX_CLASS}>{/* Space for action buttons */}</div>
       </div>
 
-      <div className="flex-1 divide-y divide-ods-border overflow-auto rounded-b-lg">
+      <div className="flex-1 divide-y divide-ods-border overflow-auto">
         {loading ? (
           // A folder listing has no page size: a typical folder's rows, each the row's own loading form.
           <LoadingItems count={FILE_MANAGER_SKELETON_ROWS}>
