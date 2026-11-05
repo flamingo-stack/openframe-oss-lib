@@ -135,6 +135,18 @@ export function processHistoricalMessages(
       wire.setMessageId(row.id);
     }
     lastRowId = row.id;
+    // The model the turn ran on, as its row names it: what a chat's badge reads after a reload.
+    const { model, modelName, providerName } = row.owner ?? {};
+    if (row.owner?.type === OWNER_TYPE.ASSISTANT && model && providerName) {
+      messages = messages.map(message =>
+        message.id !== turnId
+          ? message
+          : {
+              ...message,
+              metadata: { ...message.metadata, model, modelLabel: modelName || model, provider: providerName },
+            },
+      );
+    }
     if (typeof row.lastChunkStreamSeq === 'number') {
       const seq = row.lastChunkStreamSeq;
       messages = messages.map(message => {

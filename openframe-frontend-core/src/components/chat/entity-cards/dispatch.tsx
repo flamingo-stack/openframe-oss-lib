@@ -1962,8 +1962,7 @@ export function recordDiscussAction(ref: ChatRef, handlers: RecordActionHandlers
 
 /**
  * A record's menu actions in this chat: its "Ask Mingo"/"Display" row and whether the window opens tabs. THE one
- * builder, for the record's card (`ChatCardLoader`) and its chip (`RecordChip`, a host's chip through
- * `useRecordChipMenu`), so the two always offer the same rows.
+ * builder, for the record's card (`ChatCardLoader`) and its chip (`RecordChip`), so the two always offer the same rows.
  */
 export function recordMenuActions(
   ref: ChatRef,

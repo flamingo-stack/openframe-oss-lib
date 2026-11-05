@@ -122,7 +122,10 @@ export interface MessageOwner {
   type: OwnerType;
   machineId?: string;
   userId?: string;
+  /** An assistant row's model id, its label and its provider. */
   model?: string;
+  modelName?: string;
+  providerName?: string;
   user?: {
     id: string;
     firstName?: string;

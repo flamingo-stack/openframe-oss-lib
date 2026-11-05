@@ -40,6 +40,7 @@ import type { ChatRef } from '../chat-ref.types';
 import { useChunkCatchup } from '../hooks/use-chunk-catchup';
 import { useManagedDialogList } from '../hooks/use-managed-dialog-list';
 import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
+import type { ChatDialogSide } from '../stream/chat-dialog-store';
 import type { ChatApprovalStatus, ChunkData } from '../types';
 import type { AssistantType } from '../types/chat.types';
 import type { DialogItem, SlashCommandSummary } from '../types/component.types';
@@ -64,6 +65,7 @@ import {
   withThreadAuthor,
   type ThreadAuthorNames,
 } from '../utils/thread-display';
+import { chatDialogSideKey, createChatDialogSidesStore } from './chat-dialog-sides';
 import { createChatThreadStore, type ChatThreadStore } from './chat-thread-store';
 import type {
   ChatDialogRecord,
@@ -86,6 +88,23 @@ export interface UseChatEngineConfig {
   history?: ChatHistoryBackend;
   /** Where the threads live. Default: a store of the engine's own, for the life of the component. */
   store?: ChatThreadStore<string>;
+  /**
+   * The side of the dialog this engine shows, for a dialog with sides (a ticket's end-user chat beside its technician's).
+   * Its threads are kept under (dialog, side) in a store of dialogs with sides (`createChatDialogSidesStore`), where an
+   * approval answered or a tool run on one side shows on the others. Fixed for the life of the engine.
+   */
+  side?: ChatDialogSide;
+  /**
+   * The dialog is in direct mode as far as the host knows (a person took it over): the thread drops the assistant's
+   * chunks from the moment it is set, before a direct message on the wire says so.
+   */
+  directMode?: boolean;
+  /**
+   * The model the newest answer in the dialog's history ran on is the badge's, before the host's baseline
+   * (`modelProvider`, `modelLabel`): its label, by provider and model id. Without it the badge is the baseline until a
+   * turn names its model.
+   */
+  historyModelLabel?: (provider: string, model: string) => string;
   /**
    * The active dialog in bare-transport mode (no `history.fetchDialogs`): the host's, verbatim, `null` for none. Ignored
    * in managed mode, where the engine owns the selection.
@@ -295,6 +314,17 @@ function maxStreamSeq(messages: readonly ChatMessage[]): number | null {
   return max;
 }
 
+/** The model the newest answer of a thread ran on, as its history row named it. */
+function newestModelOf(messages: readonly ChatMessage[]): { provider: string; model: string } | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const { role, metadata } = messages[i];
+    if (role === 'assistant' && metadata?.provider && metadata.model) {
+      return { provider: metadata.provider, model: metadata.model };
+    }
+  }
+  return null;
+}
+
 export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngineOptions = {}): UnifiedChatState {
   const { active = true } = options;
   const {
@@ -328,6 +358,9 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     tableIdForDocumentType = defaultTableIdForDocumentType,
     avatarUrlOf,
     refresh,
+    side,
+    directMode,
+    historyModelLabel,
   } = config;
   const { fetchDialogs, fetchDialogMessages, fetchArchivedDialogs } = history;
   // The kind is fixed for the engine's life: a live tail is a hook, called on every render or never.
@@ -366,9 +399,14 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   // A dialog a stream's server minted mid-turn: its thread stays under the key the turn writes into (the draft's), until
   // the dialog is left.
   const [mintedAlias, setMintedAlias] = useState<{ dialogId: string; key: string } | null>(null);
+  // A minted alias is a key already (the turn's), side included.
   const keyOfDialog = useCallback(
-    (id: string | null): string => (id ? (mintedAlias?.dialogId === id ? mintedAlias.key : id) : DRAFT_DIALOG_KEY),
-    [mintedAlias],
+    (id: string | null): string => {
+      if (id && mintedAlias?.dialogId === id) return mintedAlias.key;
+      const base = id ?? DRAFT_DIALOG_KEY;
+      return side === undefined ? base : chatDialogSideKey(base, side);
+    },
+    [mintedAlias, side],
   );
 
   // ─── The thread ───────────────────────────────────────────────────────────
@@ -376,9 +414,15 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   // switch), so the engine keeps an instance-lifetime map that tops up every (re)entered dialog.
   const [globalApprovalStatuses] = useState<Record<string, ChatApprovalStatus>>(() => ({}));
   const [ownStore] = useState(() =>
-    createChatThreadStore<string>({ options: () => ({ approvalStatuses: globalApprovalStatuses }) }),
+    side === undefined
+      ? createChatThreadStore<string>({ options: () => ({ approvalStatuses: globalApprovalStatuses }) })
+      : createChatDialogSidesStore({ sides: [side], options: () => ({ approvalStatuses: globalApprovalStatuses }) }),
   );
   const store = config.store ?? ownStore;
+  // A side is kept under (dialog, side): a store that reads its keys as dialog ids would keep every side as a dialog.
+  if (side !== undefined && store.identityOf(chatDialogSideKey(DRAFT_DIALOG_KEY, side)).side !== side) {
+    throw new Error('[useChatEngine] a `side` needs a store of dialogs with sides (`createChatDialogSidesStore`).');
+  }
   const dialogKey = keyOfDialog(dialogId);
   const dialogKeyRef = useRef(dialogKey);
   useEffect(() => {
@@ -417,6 +461,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   useEffect(() => {
     Object.assign(globalApprovalStatuses, state.approvalStatuses);
   }, [globalApprovalStatuses, state.approvalStatuses]);
+
+  // The direct-mode barrier the host knows of, on the open thread's reducer.
+  useEffect(() => {
+    if (directMode !== undefined) store.mutate(dialogKey, r => r.setDirectMode(directMode));
+  }, [store, dialogKey, directMode]);
 
   const processChunk = useChatChunkProcessor({
     thread: store.bind(dialogKey),
@@ -559,7 +608,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     ...(dialogScopes ? { scope: dialogScope } : {}),
     logTag: '[useChatEngine]',
     onDialogRemoved: (id, reason) => {
-      if (reason === 'deleted') store.drop(id);
+      if (reason === 'deleted') store.drop(keyOfDialogRef.current(id));
       if (isManagedMode) leaveDialogRef.current(id);
     },
   });
@@ -785,7 +834,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     if (!active || !dialogId || !backfills) return;
     // A dead tail replays its APPROVAL_RESULT / EXECUTING_TOOL chunks on every open, and its releasing MESSAGE_END
     // never replays: the agent-busy lock is suppressed for the replay window (a counter: windows can overlap).
-    store.mutate(dialogId, r => r.adjustAgentBusySuppression(1));
+    const key = keyOfDialogRef.current(dialogId);
+    store.mutate(key, r => r.adjustAgentBusySuppression(1));
     resetChunkTracking();
     startInitialBuffering();
     catchUpChunks()
@@ -793,7 +843,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         console.error('[useChatEngine] initial catchup failed:', err);
       })
       .finally(() => {
-        store.mutate(dialogId, r => {
+        store.mutate(key, r => {
           r.adjustAgentBusySuppression(-1);
           // A replay that produced no MESSAGE_START must not leave adoption armed for the next genuine turn.
           r.armAdoptTrailingAssistant(false);
@@ -810,7 +860,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       return;
     }
     const reconnectDialogId = dialogId;
-    if (reconnectDialogId) store.mutate(reconnectDialogId, r => r.adjustAgentBusySuppression(1));
+    const reconnectKey = reconnectDialogId ? keyOfDialogRef.current(reconnectDialogId) : null;
+    if (reconnectKey) store.mutate(reconnectKey, r => r.adjustAgentBusySuppression(1));
     startInitialBuffering();
     void (async () => {
       try {
@@ -820,8 +871,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       } catch (err) {
         console.error('[useChatEngine] reconnect catchup failed:', err);
       } finally {
-        if (reconnectDialogId) {
-          store.mutate(reconnectDialogId, r => {
+        if (reconnectKey) {
+          store.mutate(reconnectKey, r => {
             r.adjustAgentBusySuppression(-1);
             // The replayed START was consumed live and is skipped by the replay: clear adoption.
             r.armAdoptTrailingAssistant(false);
@@ -969,7 +1020,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         openDialog(newId);
         currentDialogIdRef.current = newId;
         if (create.prompt && newDialogGreeting) {
-          store.upsertMessage(newId, {
+          store.upsertMessage(keyOfDialogRef.current(newId), {
             id: `welcome-${newId}`,
             role: 'assistant',
             metadata: { createdAt: new Date().toISOString(), author: { name: assistantName, assistantType } },
@@ -1020,8 +1071,9 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       if (!dialogId && !isControlled && portsRef.current.history.createDialog) {
         const newId = await createAndOpenDialog({ prompt: text, sendOptions: send });
         if (!newId) return false;
-        store.pushOptimisticSend(newId, text, { hidden });
-        return publishInto(newId, newId, text, send);
+        const newKey = keyOfDialogRef.current(newId);
+        store.pushOptimisticSend(newKey, text, { hidden });
+        return publishInto(newKey, newId, text, send);
       }
       if (sendSupersedesPending) {
         // Sending over a pending approval interrupts it (the backend answers it rejected a moment later), and over a
@@ -1106,8 +1158,9 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         }
       }
       if (prompt) {
-        store.pushOptimisticSend(newId, prompt);
-        await publishInto(newId, newId, prompt, { hidden: false });
+        const newKey = keyOfDialogRef.current(newId);
+        store.pushOptimisticSend(newKey, prompt);
+        await publishInto(newKey, newId, prompt, { hidden: false });
       }
       return newId;
     },
@@ -1198,6 +1251,12 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   }, [canDisplay, slashCommands, tableIdForDocumentType, sendMessage, logSendFailure]);
 
   const { streamingPhase, dialogTokenUsage = null, liveModel = null } = state;
+  // The model of the newest answer in the history, labelled by the host, when it asks for one.
+  const historyModel = useMemo(() => {
+    if (!historyModelLabel) return null;
+    const newest = newestModelOf(state.messages);
+    return newest ? { provider: newest.provider, modelLabel: historyModelLabel(newest.provider, newest.model) } : null;
+  }, [historyModelLabel, state.messages]);
   const writingMessageId = isStream ? writingMessageOfTurn(state.writingMessageId ?? null) : state.writingMessageId;
   // The thread as drawn: one copy of each card (a live tail's history and its replay both hold them), a row with no
   // author of its own given the chat's voice, and every face a full address.
@@ -1362,9 +1421,10 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       discussRef,
       displayRef,
       reloadHistory,
-      // The model: a live `message-metadata` chunk, else the host's baseline.
-      currentProvider: liveModel?.provider ?? modelProvider ?? null,
-      currentModelLabel: liveModel?.modelLabel ?? modelLabel ?? null,
+      // The model: a live `message-metadata` chunk, else the newest answer's in the history (`historyModelLabel`), else
+      // the host's baseline.
+      currentProvider: liveModel?.provider ?? historyModel?.provider ?? modelProvider ?? null,
+      currentModelLabel: liveModel?.modelLabel ?? historyModel?.modelLabel ?? modelLabel ?? null,
       currentContextWindowMaxTokens: dialogTokenUsage?.contextSize ?? liveModel?.contextWindowMaxTokens ?? null,
       currentInputTokens: turnUsage ? (turnUsage.inputTokens ?? null) : (dialogTokenUsage?.inputTokensSize ?? null),
       currentOutputTokens: turnUsage ? (turnUsage.outputTokens ?? null) : (dialogTokenUsage?.outputTokensSize ?? null),
@@ -1434,6 +1494,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       dialogCapabilities,
       dialogTokenUsage,
       liveModel,
+      historyModel,
       modelProvider,
       modelLabel,
       turnUsage,

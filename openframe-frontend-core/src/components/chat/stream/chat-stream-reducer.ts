@@ -744,13 +744,16 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
   function applyDirectMessage(data: ChatParticipantChunk['data'], seq: number | undefined): void {
     const { text } = data;
     if (!text) return;
-    // Seq-less fallback matches only prior ADMIN-authored twins: a client's
-    // identical text must never suppress the technician's.
+    // A person wrote into the chat: the technician (ADMIN, and a row naming no owner), or the end user (any other
+    // owner), whose reply a ticket's client chat carries beside the technician's.
+    const authorType = data.ownerType && data.ownerType !== OWNER_TYPE.ADMIN ? ('user' as const) : ('admin' as const);
+    // Seq-less fallback matches only prior twins by the same kind of author: an end user's identical text must never
+    // suppress the technician's.
     if (
       typeof seq !== 'number' &&
       hasRecentMessage(
         messages,
-        m => m.role === 'user' && m.metadata?.author?.authorType === 'admin' && textOfParts(m.parts) === text,
+        m => m.role === 'user' && m.metadata?.author?.authorType === authorType && textOfParts(m.parts) === text,
         CONTENT_DEDUP_WINDOW,
       )
     ) {
@@ -764,7 +767,10 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
         metadata: {
           createdAt: nowIso(),
           ...(typeof seq === 'number' ? { streamSeq: seq } : {}),
-          author: { name: data.displayName ?? 'Admin', authorType: 'admin' },
+          author:
+            authorType === 'admin'
+              ? { name: data.displayName ?? 'Admin', authorType }
+              : { ...(data.displayName ? { name: data.displayName } : {}), authorType },
         },
         parts: [{ type: 'text', text }],
       },

@@ -42,17 +42,28 @@ export interface ChatChunkObservers {
 export interface ChatDirectMessageRules {
   /** The owner type the viewer's own direct message comes back as: it draws no row (the optimistic one shows it). */
   ownDirectOwnerType?: string;
+  /**
+   * The signed-in viewer, when people of the same owner type write into one chat (two technicians are both ADMIN): a
+   * direct message that names another author is theirs, and draws its row. One that names no author is the viewer's.
+   * A thunk, read on every chunk.
+   */
+  ownUserId?: () => string | undefined;
   /** What a direct message naming nobody is shown as. */
   otherDisplayName?: string;
 }
 
 function isOwnDirectEcho(chunk: UiChunk, rules: ChatDirectMessageRules): boolean {
-  return (
-    rules.ownDirectOwnerType !== undefined &&
-    chunk.type === 'data-chat-participant' &&
-    chunk.data.kind === 'direct-message' &&
-    chunk.data.ownerType === rules.ownDirectOwnerType
-  );
+  if (
+    rules.ownDirectOwnerType === undefined ||
+    chunk.type !== 'data-chat-participant' ||
+    chunk.data.kind !== 'direct-message' ||
+    chunk.data.ownerType !== rules.ownDirectOwnerType
+  ) {
+    return false;
+  }
+  const author = chunk.data.userId;
+  const own = rules.ownUserId?.();
+  return !author || own === undefined || author === own;
 }
 
 function withOtherName(chunk: UiChunk, rules: ChatDirectMessageRules): UiChunk {
@@ -123,8 +134,6 @@ export interface UseChatChunkProcessorOptions extends ChatDirectMessageRules {
   messages?: readonly ChatMessage[];
   /** Persisted approval statuses, which a replayed approval card consults. */
   approvalStatuses?: Record<string, string>;
-  /** Runs before the thread gets the entry. Return true to claim it (the thread then does not get it). */
-  interceptEntry?: (entry: ChatStreamEntry) => boolean;
   observers?: ChatChunkObservers;
   /** Log what each chunk became (and, for an approval, the parts it left). Read on every chunk. */
   debug?: () => boolean;
@@ -134,16 +143,17 @@ export function useChatChunkProcessor({
   thread,
   messages,
   approvalStatuses,
-  interceptEntry,
   observers,
   ownDirectOwnerType,
+  ownUserId,
   otherDisplayName,
   debug,
 }: UseChatChunkProcessorOptions): (chunk: unknown) => void {
   // Latest-value refs, written after the commit: every reader runs in a subscription callback.
-  const latest = useRef({ thread, interceptEntry, observers, rules: { ownDirectOwnerType, otherDisplayName }, debug });
+  const rules = { ownDirectOwnerType, ownUserId, otherDisplayName };
+  const latest = useRef({ thread, observers, rules, debug });
   useEffect(() => {
-    latest.current = { thread, interceptEntry, observers, rules: { ownDirectOwnerType, otherDisplayName }, debug };
+    latest.current = { thread, observers, rules, debug };
   });
 
   // Both effects below write into a specific reducer INSTANCE, and an eviction replaces it behind an unchanged key. The
@@ -167,7 +177,7 @@ export function useChatChunkProcessor({
   }, [messages, thread, evictionEpoch]);
 
   return useCallback((chunk: unknown) => {
-    const { thread: bound, interceptEntry: intercept, observers: observe, rules, debug: debugOn } = latest.current;
+    const { thread: bound, observers: observe, rules: entryRules, debug: debugOn } = latest.current;
     const entry = bound.decode(chunk);
     const logging = debugOn?.() ?? false;
     if (logging) {
@@ -176,10 +186,9 @@ export function useChatChunkProcessor({
       console.log(`[chat-chunk] ${String(type)} → ${became}`, { chunk, entry });
     }
     if (entry.chunks.length === 0) return;
-    if (intercept?.(entry)) return;
 
-    bound.apply(threadEntryOf(entry, rules));
-    if (observe) observeChatEntry(entry, observe, rules);
+    bound.apply(threadEntryOf(entry, entryRules));
+    if (observe) observeChatEntry(entry, observe, entryRules);
 
     if (logging && entry.chunks.some(decoded => decoded.type === 'tool-approval-request')) {
       bound.mutate(reducer => {

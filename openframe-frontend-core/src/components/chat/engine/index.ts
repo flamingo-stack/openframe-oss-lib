@@ -7,6 +7,12 @@
 
 export { ChatEngineProvider, useChatEngineContext, type ChatEngineProviderProps } from './chat-engine-context';
 export {
+  chatDialogSideKey,
+  chatDialogSideOf,
+  createChatDialogSidesStore,
+  type ChatDialogSidesStoreConfig,
+} from './chat-dialog-sides';
+export {
   createChatThreadStore,
   type BoundChatThread,
   type ChatOptimisticSend,

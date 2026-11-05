@@ -572,7 +572,7 @@ describe('EmbeddableChat - the context gauge', () => {
     expect(screen.getByText(/context budget/).textContent).toMatch(/^40\.6K/);
   });
 
-  it('an older hub sends none: input plus output, as before', () => {
+  it('a turn that states no context size reads input plus output', () => {
     gauge({ currentInputTokens: 12_000, currentOutputTokens: 300 });
     expect(screen.getByText(/context budget/).textContent).toMatch(/^12\.3K/);
   });

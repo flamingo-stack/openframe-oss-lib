@@ -117,18 +117,6 @@ describe('a chat a person writes into', () => {
   });
 });
 
-describe('a host claim', () => {
-  it('an entry the host claims never reaches the thread', () => {
-    const store = createChatThreadStore<string>();
-    const interceptEntry = vi.fn(() => true);
-    const { result } = renderHook(() => useChatChunkProcessor({ thread: store.bind('d'), interceptEntry }));
-    result.current({ type: 'TEXT', text: 'mine', streamSeq: 1 });
-    store.flush();
-    expect(interceptEntry).toHaveBeenCalledOnce();
-    expect(store.snapshotOf('d').messages).toEqual([]);
-  });
-});
-
 describe('an evicted reducer', () => {
   it('is re-seeded from the thread the host holds, and gets the persisted statuses again', () => {
     const store = createChatThreadStore<string>({
