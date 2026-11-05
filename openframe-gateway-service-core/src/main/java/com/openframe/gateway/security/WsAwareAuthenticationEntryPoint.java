@@ -1,8 +1,10 @@
 package com.openframe.gateway.security;
 
 import com.nimbusds.jwt.JWTParser;
+import com.openframe.data.document.audit.AuditEntry;
 import com.openframe.gateway.config.ws.WebSocketServiceSecurityDecorator;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
+import com.openframe.gateway.service.ReactiveAuditRecorder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -14,40 +16,55 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 
-/**
- * Delegates 401 handling to the standard bearer-token entry point, but first makes WebSocket upgrade
- * rejections OBSERVABLE. Without this, an agent presenting an expired JWT is rejected silently
- * (Spring Security 401, nothing in gateway logs, no session ever opens) — from the outside the fleet
- * just "goes offline" one machine at a time as token rotation breaks, and the only evidence is on the
- * endpoints. A WARN log line (path + sub + why) plus the
- * {@code openframe.tenant.gateway.websocket.upgrade.rejected{tool,reason}} counter make that failure
- * mode visible on the gateway within one scrape interval.
- */
+import static com.openframe.data.document.audit.AuditAction.AUTH_TOKEN_FAIL;
+import static com.openframe.data.document.audit.AuditOutcome.FAILURE;
+import static com.openframe.data.document.audit.AuditRequestContext.CLIENT_IP_HEADER;
+import static com.openframe.data.document.audit.AuditRequestContext.REQUEST_ID_HEADER;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class WsAwareAuthenticationEntryPoint implements ServerAuthenticationEntryPoint {
 
     private final GatewayTrafficMetrics gatewayTrafficMetrics;
+    private final ReactiveAuditRecorder auditRecorder;
     private final ServerAuthenticationEntryPoint delegate = new BearerTokenServerAuthenticationEntryPoint();
 
     @Override
     public Mono<Void> commence(ServerWebExchange exchange, AuthenticationException ex) {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getPath().value();
-
+        String rawToken = rawToken(request);
+        String reason = classify(rawToken, ex);
         if (isWebSocketUpgrade(request)) {
-            String rawToken = rawToken(request);
-            String reason = classify(rawToken, ex);
             gatewayTrafficMetrics.recordUpgradeRejected(WebSocketServiceSecurityDecorator.toolFromPath(path), reason);
             log.debug("WS upgrade REJECTED path={} sub={} reason={} : {}",
-                    path, subOf(rawToken), reason, ex.getMessage());
+                    path, claimOf(rawToken, "sub"), reason, ex.getMessage());
         } else {
             log.debug("Request rejected (401) path={} : {}", path, ex.getMessage());
         }
-        return delegate.commence(exchange, ex);
+        String source = Objects.requireNonNullElse(request.getHeaders().getFirst(CLIENT_IP_HEADER), "-");
+        return auditRecorder.recordOnce(tokenFailure(request, path, rawToken, reason), exchange, source)
+                .then(delegate.commence(exchange, ex));
+    }
+
+    private static AuditEntry tokenFailure(ServerHttpRequest request, String path, String rawToken, String reason) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("path", path);
+        details.put("sub", claimOf(rawToken, "sub"));
+        return AuditEntry.builder()
+                .action(AUTH_TOKEN_FAIL)
+                .outcome(FAILURE)
+                .reason(reason)
+                .targetId(request.getHeaders().getFirst(REQUEST_ID_HEADER))
+                .deviceId(claimOf(rawToken, "machine_id"))
+                .details(details)
+                .build();
     }
 
     private static boolean isWebSocketUpgrade(ServerHttpRequest request) {
@@ -56,7 +73,6 @@ public class WsAwareAuthenticationEntryPoint implements ServerAuthenticationEntr
                 || request.getPath().value().startsWith("/ws/");
     }
 
-    /** Low-cardinality reason tag: expired_token / invalid_token / missing_token. */
     private static String classify(String rawToken, AuthenticationException ex) {
         if (rawToken == null) {
             return "missing_token";
@@ -65,17 +81,14 @@ public class WsAwareAuthenticationEntryPoint implements ServerAuthenticationEntr
         return message.contains("expired") ? "expired_token" : "invalid_token";
     }
 
-    /** JWT {@code sub} parsed WITHOUT signature verification — authentication already failed here, so the
-     *  raw token is the only available source; logging/correlation only. */
-    private static String subOf(String rawToken) {
+    private static String claimOf(String rawToken, String name) {
         if (rawToken == null) {
-            return "-";
+            return null;
         }
         try {
-            String sub = JWTParser.parse(rawToken).getJWTClaimsSet().getSubject();
-            return sub == null ? "-" : sub;
+            return JWTParser.parse(rawToken).getJWTClaimsSet().getStringClaim(name);
         } catch (Exception e) {
-            return "-";
+            return null;
         }
     }
 

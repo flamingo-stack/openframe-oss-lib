@@ -93,7 +93,8 @@ public class GatewaySecurityConfig {
             ServerHttpSecurity http,
             ReactiveAuthenticationManagerResolver<ServerWebExchange> issuerResolver,
             AddAuthorizationHeaderFilter addAuthorizationHeaderFilter,
-            WsAwareAuthenticationEntryPoint wsAwareAuthenticationEntryPoint
+            WsAwareAuthenticationEntryPoint wsAwareAuthenticationEntryPoint,
+            AuditAccessDeniedHandler auditAccessDeniedHandler
     ) {
         return http
                 .csrf(CsrfSpec::disable)
@@ -105,6 +106,7 @@ public class GatewaySecurityConfig {
                         // default entry point rejects silently; this one logs/counts WS upgrade rejects
                         .authenticationEntryPoint(wsAwareAuthenticationEntryPoint)
                 )
+                .exceptionHandling(exceptions -> exceptions.accessDeniedHandler(auditAccessDeniedHandler))
                 .addFilterBefore(addAuthorizationHeaderFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(HttpMethod.OPTIONS,    "/**").permitAll()

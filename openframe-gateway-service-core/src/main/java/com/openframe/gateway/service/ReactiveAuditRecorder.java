@@ -1,18 +1,17 @@
 package com.openframe.gateway.service;
 
 import com.openframe.data.document.audit.AuditActor;
-import com.openframe.data.document.audit.AuditActorType;
 import com.openframe.data.document.audit.AuditEntry;
-import com.openframe.data.document.audit.AuditEvent;
-import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.user.User;
-import com.openframe.data.reactive.repository.audit.ReactiveAuditEventRepository;
-import com.openframe.data.reactive.repository.device.ReactiveMachineRepository;
-import com.openframe.data.reactive.repository.user.ReactiveUserRepository;
+import com.openframe.data.document.audit.AuditSource;
+import com.openframe.data.reactive.repository.apikey.ReactiveApiKeyRepository;
+import com.openframe.data.reactive.service.ReactiveAuditEventWriter;
+import com.openframe.data.repository.redis.ReactiveAuditOnceRepository;
+import com.openframe.data.service.AuditTenants;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
+import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -21,145 +20,106 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
-import java.time.Instant;
+import java.time.Duration;
 import java.util.Objects;
-import java.util.stream.Stream;
 
+import static com.openframe.core.constants.HttpHeaders.X_API_KEY_ID;
+import static com.openframe.core.constants.HttpHeaders.X_USER_ID;
 import static com.openframe.data.document.audit.AuditRequestContext.CLIENT_IP_HEADER;
 import static com.openframe.data.document.audit.AuditRequestContext.REQUEST_ID_HEADER;
 import static com.openframe.data.document.audit.AuditRequestContext.SESSION_CLAIM;
-import static java.util.stream.Collectors.joining;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class ReactiveAuditRecorder {
 
-    private final ReactiveAuditEventRepository auditEventRepository;
-    private final ReactiveUserRepository userRepository;
-    private final ReactiveMachineRepository machineRepository;
-    private final ObjectMapper objectMapper;
-    private final String superTenantId;
+    private static final Duration ONCE_WINDOW = Duration.ofMinutes(1);
 
-    public ReactiveAuditRecorder(ReactiveAuditEventRepository auditEventRepository,
-                                 ReactiveUserRepository userRepository,
-                                 ReactiveMachineRepository machineRepository,
-                                 ObjectMapper objectMapper,
-                                 @Value("${openframe.security.jwt.super-tenant-id}") String superTenantId) {
-        this.auditEventRepository = auditEventRepository;
-        this.userRepository = userRepository;
-        this.machineRepository = machineRepository;
-        this.objectMapper = objectMapper;
-        this.superTenantId = superTenantId;
-    }
+    private final ReactiveApiKeyRepository apiKeyRepository;
+    private final ReactiveAuditOnceRepository auditOnceRepository;
+    private final AuditTenants auditTenants;
+    private final ReactiveAuditEventWriter writer;
 
     public Mono<Void> record(AuditEntry entry, ServerWebExchange exchange) {
-        Assert.notNull(entry.getAction(), "action is required");
-        Assert.notNull(entry.getOutcome(), "outcome is required");
-        return currentJwt()
-                .flatMap(jwt -> buildEvent(entry, exchange, actorOf(jwt), jwt.getClaimAsString(SESSION_CLAIM)))
-                .switchIfEmpty(Mono.defer(() -> buildEvent(entry, exchange, AuditActor.system(), null)))
-                .flatMap(this::save);
+        return callerOf(exchange).flatMap(caller -> write(entry, exchange, caller));
     }
 
-    private Mono<AuditEvent> buildEvent(AuditEntry entry, ServerWebExchange exchange, AuditActor actor,
-                                        String sessionId) {
-        return nameOf(actor)
-                .map(name -> event(entry, exchange, actor, sessionId, name))
-                .switchIfEmpty(Mono.fromSupplier(() -> event(entry, exchange, actor, sessionId, null)));
+    public Mono<Void> record(AuditEntry entry, ServerWebExchange exchange, AuditActor actor) {
+        return write(entry, exchange, new Caller(actor, null));
     }
 
-    private AuditEvent event(AuditEntry entry, ServerWebExchange exchange, AuditActor actor, String sessionId,
-                             String actorName) {
+    public Mono<Void> recordOnce(AuditEntry entry, ServerWebExchange exchange, String key) {
+        return callerOf(exchange).flatMap(caller -> writeOnce(entry, exchange, caller, key));
+    }
+
+    public Mono<Void> recordOnce(AuditEntry entry, ServerWebExchange exchange, AuditActor actor, String key) {
+        return writeOnce(entry, exchange, new Caller(actor, null), key);
+    }
+
+    private record Caller(AuditActor actor, String sessionId) {
+    }
+
+    private Mono<Void> writeOnce(AuditEntry entry, ServerWebExchange exchange, Caller caller, String key) {
+        String onceKey = entry.getAction().getName() + ":" + key + ":"
+                + Objects.requireNonNullElse(caller.actor().id(), "-");
+        return auditOnceRepository.claim(onceKey, ONCE_WINDOW, TenantRoutingHeaders.tenantId(exchange.getRequest()))
+                .onErrorResume(DataAccessException.class, e -> {
+                    log.error("Audit dedupe lookup failed, the event is recorded", e);
+                    return Mono.just(true);
+                })
+                .flatMap(first -> first ? write(entry, exchange, caller) : Mono.empty());
+    }
+
+    private Mono<Void> write(AuditEntry entry, ServerWebExchange exchange, Caller caller) {
         ServerHttpRequest request = exchange.getRequest();
-        return AuditEvent.builder()
-                .id(AuditEvent.newId())
-                .schemaVersion(AuditEvent.SCHEMA_VERSION)
-                .occurredAt(Instant.now())
-                .action(entry.getAction().getName())
-                .outcome(entry.getOutcome())
-                .reason(entry.getReason())
-                .actorType(actor.type())
-                .actorId(actor.id())
-                .actorName(actorName)
-                .actorEmail(actor.email())
-                .roleSnapshot(actor.roles())
-                .originTool(entry.getOriginTool())
-                .sourceIp(request.getHeaders().getFirst(CLIENT_IP_HEADER))
-                .userAgent(request.getHeaders().getFirst(HttpHeaders.USER_AGENT))
-                .sessionId(sessionId)
-                .correlationId(request.getHeaders().getFirst(REQUEST_ID_HEADER))
-                .parentEventId(entry.getParentEventId())
-                .tenantId(tenantOf(entry, actor, request))
-                .organizationId(entry.getOrganizationId())
-                .deviceId(entry.getDeviceId())
-                .targetType(Objects.requireNonNullElse(entry.getTargetType(), entry.getAction().getTargetType()))
-                .targetId(entry.getTargetId())
-                .targetName(entry.getTargetName())
-                .details(entry.getDetails())
-                .changes(entry.getChanges())
-                .build();
+        HttpHeaders headers = request.getHeaders();
+        AuditSource source = new AuditSource(headers.getFirst(CLIENT_IP_HEADER), headers.getFirst(HttpHeaders.USER_AGENT),
+                headers.getFirst(REQUEST_ID_HEADER), caller.sessionId());
+        String routedTenantId = TenantRoutingHeaders.tenantId(request);
+        String tenantId = caller.actor().tenantFor(entry.getTenantId(), auditTenants.superTenantId(),
+                () -> StringUtils.hasText(routedTenantId) ? routedTenantId : auditTenants.servedTenantId());
+        return writer.write(entry, caller.actor(), source, tenantId);
+    }
+
+    private Mono<Caller> callerOf(ServerWebExchange exchange) {
+        return currentJwt()
+                .map(jwt -> new Caller(actorOf(jwt), jwt.getClaimAsString(SESSION_CLAIM)))
+                .switchIfEmpty(Mono.defer(() -> actorOfApiKey(exchange.getRequest())
+                        .defaultIfEmpty(AuditActor.system())
+                        .map(actor -> new Caller(actor, null))));
     }
 
     private AuditActor actorOf(Jwt jwt) {
         AuthPrincipal principal = AuthPrincipal.fromJwt(jwt);
-        return AuditActor.fromToken(principal.getRoles(), principal.getId(), principal.getEmail(),
-                principal.getTenantId(), principal.getMachineId(), superTenantId);
+        return principal.getActorType() == ActorType.AGENT
+                ? AuditActor.fromAgent(principal.getMachineId(), principal.getRoles(), principal.getTenantId())
+                : AuditActor.fromUser(principal.getId(), principal.getEmail(), principal.getRoles(),
+                        principal.getTenantId(), auditTenants.superTenantId());
     }
 
-    private Mono<String> nameOf(AuditActor actor) {
-        if (actor.isPerson()) {
-            return userRepository.findById(actor.id()).map(ReactiveAuditRecorder::fullName);
+    private Mono<AuditActor> actorOfApiKey(ServerHttpRequest request) {
+        String keyId = request.getHeaders().getFirst(X_API_KEY_ID);
+        if (!StringUtils.hasText(keyId)) {
+            return Mono.empty();
         }
-        if (actor.type() == AuditActorType.DEVICE) {
-            return machineRepository.findByMachineId(actor.id()).map(Machine::getHostname);
-        }
-        return Mono.empty();
-    }
-
-    private String tenantOf(AuditEntry entry, AuditActor actor, ServerHttpRequest request) {
-        if (StringUtils.hasText(entry.getTenantId())) {
-            return entry.getTenantId();
-        }
-        String tokenTenantId = actor.tokenTenantId();
-        if (StringUtils.hasText(tokenTenantId) && !superTenantId.equals(tokenTenantId)) {
-            return tokenTenantId;
-        }
-        return Objects.requireNonNullElse(TenantRoutingHeaders.tenantId(request), superTenantId);
-    }
-
-    private Mono<Void> save(AuditEvent event) {
-        return auditEventRepository.insert(event)
-                .then()
+        String ownerId = request.getHeaders().getFirst(X_USER_ID);
+        return apiKeyRepository.findById(keyId)
                 .onErrorResume(DataAccessException.class, e -> {
-                    log.error("Audit event not stored: {}", asJson(event), e);
+                    log.error("Audit lookup failed, the event is stored without its result", e);
                     return Mono.empty();
-                });
-    }
-
-    private String asJson(AuditEvent event) {
-        try {
-            return objectMapper.writeValueAsString(event);
-        } catch (JacksonException e) {
-            return event.toString();
-        }
-    }
-
-    private static String fullName(User user) {
-        return Stream.of(user.getFirstName(), user.getLastName())
-                .filter(StringUtils::hasText)
-                .collect(joining(" "));
+                })
+                .map(key -> AuditActor.fromApiKey(keyId, key.getName(), key.getRoles(), key.getTenantId(), ownerId))
+                .defaultIfEmpty(AuditActor.fromApiKey(keyId, null, null, null, ownerId));
     }
 
     private static Mono<Jwt> currentJwt() {
         return ReactiveSecurityContextHolder.getContext()
-                .map(SecurityContext::getAuthentication)
+                .mapNotNull(SecurityContext::getAuthentication)
                 .filter(JwtAuthenticationToken.class::isInstance)
                 .cast(JwtAuthenticationToken.class)
                 .map(JwtAuthenticationToken::getToken);

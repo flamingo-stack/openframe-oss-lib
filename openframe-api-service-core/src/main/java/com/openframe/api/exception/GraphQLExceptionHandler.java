@@ -1,13 +1,15 @@
 package com.openframe.api.exception;
 
-import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.core.exception.BaseException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.audit.AuditEntry;
 import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.loki.client.LokiQueryRejectedException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
+import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.security.authentication.AccessDeniedErrorCode;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
@@ -16,6 +18,7 @@ import graphql.execution.ResultPath;
 import graphql.execution.SimpleDataFetcherExceptionHandler;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.access.AccessDeniedException;
@@ -24,9 +27,15 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.data.document.audit.AuditAction.AUTH_ACCESS_DENY;
+import static com.openframe.data.document.audit.AuditOutcome.REFUSED;
+
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
+
+    private final AuditRecorder auditRecorder;
 
     @Override
     public CompletableFuture<DataFetcherExceptionHandlerResult> handleException(
@@ -37,6 +46,14 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
         if (exception instanceof AccessDeniedException) {
             ErrorCode code = AccessDeniedErrorCode.forCurrentCaller();
             log.warn("GraphQL access denied ({}): {}", code.getCode(), exception.getMessage());
+            auditRecorder.record(AuditEntry.builder()
+                    .action(AUTH_ACCESS_DENY)
+                    .outcome(REFUSED)
+                    .reason(code.getCode())
+                    .targetId(path.toString())
+                    .details(Map.of("operation", handlerParameters.getDataFetchingEnvironment()
+                            .getOperationDefinition().getOperation().name()))
+                    .build());
             return result(buildError(AccessDeniedErrorCode.MESSAGE, code), path);
         }
         if (exception instanceof InvalidRelayIdException) {

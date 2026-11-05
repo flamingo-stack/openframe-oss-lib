@@ -51,13 +51,13 @@ public class ApiKeyValidationService {
                 .map(apiKey -> {
                     if (!apiKey.isActive()) {
                         log.warn("API key is not active or expired: {}", parsed.keyId());
-                        return ApiKeyValidationResult.invalid("API key is not active or expired");
+                        return ApiKeyValidationResult.invalid("API key is not active or expired", parsed.keyId(), apiKey);
                     }
 
                     if (!passwordEncoder.matches(parsed.secret(), apiKey.getHashedKey())) {
                         log.warn("Invalid secret for API key: {}", parsed.keyId());
                         apiKeyStatsService.incrementFailed(parsed.keyId(), tenantId);
-                        return ApiKeyValidationResult.invalid("Invalid API key secret");
+                        return ApiKeyValidationResult.invalid("Invalid API key secret", parsed.keyId(), apiKey);
                     }
 
                     log.debug("API key validation successful for: {}", parsed.keyId());
@@ -65,11 +65,11 @@ public class ApiKeyValidationService {
                 })
                 .switchIfEmpty(Mono.defer(() -> {
                     log.warn("API key not found: {}", parsed.keyId());
-                    return Mono.just(ApiKeyValidationResult.invalid("API key not found"));
+                    return Mono.just(ApiKeyValidationResult.invalid("API key not found", parsed.keyId(), null));
                 }))
                 .onErrorResume(error -> {
                     log.error("Error during API key validation", error);
-                    return Mono.just(ApiKeyValidationResult.invalid("Internal validation error"));
+                    return Mono.just(ApiKeyValidationResult.invalid("Internal validation error", parsed.keyId(), null));
                 });
     }
     
@@ -154,20 +154,26 @@ public class ApiKeyValidationService {
     public static class ApiKeyValidationResult {
         private final boolean valid;
         private final String errorMessage;
+        private final String keyId;
         private final ApiKey apiKey;
-        
-        private ApiKeyValidationResult(boolean valid, String errorMessage, ApiKey apiKey) {
+
+        private ApiKeyValidationResult(boolean valid, String errorMessage, String keyId, ApiKey apiKey) {
             this.valid = valid;
             this.errorMessage = errorMessage;
+            this.keyId = keyId;
             this.apiKey = apiKey;
         }
-        
+
         public static ApiKeyValidationResult valid(ApiKey apiKey) {
-            return new ApiKeyValidationResult(true, null, apiKey);
+            return new ApiKeyValidationResult(true, null, apiKey.getKeyId(), apiKey);
         }
-        
+
         public static ApiKeyValidationResult invalid(String errorMessage) {
-            return new ApiKeyValidationResult(false, errorMessage, null);
+            return invalid(errorMessage, null, null);
+        }
+
+        public static ApiKeyValidationResult invalid(String errorMessage, String keyId, ApiKey apiKey) {
+            return new ApiKeyValidationResult(false, errorMessage, keyId, apiKey);
         }
     }
 } 

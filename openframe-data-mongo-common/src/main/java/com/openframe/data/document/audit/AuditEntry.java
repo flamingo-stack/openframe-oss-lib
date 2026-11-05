@@ -6,8 +6,9 @@ import lombok.Getter;
 import java.util.Map;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class AuditEntry {
+    private final String id;
     private final AuditAction action;
     private final AuditOutcome outcome;
     private final String reason;

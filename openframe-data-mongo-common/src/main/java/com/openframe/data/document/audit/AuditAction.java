@@ -36,7 +36,7 @@ public enum AuditAction {
     SSO_CONFIG_DELETE("sso.config.delete", CHANGE, SSO_CONFIG),
     SSO_CONFIG_SECRET_VIEW("sso.config_secret.view", SENSITIVE_READ, SSO_CONFIG),
     SSO_IDENTITY_LINK("sso.identity.link", CHANGE, USER),
-    AUTH_PASSWORD_LOGIN_TOGGLE("auth.password_login.toggle", CHANGE, TENANT),
+    AUTH_PASSWORD_LOGIN_TOGGLE("auth.password_login.toggle", CHANGE, SSO_CONFIG),
     AUTH_DOMAIN_POLICY_CHANGE("auth.domain_policy.change", CHANGE, TENANT),
     API_KEY_CREATE("api_key.create", CHANGE, API_KEY),
     API_KEY_UPDATE("api_key.update", CHANGE, API_KEY),

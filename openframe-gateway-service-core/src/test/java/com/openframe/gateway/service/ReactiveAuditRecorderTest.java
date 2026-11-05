@@ -1,5 +1,6 @@
 package com.openframe.gateway.service;
 
+import com.openframe.data.document.apikey.ApiKey;
 import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditActorType;
 import com.openframe.data.document.audit.AuditEntry;
@@ -9,9 +10,12 @@ import com.openframe.data.document.audit.AuditRequestContext;
 import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.user.User;
+import com.openframe.data.mapper.AuditEventMapperImpl;
+import com.openframe.data.reactive.repository.apikey.ReactiveApiKeyRepository;
 import com.openframe.data.reactive.repository.audit.ReactiveAuditEventRepository;
 import com.openframe.data.reactive.repository.device.ReactiveMachineRepository;
 import com.openframe.data.reactive.repository.user.ReactiveUserRepository;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +28,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.server.ServerWebExchange;
@@ -32,6 +37,8 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
+import static com.openframe.core.constants.HttpHeaders.X_API_KEY_ID;
+import static com.openframe.core.constants.HttpHeaders.X_USER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -49,6 +56,8 @@ class ReactiveAuditRecorderTest {
     @Mock private ReactiveAuditEventRepository auditEventRepository;
     @Mock private ReactiveUserRepository userRepository;
     @Mock private ReactiveMachineRepository machineRepository;
+    @Mock private ReactiveApiKeyRepository apiKeyRepository;
+    @Mock private TenantIdProvider tenantIdProvider;
     @Captor private ArgumentCaptor<AuditEvent> eventCaptor;
 
     private ReactiveAuditRecorder recorder;
@@ -56,16 +65,13 @@ class ReactiveAuditRecorderTest {
     @BeforeEach
     void setUp() {
         recorder = new ReactiveAuditRecorder(auditEventRepository, userRepository, machineRepository,
-                new ObjectMapper(), SUPER_TENANT_ID);
+                apiKeyRepository, tenantIdProvider, new AuditEventMapperImpl(), new ObjectMapper(), SUPER_TENANT_ID);
     }
 
     @Test
     void recordsTechnicianActionWithTokenAndHeaders() {
         insertSucceeds();
-        User user = new User();
-        user.setFirstName("Anna");
-        user.setLastName("Kowalski");
-        when(userRepository.findById(USER_ID)).thenReturn(Mono.just(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Mono.just(user("Anna", "Kowalski")));
         ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/api/tickets")
                 .header(AuditRequestContext.CLIENT_IP_HEADER, "203.0.113.24")
                 .header("User-Agent", "Chrome")
@@ -103,7 +109,7 @@ class ReactiveAuditRecorderTest {
 
         AuditEvent event = savedEvent();
         assertThat(event.getActorType()).isEqualTo(AuditActorType.STAFF);
-        assertThat(event.getActorName()).isEmpty();
+        assertThat(event.getActorName()).isNull();
         assertThat(event.getTenantId()).isEqualTo(ROUTED_TENANT_ID);
     }
 
@@ -127,6 +133,29 @@ class ReactiveAuditRecorderTest {
     }
 
     @Test
+    void recordsApiKeyCallWithTheKeyAndItsOwner() {
+        insertSucceeds();
+        ApiKey key = ApiKey.builder().keyId("key-1").name("Billing sync").roles(List.of("ADMIN")).build();
+        when(apiKeyRepository.findById("key-1")).thenReturn(Mono.just(key));
+        when(userRepository.findById(USER_ID)).thenReturn(Mono.just(user("Anna", "Kowalski")));
+        ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.post("/external-api/tickets")
+                .header(X_API_KEY_ID, "key-1")
+                .header(X_USER_ID, USER_ID)
+                .header(TenantRoutingHeaders.TENANT_ID_HEADER, ROUTED_TENANT_ID));
+
+        recorder.record(entry(AuditAction.TICKET_ARCHIVE), exchange).block();
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.API_KEY);
+        assertThat(event.getActorId()).isEqualTo("key-1");
+        assertThat(event.getActorName()).isEqualTo("Billing sync");
+        assertThat(event.getRoleSnapshot()).containsExactly("ADMIN");
+        assertThat(event.getOnBehalfOfId()).isEqualTo(USER_ID);
+        assertThat(event.getOnBehalfOfName()).isEqualTo("Anna Kowalski");
+        assertThat(event.getTenantId()).isEqualTo(ROUTED_TENANT_ID);
+    }
+
+    @Test
     void recordsSystemUnderTheSuperTenantWhenNothingNamesATenant() {
         insertSucceeds();
         ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/tickets"));
@@ -138,7 +167,19 @@ class ReactiveAuditRecorderTest {
         assertThat(event.getActorName()).isNull();
         assertThat(event.getSessionId()).isNull();
         assertThat(event.getTenantId()).isEqualTo(SUPER_TENANT_ID);
-        verifyNoInteractions(userRepository, machineRepository);
+        verifyNoInteractions(userRepository, machineRepository, apiKeyRepository);
+    }
+
+    @Test
+    void recordsSystemWhenTheSecurityContextHoldsNoAuthentication() {
+        insertSucceeds();
+        ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/tickets"));
+
+        recorder.record(entry(AuditAction.AUTH_ACCESS_DENY), exchange)
+                .contextWrite(ReactiveSecurityContextHolder.withSecurityContext(Mono.just(new SecurityContextImpl())))
+                .block();
+
+        assertThat(savedEvent().getActorType()).isEqualTo(AuditActorType.SYSTEM);
     }
 
     @Test
@@ -183,6 +224,13 @@ class ReactiveAuditRecorderTest {
 
     private static AuditEntry entry(AuditAction action) {
         return AuditEntry.builder().action(action).outcome(AuditOutcome.SUCCESS).build();
+    }
+
+    private static User user(String firstName, String lastName) {
+        User user = new User();
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        return user;
     }
 
     private static Jwt jwt(String subject, String email, List<String> roles, String tenantId, String machineId,

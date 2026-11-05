@@ -1,12 +1,16 @@
 package com.openframe.gateway.filter;
 
+import java.util.Map;
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.data.document.apikey.ApiKey;
+import com.openframe.data.document.audit.AuditActor;
+import com.openframe.data.document.audit.AuditEntry;
 import com.openframe.gateway.config.prop.RateLimitProperties;
 import com.openframe.gateway.model.RateLimitStatus;
 import com.openframe.gateway.service.ApiKeyValidationService;
 import com.openframe.gateway.service.RateLimitService;
+import com.openframe.gateway.service.ReactiveAuditRecorder;
 import com.openframe.gateway.tenant.TenantRoutingHeaders;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +24,10 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import static com.openframe.core.constants.HttpHeaders.*;
+import static com.openframe.data.document.audit.AuditAction.API_KEY_AUTH_FAIL;
+import static com.openframe.data.document.audit.AuditAction.API_KEY_RATE_LIMIT_REFUSE;
+import static com.openframe.data.document.audit.AuditOutcome.FAILURE;
+import static com.openframe.data.document.audit.AuditOutcome.REFUSED;
 import static org.springframework.http.HttpStatus.*;
 
 /**
@@ -47,6 +55,7 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
     private final RateLimitService rateLimitService;
     private final RateLimitProperties rateLimitProperties;
     private final ObjectMapper objectMapper;
+    private final ReactiveAuditRecorder auditRecorder;
 
     /**
      * Multi-tenant routing mode. When true the trusted {@code X-Tenant-Id} header is guaranteed by the
@@ -105,7 +114,8 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
                                                ServerWebExchange exchange, GatewayFilterChain chain, String path, String tenantId) {
         if (!validationResult.isValid()) {
             log.warn("Invalid API key for path {}: {}", path, validationResult.getErrorMessage());
-            return handleUnauthorized(exchange, validationResult.getErrorMessage());
+            return auditRecorder.record(authFailure(validationResult, path), exchange, AuditActor.system(ownerOf(validationResult)))
+                    .then(handleUnauthorized(exchange, validationResult.getErrorMessage()));
         }
 
         ApiKey apiKeyObj = validationResult.getApiKey();
@@ -123,7 +133,7 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
     private Mono<Void> processRateLimitCheck(Boolean allowed, String keyId, ServerWebExchange exchange,
                                              GatewayFilterChain chain, ApiKey apiKeyObj, String path, String tenantId) {
         if (!allowed) {
-            return processRateLimitExceeded(keyId, exchange, path, tenantId);
+            return processRateLimitExceeded(apiKeyObj, exchange, path, tenantId);
         }
 
         return processAllowedRequest(keyId, exchange, chain, apiKeyObj, tenantId);
@@ -132,13 +142,47 @@ public class ApiKeyAuthenticationFilter implements GlobalFilter, Ordered {
     /**
      * Process rate limit exceeded scenario
      */
-    private Mono<Void> processRateLimitExceeded(String keyId, ServerWebExchange exchange, String path, String tenantId) {
+    private Mono<Void> processRateLimitExceeded(ApiKey apiKey, ServerWebExchange exchange, String path, String tenantId) {
+        String keyId = apiKey.getKeyId();
         return rateLimitService.getRateLimitStatus(keyId, tenantId)
                 .flatMap(rateLimitStatus -> {
                     log.warn("Rate limit exceeded for API key: {} on path: {}", keyId, path);
                     apiKeyValidationService.recordFailedRequest(keyId, tenantId);
-                    return handleRateLimitExceeded(exchange, rateLimitStatus);
+                    AuditActor actor = AuditActor.fromApiKey(keyId, apiKey.getName(), apiKey.getRoles(),
+                            apiKey.getTenantId(), apiKey.getUserId());
+                    return auditRecorder.recordOnce(rateLimitRefusal(apiKey, path, rateLimitStatus), exchange, actor, keyId)
+                            .then(handleRateLimitExceeded(exchange, rateLimitStatus));
                 });
+    }
+
+    private static AuditEntry authFailure(ApiKeyValidationService.ApiKeyValidationResult result, String path) {
+        ApiKey apiKey = result.getApiKey();
+        return AuditEntry.builder()
+                .action(API_KEY_AUTH_FAIL)
+                .outcome(FAILURE)
+                .reason(result.getErrorMessage())
+                .targetId(result.getKeyId())
+                .targetName(apiKey == null ? null : apiKey.getName())
+                .details(Map.of("path", path))
+                .build();
+    }
+
+    private static String ownerOf(ApiKeyValidationService.ApiKeyValidationResult result) {
+        return result.getApiKey() == null ? null : result.getApiKey().getUserId();
+    }
+
+    private static AuditEntry rateLimitRefusal(ApiKey apiKey, String path, RateLimitStatus status) {
+        return AuditEntry.builder()
+                .action(API_KEY_RATE_LIMIT_REFUSE)
+                .outcome(REFUSED)
+                .reason("RATE_LIMIT_EXCEEDED")
+                .targetId(apiKey.getKeyId())
+                .targetName(apiKey.getName())
+                .details(Map.of("path", path,
+                        "minuteExceeded", status.isMinuteExceeded(),
+                        "hourExceeded", status.isHourExceeded(),
+                        "dayExceeded", status.isDayExceeded()))
+                .build();
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.openframe.api.exception;
 
 import com.openframe.api.dto.device.DeviceLogFilterInput;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
@@ -52,7 +53,7 @@ class GraphQLExceptionHandlerTest {
     private static final String UNEXPECTED = "An unexpected error occurred. Please try again later.";
     private static final String WRONG_TYPE_ID = "Expected a Ticket id, got Tag";
 
-    private final GraphQLExceptionHandler handler = new GraphQLExceptionHandler();
+    private final GraphQLExceptionHandler handler = new GraphQLExceptionHandler(mock(AuditRecorder.class));
 
     @AfterEach
     void signOut() {
