@@ -1,5 +1,6 @@
 'use client';
 
+import { cn } from '../../utils/cn';
 import { personFirstName } from '../../utils/format';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { AvatarStack } from './avatar-stack';
@@ -48,6 +49,11 @@ export interface PersonCellProps {
   size?: 'sm' | 'lg';
   /** The person is still being read: the cell draws its skeleton at its size. A loading scope does the same. */
   loading?: boolean;
+  /**
+   * `2` (default): the name and its second line. `1`: the name alone, one line, with the second line in a tooltip:
+   * for a table whose rows are one line in every column but the first.
+   */
+  lines?: 1 | 2;
 }
 
 const PERSON_CELL_SIZE = {
@@ -67,11 +73,29 @@ export function PersonCell({
   actionTitle,
   size = 'sm',
   loading,
+  lines = 2,
 }: PersonCellProps) {
   // In a page's loading state (or while the host reads the person) the cell is its skeleton.
-  if (useLoadingScope() || loading) return <PersonCellSkeleton size={size} />;
+  if (useLoadingScope() || loading) return <PersonCellSkeleton size={size} lines={lines} />;
   const displayName = name || fallbackName;
   const scale = PERSON_CELL_SIZE[size];
+  if (lines === 1) {
+    const oneLine = (
+      <div className={`${PERSON_ROW_CLASS} ${scale.gap}`}>
+        <SquareAvatar size={scale.avatar} src={avatarUrl ?? undefined} alt={displayName} fallback={displayName} />
+        <TruncateText variant={scale.primary} className="min-w-0 flex-1">
+          {displayName}
+        </TruncateText>
+      </div>
+    );
+    return secondary ? (
+      <FloatingTooltip content={`${displayName} · ${secondary}`} triggerClassName="min-w-0 max-w-full">
+        {oneLine}
+      </FloatingTooltip>
+    ) : (
+      oneLine
+    );
+  }
   const row = (
     <div className={`group/person-cell ${PERSON_ROW_CLASS} ${scale.gap}`}>
       <SquareAvatar size={scale.avatar} src={avatarUrl ?? undefined} alt={displayName} fallback={displayName} />
@@ -104,14 +128,20 @@ export function PersonCell({
 }
 
 /** The cell while it loads: the SAME avatar box, gap and two lines (the name's type step, then the caption's). */
-function PersonCellSkeleton({ size = 'sm' }: { size?: PersonCellProps['size'] }) {
+function PersonCellSkeleton({
+  size = 'sm',
+  lines = 2,
+}: {
+  size?: PersonCellProps['size'];
+  lines?: PersonCellProps['lines'];
+}) {
   const scale = PERSON_CELL_SIZE[size];
   return (
     <div className={`${PERSON_ROW_CLASS} ${scale.gap}`} aria-hidden>
       <SquareAvatar loading size={scale.avatar} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TextLineSkeleton type={scale.primary} className="w-3/4" />
-        <TextLineSkeleton type="h6" className="w-1/2" />
+        {lines === 2 ? <TextLineSkeleton type="h6" className="w-1/2" /> : null}
       </div>
     </div>
   );
@@ -130,14 +160,16 @@ export interface PeopleCellProps {
   people: PeopleCellPerson[];
   /** Shown when the list is empty — the same slot `PersonCell` fills. */
   fallbackName?: string;
+  /** `1`: one line for one person or several (see `PersonCellProps.lines`). */
+  lines?: 1 | 2;
 }
 
 /** Positions the multi-person stack reserves: two faces, or one face and "+N". */
 const PEOPLE_CELL_STACK_SLOTS = 2;
 
-export function PeopleCell({ people, fallbackName = 'Unassigned' }: PeopleCellProps) {
+export function PeopleCell({ people, fallbackName = 'Unassigned', lines = 2 }: PeopleCellProps) {
   // In a page's loading state the people are read: the cell is a person cell's skeleton.
-  if (useLoadingScope()) return <PersonCellSkeleton />;
+  if (useLoadingScope()) return <PersonCellSkeleton lines={lines} />;
   if (people.length <= 1) {
     const [person] = people;
     return (
@@ -146,6 +178,7 @@ export function PeopleCell({ people, fallbackName = 'Unassigned' }: PeopleCellPr
         avatarUrl={person?.avatarUrl}
         secondary={person ? person.secondary : undefined}
         fallbackName={fallbackName}
+        lines={lines}
       />
     );
   }
@@ -163,7 +196,12 @@ export function PeopleCell({ people, fallbackName = 'Unassigned' }: PeopleCellPr
             people={people.map(p => ({ key: p.key, name: p.name || 'Unknown', avatarUrl: p.avatarUrl }))}
           />
         </div>
-        <p className="line-clamp-2 min-w-0 flex-1 break-words text-ods-text-primary text-h6">
+        <p
+          className={cn(
+            'min-w-0 flex-1 break-words text-ods-text-primary text-h6',
+            lines === 1 ? 'line-clamp-1' : 'line-clamp-2',
+          )}
+        >
           <span aria-hidden>{people.map(p => personFirstName(p.name, 'Unknown')).join(' & ')}</span>
           <span className="sr-only">{fullNames}</span>
         </p>

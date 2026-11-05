@@ -3,7 +3,7 @@
 /**
  * DesignDocCard (pure presentation) — a design doc as the entity card every surface shows it with: the full card
  * (`default`, the `RoadmapCard` layout without its image slot, since a doc has no image of its own and a constant glyph
- * says nothing: title, DRI and date, readiness (the hub's own wording, `design-doc-readiness`), summary, sign-off caption and the people) for admin surfaces, and the chat's compact card (`DesignDocChatCard` in `dispatch.tsx`, which reads
+ * says nothing: title, DRI and date, its status (the status a person set, else its readiness: the hub's own wording, `design-doc-readiness`), summary, sign-off caption and the people) for admin surfaces, and the chat's compact card (`DesignDocChatCard` in `dispatch.tsx`, which reads
  * the same readiness and meta). The card writes no click logic beyond its `href` anchor.
  */
 
@@ -12,15 +12,11 @@ import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
 import { cn } from '../../../utils/cn';
 import { formatDateShort } from '../../../utils/date-formatters';
-import {
-  DESIGN_DOC_READINESS_DISPLAY,
-  designDocReadiness,
-  formatCompletionLabelWithBlockers,
-} from '../../../utils/design-doc-readiness';
+import { designDocStatusDisplay, formatCompletionLabelWithBlockers } from '../../../utils/design-doc-readiness';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { StatusBadge } from '../../ui/status-badge';
+import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
 import { safeHref } from '../utils/compact-card-classes';
 import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 
@@ -102,7 +98,7 @@ function DesignDocCardSkeleton({ className }: { className?: string } = {}) {
 }
 
 export function DesignDocCard({ doc, href, target, rel, className }: DesignDocCardProps) {
-  const readiness = DESIGN_DOC_READINESS_DISPLAY[designDocReadiness(doc.completion)];
+  const status = designDocStatusDisplay(doc);
   const people = designDocPeople(doc);
   const link = safeHref(href ?? null);
   if (useLoadingScope()) return <DesignDocCardSkeleton className={className} />;
@@ -118,15 +114,20 @@ export function DesignDocCard({ doc, href, target, rel, className }: DesignDocCa
           </div>
         </div>
         <StatusBadge
-          text={readiness.label}
-          colorScheme={readiness.scheme}
+          text={status.label}
+          colorScheme={status.scheme as StatusBadgeProps['colorScheme']}
           variant="button"
           singleLine
           className="hidden md:inline-flex"
         />
       </div>
       <div className="md:hidden">
-        <StatusBadge text={readiness.label} colorScheme={readiness.scheme} variant="button" singleLine />
+        <StatusBadge
+          text={status.label}
+          colorScheme={status.scheme as StatusBadgeProps['colorScheme']}
+          variant="button"
+          singleLine
+        />
       </div>
       <div className={DESIGN_DOC_CARD_SUMMARY_ROW}>
         <p className="line-clamp-3 text-ods-text-secondary text-h4">{doc.summary || ''}</p>
