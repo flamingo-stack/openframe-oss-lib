@@ -48,11 +48,7 @@ import {
 } from '../../../types/trust-center';
 import { isAppOriginUrl } from '../../../utils/app-origins';
 import { formatDateShort } from '../../../utils/date-formatters';
-import {
-  DESIGN_DOC_READINESS_DISPLAY,
-  designDocReadiness,
-  formatCompletionLabel,
-} from '../../../utils/design-doc-readiness';
+import { designDocStatusDisplay, formatCompletionLabel } from '../../../utils/design-doc-readiness';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
@@ -91,6 +87,7 @@ import { ActionsMenuDropdown, type ActionsMenuGroup } from '../../ui/actions-men
 import { Button } from '../../ui/button';
 import { FloatingTooltip } from '../../ui/floating-tooltip';
 import { ExternalMediaNotice } from '../../ui/markdown/external-media-notice';
+import { tagVariantForBadgeColor } from '../../ui/tag';
 import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
@@ -1063,9 +1060,9 @@ function CustomerInterviewChatCard({
 }
 
 /**
- * Design doc → the doc glyph, its readiness as the pill (the hub's own wording: "Ready to build" / "Not ready",
- * `design-doc-readiness`) and "DRI · updated · n/m reviews signed off" under the title, all read from the doc's list
- * row, which the hub's card route attaches as `item.doc`. A row without it is a card that did not load.
+ * Design doc → the doc glyph, its status as the pill (the status a person set, else its readiness, both vocabulary rows the hub resolves onto the
+ * doc: `designDocStatusDisplay`) and "DRI · updated · n/m signed off" under the title, all read from the doc's list row, which the hub's card
+ * route attaches as `item.doc`. A row without it is a card that did not load.
  */
 function DesignDocChatCard({
   item,
@@ -1081,13 +1078,17 @@ function DesignDocChatCard({
   const doc = item?.doc;
   if (!doc) return <CardLoadFailure label="Design doc" id={chatRef.id} detail="The design doc did not load" />;
   const displayRef = fetchedItemDisplayRef(item, chatRef);
-  const readiness = DESIGN_DOC_READINESS_DISPLAY[designDocReadiness(doc.completion)];
+  const status = designDocStatusDisplay(doc);
   return (
     <MingoInfoCard
       title={doc.title}
       description={[designDocMetaLine(doc), formatCompletionLabel(doc.completion)].join(' · ')}
       icon={<FileContentIcon size={24} />}
-      status={{ label: readiness.label, variant: readiness.scheme === 'success' ? 'success' : 'grey' }}
+      status={
+        status
+          ? { label: status.label, variant: tagVariantForBadgeColor(status.color_scheme) }
+          : { label: 'Design doc', variant: 'grey' }
+      }
       anchorProps={buildAnchorProps(displayRef.url, isNewTab, displayRef.targetPlatform)}
       menuGroups={recordMenuGroups(displayRef, actions)}
       menuAriaLabel="Design doc actions"
