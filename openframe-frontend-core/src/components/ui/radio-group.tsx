@@ -218,7 +218,9 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                 {/* The row's full height, its content centred whatever the row aligns (a design may top-align the dot with
                     the label); a trailing node can still place itself (`self-start`). */}
                 {option?.trailing && (
-                  <div className="ml-auto flex shrink-0 items-center self-stretch">{option.trailing}</div>
+                  <div data-radio-trailing className="ml-auto flex shrink-0 items-center self-stretch">
+                    {option.trailing}
+                  </div>
                 )}
               </>
             );
@@ -240,6 +242,10 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                   // CheckboxBlock — the border stays put so an unselected row
                   // never flashes "selected" under the cursor.
                   interactive && 'hover:bg-ods-bg-hover active:bg-ods-bg-active',
+                  // A control in `trailing` (a button, a menu) is its own target: on it, the row is not hovered or
+                  // pressed, so the row never looks like what the click will do.
+                  interactive &&
+                    '[&:has([data-radio-trailing]_:active)]:bg-ods-card [&:has([data-radio-trailing]_:hover)]:bg-ods-card',
                   isGrouped
                     ? cn(
                         'bg-ods-card px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs,8px)]',

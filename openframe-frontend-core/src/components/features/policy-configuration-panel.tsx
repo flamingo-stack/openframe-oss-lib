@@ -14,7 +14,13 @@ import { Chevron02DownIcon, ShieldIcon } from '../icons-v2-generated';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { ToolIcon } from '../tool-icon';
 import { Button } from '../ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { APPROVAL_LEVEL_META, APPROVAL_LEVELS, ApprovalLevelView } from './approval-level';
 
@@ -79,16 +85,20 @@ const ApprovalLevelDropdown: FC<{
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" className={contentClassName}>
-      {allowClear && (
-        <DropdownMenuItem onClick={() => onChange(undefined)} className={LEVEL_MENU_ITEM_CLASS}>
-          Clear Global Permission
-        </DropdownMenuItem>
-      )}
       {APPROVAL_LEVELS.map(level => (
         <DropdownMenuItem key={level} onClick={() => onChange(level)} className={LEVEL_MENU_ITEM_CLASS}>
           <LevelOption level={level} />
         </DropdownMenuItem>
       ))}
+      {/* The way back out comes last, apart from the levels. */}
+      {allowClear && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => onChange(undefined)} className={LEVEL_MENU_ITEM_CLASS}>
+            Clear Global Permission
+          </DropdownMenuItem>
+        </>
+      )}
     </DropdownMenuContent>
   </DropdownMenu>
 );
@@ -119,15 +129,13 @@ const PolicyRow: FC<{
         <ToolIcon toolType={policy.toolName} size={16} />
       </div>
 
-      {/* Policy Info — on mobile the approval level stacks below the pattern */}
+      {/* Policy Info — on mobile the approval level stacks below the name */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-[var(--spacing-system-sf)]">
           <div className="flex min-w-0 flex-1 flex-col">
+            {/* The rule's name only: its command pattern is a regex, not something to read. */}
             <p id={nameId} className="truncate text-ods-text-primary text-h4" title={policy.name}>
               {policy.name}
-            </p>
-            <p className="truncate text-ods-text-secondary text-h6" title={policy.commandPattern}>
-              {policy.commandPattern}
             </p>
           </div>
           {editMode && (
@@ -191,11 +199,9 @@ const CategorySection: FC<{
       {/* Category Header */}
       <div
         {...loadingItemProps(props)}
-        className={cn(
-          CATEGORY_HEADER_CLASS,
-          'peer',
-          !loading && 'cursor-pointer transition-colors hover:bg-ods-bg-hover',
-        )}
+        // The row toggles, and says so by lighting its chevron (not the row: a lit row stood apart from the open
+        // category's frame). The bulk dropdown has its own hover, and leaves the chevron alone.
+        className={cn(CATEGORY_HEADER_CLASS, 'group', !loading && 'cursor-pointer')}
         onClick={loading ? undefined : () => onToggle(category.id)}
       >
         {/* Category Icon (static: the host's, else the default shield) */}
@@ -223,7 +229,7 @@ const CategorySection: FC<{
 
         {/* Global Permission column (desktop only) */}
         {editMode ? (
-          <div className="hidden shrink-0 content-md:block" onClick={e => e.stopPropagation()}>
+          <div data-bulk-level className="hidden shrink-0 content-md:block" onClick={e => e.stopPropagation()}>
             <ApprovalLevelDropdown
               value={bulkLevel}
               onChange={handleBulkChange}
@@ -248,7 +254,10 @@ const CategorySection: FC<{
           }}
           leftIcon={<Chevron02DownIcon className={cn(CHEVRON_CLASS, isExpanded && 'rotate-180')} />}
           // 40px on a phone (Figma 4365-22452), 48 from content-md.
-          className="h-auto w-auto shrink-0 rounded-md !p-[var(--spacing-system-xsf)] content-md:!p-[var(--spacing-system-sf)]"
+          className={cn(
+            'h-auto w-auto shrink-0 rounded-md !p-[var(--spacing-system-xsf)] content-md:!p-[var(--spacing-system-sf)]',
+            !loading && 'group-hover:bg-ods-bg-hover group-has-[[data-bulk-level]:hover]:bg-transparent',
+          )}
           aria-label={isExpanded ? 'Collapse' : 'Expand'}
         />
       </div>
@@ -257,15 +266,12 @@ const CategorySection: FC<{
       <div
         style={{
           ...containerStyle,
-          // background-color: the header's hover, in step with the header (`transition-colors`, 150ms).
-          transition: `${containerStyle.transition}, opacity 300ms ease-in-out, visibility 300ms, background-color 150ms cubic-bezier(0.4, 0, 0.2, 1)`,
+          transition: `${containerStyle.transition}, opacity 300ms ease-in-out, visibility 300ms`,
           // visibility drops collapsed content from the tab order and a11y
           // tree; its discrete transition delays hiding until the fade ends.
           visibility: isExpanded ? 'visible' : 'hidden',
         }}
-        // Hovering the header lights the open category whole: the frame around its rules with the header, not the
-        // header alone over an unlit frame.
-        className={cn(isExpanded ? 'opacity-100' : 'opacity-0', !loading && 'peer-hover:bg-ods-bg-hover')}
+        className={isExpanded ? 'opacity-100' : 'opacity-0'}
       >
         <div ref={innerRef} className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
           <div className="overflow-hidden rounded-md border border-ods-border">

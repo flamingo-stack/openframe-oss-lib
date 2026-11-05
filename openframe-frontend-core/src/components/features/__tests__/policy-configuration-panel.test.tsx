@@ -24,7 +24,7 @@ const categories: PermissionCategory[] = [
 const open = () => fireEvent.click(screen.getByRole('button', { name: 'Expand' }));
 
 describe('PolicyConfigurationPanel', () => {
-  it("shows a rule's level with its icon in its colour, and its pattern on one line", () => {
+  it("shows a rule's level with its icon in its colour, and its name without the command regex", () => {
     render(
       <PolicyConfigurationPanel
         categories={categories}
@@ -37,8 +37,8 @@ describe('PolicyConfigurationPanel', () => {
     const [level] = screen.getAllByText('Ask User');
     expect(level?.className).toContain('text-h4');
     expect((level?.previousElementSibling as HTMLElement).className).toContain('text-ods-warning');
-    const pattern = screen.getByTitle('(?i)^(Invoke-WebRequest|wget|curl).*');
-    expect(pattern.className).toContain('truncate');
+    expect(screen.queryByText('(?i)^(Invoke-WebRequest|wget|curl).*')).toBeNull();
+    expect(screen.queryByTitle('(?i)^(Invoke-WebRequest|wget|curl).*')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
   });
 
@@ -64,7 +64,7 @@ describe('PolicyConfigurationPanel', () => {
     expect(tile.className).toContain('text-ods-text-secondary');
   });
 
-  it("lights an open category's rules frame with its header on hover", () => {
+  it('says a category row toggles by lighting its chevron, not the row, and not over the bulk menu', () => {
     render(
       <PolicyConfigurationPanel
         categories={categories}
@@ -73,11 +73,27 @@ describe('PolicyConfigurationPanel', () => {
         onCategoryPermissionChange={() => {}}
       />,
     );
-    open();
     const header = (screen.getByText('File Downloads').parentElement as HTMLElement).parentElement as HTMLElement;
-    const frame = header.nextElementSibling as HTMLElement;
-    expect(header.className).toContain('peer');
-    expect(frame.className).toContain('peer-hover:bg-ods-bg-hover');
+    expect(header.className).toContain('group');
+    expect(header.className).not.toContain('hover:bg-ods-bg-hover');
+    const chevron = screen.getByRole('button', { name: 'Expand' });
+    expect(chevron.className).toContain('group-hover:bg-ods-bg-hover');
+    expect(chevron.className).toContain('group-has-[[data-bulk-level]:hover]:bg-transparent');
+  });
+
+  it('offers the levels first and the way back out last', () => {
+    render(
+      <PolicyConfigurationPanel
+        categories={categories}
+        editMode
+        onPolicyPermissionChange={() => {}}
+        onCategoryPermissionChange={() => {}}
+      />,
+    );
+    const trigger = screen.getByRole('button', { name: 'Set Global Permission' });
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' });
+    const items = screen.getAllByRole('menuitem').map(item => item.textContent);
+    expect(items).toEqual(['Allow', 'Ask User', 'Ask Technician', 'Restrict', 'Clear Global Permission']);
   });
 
   it('while editing, sets rules one by one on a phone: no bulk menu, the tool icon beside the name', () => {
