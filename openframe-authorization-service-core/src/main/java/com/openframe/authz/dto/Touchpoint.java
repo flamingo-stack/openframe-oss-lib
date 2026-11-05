@@ -5,14 +5,11 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Objects;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
-
 /**
- * What a browser tells about where the visitor came from: its first and its last visit, each ad platform's latest
- * click, and the Meta, Reddit and HubSpot cookies. A signup can have several: the signup request, the download and
- * the "email me the link" request; SignupAttribution merges them by time.
+ * What a browser tells about where the visitor came from: the first visit it saw, the last visit (the one this
+ * request happens on: the signup, the download or the "email me the link" request), each ad platform's latest click,
+ * and the Meta, Reddit and HubSpot cookies. A signup can have several, one per request; SignupAttribution merges them
+ * by time.
  */
 @Data
 @Builder(toBuilder = true)
@@ -32,6 +29,7 @@ public class Touchpoint {
 
     private String hutk;
 
+    /** The value of Reddit's {@code _rdt_uuid} cookie. */
     private String rdtUuid;
 
     private String eventId;
@@ -53,20 +51,4 @@ public class Touchpoint {
 
     /** The free text typed when the answer is {@code other}. Sent to HubSpot as the source. */
     private String heardFromOther;
-
-    public int totalLength() {
-        int flat = Stream.of(fbc, fbp, hutk, rdtUuid, eventId, ref, downloadId, heardFrom, heardFromOther)
-                .filter(Objects::nonNull)
-                .mapToInt(String::length)
-                .sum();
-        return IntStream.of(flat,
-                        firstVisit == null ? 0 : firstVisit.totalLength(),
-                        lastVisit == null ? 0 : lastVisit.totalLength(),
-                        latestClicks == null ? 0 : latestClicks.totalLength())
-                .sum();
-    }
-
-    public Touchpoint withoutUrls() {
-        return toBuilder().lastVisit(lastVisit == null ? null : lastVisit.withoutUrls()).build();
-    }
 }

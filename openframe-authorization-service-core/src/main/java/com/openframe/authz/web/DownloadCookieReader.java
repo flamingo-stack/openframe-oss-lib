@@ -13,32 +13,32 @@ import org.springframework.web.util.WebUtils;
 
 import java.net.URLDecoder;
 
-import static com.openframe.core.constants.SignupSourceParams.COOKIE;
-import static com.openframe.core.constants.SignupSourceParams.DOWNLOAD_ID;
-import static com.openframe.core.constants.SignupSourceParams.FBC;
-import static com.openframe.core.constants.SignupSourceParams.FBCLID;
-import static com.openframe.core.constants.SignupSourceParams.FBP;
-import static com.openframe.core.constants.SignupSourceParams.GBRAID;
-import static com.openframe.core.constants.SignupSourceParams.GCLID;
-import static com.openframe.core.constants.SignupSourceParams.LANDED_AT;
-import static com.openframe.core.constants.SignupSourceParams.LANDING_URL;
-import static com.openframe.core.constants.SignupSourceParams.LI_FAT_ID;
-import static com.openframe.core.constants.SignupSourceParams.RDT_CID;
-import static com.openframe.core.constants.SignupSourceParams.RDT_UUID;
-import static com.openframe.core.constants.SignupSourceParams.REF;
-import static com.openframe.core.constants.SignupSourceParams.REFERRER;
-import static com.openframe.core.constants.SignupSourceParams.UTM_CAMPAIGN;
-import static com.openframe.core.constants.SignupSourceParams.UTM_CONTENT;
-import static com.openframe.core.constants.SignupSourceParams.UTM_MEDIUM;
-import static com.openframe.core.constants.SignupSourceParams.UTM_SOURCE;
-import static com.openframe.core.constants.SignupSourceParams.UTM_TERM;
-import static com.openframe.core.constants.SignupSourceParams.WBRAID;
+import static com.openframe.core.constants.DownloadParams.COOKIE;
+import static com.openframe.core.constants.DownloadParams.DOWNLOAD_ID;
+import static com.openframe.core.constants.DownloadParams.FBC;
+import static com.openframe.core.constants.DownloadParams.FBCLID;
+import static com.openframe.core.constants.DownloadParams.FBP;
+import static com.openframe.core.constants.DownloadParams.GBRAID;
+import static com.openframe.core.constants.DownloadParams.GCLID;
+import static com.openframe.core.constants.DownloadParams.LANDED_AT;
+import static com.openframe.core.constants.DownloadParams.LANDING_URL;
+import static com.openframe.core.constants.DownloadParams.LI_FAT_ID;
+import static com.openframe.core.constants.DownloadParams.RDT_CID;
+import static com.openframe.core.constants.DownloadParams.RDT_UUID;
+import static com.openframe.core.constants.DownloadParams.REF;
+import static com.openframe.core.constants.DownloadParams.REFERRER;
+import static com.openframe.core.constants.DownloadParams.UTM_CAMPAIGN;
+import static com.openframe.core.constants.DownloadParams.UTM_CONTENT;
+import static com.openframe.core.constants.DownloadParams.UTM_MEDIUM;
+import static com.openframe.core.constants.DownloadParams.UTM_SOURCE;
+import static com.openframe.core.constants.DownloadParams.UTM_TERM;
+import static com.openframe.core.constants.DownloadParams.WBRAID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 @Slf4j
-public final class SignupSourceCookie {
+public final class DownloadCookieReader {
 
-    private SignupSourceCookie() {
+    private DownloadCookieReader() {
     }
 
     public static Touchpoint read(HttpServletRequest request) {

@@ -1,6 +1,5 @@
 package com.openframe.authz.service.sso;
 
-import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.dto.SsoTenantRegistrationInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
@@ -9,7 +8,6 @@ import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.validation.RegistrationValidationService;
 import com.openframe.authz.service.validation.SsoProviderValidator;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import static com.openframe.authz.security.SsoRegistrationConstants.FLOW_COOKIE_TTL_SECONDS;
@@ -18,13 +16,9 @@ import static com.openframe.authz.security.SsoRegistrationConstants.ONBOARDING_T
 import static java.time.Instant.now;
 import static java.util.UUID.randomUUID;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SsoTenantRegistrationService {
-
-    /** A normal attribution is well under 1KB; the whole signed cookie must stay under the ~4KB browser cap */
-    private static final int MAX_ATTRIBUTION_LENGTH = 2048;
 
     private final SsoCookieCodec ssoCookieCodec;
     private final RegistrationValidationService validationService;
@@ -78,28 +72,10 @@ public class SsoTenantRegistrationService {
                 provider,
                 request.getRedirectTo(),
                 request.isAuthMobile(),
-                boundedAttribution(request.getAttribution()),
+                request.getAttribution(),
                 issuedAt,
                 issuedAt + FLOW_COOKIE_TTL_SECONDS
         );
-    }
-
-    private Touchpoint boundedAttribution(Touchpoint full) {
-        if (full == null) {
-            return null;
-        }
-        Touchpoint attribution = full.toBuilder().firstVisit(null).latestClicks(null).build();
-        if (attribution.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
-            return attribution;
-        }
-        Touchpoint withoutUrls = attribution.withoutUrls();
-        if (withoutUrls.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
-            log.warn("Attribution too large for the SSO cookie ({} chars) — dropping its referrer and landing URL",
-                    attribution.totalLength());
-            return withoutUrls;
-        }
-        log.warn("Attribution too large for the SSO cookie ({} chars) — dropping it", attribution.totalLength());
-        return null;
     }
 
     private String buildRedirectPath(String provider) {

@@ -2,9 +2,9 @@ package com.openframe.core.constants;
 
 import java.util.List;
 
-public final class SignupSourceParams {
+public final class DownloadParams {
 
-    private SignupSourceParams() {
+    private DownloadParams() {
     }
 
     public static final String COOKIE = "of_src";
@@ -31,11 +31,10 @@ public final class SignupSourceParams {
     public static final String CLICKED_AT = "clicked_at";
     public static final String FIRST_VISIT = "first_visit";
     public static final String LAST_VISIT = "last_visit";
-    public static final String LATEST_CLICKS = "latest_clicks";
-    public static final String LATEST_CLICKS_META = LATEST_CLICKS + ".meta";
-    public static final String LATEST_CLICKS_GOOGLE = LATEST_CLICKS + ".google";
-    public static final String LATEST_CLICKS_REDDIT = LATEST_CLICKS + ".reddit";
-    public static final String LATEST_CLICKS_LINKEDIN = LATEST_CLICKS + ".linkedin";
+    public static final String LATEST_CLICKS_META = "latest_clicks.meta";
+    public static final String LATEST_CLICKS_GOOGLE = "latest_clicks.google";
+    public static final String LATEST_CLICKS_REDDIT = "latest_clicks.reddit";
+    public static final String LATEST_CLICKS_LINKEDIN = "latest_clicks.linkedin";
 
     public static final List<String> URLS = List.of(REFERRER, LANDING_URL);
 }

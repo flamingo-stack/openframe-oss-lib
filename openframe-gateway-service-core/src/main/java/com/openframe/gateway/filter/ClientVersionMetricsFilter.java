@@ -2,7 +2,7 @@ package com.openframe.gateway.filter;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.openframe.core.clientversion.AppShellOrigins;
+import com.openframe.core.clientversion.AppOrigins;
 import com.openframe.core.clientversion.ClientIdentity;
 import com.openframe.core.clientversion.ClientIdentityParser;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
@@ -87,7 +87,7 @@ public class ClientVersionMetricsFilter implements GlobalFilter, Ordered {
             record(request, sub, identity.getKind().getLabel(), identity.getShellVersion(), identity.getBundleVersion());
             return;
         }
-        AppShellOrigins.kindOf(request.getHeaders().getFirst(ORIGIN)).ifPresentOrElse(
+        AppOrigins.kindOf(request.getHeaders().getFirst(ORIGIN)).ifPresentOrElse(
                 shell -> record(request, sub, LEGACY_KIND_PREFIX + shell.getLabel(), UNKNOWN_VERSION, UNKNOWN_VERSION),
                 () -> metrics.recordClientRequest(NO_HEADER_KIND, UNKNOWN_VERSION, UNKNOWN_VERSION));
     }

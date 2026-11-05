@@ -258,7 +258,7 @@ class LoginSsoHandlerTest {
     }
 
     @Test
-    void handle_unknownAppUserWithSourceCookie_parksCookieSourceInTicket() throws Exception {
+    void handle_unknownAppUserWithDownloadCookie_parksCookieSourceInTicket() throws Exception {
         when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.empty());
         when(ssoOidcUserService.autoProvisionTenantForDomain("ada@acme.com")).thenReturn(Optional.empty());
         when(ssoIdentityService.subjectOf(eq("google"), anyMap())).thenReturn(Optional.of("g-1"));

@@ -319,7 +319,7 @@ class SsoLoginControllerTest {
 
         assertThat(registeredRequest())
                 .returns(appFields, TenantRegistrationRequest::getAttribution)
-                .returns(ticketCookie, TenantRegistrationRequest::getSourceCookie);
+                .returns(ticketCookie, TenantRegistrationRequest::getDownloadCookie);
     }
 
     private void ticketPeeks(PendingSignup pendingSignup) {

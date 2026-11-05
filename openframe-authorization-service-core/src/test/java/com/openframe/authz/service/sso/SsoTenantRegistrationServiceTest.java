@@ -1,7 +1,5 @@
 package com.openframe.authz.service.sso;
 
-import com.openframe.authz.dto.Click;
-import com.openframe.authz.dto.LatestClicks;
 import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.dto.SsoTenantRegistrationInitRequest;
 import com.openframe.authz.dto.Visit;
@@ -23,11 +21,6 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class SsoTenantRegistrationServiceTest {
 
-    private static final String UTM_SOURCE = "google";
-    private static final String DOWNLOAD_ID = "0b4c5a52-6f0e-4d7b-9a3e-2f1c8d7e6b5a";
-    private static final String REFERRER = "https://www.google.com/";
-    private static final String LANDING_URL = "https://openframe.ai/pricing";
-
     @Mock
     private SsoCookieCodec ssoCookieCodec;
     @Mock
@@ -41,39 +34,13 @@ class SsoTenantRegistrationServiceTest {
     private SsoTenantRegistrationService service;
 
     @Test
-    void startRegistration_noAttribution_cookieCarriesNoAttribution() {
-        assertThat(cookieAttribution(null)).isNull();
-    }
-
-    @Test
-    void startRegistration_attributionAtCookieLimit_cookieCarriesItWhole() {
-        Touchpoint atLimit = attribution(2048 - REFERRER.length() - LANDING_URL.length());
-
-        assertThat(cookieAttribution(atLimit)).isEqualTo(atLimit);
-    }
-
-    @Test
-    void startRegistration_attributionFitsOnlyWithoutUrls_dropsReferrerAndLandingUrl() {
-        Touchpoint bounded = cookieAttribution(attribution(2048));
-
-        assertThat(bounded).isEqualTo(withoutUrls(2048));
-    }
-
-    @Test
-    void startRegistration_attributionTooLargeEvenWithoutUrls_dropsIt() {
-        Touchpoint bounded = cookieAttribution(attribution(2049));
-
-        assertThat(bounded).isNull();
-    }
-
-    @Test
-    void startRegistration_largeFirstVisitAndClicks_cookieCarriesOnlyTheLastVisit() {
-        Touchpoint full = attribution(100).toBuilder()
-                .firstVisit(Visit.builder().utmCampaign("c".repeat(3000)).build())
-                .latestClicks(LatestClicks.builder().meta(Click.builder().fbclid("fb-1").build()).build())
+    void startRegistration_attribution_cookieCarriesItAsSent() {
+        Touchpoint attribution = Touchpoint.builder()
+                .downloadId("0b4c5a52-6f0e-4d7b-9a3e-2f1c8d7e6b5a")
+                .lastVisit(Visit.builder().utmSource("google").referrer("https://www.google.com/").build())
                 .build();
 
-        assertThat(cookieAttribution(full)).isEqualTo(attribution(100));
+        assertThat(cookieAttribution(attribution)).isEqualTo(attribution);
     }
 
     private Touchpoint cookieAttribution(Touchpoint attribution) {
@@ -82,22 +49,5 @@ class SsoTenantRegistrationServiceTest {
         ArgumentCaptor<SsoTenantRegCookiePayload> payload = ArgumentCaptor.forClass(SsoTenantRegCookiePayload.class);
         verify(ssoCookieCodec).encodeTenant(payload.capture());
         return payload.getValue().attribution();
-    }
-
-    private static Touchpoint attribution(int lengthWithoutUrls) {
-        Touchpoint withoutUrls = withoutUrls(lengthWithoutUrls);
-        return withoutUrls.toBuilder()
-                .lastVisit(withoutUrls.getLastVisit().toBuilder().referrer(REFERRER).landingUrl(LANDING_URL).build())
-                .build();
-    }
-
-    private static Touchpoint withoutUrls(int length) {
-        return Touchpoint.builder()
-                .downloadId(DOWNLOAD_ID)
-                .lastVisit(Visit.builder()
-                        .utmSource(UTM_SOURCE)
-                        .utmCampaign("c".repeat(length - UTM_SOURCE.length() - DOWNLOAD_ID.length()))
-                        .build())
-                .build();
     }
 }

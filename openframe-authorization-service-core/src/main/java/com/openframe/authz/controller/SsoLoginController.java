@@ -165,7 +165,7 @@ public class SsoLoginController {
                     .tenantDomain(signupCompletion.tenantDomain().toLowerCase(Locale.ROOT))
                     .emailPreVerified(pendingSignup.emailVerified())
                     .attribution(signupCompletion.attribution())
-                    .sourceCookie(pendingSignup.attribution())
+                    .downloadCookie(pendingSignup.attribution())
                     .build();
 
             var tenant = registrationService.registerTenant(reg);

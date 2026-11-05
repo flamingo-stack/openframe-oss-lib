@@ -6,7 +6,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class AppShellOriginsTest {
+class AppOriginsTest {
 
     @ParameterizedTest
     @CsvSource({
@@ -15,17 +15,17 @@ class AppShellOriginsTest {
             "tauri://localhost,      DESKTOP",
             "http://tauri.localhost, DESKTOP"
     })
-    void kindOf_appShellOrigin_returnsItsKind(String origin, ClientKind kind) {
-        assertThat(AppShellOrigins.kindOf(origin)).contains(kind);
+    void kindOf_appOrigin_returnsItsKind(String origin, ClientKind kind) {
+        assertThat(AppOrigins.kindOf(origin)).contains(kind);
     }
 
     @Test
     void kindOf_webOrigin_returnsEmpty() {
-        assertThat(AppShellOrigins.kindOf("https://openframe.ai")).isEmpty();
+        assertThat(AppOrigins.kindOf("https://openframe.ai")).isEmpty();
     }
 
     @Test
     void kindOf_noOrigin_returnsEmpty() {
-        assertThat(AppShellOrigins.kindOf(null)).isEmpty();
+        assertThat(AppOrigins.kindOf(null)).isEmpty();
     }
 }
