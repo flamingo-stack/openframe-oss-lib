@@ -12,15 +12,17 @@ export interface PdfViewerProps {
   onPreview?: () => void;
   onDownload?: () => void;
   height?: string;
+  /** The document is being read: the viewer draws its loading form. A loading scope does the same. */
+  loading?: boolean;
 }
 
-export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfViewerProps) {
+export function PdfViewer({ src, fileName, onPreview, onDownload, height, loading = false }: PdfViewerProps) {
   const displayName = fileName || 'PDF Document';
   // In a loading scope the document is being read: the frame draws its loading form, never "not available".
-  const inScope = useLoadingScope();
+  const isLoading = useLoadingScope() || loading;
 
   // Historical shape: no src at all → standalone empty state with NO header.
-  if (!src && !inScope) {
+  if (!src && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <AdobePdfIcon className="mb-4 h-16 w-16 text-ods-text-secondary" />
@@ -61,6 +63,7 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
       }
       src={src}
       loadingActionCount={2}
+      loading={loading}
       height={height}
     />
   );

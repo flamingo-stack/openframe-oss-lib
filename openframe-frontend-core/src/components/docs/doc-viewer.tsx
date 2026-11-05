@@ -113,7 +113,7 @@ export interface DocViewerProps {
   /** Base route path for URL navigation. */
   baseRoute: string;
 
-  /** Empty state copy when no doc is selected. */
+  /** What the viewer says when the source holds no documents yet (default "No documents yet."). */
   emptyStateText?: string;
 
   /** Whether to render the doc-search bar (bound to chat). */
@@ -284,11 +284,10 @@ function DocViewerContent({
   const containerBgStyle =
     colorPalette.containerBackground !== 'transparent' ? { backgroundColor: colorPalette.containerBackground } : {};
 
-  const defaultEmptyText =
-    structure.length > 0
-      ? 'Select a document from the sidebar to view'
-      : 'No documents yet. Add content from the admin panel.';
-  const resolvedEmptyText = emptyStateText || defaultEmptyText;
+  // A source with documents and none open asks for one; an empty source says so in the host's words (a reader may
+  // not be the one who adds documents, so the default names no admin screen).
+  const resolvedEmptyText =
+    structure.length > 0 ? 'Select a document from the sidebar to view' : emptyStateText || 'No documents yet.';
 
   // Unified header: title/subtitle route through the canonical (frozen)
   // `PageLayout` `TitleBlock` (text-h2) — same as every other help-center page —

@@ -19,7 +19,9 @@ export interface FigmaEmbedProps {
    */
   height?: string;
   /** iframe loading strategy. Defaults to `"lazy"`; the data-room viewer passes `"eager"`. */
-  loading?: 'eager' | 'lazy';
+  iframeLoading?: 'eager' | 'lazy';
+  /** The document is being read: the embed draws its loading form. A loading scope does the same. */
+  loading?: boolean;
 }
 
 type SlidesView = 'present' | 'browse';
@@ -82,7 +84,7 @@ function SlidesViewToggle({ view, onChange }: { view: SlidesView; onChange: (v: 
  * plain ReactNode) — flipping it recomputes `embedSrc`, and the frame's
  * `EmbedIframe` remounts on the new src exactly as before the extraction.
  */
-export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedProps) {
+export function FigmaEmbed({ url, title, height, iframeLoading = 'lazy', loading = false }: FigmaEmbedProps) {
   const [view, setView] = useState<SlidesView>('present');
   const isSlides = url ? isFigmaSlidesUrl(url) : false;
   const embedSrc = url ? toFigmaEmbedUrl(url, { slidesView: view }) : null;
@@ -126,6 +128,7 @@ export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedP
       }
       src={embedSrc}
       allow="clipboard-write; clipboard-read; fullscreen"
+      iframeLoading={iframeLoading}
       loading={loading}
       height={height}
       allowFullScreen

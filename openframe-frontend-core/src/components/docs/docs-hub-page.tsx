@@ -53,7 +53,7 @@ const defaultGoogleSheetRenderer: DocRenderer = content => (
 );
 
 const defaultFigmaRenderer: DocRenderer = content => (
-  <FigmaEmbed url={content.externalUrl ?? ''} title={content.fileName} loading="eager" />
+  <FigmaEmbed url={content.externalUrl ?? ''} title={content.fileName} iframeLoading="eager" />
 );
 
 const defaultFileRenderer: DocRenderer = content => (

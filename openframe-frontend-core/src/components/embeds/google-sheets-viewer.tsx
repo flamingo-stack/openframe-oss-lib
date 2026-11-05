@@ -11,16 +11,18 @@ export interface GoogleSheetsViewerProps {
   externalUrl: string;
   fileName?: string;
   height?: string;
+  /** The document is being read: the viewer draws its loading form. A loading scope does the same. */
+  loading?: boolean;
 }
 
-export function GoogleSheetsViewer({ externalUrl, fileName, height }: GoogleSheetsViewerProps) {
+export function GoogleSheetsViewer({ externalUrl, fileName, height, loading = false }: GoogleSheetsViewerProps) {
   const displayName = fileName || 'Google Sheet';
   // In a loading scope the document is being read: the frame draws its loading form, never "not configured".
-  const inScope = useLoadingScope();
+  const isLoading = useLoadingScope() || loading;
 
   // Historical shape: no URL at all → standalone empty state with NO header
   // (the frame's empty body keeps the header — that's the figma behavior).
-  if (!externalUrl && !inScope) {
+  if (!externalUrl && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <GoogleSheetsIcon className="mb-4 h-16 w-16 text-ods-text-secondary" />
@@ -48,6 +50,7 @@ export function GoogleSheetsViewer({ externalUrl, fileName, height }: GoogleShee
       }
       src={externalUrl ? toGoogleSheetsEmbedUrl(externalUrl) : null}
       height={height}
+      loading={loading}
     />
   );
 }

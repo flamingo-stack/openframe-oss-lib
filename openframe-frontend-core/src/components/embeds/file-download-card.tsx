@@ -9,6 +9,8 @@ export interface FileDownloadCardProps {
   mimeType?: string;
   fileSize?: number;
   fileUrl?: string;
+  /** The file is being read: the card draws its loading form. A loading scope does the same. */
+  loading?: boolean;
 }
 
 /** The card's boxes, shared by the card and its loading form. */
@@ -25,9 +27,9 @@ const FILE_ICON_CLASS = 'mx-auto h-16 w-16 text-ods-text-secondary';
  * renders the filename + type + size so the user knows what they were
  * about to download).
  */
-export function FileDownloadCard({ fileName, mimeType, fileSize, fileUrl }: FileDownloadCardProps) {
+export function FileDownloadCard({ fileName, mimeType, fileSize, fileUrl, loading = false }: FileDownloadCardProps) {
   // In a loading scope the file is being read: the card draws its own loading form, in its own boxes.
-  if (useLoadingScope()) {
+  if (useLoadingScope() || loading) {
     return (
       <div className={FILE_CARD_OUTER_CLASS}>
         <div className={FILE_CARD_CLASS}>
