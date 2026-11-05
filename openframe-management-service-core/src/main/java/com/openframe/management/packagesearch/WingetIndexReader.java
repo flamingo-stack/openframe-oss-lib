@@ -1,5 +1,7 @@
 package com.openframe.management.packagesearch;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -29,6 +31,8 @@ class WingetIndexReader {
             + "lower(substr(hex(hash), 1, 8)) FROM packages";
     private static final String UPGRADE_CODES_QUERY = "SELECT package, upgradecode FROM upgradecodes2";
     private static final String NORMALIZED_NAMES_QUERY = "SELECT package, norm_name FROM norm_names2";
+    private static final String PRODUCT_CODES_QUERY = "SELECT package, productcode FROM productcodes2";
+    private static final String NORMALIZED_PUBLISHERS_QUERY = "SELECT package, norm_publisher FROM norm_publishers2";
 
     List<WingetEntry> read(byte[] msixBytes) {
         Path tempMsix;
@@ -79,9 +83,12 @@ class WingetIndexReader {
         Path absoluteDb = db.toAbsolutePath();
         String jdbcUrl = "jdbc:sqlite:" + absoluteDb;
         try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
-            Map<Long, List<String>> upgradeCodes = readValuesByPackage(connection, UPGRADE_CODES_QUERY);
-            Map<Long, List<String>> normalizedNames = readValuesByPackage(connection, NORMALIZED_NAMES_QUERY);
-            return readEntries(connection, upgradeCodes, normalizedNames);
+            MatchingKeys keys = new MatchingKeys(
+                    readValuesByPackage(connection, PRODUCT_CODES_QUERY),
+                    readValuesByPackage(connection, UPGRADE_CODES_QUERY),
+                    readValuesByPackage(connection, NORMALIZED_NAMES_QUERY),
+                    readValuesByPackage(connection, NORMALIZED_PUBLISHERS_QUERY));
+            return readEntries(connection, keys);
         }
     }
 
@@ -100,24 +107,20 @@ class WingetIndexReader {
         return valuesByPackage;
     }
 
-    private static List<WingetEntry> readEntries(Connection connection, Map<Long, List<String>> upgradeCodes,
-                                                 Map<Long, List<String>> normalizedNames) throws SQLException {
+    private static List<WingetEntry> readEntries(Connection connection, MatchingKeys keys) throws SQLException {
         List<WingetEntry> entries = new ArrayList<>();
         try (Statement statement = connection.createStatement();
              ResultSet resultSet = statement.executeQuery(PACKAGES_QUERY)) {
             while (resultSet.next()) {
                 long rowId = resultSet.getLong(1);
-                List<String> packageUpgradeCodes = upgradeCodes.getOrDefault(rowId, List.of());
-                List<String> packageNormalizedNames = normalizedNames.getOrDefault(rowId, List.of());
-                WingetEntry entry = toEntry(resultSet, packageUpgradeCodes, packageNormalizedNames);
+                WingetEntry entry = toEntry(resultSet, keys, rowId);
                 entries.add(entry);
             }
         }
         return entries;
     }
 
-    private static WingetEntry toEntry(ResultSet resultSet, List<String> upgradeCodes, List<String> normalizedNames)
-            throws SQLException {
+    private static WingetEntry toEntry(ResultSet resultSet, MatchingKeys keys, long rowId) throws SQLException {
         String id = resultSet.getString(2);
         String name = resultSet.getString(3);
         String moniker = resultSet.getString(4);
@@ -131,8 +134,24 @@ class WingetIndexReader {
                 .latestVersion(latestVersion)
                 .latestDisplayVersion(latestDisplayVersion)
                 .hashPrefix(hashPrefix)
-                .upgradeCodes(upgradeCodes)
-                .normalizedNames(normalizedNames)
+                .productCodes(keys.of(keys.getProductCodes(), rowId))
+                .upgradeCodes(keys.of(keys.getUpgradeCodes(), rowId))
+                .normalizedNames(keys.of(keys.getNormalizedNames(), rowId))
+                .normalizedPublishers(keys.of(keys.getNormalizedPublishers(), rowId))
                 .build();
+    }
+
+    // what winget matches an installed program by, per package row id
+    @Getter
+    @AllArgsConstructor
+    private static class MatchingKeys {
+        private final Map<Long, List<String>> productCodes;
+        private final Map<Long, List<String>> upgradeCodes;
+        private final Map<Long, List<String>> normalizedNames;
+        private final Map<Long, List<String>> normalizedPublishers;
+
+        List<String> of(Map<Long, List<String>> keysByPackage, long rowId) {
+            return keysByPackage.getOrDefault(rowId, List.of());
+        }
     }
 }

@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 // A port of winget's NameNormalization.cpp (NormalizationVersion::Initial, the name half): winget's index keeps names
@@ -71,10 +72,18 @@ class WingetNameNormalizer {
     private static final Pattern BOMGAR = compile(
             "(?<=^BOMGAR\\s(JUMP CLIENT|(ACCESS|REPRESENTATIVE) CONSOLE|BUTTON)|^EMBEDDED CALLBACK)(\\s.*)");
     private static final Pattern PROGRAM_NAME_SPLIT = compile("[^\\p{L}\\p{Nd}\\+\\&]");
+    private static final Pattern PUBLISHER_NAME_SPLIT = compile("[^\\p{L}\\p{Nd}]");
+    private static final Pattern NON_LETTERS = compile("(?<=^|\\s)[^\\p{L}]+(?=\\s|$)");
+    private static final Pattern TRAILING_NON_LETTERS = compile("\\P{L}+$");
+    private static final Pattern ACRONYM_SEPARATORS =
+            compile("(?:(?<=^\\p{L})|(?<=\\P{L}\\p{L}))(\\.|\\/)(?=\\p{L}(?:\\P{L}|$))");
 
     private static final List<Pattern> PROGRAM_NAME_PATTERNS = List.of(ROBLOX, BOMGAR, PREFIX_PARENS, EMPTY_PARENS,
             FILE_PATH_GHS, FILE_PATH_PARENS, FILE_PATH_QUOTES, FILE_PATH, VERSION_LETTER, VERSION_DELIMITED, VERSION, EN,
             NON_NESTED_BRACKET, BRACKET_ENCLOSED, URI_PROTOCOL, LEADING_SYMBOLS, TRAILING_SYMBOLS);
+
+    private static final List<Pattern> PUBLISHER_NAME_PATTERNS = List.of(VERSION_DELIMITED, VERSION, NON_NESTED_BRACKET,
+            BRACKET_ENCLOSED, URI_PROTOCOL, NON_LETTERS, TRAILING_NON_LETTERS, ACRONYM_SEPARATORS);
 
     // first removal wins, in winget's order: "32/64 bit" before "64 bit", "x86-64" before "x86"
     private static final List<ArchitecturePattern> ARCHITECTURES = List.of(
@@ -138,11 +147,25 @@ class WingetNameNormalizer {
         NormalizedName withoutArchitecture = removeArchitecture(value);
         String withoutLocales = removeLocales(withoutArchitecture.getName());
         String withKbNumbers = KB_NUMBERS.matcher(withoutLocales).replaceAll("$1");
-        String reduced = removeProgramNameNoise(withKbNumbers);
-        List<String> words = words(reduced);
+        String reduced = removeRepeatedly(withKbNumbers, PROGRAM_NAME_PATTERNS);
+        List<String> words = programWords(reduced);
         String joined = String.join("", words);
         String normalized = NON_LETTERS_AND_DIGITS.matcher(joined).replaceAll("");
         return new NormalizedName(normalized, withoutArchitecture.getArchitecture());
+    }
+
+    static String normalizePublisher(String publisher) {
+        String prepared = prepare(publisher);
+        String value = unwrap(prepared);
+        String reduced = removeRepeatedly(value, PUBLISHER_NAME_PATTERNS);
+        String joined = String.join("", publisherWords(reduced));
+        return NON_LETTERS_AND_DIGITS.matcher(joined).replaceAll("");
+    }
+
+    // the publisher key winget's index is searched with
+    static String searchPublisher(String publisher) {
+        String folded = fold(publisher);
+        return normalizePublisher(folded);
     }
 
     private static String prepare(String value) {
@@ -208,43 +231,54 @@ class WingetNameNormalizer {
         return LOCALES.contains(folded);
     }
 
-    private static String removeProgramNameNoise(String value) {
+    private static String removeRepeatedly(String value, List<Pattern> patterns) {
         String current = value;
         String previous;
         do {
             previous = current;
-            for (Pattern pattern : PROGRAM_NAME_PATTERNS) {
+            for (Pattern pattern : patterns) {
                 current = pattern.matcher(current).replaceAll("");
             }
         } while (!current.equals(previous));
         return current;
     }
 
-    private static List<String> words(String value) {
-        List<String> words = new ArrayList<>();
-        Matcher separators = PROGRAM_NAME_SPLIT.matcher(value);
+    // winget splits on separators and keeps both the words and the separators between them, minus blank ones
+    private static List<String> segments(String value, Pattern separators) {
+        List<String> segments = new ArrayList<>();
+        Matcher matcher = separators.matcher(value);
         int start = 0;
-        while (separators.find()) {
-            String word = value.substring(start, separators.start());
-            addWord(words, word);
-            addWord(words, separators.group());
-            start = separators.end();
+        while (matcher.find()) {
+            String word = value.substring(start, matcher.start());
+            segments.add(word);
+            segments.add(matcher.group());
+            start = matcher.end();
         }
         String last = value.substring(start);
-        addWord(words, last);
-        return words;
+        segments.add(last);
+        return segments.stream().filter(segment -> !isBlank(segment)).toList();
     }
 
-    private static void addWord(List<String> words, String segment) {
-        if (isBlank(segment) || isLegalEntitySuffixAfterFirstWord(words, segment)) {
-            return;
-        }
-        words.add(segment);
+    // a legal entity suffix is dropped from a program name, but ends a publisher name; the first word always stays
+    private static List<String> programWords(String value) {
+        List<String> segments = segments(value, PROGRAM_NAME_SPLIT);
+        return IntStream.range(0, segments.size())
+                .filter(index -> index == 0 || !isLegalEntitySuffix(segments.get(index)))
+                .mapToObj(segments::get)
+                .toList();
     }
 
-    private static boolean isLegalEntitySuffixAfterFirstWord(List<String> words, String segment) {
+    private static List<String> publisherWords(String value) {
+        List<String> segments = segments(value, PUBLISHER_NAME_SPLIT);
+        return IntStream.range(0, segments.size())
+                .takeWhile(index -> index == 0 || !isLegalEntitySuffix(segments.get(index)))
+                .mapToObj(segments::get)
+                .toList();
+    }
+
+    private static boolean isLegalEntitySuffix(String segment) {
         String folded = fold(segment);
-        return !words.isEmpty() && LEGAL_ENTITY_SUFFIXES.contains(folded);
+        return LEGAL_ENTITY_SUFFIXES.contains(folded);
     }
 
     private static boolean isBlank(String value) {

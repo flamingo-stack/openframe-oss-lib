@@ -54,10 +54,10 @@ class WingetIndexReaderTest {
 
         // verifications
         assertThat(entries)
-                .extracting(WingetEntry::getLatestDisplayVersion, WingetEntry::getUpgradeCodes,
-                        WingetEntry::getNormalizedNames)
-                .containsExactly(tuple("154.0.1.9001", List.of(UPGRADE_CODE),
-                        List.of("mozillafirefox", "mozillafirefox(X64)")));
+                .extracting(WingetEntry::getLatestDisplayVersion, WingetEntry::getProductCodes, WingetEntry::getUpgradeCodes,
+                        WingetEntry::getNormalizedNames, WingetEntry::getNormalizedPublishers)
+                .containsExactly(tuple("154.0.1.9001", List.of("mozilla firefox 154.0.1 (x64 en-us)"), List.of(UPGRADE_CODE),
+                        List.of("mozillafirefox", "mozillafirefox(X64)"), List.of("mozilla")));
     }
 
     @Test
@@ -74,8 +74,9 @@ class WingetIndexReaderTest {
 
         // verifications
         assertThat(entries)
-                .extracting(WingetEntry::getUpgradeCodes, WingetEntry::getNormalizedNames)
-                .containsExactly(tuple(List.of(), List.of()));
+                .extracting(WingetEntry::getProductCodes, WingetEntry::getUpgradeCodes, WingetEntry::getNormalizedNames,
+                        WingetEntry::getNormalizedPublishers)
+                .containsExactly(tuple(List.of(), List.of(), List.of(), List.of()));
     }
 
     @Test
@@ -94,6 +95,8 @@ class WingetIndexReaderTest {
             statement.execute("INSERT INTO upgradecodes2(upgradecode, package) VALUES ('" + UPGRADE_CODE + "', 1)");
             statement.execute("INSERT INTO norm_names2(norm_name, package) VALUES ('mozillafirefox', 1)");
             statement.execute("INSERT INTO norm_names2(norm_name, package) VALUES ('mozillafirefox(X64)', 1)");
+            statement.execute("INSERT INTO productcodes2(productcode, package) VALUES ('mozilla firefox 154.0.1 (x64 en-us)', 1)");
+            statement.execute("INSERT INTO norm_publishers2(norm_publisher, package) VALUES ('mozilla', 1)");
         }
         return db;
     }
@@ -108,6 +111,10 @@ class WingetIndexReaderTest {
                     + "PRIMARY KEY(upgradecode, package)) WITHOUT ROWID");
             statement.execute("CREATE TABLE norm_names2(norm_name TEXT NOT NULL, package INT64 NOT NULL, "
                     + "PRIMARY KEY(norm_name, package)) WITHOUT ROWID");
+            statement.execute("CREATE TABLE productcodes2(productcode TEXT NOT NULL, package INT64 NOT NULL, "
+                    + "PRIMARY KEY(productcode, package)) WITHOUT ROWID");
+            statement.execute("CREATE TABLE norm_publishers2(norm_publisher TEXT NOT NULL, package INT64 NOT NULL, "
+                    + "PRIMARY KEY(norm_publisher, package)) WITHOUT ROWID");
         }
     }
 

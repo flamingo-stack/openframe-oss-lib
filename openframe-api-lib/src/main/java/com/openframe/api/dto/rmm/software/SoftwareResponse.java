@@ -27,4 +27,5 @@ public class SoftwareResponse {
     // not in the GraphQL schema: what the package catalog is matched by
     private String fleetSource;
     private String upgradeCode;
+    private String productCode;
 }
