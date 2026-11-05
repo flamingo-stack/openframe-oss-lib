@@ -288,7 +288,7 @@ export interface ChatUsage {
   inputTokenDetails?: { noCacheTokens?: number; cacheReadTokens?: number; cacheWriteTokens?: number };
   /**
    * What the chat holds now: the last request's whole input plus its output. `inputTokens` is what a turn cost, summed over
-   * its requests, so a turn with a follow-up counts the same history twice. An older hub sends none.
+   * its requests, so a turn with a follow-up counts the same history twice.
    */
   contextTokens?: number;
   hit_rate_pct?: number;

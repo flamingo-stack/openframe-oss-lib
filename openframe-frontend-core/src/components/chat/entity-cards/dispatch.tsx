@@ -483,8 +483,7 @@ function hubspotStatusToVariant(status: string | undefined): MingoInfoCardStatus
  *   - bare 11-char id → YouTube (lite-youtube facade takes the bare id)
  *   - `mux-<playbackId>` → `https://stream.mux.com/<playbackId>.m3u8`
  *   - `mp4-<base64url(url)>` → decoded https URL
- * Legacy pre-2026-08 sha1-hash ids (`<kind>-<10 hex>`) and anything
- * undecodable return null — the caller falls through to the loader,
+ * Anything undecodable returns null: the caller falls through to the loader,
  * which renders the record as plain text (same anti-hallucination
  * posture as every other card type).
  */
@@ -492,14 +491,9 @@ function decodeVideoMarkerId(id: string): { videoUrl?: string; youtubeUrl?: stri
   // Prefix checks FIRST: an id like `mux-1234567` (11 chars) would also
   // satisfy the bare-YouTube-id pattern below.
   const mux = id.match(/^mux-([A-Za-z0-9_-]+)$/);
-  if (mux) {
-    // Legacy sha1 ids are exactly 10 lowercase hex — not playback ids.
-    if (/^[0-9a-f]{10}$/.test(mux[1])) return null;
-    return { videoUrl: `https://stream.mux.com/${mux[1]}.m3u8` };
-  }
+  if (mux) return { videoUrl: `https://stream.mux.com/${mux[1]}.m3u8` };
   const mp4 = id.match(/^mp4-([A-Za-z0-9_-]+)$/);
   if (mp4) {
-    if (/^[0-9a-f]{10}$/.test(mp4[1])) return null;
     try {
       const b64 = mp4[1].replace(/-/g, '+').replace(/_/g, '/');
       const url = atob(b64);
@@ -1070,8 +1064,8 @@ function CustomerInterviewChatCard({
 
 /**
  * Design doc → the doc glyph, its readiness as the pill (the hub's own wording: "Ready to build" / "Not ready",
- * `design-doc-readiness`) and "DRI · updated · n/m reviews signed off" under the title. The hub's card route attaches the doc's list row as
- * `item.doc`; a row without it (an older hub) renders the ref's own title and preview.
+ * `design-doc-readiness`) and "DRI · updated · n/m reviews signed off" under the title, all read from the doc's list
+ * row, which the hub's card route attaches as `item.doc`. A row without it is a card that did not load.
  */
 function DesignDocChatCard({
   item,
@@ -1084,23 +1078,16 @@ function DesignDocChatCard({
   isNewTab: boolean;
   actions: RecordMenuActions;
 }) {
-  const displayRef = fetchedItemDisplayRef(item, chatRef);
   const doc = item?.doc;
-  const readiness = doc ? DESIGN_DOC_READINESS_DISPLAY[designDocReadiness(doc.completion)] : null;
+  if (!doc) return <CardLoadFailure label="Design doc" id={chatRef.id} detail="The design doc did not load" />;
+  const displayRef = fetchedItemDisplayRef(item, chatRef);
+  const readiness = DESIGN_DOC_READINESS_DISPLAY[designDocReadiness(doc.completion)];
   return (
     <MingoInfoCard
-      title={doc?.title ?? displayRef.title}
-      description={
-        doc
-          ? [designDocMetaLine(doc), formatCompletionLabel(doc.completion)].join(' · ')
-          : (displayRef.preview ?? undefined)
-      }
+      title={doc.title}
+      description={[designDocMetaLine(doc), formatCompletionLabel(doc.completion)].join(' · ')}
       icon={<FileContentIcon size={24} />}
-      status={
-        readiness
-          ? { label: readiness.label, variant: readiness.scheme === 'success' ? 'success' : 'grey' }
-          : { label: 'Design doc', variant: 'grey' }
-      }
+      status={{ label: readiness.label, variant: readiness.scheme === 'success' ? 'success' : 'grey' }}
       anchorProps={buildAnchorProps(displayRef.url, isNewTab, displayRef.targetPlatform)}
       menuGroups={recordMenuGroups(displayRef, actions)}
       menuAriaLabel="Design doc actions"
@@ -2446,8 +2433,7 @@ export function renderChatInlineEntityCard(
 
   // Embedded videos are SELF-DESCRIBING: the record id alone recovers the
   // playable URL (`decodeVideoMarkerId`), so the player renders on ANY
-  // transport with zero refs/fetch. Undecodable ids (legacy sha1 hashes,
-  // hallucinations) fall through to the loader → plain-text degrade.
+  // transport with zero refs/fetch. Undecodable ids (hallucinations) fall through to the loader → plain-text degrade.
   // Hero videos on FETCHED entity types (webinars, releases, …) are
   // handled post-fetch inside ChatCardLoader (`chatCardDisclosureOf`) — the
   // record's ref plays no part in either path.
