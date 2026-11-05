@@ -24,6 +24,7 @@ import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
@@ -409,6 +410,57 @@ class ScriptDispatchServiceTest {
         verify(scriptExecutionService).createBatch(
                 any(), eq(SCRIPT_ID), eq((String) null), eq(List.of("machine-1")), eq(PrivilegeLevel.ADMIN), eq(60), eq(USER_ID), eq(ExecutionSource.MANUAL));
         verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
+    }
+
+    @Test
+    @DisplayName("batchRunScript: an unsaved draft body and shell replace the saved ones, and the run keeps the script's stored env vars, secrets included")
+    void batchRunScript_draftBody_runsWithTheStoredEnvVars() {
+        ScriptEnvVarInput token = ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build();
+        ScriptResponse withSecret = ScriptResponse.builder()
+                .id(SCRIPT_ID).shell(BASH).scriptBody("df -h").defaultTimeoutSeconds(60)
+                .envVars(List.of(token))
+                .build();
+        when(scriptService.get(SCRIPT_ID)).thenReturn(withSecret);
+        BatchRunScriptInput draft = batchInput(List.of(MACHINE_ID));
+        draft.setScriptBody("Write-Output $env:TOKEN.Length");
+        draft.setShell(ScriptShell.POWERSHELL);
+
+        scriptDispatchService.batchRunScript(draft, USER_ID, ExecutionSource.AI_ASSISTANT);
+
+        ScriptMessage sent = capturePublished();
+        assertThat(sent.getCode()).isEqualTo("Write-Output $env:TOKEN.Length");
+        assertThat(sent.getShell()).isEqualTo(ScriptShell.POWERSHELL);
+        assertThat(sent.getScriptId()).isEqualTo(SCRIPT_ID);
+        assertThat(sent.getEnvVars())
+                .extracting(ScriptEnvVar::getName, ScriptEnvVar::getValue, ScriptEnvVar::isSecret)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("TOKEN", "s3cr3t", true));
+    }
+
+    @Test
+    @DisplayName("batchRunScript: a draft body without a shell keeps the saved script's shell")
+    void batchRunScript_draftWithoutShell_keepsTheSavedShell() {
+        BatchRunScriptInput draft = batchInput(List.of(MACHINE_ID));
+        draft.setScriptBody("du -sh /tmp");
+
+        scriptDispatchService.batchRunScript(draft, USER_ID, ExecutionSource.AI_ASSISTANT);
+
+        ScriptMessage sent = capturePublished();
+        assertThat(sent.getCode()).isEqualTo("du -sh /tmp");
+        assertThat(sent.getShell()).isEqualTo(BASH);
+    }
+
+    @Test
+    @DisplayName("batchRunScript: a blank draft body runs the saved body and shell")
+    void batchRunScript_blankDraft_runsTheSavedScript() {
+        BatchRunScriptInput draft = batchInput(List.of(MACHINE_ID));
+        draft.setScriptBody("  ");
+        draft.setShell(ScriptShell.POWERSHELL);
+
+        scriptDispatchService.batchRunScript(draft, USER_ID, ExecutionSource.AI_ASSISTANT);
+
+        ScriptMessage sent = capturePublished();
+        assertThat(sent.getCode()).isEqualTo("df -h");
+        assertThat(sent.getShell()).isEqualTo(BASH);
     }
 
     private ScriptMessage capturePublished() {
