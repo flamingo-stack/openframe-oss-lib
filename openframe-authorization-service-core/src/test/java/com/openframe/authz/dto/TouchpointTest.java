@@ -8,36 +8,34 @@ class TouchpointTest {
 
     private static final String DOWNLOAD_ID = "0b4c5a52-6f0e-4d7b-9a3e-2f1c8d7e6b5a";
 
-    private static Touchpoint everyField(String prefix) {
-        return Touchpoint.builder()
-                .fbc(prefix + "01")
-                .fbclid(prefix + "02")
-                .fbp(prefix + "03")
-                .hutk(prefix + "04")
-                .gclid(prefix + "05")
-                .rdtCid(prefix + "06")
-                .liFatId(prefix + "07")
-                .utmSource(prefix + "08")
-                .utmMedium(prefix + "09")
-                .utmCampaign(prefix + "10")
-                .utmContent(prefix + "11")
-                .utmTerm(prefix + "12")
-                .eventId(prefix + "13")
-                .ref(prefix + "14")
-                .referrer(prefix + "15")
-                .landingUrl(prefix + "16")
-                .downloadId(prefix + "17")
-                .heardFrom(prefix + "18")
-                .heardFromOther(prefix + "19")
-                .gbraid(prefix + "20")
-                .wbraid(prefix + "21")
-                .rdtUuid(prefix + "22")
-                .build();
-    }
-
     @Test
     void totalLength_everyFieldSet_sumsTheLengthOfAllTwentyTwo() {
-        assertThat(everyField("x").totalLength()).isEqualTo(66);
+        Touchpoint attribution = Touchpoint.builder()
+                .fbc("x01")
+                .fbclid("x02")
+                .fbp("x03")
+                .hutk("x04")
+                .gclid("x05")
+                .rdtCid("x06")
+                .liFatId("x07")
+                .utmSource("x08")
+                .utmMedium("x09")
+                .utmCampaign("x10")
+                .utmContent("x11")
+                .utmTerm("x12")
+                .eventId("x13")
+                .ref("x14")
+                .referrer("x15")
+                .landingUrl("x16")
+                .downloadId("x17")
+                .heardFrom("x18")
+                .heardFromOther("x19")
+                .gbraid("x20")
+                .wbraid("x21")
+                .rdtUuid("x22")
+                .build();
+
+        assertThat(attribution.totalLength()).isEqualTo(66);
     }
 
     @Test
