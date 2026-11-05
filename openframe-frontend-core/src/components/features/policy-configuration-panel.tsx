@@ -37,7 +37,7 @@ const CATEGORY_LEVEL_COLUMN_CLASS = cn(
   CATEGORY_LEVEL_WIDTH,
 );
 /** The expand / collapse control's chevron. */
-const CHEVRON_CLASS = 'h-6 w-6 text-ods-text-primary transition-transform duration-300';
+const CHEVRON_CLASS = '!h-6 !w-6 text-ods-text-primary transition-transform duration-300';
 
 /** A level as the dropdown writes it: its icon in its colour, then its name. */
 const LevelOption: FC<{ level: ApprovalLevel }> = ({ level }) => {
@@ -64,9 +64,9 @@ const ApprovalLevelDropdown: FC<{
       <Button
         variant="outline"
         disabled={disabled}
-        rightIcon={<Chevron02DownIcon className="h-6 w-6 text-ods-text-secondary" />}
+        rightIcon={<Chevron02DownIcon className="!h-6 !w-6 text-ods-text-secondary" />}
         className={cn(
-          'flex h-auto items-center justify-between gap-[var(--spacing-system-xsf)] rounded-md border border-ods-border bg-ods-card !px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xsf)] transition-colors !text-h6 hover:bg-ods-bg-hover',
+          'flex h-auto items-center justify-between gap-[var(--spacing-system-xsf)] rounded-md border border-ods-border bg-ods-card !p-[var(--spacing-system-sf)] transition-colors !text-h4 hover:bg-ods-bg-hover',
           value ? 'text-ods-text-primary' : 'text-ods-text-secondary',
           triggerClassName,
         )}
@@ -236,7 +236,7 @@ const CategorySection: FC<{
             onToggle(category.id);
           }}
           leftIcon={<Chevron02DownIcon className={cn(CHEVRON_CLASS, isExpanded && 'rotate-180')} />}
-          className="h-auto w-auto shrink-0 rounded-md"
+          className="h-auto w-auto shrink-0 rounded-md !p-[var(--spacing-system-sf)]"
           aria-label={isExpanded ? 'Collapse' : 'Expand'}
         />
       </div>

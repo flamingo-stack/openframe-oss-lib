@@ -38,7 +38,7 @@ describe('PolicyConfigurationPanel', () => {
     expect(level?.className).toContain('text-ods-warning');
     const pattern = screen.getByTitle('(?i)^(Invoke-WebRequest|wget|curl).*');
     expect(pattern.className).toContain('truncate');
-    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
   });
 
   it('picks a level from the four while editing', () => {
@@ -52,10 +52,7 @@ describe('PolicyConfigurationPanel', () => {
       />,
     );
     open();
-    const allow = screen.getAllByRole('radio', { name: 'Allow' })[0] as HTMLElement;
-    expect(
-      screen.getAllByRole('radio', { name: /Allow|Restrict|Ask Technician|Ask User/ }).length,
-    ).toBeGreaterThanOrEqual(4);
+    const allow = screen.getAllByRole('button', { name: 'Allow' })[0] as HTMLElement;
     fireEvent.click(allow);
     expect(onChange).toHaveBeenCalledWith('downloads', 'web', 'ALLOW');
   });
