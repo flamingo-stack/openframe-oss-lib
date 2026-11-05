@@ -43,6 +43,11 @@ export interface StatusFilterComponentProps {
   showAll?: boolean;
   /** The options are read on the client and have not arrived: the row draws its skeleton, as in a loading scope. */
   loading?: boolean;
+  /**
+   * How many option boxes the skeleton draws when the options are read (default `STATUS_FILTER_SKELETON_PILLS`). Set
+   * it when the page knows how many options the row will have, so the loaded row has the same number of buttons.
+   */
+  loadingPills?: number;
 }
 
 /** The row's frame, label and controls, read by the row and by its skeleton, so the skeleton is the row's size. */
@@ -74,6 +79,7 @@ export function StatusFilterComponent({
   label = 'Status',
   showAll = true,
   loading = false,
+  loadingPills,
 }: StatusFilterComponentProps) {
   // Filter out 'all' from options since we render it separately
   const filteredOptions = statusOptions.filter(option => option.value !== 'all');
@@ -84,6 +90,7 @@ export function StatusFilterComponent({
         label={label}
         // Options the page states itself are its own words: drawn for real. Read ones arrive empty: boxes.
         options={filteredOptions.length > 0 ? filteredOptions.map(option => option.label) : undefined}
+        pills={loadingPills}
         showAll={showAll}
         showCount={showCount}
         className={className}
