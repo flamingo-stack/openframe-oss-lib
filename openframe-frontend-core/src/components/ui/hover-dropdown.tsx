@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import Link from '../../embed-shims/next-link';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { Button } from './button';
+import { usePortalContainer } from './portal-container';
 
 // =============================================================================
 // Types
@@ -85,10 +86,12 @@ interface HoverDropdownProps {
  *
  * Uses fixed positioning with getBoundingClientRect for proper placement
  * inside containers with overflow hidden (e.g., Sheet, modals), and is drawn in
- * a portal on the page body: inside the chat's message list a `fixed` panel
- * stays in that list's stacking context whatever its z-index, and the composer
- * below the list painted over it (2026-11-04). The panel keeps the hover open
- * itself, since it is no longer inside the trigger.
+ * a portal: the surface's portal host when there is one (a modal drawer takes
+ * pointer events only inside itself), else the page body. Inside the chat's
+ * message list a `fixed` panel stays in that list's stacking context whatever
+ * its z-index, and the composer below the list painted over it (2026-11-04).
+ * The panel keeps the hover open itself, since it is no longer inside the
+ * trigger.
  *
  * Usage:
  *   <HoverDropdown items={[{ label: 'Blog Post', href: '/blog/1' }]}>
@@ -115,6 +118,9 @@ export function HoverDropdown({
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Inside a modal surface (the hub's chat drawer) the page outside it takes no pointer events, so a panel on the
+  // page body could not be hovered and closed as the cursor reached it. The surface's own portal host keeps it inside.
+  const portalContainer = usePortalContainer();
 
   // Viewport-fit placement is a DOM MEASUREMENT — the panel's own rendered
   // width/height plus the trigger's live rect — so it is written to the node
@@ -136,24 +142,33 @@ export function HoverDropdown({
     const spaceLeft = rect.left;
     const fitsRight = spaceRight >= elWidth + 8;
     const fitsLeft = spaceLeft >= elWidth + 8;
+    const besideTop = Math.min(Math.max(rect.top, 8), window.innerHeight - elHeight - 8);
 
+    let left: number;
+    let top: number;
     if (fitsRight || (!fitsLeft && spaceRight >= spaceLeft)) {
-      // Place to the right
-      el.style.left = `${rect.right + 4}px`;
-      el.style.top = `${Math.min(Math.max(rect.top, 8), window.innerHeight - elHeight - 8)}px`;
+      left = rect.right + 4;
+      top = besideTop;
     } else if (fitsLeft) {
-      // Place to the left
-      el.style.left = `${rect.left - elWidth - 4}px`;
-      el.style.top = `${Math.min(Math.max(rect.top, 8), window.innerHeight - elHeight - 8)}px`;
+      left = rect.left - elWidth - 4;
+      top = besideTop;
     } else {
       // Fallback: place above or below
-      const left = Math.min(Math.max(rect.left, 8), window.innerWidth - elWidth - 8);
-      el.style.left = `${left}px`;
-      if (side === 'top' || window.innerHeight - rect.bottom < elHeight + 8) {
-        el.style.top = `${Math.max(rect.top - elHeight - 4, 8)}px`;
-      } else {
-        el.style.top = `${rect.bottom + 4}px`;
-      }
+      left = Math.min(Math.max(rect.left, 8), window.innerWidth - elWidth - 8);
+      top =
+        side === 'top' || window.innerHeight - rect.bottom < elHeight + 8
+          ? Math.max(rect.top - elHeight - 4, 8)
+          : rect.bottom + 4;
+    }
+
+    // The panel may sit in a portal host inside a transformed surface (the chat drawer), where `fixed` is laid out
+    // against that surface rather than the viewport. Place it, measure where it landed, and move it by the difference.
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    const placed = el.getBoundingClientRect();
+    if (placed.left !== left || placed.top !== top) {
+      el.style.left = `${left + (left - placed.left)}px`;
+      el.style.top = `${top + (top - placed.top)}px`;
     }
   });
 
@@ -278,7 +293,7 @@ export function HoverDropdown({
               );
             })}
           </div>,
-          document.body,
+          portalContainer ?? document.body,
         )}
     </div>
   );
