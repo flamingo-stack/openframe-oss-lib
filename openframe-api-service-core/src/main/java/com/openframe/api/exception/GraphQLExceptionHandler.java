@@ -44,7 +44,7 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
         }
         if (exception instanceof OptimisticLockingFailureException) {
             log.warn("GraphQL conflict: {}", exception.getMessage());
-            return result(buildError(CONFLICT_MESSAGE, ErrorCode.CONFLICT));
+            return result(buildError(CONFLICT_MESSAGE, ErrorCode.CONFLICT), path);
         }
         if (exception instanceof InvalidRelayIdException) {
             String message = exception.getMessage();
