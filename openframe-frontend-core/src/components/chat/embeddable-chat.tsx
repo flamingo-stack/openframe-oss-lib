@@ -241,12 +241,12 @@ export interface EmbeddableChatProps {
   /**
    * Dialog-management capabilities for injected Mingo mode (`mingoState`).
    *
-   * When the host injects `mingoState`, it doesn't pass `modes.mingo` (that
-   * would re-activate the idle built-in adapter), so the rename/archive/
-   * restore/archive-page affordances can't read their capability flags off the
-   * callback config. Supply them here instead. Default OFF: the row ⋯ menu and
-   * the archive page appear only when the host opts in, so nothing advertises
-   * an action the host hasn't wired. Ignored unless `mingoState` is set.
+   * Laid over the injected state's own `dialogCapabilities` (these win), so a
+   * host that injects an engine's state adds what only it knows (Copy link,
+   * Compact) and keeps the engine's search, rename and archive. A state with
+   * none of its own takes these alone. Default OFF: the row ⋯ menu and the
+   * archive page appear only when the state or the host opts in, so nothing
+   * advertises an action nobody wired. Ignored unless `mingoState` is set.
    *
    * Same shape an adapter reports through `UnifiedChatState.dialogCapabilities`
    * (`ChatDialogCapabilities`) — one type, whether the list is host-owned or

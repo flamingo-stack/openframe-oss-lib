@@ -97,6 +97,17 @@ describe('useChatEngine over a replaying tail', () => {
     expect(drawn[drawn.length - 2]).toEqual(['user', 'next']);
   });
 
+  it("draws a history page's assistant rows as the assistant it is given", async () => {
+    const author = (result: { current: { messages: { role: string; metadata?: { author?: unknown } }[] } }) =>
+      result.current.messages.find(message => message.role === 'assistant')?.metadata?.author;
+    const mingo = setup();
+    await waitFor(() => expect(mingo.result.current.messages).toHaveLength(2));
+    expect(author(mingo.result)).toMatchObject({ assistantType: 'mingo', authorType: 'mingo' });
+    const fae = setup({ assistantName: 'Fae', assistantType: 'fae' });
+    await waitFor(() => expect(fae.result.current.messages).toHaveLength(2));
+    expect(author(fae.result)).toMatchObject({ name: 'Fae', assistantType: 'fae', authorType: 'fae' });
+  });
+
   it('a store handed in keeps the thread across an unmount', async () => {
     const store = createChatThreadStore<string>();
     const first = setup({ store });

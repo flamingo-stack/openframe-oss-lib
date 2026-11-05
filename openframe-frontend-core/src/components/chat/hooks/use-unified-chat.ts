@@ -76,9 +76,10 @@ export interface UseUnifiedChatOptions {
   mingoStateOverride?: UnifiedChatState;
 
   /**
-   * Conversation-list capabilities for a `mingoStateOverride`. A host that
-   * builds the whole state in its own store has no adapter to report them, so
-   * it declares them alongside the state it injects.
+   * Conversation-list capabilities the host adds to a `mingoStateOverride`'s
+   * own: laid over the state's `dialogCapabilities` (the host's win), so a host
+   * that injects an engine's state adds what only it knows (the link to copy,
+   * Compact) without losing the engine's search, rename and archive.
    *
    * Supplying the override AT ALL declares that its panel owns a conversation
    * list — an override with no capabilities still resolves to an empty object,
@@ -143,9 +144,13 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
   // render would invalidate the state memo below (and every memo a consumer
   // hangs off its identity) forever.
   const stableInjected = useStableShallow(injectedDialogCapabilities);
-  const dialogCapabilities = activeStateIsInjected
-    ? (activeState.dialogCapabilities ?? stableInjected ?? EMPTY_DIALOG_CAPABILITIES)
-    : activeState.dialogCapabilities;
+  const ownCapabilities = activeState.dialogCapabilities;
+  const injectedCapabilities = useMemo<ChatDialogCapabilities>(() => {
+    if (!stableInjected) return ownCapabilities ?? EMPTY_DIALOG_CAPABILITIES;
+    if (!ownCapabilities) return stableInjected;
+    return { ...ownCapabilities, ...stableInjected };
+  }, [ownCapabilities, stableInjected]);
+  const dialogCapabilities = activeStateIsInjected ? injectedCapabilities : ownCapabilities;
 
   // Live ref to the active state. The injected `mingoState` (and the SSE/NATS
   // adapters) hand back a NEW state object on EVERY streaming chunk

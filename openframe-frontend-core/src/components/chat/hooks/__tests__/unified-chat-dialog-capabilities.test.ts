@@ -15,7 +15,8 @@
  *     capabilities of its own falls back to the `injectedDialogCapabilities`
  *     companion, and to an EMPTY object when the host passes neither — so
  *     injecting a state never costs a host its list surface;
- *   - capabilities ON the injected state win over the companion prop.
+ *   - the companion prop is laid over capabilities ON the injected state (the
+ *     host's win), so a host adds its own to an engine's.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -106,13 +107,26 @@ describe('useUnifiedChat — dialogCapabilities resolution', () => {
     expect(caps).toEqual({});
   });
 
-  it('capabilities ON the injected state win over the companion prop', () => {
+  it("the companion prop is laid over the injected state's own capabilities", () => {
+    // An injected engine state carries the engine's list capabilities; the host
+    // adds what only it knows (here Copy link) and wins where both name one.
+    const onCopyLink = vi.fn();
+    const own: ChatDialogCapabilities = { canRename: true, canArchive: false, searchQuery: 'q' };
+    const caps = capsOf({
+      modes: {},
+      activeMode: 'mingo',
+      mingoStateOverride: injectedState({ dialogCapabilities: own }),
+      injectedDialogCapabilities: { canArchive: true, onCopyLink },
+    });
+    expect(caps).toEqual({ canRename: true, canArchive: true, searchQuery: 'q', onCopyLink });
+  });
+
+  it('an injected state with its own capabilities and no companion prop keeps them', () => {
     const own: ChatDialogCapabilities = { canRename: true };
     const caps = capsOf({
       modes: {},
       activeMode: 'mingo',
       mingoStateOverride: injectedState({ dialogCapabilities: own }),
-      injectedDialogCapabilities: { canArchive: true },
     });
     expect(caps).toBe(own);
   });

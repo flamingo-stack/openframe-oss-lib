@@ -34,6 +34,7 @@ import { useChunkCatchup } from '../hooks/use-chunk-catchup';
 import { useManagedDialogList } from '../hooks/use-managed-dialog-list';
 import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
 import type { ChatApprovalStatus, ChunkData } from '../types';
+import type { AssistantType } from '../types/chat.types';
 import type { DialogItem } from '../types/component.types';
 import type { ChatMessageActions } from '../types/message.types';
 import type {
@@ -76,6 +77,8 @@ export interface UseChatEngineConfig {
   displayApprovalTypes?: readonly string[];
   /** The assistant's name on a history page's rows (default 'Mingo'). */
   assistantName?: string;
+  /** Which assistant a history page's rows and a new dialog's greeting are drawn as (default 'mingo'). */
+  assistantType?: AssistantType;
   /** Only the history rows of this chat type (`ADMIN_AI_CHAT` for Mingo). */
   chatTypeFilter?: string;
   dialogsPageSize?: number;
@@ -159,6 +162,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     dialogId: controlledDialogId,
     displayApprovalTypes = DEFAULT_DISPLAY_APPROVAL_TYPES,
     assistantName = 'Mingo',
+    assistantType = 'mingo',
     chatTypeFilter,
     dialogsPageSize = CHAT_HISTORY_PAGE_SIZE,
     messagesPageSize = 50,
@@ -442,7 +446,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       const { messages: processed } = processHistoricalMessages(page.messages, {
         assistantName,
         ...(assistantAvatar !== undefined ? { assistantAvatar } : {}),
-        assistantType: 'mingo',
+        assistantType,
         chatTypeFilter,
         approvalStatuses: store.snapshotOf(id).state.approvalStatuses,
       });
@@ -457,7 +461,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       if (page.tokenUsage !== undefined) store.mutate(id, r => r.setDialogTokenUsage(page.tokenUsage ?? null));
       setCursorEntry({ dialogId: id, cursor: page.nextCursor });
     },
-    [store, assistantName, assistantAvatar, chatTypeFilter, isBufferingActive, backfills],
+    [store, assistantName, assistantAvatar, assistantType, chatTypeFilter, isBufferingActive, backfills],
   );
 
   const loadDialogHistory = useCallback(
@@ -636,7 +640,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
           store.upsertMessage(newId, {
             id: `welcome-${newId}`,
             role: 'assistant',
-            metadata: { createdAt: new Date().toISOString(), author: { name: assistantName, assistantType: 'mingo' } },
+            metadata: { createdAt: new Date().toISOString(), author: { name: assistantName, assistantType } },
             parts: [{ type: 'text', text: newDialogGreeting }],
           });
         }
@@ -648,7 +652,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
         setIsCreatingDialog(false);
       }
     },
-    [store, openDialog, upsertDialogTop, newDialogGreeting, assistantName],
+    [store, openDialog, upsertDialogTop, newDialogGreeting, assistantName, assistantType],
   );
 
   /** Publish into a dialog: once its tail is subscribed when the transport needs that, and a failure left as a row. */
