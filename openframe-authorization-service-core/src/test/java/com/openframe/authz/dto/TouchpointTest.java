@@ -1,10 +1,6 @@
 package com.openframe.authz.dto;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,18 +29,15 @@ class TouchpointTest {
                 .downloadId(prefix + "17")
                 .heardFrom(prefix + "18")
                 .heardFromOther(prefix + "19")
+                .gbraid(prefix + "20")
+                .wbraid(prefix + "21")
+                .rdtUuid(prefix + "22")
                 .build();
     }
 
-    private static Stream<Touchpoint> requestsWithOnlyGbraidOrWbraid() {
-        return Stream.of(
-                Touchpoint.builder().gbraid("gb-1").build(),
-                Touchpoint.builder().wbraid("wb-1").build());
-    }
-
     @Test
-    void totalLength_everyFieldSet_sumsTheLengthOfAllNineteen() {
-        assertThat(everyField("x").totalLength()).isEqualTo(57);
+    void totalLength_everyFieldSet_sumsTheLengthOfAllTwentyTwo() {
+        assertThat(everyField("x").totalLength()).isEqualTo(66);
     }
 
     @Test
@@ -58,16 +51,5 @@ class TouchpointTest {
                 .build();
 
         assertThat(attribution.totalLength()).isEqualTo(89);
-    }
-
-    @Test
-    void totalLength_gbraidWbraidAndRdtUuidSet_countsThem() {
-        Touchpoint attribution = Touchpoint.builder()
-                .gbraid("gb-1")
-                .wbraid("wb-12")
-                .rdtUuid("uuid-123")
-                .build();
-
-        assertThat(attribution.totalLength()).isEqualTo(17);
     }
 }
