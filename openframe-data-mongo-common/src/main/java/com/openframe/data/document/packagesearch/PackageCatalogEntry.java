@@ -39,10 +39,9 @@ public class PackageCatalogEntry {
     private List<String> aliases;
     // winget: the DisplayVersion Windows lists for the latest release, set only where it differs from version
     private String displayVersion;
-    // lower-case keys an installed program is matched by: winget's own, as its index keeps them, and a cask's .apps
+    // winget: lower-case keys it matches an installed program by, as its index keeps them
     private List<String> upgradeCodes;
     private List<String> normalizedNames;
-    private List<String> appNames;
     private Instant updatedAt;
 
 }

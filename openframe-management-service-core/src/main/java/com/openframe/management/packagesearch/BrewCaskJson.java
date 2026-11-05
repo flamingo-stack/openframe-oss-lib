@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import tools.jackson.databind.JsonNode;
 
 import java.util.List;
 
@@ -21,5 +20,4 @@ class BrewCaskJson {
     @JsonProperty("old_tokens")
     private List<String> oldTokens;
     private Boolean disabled;
-    private List<JsonNode> artifacts;
 }
