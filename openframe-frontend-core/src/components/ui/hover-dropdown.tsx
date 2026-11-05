@@ -6,7 +6,6 @@ import { createPortal } from 'react-dom';
 import Link from '../../embed-shims/next-link';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { Button } from './button';
-import { usePortalContainer } from './portal-container';
 
 // =============================================================================
 // Types
@@ -86,12 +85,12 @@ interface HoverDropdownProps {
  *
  * Uses fixed positioning with getBoundingClientRect for proper placement
  * inside containers with overflow hidden (e.g., Sheet, modals), and is drawn in
- * a portal: the surface's portal host when there is one (a modal drawer takes
- * pointer events only inside itself), else the page body. Inside the chat's
- * message list a `fixed` panel stays in that list's stacking context whatever
- * its z-index, and the composer below the list painted over it (2026-11-04).
- * The panel keeps the hover open itself, since it is no longer inside the
- * trigger.
+ * a portal: on the page body, since inside the chat's message list a `fixed`
+ * panel stays in that list's stacking context whatever its z-index, and the
+ * composer below the list painted over it (2026-11-04); inside a modal dialog,
+ * at the end of that dialog, since a modal takes pointer events off the rest of
+ * the page (`modalDialogOf`). The panel keeps the hover open itself, since it
+ * is no longer inside the trigger.
  *
  * Usage:
  *   <HoverDropdown items={[{ label: 'Blog Post', href: '/blog/1' }]}>
@@ -106,6 +105,15 @@ function DefaultAnchor({ href, className, children }: HoverDropdownRenderAnchorA
   );
 }
 
+/**
+ * The modal dialog a node sits in, or null. Radix marks a modal by taking pointer events off the page body while it is
+ * open, so a dialog counts only then: a non-modal panel keeps the page body as its layer.
+ */
+function modalDialogOf(node: HTMLElement | null): HTMLElement | null {
+  if (!node || document.body.style.pointerEvents !== 'none') return null;
+  return node.closest<HTMLElement>('[role="dialog"]');
+}
+
 export function HoverDropdown({
   children,
   items,
@@ -118,9 +126,11 @@ export function HoverDropdown({
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  // Inside a modal surface (the hub's chat drawer) the page outside it takes no pointer events, so a panel on the
-  // page body could not be hovered and closed as the cursor reached it. The surface's own portal host keeps it inside.
-  const portalContainer = usePortalContainer();
+  // Where the panel is drawn: the page body, above every local stacking context (inside the chat's message list
+  // the composer below it painted over a panel drawn there). Except inside a MODAL dialog (the hubs' chat drawer):
+  // a modal makes the page outside it ignore the pointer, so a panel on the body closed as the cursor reached it.
+  // There it is drawn at the end of the dialog itself.
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
   // Viewport-fit placement is a DOM MEASUREMENT — the panel's own rendered
   // width/height plus the trigger's live rect — so it is written to the node
@@ -174,6 +184,7 @@ export function HoverDropdown({
 
   const show = useCallback(() => {
     clearTimeout(timeoutRef.current);
+    setPortalTarget(modalDialogOf(containerRef.current) ?? document.body);
     setOpen(true);
   }, []);
 
@@ -189,6 +200,7 @@ export function HoverDropdown({
   const toggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     clearTimeout(timeoutRef.current);
+    setPortalTarget(modalDialogOf(containerRef.current) ?? document.body);
     setOpen(prev => !prev);
   }, []);
 
@@ -202,7 +214,7 @@ export function HoverDropdown({
     <div ref={containerRef} className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide} onClick={toggle}>
       {children}
       {open &&
-        typeof document !== 'undefined' &&
+        portalTarget &&
         createPortal(
           <div
             onMouseEnter={show}
@@ -293,7 +305,7 @@ export function HoverDropdown({
               );
             })}
           </div>,
-          portalContainer ?? document.body,
+          portalTarget,
         )}
     </div>
   );
