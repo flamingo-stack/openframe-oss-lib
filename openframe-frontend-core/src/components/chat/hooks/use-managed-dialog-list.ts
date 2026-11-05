@@ -45,6 +45,8 @@ export interface UseManagedDialogListArgs {
    *  adapter never sets it, so its wire params stay `{cursor, limit}`); any
    *  string change — including back to `''` — reloads page 1 with `search`. */
   search?: string;
+  /** Server-side owner filter (`'my'` / `'all'`). `undefined` = the host has none; a change reloads page 1 with it. */
+  scope?: 'my' | 'all';
   /** Fires AFTER a row was removed locally by a successful archive/delete.
    *  Read through a latest-ref so its identity never enters the mutation
    *  callbacks' deps. */
@@ -85,9 +87,12 @@ export function useManagedDialogList({
   deleteDialog: deleteDialogCallback,
   pageSize,
   search,
+  scope,
   onDialogRemoved,
   logTag,
 }: UseManagedDialogListArgs): UseManagedDialogListResult {
+  // What the first page is fetched for: the search term and the scope. A change of either reloads page 1.
+  const listKey = JSON.stringify([search ?? null, scope ?? null]);
   const [dialogs, setDialogs] = useState<DialogItem[]>([]);
   const [dialogsNextCursor, setDialogsNextCursor] = useState<string | null>(null);
   const [isDialogsLoading, setIsDialogsLoading] = useState<boolean>(false);
@@ -97,8 +102,8 @@ export function useManagedDialogList({
   // rather than only once the effect fires — a consumer that branches on "the
   // list is empty" would otherwise see a one-frame empty list on mount, and
   // again on every search change, before the request starts.
-  const [settledSearch, setSettledSearch] = useState<string | null | undefined>(
-    autoLoad && fetchDialogs ? undefined : null,
+  const [settledSearch, setSettledSearch] = useState<string | undefined>(
+    autoLoad && fetchDialogs ? undefined : listKey,
   );
   // The seed above is a FIRST-RENDER value, so it misses a consumer that mounts
   // with `autoLoad: false` and turns it on later (a panel opened in the other
@@ -156,8 +161,9 @@ export function useManagedDialogList({
         const result = await fetchDialogs({
           cursor,
           limit: pageSize,
-          // Only hosts that run a search ever see the key.
+          // Only hosts that run a search, or filter by scope, ever see the key.
           ...(search !== undefined ? { search } : {}),
+          ...(scope !== undefined ? { scope } : {}),
         });
         // Superseded by a newer load — drop the response entirely.
         if (!isCurrent()) return;
@@ -187,12 +193,12 @@ export function useManagedDialogList({
         // Only the latest request owns the shared flags.
         if (isCurrent()) {
           pendingRef.current = false;
-          if (cursor === undefined) setSettledSearch(search ?? null);
+          if (cursor === undefined) setSettledSearch(listKey);
           setIsDialogsLoading(false);
         }
       }
     },
-    [fetchDialogs, pageSize, search, logTag],
+    [fetchDialogs, pageSize, search, scope, listKey, logTag],
   );
 
   const reloadDialogs = useCallback(() => {
@@ -208,11 +214,11 @@ export function useManagedDialogList({
   useEffect(() => {
     if (!fetchDialogs) return;
     if (!autoLoad) return;
-    if (initialDialogsLoadedRef.current && loadedSearchRef.current === search) return;
+    if (initialDialogsLoadedRef.current && loadedSearchRef.current === listKey) return;
     initialDialogsLoadedRef.current = true;
-    loadedSearchRef.current = search;
+    loadedSearchRef.current = listKey;
     void loadDialogsPage();
-  }, [autoLoad, fetchDialogs, search, loadDialogsPage]);
+  }, [autoLoad, fetchDialogs, listKey, loadDialogsPage]);
 
   const removeLocal = useCallback((id: string) => {
     setDialogs(prev => prev.filter(d => d.id !== id));
@@ -301,7 +307,7 @@ export function useManagedDialogList({
   const hasMoreDialogs = dialogsNextCursor != null;
   // Reported as loading until the first page for the CURRENT search settles —
   // see `settledSearch`.
-  const awaitingFirstPage = !!fetchDialogs && settledSearch !== (search ?? null);
+  const awaitingFirstPage = !!fetchDialogs && settledSearch !== listKey;
   const dialogsLoading = isDialogsLoading || awaitingFirstPage;
 
   return useMemo<UseManagedDialogListResult>(

@@ -8,12 +8,17 @@
  * The live tail is a HOOK (`useLiveTail`), because every live transport is one: the NATS WebSocket subscription, the
  * JetStream consumer, the Tauri bridge's. The engine calls it once per render; the function may be a new one each
  * render, as long as the hooks it calls are always the same.
+ *
+ * A replaying tail (JetStream, the Tauri bridge) delivers at least once: a chunk it already delivered can come again
+ * after a reconnect. `redeliveryGate` is THE rule that drops it, by its stream sequence; every replaying tail applies
+ * it before the engine sees a chunk.
  */
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { NatsBeforeReconnect } from '../../../nats/shared-connection';
 import { useJetStreamDialogSubscription } from '../hooks/use-jetstream-dialog-subscription';
 import { useNatsDialogSubscription } from '../hooks/use-nats-dialog-subscription';
-import type { FetchChunksFunction, HistoricalMessage, NatsMessageType } from '../types';
+import type { DialogItem, FetchChunksFunction, HistoricalMessage, NatsMessageType } from '../types';
 import type {
   DialogTokenUsage,
   FetchDialogsParams,
@@ -36,6 +41,8 @@ export interface ChatLiveTailOptions {
   onConnect: () => void;
   /** A replaying tail came back after a gap and delivered what the stream held: the engine refetches history. */
   onResync: () => void;
+  /** The tail is subscribed to `dialogId`: a transport that `awaitsSubscription` publishes only after it. */
+  onSubscribed?: () => void;
 }
 
 export type UseChatLiveTail = (options: ChatLiveTailOptions) => void;
@@ -46,10 +53,18 @@ export interface ChatTransport {
   /** Whether the tail replays what it missed itself. Otherwise the engine back-fills from `fetchChunks` on reconnect. */
   replays?: boolean;
   /**
+   * The answer to a message comes only on the live tail, and a tail that is not subscribed yet would miss its start:
+   * the engine publishes once the tail says it is subscribed to the dialog (`onSubscribed`), within 30 seconds.
+   */
+  awaitsSubscription?: boolean;
+  /**
    * Send the user's message, with what the composer attached to it (`contextItems`, `currentPage`, …) for the host to
    * fold into its request. The answer arrives on the live tail.
    */
-  publish: (text: string, options: UnifiedSendMessageOptions & { dialogId: string | null }) => Promise<void> | void;
+  publish: (
+    text: string,
+    options: UnifiedSendMessageOptions & { dialogId: string | null },
+  ) => Promise<void | boolean> | void | boolean;
   /** The chunk back-fill a tail that does not replay is read with (see `useChunkCatchup`). */
   fetchChunks?: FetchChunksFunction;
   /** Cancel the running answer on the backend. Without it, Stop only unlocks the composer. */
@@ -76,13 +91,33 @@ export interface FetchDialogMessagesResult {
   tokenUsage?: DialogTokenUsage | null;
 }
 
+/** What a new dialog is created for: the app's name for it, the intent it opens for, the first message it will get. */
+export interface ChatCreateDialogOptions {
+  title?: string;
+  intent?: string;
+  /** The message the dialog is created to send, with what the composer attached to it. */
+  firstMessage?: string;
+  sendOptions?: UnifiedSendMessageOptions;
+}
+
+/** The open dialog's own record: what the list may not hold (an archived dialog, one reached by link). */
+export interface ChatDialogRecord {
+  dialog: DialogItem;
+  tokenUsage?: DialogTokenUsage | null;
+}
+
 /** How a chat reads and keeps its dialogs. Every field is a capability: absent, its affordance is hidden. */
 export interface ChatHistoryBackend {
   /** The dialog list. With it the engine owns the active dialog and the list (managed mode). */
   fetchDialogs?: (params: FetchDialogsParams) => Promise<FetchDialogsResult>;
   /** One page of a dialog's persisted messages, oldest first (`createMingoGraphqlHistory` for an OpenFrame backend). */
   fetchDialogMessages?: (params: FetchDialogMessagesParams) => Promise<FetchDialogMessagesResult>;
-  createDialog?: () => Promise<{ dialogId: string }>;
+  /** Create a dialog. With it a send with no dialog open creates one first, and `startNewDialog` opens one. */
+  createDialog?: (options: ChatCreateDialogOptions) => Promise<{ dialogId: string }>;
+  /** The open dialog's record, or null when it does not resolve (the engine then says so, `dialogError`). */
+  fetchDialog?: (dialogId: string) => Promise<ChatDialogRecord | null>;
+  /** Compact a dialog's context on the backend (the list's "Compact" action). */
+  compactDialog?: (dialogId: string) => Promise<void>;
   deleteDialog?: (dialogId: string) => Promise<void>;
   renameDialog?: (dialogId: string, title: string) => Promise<void>;
   archiveDialog?: (dialogId: string) => Promise<void>;
@@ -105,7 +140,7 @@ export function natsWsLiveTail({
   clientConfig,
   topics,
 }: ChatNatsConnection & { topics?: NatsMessageType[] }): UseChatLiveTail {
-  return function useNatsWsLiveTail({ enabled, dialogId, onEvent, onConnect }) {
+  return function useNatsWsLiveTail({ enabled, dialogId, onEvent, onConnect, onSubscribed }) {
     useNatsDialogSubscription({
       enabled,
       dialogId,
@@ -114,6 +149,7 @@ export function natsWsLiveTail({
       clientConfig,
       onEvent,
       onConnect,
+      ...(onSubscribed ? { onSubscribed } : {}),
     });
   };
 }
@@ -128,8 +164,15 @@ export function jetStreamLiveTail({
   clientConfig,
   topic,
   streamName,
-}: ChatNatsConnection & { topic: NatsMessageType; streamName?: string }): UseChatLiveTail {
-  return function useJetStreamLiveTail({ enabled, dialogId, fromSeq, onEvent, onConnect, onResync }) {
+  onBeforeReconnect,
+}: ChatNatsConnection & {
+  topic: NatsMessageType;
+  streamName?: string;
+  /** Asked before the client reconnects (a token refresh). */
+  onBeforeReconnect?: NatsBeforeReconnect;
+}): UseChatLiveTail {
+  return function useJetStreamLiveTail({ enabled, dialogId, fromSeq, onEvent, onConnect, onResync, onSubscribed }) {
+    const deliver = useRedeliveryGate(dialogId, onEvent);
     const { caughtUpCount } = useJetStreamDialogSubscription({
       enabled: enabled && fromSeq !== undefined,
       dialogId,
@@ -138,11 +181,53 @@ export function jetStreamLiveTail({
       optStartSeq: fromSeq ?? null,
       getNatsWsUrl,
       clientConfig,
-      onEvent,
+      onEvent: deliver,
       onConnect,
+      ...(onSubscribed ? { onSubscribed } : {}),
+      ...(onBeforeReconnect ? { onBeforeReconnect } : {}),
     });
     useResyncOn(caughtUpCount, onResync);
   };
+}
+
+/**
+ * THE redelivery gate of an at-least-once tail: a chunk whose stream sequence is not above the last one delivered for
+ * the dialog was delivered already, and delivering it again would write its text or its row twice. A chunk with no
+ * sequence passes. The last sequence starts over with the dialog.
+ */
+export function redeliveryGate(): (dialogId: string | null, payload: unknown) => boolean {
+  let gatedDialog: string | null = null;
+  let lastSeq = -1;
+  return (dialogId, payload) => {
+    if (dialogId !== gatedDialog) {
+      gatedDialog = dialogId;
+      lastSeq = -1;
+    }
+    const seq = (payload as { streamSeq?: unknown } | null)?.streamSeq;
+    if (typeof seq !== 'number') return true;
+    if (seq <= lastSeq) return false;
+    lastSeq = seq;
+    return true;
+  };
+}
+
+/** `onEvent` behind the redelivery gate, for a replaying tail hook. */
+export function useRedeliveryGate(
+  dialogId: string | null,
+  onEvent: ChatLiveTailOptions['onEvent'],
+): ChatLiveTailOptions['onEvent'] {
+  const [passes] = useState(redeliveryGate);
+  const latest = useRef({ dialogId, onEvent });
+  useEffect(() => {
+    latest.current = { dialogId, onEvent };
+  });
+  return useCallback(
+    (payload: unknown, messageType: NatsMessageType) => {
+      const { dialogId: current, onEvent: deliver } = latest.current;
+      if (passes(current, payload)) deliver(payload, messageType);
+    },
+    [passes],
+  );
 }
 
 /** Calls `onResync` each time `count` moves on from the value it had when the tail opened. */

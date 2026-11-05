@@ -31,6 +31,10 @@ export { useChatThread } from './use-chat-thread';
 export {
   jetStreamLiveTail,
   natsWsLiveTail,
+  redeliveryGate,
+  useRedeliveryGate,
+  type ChatCreateDialogOptions,
+  type ChatDialogRecord,
   type ChatHistoryBackend,
   type ChatLiveTailOptions,
   type ChatNatsConnection,
@@ -39,9 +43,17 @@ export {
   type FetchDialogMessagesResult,
   type UseChatLiveTail,
 } from './chat-transport';
-export { useChatEngine, type UseChatEngineConfig, type UseChatEngineOptions } from './use-chat-engine';
 export {
+  useChatEngine,
+  type ChatEngineAction,
+  type UseChatEngineConfig,
+  type UseChatEngineOptions,
+} from './use-chat-engine';
+export {
+  createMingoGraphqlDialogs,
   createMingoGraphqlHistory,
+  dialogItemOfNode,
+  type MingoGraphqlDialogsOptions,
   type MingoGraphqlHistoryOptions,
   type MingoGraphqlPost,
 } from './mingo-graphql-history';

@@ -32,6 +32,8 @@ export interface FetchDialogsParams {
   cursor?: string;
   limit?: number;
   search?: string;
+  /** The owner filter, for a host that has one (`dialogScopes`): only the viewer's dialogs, or everyone's. */
+  scope?: 'my' | 'all';
 }
 
 /** Successful `fetchDialogs` response. `nextCursor: null` means "no more
@@ -158,6 +160,18 @@ export interface UnifiedUsageBreakdown {
   haikuClassifier?: { input: number; output: number };
   haikuSummarizer?: { input: number; output: number };
   routedAnswer?: { model: string; complexity: string; thinkingBudget: number };
+}
+
+// ─── startNewDialog options ──────────────────────────────────────────────────
+
+/** How a new dialog starts. Every field is optional; an adapter reads what it can do. */
+export interface ChatNewDialogOptions {
+  /** Its name, given by the app (a tour, a launcher), so the list never shows it as a new chat. */
+  title?: string;
+  /** What it is opened for (the backend's intent: create one entity). The backend writes the first message. */
+  intent?: string;
+  /** A first message sent into it once it is open. */
+  prompt?: string;
 }
 
 // ─── sendMessage options ─────────────────────────────────────────────────────
@@ -354,8 +368,18 @@ export interface UnifiedChatState {
 
   /** Allocate a fresh dialog on the backend (Mingo) or in localStorage
    *  (Guide) and switch to it. Returns the new dialog id. When the
-   *  adapter doesn't support creation, resolves to `null`. */
-  startNewDialog: () => Promise<string | null>;
+   *  adapter doesn't support creation, resolves to `null`. `options` names it, opens it for an intent, or sends a
+   *  first message into it (a launcher's "Ask about X"); an adapter that has no use for one ignores it. */
+  startNewDialog: (options?: ChatNewDialogOptions) => Promise<string | null>;
+
+  /**
+   * Why the open dialog could not be read, or null: its record does not resolve (deleted, someone else's, a mistyped
+   * link) or its history failed. Without it such a dialog renders as an ordinary empty thread and says nothing.
+   */
+  dialogError?: string | null;
+
+  /** The thread's tail is a context compaction still running: the composer stays locked, as for a turn. */
+  isCompacting?: boolean;
 
   /** Delete a dialog from history. No-op (resolves) when the adapter doesn't
    *  expose `deleteDialog`.

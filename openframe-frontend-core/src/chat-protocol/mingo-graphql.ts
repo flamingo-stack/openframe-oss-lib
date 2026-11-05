@@ -239,3 +239,186 @@ export function mingoMessagesPage(connection: MingoMessagesConnection): {
   const messages = connection.edges.map(edge => historicalMessageOfNode(edge.node)).reverse();
   return { messages, nextCursor: connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null };
 }
+
+// =============================================================================
+// Dialogs: the list, the open dialog's record, and what a person does to one
+// =============================================================================
+
+/** The owner a dialog row and record name: an admin (with their face), or the machine of an end user's chat. */
+const DIALOG_OWNER_SELECTION = `
+    owner {
+      type
+      ... on AdminDialogOwner {
+        userId
+        user {
+          id
+          firstName
+          lastName
+          image {
+            imageUrl
+            hash
+          }
+        }
+      }
+      ... on ClientDialogOwner {
+        machineId
+        machine {
+          id
+          machineId
+          hostname
+        }
+      }
+    }`;
+
+/**
+ * One page of the dialog list. `pendingApproval` rides along when the list draws each row's status (the chat's own
+ * list); the other lists (the archive, an incident's chats) need none and do not ask for it.
+ */
+export function mingoDialogsQuery({ pendingApproval }: { pendingApproval: boolean }): string {
+  return `
+  query GetDialogs($filter: DialogFilterInput, $first: Int, $after: String, $search: String, $sort: SortInput) {
+    dialogs(filter: $filter, first: $first, after: $after, search: $search, sort: $sort) {
+      edges {
+        cursor
+        node {
+          id
+          dialogId
+          title
+          status
+          streamState${pendingApproval ? '\n          pendingApproval {\n            id\n            approvalType\n          }' : ''}
+          createdAt
+          statusUpdatedAt
+          lastActivityAt${DIALOG_OWNER_SELECTION}
+        }
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+    }
+  }
+`;
+}
+
+/** The open dialog's own record: what the list may not hold (an archived dialog, one reached by link). */
+export const MINGO_DIALOG_QUERY = `
+  query GetDialog($id: ID!) {
+    dialog(id: $id) {
+      id
+      dialogId
+      title
+      status
+      streamState${DIALOG_OWNER_SELECTION}
+      createdAt
+      statusUpdatedAt
+      lastActivityAt
+      resolvedAt
+      aiResolutionSuggestedAt
+      ticketId
+      rating {
+        id
+        dialogId
+        createdAt
+      }
+      tokenUsage {
+        chatType
+        inputTokensSize
+        outputTokensSize
+        totalTokensSize
+        contextSize
+      }
+    }
+  }
+`;
+
+export const MINGO_RENAME_DIALOG_MUTATION = `
+  mutation RenameDialog($input: RenameDialogInput!) {
+    renameDialog(input: $input) {
+      dialog { id title }
+      userErrors { field message }
+    }
+  }
+`;
+
+export const MINGO_ARCHIVE_DIALOG_MUTATION = `
+  mutation ArchiveDialog($input: DialogIdInput!) {
+    archiveDialog(input: $input) {
+      dialog { id status }
+      userErrors { field message }
+    }
+  }
+`;
+
+export const MINGO_UNARCHIVE_DIALOG_MUTATION = `
+  mutation UnarchiveDialog($input: DialogIdInput!) {
+    unarchiveDialog(input: $input) {
+      dialog { id status }
+      userErrors { field message }
+    }
+  }
+`;
+
+export const MINGO_COMPACT_DIALOG_MUTATION = `
+  mutation CompactDialog($input: DialogIdInput!) {
+    compactDialog(input: $input) {
+      userErrors { field message code }
+    }
+  }
+`;
+
+/** A person's face as the API answers it: the stored image and its cache hash. */
+export interface MingoImage {
+  imageUrl?: string | null;
+  hash?: string | null;
+}
+
+/** A dialog row or record as the queries answer it. */
+export interface MingoDialogNode {
+  /** The Relay global id. */
+  id: string;
+  /** The raw id: what the NATS subject, the list rows and every chat key on. */
+  dialogId: string;
+  title?: string | null;
+  status?: string | null;
+  streamState?: string | null;
+  pendingApproval?: { id: string; approvalType?: string | null } | null;
+  createdAt: string;
+  statusUpdatedAt?: string | null;
+  lastActivityAt?: string | null;
+  resolvedAt?: string | null;
+  aiResolutionSuggestedAt?: string | null;
+  ticketId?: string | null;
+  owner?: {
+    type?: string;
+    userId?: string;
+    user?: { id?: string; firstName?: string | null; lastName?: string | null; image?: MingoImage | null } | null;
+    machineId?: string;
+    machine?: { id?: string; machineId?: string; hostname?: string | null } | null;
+  } | null;
+  rating?: { id: string; dialogId: string; createdAt: string } | null;
+  tokenUsage?: Array<{
+    chatType?: string | null;
+    inputTokensSize?: number | null;
+    outputTokensSize?: number | null;
+    totalTokensSize?: number | null;
+    contextSize?: number | null;
+  }> | null;
+}
+
+export interface MingoDialogsConnection {
+  edges: Array<{ cursor: string; node: MingoDialogNode }>;
+  pageInfo: MingoMessagesConnection['pageInfo'];
+}
+
+/** A mutation's own refusals. */
+export interface MingoUserErrors {
+  userErrors?: Array<{ field?: string | null; message: string; code?: string | null }> | null;
+}
+
+/** A mutation that refused says why: its first user error's message. */
+export function throwOnUserErrors(payload: MingoUserErrors | null | undefined): void {
+  const first = payload?.userErrors?.[0];
+  if (first) throw new Error(first.message);
+}

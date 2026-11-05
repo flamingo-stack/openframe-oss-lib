@@ -194,7 +194,10 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
   // identity does. We don't recreate per-call to avoid spurious child
   // re-renders downstream.
   const selectDialog = useCallback((id: string | null) => activeStateRef.current.selectDialog(id), []);
-  const startNewDialog = useCallback(() => activeStateRef.current.startNewDialog(), []);
+  const startNewDialog = useCallback<UnifiedChatState['startNewDialog']>(
+    start => activeStateRef.current.startNewDialog(start),
+    [],
+  );
   const deleteDialog = useCallback((id: string) => activeStateRef.current.deleteDialog(id), []);
   const renameDialog = useCallback((id: string, title: string) => activeStateRef.current.renameDialog(id, title), []);
   const archiveDialog = useCallback((id: string) => activeStateRef.current.archiveDialog(id), []);
