@@ -71,18 +71,50 @@ export const DEFAULT_SOFTWARE_UPDATE_SETTINGS: SoftwareUpdateSettingsValues = {
   autoUpdatePolicy: DEFAULT_SOFTWARE_UPDATE_POLICY,
 };
 
-const MODE_OPTIONS: RadioGroupBlockOption[] = [
-  {
-    value: 'WAIT',
-    label: 'Wait & notify',
-    description: 'The user gets Update now or Ask Later. If they close the app, it updates then.',
-  },
-  {
-    value: 'FORCE',
-    label: 'Force Update',
-    description: 'The user gets a short countdown, then the app closes and updates.',
-  },
-];
+/**
+ * Without user notifications there is no one to wait for and no countdown to show: an update on a device where the
+ * app is running closes it and updates. Wait & notify falls back to Force Update, and its deadline goes with it;
+ * `countdownSeconds` is kept, since the input requires it.
+ */
+function forceWithoutNotifications(policy: SoftwareUpdatePolicy): SoftwareUpdatePolicy {
+  return policy.mode === 'FORCE' && !policy.deadlineEnabled
+    ? policy
+    : { ...policy, mode: 'FORCE', deadlineEnabled: false };
+}
+
+/**
+ * The settings as the form can offer them: unchanged with user notifications, Force Update for both policies without
+ * them (a draft or a saved policy on Wait & notify reads as Force Update). What the fields draw and the form submits.
+ */
+export function availableSoftwareUpdateSettings(
+  settings: SoftwareUpdateSettingsValues,
+  userNotifications: boolean,
+): SoftwareUpdateSettingsValues {
+  if (userNotifications) return settings;
+  const policy = forceWithoutNotifications(settings.policy);
+  const autoUpdatePolicy = forceWithoutNotifications(settings.autoUpdatePolicy);
+  return policy === settings.policy && autoUpdatePolicy === settings.autoUpdatePolicy
+    ? settings
+    : { ...settings, policy, autoUpdatePolicy };
+}
+
+const WAIT_OPTION: RadioGroupBlockOption = {
+  value: 'WAIT',
+  label: 'Wait & notify',
+  description: 'The user gets Update now or Ask Later. If they close the app, it updates then.',
+};
+
+const FORCE_OPTION: RadioGroupBlockOption = {
+  value: 'FORCE',
+  label: 'Force Update',
+  description: 'The user gets a short countdown, then the app closes and updates.',
+};
+
+/** Force Update with no countdown first: what a device does while there are no user notifications. */
+const FORCE_ONLY_OPTION: RadioGroupBlockOption = {
+  ...FORCE_OPTION,
+  description: 'The app closes and updates.',
+};
 
 const SAME_SETTINGS_DESCRIPTION: Record<SoftwareUpdateMode, string> = {
   WAIT: 'Auto-updates follow "If the app is running" above. Uncheck to set them separately.',
@@ -126,12 +158,15 @@ function UpdatePolicyFields({
   name,
   label,
   policy,
+  userNotifications,
   onChange,
 }: {
   /** The radio group's name: two policies on one page must not share it. */
   name: string;
   label: string;
   policy: SoftwareUpdatePolicy;
+  /** Off, Force Update is the only choice and it has no countdown to set. */
+  userNotifications: boolean;
   onChange: (policy: SoftwareUpdatePolicy) => void;
 }) {
   const waits = policy.mode === 'WAIT';
@@ -154,7 +189,7 @@ function UpdatePolicyFields({
           variant="grouped"
           value={policy.mode}
           onValueChange={mode => onChange({ ...policy, mode: mode as SoftwareUpdateMode })}
-          options={MODE_OPTIONS}
+          options={userNotifications ? [WAIT_OPTION, FORCE_OPTION] : [FORCE_ONLY_OPTION]}
           itemClassName="py-[var(--spacing-system-sf)]"
         />
       </div>
@@ -180,7 +215,9 @@ function UpdatePolicyFields({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3">{countdown}</div>
+        userNotifications && (
+          <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3">{countdown}</div>
+        )
       )}
     </div>
   );
@@ -189,6 +226,11 @@ function UpdatePolicyFields({
 export interface SoftwareUpdateSettingsFieldsProps {
   value: SoftwareUpdateSettingsValues;
   onChange: (value: SoftwareUpdateSettingsValues) => void;
+  /**
+   * The devices can notify the user: Wait & notify, its deadline and the countdowns are offered. Default false, as
+   * today, when the client has no notifications: Force Update alone, with nothing to set.
+   */
+  userNotifications?: boolean;
 }
 
 /**
@@ -196,7 +238,12 @@ export interface SoftwareUpdateSettingsFieldsProps {
  * rules 1034:8173): what happens on a device where the app is running, and
  * whether later releases are installed the same way.
  */
-export function SoftwareUpdateSettingsFields({ value, onChange }: SoftwareUpdateSettingsFieldsProps) {
+export function SoftwareUpdateSettingsFields({
+  value: settings,
+  onChange,
+  userNotifications = false,
+}: SoftwareUpdateSettingsFieldsProps) {
+  const value = availableSoftwareUpdateSettings(settings, userNotifications);
   return (
     <section aria-labelledby="software-update-settings" className="flex flex-col gap-[var(--spacing-system-l)]">
       <h2 id="software-update-settings" className="pt-[var(--spacing-system-l)] text-ods-text-primary text-h2">
@@ -207,6 +254,7 @@ export function SoftwareUpdateSettingsFields({ value, onChange }: SoftwareUpdate
         name="updatePolicy"
         label="If the app is running"
         policy={value.policy}
+        userNotifications={userNotifications}
         onChange={policy => onChange({ ...value, policy })}
       />
 
@@ -235,6 +283,7 @@ export function SoftwareUpdateSettingsFields({ value, onChange }: SoftwareUpdate
                     name="autoUpdatePolicy"
                     label="For auto-updates"
                     policy={value.autoUpdatePolicy}
+                    userNotifications={userNotifications}
                     onChange={autoUpdatePolicy => onChange({ ...value, autoUpdatePolicy })}
                   />
                 </div>

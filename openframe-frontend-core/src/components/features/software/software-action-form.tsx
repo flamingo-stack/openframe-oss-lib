@@ -10,6 +10,7 @@ import { SOFTWARE_ACTION_COPY, type SoftwareActionKind } from './software-action
 import { newSoftwareRow, type SoftwareRow } from './software-row';
 import { type PackageSearchSlotProps, SoftwareRowFields } from './software-row-fields';
 import {
+  availableSoftwareUpdateSettings,
   DEFAULT_SOFTWARE_UPDATE_SETTINGS,
   SoftwareUpdateSettingsFields,
   type SoftwareUpdateSettingsValues,
@@ -74,6 +75,11 @@ export interface SoftwareActionFormProps<TRef extends string = string> {
    * settings yet never shows choices that go nowhere; the host that submits `updateSettings` passes true.
    */
   showUpdateSettings?: boolean;
+  /**
+   * "Update Settings" offer Wait & notify and the countdowns, which need the devices to notify the user. Default
+   * false: Force Update alone, and that is what is submitted, a Wait & notify in `initialValues` included.
+   */
+  updateUserNotifications?: boolean;
   /** The "Device Selection" heading over the picker. Default true; a host that titles the picker itself passes false. */
   showDeviceHeading?: boolean;
   className?: string;
@@ -104,6 +110,7 @@ export function SoftwareActionForm<TRef extends string = string>({
   addRows = true,
   runModeLayout = 'stacked',
   showUpdateSettings = false,
+  updateUserNotifications = false,
   showDeviceHeading = true,
   className = 'px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]',
 }: SoftwareActionFormProps<TRef>) {
@@ -134,7 +141,9 @@ export function SoftwareActionForm<TRef extends string = string>({
           date,
           time,
           timeReference,
-          updateSettings: withUpdateSettings ? updateSettings : undefined,
+          updateSettings: withUpdateSettings
+            ? availableSoftwareUpdateSettings(updateSettings, updateUserNotifications)
+            : undefined,
         }),
       disabled: submitDisabled,
       loading: submitting,
@@ -215,7 +224,13 @@ export function SoftwareActionForm<TRef extends string = string>({
         </>
       )}
 
-      {withUpdateSettings && <SoftwareUpdateSettingsFields value={updateSettings} onChange={setUpdateSettings} />}
+      {withUpdateSettings && (
+        <SoftwareUpdateSettingsFields
+          value={updateSettings}
+          onChange={setUpdateSettings}
+          userNotifications={updateUserNotifications}
+        />
+      )}
 
       {showDeviceHeading && (
         <h2 className="pt-[var(--spacing-system-l)] text-ods-text-primary text-h2">Device Selection</h2>

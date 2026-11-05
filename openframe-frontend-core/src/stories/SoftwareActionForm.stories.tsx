@@ -52,12 +52,17 @@ export const EmptyInstall: Story = {
   },
 };
 
-/** Update Software as it opens: "Update Settings" with the server's defaults between the timing and the devices. */
+/** Update Software as it opens while the devices cannot notify the user: "Update Settings" offer Force Update alone. */
 export const EmptyUpdate: Story = {
   args: { ...EmptyInstall.args, action: 'UPDATE', showUpdateSettings: true },
 };
 
-/** "Update Settings" on its own, auto-updates set separately (design 1034:8173). */
+/** With user notifications: Wait & notify, its deadline and the countdowns, on the server's defaults. */
+export const EmptyUpdateWithNotifications: Story = {
+  args: { ...EmptyUpdate.args, updateUserNotifications: true },
+};
+
+/** "Update Settings" on its own, auto-updates set separately (design 1034:8173), with user notifications. */
 export const UpdateSettingsSeparateAutoUpdate: Story = {
   render: () => {
     const [value, setValue] = useState<SoftwareUpdateSettingsValues>({
@@ -66,7 +71,7 @@ export const UpdateSettingsSeparateAutoUpdate: Story = {
     });
     return (
       <div className="p-[var(--spacing-system-l)]">
-        <SoftwareUpdateSettingsFields value={value} onChange={setValue} />
+        <SoftwareUpdateSettingsFields value={value} onChange={setValue} userNotifications />
       </div>
     );
   },
