@@ -8,6 +8,7 @@ import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.ToolUrlService;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.FleetTenantHeader;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmNotFoundException;
 import com.openframe.sdk.fleetmdm.model.Host;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -104,14 +105,22 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
 
     // Instance-mode devices (ORBIT_HOST_IDENTIFIER=instance) report an osquery_host_id the host search never matches.
     private Optional<Host> findHostByOsqueryHostId(FleetMdmClient fleetClient, String machineId, String osqueryHostId) {
-        Host host = fleetClient.getHostByIdentifier(osqueryHostId);
-
-        Optional<Host> enrolledWithId = Optional.ofNullable(host)
+        Optional<Host> enrolledWithId = fetchHostByIdentifier(fleetClient, machineId, osqueryHostId)
                 .filter(candidate -> isEnrolledWithOsqueryHostId(candidate, osqueryHostId))
                 .filter(FleetMdmAgentIdTransformer::hasOsqueryVersion);
 
         enrolledWithId.ifPresent(matched -> logOsqueryHostIdMatch(machineId, osqueryHostId, matched));
         return enrolledWithId;
+    }
+
+    private Optional<Host> fetchHostByIdentifier(FleetMdmClient fleetClient, String machineId, String identifier) {
+        try {
+            Host host = fleetClient.getHostByIdentifier(identifier);
+            return Optional.of(host);
+        } catch (FleetMdmNotFoundException e) {
+            log.info("No Fleet host for identifier, machineId={}, identifier={}", machineId, identifier);
+            return Optional.empty();
+        }
     }
 
     private static boolean isEnrolledWithOsqueryHostId(Host host, String osqueryHostId) {

@@ -9,6 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmArgumentException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmNotFoundException;
 import com.openframe.sdk.fleetmdm.model.AffectedSoftware;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
@@ -165,7 +166,11 @@ public class FleetMdmClient {
         validateIdentifier(identifier);
         String encodedIdentifier = URLEncoder.encode(identifier, StandardCharsets.UTF_8).replace("+", "%20");
         String url = baseUrl + HOST_BY_IDENTIFIER_URL + encodedIdentifier + "?exclude_software=true";
-        return getHost(identifier, url, Host.class);
+        Host host = getHost(identifier, url, Host.class);
+        if (host == null) {
+            throw new FleetMdmNotFoundException("Fleet host not found for identifier " + identifier, "");
+        }
+        return host;
     }
 
     public HostVulnerabilityInventory getHostVulnerabilityInventoryById(long id) {
