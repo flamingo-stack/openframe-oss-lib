@@ -24,7 +24,7 @@ const categories: PermissionCategory[] = [
 const open = () => fireEvent.click(screen.getByRole('button', { name: 'Expand' }));
 
 describe('PolicyConfigurationPanel', () => {
-  it("shows a rule's level in its colour, and its pattern on one line", () => {
+  it("shows a rule's level with its icon in its colour, and its pattern on one line", () => {
     render(
       <PolicyConfigurationPanel
         categories={categories}
@@ -35,10 +35,23 @@ describe('PolicyConfigurationPanel', () => {
     );
     open();
     const [level] = screen.getAllByText('Ask User');
-    expect(level?.className).toContain('text-ods-warning');
+    expect(level?.className).toContain('text-h4');
+    expect((level?.previousElementSibling as HTMLElement).className).toContain('text-ods-warning');
     const pattern = screen.getByTitle('(?i)^(Invoke-WebRequest|wget|curl).*');
     expect(pattern.className).toContain('truncate');
     expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
+  });
+
+  it('counts a category with one rule in the singular', () => {
+    render(
+      <PolicyConfigurationPanel
+        categories={categories}
+        editMode={false}
+        onPolicyPermissionChange={() => {}}
+        onCategoryPermissionChange={() => {}}
+      />,
+    );
+    expect(screen.getByText('1 Configuration')).toBeTruthy();
   });
 
   it('picks a level from the four while editing', () => {

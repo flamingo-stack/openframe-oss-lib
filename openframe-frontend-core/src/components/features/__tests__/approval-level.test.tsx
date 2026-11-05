@@ -43,13 +43,23 @@ describe('ApprovalLevelView, editable', () => {
 });
 
 describe('ApprovalLevelView, read-only', () => {
-  it('writes the same name in the same colour as the editable form, with no choice to make', () => {
-    const { rerender } = render(<ApprovalLevelView value="DENY" />);
-    const readOnlyName = screen.getByText('Restrict');
+  it('draws the icon in the level colour before the name, with no choice to make', () => {
+    const { container } = render(<ApprovalLevelView value="DENY" />);
+    const name = screen.getByText('Restrict');
     expect(screen.queryByRole('button')).toBeNull();
-    const readOnlyClass = readOnlyName.className;
-    rerender(<ApprovalLevelView value="DENY" onChange={() => {}} />);
-    expect(screen.getByText('Restrict').className).toBe(readOnlyClass);
+    expect(name.className).toContain('text-h4');
+    const icon = (container.querySelector('svg') as SVGElement).parentElement as HTMLElement;
+    expect(icon.className).toContain(APPROVAL_LEVEL_META.DENY.toneClassName);
+    expect(icon.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('writes the name in the level colour beside the strip while editing, the level in force primary', () => {
+    render(<ApprovalLevelView value="DENY" onChange={() => {}} />);
+    expect(screen.getByText('Restrict').className).toContain(APPROVAL_LEVEL_META.DENY.toneClassName);
+    const tone = (name: string) =>
+      (screen.getByRole('button', { name }).querySelector('svg') as SVGElement).getAttribute('class');
+    expect(tone('Restrict')).toContain('text-ods-text-primary');
+    expect(tone('Allow')).toContain('text-ods-text-secondary');
   });
 
   it('keeps the name as the accessible name when it is not written', () => {

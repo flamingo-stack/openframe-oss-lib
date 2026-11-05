@@ -215,7 +215,10 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                     )
                   )}
                 </div>
-                {option?.trailing && <div className="ml-auto flex shrink-0 items-center">{option.trailing}</div>}
+                {/* Centred on the row whatever the row aligns (a design may top-align the dot with the label). */}
+                {option?.trailing && (
+                  <div className="ml-auto flex shrink-0 items-center self-center">{option.trailing}</div>
+                )}
               </>
             );
             return (

@@ -53,11 +53,14 @@ export const APPROVAL_LEVEL_META: Record<ApprovalLevel, ApprovalLevelMeta> = {
   DENY: { label: 'Restrict', hint: 'Never runs.', Icon: BannedIcon, toneClassName: 'text-ods-error' },
 };
 
-const ICON_PX = 16;
+/** A read-only level's icon (Figma 1608-49531: 24px, before the name). */
+const ICON_PX = 24;
 
 /** The view's layout, read by the view and by its skeleton, so the skeleton is the view's size. */
 const READ_ONLY_ROW_CLASS = 'inline-flex shrink-0 items-center gap-[var(--spacing-system-xxs)]';
 const EDITABLE_ROW_CLASS = 'flex shrink-0 items-center gap-[var(--spacing-system-m)]';
+/** Read-only, the name is the row's value (h4, primary); editable, a caption in the level's colour beside the strip. */
+const READ_ONLY_NAME_CLASS = 'whitespace-nowrap text-ods-text-primary text-h4';
 const LEVEL_NAME_CLASS = 'whitespace-nowrap text-h6';
 /** An editable level's icon (Figma: 20px in the segment). */
 const EDITABLE_ICON_PX = 20;
@@ -65,6 +68,15 @@ const EDITABLE_ICON_PX = 20;
 const LONGEST_LEVEL_LABEL = APPROVAL_LEVELS.map(level => APPROVAL_LEVEL_META[level].label).reduce((a, b) =>
   b.length > a.length ? b : a,
 );
+
+/** The strip's four levels: the one in force (none while loading) in the primary colour, the others secondary (Figma 4365-22670). */
+function levelItems(inForce: ApprovalLevel | undefined) {
+  return APPROVAL_LEVELS.map(level => {
+    const { label, Icon } = APPROVAL_LEVEL_META[level];
+    const tone = level === inForce ? 'text-ods-text-primary' : 'text-ods-text-secondary';
+    return { id: level, ariaLabel: label, icon: <Icon size={EDITABLE_ICON_PX} className={tone} aria-hidden /> };
+  });
+}
 
 export interface ApprovalLevelViewProps {
   /** The level in force. */
@@ -94,11 +106,11 @@ export interface ApprovalLevelViewProps {
 
 /**
  * THE way a level is shown, read-only or editable, by one prop: the level's
- * name in its colour, then its icon (read-only) or the four levels' icons in a
- * `TabSelector` strip, the one in force filled (editable). Name, icon and colour
- * are `APPROVAL_LEVEL_META`'s in both, so a rule reads the same on a page that
- * shows it and on one that lets it change. Editable, each icon has its level's
- * name as its accessible name.
+ * icon in its colour, then its name (read-only, Figma 1608-49531), or its name
+ * in its colour, then the four levels' icons in a compact `TabSelector` strip,
+ * the one in force filled (editable, Figma 4365-22670). Name, icon and colour
+ * are `APPROVAL_LEVEL_META`'s in both. Editable, each icon has its level's name
+ * as its accessible name.
  */
 export function ApprovalLevelView({
   value,
@@ -116,7 +128,6 @@ export function ApprovalLevelView({
     return <ApprovalLevelSkeleton editable={canEdit} showLabel={showLabel} className={className} />;
   }
   const current = APPROVAL_LEVEL_META[value];
-  const name = showLabel ? <span className={cn(LEVEL_NAME_CLASS, current.toneClassName)}>{current.label}</span> : null;
 
   if (!canEdit) {
     const icon = (
@@ -127,7 +138,6 @@ export function ApprovalLevelView({
     );
     return (
       <span className={cn(READ_ONLY_ROW_CLASS, className)}>
-        {name}
         {showLabel ? (
           icon
         ) : (
@@ -135,9 +145,12 @@ export function ApprovalLevelView({
             {icon}
           </TouchFriendlyTooltip>
         )}
+        {showLabel && <span className={READ_ONLY_NAME_CLASS}>{current.label}</span>}
       </span>
     );
   }
+
+  const name = showLabel ? <span className={cn(LEVEL_NAME_CLASS, current.toneClassName)}>{current.label}</span> : null;
 
   return (
     <div className={cn(EDITABLE_ROW_CLASS, className)}>
@@ -146,15 +159,13 @@ export function ApprovalLevelView({
       <div role="group" aria-labelledby={labelledBy}>
         <TabSelector
           variant="secondary"
+          size="compact"
           value={value}
           disabled={disabled}
           onValueChange={next => {
             if (next !== value) onChange?.(next as ApprovalLevel);
           }}
-          items={APPROVAL_LEVELS.map(level => {
-            const { label, Icon } = APPROVAL_LEVEL_META[level];
-            return { id: level, ariaLabel: label, icon: <Icon size={EDITABLE_ICON_PX} aria-hidden /> };
-          })}
+          items={levelItems(value)}
           className="w-auto"
         />
       </div>
@@ -175,32 +186,34 @@ interface ApprovalLevelSkeletonProps {
  * read-only icon's box or the editable strip itself, disabled. Inert: nothing in it can be picked.
  */
 function ApprovalLevelSkeleton({ editable = false, showLabel = true, className }: ApprovalLevelSkeletonProps) {
+  if (!editable) {
+    return (
+      <span aria-hidden className={cn(READ_ONLY_ROW_CLASS, className)}>
+        <UnifiedSkeleton as="span" className="inline-block shrink-0 rounded-sm" width={ICON_PX} height={ICON_PX} />
+        {showLabel && (
+          <span className={READ_ONLY_NAME_CLASS}>
+            <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>
+          </span>
+        )}
+      </span>
+    );
+  }
   const name = showLabel ? (
     <span className={LEVEL_NAME_CLASS}>
       <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>
     </span>
   ) : null;
-  if (!editable) {
-    return (
-      <span aria-hidden className={cn(READ_ONLY_ROW_CLASS, className)}>
-        {name}
-        <UnifiedSkeleton as="span" className="inline-block shrink-0 rounded-sm" width={ICON_PX} height={ICON_PX} />
-      </span>
-    );
-  }
   return (
     <div aria-hidden inert className={cn(EDITABLE_ROW_CLASS, className)}>
       {name}
       {/* The real strip, inert, with no level in force yet. */}
       <TabSelector
         variant="secondary"
+        size="compact"
         value=""
         disabled
         onValueChange={() => {}}
-        items={APPROVAL_LEVELS.map(level => {
-          const { label, Icon } = APPROVAL_LEVEL_META[level];
-          return { id: level, ariaLabel: label, icon: <Icon size={EDITABLE_ICON_PX} aria-hidden /> };
-        })}
+        items={levelItems(undefined)}
         className="w-auto"
       />
     </div>

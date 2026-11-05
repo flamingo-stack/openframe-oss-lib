@@ -235,6 +235,13 @@ export default defineConfig([
       // (`h-full`), never an inline one measured from the window, and the rows' scroll box inside it. No `screen`
       // query reaches either, so the test walks up from the header label and a row.
       'src/components/ui/__tests__/file-manager-table-height.test.tsx',
+      // A guardrail level's tone and the level picker's size: the colour sits on the role-less span around a level's
+      // icon (and on the icon in each segment), the size on the strip and the segments' icon box. Their classes ARE
+      // the contract (Figma 1608-49525 / 4365-22670), and no `screen` query reaches them, so the tests walk from the
+      // name or the segment.
+      'src/components/features/__tests__/approval-level.test.tsx',
+      'src/components/features/__tests__/policy-configuration-panel.test.tsx',
+      'src/components/ui/__tests__/tab-selector.test.tsx',
       // A page drawn only in the browser loads the complete stylesheet: the contract is the <link> RouteStyle appends
       // to <head>, outside anything it renders, which no `screen` query reaches.
       'src/__tests__/route-styles-client.test.tsx',

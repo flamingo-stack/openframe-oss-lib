@@ -96,8 +96,8 @@ const PolicyRow: FC<{
   onPermissionChange: (categoryId: string, policyId: string, level: ApprovalLevel) => void;
 }> = ({ policy, categoryId, editMode, onPermissionChange }) => {
   const nameId = `policy-${categoryId}-${policy.id}`;
-  // The level as every guardrail surface draws it (Figma 4365-22663): its name in its colour, then its icon, or the
-  // four levels' icons to pick from while editing.
+  // The level as every guardrail surface draws it: its icon in its colour, then its name (Figma 1608-49525), or, while
+  // editing, its name in its colour beside the four levels' icons to pick from (Figma 4365-22663).
   const level = policy.approvalLevel ? (
     <ApprovalLevelView
       value={policy.approvalLevel}
@@ -194,7 +194,9 @@ const CategorySection: FC<{
           {loading ? (
             <TextLineSkeleton type="h6" className="w-24" />
           ) : (
-            <p className="text-ods-text-secondary text-h6">{category.policies.length} Configurations</p>
+            <p className="text-ods-text-secondary text-h6">
+              {category.policies.length} {category.policies.length === 1 ? 'Configuration' : 'Configurations'}
+            </p>
           )}
           {editMode && (
             <div className="mt-[var(--spacing-system-xsf)] content-md:hidden" onClick={e => e.stopPropagation()}>
