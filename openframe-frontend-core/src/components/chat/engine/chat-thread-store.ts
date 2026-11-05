@@ -185,7 +185,7 @@ const defaultIdentity = (key: string) => ({ dialogId: key, side: DEFAULT_DIALOG_
 export function createChatThreadStore<K extends string>(config: ChatThreadStoreConfig<K> = {}): ChatThreadStore<K> {
   const {
     createStore = createChatDialogStore,
-    identityFor = defaultIdentity as (key: K) => { dialogId: string; side: ChatDialogSide },
+    identityFor = defaultIdentity,
     options = () => ({}),
     onSnapshot,
     siblingKeys,

@@ -32,6 +32,7 @@ describe('ticketReceiptMessage', () => {
   });
 
   it("is the assistant's first message, named by the ticket", () => {
+    const namesTheSubject: unknown = expect.stringContaining('**VPN**');
     expect(
       ticketReceiptMessage(
         { id: 't1', creationSource: 'FAE_FORM', title: 'VPN', createdAt: '2026-11-04T10:00:00Z' },
@@ -41,7 +42,7 @@ describe('ticketReceiptMessage', () => {
       id: 'ticket-receipt-t1',
       role: 'assistant',
       metadata: { createdAt: '2026-11-04T10:00:00.000Z', author: FAE },
-      parts: [{ type: 'text', text: expect.stringContaining('**VPN**') }],
+      parts: [{ type: 'text', text: namesTheSubject }],
     });
   });
 });

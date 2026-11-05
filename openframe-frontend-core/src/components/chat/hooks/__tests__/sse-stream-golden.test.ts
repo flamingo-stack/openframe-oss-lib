@@ -263,7 +263,7 @@ describe.skipIf(!WIRE)('the standard wire', () => {
       fileSize: 1,
     };
     await act(async () => {
-      await result.current.sendMessage('look', { attachments: [attachment] } as never);
+      await result.current.sendMessage('look', { attachments: [attachment] });
     });
     await act(async () => {
       await result.current.sendMessage('again');
