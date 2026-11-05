@@ -14,10 +14,10 @@ import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.software.DeviceVulnerability;
+import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.data.repository.rmm.software.DeviceVulnerabilityRepository;
+import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -47,7 +47,7 @@ public class TenantSoftwareReadModelQuery {
             "cveCount", "cveCount");
 
     private final SoftwareRepository softwareRepository;
-    private final DeviceVulnerabilityRepository vulnerabilityRepository;
+    private final VulnerabilityRepository vulnerabilityRepository;
     private final MachineRepository machineRepository;
 
     public boolean exists(String tenantId, String softwareId) {
@@ -96,14 +96,14 @@ public class TenantSoftwareReadModelQuery {
         return paginate(all, page, perPage);
     }
 
-    private SoftwareVulnerabilityResponse toSoftwareVuln(DeviceVulnerability vuln, Long titleId) {
+    private SoftwareVulnerabilityResponse toSoftwareVuln(Vulnerability vuln, Long titleId) {
         SoftwareVulnerabilityResponse v = new SoftwareVulnerabilityResponse();
         v.setCveId(vuln.getCveId());
         v.setDiscoveredAt(vuln.getDiscoveredAt());
         if (vuln.getAffectedSoftware() != null) {
             vuln.getAffectedSoftware().stream()
                     .filter(a -> titleId.equals(a.getSoftwareTitleId()))
-                    .map(DeviceVulnerability.AffectedSoftware::getInstalledVersion)
+                    .map(Vulnerability.AffectedSoftware::getInstalledVersion)
                     .filter(Objects::nonNull).findFirst()
                     .ifPresent(v::setAffectedVersion);
         }

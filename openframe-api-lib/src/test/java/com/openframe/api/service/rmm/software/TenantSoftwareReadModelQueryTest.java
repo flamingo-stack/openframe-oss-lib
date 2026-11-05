@@ -11,10 +11,10 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.software.DeviceVulnerability;
+import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.data.repository.rmm.software.DeviceVulnerabilityRepository;
+import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,7 +47,7 @@ class TenantSoftwareReadModelQueryTest {
     private static final String TENANT = "t1";
 
     @Mock private SoftwareRepository softwareRepository;
-    @Mock private DeviceVulnerabilityRepository vulnerabilityRepository;
+    @Mock private VulnerabilityRepository vulnerabilityRepository;
     @Mock private MachineRepository machineRepository;
 
     @InjectMocks private TenantSoftwareReadModelQuery query;
@@ -203,13 +203,13 @@ class TenantSoftwareReadModelQueryTest {
 
     @Test
     void listVulnerabilitiesForSoftware_searchSortAndAffectedVersion() {
-        DeviceVulnerability older = DeviceVulnerability.builder().cveId("CVE-2024-1").discoveredAt(Instant.parse("2024-01-01T00:00:00Z"))
-                .affectedSoftware(List.of(DeviceVulnerability.AffectedSoftware.builder().softwareTitleId(99L).installedVersion("x").build(),
-                        DeviceVulnerability.AffectedSoftware.builder().softwareTitleId(42L).installedVersion("1.6").build()))
+        Vulnerability older = Vulnerability.builder().cveId("CVE-2024-1").discoveredAt(Instant.parse("2024-01-01T00:00:00Z"))
+                .affectedSoftware(List.of(Vulnerability.AffectedSoftware.builder().softwareTitleId(99L).installedVersion("x").build(),
+                        Vulnerability.AffectedSoftware.builder().softwareTitleId(42L).installedVersion("1.6").build()))
                 .build();
-        DeviceVulnerability newer = DeviceVulnerability.builder().cveId("CVE-2025-2").discoveredAt(Instant.parse("2025-01-01T00:00:00Z"))
+        Vulnerability newer = Vulnerability.builder().cveId("CVE-2025-2").discoveredAt(Instant.parse("2025-01-01T00:00:00Z"))
                 .build();
-        DeviceVulnerability other = DeviceVulnerability.builder().cveId("GHSA-1").build();
+        Vulnerability other = Vulnerability.builder().cveId("GHSA-1").build();
         when(vulnerabilityRepository.findByTenantIdAndAffectedSoftwareSoftwareTitleId(TENANT, 42L))
                 .thenReturn(List.of(older, newer, other));
 
