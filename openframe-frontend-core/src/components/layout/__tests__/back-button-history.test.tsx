@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { BackButton } from '../back-button';
 
 /**
@@ -13,7 +13,7 @@ const setNavigation = (navigation: NavigationStub | undefined) => {
 };
 
 describe('BackButton historyBack', () => {
-  let back: ReturnType<typeof vi.spyOn>;
+  let back: MockInstance<History['back']>;
   beforeEach(() => {
     back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
   });
