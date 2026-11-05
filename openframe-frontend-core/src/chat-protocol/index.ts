@@ -10,6 +10,8 @@ export * from './ui-chunks';
 export * from './apply-chunk';
 export * from './ui-writer';
 export * from './citations';
+// Approvals a server reads: the parts a turn left asking, and the answers a request carries.
+export * from './approval-response';
 export * from './message-decoder';
 // The stages a turn reports before its first answer token, and their copy.
 export * from './progress';

@@ -210,6 +210,25 @@ export function unlinkUnknownRecords(text: string, allowed: (record: RecordLink)
   );
 }
 
+/** A link that is already whole: `[text](destination)`. */
+const WHOLE_LINK = /^\[(?:\\.|[^\\[\]\n])*\]\([^)\n]*\)/;
+/** Text that can no longer become a link: its brackets closed and no `(` after them. */
+const NOT_A_LINK = /^\[(?:\\.|[^\\[\]\n])*\](?!\(|$)/;
+/** An open `[` further back than this is no link, so nothing is held for it. */
+export const RECORD_LINK_MAX_OPEN_TAIL = 400;
+
+/**
+ * Where a streamed text's unfinished link starts: the `[` of a link whose destination has not closed yet, which a server
+ * holds back until it can check the link whole (a record link it never offered becomes its name). The text's length when
+ * its end can no longer become a link: no `[` within `maxTail`, a line break after it, or the link already closed.
+ */
+export function openRecordLinkTailStart(text: string, maxTail: number = RECORD_LINK_MAX_OPEN_TAIL): number {
+  const bracket = text.lastIndexOf('[');
+  if (bracket < 0 || text.length - bracket > maxTail) return text.length;
+  const rest = text.slice(bracket);
+  return rest.includes('\n') || WHOLE_LINK.test(rest) || NOT_A_LINK.test(rest) ? text.length : bracket;
+}
+
 /** Every record a message's text parts link, once each, in the order they first link it, with the name given it. */
 export function recordLinksInParts(parts: readonly ChatPart[]): DrawnRecordLink[] {
   const byKey = new Map<string, DrawnRecordLink>();

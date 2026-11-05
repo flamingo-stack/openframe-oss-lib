@@ -11,6 +11,7 @@ import {
   extractRecordLinks,
   normalizeRecordUri,
   normalizeRecordUris,
+  openRecordLinkTailStart,
   parseCollectionHref,
   parseRecordHref,
   recordHref,
@@ -194,5 +195,28 @@ describe('normalizeRecordUris', () => {
   it('leaves out what names no record', () => {
     expect(normalizeRecordUris(['record://a', 'https://x.test', 7, null])).toEqual([]);
     expect(normalizeRecordUris('record://a/1')).toEqual([]);
+  });
+});
+
+describe('openRecordLinkTailStart', () => {
+  it('holds a link whose destination is still open, from its bracket', () => {
+    expect(openRecordLinkTailStart('See the [Mac guide](record://onboar')).toBe(8);
+    expect(openRecordLinkTailStart('See the [Mac gui')).toBe(8);
+    expect(openRecordLinkTailStart('See the [')).toBe(8);
+    expect(openRecordLinkTailStart('See the [Mac guide]')).toBe(8);
+  });
+
+  it('holds nothing once the end can no longer become a link', () => {
+    const whole = 'See the [Mac guide](record://onboarding_guide/mac) now';
+    expect(openRecordLinkTailStart(whole)).toBe(whole.length);
+    expect(openRecordLinkTailStart('array[1] is first')).toBe('array[1] is first'.length);
+    expect(openRecordLinkTailStart('a [list\nof things')).toBe('a [list\nof things'.length);
+    expect(openRecordLinkTailStart('no bracket at all')).toBe('no bracket at all'.length);
+  });
+
+  it('holds nothing for a bracket further back than the tail limit', () => {
+    const text = `[${'x'.repeat(20)}`;
+    expect(openRecordLinkTailStart(text, 10)).toBe(text.length);
+    expect(openRecordLinkTailStart(text, 30)).toBe(0);
   });
 });
