@@ -4,6 +4,8 @@ import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
+import com.openframe.data.service.rmm.software.SoftwareProjector;
+import com.openframe.data.service.rmm.software.VulnerabilityProjector;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareInstalledVersion;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;

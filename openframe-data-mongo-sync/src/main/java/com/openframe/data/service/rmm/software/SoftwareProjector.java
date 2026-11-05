@@ -1,4 +1,4 @@
-package com.openframe.stream.handler.software;
+package com.openframe.data.service.rmm.software;
 
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.DeviceSoftware;

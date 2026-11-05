@@ -62,7 +62,7 @@ class AgentUninstallServiceTest {
 
         assertThat(machine.getStatus()).isEqualTo(DeviceStatus.DELETED);
         verify(machineRepository).save(machine);
-        verify(deletedMachineCleanup).removeFromSchedules(TENANT, MACHINE);
+        verify(deletedMachineCleanup).cleanUpDeletedMachine(TENANT, MACHINE);
         ArgumentCaptor<DeviceUninstalledEvent> event = ArgumentCaptor.forClass(DeviceUninstalledEvent.class);
         verify(eventPublisher).publishEvent(event.capture());
         assertThat(event.getValue().getMachine().getMachineId()).isEqualTo(MACHINE);
