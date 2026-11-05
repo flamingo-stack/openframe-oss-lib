@@ -10,7 +10,7 @@ import {
   type MingoChatType,
   type MingoMessagesConnection,
 } from '../../../chat-protocol/mingo-graphql';
-import type { FetchDialogMessagesParams, FetchDialogMessagesResult } from '../hooks/use-nats-chat-adapter';
+import type { FetchDialogMessagesParams, FetchDialogMessagesResult } from './chat-transport';
 
 /** Post one GraphQL request; resolves to its `data`, and rejects on any GraphQL error. */
 export type MingoGraphqlPost = <T>(query: string, variables: Record<string, unknown>) => Promise<T>;

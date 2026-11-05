@@ -163,6 +163,11 @@ export interface ChatThreadStore<K extends string> {
   setActiveKeys: (keys: readonly K[]) => void;
   /** Land what the delta batcher holds, so a read of the thread is the thread (a history merge reads after this). */
   flush: () => void;
+  /**
+   * Start a key over for a dialog (re)entered: a fresh decoder and the reducer's stream state reset, the approval
+   * statuses it learned kept (an approval id is the backend's, whatever dialog shows it).
+   */
+  restart: (key: K) => void;
   /** Drop a key's reducer, snapshot and decoder. The next use starts a fresh sequence the host seeds. */
   drop: (key: K) => void;
   /** Every key this store has seen and not dropped. */
@@ -495,6 +500,14 @@ export function createChatThreadStore<K extends string>(config: ChatThreadStoreC
     return bound;
   }
 
+  function restart(key: K): void {
+    decoderByKey.delete(key);
+    awaitingAdopt.delete(key);
+    mutate(key, reducer => {
+      reducer.resetForDialogSwitch();
+    });
+  }
+
   function drop(key: K): void {
     boundByKey.delete(key);
     // Land and cancel first: another key's batch would be stranded, and this key's must not fire after `remove`.
@@ -532,6 +545,7 @@ export function createChatThreadStore<K extends string>(config: ChatThreadStoreC
     bind,
     setActiveKeys,
     flush,
+    restart,
     drop,
     knownKeys: () => [...knownKeys],
     snapshotOf,

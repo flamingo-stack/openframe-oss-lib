@@ -29,6 +29,18 @@ export {
 } from './use-chat-chunk-processor';
 export { useChatThread } from './use-chat-thread';
 export {
+  jetStreamLiveTail,
+  natsWsLiveTail,
+  type ChatHistoryBackend,
+  type ChatLiveTailOptions,
+  type ChatNatsConnection,
+  type ChatTransport,
+  type FetchDialogMessagesParams,
+  type FetchDialogMessagesResult,
+  type UseChatLiveTail,
+} from './chat-transport';
+export { useChatEngine, type UseChatEngineConfig, type UseChatEngineOptions } from './use-chat-engine';
+export {
   createMingoGraphqlHistory,
   type MingoGraphqlHistoryOptions,
   type MingoGraphqlPost,

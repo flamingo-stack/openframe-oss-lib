@@ -5,15 +5,12 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { within, userEvent } from 'storybook/test';
 import { EmbeddableChat } from '../components/chat/embeddable-chat';
-import type {
-  UseNatsChatAdapterConfig,
-  FetchDialogsResult,
-  FetchDialogMessagesResult,
-} from '../components/chat/hooks/use-nats-chat-adapter';
+import type { FetchDialogMessagesResult } from '../components/chat/engine/chat-transport';
+import { natsWsEngineConfig, type UseNatsChatAdapterConfig } from '../components/chat/hooks/use-nats-chat-adapter';
 import type { SlashCommandSummary } from '../components/chat/hooks/use-slash-commands';
 import type { MingoQuickAction } from '../components/chat/mingo-welcome';
 import type { DialogItem } from '../components/chat/types/component.types';
-import type { UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
+import type { FetchDialogsResult, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import { BracketCurlyIcon, Rocket01Icon, SearchIcon } from '../components/icons-v2-generated';
 import { ChatRuntimeContext, type ChatRuntime } from '../contexts/chat-runtime-context';
 import { type StoryRow, storyMessage, textPart } from './__fixtures__/chat-messages';
@@ -528,7 +525,7 @@ export const MingoOnly: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfig(),
+        mingo: natsWsEngineConfig(createMockMingoConfig()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -549,7 +546,7 @@ export const ComposerLocked: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfig(),
+        mingo: natsWsEngineConfig(createMockMingoConfig()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -579,7 +576,7 @@ export const BothModes: Story = {
       {...args}
       modes={{
         guide: {},
-        mingo: createMockMingoConfig(),
+        mingo: natsWsEngineConfig(createMockMingoConfig()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -611,7 +608,7 @@ export const ReturningUser: Story = {
       {...args}
       modes={{
         guide: {},
-        mingo: createMockMingoConfigWithDialogs(),
+        mingo: natsWsEngineConfig(createMockMingoConfigWithDialogs()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -638,7 +635,7 @@ export const ChatsLoading: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfigChatsLoading(),
+        mingo: natsWsEngineConfig(createMockMingoConfigChatsLoading()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -664,7 +661,7 @@ export const ChatLoading: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfigChatLoading(),
+        mingo: natsWsEngineConfig(createMockMingoConfigChatLoading()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -696,7 +693,7 @@ export const ChatsError: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfigChatsError(),
+        mingo: natsWsEngineConfig(createMockMingoConfigChatsError()),
       }}
       defaultActiveMode="mingo"
       defaultOpen
@@ -722,7 +719,7 @@ export const ArchiveEmpty: Story = {
     <EmbeddableChat
       {...args}
       modes={{
-        mingo: createMockMingoConfigArchiveEmpty(),
+        mingo: natsWsEngineConfig(createMockMingoConfigArchiveEmpty()),
       }}
       defaultActiveMode="mingo"
       defaultOpen

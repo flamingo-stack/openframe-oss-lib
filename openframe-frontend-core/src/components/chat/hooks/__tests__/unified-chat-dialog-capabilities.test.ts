@@ -24,6 +24,7 @@ import { createElement, type ReactNode } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
 import type { ChatDialogCapabilities, UnifiedChatState } from '../../types/unified-chat-state.types';
+import { natsWsEngineConfig } from '../use-nats-chat-adapter';
 import { useUnifiedChat, type UseUnifiedChatModes } from '../use-unified-chat';
 
 const endpoints: ChatRuntime['endpoints'] = {
@@ -54,11 +55,11 @@ const managedRuntime: ChatRuntime = {
 };
 
 /** A Mingo mode config that is structurally valid but never opens a socket. */
-const mingoMode: UseUnifiedChatModes['mingo'] = {
+const mingoMode: UseUnifiedChatModes['mingo'] = natsWsEngineConfig({
   dialogId: null,
   getNatsWsUrl: () => null,
   publishUserMessage: vi.fn(),
-};
+});
 
 /** Minimal host-built state — only the fields this contract reads. */
 function injectedState(overrides: Partial<UnifiedChatState> = {}): UnifiedChatState {

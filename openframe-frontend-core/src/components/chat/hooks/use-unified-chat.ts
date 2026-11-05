@@ -2,8 +2,9 @@
 
 /**
  * useUnifiedChat — the single public entry point for the unified chat
- * surface. Dispatches between the SSE/Guide and NATS/Mingo transport
- * adapters based on the active mode. Always calls both underlying
+ * surface. Dispatches between the SSE/Guide adapter and the chat engine
+ * (`useChatEngine`, Mingo over a live-tail transport) based on the active
+ * mode. Always calls both underlying
  * hooks (React rules of hooks) but only one is "live": the inactive
  * one stays idle (no streams, no subscriptions) while preserving its
  * local message buffer so a mode-flip restores the user to exactly
@@ -19,9 +20,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { natsWsLiveTail } from '../engine/chat-transport';
+import { useChatEngine, type UseChatEngineConfig } from '../engine/use-chat-engine';
 import { EMPTY_DIALOG_CAPABILITIES } from '../types/unified-chat-state.types';
 import type { ChatDialogCapabilities, UnifiedChatState } from '../types/unified-chat-state.types';
-import { useNatsChatAdapter, type UseNatsChatAdapterConfig } from './use-nats-chat-adapter';
 import { useSseChatAdapter, type UseSseChatAdapterOptions } from './use-sse-chat-adapter';
 import { useStableShallow } from './use-stable-shallow';
 
@@ -49,11 +51,11 @@ export interface UseUnifiedChatModes {
   guide?: UseSseChatAdapterOptions;
 
   /**
-   * Mingo mode (NATS → openframe). All wiring is explicit: dialog id,
-   * NATS URL builder, publish callback, optional catchup fetcher.
-   * See `UseNatsChatAdapterConfig` for the field-by-field contract.
+   * Mingo mode: the chat engine over the host's transport and history
+   * (`UseChatEngineConfig`). A callback config for the plain NATS WebSocket
+   * is `natsWsEngineConfig(config)`.
    */
-  mingo?: UseNatsChatAdapterConfig;
+  mingo?: UseChatEngineConfig;
 }
 
 export interface UseUnifiedChatOptions {
@@ -92,15 +94,17 @@ export interface UseUnifiedChatOptions {
 
 const EMPTY_SSE_OPTIONS: UseSseChatAdapterOptions = {};
 
-function createDisabledNatsConfig(): UseNatsChatAdapterConfig {
+function createDisabledEngineConfig(): UseChatEngineConfig {
   return {
     dialogId: null,
-    getNatsWsUrl: () => null,
-    publishUserMessage: () => {
-      throw new Error(
-        '[useUnifiedChat] publishUserMessage invoked but mingo mode is not configured. ' +
-          'Pass `modes.mingo` to enable Mingo agent transport.',
-      );
+    transport: {
+      useLiveTail: natsWsLiveTail({ getNatsWsUrl: () => null }),
+      publish: () => {
+        throw new Error(
+          '[useUnifiedChat] a message was sent but mingo mode is not configured. ' +
+            'Pass `modes.mingo` to enable the Mingo transport.',
+        );
+      },
     },
   };
 }
@@ -112,13 +116,8 @@ function createDisabledNatsConfig(): UseNatsChatAdapterConfig {
 export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState {
   const { modes, activeMode, mingoStateOverride, injectedDialogCapabilities } = options;
 
-  // The mingo config object identity matters — `useNatsChatAdapter`
-  // wires its `dialogId`/url/publish into deps. Stabilise the disabled
-  // fallback so a guide-only consumer doesn't churn NATS hook state
-  // every render.
-  // Built once by `useState`'s lazy initialiser — that is exactly the
-  // create-on-first-render shape, without a ref filled during render.
-  const [disabledNatsConfig] = useState<UseNatsChatAdapterConfig>(createDisabledNatsConfig);
+  // The disabled fallback is built once, so a guide-only consumer doesn't churn the engine's state every render.
+  const [disabledEngineConfig] = useState<UseChatEngineConfig>(createDisabledEngineConfig);
 
   // Each adapter receives the user's config OR the disabled fallback,
   // plus an `active` flag that gates its live network work. Both
@@ -129,7 +128,7 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
   const sseState = useSseChatAdapter(modes.guide ?? EMPTY_SSE_OPTIONS, {
     active: sseActive,
   });
-  const natsState = useNatsChatAdapter(modes.mingo ?? disabledNatsConfig, { active: natsActive });
+  const natsState = useChatEngine(modes.mingo ?? disabledEngineConfig, { active: natsActive });
 
   // Host-injected Mingo state wins when present: the internal `natsState`
   // still runs (rules of hooks) but is idle (no `modes.mingo` → not active),
