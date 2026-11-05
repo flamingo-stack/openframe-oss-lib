@@ -3,6 +3,7 @@ package com.openframe.client.service.agentregistration.transformer;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolApiKey;
 import com.openframe.data.document.tool.ToolCredentials;
+import com.openframe.data.document.tool.ToolType;
 import com.openframe.data.document.tool.ToolUrl;
 import com.openframe.data.document.tool.ToolUrlType;
 import com.openframe.data.service.IntegratedToolService;
@@ -222,6 +223,58 @@ class FleetMdmAgentIdTransformerTest {
         // verifications
         assertThat(result).isEqualTo(agentToolId);
         verifyNoInteractions(integratedToolService, toolUrlService, fleetClient);
+    }
+
+    @Test
+    void transform_toolMissing_throwsIllegalState() {
+        // setup
+        when(integratedToolService.getToolByKey(TOOL_ID)).thenReturn(Optional.empty());
+
+        // execution
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> transformer.transform(MACHINE_ID, HARDWARE_UUID, false));
+
+        // verifications
+        assertThat(ex.getMessage()).contains(TRANSFORM_FAILED);
+        assertThat(ex.getCause().getMessage()).contains("Found no tool");
+    }
+
+    @Test
+    void transform_apiUrlMissing_throwsIllegalState() {
+        // setup
+        when(integratedToolService.getToolByKey(TOOL_ID)).thenReturn(Optional.of(tool));
+        when(toolUrlService.getUrlByToolType(tool, ToolUrlType.API)).thenReturn(Optional.empty());
+
+        // execution
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> transformer.transform(MACHINE_ID, HARDWARE_UUID, false));
+
+        // verifications
+        assertThat(ex.getMessage()).contains(TRANSFORM_FAILED);
+        assertThat(ex.getCause().getMessage()).contains("Found no api url");
+    }
+
+    @Test
+    void getToolType_returnsFleetMdm() {
+        // setup
+
+        // execution
+        ToolType toolType = transformer.getToolType();
+
+        // verifications
+        assertThat(toolType).isEqualTo(ToolType.FLEET_MDM);
+    }
+
+    @Test
+    void createClient_realTransformer_returnsFleetClient() {
+        // setup
+        FleetMdmAgentIdTransformer realTransformer = new FleetMdmAgentIdTransformer(integratedToolService, toolUrlService);
+
+        // execution
+        FleetMdmClient client = realTransformer.createClient("http://fleet:8080", "api-token");
+
+        // verifications
+        assertThat(client).isNotNull();
     }
 
     private void stubTool() {
