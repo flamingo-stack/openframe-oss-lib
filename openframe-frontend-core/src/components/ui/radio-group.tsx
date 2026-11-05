@@ -215,9 +215,10 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                     )
                   )}
                 </div>
-                {/* Centred on the row whatever the row aligns (a design may top-align the dot with the label). */}
+                {/* The row's full height, its content centred whatever the row aligns (a design may top-align the dot with
+                    the label); a trailing node can still place itself (`self-start`). */}
                 {option?.trailing && (
-                  <div className="ml-auto flex shrink-0 items-center self-center">{option.trailing}</div>
+                  <div className="ml-auto flex shrink-0 items-center self-stretch">{option.trailing}</div>
                 )}
               </>
             );

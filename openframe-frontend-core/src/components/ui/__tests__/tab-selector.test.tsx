@@ -13,17 +13,18 @@ describe('TabSelector size', () => {
     const segment = screen.getByRole('button', { name: 'A' });
     expect((segment.parentElement as HTMLElement).className).toContain('content-md:h-12');
     expect(segment.className).toContain('flex-1');
-    expect(segment.querySelector('.size-5')).toBeNull();
+    expect(segment.querySelector(String.raw`.content-md\:size-5`)).toBeNull();
   });
 
-  it('draws compact as a 44px strip of 36px segments with 20px icons', () => {
+  it('draws compact as a 40px strip of 32px segments with 16px icons, 44 / 36 / 20 from content-md', () => {
     render(<TabSelector value="a" size="compact" onValueChange={() => {}} items={items} />);
     const segment = screen.getByRole('button', { name: 'A' });
     const strip = segment.parentElement as HTMLElement;
-    expect(strip.className).toContain('h-11');
+    expect(strip.className).toContain('h-10 content-md:h-11');
     expect(strip.className).not.toContain('content-md:h-12');
-    expect(segment.className).toContain('w-9');
+    expect(segment.className).toContain('w-8');
+    expect(segment.className).toContain('content-md:w-9');
     expect(segment.className).not.toContain('flex-1');
-    expect(segment.querySelector('.size-5')).not.toBeNull();
+    expect(segment.querySelector(String.raw`.content-md\:size-5`)).not.toBeNull();
   });
 });

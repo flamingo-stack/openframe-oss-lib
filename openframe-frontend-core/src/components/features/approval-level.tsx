@@ -58,7 +58,12 @@ const ICON_PX = 24;
 
 /** The view's layout, read by the view and by its skeleton, so the skeleton is the view's size. */
 const READ_ONLY_ROW_CLASS = 'inline-flex shrink-0 items-center gap-[var(--spacing-system-xxs)]';
-const EDITABLE_ROW_CLASS = 'flex shrink-0 items-center gap-[var(--spacing-system-m)]';
+/** Editable: the name after the strip on a phone, before it from `content-md` (Figma 4365-22461 / 4365-22663). */
+const EDITABLE_ROW_CLASS =
+  'flex shrink-0 items-center gap-[var(--spacing-system-xxs)] content-md:gap-[var(--spacing-system-m)]';
+const EDITABLE_NAME_ORDER_CLASS = 'order-last content-md:order-none';
+/** A read-only level's icon box: 16px on a phone, 24 from `content-md` (Figma 555-39573 / 1608-49531). */
+const READ_ONLY_ICON_BOX_CLASS = '[&>*]:!size-4 content-md:[&>*]:!size-6';
 /** Read-only, the name is the row's value (h4, primary); editable, a caption in the level's colour beside the strip. */
 const READ_ONLY_NAME_CLASS = 'whitespace-nowrap text-ods-text-primary text-h4';
 const LEVEL_NAME_CLASS = 'whitespace-nowrap text-h6';
@@ -131,7 +136,7 @@ export function ApprovalLevelView({
 
   if (!canEdit) {
     const icon = (
-      <span className={cn('inline-flex shrink-0', current.toneClassName)}>
+      <span className={cn('inline-flex shrink-0', READ_ONLY_ICON_BOX_CLASS, current.toneClassName)}>
         <current.Icon size={ICON_PX} aria-hidden />
         {!showLabel && <span className="sr-only">{current.label}</span>}
       </span>
@@ -150,7 +155,9 @@ export function ApprovalLevelView({
     );
   }
 
-  const name = showLabel ? <span className={cn(LEVEL_NAME_CLASS, current.toneClassName)}>{current.label}</span> : null;
+  const name = showLabel ? (
+    <span className={cn(LEVEL_NAME_CLASS, EDITABLE_NAME_ORDER_CLASS, current.toneClassName)}>{current.label}</span>
+  ) : null;
 
   return (
     <div className={cn(EDITABLE_ROW_CLASS, className)}>
@@ -189,7 +196,9 @@ function ApprovalLevelSkeleton({ editable = false, showLabel = true, className }
   if (!editable) {
     return (
       <span aria-hidden className={cn(READ_ONLY_ROW_CLASS, className)}>
-        <UnifiedSkeleton as="span" className="inline-block shrink-0 rounded-sm" width={ICON_PX} height={ICON_PX} />
+        <span className={cn('inline-flex shrink-0', READ_ONLY_ICON_BOX_CLASS)}>
+          <UnifiedSkeleton as="span" className="inline-block shrink-0 rounded-sm" width={ICON_PX} height={ICON_PX} />
+        </span>
         {showLabel && (
           <span className={READ_ONLY_NAME_CLASS}>
             <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>
@@ -199,7 +208,7 @@ function ApprovalLevelSkeleton({ editable = false, showLabel = true, className }
     );
   }
   const name = showLabel ? (
-    <span className={LEVEL_NAME_CLASS}>
+    <span className={cn(LEVEL_NAME_CLASS, EDITABLE_NAME_ORDER_CLASS)}>
       <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>
     </span>
   ) : null;

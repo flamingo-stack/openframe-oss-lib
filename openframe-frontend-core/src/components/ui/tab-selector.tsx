@@ -31,8 +31,9 @@ export interface TabSelectorProps {
   /** Visual variant: primary (accent bg) or secondary (soft grey bg) */
   variant?: 'primary' | 'secondary';
   /**
-   * `compact`: an icon-only strip at its content's width: 44px tall at every breakpoint, 36px square segments and
-   * 20px icons (the guardrails level picker, Figma 4365-22670). Default: the full-width strip, 48px at `content-md`.
+   * `compact`: an icon-only strip at its content's width: 44px tall, 36px segments and 20px icons from `content-md`,
+   * 40 / 32 / 16px below it (the guardrails level picker, Figma 4365-22670 / 4365-22462). Default: the full-width
+   * strip, 48px at `content-md`.
    */
   size?: 'default' | 'compact';
   /** Optional label displayed above the selector */
@@ -87,8 +88,8 @@ export function TabSelector({
           flush
             ? 'h-10 w-full'
             : cn(
-                'h-11 rounded-md border border-ods-border',
-                !compact && 'content-md:h-12',
+                'rounded-md border border-ods-border',
+                compact ? 'h-10 content-md:h-11' : 'h-11 content-md:h-12',
                 scrollable ? 'overflow-x-auto' : compact ? 'w-auto' : 'w-full',
               ),
         )}
@@ -114,14 +115,15 @@ export function TabSelector({
               // defeats the scroll).
               className={cn(
                 'h-full',
-                compact ? 'w-9 flex-none' : scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1',
+                compact ? 'w-8 flex-none content-md:w-9' : scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1',
               )}
             >
               {item.icon && (
                 <span
                   className={cn(
                     'flex shrink-0 items-center justify-center',
-                    compact ? 'size-5' : 'size-4 content-md:size-6',
+                    // compact: the box sizes the icon, whatever size the caller drew it at.
+                    compact ? 'size-4 content-md:size-5 [&>svg]:size-full' : 'size-4 content-md:size-6',
                   )}
                 >
                   {item.icon}

@@ -58,8 +58,9 @@ describe('PolicyConfigurationPanel', () => {
       column.some(box => box.className.includes('content-md:flex') && box.className.includes('items-center')),
     ).toBe(true);
     expect(column.every(box => !box.className.includes('content-md:block'))).toBe(true);
-    const tile = (screen.getByText('Download files from web').parentElement as HTMLElement)
-      .previousElementSibling as HTMLElement;
+    const name = screen.getByText('Download files from web');
+    const tile = ((name.parentElement as HTMLElement).parentElement as HTMLElement).parentElement
+      ?.previousElementSibling as HTMLElement;
     expect(tile.className).toContain('text-ods-text-secondary');
   });
 
@@ -77,6 +78,25 @@ describe('PolicyConfigurationPanel', () => {
     const frame = header.nextElementSibling as HTMLElement;
     expect(header.className).toContain('peer');
     expect(frame.className).toContain('peer-hover:bg-ods-bg-hover');
+  });
+
+  it('while editing, sets rules one by one on a phone: no bulk menu, the tool icon beside the name', () => {
+    render(
+      <PolicyConfigurationPanel
+        categories={categories}
+        editMode
+        onPolicyPermissionChange={() => {}}
+        onCategoryPermissionChange={() => {}}
+      />,
+    );
+    open();
+    // One bulk trigger (the content-md column), not a second one stacked for phones.
+    expect(screen.getAllByText('Set Global Permission')).toHaveLength(1);
+    const name = screen.getByText('Download files from web');
+    const nameRow = (name.parentElement as HTMLElement).parentElement as HTMLElement;
+    expect((nameRow.lastElementChild as HTMLElement).className).toContain('content-md:hidden');
+    const tile = nameRow.parentElement?.previousElementSibling as HTMLElement;
+    expect(tile.className).toContain('hidden content-md:flex');
   });
 
   it('counts a category with one rule in the singular', () => {
