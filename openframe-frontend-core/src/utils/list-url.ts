@@ -100,6 +100,7 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   hubspot_ticket: (ids, b) => `${b}/api/tickets/internal?ids=${ids.join(',')}`,
   hubspot_ticket_anon: (ids, b) => `${b}/api/tickets/known-issues?ids=${ids.join(',')}`,
   data_room_doc: (ids, b) => `${b}/api/data-room/documents?ids=${ids.join(',')}`,
+  policy_doc: (ids, b) => `${b}/api/policies/documents?ids=${ids.join(',')}`,
   markdown: (ids, b) => `${b}/api/docs/pages?ids=${ids.join(',')}`,
   financial_kpi: (ids, b) => `${b}/api/financials/kpis?ids=${ids.join(',')}`,
   cap_table: (ids, b) => `${b}/api/financials/cap-table?ids=${ids.join(',')}`,
