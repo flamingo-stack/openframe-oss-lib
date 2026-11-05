@@ -3,7 +3,7 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
-import com.openframe.api.util.SoftwareVersions;
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;

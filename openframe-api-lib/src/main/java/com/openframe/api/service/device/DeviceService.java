@@ -350,7 +350,7 @@ public class DeviceService {
             return;
         }
         if (status == DeviceStatus.DELETED) {
-            deletedMachineCleanup.removeFromSchedules(machine.getTenantId(), machineId);
+            deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
         }
 
         machine.setStatus(status);
