@@ -197,11 +197,8 @@ export interface MarkdownEngineProps {
    * sections, each a heading and its paragraphs. Unset, one paragraph of `skeletonLines` lines.
    */
   skeletonSections?: number;
-  /**
-   * Lines of the one paragraph a loading body draws when it names no sections. Default 3. A text whose length changes
-   * the lines it wraps to at each width (a summary) gives its typical lines per breakpoint instead.
-   */
-  skeletonLines?: number | TextLinesByBreakpoint;
+  /** Lines of the one paragraph a loading body draws when it names no sections, per width. Default 3 at every width. */
+  skeletonLines?: TextLinesByBreakpoint;
   /** A loading body opens with its own `# ` title (a legal document's): its title row is drawn first. */
   skeletonTitle?: boolean;
   /** The content is still being read: the body draws its skeleton (the `skeleton*` shape). A loading scope does the
@@ -210,16 +207,19 @@ export interface MarkdownEngineProps {
 }
 
 /** Lines a loading body draws when its caller names no shape. */
-export const MARKDOWN_SKELETON_LINES = 3;
+export const MARKDOWN_SKELETON_LINES: TextLinesByBreakpoint = { phone: 3, md: 3, lg: 3 };
 /** Paragraphs under each heading of a loading body, and their lines. */
-const SKELETON_SECTION_PARAGRAPHS = [3, 2] as const;
+const SKELETON_SECTION_PARAGRAPHS: readonly TextLinesByBreakpoint[] = [
+  { phone: 3, md: 3, lg: 3 },
+  { phone: 2, md: 2, lg: 2 },
+];
 /**
- * Lines a typical body's opening line set takes, on a phone (below `content-md`) and from `content-md`: a document's
+ * Lines a typical body's opening line set takes, per width: a document's
  * `# ` title wraps on a phone, and the opening paragraph every post and legal document starts with runs a few lines.
  * Typical lengths, never one record's: a longer record growing past them is a settle below its own lines.
  */
-const SKELETON_TITLE_LINES = { phone: 2, wide: 1 } as const;
-const SKELETON_LEAD_LINES = { phone: 5, wide: 3 } as const;
+const SKELETON_TITLE_LINES: TextLinesByBreakpoint = { phone: 2, md: 1, lg: 1 };
+const SKELETON_LEAD_LINES: TextLinesByBreakpoint = { phone: 5, md: 3, lg: 3 };
 /** The renderer's own frame: read by the engine and by its skeleton. */
 /** The renderer's root class, on the rendered document and on every skeleton of one: it names a markdown body. */
 export const MARKDOWN_RENDERER_CLASS = 'simple-markdown-renderer';
@@ -474,32 +474,12 @@ export const MarkdownEngine = memo(function MarkdownEngineGate(props: MarkdownEn
   return <MarkdownEngineImpl {...props} />;
 });
 
-/** A paragraph of `lines` lines (or its lines per breakpoint) at the body's own paragraph type. */
-function ParagraphBar({ lines, className }: { lines: number | TextLinesByBreakpoint; className: string }) {
+/** A paragraph of its `lines` per width at the body's own paragraph type. */
+function ParagraphBar({ lines, className }: { lines: TextLinesByBreakpoint; className: string }) {
   return (
     <div className={className}>
-      {typeof lines === 'number' ? (
-        <TextLineSkeleton type="inherit" lines={lines} className="w-full" />
-      ) : (
-        <TextLinesByBreakpointSkeleton lines={lines} />
-      )}
+      <TextLinesByBreakpointSkeleton lines={lines} />
     </div>
-  );
-}
-
-/** Lines of a text run per breakpoint: on a phone, and from `content-md`. */
-interface SkeletonLinesByBreakpoint {
-  phone: number;
-  wide: number;
-}
-
-/** A text run of the lines it takes on a phone and from `content-md` (the content area's own steps). */
-function LinesByBreakpoint({ lines, as = 'div' }: { lines: SkeletonLinesByBreakpoint; as?: 'div' | 'span' }) {
-  return (
-    <>
-      <TextLineSkeleton type="inherit" as={as} lines={lines.phone} className="w-full content-md:hidden" />
-      <TextLineSkeleton type="inherit" as={as} lines={lines.wide} className="hidden w-full content-md:flex" />
-    </>
   );
 }
 
@@ -517,7 +497,7 @@ export function MarkdownEngineSkeleton({
   className = '',
 }: {
   sections?: number;
-  lines?: number | TextLinesByBreakpoint;
+  lines?: TextLinesByBreakpoint;
   textSize?: TextSizeConfig;
   /** The body opens with its own `# ` title (a legal document's, demoted to an `h2`): its H1 row is drawn first. */
   title?: boolean;
@@ -533,12 +513,12 @@ export function MarkdownEngineSkeleton({
         <div className={ARTICLE_CLASS}>
           {title && (
             <h2 className={cn(MARKDOWN_H1_CLASS, textSizes.h1)}>
-              <LinesByBreakpoint lines={SKELETON_TITLE_LINES} as="span" />
+              <TextLinesByBreakpointSkeleton lines={SKELETON_TITLE_LINES} as="span" />
             </h2>
           )}
           {sections ? (
             <div className={paragraphClass}>
-              <LinesByBreakpoint lines={SKELETON_LEAD_LINES} />
+              <TextLinesByBreakpointSkeleton lines={SKELETON_LEAD_LINES} />
             </div>
           ) : null}
           {sections ? (

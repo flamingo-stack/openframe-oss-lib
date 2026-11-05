@@ -16,7 +16,8 @@ import { designDocStatusDisplay, formatCompletionLabelWithBlockers } from '../..
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
+import { PaletteBadge } from '../../ui/palette-badge';
+import { StatusBadge } from '../../ui/status-badge';
 import { safeHref } from '../utils/compact-card-classes';
 import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 
@@ -113,22 +114,15 @@ export function DesignDocCard({ doc, href, target, rel, className }: DesignDocCa
             <p className="truncate text-ods-text-secondary text-h5">{designDocMetaLine(doc)}</p>
           </div>
         </div>
-        <StatusBadge
-          text={status.label}
-          colorScheme={status.scheme as StatusBadgeProps['colorScheme']}
-          variant="button"
-          singleLine
-          className="hidden md:inline-flex"
-        />
+        {status ? (
+          <PaletteBadge text={status.label} color={status.color_scheme} className="hidden md:inline-flex" />
+        ) : null}
       </div>
-      <div className="md:hidden">
-        <StatusBadge
-          text={status.label}
-          colorScheme={status.scheme as StatusBadgeProps['colorScheme']}
-          variant="button"
-          singleLine
-        />
-      </div>
+      {status ? (
+        <div className="md:hidden">
+          <PaletteBadge text={status.label} color={status.color_scheme} />
+        </div>
+      ) : null}
       <div className={DESIGN_DOC_CARD_SUMMARY_ROW}>
         <p className="line-clamp-3 text-ods-text-secondary text-h4">{doc.summary || ''}</p>
       </div>

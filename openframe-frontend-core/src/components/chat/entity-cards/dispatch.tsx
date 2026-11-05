@@ -84,6 +84,7 @@ import type { LoadedProductReleaseCardProps } from '../../shared/product-release
 import { ProductReleaseCard } from '../../shared/product-release/product-release-card';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import { ExternalMediaNotice } from '../../ui/markdown/external-media-notice';
+import { tagVariantForBadgeColor } from '../../ui/tag';
 import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
@@ -1042,15 +1043,10 @@ function CustomerInterviewChatCard({
 }
 
 /**
- * Design doc → the doc glyph, its status as the pill (the status a person set, else its readiness: the hub's own
- * wording, `design-doc-readiness`) and "DRI · updated · n/m signed off" under the title. The hub's card route attaches the doc's list row as
+ * Design doc → the doc glyph, its status as the pill (the status a person set, else its readiness, both vocabulary rows the hub resolves onto the
+ * doc: `designDocStatusDisplay`) and "DRI · updated · n/m signed off" under the title. The hub's card route attaches the doc's list row as
  * `item.doc`; a row without it (an older hub) renders the ref's own title and preview.
  */
-/** A status badge scheme as the chat pill's tag variant: the three semantic tones carry over, anything else is grey. */
-function designDocTagVariant(scheme: string): 'success' | 'warning' | 'error' | 'grey' {
-  return scheme === 'success' || scheme === 'warning' || scheme === 'error' ? scheme : 'grey';
-}
-
 function DesignDocChatCard({
   item,
   chatRef,
@@ -1076,7 +1072,7 @@ function DesignDocChatCard({
       icon={<FileContentIcon size={24} />}
       status={
         status
-          ? { label: status.label, variant: designDocTagVariant(status.scheme) }
+          ? { label: status.label, variant: tagVariantForBadgeColor(status.color_scheme) }
           : { label: 'Design doc', variant: 'grey' }
       }
       anchorProps={buildAnchorProps(displayRef.url, isNewTab, displayRef.targetPlatform)}

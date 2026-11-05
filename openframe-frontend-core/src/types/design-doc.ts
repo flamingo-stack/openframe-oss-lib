@@ -62,7 +62,8 @@ export type DesignDocVocabularyKind =
   | 'comment_status'
   | 'link_type'
   | 'media_type'
-  | 'lifecycle_status';
+  | 'lifecycle_status'
+  | 'readiness';
 
 /** A `design_doc_vocabulary` row, as the DAL and the vocabulary API return it. */
 export interface DesignDocVocabularyOption {
@@ -121,6 +122,11 @@ export type DesignDocMediaType = string;
  * beside the readiness the sign-offs decide. Null on a doc = active, and its readiness shows.
  */
 export type DesignDocLifecycleStatus = string;
+/**
+ * A `design_doc_vocabulary.value` of kind `readiness`: the stage the sign-offs put a doc in (not ready, in active
+ * work, blocked, ready to build). The hub picks the row by its role; the words and the colour are the row's.
+ */
+export type DesignDocReadiness = string;
 
 /** A vocabulary value as a card shows it, resolved by the hub so a surface without the vocabulary can draw it. */
 export interface DesignDocVocabularyDisplay {
@@ -287,6 +293,8 @@ export interface DesignDoc {
   /** When the status was last set or cleared, and by whom. */
   lifecycle_status_changed_at: string | null;
   lifecycle_status_changed_by?: DesignDocPerson | null;
+  /** The stage its sign-offs put it in, as the vocabulary words it, resolved by the hub. */
+  readiness?: DesignDocVocabularyDisplay | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -389,8 +397,8 @@ export interface AddDesignDocCommentData {
   body: string;
 }
 
-/** The dashboard's readiness filter (`?ready=`). */
-export type DesignDocReadyFilter = 'ready' | 'in_progress' | 'not_ready';
+/** The dashboard's readiness filter (`?ready=`): one `readiness` value. */
+export type DesignDocReadyFilter = DesignDocReadiness;
 
 /**
  * The dashboard's status filter (`?status=`): `active` (no lifecycle status set, the default) or one
@@ -417,8 +425,8 @@ export interface DesignDocListResponse {
    *  filter itself — so a filtered row still shows what the other value holds. */
   facets: {
     spec_mode: Record<string, number>;
-    /** The same over readiness (`ready` / `in_progress` / `not_ready`), MINUS the ready filter itself: the filter row's options. */
-    ready: Record<DesignDocReadyFilter, number>;
+    /** The same over readiness (each `readiness` value), MINUS the ready filter itself: the filter row's options. */
+    ready: Record<DesignDocReadiness, number>;
     /** The same over the status filter (`active` and each `lifecycle_status` value), MINUS the status filter itself. */
     lifecycle: Record<string, number>;
   };
@@ -427,12 +435,8 @@ export interface DesignDocListResponse {
 /** Counted over ACTIVE docs (no lifecycle status), so postponed, shipped and archived docs never inflate open work. */
 export interface DesignDocStats {
   total: number;
-  /** Docs whose every section is signed off with no open blocking comment. */
-  ready: number;
-  /** Docs with at least one section signed off that are not ready yet. */
-  in_progress: number;
-  /** Docs with no section signed off yet. */
-  not_ready: number;
+  /** How many active docs each `readiness` value holds, zeros included. */
+  readiness: Record<DesignDocReadiness, number>;
   waiting_on_me_docs: number;
   waiting_on_me_tasks: number;
 }
