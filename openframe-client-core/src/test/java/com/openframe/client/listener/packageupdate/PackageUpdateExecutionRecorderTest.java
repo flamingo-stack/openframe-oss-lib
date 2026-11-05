@@ -1,5 +1,6 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -76,7 +77,21 @@ class PackageUpdateExecutionRecorderTest {
         recorder.record(request, "m1", event(State.WAITING));
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(row.getWaiting()).isTrue();
         assertThat(row.getStatusChangedAt()).isNotNull();
+        verify(scriptExecutionRepository).save(row);
+    }
+
+    @Test
+    void waiting_onARunningRowWithoutTheFlag_marksItWaiting() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        row.setStdout("kept");
+
+        recorder.record(request, "m1", event(State.WAITING));
+
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(row.getWaiting()).isTrue();
+        assertThat(row.getStdout()).isEqualTo("kept");
         verify(scriptExecutionRepository).save(row);
     }
 
@@ -95,8 +110,8 @@ class PackageUpdateExecutionRecorderTest {
     }
 
     @Test
-    void waiting_againWhileRunning_writesNothing() {
-        rowFound(ExecutionStatus.RUNNING);
+    void waiting_againWhileWaiting_writesNothing() {
+        rowFound(ExecutionStatus.RUNNING).setWaiting(true);
 
         recorder.record(request, "m1", event(State.WAITING));
 
@@ -106,10 +121,12 @@ class PackageUpdateExecutionRecorderTest {
     @Test
     void done_upgraded_succeedsWithSummary() {
         ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        row.setWaiting(true);
 
         recorder.record(request, "m1", done(Done.Result.UPGRADED, "4.36.140", true));
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        assertThat(row.getWaiting()).isNull();
         assertThat(row.getFinishedAt()).isNotNull();
         assertThat(row.getStdout()).isEqualTo("Updated (4.36.140), reboot required.");
         assertThat(row.getError()).isNull();
@@ -129,14 +146,26 @@ class PackageUpdateExecutionRecorderTest {
     @Test
     void failed_failsWithReasonMessageAndExitCode() {
         ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        row.setWaiting(true);
 
         recorder.record(request, "m1", failed(Failed.Reason.MANAGER_ERROR, "winget exited 1", 1L));
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(row.getWaiting()).isNull();
         assertThat(row.getFinishedAt()).isNotNull();
         assertThat(row.getError()).isEqualTo("MANAGER_ERROR: winget exited 1");
         assertThat(row.getExitCode()).isEqualTo(1);
         assertThat(row.getStdout()).isNull();
+    }
+
+    @Test
+    void notInstalled_keepsTheReasonOnTheRow() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+
+        recorder.record(request, "m1", failed(Failed.Reason.NOT_INSTALLED, null, null));
+
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(row.getError()).isEqualTo("NOT_INSTALLED");
     }
 
     @Test
@@ -148,6 +177,31 @@ class PackageUpdateExecutionRecorderTest {
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(row.getError()).isEqualTo(PackageUpdateExecutionRecorder.SUPERSEDED_ERROR);
+    }
+
+    @Test
+    void undelivered_failsTheRowWithTheDeliveryReason() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+
+        recorder.recordUndelivered(request, "m1", DeliveryFailure.EXHAUSTED);
+
+        verify(scriptExecutionRepository).save(row);
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(row.getError()).isEqualTo("The device did not receive the update (EXHAUSTED)");
+        assertThat(row.getFinishedAt()).isNotNull();
+        assertThat(row.getStatusChangedAt()).isNotNull();
+        assertThat(row.getExitCode()).isNull();
+    }
+
+    @Test
+    void undelivered_noRowOwnedByThisRequest_writesNothing() {
+        when(scriptExecutionRepository.findByTenantIdAndExecutionIdAndMachineIdAndPackageUpdateRequestId(
+                "t1", "exec-1", "m1", "req-1")).thenReturn(Optional.empty());
+
+        recorder.recordUndelivered(request, "m1", DeliveryFailure.OFFLINE);
+        recorder.recordUndelivered(null, "m1", DeliveryFailure.OFFLINE);
+
+        verify(scriptExecutionRepository, never()).save(any());
     }
 
     @Test

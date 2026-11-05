@@ -2,9 +2,11 @@ package com.openframe.data.service.rmm.software;
 
 import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
+import com.openframe.data.service.machine.AgentVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,6 +39,12 @@ class PackageUpdateEligibilityServiceTest {
         return m;
     }
 
+    private Machine machine(String id, String agentVersion, DeviceStatus status) {
+        Machine m = machine(id, agentVersion);
+        m.setStatus(status);
+        return m;
+    }
+
     private void flag(boolean enabled, String minVersion) {
         OpenFrameClientConfiguration config = OpenFrameClientConfiguration.builder()
                 .featureFlags(Map.of(PackageUpdateEligibilityService.FLAG,
@@ -47,13 +55,13 @@ class PackageUpdateEligibilityServiceTest {
 
     @Test
     void versionAtLeast_rules() {
-        assertThat(PackageUpdateEligibilityService.versionAtLeast("1.3.0", "1.2.0")).isTrue();
-        assertThat(PackageUpdateEligibilityService.versionAtLeast("1.2.0", "1.2.0")).isTrue();
-        assertThat(PackageUpdateEligibilityService.versionAtLeast("1.1.9", "1.2.0")).isFalse();
-        assertThat(PackageUpdateEligibilityService.versionAtLeast("2.0", "1.12.0")).isTrue();   // numeric, not lexical
-        assertThat(PackageUpdateEligibilityService.versionAtLeast(null, "1.0.0")).isFalse();
-        assertThat(PackageUpdateEligibilityService.versionAtLeast("1.0.0", null)).isTrue();     // no floor
-        assertThat(PackageUpdateEligibilityService.versionAtLeast("1.0.0", "  ")).isTrue();
+        assertThat(AgentVersion.isAtLeast("1.3.0", "1.2.0")).isTrue();
+        assertThat(AgentVersion.isAtLeast("1.2.0", "1.2.0")).isTrue();
+        assertThat(AgentVersion.isAtLeast("1.1.9", "1.2.0")).isFalse();
+        assertThat(AgentVersion.isAtLeast("2.0", "1.12.0")).isTrue();   // numeric, not lexical
+        assertThat(AgentVersion.isAtLeast(null, "1.0.0")).isFalse();
+        assertThat(AgentVersion.isAtLeast("1.0.0", null)).isTrue();     // no floor
+        assertThat(AgentVersion.isAtLeast("1.0.0", "  ")).isTrue();
     }
 
     @Test
@@ -96,6 +104,20 @@ class PackageUpdateEligibilityServiceTest {
     }
 
     @Test
+    void eligibleConnectedMachines_skipsDevicesThatAreNoLongerConnected() {
+        flag(true, "1.2.0");
+        when(machineRepository.findByMachineIdIn(List.of("on", "off", "archived", "deleted", "old"))).thenReturn(List.of(
+                machine("on", "1.3.0", DeviceStatus.ONLINE),
+                machine("off", "1.3.0", DeviceStatus.OFFLINE),
+                machine("archived", "1.3.0", DeviceStatus.ARCHIVED),
+                machine("deleted", "1.3.0", DeviceStatus.DELETED),
+                machine("old", "1.1.0", DeviceStatus.ONLINE)));   // connected, below floor
+
+        assertThat(service.eligibleConnectedMachines(UPDATE, List.of("on", "off", "archived", "deleted", "old")))
+                .containsExactlyInAnyOrder("on", "off");
+    }
+
+    @Test
     void eligibleMachines_noMinVersion_allWithAgentVersion() {
         flag(true, null);
         lenient().when(machineRepository.findByMachineIdIn(List.of("m1", "m2"))).thenReturn(List.of(
@@ -116,5 +138,23 @@ class PackageUpdateEligibilityServiceTest {
     void isEligible_flagDisabled_isFalse() {
         flag(false, null);
         assertThat(service.isEligible(UPDATE, machine("m1", "9.9.9"))).isFalse();
+    }
+
+    // the dev build takes every enabled flag whatever its minVersion, so it must take the orders too
+    @Test
+    void devBuildAgent_isEligibleAboveAnyFloor() {
+        flag(true, "1.6.5");
+        when(machineRepository.findByMachineIdIn(List.of("dev", "old"))).thenReturn(List.of(
+                machine("dev", "0.0.0-dev"),
+                machine("old", "1.6.0")));
+
+        assertThat(service.eligibleMachines(UPDATE, List.of("dev", "old"))).containsExactly("dev");
+        assertThat(service.isEligible(UPDATE, machine("dev", "0.0.0-dev"))).isTrue();
+    }
+
+    @Test
+    void devBuildAgent_flagDisabled_isNotEligible() {
+        flag(false, "1.6.5");
+        assertThat(service.isEligible(UPDATE, machine("dev", "0.0.0-dev"))).isFalse();
     }
 }

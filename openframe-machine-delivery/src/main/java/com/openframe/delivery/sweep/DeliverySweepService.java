@@ -13,9 +13,11 @@ import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.config.DeliveryProperties.Sweep;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
+import com.openframe.delivery.dispatch.DeliveryPayloadStore;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
+import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliverySeed;
 import com.openframe.delivery.spec.DeliverySpec;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -39,6 +42,7 @@ import static java.util.stream.Collectors.toSet;
 public class DeliverySweepService {
 
     private final MachineDeliveryRepository repository;
+    private final DeliveryPayloadStore payloads;
     private final MachineOnlineStatus machineOnlineStatus;
     private final DeliverySpecRegistry registry;
     private final DeliveryProperties properties;
@@ -109,8 +113,8 @@ public class DeliverySweepService {
     }
 
     private void parkSkipOrFailOffline(MachineDelivery delivery, Policy policy, Instant now) {
-        if (shouldSkipOffline(policy)) {
-            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine not online, type skips offline machines", now);
+        if (shouldSkipOffline(delivery, policy)) {
+            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine not online, offline machines are skipped", now);
             return;
         }
         Instant windowEnd = reconnectWindowEnd(delivery, policy);
@@ -135,9 +139,7 @@ public class DeliverySweepService {
         }
         DeliveryType type = delivery.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
-        Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
-        String json = delivery.getPayloadJson();
-        DeliveryPayload payload = payloadJson.read(json, payloadClass);
+        DeliveryPayload payload = payloadOf(delivery, spec, delivery.getDispatchId());
         String machineId = delivery.getMachineId();
         boolean published = publish(spec, machineId, payload);
         if (!published) {
@@ -165,12 +167,8 @@ public class DeliverySweepService {
     private void publishRerun(MachineDelivery delivery, Policy policy, Instant now) {
         DeliveryType type = delivery.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
-        Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
-        String storedJson = delivery.getPayloadJson();
-        DeliveryPayload payload = payloadJson.read(storedJson, payloadClass);
         String dispatchId = UUID.randomUUID().toString();
-        payload.getDelivery().setDispatchId(dispatchId);
-        String json = payloadJson.write(payload);
+        DeliveryPayload payload = payloadOf(delivery, spec, dispatchId);
         long delaySeconds = retryBackoff.delaySeconds(1, policy);
         Instant dueAt = now.plusSeconds(delaySeconds);
         String id = delivery.getId();
@@ -179,7 +177,6 @@ public class DeliverySweepService {
                 .from(DeliveryStatus.UNACKED)
                 .dispatchedAt(delivery.getDispatchedAt())
                 .dispatchId(dispatchId)
-                .payloadJson(json)
                 .publishedAt(now)
                 .dueAt(dueAt)
                 .build();
@@ -201,6 +198,28 @@ public class DeliverySweepService {
                 type, delivery.getTargetId(), machineId, run, dispatchId, dueAt);
     }
 
+    // the body comes from the store, the delivery block from the row: what the agent copies back names this very
+    // dispatch, whichever pass publishes it
+    private DeliveryPayload payloadOf(MachineDelivery delivery, DeliverySpec<DeliverySeed, DeliveryPayload> spec, String dispatchId) {
+        Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
+        String json = bodyJson(delivery);
+        DeliveryPayload payload = payloadJson.read(json, payloadClass);
+        DeliveryRef ref = new DeliveryRef(delivery.getType(), delivery.getTargetId(), dispatchId);
+        ref.setSequence(delivery.getSequence());
+        payload.setDelivery(ref);
+        return payload;
+    }
+
+    // a row written before the payload store carries its body inline, until it expires
+    private String bodyJson(MachineDelivery delivery) {
+        String payloadId = delivery.getPayloadId();
+        if (payloadId == null) {
+            return delivery.getPayloadJson();
+        }
+        return payloads.find(payloadId)
+                .orElseThrow(() -> new IllegalStateException("Delivery payload body is gone: " + payloadId));
+    }
+
     private static boolean isRerunStart(MachineDelivery delivery) {
         return delivery.getReruns() > 0 && delivery.getAttempts() == 0;
     }
@@ -208,7 +227,8 @@ public class DeliverySweepService {
     private boolean publish(DeliverySpec<DeliverySeed, DeliveryPayload> spec, String machineId, DeliveryPayload payload) {
         try {
             String subject = spec.subject(machineId);
-            publisher.publish(subject, payload);
+            DeliveryPayload wireForm = spec.wireForm(payload);
+            publisher.publish(subject, wireForm);
             return true;
         } catch (RuntimeException e) {
             log.error("Delivery publish failed: machineId={}", machineId, e);
@@ -261,12 +281,16 @@ public class DeliverySweepService {
         return delivery.getAttempts() < policy.getMaxAttempts();
     }
 
-    private static boolean shouldSkipOffline(Policy policy) {
-        return policy.getOfflineBehavior() == DeliveryOfflineBehavior.SKIP;
+    // the row's own rule wins over the type's policy: the request said what to do with a machine that is not online
+    private static boolean shouldSkipOffline(MachineDelivery delivery, Policy policy) {
+        DeliveryOfflineBehavior behavior = Optional.ofNullable(delivery.getOfflineBehavior())
+                .orElseGet(policy::getOfflineBehavior);
+        return behavior == DeliveryOfflineBehavior.SKIP;
     }
 
     private static Instant reconnectWindowEnd(MachineDelivery delivery, Policy policy) {
-        long windowSeconds = policy.getReconnectWindowSeconds();
+        long windowSeconds = Optional.ofNullable(delivery.getReconnectWindowSeconds())
+                .orElseGet(policy::getReconnectWindowSeconds);
         return delivery.getDispatchedAt().plusSeconds(windowSeconds);
     }
 }

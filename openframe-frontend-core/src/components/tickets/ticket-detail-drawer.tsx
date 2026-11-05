@@ -23,11 +23,13 @@
 
 import { useEffect, useRef } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
+import { type ChatRuntime, useChatRuntime } from '../../contexts/chat-runtime-context';
 import { LoadingRegion } from '../loading/loading-region';
 import { formatRelativeTime } from './../../utils/date-utils';
 import { ChatMessageRow } from './../chat/chat-message-row';
 import { useChatIdentity } from './../chat/hooks/use-chat-identity';
 import type { ChatAttachment } from './../chat/utils/chat-attachment-markdown';
+import { executeNewTabNavigation } from './../chat/utils/execute-navigation';
 import { EmptyState } from './../empty-state';
 import { Button } from './../ui/button';
 import { LoadingItems } from './../ui/loading-scope';
@@ -178,6 +180,7 @@ const TICKET_FEED_SKELETON_ROWS = 6;
 
 function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
   const identity = useChatIdentity();
+  const runtime = useChatRuntime();
   // Optimistic placeholders don't have a real external_id yet — skip
   // the engagement fetch until the real ticket lands.
   const externalId = isOptimistic(ticket) ? null : ticket.external_id;
@@ -441,7 +444,7 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           // support bubbles was a legacy artifact from when Notes
           // were rendered and made customers think their support
           // engineer was leaving internal comments on their ticket.
-          const engAttachments = mapEngagementAttachments(eng.attachments);
+          const engAttachments = mapEngagementAttachments(eng.attachments, runtime);
           return (
             <ChatMessageRow
               key={eng.id}
@@ -474,9 +477,9 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
 /** Map the engagement file shape to the lib's canonical
  *  `TicketAttachment` so we can hand it straight to
  *  `<TicketAttachmentsList>`. Engagement `url` becomes a
- *  window.open-style download click; missing names degrade to
+ *  download click in a new tab; missing names degrade to
  *  `file-<id>` so the chip never renders an empty label. */
-function mapEngagementAttachments(files: TicketEngagementFile[]): TicketAttachment[] {
+function mapEngagementAttachments(files: TicketEngagementFile[], runtime: ChatRuntime | null): TicketAttachment[] {
   return files.map(f => {
     // Captured before the `onDownload` closure below: a narrowing of `f.url`
     // does not reach into a callback that runs on a later click.
@@ -489,7 +492,7 @@ function mapEngagementAttachments(files: TicketEngagementFile[]): TicketAttachme
       // viewable URL). Non-images fall back to the file-type icon. SquareAvatar
       // degrades to initials on a broken/expired image URL.
       thumbnailSrc: url && (f.mime?.startsWith('image/') ?? false) ? url : undefined,
-      onDownload: url ? () => window.open(url, '_blank', 'noopener,noreferrer') : undefined,
+      onDownload: url ? () => executeNewTabNavigation({ runtime, href: url }) : undefined,
     };
   });
 }

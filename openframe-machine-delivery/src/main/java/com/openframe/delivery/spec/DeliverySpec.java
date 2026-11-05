@@ -16,6 +16,11 @@ public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload>
 
     String subject(String machineId);
 
+    // what goes to the agent: the stored body can keep what must not lie in the database in the clear
+    default P wireForm(P payload) {
+        return payload;
+    }
+
     // a machine that never connected is still waiting for its first commands; one that is gone or leaving gets none
     default Set<DeviceStatus> getDeliverableStatuses() {
         return EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING);

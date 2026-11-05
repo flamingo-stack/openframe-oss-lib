@@ -39,6 +39,8 @@ export interface BoardColumnProps {
    * the same lane.
    */
   touchMode?: boolean;
+  /** A CSS length the list keeps clear at its end (`BoardProps.laneEndInset`). */
+  endInset?: string;
   /** Merged last, so the touch pager can override the fixed lane width. */
   className?: string;
 }
@@ -61,6 +63,7 @@ export const BoardColumn = memo(function BoardColumnImpl({
   joinLeft = false,
   joinRight = false,
   touchMode = false,
+  endInset,
   className,
 }: BoardColumnProps) {
   // The drop zone is the WHOLE lane, header included — not just the list. A
@@ -147,6 +150,7 @@ export const BoardColumn = memo(function BoardColumnImpl({
             onLoadMore={onLoadMore}
             loadMoreRootMargin={loadMoreRootMargin}
             touchMode={touchMode}
+            endInset={endInset}
           />
         </>
       )}
@@ -163,6 +167,7 @@ interface ColumnBodyProps {
   onLoadMore?: (columnId: string) => void;
   loadMoreRootMargin: string;
   touchMode: boolean;
+  endInset?: string;
 }
 
 function ColumnBody({
@@ -174,6 +179,7 @@ function ColumnBody({
   onLoadMore,
   loadMoreRootMargin,
   touchMode,
+  endInset,
 }: ColumnBodyProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -232,6 +238,8 @@ function ColumnBody({
       // is the sliver it lives in there — without it the line is clipped away by
       // this element's own overflow exactly when a card is aimed at either end.
       className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-xs)] overflow-y-auto py-[5px] [overflow-anchor:none]"
+      // The end inset on top of that sliver: the last card scrolls clear of what lies over the board's bottom.
+      style={endInset ? { paddingBottom: `calc(5px + ${endInset})` } : undefined}
     >
       {column.isLoading ? (
         // A lane loads one page of its tickets: its loading form draws that page, each card its own skeleton.

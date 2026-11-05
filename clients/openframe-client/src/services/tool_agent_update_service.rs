@@ -6,7 +6,7 @@ use crate::platform::{
     run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
-use crate::services::tool_ops::{ToolOpGuard, ToolOps};
+use crate::services::tool_ops::ToolOpGuard;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
@@ -25,7 +25,6 @@ pub struct ToolAgentUpdateService {
     tool_kill_service: ToolKillService,
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     tool_run_manager: ToolRunManager,
-    tool_ops: ToolOps,
     directory_manager: DirectoryManager,
     config_service: AgentConfigurationService,
     installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -39,7 +38,6 @@ impl ToolAgentUpdateService {
         installed_tools_service: InstalledToolsService,
         tool_kill_service: ToolKillService,
         tool_run_manager: ToolRunManager,
-        tool_ops: ToolOps,
         directory_manager: DirectoryManager,
         config_service: AgentConfigurationService,
         installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -56,7 +54,6 @@ impl ToolAgentUpdateService {
             installed_tools_service,
             tool_kill_service,
             tool_run_manager,
-            tool_ops,
             directory_manager,
             config_service,
             installed_agent_publisher,
@@ -64,36 +61,10 @@ impl ToolAgentUpdateService {
         }
     }
 
-    pub async fn process_update(&self, message: ToolAgentUpdateMessage) -> Result<()> {
-        let tool_agent_id = &message.tool_agent_id;
-        let new_version = &message.version;
-
-        info!(
-            "Processing tool agent update for tool: {} to version: {}",
-            tool_agent_id, new_version
-        );
-
-        let tool_lock = match self.tool_ops.try_lock(tool_agent_id) {
-            Ok(lock) => lock,
-            Err(_) => {
-                info!(
-                    "Tool {} busy with another operation, deferring update",
-                    tool_agent_id
-                );
-                anyhow::bail!(
-                    "tool {} busy, deferring update for redelivery",
-                    tool_agent_id
-                );
-            }
-        };
-        self.process_update_locked(message, tool_lock).await
-    }
-
-    // a ToolLock is marked busy only once there is something to update; a ToolOpGuard already is
     pub async fn process_update_locked(
         &self,
         message: ToolAgentUpdateMessage,
-        tool: impl Into<ToolOpGuard>,
+        _op: ToolOpGuard,
     ) -> Result<()> {
         let tool_agent_id = &message.tool_agent_id;
         let new_version = &message.version;
@@ -215,8 +186,6 @@ impl ToolAgentUpdateService {
             );
             return Ok(());
         }
-
-        let _op: ToolOpGuard = tool.into();
 
         // A Standard->GuiApp migration self-relaunches, so only relaunch here if it was already a GUI app.
         let was_gui_before_update =

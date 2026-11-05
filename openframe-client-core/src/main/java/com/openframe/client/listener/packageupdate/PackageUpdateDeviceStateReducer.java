@@ -1,5 +1,6 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -20,9 +21,21 @@ import java.time.Instant;
 @UtilityClass
 public class PackageUpdateDeviceStateReducer {
 
+    static final String NOT_DELIVERED = "NOT_DELIVERED";
+
     public void apply(PackageUpdateDeviceState state, PackageUpdateRequest request, PackageUpdateStatusMessage event) {
         applyEvent(state, event);
         armDeadline(state, request, event);
+    }
+
+    // the order never reached the device; the event clock stays untouched, so a late status from the agent still applies
+    public void applyUndelivered(PackageUpdateDeviceState state, DeliveryFailure failure) {
+        state.setState(name(State.FAILED));
+        clearDetail(state);
+        state.setStatus(SoftwareActionStatus.FAILED);
+        state.setFailedReason(NOT_DELIVERED);
+        state.setFailedMessage(failure.name());
+        state.setUpdatedAt(Instant.now());
     }
 
     private void applyEvent(PackageUpdateDeviceState state, PackageUpdateStatusMessage event) {

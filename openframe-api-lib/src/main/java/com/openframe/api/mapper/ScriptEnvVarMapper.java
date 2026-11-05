@@ -53,9 +53,9 @@ public final class ScriptEnvVarMapper {
             throw new BadRequestException("Env var '" + name + "' must have a value");
         }
         for (List<ScriptEnvVar> source : fallbacks) {
-            String resolved = lookup(source, name);
-            if (resolved != null) {
-                return build(name, resolved, true);
+            ScriptEnvVar stored = lookup(source, name);
+            if (stored != null) {
+                return stored.toBuilder().secret(true).build();
             }
         }
         throw new BadRequestException(
@@ -70,13 +70,13 @@ public final class ScriptEnvVarMapper {
                 .build();
     }
 
-    private static String lookup(List<ScriptEnvVar> source, String name) {
+    private static ScriptEnvVar lookup(List<ScriptEnvVar> source, String name) {
         if (source == null) {
             return null;
         }
         for (ScriptEnvVar v : source) {
-            if (name.equals(v.getName())) {
-                return v.getValue();
+            if (name.equals(v.getName()) && v.getValue() != null) {
+                return v;
             }
         }
         return null;

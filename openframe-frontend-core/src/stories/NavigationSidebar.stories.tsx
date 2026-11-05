@@ -124,3 +124,19 @@ export const Default: Story = {
     },
   },
 };
+
+/**
+ * `config.resizable`: a grip astride the right edge. Drag it, or press the arrow
+ * keys, Home and End on it, to choose the expanded width between 200 and 480px;
+ * double-click it to go back to 224px. The choice is kept under the storage key.
+ */
+export const Resizable: Story = {
+  args: {
+    config: {
+      items: allNavigationItems,
+      onNavigate: fn(),
+      onToggleMinimized: fn(),
+      resizable: { minWidth: 200, maxWidth: 480, storageKey: 'storybook.navigationSidebar.width' },
+    },
+  },
+};

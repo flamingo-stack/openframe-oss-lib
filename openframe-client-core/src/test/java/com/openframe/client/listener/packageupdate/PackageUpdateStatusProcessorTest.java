@@ -1,17 +1,25 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
+import com.openframe.delivery.dispatch.DeliveryDispatcher;
+import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -37,6 +46,11 @@ class PackageUpdateStatusProcessorTest {
     @Mock private PackageUpdateDeviceStateRepository deviceStateRepository;
     @Mock private PackageUpdateRequestRepository requestRepository;
     @Mock private PackageUpdateExecutionRecorder executionRecorder;
+    @Mock private DeliveryDispatcher deliveryDispatcher;
+    @Mock private DeliveryTracker deliveryTracker;
+    @Mock private PackageAutoUpdateRetry autoUpdateRetry;
+
+    @Captor private ArgumentCaptor<PackageUpdateDeliverySeed> seedCaptor;
 
     @InjectMocks private PackageUpdateStatusProcessor processor;
 
@@ -131,6 +145,7 @@ class PackageUpdateStatusProcessorTest {
 
         verify(requestRepository).save(any());                   // rolled up to WAITING
         verify(executionRecorder).record(any(), eq("m1"), any()); // mirrored onto the history row
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker); // no deadline, no force
     }
 
     @Test
@@ -218,15 +233,17 @@ class PackageUpdateStatusProcessorTest {
         assertThat(st.getRebootRequired()).isTrue();
         assertThat(st.getWaitingReason()).isNull();              // stale waiting detail cleared
         assertThat(st.getHolders()).isNull();
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker); // no deadline, nothing to withdraw
     }
 
     @Test
-    void firstAppRunningWaiting_armsDeadline_whenPolicyHasOne() {
+    void firstAppRunningWaiting_armsDeadline_andSchedulesTheForceForItBeforeTheStateIsSaved() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L);
+        req.setForceCountdownSeconds(300);
         when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
-        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
-                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
         when(deviceStateRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(List.of(st));
 
         processor.process("m1", waiting("e1", T,
@@ -234,6 +251,232 @@ class PackageUpdateStatusProcessorTest {
                 PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
 
         assertThat(st.getDeadlineAt()).isEqualTo(T.plusSeconds(3600));
+        InOrder order = inOrder(deliveryDispatcher, deviceStateRepository);
+        order.verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(T.plusSeconds(3600)));
+        order.verify(deviceStateRepository).save(st);
+        PackageUpdateDeliverySeed seed = seedCaptor.getValue();
+        assertThat(seed.getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(seed.getCountdownSeconds()).isEqualTo(300);
+        assertThat(seed.getMachineId()).isEqualTo("m1");
+        assertThat(seed.getRequestId()).isEqualTo("req-1");              // the agent finds the request by it
+        assertThat(seed.getTargetId()).isEqualTo("req-1:deadline");      // a row of its own, the WAIT keeps its row
+        verifyNoInteractions(deliveryTracker);
+    }
+
+    @Test
+    void waitingAgain_deadlineArmedEarlier_forceNotScheduledTwice() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(T.plusSeconds(3600));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", waiting("e2", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
+
+        assertThat(st.getDeadlineAt()).isEqualTo(T.plusSeconds(3600));
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+    }
+
+    @Test
+    void doneBeforeTheDeadline_withdrawsTheScheduledForce() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(Instant.now().plusSeconds(3600));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", base("e2", T, PackageUpdateStatusMessage.State.DONE));
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.COMPLETED);
+        verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1:deadline"), eq("m1"), any());
+        verifyNoInteractions(deliveryDispatcher);
+    }
+
+    @Test
+    void failedPastTheDeadline_forceAlreadyOut_leftAlone() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(Instant.now().minusSeconds(60));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT));
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+    }
+
+    @Test
+    void schedulingTheForceFails_stateIsNotSaved_soTheRedeliveryArmsTheDeadlineAgain() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+        doThrow(new IllegalStateException("mongo down")).when(deliveryDispatcher).schedule(any(), any());
+
+        assertThatThrownBy(() -> processor.process("m1", waiting("e1", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.PROMPT)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(deviceStateRepository, never()).save(any());
+    }
+
+    @Test
+    void failedStatus_retryDecidedBeforeTheStateIsSaved() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT));
+
+        InOrder order = inOrder(autoUpdateRetry, deviceStateRepository);
+        order.verify(autoUpdateRetry).scheduleIfDue(st, req);
+        order.verify(deviceStateRepository).save(st);
+    }
+
+    @Test
+    void failedStatus_policyDecidedBeforeTheStateIsSaved() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.NOT_INSTALLED));
+
+        InOrder order = inOrder(autoUpdateRetry, deviceStateRepository);
+        order.verify(autoUpdateRetry).turnOffIfPackageRemoved(st, req);
+        order.verify(deviceStateRepository).save(st);
+    }
+
+    @Test
+    void schedulingTheRetryFails_stateIsNotSaved_soTheRedeliveryDecidesAgain() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+        doThrow(new IllegalStateException("mongo down")).when(autoUpdateRetry).scheduleIfDue(st, req);
+
+        assertThatThrownBy(() -> processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(deviceStateRepository, never()).save(any());
+    }
+
+    @Test
+    void undelivered_retryDecidedBeforeTheStateIsSaved() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.EXHAUSTED);
+
+        InOrder order = inOrder(autoUpdateRetry, deviceStateRepository);
+        order.verify(autoUpdateRetry).scheduleIfDue(st, req);
+        order.verify(deviceStateRepository).save(st);
+    }
+
+    @Test
+    void undelivered_deviceAlreadyReported_noRetry() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.FAILED);
+        st.setLastEventId("e1");
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.EXHAUSTED);
+
+        verifyNoInteractions(autoUpdateRetry);
+    }
+
+    @Test
+    void undelivered_movesUpdatedAt() {
+        machineResolves();
+        Instant before = Instant.parse("2026-10-30T10:00:00Z");
+        PackageUpdateDeviceState state = PackageUpdateDeviceState.builder()
+                .tenantId("t1").requestId("req-1").machineId("m1").status(SoftwareActionStatus.SCHEDULED).updatedAt(before)
+                .build();
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(state));
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.EXHAUSTED);
+
+        assertThat(state.getUpdatedAt()).isAfter(before);
+    }
+
+    @Test
+    void undelivered_deviceNeverReported_failsItRecordsHistoryAndClosesTheRequest() {
+        machineResolves();
+        PackageUpdateRequest req = request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null);
+        req.setStatus(SoftwareActionStatus.IN_PROGRESS);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.empty());
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+        ArgumentCaptor<PackageUpdateDeviceState> saved = ArgumentCaptor.forClass(PackageUpdateDeviceState.class);
+        when(deviceStateRepository.save(saved.capture())).thenAnswer(inv -> inv.getArgument(0));
+        when(deviceStateRepository.findByTenantIdAndRequestId("t1", "req-1")).thenAnswer(inv -> List.of(saved.getValue()));
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.EXHAUSTED);
+
+        PackageUpdateDeviceState st = saved.getValue();
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
+        assertThat(st.getState()).isEqualTo("FAILED");
+        assertThat(st.getFailedReason()).isEqualTo("NOT_DELIVERED");
+        assertThat(st.getFailedMessage()).isEqualTo("EXHAUSTED");
+        assertThat(st.getLastEventId()).isNull();
+        assertThat(st.getLastEventAt()).isNull();
+        verify(executionRecorder).recordUndelivered(req, "m1", DeliveryFailure.EXHAUSTED);
+        verify(requestRepository).save(req);
+        assertThat(req.getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
+    }
+
+    @Test
+    void undelivered_deviceAlreadyReported_receiptLostOnly_leftAlone() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setLastEventId("e1");
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.TIMEOUT);
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.WAITING);
+        verify(deviceStateRepository, never()).save(any());
+        verifyNoInteractions(requestRepository, executionRecorder);
+    }
+
+    @Test
+    void undelivered_unknownMachine_isIgnored() {
+        when(machineRepository.findByMachineId("m1")).thenReturn(Optional.empty());
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.OFFLINE);
+
+        verifyNoInteractions(deviceStateRepository, requestRepository, executionRecorder);
+    }
+
+    @Test
+    void statusArrivingAfterUndelivered_stillApplies() {
+        // the agent had the order after all: its first event is not taken for a stale one
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.FAILED);
+        PackageUpdateDeviceStateReducer.applyUndelivered(st, DeliveryFailure.TIMEOUT);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+
+        processor.process("m1", base("e1", T, PackageUpdateStatusMessage.State.DONE));
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.COMPLETED);
+        assertThat(st.getFailedReason()).isNull();
+        verify(deviceStateRepository).save(st);
     }
 
     @Test

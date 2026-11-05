@@ -1,7 +1,9 @@
-use crate::config::update_config::ALLOW_DOWNGRADE;
+use crate::config::update_config::{ALLOW_DOWNGRADE, STAGED_VERSION_PROBE_TIMEOUT_SECS};
 use crate::models::openframe_client_info::ClientUpdateStatus;
 use crate::models::openframe_client_update_message::OpenFrameClientUpdateMessage;
 use crate::models::update_state::{UpdatePhase, UpdateState};
+use crate::platform::binary_version;
+use crate::platform::directories::get_update_staging_directory;
 use crate::platform::updater_launcher::{self, LaunchedUpdater, UpdaterParams};
 use crate::service::FULL_SERVICE_NAME;
 use crate::services::github_download_service::GithubDownloadService;
@@ -11,6 +13,8 @@ use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
+use crate::utils::fs::JsonFile;
+use crate::utils::in_progress::InProgressView;
 use crate::utils::version_comparator;
 use anyhow::{anyhow, Context, Result};
 use semver::Version;
@@ -18,6 +22,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -53,12 +58,14 @@ pub struct OpenFrameClientUpdateService {
     last_known_good_service: LastKnownGoodService,
     tool_run_manager: ToolRunManager,
     tool_ops: ToolOps,
+    package_upgrades: InProgressView,
     update_handler_service: UpdateHandlerService,
     /// Set from the update request until the updater is done with this process
     update_in_progress: Arc<AtomicBool>,
 }
 
 impl OpenFrameClientUpdateService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_info_service: OpenFrameClientInfoService,
         github_download_service: GithubDownloadService,
@@ -66,6 +73,7 @@ impl OpenFrameClientUpdateService {
         last_known_good_service: LastKnownGoodService,
         tool_run_manager: ToolRunManager,
         tool_ops: ToolOps,
+        package_upgrades: InProgressView,
         update_handler_service: UpdateHandlerService,
     ) -> Self {
         Self {
@@ -75,20 +83,13 @@ impl OpenFrameClientUpdateService {
             last_known_good_service,
             tool_run_manager,
             tool_ops,
+            package_upgrades,
             update_handler_service,
             update_in_progress: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    pub async fn process_update(
-        &self,
-        message: OpenFrameClientUpdateMessage,
-    ) -> Result<UpdateLaunch> {
-        let guard = self.reserve(&message)?;
-        self.apply(message, guard).await
-    }
-
-    /// Takes the update slot and parks new tool operations, unless another update or a tool holds them
+    /// Takes the update slot and parks new tool operations, unless another update, a tool or a package upgrade holds them
     pub fn reserve(&self, message: &OpenFrameClientUpdateMessage) -> Result<UpdateGuard> {
         let requested_version = message.version.trim();
         info!("Received update request for version: {}", requested_version);
@@ -103,15 +104,32 @@ impl OpenFrameClientUpdateService {
         };
         info!("Acquired update lock for version: {}", requested_version);
 
+        // apply() skips the running version, so it neither parks tool operations nor waits for them
+        if Self::is_running_version(requested_version) {
+            return Ok(guard);
+        }
+
         self.tool_run_manager.mark_client_update_pending();
 
-        if self.tool_ops.any_busy() {
-            warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
-            return Err(anyhow!(
-                "Tool operation in progress, deferring client update"
-            ));
+        if let Some(busy) = self.busy_with() {
+            warn!(
+                "{} in progress, deferring client update to version {} (will redeliver)",
+                busy, requested_version
+            );
+            return Err(anyhow!("{} in progress, deferring client update", busy));
         }
         Ok(guard)
+    }
+
+    /// What must finish before the agent may be replaced; the client update waits for it.
+    fn busy_with(&self) -> Option<&'static str> {
+        if self.tool_ops.any_busy() {
+            Some("Tool operation")
+        } else if self.package_upgrades.is_active() {
+            Some("Package upgrade")
+        } else {
+            None
+        }
     }
 
     /// Update processing with version validation and safety checks, under a reserved update slot
@@ -132,7 +150,7 @@ impl OpenFrameClientUpdateService {
             .with_context(|| format!("Failed to parse requested version: {}", requested_version))?;
         let canonical_version = requested_semver.to_string();
 
-        if canonical_version == env!("OPENFRAME_VERSION") {
+        if Self::is_running_version(requested_version) {
             info!(
                 "Already running version {}, ignoring update request",
                 canonical_version
@@ -175,48 +193,44 @@ impl OpenFrameClientUpdateService {
         }
 
         // 4. Log current version for informational purposes
-        let client_info = self
-            .client_info_service
-            .get()
-            .await
-            .context("Failed to get current client info")?;
-
-        if !client_info.current_version.is_empty() {
-            info!(
+        match self.client_info_service.get().await {
+            Ok(client_info) if !client_info.current_version.is_empty() => info!(
                 "Updating from version {} to {}",
                 client_info.current_version, requested_version
-            );
-        } else {
-            info!(
+            ),
+            Ok(_) => info!(
                 "No current version set, installing version: {}",
                 requested_version
-            );
+            ),
+            Err(e) => error!(
+                "Failed to get current client info, updating to {} anyway: {:#}",
+                requested_version, e
+            ),
         }
 
-        // 5. Create update state for tracking
+        // 5. Track the update; it is saved once, right before the updater launches
         let mut update_state = UpdateState::new(canonical_version.clone());
-        self.update_state_service
-            .save(&update_state)
-            .await
-            .context("Failed to save initial update state")?;
 
-        // 6. Set update status to updating
-        self.client_info_service
+        // 6. Set update status to updating; bookkeeping only, so a failure must not block the update
+        if let Err(e) = self
+            .client_info_service
             .set_update_status(
                 ClientUpdateStatus::Updating,
                 Some(canonical_version.clone()),
             )
             .await
-            .context("Failed to set update status")?;
+        {
+            error!("Failed to set update status to Updating: {:#}", e);
+        }
 
         info!("Starting update to version {}", requested_version);
 
         // Execute update with status rollback
         let update_result = self
-            .execute_update(&message, &mut update_state, guard)
+            .execute_update(&message, &requested_semver, &mut update_state, guard)
             .await;
 
-        // Handle errors: set status to Failed (cleanup already done in execute_update)
+        // Handle errors: set status to Failed and drop any update state (execute_update removed the staged binary)
         if let Err(ref e) = update_result {
             error!("Update failed: {:#}", e);
 
@@ -229,6 +243,11 @@ impl OpenFrameClientUpdateService {
                 error!("Failed to set update status to Failed: {:#}", status_err);
             }
 
+            // a stale state from an earlier attempt would otherwise feed the boot crash-loop guard
+            if let Err(clear_err) = self.update_state_service.clear().await {
+                warn!("Failed to clear the update state: {:#}", clear_err);
+            }
+
             info!("Update failed, NATS will retry");
         }
 
@@ -239,6 +258,7 @@ impl OpenFrameClientUpdateService {
     async fn execute_update(
         &self,
         message: &OpenFrameClientUpdateMessage,
+        expected_version: &Version,
         update_state: &mut UpdateState,
         guard: UpdateGuard,
     ) -> Result<()> {
@@ -254,9 +274,6 @@ impl OpenFrameClientUpdateService {
         );
 
         // 2. Download and extract binary using GithubDownloadService
-        update_state.set_phase(UpdatePhase::Downloading);
-        self.update_state_service.save(update_state).await?;
-
         let binary_bytes = match self
             .github_download_service
             .download_and_extract(download_config)
@@ -265,8 +282,6 @@ impl OpenFrameClientUpdateService {
             Ok(bytes) => bytes,
             Err(e) => {
                 error!("Download failed: {:#}", e);
-                // Clear update state - download failed, nothing to cleanup
-                self.update_state_service.clear().await?;
                 return Err(e.context("Failed to download and extract update"));
             }
         };
@@ -278,14 +293,10 @@ impl OpenFrameClientUpdateService {
 
         self.tool_run_manager.mark_client_update_pending();
 
-        // 3. Extract binary
-        update_state.set_phase(UpdatePhase::Extracting);
-        self.update_state_service.save(update_state).await?;
+        let current_exe =
+            std::env::current_exe().context("Failed to get current executable path")?;
 
-        // 4. Stage the extracted binary for the updater script
-        update_state.set_phase(UpdatePhase::PreparingUpdater);
-        self.update_state_service.save(update_state).await?;
-
+        // 3. Stage the extracted binary for the updater script
         let staged_path = match self
             .stage_binary(&binary_bytes, &download_config.target_file_name)
             .await
@@ -293,20 +304,20 @@ impl OpenFrameClientUpdateService {
             Ok(path) => path,
             Err(e) => {
                 error!("Failed to stage binary: {:#}", e);
-                self.update_state_service.clear().await?;
                 return Err(e.context("Failed to stage update binary"));
             }
         };
 
         info!("Update binary staged: {}", staged_path.display());
 
-        // 5. Launch update process (platform-specific)
-        update_state.set_phase(UpdatePhase::UpdaterLaunched);
-        self.update_state_service.save(update_state).await?;
+        // Refused before the service stops, so a wrong build costs no restart; the delivery engine re-runs a failed update
+        if let Err(e) = Self::verify_staged_version(&staged_path, expected_version).await {
+            error!("Staged binary rejected: {:#}", e);
+            Self::remove_staged_binary(&staged_path, "the version check");
+            return Err(e);
+        }
 
-        let current_exe =
-            std::env::current_exe().context("Failed to get current executable path")?;
-
+        // 4. Launch update process (platform-specific)
         let params = UpdaterParams {
             binary_path: staged_path.clone(),
             target_exe: current_exe,
@@ -324,18 +335,23 @@ impl OpenFrameClientUpdateService {
             rollback_only: false,
         };
 
-        if self.tool_ops.any_busy() {
-            warn!("Tool operation started during client download, deferring client update (will redeliver)");
-            if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
-                warn!(
-                    "Failed to remove staged binary after deferring: {}",
-                    cleanup_err
-                );
-            }
-            self.update_state_service.clear().await?;
+        if let Some(busy) = self.busy_with() {
+            warn!(
+                "{} started during client download, deferring client update (will redeliver)",
+                busy
+            );
+            Self::remove_staged_binary(&staged_path, "deferring");
             return Err(anyhow!(
-                "Tool operation started during download, deferring client update"
+                "{} started during download, deferring client update",
+                busy
             ));
+        }
+
+        // The updater script needs the state file; any earlier failure leaves none behind
+        update_state.set_phase(UpdatePhase::UpdaterLaunched);
+        if let Err(e) = self.update_state_service.save(update_state).await {
+            Self::remove_staged_binary(&staged_path, "the state save failure");
+            return Err(e);
         }
 
         // If launch failed, cleanup staged binary and state
@@ -343,13 +359,7 @@ impl OpenFrameClientUpdateService {
             Ok(launched) => launched,
             Err(e) => {
                 error!("Failed to launch updater: {:#}", e);
-                if let Err(cleanup_err) = std::fs::remove_file(&staged_path) {
-                    warn!(
-                        "Failed to remove staged binary after launch failure: {}",
-                        cleanup_err
-                    );
-                }
-                self.update_state_service.clear().await?;
+                Self::remove_staged_binary(&staged_path, "launch failure");
                 return Err(e);
             }
         };
@@ -413,15 +423,16 @@ impl OpenFrameClientUpdateService {
             }
         }
 
-        let mut state = match self.update_state_service.load().await {
-            Ok(Some(state)) => state,
-            Ok(None) => {
+        let mut state = match self.update_state_service.read_state().await {
+            Ok(JsonFile::Parsed(state)) => state,
+            Ok(JsonFile::Missing) => {
                 warn!(
                     "Updater for {} exited early and the update state is gone (client uninstalled?), nothing to finish",
                     target_version
                 );
                 return;
             }
+            Ok(JsonFile::Corrupt) => UpdateState::new(target_version.to_string()),
             Err(e) => {
                 warn!(
                     "Updater for {} exited early and the update state is unreadable: {:#}",
@@ -456,11 +467,14 @@ impl OpenFrameClientUpdateService {
         }
     }
 
-    /// Writes the extracted binary to a temp file for the updater script. The UUID name means
+    /// Writes the extracted binary to the staging dir for the updater script. The UUID name means
     /// nothing can read it before we return, so no atomic-rename or fsync ceremony is needed.
     async fn stage_binary(&self, binary_bytes: &[u8], binary_name: &str) -> Result<PathBuf> {
-        let temp_dir = std::env::temp_dir();
-        let binary_path = temp_dir.join(format!(
+        let staging_dir = get_update_staging_directory();
+        tokio::fs::create_dir_all(&staging_dir)
+            .await
+            .context("Failed to create update staging directory")?;
+        let binary_path = staging_dir.join(format!(
             "openframe-update-{}-{}",
             Uuid::new_v4(),
             binary_name
@@ -471,11 +485,45 @@ impl OpenFrameClientUpdateService {
         Ok(binary_path)
     }
 
+    fn remove_staged_binary(staged_path: &Path, after: &str) {
+        if let Err(e) = std::fs::remove_file(staged_path) {
+            warn!("Failed to remove staged binary after {}: {}", after, e);
+        }
+    }
+
     /// Parse version string into semver Version
     /// Supports formats like: "1.2.3", "v1.2.3", "1.2.3-beta", "1.2.3+build"
     fn parse_version(version: &str) -> Result<Version> {
         version_comparator::parse_version(version)
             .with_context(|| format!("Failed to parse version: {}", version))
+    }
+
+    /// Refuses the staged binary only when it clearly reports another version; one that cannot tell is installed unverified
+    async fn verify_staged_version(staged_path: &Path, expected: &Version) -> Result<()> {
+        let limit = Duration::from_secs(STAGED_VERSION_PROBE_TIMEOUT_SECS);
+        let Some(reported) = binary_version::reported_version(staged_path, limit).await else {
+            warn!(
+                "Could not read the version of the staged binary, installing it unverified as {}",
+                expected
+            );
+            return Ok(());
+        };
+        if version_comparator::precedence(&reported, expected) != std::cmp::Ordering::Equal {
+            return Err(anyhow!(
+                "Downloaded binary reports version {}, expected {}; not installing it",
+                reported,
+                expected
+            ));
+        }
+        info!("Staged binary reports the expected version {}", reported);
+        Ok(())
+    }
+
+    /// The request names the version this binary was built as
+    fn is_running_version(version: &str) -> bool {
+        Self::is_valid_version(version)
+            && Self::parse_version(version)
+                .is_ok_and(|parsed| parsed.to_string() == env!("OPENFRAME_VERSION"))
     }
 
     /// Validate version format (basic semver check)
@@ -492,3 +540,7 @@ impl OpenFrameClientUpdateService {
                 .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+')
     }
 }
+
+#[cfg(test)]
+#[path = "openframe_client_update_service_tests.rs"]
+mod tests;

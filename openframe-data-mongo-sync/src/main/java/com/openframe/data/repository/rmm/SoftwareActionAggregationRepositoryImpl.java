@@ -4,6 +4,7 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareActionSummary;
@@ -36,6 +37,7 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
     private static final String SCRIPT_EXECUTIONS = "script_executions";
     private static final List<String> TERMINAL = List.of(ExecutionStatus.SUCCESS.name(), ExecutionStatus.FAILED.name());
     private static final List<String> IN_PROGRESS = List.of(ExecutionStatus.QUEUED.name(), ExecutionStatus.RUNNING.name());
+    private static final List<String> FINISHED = List.of(SoftwareActionStatus.COMPLETED.name(), SoftwareActionStatus.FAILED.name());
     private static final String DEFAULT_SORT = "dispatchedAt";
     private static final Set<String> SORTABLE = Set.of("dispatchedAt", "status", "packageName", "totalMachineCount");
 
@@ -123,6 +125,12 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
             if (filter.getActions() != null && !filter.getActions().isEmpty()) {
                 match.append("action", new Document("$in", names(filter.getActions())));
             }
+            if (filter.getKinds() != null && !filter.getKinds().isEmpty()) {
+                List<String> kinds = names(filter.getKinds());
+                match.append("$or", List.of(
+                        new Document("kind", new Document("$in", kinds)),
+                        new Document("kind", null).append("action", new Document("$in", kinds))));
+            }
             if (filter.getEngines() != null && !filter.getEngines().isEmpty()) {
                 match.append("packageManager", new Document("$in", names(filter.getEngines())));
             }
@@ -141,9 +149,12 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                         new Document("$ne", Arrays.asList("$softwareAction", null)))))),
                 new Document("$group", new Document("_id", null)
                         .append("responded", new Document("$addToSet", cond(inArr("$status", TERMINAL), "$machineId", null)))
+                        .append("waiting", new Document("$addToSet", cond(isWaiting(), "$machineId", null)))
                         .append("hasInProgress", new Document("$max", cond(inArr("$status", IN_PROGRESS), 1, 0)))
                         .append("failed", new Document("$max",
                                 cond(new Document("$eq", Arrays.asList("$status", ExecutionStatus.FAILED.name())), 1, 0)))
+                        .append("firstDispatchedAt", new Document("$min", "$dispatchedAt"))
+                        .append("lastFinishedAt", new Document("$max", "$finishedAt"))
                         .append("execCount", new Document("$sum", 1))));
         return new Document("$lookup", new Document("from", SCRIPT_EXECUTIONS)
                 .append("let", new Document("eid", "$executionId").append("tid", "$tenantId"))
@@ -156,17 +167,37 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
         stages.add(ctx -> new Document("$addFields",
                 new Document("_exec", new Document("$arrayElemAt", Arrays.asList("$exec", 0)))));
         Object hasLeaves = new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.execCount", 0)), 0));
-        Object responded = new Document("$size", new Document("$setDifference", List.of(
-                new Document("$ifNull", Arrays.asList("$_exec.responded", Collections.emptyList())),
-                Collections.singletonList(null))));
-        Object liveStatus = cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.hasInProgress", 0)), 0)),
-                SoftwareActionStatus.IN_PROGRESS.name(),
-                cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.failed", 0)), 0)),
-                        SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.COMPLETED.name()));
+        Object responded = machineCount("$_exec.responded");
+        Object waiting = machineCount("$_exec.waiting");
+        // same precedence as the package-update roll-up: any waiting device makes the whole action WAITING
+        Object liveStatus = cond(new Document("$gt", Arrays.asList(waiting, 0)),
+                SoftwareActionStatus.WAITING.name(),
+                cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.hasInProgress", 0)), 0)),
+                        SoftwareActionStatus.IN_PROGRESS.name(),
+                        cond(new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList("$_exec.failed", 0)), 0)),
+                                SoftwareActionStatus.FAILED.name(), SoftwareActionStatus.COMPLETED.name())));
         stages.add(ctx -> new Document("$addFields", new Document()
                 .append("respondedMachineCount", cond(hasLeaves, responded, 0))
+                .append("waitingMachineCount", cond(hasLeaves, waiting, 0))
                 .append("status", cond(hasLeaves, liveStatus, "$status"))));
+        // a schedule's row is written before it fires and never updated, so its dispatch time comes from the devices
+        stages.add(ctx -> new Document("$addFields", new Document()
+                .append("dispatchedAt", new Document("$ifNull", Arrays.asList("$dispatchedAt", "$_exec.firstDispatchedAt")))
+                .append("finishedAt", cond(inArr("$status", FINISHED), "$_exec.lastFinishedAt", null))));
         return stages;
+    }
+
+    private static Document isWaiting() {
+        return new Document("$and", List.of(
+                new Document("$eq", Arrays.asList("$status", ExecutionStatus.RUNNING.name())),
+                new Document("$eq", Arrays.asList("$waiting", true))));
+    }
+
+    // distinct machine ids collected by the lookup, without the null the $cond adds for non-matching leaves
+    private static Document machineCount(String field) {
+        return new Document("$size", new Document("$setDifference", List.of(
+                new Document("$ifNull", Arrays.asList(field, Collections.emptyList())),
+                Collections.singletonList(null))));
     }
 
     private static Document projectDoc() {
@@ -174,13 +205,17 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .append("executionId", 1)
                 .append("packageManager", 1)
                 .append("packageName", 1)
+                .append("version", 1)
                 .append("action", 1)
+                .append("kind", new Document("$ifNull", Arrays.asList("$kind", "$action")))
                 .append("initiatedBy", 1)
                 .append("bundleId", 1)
                 .append("scheduleId", 1)
                 .append("dispatchedAt", 1)
+                .append("finishedAt", 1)
                 .append("totalMachineCount", 1)
                 .append("respondedMachineCount", 1)
+                .append("waitingMachineCount", 1)
                 .append("status", 1);
     }
 
@@ -214,11 +249,15 @@ public class SoftwareActionAggregationRepositoryImpl implements SoftwareActionAg
                 .executionId(doc.getString("executionId"))
                 .packageManager(enumOrNull(doc.getString("packageManager"), PackageManagerType.class))
                 .packageName(doc.getString("packageName"))
+                .version(doc.getString("version"))
                 .action(enumOrNull(doc.getString("action"), SoftwareAction.class))
+                .kind(enumOrNull(doc.getString("kind"), SoftwareActionKind.class))
                 .status(enumOrNull(doc.getString("status"), SoftwareActionStatus.class))
                 .totalMachineCount(intValue(doc.get("totalMachineCount")))
                 .respondedMachineCount(intValue(doc.get("respondedMachineCount")))
+                .waitingMachineCount(intValue(doc.get("waitingMachineCount")))
                 .dispatchedAt(instantOrNull(doc.get("dispatchedAt")))
+                .finishedAt(instantOrNull(doc.get("finishedAt")))
                 .initiatedBy(doc.getString("initiatedBy"))
                 .bundleId(doc.getString("bundleId"))
                 .scheduleId(doc.getString("scheduleId"))

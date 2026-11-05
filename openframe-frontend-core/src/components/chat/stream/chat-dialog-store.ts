@@ -199,7 +199,6 @@ export interface EvictedReducerState {
 const EMPTY_STATE: ChatReducerState = Object.freeze({
   messages: Object.freeze([]) as unknown as ChatReducerState['messages'],
   streamingPhase: 'idle',
-  streamingProgress: null,
   turnMeta: Object.freeze({
     meta: new Map(),
     sources: new Map(),

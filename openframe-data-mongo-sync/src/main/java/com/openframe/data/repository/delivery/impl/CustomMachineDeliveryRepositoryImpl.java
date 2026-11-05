@@ -9,6 +9,7 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.delivery.CustomMachineDeliveryRepository;
+import com.openframe.data.repository.delivery.PayloadReplacement;
 import com.openframe.data.repository.delivery.RerunPublication;
 import org.bson.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -36,6 +37,9 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_RERUNS = "reruns";
     private static final String FIELD_DISPATCH_ID = "dispatchId";
     private static final String FIELD_SEQUENCE = "sequence";
+    private static final String FIELD_PAYLOAD_ID = "payloadId";
+    private static final String FIELD_OFFLINE_BEHAVIOR = "offlineBehavior";
+    private static final String FIELD_RECONNECT_WINDOW_SECONDS = "reconnectWindowSeconds";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_DUE_AT = "dueAt";
@@ -94,6 +98,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         Document document = new Document();
         mongoTemplate.getConverter().write(delivery, document);
         Update update = new Update().set(FIELD_TENANT_ID, tenantId())
+                .unset(FIELD_PAYLOAD_JSON)
                 .unset(FIELD_ACKED_AT)
                 .unset(FIELD_FINISHED_AT)
                 .unset(FIELD_FAILURE)
@@ -204,10 +209,29 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         Update update = new Update()
                 .set(FIELD_DISPATCH_ID, publication.getDispatchId())
                 .set(FIELD_DISPATCHED_AT, publication.getPublishedAt())
-                .set(FIELD_PAYLOAD_JSON, publication.getPayloadJson())
                 .set(FIELD_ATTEMPTS, 1)
                 .set(FIELD_DUE_AT, publication.getDueAt());
         return updateOne(notYetPublished, update);
+    }
+
+    // only the dispatch the caller looked at: a body replaced twice at once keeps the later caller's
+    @Override
+    public boolean replacePayload(PayloadReplacement replacement) {
+        String id = replacement.getId();
+        Set<DeliveryStatus> from = replacement.getFrom();
+        String dispatchId = replacement.getDispatchId();
+        Update update = new Update()
+                .set(FIELD_PAYLOAD_ID, replacement.getPayloadId())
+                .set(FIELD_DISPATCH_ID, replacement.getNextDispatchId())
+                .set(FIELD_DUE_AT, replacement.getDueAt())
+                .unset(FIELD_PAYLOAD_JSON);
+        if (replacement.getOfflineBehavior() != null) {
+            update.set(FIELD_OFFLINE_BEHAVIOR, replacement.getOfflineBehavior());
+        }
+        if (replacement.getReconnectWindowSeconds() != null) {
+            update.set(FIELD_RECONNECT_WINDOW_SECONDS, replacement.getReconnectWindowSeconds());
+        }
+        return updateOne(thisDispatch(id, from, dispatchId), update);
     }
 
     private static Update rerun(Instant dueAt) {

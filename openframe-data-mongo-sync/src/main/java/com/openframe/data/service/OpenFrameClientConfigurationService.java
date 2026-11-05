@@ -26,8 +26,12 @@ public class OpenFrameClientConfigurationService {
     private final TenantIdProvider tenantIdProvider;
 
     public OpenFrameClientConfiguration get() {
-        return repository.findByTenantId(tenantIdProvider.getTenantId())
-                .orElseThrow(() -> new IllegalStateException("No openframe client configuration found"));
+        return find().orElseThrow(() -> new IllegalStateException("No openframe client configuration found"));
+    }
+
+    public Optional<OpenFrameClientConfiguration> find() {
+        String tenantId = tenantIdProvider.getTenantId();
+        return repository.findByTenantId(tenantId);
     }
 
     public Optional<OpenFrameClientConfiguration> findById(String id) {

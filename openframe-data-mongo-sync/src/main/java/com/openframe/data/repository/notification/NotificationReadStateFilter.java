@@ -1,6 +1,7 @@
 package com.openframe.data.repository.notification;
 
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationSeverity;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,4 +19,6 @@ public class NotificationReadStateFilter {
     private final List<String> types;
     private final List<NotificationSeverity> severities;
     private final String search;
+    private final NotificationEntityType entityType;
+    private final String entityId;
 }

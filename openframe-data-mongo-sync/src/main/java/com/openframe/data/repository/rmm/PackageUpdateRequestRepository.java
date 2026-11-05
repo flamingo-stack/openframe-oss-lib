@@ -1,9 +1,7 @@
 package com.openframe.data.repository.rmm;
 
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
-import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,8 +14,6 @@ public interface PackageUpdateRequestRepository extends MongoRepository<PackageU
     Optional<PackageUpdateRequest> findByTenantIdAndRequestId(String tenantId, String requestId);
 
     List<PackageUpdateRequest> findByTenantIdAndStatus(String tenantId, SoftwareActionStatus status);
-
-    List<PackageUpdateRequest> findBySourceAndStatus(PackageUpdateSource source, SoftwareActionStatus status, Pageable pageable);
 
     long deleteByTenantIdAndRequestId(String tenantId, String requestId);
 }

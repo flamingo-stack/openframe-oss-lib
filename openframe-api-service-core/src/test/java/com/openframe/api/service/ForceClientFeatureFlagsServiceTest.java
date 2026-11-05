@@ -8,9 +8,9 @@ import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientFeatureFlagsDeliverySeed;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import com.openframe.delivery.config.DeliveryProperties;
-import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import com.openframe.delivery.spec.DeliveryAudience;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ class ForceClientFeatureFlagsServiceTest {
 
     @Mock private OpenFrameClientConfigurationService clientConfigurationService;
     @Mock private DeliveryProperties deliveryProperties;
-    @Mock private DeliveryDispatcher deliveryDispatcher;
+    @Mock private DeliveryRouter deliveryRouter;
     @Captor private ArgumentCaptor<ClientFeatureFlagsDeliverySeed> seedCaptor;
     @InjectMocks private ForceClientFeatureFlagsService service;
 
@@ -55,16 +55,17 @@ class ForceClientFeatureFlagsServiceTest {
     }
 
     @Test
-    void process_typeOnTheEngine_currentFlagsHandedToEachMachine() {
+    void process_typeOnTheEngine_currentFlagsSentToEachMachine() {
         // setup
         when(deliveryProperties.isEnabled(DeliveryType.CLIENT_FEATURE_FLAGS)).thenReturn(true);
         when(clientConfigurationService.get()).thenReturn(OpenFrameClientConfiguration.builder().featureFlags(FLAGS).build());
+        when(deliveryRouter.dispatch(any())).thenReturn(true);
 
         // execution
         ForceClientFeatureFlagsResponse response = service.process(request);
 
         // verifications
-        verify(deliveryDispatcher, times(2)).dispatch(seedCaptor.capture());
+        verify(deliveryRouter, times(2)).dispatch(seedCaptor.capture());
         List<ClientFeatureFlagsDeliverySeed> seeds = seedCaptor.getAllValues();
         assertThat(seeds).extracting(ClientFeatureFlagsDeliverySeed::getMachineId).containsExactly(MACHINE_ID, OTHER_MACHINE_ID);
         assertThat(seeds).extracting(ClientFeatureFlagsDeliverySeed::getAudience).containsOnly(DeliveryAudience.MACHINE);
@@ -73,7 +74,7 @@ class ForceClientFeatureFlagsServiceTest {
     }
 
     @Test
-    void process_configurationWithoutFlagsYet_emptySetHandedOver() {
+    void process_configurationWithoutFlagsYet_emptySetSent() {
         // setup
         when(deliveryProperties.isEnabled(DeliveryType.CLIENT_FEATURE_FLAGS)).thenReturn(true);
         when(clientConfigurationService.get()).thenReturn(OpenFrameClientConfiguration.builder().build());
@@ -82,23 +83,23 @@ class ForceClientFeatureFlagsServiceTest {
         service.process(request);
 
         // verifications
-        verify(deliveryDispatcher, times(2)).dispatch(seedCaptor.capture());
+        verify(deliveryRouter, times(2)).dispatch(seedCaptor.capture());
         assertThat(seedCaptor.getValue().getFlags()).isEmpty();
     }
 
     @Test
-    void process_oneHandOffFails_thatMachineFailedTheOtherProcessed() {
+    void process_oneMachineFailsOneUnreachable_eachReportedOnItsOwn() {
         // setup
         when(deliveryProperties.isEnabled(DeliveryType.CLIENT_FEATURE_FLAGS)).thenReturn(true);
         when(clientConfigurationService.get()).thenReturn(OpenFrameClientConfiguration.builder().featureFlags(FLAGS).build());
-        doThrow(new IllegalStateException("kafka down")).doNothing().when(deliveryDispatcher).dispatch(any());
+        doThrow(new IllegalStateException("kafka down")).doReturn(false).when(deliveryRouter).dispatch(any());
 
         // execution
         ForceClientFeatureFlagsResponse response = service.process(request);
 
         // verifications
         assertThat(response.getItems()).extracting(ForceClientFeatureFlagsResponseItem::getStatus)
-                .containsExactly(ForceAgentStatus.FAILED, ForceAgentStatus.PROCESSED);
+                .containsExactly(ForceAgentStatus.FAILED, ForceAgentStatus.FAILED);
     }
 
     @Test
@@ -108,7 +109,7 @@ class ForceClientFeatureFlagsServiceTest {
 
         // execution + verifications
         assertThatThrownBy(() -> service.process(request)).isInstanceOf(IllegalStateException.class);
-        verifyNoInteractions(clientConfigurationService, deliveryDispatcher);
+        verifyNoInteractions(clientConfigurationService, deliveryRouter);
     }
 
     @Test

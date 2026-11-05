@@ -88,7 +88,7 @@ export interface ProductReleasesViewProps {
 
 /**
  * Per-row child — owns the per-release hooks (`useChatRuntime` +
- * `useEntityCardLink` + `useRouter`) so they run at a component top level, NOT
+ * `useEntityCardLink`) so they run at a component top level, NOT
  * inside the parent `.map()` (Rules-of-Hooks).
  */
 function ReleaseRow({
@@ -101,7 +101,6 @@ function ReleaseRow({
   buildCardProps: (release: ProductRelease) => ProductReleaseCardExtras;
 }) {
   const runtime = useChatRuntime();
-  const router = useRouter();
   // Pass the HYDRATED junction (`product_release_platforms` — the release DAL
   // flattens each platform's `name` onto it), like the blog / case-study /
   // interview grids. The composer reads `name` → resolves to the CURRENT
@@ -116,15 +115,13 @@ function ReleaseRow({
 
   const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
     // Let the browser handle modifier / middle / new-tab clicks (shared
-    // `isModifierClick` rule). Otherwise soft same-origin nav: the host's
-    // `navigate` (hub docNav) if wired, else the registered embed-shims router.
+    // `isModifierClick` rule). Otherwise the host's in-app `navigate`.
     if (e.defaultPrevented || isModifierClick(e) || target === '_blank') return;
     e.preventDefault();
     executeNavigationImperative({
       runtime,
       href: cta.href,
       targetPlatform: cta.targetPlatform,
-      fallbackNavigate: router.push,
     });
   };
 

@@ -15,14 +15,15 @@ pub mod machine_heartbeat_message;
 pub mod machine_timezone_message;
 pub mod openframe_client_info;
 pub mod openframe_client_update_message;
+pub mod package_ref;
+pub mod package_update;
+pub mod package_update_status;
 pub mod remote_access_mode;
 pub mod tool_agent_update_message;
 pub mod tool_connection;
 pub mod tool_connection_message;
 pub mod tool_installation_message;
 pub mod tool_installation_result;
-pub mod tool_restart_message;
-pub mod tool_uninstall_message;
 pub mod tool_version_overrides;
 pub mod update_state;
 
@@ -57,12 +58,19 @@ pub use machine_heartbeat_message::MachineHeartbeatMessage;
 pub use machine_timezone_message::MachineTimezoneMessage;
 pub use openframe_client_info::OpenFrameClientInfo;
 pub use openframe_client_update_message::OpenFrameClientUpdateMessage;
+pub use package_ref::{BrewKind, PackageRef};
+pub use package_update::{
+    PackageUpdateMessage, SourceKind, SourceOrigin, UpdateMode, UpdateSource, PACKAGE_UPDATE_KIND,
+};
+pub use package_update_status::{
+    package_update_status_subject, Done, DoneResult, FailReason, Failed, HolderInfo,
+    PackageUpdateStatusMessage, UpdateStatus, WaitPhase, WaitReason, Waiting,
+    PACKAGE_UPDATE_STATUS_KIND,
+};
 pub use remote_access_mode::RemoteAccessMode;
 pub use tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 pub use tool_connection::ToolConnection;
 pub use tool_connection_message::ToolConnectionMessage;
 pub use tool_installation_message::ToolInstallationMessage;
 pub use tool_installation_result::ToolInstallationResult;
-pub use tool_restart_message::ToolRestartMessage;
-pub use tool_uninstall_message::ToolUninstallMessage;
 pub use update_state::{UpdatePhase, UpdateState};

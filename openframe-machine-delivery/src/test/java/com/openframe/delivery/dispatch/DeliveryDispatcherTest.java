@@ -10,10 +10,14 @@ import com.openframe.delivery.spec.TestSeed;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
+
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,6 +37,8 @@ class DeliveryDispatcherTest {
     @Mock private DeliverySpec<TestSeed, TestPayload> spec;
     @Mock private ObjectProvider<DeliverySink> sinkProvider;
     @Mock private DeliverySink sink;
+
+    @Captor private ArgumentCaptor<DeliveryRequest<?>> requestCaptor;
 
     @InjectMocks private DeliveryDispatcher dispatcher;
 
@@ -119,5 +125,44 @@ class DeliveryDispatcherTest {
 
         // verifications
         verify(sink).accept(forEveryMachine);
+    }
+
+    @Test
+    void schedule_seed_requestCarriesTheMomentAndHandedToSink() {
+        // setup
+        Instant at = Instant.parse("2026-11-01T10:00:00Z");
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.request(seed)).thenReturn(request);
+        when(sinkProvider.getObject()).thenReturn(sink);
+
+        // execution
+        dispatcher.schedule(seed, at);
+
+        // verifications
+        verify(sink).accept(requestCaptor.capture());
+        DeliveryRequest<?> scheduled = requestCaptor.getValue();
+        assertThat(scheduled.getDueAt()).isEqualTo(at);
+        assertThat(scheduled.getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(scheduled.getPayload().getDelivery().getTargetId()).isEqualTo(TARGET_ID);
+        assertThat(scheduled.getPayload().getDelivery().getDispatchId()).isNotBlank();
+    }
+
+    @Test
+    void schedule_everyMachine_throwsWithoutHandOff() {
+        // setup
+        TestSeed everyMachine = new TestSeed(null);
+        DeliveryRequest<TestPayload> forEveryMachine = DeliveryRequest.<TestPayload>builder()
+                .type(DeliveryType.TOOL_INSTALLATION)
+                .targetId(TARGET_ID)
+                .audience(DeliveryAudience.EVERY_MACHINE)
+                .payload(payload)
+                .build();
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.request(everyMachine)).thenReturn(forEveryMachine);
+
+        // execution + verifications
+        assertThatThrownBy(() -> dispatcher.schedule(everyMachine, Instant.now().plusSeconds(60)))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(sinkProvider);
     }
 }

@@ -1,8 +1,12 @@
 package com.openframe.client.service.rmm;
 
+import java.util.List;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.bootstrap.SystemScriptCode;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.Script;
@@ -34,11 +38,17 @@ public class PackageManagerBootstrapService {
     private final ScriptRepository scriptRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
+    private final EncryptionService encryptionService;
 
     @Value("${openframe.rmm.package-manager-bootstrap.cooldown-seconds}")
     private long cooldownSeconds;
 
     public void dispatchInstall(String machineId, PackageManagerType packageManager) {
+        SystemScriptCode bootstrapScript = packageManager.bootstrapScript();
+        dispatchInstall(machineId, packageManager, bootstrapScript);
+    }
+
+    public void dispatchInstall(String machineId, PackageManagerType packageManager, SystemScriptCode bootstrapScript) {
         Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
         if (foundMachine.isEmpty()) {
             log.warn("Package-manager report for unknown machine {}, ignoring", machineId);
@@ -53,10 +63,10 @@ public class PackageManagerBootstrapService {
 
         String tenantId = machine.getTenantId();
         Optional<Script> foundScript = scriptRepository.findByTenantIdAndNameAndType(
-                tenantId, packageManager.bootstrapScript().canonicalName(), ScriptType.SYSTEM);
+                tenantId, bootstrapScript.canonicalName(), ScriptType.SYSTEM);
         if (foundScript.isEmpty()) {
             log.warn("Bootstrap script {} not seeded for tenant {}, ignoring report from machineId={}",
-                    packageManager.bootstrapScript(), tenantId, machineId);
+                    bootstrapScript, tenantId, machineId);
             return;
         }
         Script script = foundScript.get();
@@ -108,6 +118,9 @@ public class PackageManagerBootstrapService {
                 .statusChangedAt(now)
                 .build());
 
+        // the agent gets a stored secret in the clear
+        List<ScriptEnvVar> storedEnvVars = script.getEnvVars();
+        List<ScriptEnvVar> envVars = ScriptEnvVar.revealAll(storedEnvVars, encryptionService::decrypt);
         scriptBootstrapNatsPublisher.publishBootstrapScript(machineId, ScriptMessage.builder()
                 .executionId(executionId)
                 .scriptId(script.getId())
@@ -117,7 +130,7 @@ public class PackageManagerBootstrapService {
                 .privilegeLevel(script.getPrivilegeLevel())
                 .args(ScriptArgsTokenizer.tokenize(script.getDefaultArgs()))
                 .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                .envVars(script.getEnvVars())
+                .envVars(envVars)
                 .build());
 
         log.info("Dispatched {} bootstrap: machineId={} executionId={} scriptId={}",

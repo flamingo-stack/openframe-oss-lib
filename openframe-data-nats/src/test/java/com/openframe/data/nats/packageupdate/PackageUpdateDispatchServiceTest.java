@@ -7,6 +7,7 @@ import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
@@ -106,6 +107,70 @@ class PackageUpdateDispatchServiceTest {
         assertThat(s1.getPackageRef().getName()).isNull();
         assertThat(seed.getAllValues()).extracting(PackageUpdateDeliverySeed::getMachineId)
                 .containsExactlyInAnyOrder("m1", "m2");
+    }
+
+    @Test
+    void adminUpdate_withSettings_ordersWithTheirModeDeadlineAndCountdown() {
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        PackageUpdateSettings settings = PackageUpdateSettings.builder()
+                .mode(PackageUpdateMode.WAIT).deadlineSeconds(259_200L).countdownSeconds(900).build();
+
+        service.dispatchAdminUpdate(rows("exec-1", PackageManagerType.WINGET, "Google.Chrome", "m1"), null, settings);
+
+        ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
+        verify(requestRepository).save(req.capture());
+        assertThat(req.getValue().getSource()).isEqualTo(PackageUpdateSource.ADMIN);
+        assertThat(req.getValue().getMode()).isEqualTo(PackageUpdateMode.WAIT);
+        assertThat(req.getValue().getDeadlineSeconds()).isEqualTo(259_200L);
+        assertThat(req.getValue().getForceCountdownSeconds()).isEqualTo(900);
+    }
+
+    @Test
+    void adminUpdate_force_sendsTheCountdownWithTheOrder() {
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        PackageUpdateSettings settings = PackageUpdateSettings.builder()
+                .mode(PackageUpdateMode.FORCE).countdownSeconds(120).build();
+
+        service.dispatchAdminUpdate(rows("exec-1", PackageManagerType.WINGET, "Google.Chrome", "m1"), null, settings);
+
+        ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
+        verify(requestRepository).save(req.capture());
+        assertThat(req.getValue().getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(req.getValue().getDeadlineSeconds()).isNull();
+        ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
+        verify(deliveryDispatcher).dispatch(seed.capture());
+        assertThat(seed.getValue().getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(seed.getValue().getCountdownSeconds()).isEqualTo(120);
+    }
+
+    @Test
+    void autoUpdate_ordersAsAutoWithThePolicysSettings() {
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+        PackageUpdateSettings settings = PackageUpdateSettings.builder()
+                .mode(PackageUpdateMode.WAIT).deadlineSeconds(604_800L).countdownSeconds(300).build();
+
+        service.dispatchAutoUpdate(rows("exec-auto", PackageManagerType.WINGET, "Google.Chrome", "m1"), null, settings);
+
+        ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
+        verify(requestRepository).save(req.capture());
+        assertThat(req.getValue().getSource()).isEqualTo(PackageUpdateSource.AUTO);
+        assertThat(req.getValue().getDeadlineSeconds()).isEqualTo(604_800L);
+        ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
+        verify(deliveryDispatcher).dispatch(seed.capture());
+        assertThat(seed.getValue().getSource().getKind()).isEqualTo(UpdateSource.Kind.AUTO);
+    }
+
+    @Test
+    void adminUpdate_withoutSettings_keepsTheUpdateNowDefaults() {
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+
+        service.dispatchAdminUpdate(rows("exec-1", PackageManagerType.WINGET, "Google.Chrome", "m1"), null, null);
+
+        ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
+        verify(requestRepository).save(req.capture());
+        assertThat(req.getValue().getMode()).isEqualTo(PackageUpdateMode.WAIT);
+        assertThat(req.getValue().getDeadlineSeconds()).isNull();
+        assertThat(req.getValue().getForceCountdownSeconds()).isEqualTo(300);
     }
 
     @Test

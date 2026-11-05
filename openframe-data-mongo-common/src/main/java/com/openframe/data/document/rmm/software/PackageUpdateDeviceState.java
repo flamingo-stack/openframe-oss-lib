@@ -18,7 +18,6 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "package_update_device_state")
 @CompoundIndex(name = "tenant_request_machine", def = "{'tenantId': 1, 'requestId': 1, 'machineId': 1}", unique = true)
-@CompoundIndex(name = "deadline_scan", def = "{'status': 1, 'deadlineAt': 1}")
 @CompoundIndex(name = "tenant_request", def = "{'tenantId': 1, 'requestId': 1}")
 public class PackageUpdateDeviceState implements TenantScoped {
 
@@ -34,8 +33,6 @@ public class PackageUpdateDeviceState implements TenantScoped {
     private PackageUpdateMode mode;
 
     private Instant deadlineAt;
-
-    private boolean forced;
 
     private String lastEventId;
     private Instant lastEventAt;
@@ -57,6 +54,8 @@ public class PackageUpdateDeviceState implements TenantScoped {
 
     private String installedVersion;
     private String availableVersion;
+
+    private int retries;
 
     private Instant createdAt;
     private Instant updatedAt;
