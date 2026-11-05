@@ -64,7 +64,7 @@ describe('PolicyConfigurationPanel', () => {
     expect(tile.className).toContain('text-ods-text-secondary');
   });
 
-  it('says a category row toggles by lighting its chevron, not the row, and not over the bulk menu', () => {
+  it('lights the whole category row on hover, not over the bulk menu, with no second hover on the chevron', () => {
     render(
       <PolicyConfigurationPanel
         categories={categories}
@@ -74,11 +74,11 @@ describe('PolicyConfigurationPanel', () => {
       />,
     );
     const header = (screen.getByText('File Downloads').parentElement as HTMLElement).parentElement as HTMLElement;
-    expect(header.className).toContain('group');
-    expect(header.className).not.toContain('hover:bg-ods-bg-hover');
+    expect(header.className).toContain('hover:bg-ods-bg-hover');
+    expect(header.className).toContain('[&:has([data-bulk-level]:hover)]:bg-ods-card');
     const chevron = screen.getByRole('button', { name: 'Expand' });
-    expect(chevron.className).toContain('group-hover:bg-ods-bg-hover');
-    expect(chevron.className).toContain('group-has-[[data-bulk-level]:hover]:bg-transparent');
+    expect(chevron.className).toContain('hover:bg-transparent');
+    expect(chevron.className).not.toContain('hover:bg-ods-bg-hover');
   });
 
   it('offers the levels first and the way back out last', () => {

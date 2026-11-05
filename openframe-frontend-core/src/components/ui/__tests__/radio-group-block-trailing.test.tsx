@@ -18,3 +18,30 @@ describe('RadioGroupBlock trailing control', () => {
     expect(screen.getByRole('button', { name: 'Act' }).closest('[data-radio-trailing]')).not.toBeNull();
   });
 });
+
+describe('RadioGroupBlock rows added later', () => {
+  it('fades in a row added after the first options, and only that row', () => {
+    const optionA = { value: 'a', label: 'Option A' };
+    const { rerender } = render(<RadioGroupBlock name="t" value="a" onValueChange={() => {}} options={[optionA]} />);
+    expect((screen.getByText('Option A').closest('label') as HTMLElement).className).not.toContain('animate-in');
+
+    rerender(
+      <RadioGroupBlock
+        name="t"
+        value="a"
+        onValueChange={() => {}}
+        options={[optionA, { value: 'b', label: 'Option B' }]}
+      />,
+    );
+    expect((screen.getByText('Option B').closest('label') as HTMLElement).className).toContain('animate-in');
+    expect((screen.getByText('Option A').closest('label') as HTMLElement).className).not.toContain('animate-in');
+  });
+
+  it('does not fade the first options in after the skeleton', () => {
+    const { rerender } = render(<RadioGroupBlock name="t" value="" onValueChange={() => {}} options={[]} loading />);
+    rerender(
+      <RadioGroupBlock name="t" value="a" onValueChange={() => {}} options={[{ value: 'a', label: 'Option A' }]} />,
+    );
+    expect((screen.getByText('Option A').closest('label') as HTMLElement).className).not.toContain('animate-in');
+  });
+});

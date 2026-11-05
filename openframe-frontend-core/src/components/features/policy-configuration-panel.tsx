@@ -199,9 +199,13 @@ const CategorySection: FC<{
       {/* Category Header */}
       <div
         {...loadingItemProps(props)}
-        // The row toggles, and says so by lighting its chevron (not the row: a lit row stood apart from the open
-        // category's frame). The bulk dropdown has its own hover, and leaves the chevron alone.
-        className={cn(CATEGORY_HEADER_CLASS, 'group', !loading && 'cursor-pointer')}
+        // The whole row toggles, so the whole row lights on hover; not while the pointer is on the bulk dropdown, which
+        // is its own target. Open, a rule under the row (on the frame below) ends the lit row at an edge.
+        className={cn(
+          CATEGORY_HEADER_CLASS,
+          !loading &&
+            'cursor-pointer transition-colors hover:bg-ods-bg-hover [&:has([data-bulk-level]:hover)]:bg-ods-card',
+        )}
         onClick={loading ? undefined : () => onToggle(category.id)}
       >
         {/* Category Icon (static: the host's, else the default shield) */}
@@ -256,7 +260,8 @@ const CategorySection: FC<{
           // 40px on a phone (Figma 4365-22452), 48 from content-md.
           className={cn(
             'h-auto w-auto shrink-0 rounded-md !p-[var(--spacing-system-xsf)] content-md:!p-[var(--spacing-system-sf)]',
-            !loading && 'group-hover:bg-ods-bg-hover group-has-[[data-bulk-level]:hover]:bg-transparent',
+            // The row is the hover; the chevron adds none of its own.
+            'hover:bg-transparent active:bg-transparent',
           )}
           aria-label={isExpanded ? 'Collapse' : 'Expand'}
         />
@@ -273,7 +278,10 @@ const CategorySection: FC<{
         }}
         className={isExpanded ? 'opacity-100' : 'opacity-0'}
       >
-        <div ref={innerRef} className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
+        <div
+          ref={innerRef}
+          className="border-t border-ods-border px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-[var(--spacing-system-mf)]"
+        >
           <div className="overflow-hidden rounded-md border border-ods-border">
             {/* No rows while the policies are read: nothing read is drawn, even collapsed. */}
             {(loading ? [] : category.policies).map(policy => (

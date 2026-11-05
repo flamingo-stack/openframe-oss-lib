@@ -1,7 +1,7 @@
 'use client';
 
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
-import { type ComponentPropsWithoutRef, type ComponentRef, type ReactNode, forwardRef } from 'react';
+import { type ComponentPropsWithoutRef, type ComponentRef, type ReactNode, forwardRef, useState } from 'react';
 
 import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
@@ -126,6 +126,10 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
       loading && options.length === 0 ? Array.from({ length: skeletonCount }, () => null) : options;
     const isGrouped = variant === 'grouped';
     const isHorizontal = orientation === 'horizontal';
+    // The options the block first showed loaded. One added after that (a row the user's action brought in) fades in, as
+    // new rows do across the system; the first options, and the skeleton's swap to them, do not.
+    const [firstOptions, setFirstOptions] = useState<ReadonlySet<string> | null>(null);
+    if (!loading && firstOptions === null) setFirstOptions(new Set(options.map(option => option.value)));
     return (
       <div className={cn('relative flex w-full flex-col', className)}>
         <RadioGroupPrimitive.Root
@@ -264,6 +268,10 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                   // `Tag`'s label is a span too, and it went invisible against
                   // its own fill.
                   isDisabled && 'bg-ods-bg',
+                  option &&
+                    firstOptions !== null &&
+                    !firstOptions.has(option.value) &&
+                    'duration-300 animate-in fade-in slide-in-from-top-2 motion-reduce:animate-none',
                   // With a footer the option stacks: its row, then the footer.
                   hasFooter && 'flex-col items-stretch gap-[var(--spacing-system-sf)]',
                   itemClassName,
