@@ -42,7 +42,9 @@ function SlidesViewToggle({ view, onChange }: { view: SlidesView; onChange: (v: 
         if (v && v !== view) onChange(v as SlidesView);
       }}
       aria-label="Figma slides view mode"
-      className="flex shrink-0 items-center gap-0.5 rounded-lg border border-ods-border bg-ods-card p-0.5"
+      // The whole control is one button tall (40px, border and padding included), so the header row is the same height
+      // with or without it, loading and loaded alike.
+      className="flex h-10 shrink-0 items-center gap-0.5 rounded-lg border border-ods-border bg-ods-card p-0.5"
     >
       {options.map(({ key, label, Icon }) => {
         const active = view === key;
@@ -51,7 +53,7 @@ function SlidesViewToggle({ view, onChange }: { view: SlidesView; onChange: (v: 
             key={key}
             value={key}
             aria-label={label}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors text-h6 ${
+            className={`flex h-full items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors text-h6 ${
               active
                 ? 'bg-ods-accent text-ods-text-on-accent'
                 : 'text-ods-text-secondary hover:bg-ods-bg-hover hover:text-ods-text-primary'
@@ -127,8 +129,6 @@ export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedP
       loading={loading}
       height={height}
       allowFullScreen
-      // Figma draws its own loader inside the frame: it is the only loading state.
-      drawsOwnLoading
       emptyIcon={<FigmaIcon className="mb-4 h-16 w-16 text-ods-text-secondary" />}
       emptyMessage="Figma URL not configured"
     />

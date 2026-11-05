@@ -5,6 +5,7 @@ import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { FullscreenSwitchController } from '../../utils/fullscreen-switch';
+import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { EmbedIframe, EmbedLoadingSkeleton } from './embed-iframe';
@@ -66,8 +67,8 @@ export interface EmbedViewerFrameProps {
    *  button (the Figma player) and some cannot (a self-hosted Claude
    *  artifact mirror) — the shell provides the affordance uniformly. */
   fullscreenControl?: boolean;
-  /** The embedded app draws its own loading state (Figma, Google Sheets): see `EmbedIframe`. */
-  drawsOwnLoading?: boolean;
+  /** How many buttons `actions` draws (PDF: Preview and Download): the header's loading form draws as many. Default 1. */
+  loadingActionCount?: number;
 }
 
 export function EmbedViewerFrame({
@@ -86,10 +87,11 @@ export function EmbedViewerFrame({
   sandbox,
   className,
   fullscreenControl,
-  drawsOwnLoading,
+  loadingActionCount = 1,
 }: EmbedViewerFrameProps) {
   // ONE switch: a page's loading scope, or the viewer still resolving where its frame points.
-  const isLoading = useLoadingScope() || !!isLoadingGiven;
+  const inScope = useLoadingScope();
+  const isLoading = inScope || !!isLoadingGiven;
   const frameRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -130,7 +132,11 @@ export function EmbedViewerFrame({
       <div className="flex flex-col gap-3 content-sm:flex-row content-sm:items-center content-sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
           {icon}
-          {titleVariant === 'h3' ? (
+          {inScope ? (
+            // The document is being read: its name is not known yet. (A viewer still resolving its frame, with a
+            // known title, keeps it.)
+            <TextLineSkeleton type={titleVariant} className="w-48 max-w-full" />
+          ) : titleVariant === 'h3' ? (
             <h2 className="truncate text-ods-text-primary text-h3">{title}</h2>
           ) : (
             <span className="truncate font-semibold text-ods-text-primary text-h6">{title}</span>
@@ -143,7 +149,15 @@ export function EmbedViewerFrame({
             fullscreen toggle, `actions` renders EXACTLY as before — the
             wrapper exists only when the toggle joins it, so pre-existing
             viewers (figma/pdf/sheets) are byte-identical. */}
-        {fullscreenControl && src ? (
+        {inScope ? (
+          // The actions point at the document being read: each its button's loading form, in the actions' row.
+          <div className="flex w-full items-center gap-2 content-sm:w-auto">
+            {Array.from({ length: loadingActionCount }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: loading buttons never reorder
+              <InteractiveSkeleton.Button key={i} size="small-legacy" className="flex-1 content-sm:flex-initial" />
+            ))}
+          </div>
+        ) : fullscreenControl && src ? (
           <div className="flex flex-col gap-[var(--spacing-system-xsf)] content-sm:flex-row content-sm:items-center">
             {actions}
             <Button
@@ -174,7 +188,6 @@ export function EmbedViewerFrame({
           allowFullScreen={allowFullScreen}
           loading={loading}
           sandbox={sandbox}
-          drawsOwnLoading={drawsOwnLoading}
         />
       ) : isLoading ? (
         // The EXACT skeleton every embed shows while its iframe loads

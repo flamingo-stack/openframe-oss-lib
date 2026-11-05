@@ -3,6 +3,7 @@
 import { Download, Eye } from 'lucide-react';
 import { AdobePdfIcon } from '../icons-v2-generated';
 import { Button } from '../ui';
+import { useLoadingScope } from '../ui/loading-scope';
 import { EmbedViewerFrame } from './embed-viewer-frame';
 
 export interface PdfViewerProps {
@@ -15,9 +16,11 @@ export interface PdfViewerProps {
 
 export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfViewerProps) {
   const displayName = fileName || 'PDF Document';
+  // In a loading scope the document is being read: the frame draws its loading form, never "not available".
+  const inScope = useLoadingScope();
 
   // Historical shape: no src at all → standalone empty state with NO header.
-  if (!src) {
+  if (!src && !inScope) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <AdobePdfIcon className="mb-4 h-16 w-16 text-ods-text-secondary" />
@@ -57,6 +60,7 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
         </div>
       }
       src={src}
+      loadingActionCount={2}
       height={height}
     />
   );
