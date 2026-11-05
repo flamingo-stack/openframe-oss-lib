@@ -64,8 +64,10 @@ public class WingetCatalogFetcher {
                 .publisher(publisherFromId(id))
                 .hashPrefix(indexEntry.getHashPrefix())
                 .aliases(aliases)
+                .productCodes(indexEntry.getProductCodes())
                 .upgradeCodes(indexEntry.getUpgradeCodes())
                 .normalizedNames(indexEntry.getNormalizedNames())
+                .normalizedPublishers(indexEntry.getNormalizedPublishers())
                 .build();
     }
 

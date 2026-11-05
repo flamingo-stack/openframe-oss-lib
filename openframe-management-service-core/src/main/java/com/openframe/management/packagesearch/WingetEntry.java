@@ -16,6 +16,8 @@ class WingetEntry {
     private final String latestDisplayVersion;
     // first 8 hex chars of the package hash, lower-cased — a CDN path segment that 404s on upper-case
     private final String hashPrefix;
+    private final List<String> productCodes;
     private final List<String> upgradeCodes;
     private final List<String> normalizedNames;
+    private final List<String> normalizedPublishers;
 }

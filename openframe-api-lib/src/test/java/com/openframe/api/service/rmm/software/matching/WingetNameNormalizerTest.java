@@ -21,13 +21,14 @@ class WingetNameNormalizerTest {
 
     @ParameterizedTest
     @MethodSource("wingetTestData")
-    void normalize_wingetsOwnTestData_sameNameAsWinget(String displayName, String wingetName) {
+    void normalize_wingetsOwnTestData_sameIdAsWinget(String displayName, String publisher, String wingetId) {
         // setup
         // execution
-        WingetNameNormalizer.NormalizedName normalized = WingetNameNormalizer.normalize(displayName);
+        String normalizedPublisher = WingetNameNormalizer.normalizePublisher(publisher);
+        WingetNameNormalizer.NormalizedName normalizedName = WingetNameNormalizer.normalize(displayName);
 
         // verifications
-        assertThat(normalized.getName()).isEqualTo(wingetName);
+        assertThat(normalizedPublisher + "." + normalizedName.getName()).isEqualTo(wingetId);
     }
 
     @Test
@@ -79,6 +80,18 @@ class WingetNameNormalizerTest {
     }
 
     @Test
+    void searchPublisher_legalEntitySuffix_endsThePublisher() {
+        // setup
+        String publisher = "Notepad++ Team Inc. Holdings";
+
+        // execution
+        String normalized = WingetNameNormalizer.searchPublisher(publisher);
+
+        // verifications
+        assertThat(normalized).isEqualTo("notepadteam");
+    }
+
+    @Test
     void searchNames_nothingLeftAfterNormalizing_noNames() {
         // setup
         String displayName = " (1.0) ";
@@ -92,16 +105,10 @@ class WingetNameNormalizerTest {
 
     private static Stream<Arguments> wingetTestData() {
         List<String> displayNames = lines("InputNames.txt");
+        List<String> publishers = lines("InputPublishers.txt");
         List<String> wingetIds = lines("NormalizationInitialIds.txt");
         return IntStream.range(0, displayNames.size())
-                .mapToObj(line -> testCase(displayNames, wingetIds, line));
-    }
-
-    private static Arguments testCase(List<String> displayNames, List<String> wingetIds, int line) {
-        String displayName = displayNames.get(line);
-        String wingetId = wingetIds.get(line);
-        String wingetName = wingetId.substring(wingetId.indexOf('.') + 1);
-        return Arguments.of(displayName, wingetName);
+                .mapToObj(line -> Arguments.of(displayNames.get(line), publishers.get(line), wingetIds.get(line)));
     }
 
     private static List<String> lines(String file) {
