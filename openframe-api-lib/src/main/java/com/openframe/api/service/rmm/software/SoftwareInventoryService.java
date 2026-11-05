@@ -52,6 +52,8 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -606,7 +608,7 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> titleRows = List.of(titleRow);
         catalogStatus.apply(titleRows);
         String latestVersion = titleRow.getLatestVersion();
-        SoftwareSource installedBy = installedBy(title.getSource());
+        SoftwareSource installedBy = managedBy(titleRow, title.getSource());
 
         List<SoftwareTitleVersion> versions = title.getVersions().stream()
                 .filter(version -> version.getId() != null)
@@ -650,6 +652,22 @@ public class SoftwareInventoryService {
         return source == SoftwareSource.UNMANAGED ? null : source;
     }
 
+    // a program winget matches is managed by winget whoever installed it; brew and choco manage what they installed
+    private static SoftwareSource managedBy(SoftwareResponse titleRow, String fleetSource) {
+        return titleRow.getSource() == SoftwareSource.WINGET ? SoftwareSource.WINGET : installedBy(fleetSource);
+    }
+
+    // winget manages a program only on a device where it runs; a device that never reported its managers counts as
+    // having it, as everywhere else in Software Management
+    private static SoftwareSource managedByOn(Machine device, SoftwareSource managedBy) {
+        if (managedBy != SoftwareSource.WINGET) {
+            return managedBy;
+        }
+        Map<PackageManagerType, PackageManagerState> reported = device.getPackageManagers();
+        boolean hasWinget = reported == null || reported.get(PackageManagerType.WINGET) == PackageManagerState.PRESENT;
+        return hasWinget ? managedBy : null;
+    }
+
     private List<HostVersion> hostVersionsOf(SoftwareTitleVersion version) {
         HostSearchRequest request = new HostSearchRequest();
         request.setSoftwareVersionId(version.getId());
@@ -673,7 +691,7 @@ public class SoftwareInventoryService {
                 .device(device)
                 .softwareVersion(hv.version())
                 .status(status)
-                .installedBy(installedBy)
+                .installedBy(managedByOn(device, installedBy))
                 .build();
     }
 
