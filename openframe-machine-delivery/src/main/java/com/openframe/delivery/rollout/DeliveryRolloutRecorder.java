@@ -61,6 +61,7 @@ public class DeliveryRolloutRecorder {
                 .status(DeliveryRolloutStatus.RUNNING)
                 .cursor(BEFORE_FIRST_MACHINE)
                 .dispatched(0)
+                .parentEventId(request.getParentEventId())
                 .startedAt(Instant.now())
                 .build();
         repository.save(rollout);

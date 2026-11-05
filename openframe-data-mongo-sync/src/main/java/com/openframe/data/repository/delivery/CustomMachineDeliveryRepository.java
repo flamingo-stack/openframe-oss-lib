@@ -31,12 +31,16 @@ public interface CustomMachineDeliveryRepository {
 
     boolean markAcked(String id, String dispatchId, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt);
 
-    boolean markDone(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
+    Optional<MachineDelivery> markDone(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt,
+                                       Instant expiresAt);
 
-    boolean markCancelled(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant finishedAt, Instant expiresAt);
+    Optional<MachineDelivery> markCancelled(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant finishedAt,
+                                            Instant expiresAt);
 
-    boolean markFailed(String id, Set<DeliveryStatus> from, Instant dispatchedAt, DeliveryFailure failure, Instant finishedAt, Instant expiresAt);
-    boolean markFailed(String id, String dispatchId, Set<DeliveryStatus> from, DeliveryFailure failure, String error, Instant finishedAt, Instant expiresAt);
+    Optional<MachineDelivery> markFailed(String id, Set<DeliveryStatus> from, Instant dispatchedAt, DeliveryFailure failure,
+                                         Instant finishedAt, Instant expiresAt);
+    Optional<MachineDelivery> markFailed(String id, String dispatchId, Set<DeliveryStatus> from, DeliveryFailure failure,
+                                         String error, Instant finishedAt, Instant expiresAt);
 
     boolean scheduleRerun(String id, Set<DeliveryStatus> from, Instant dispatchedAt, int reruns, Instant dueAt);
 

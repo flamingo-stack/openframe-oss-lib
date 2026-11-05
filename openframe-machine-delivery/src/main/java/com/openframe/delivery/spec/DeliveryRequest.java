@@ -24,6 +24,7 @@ public class DeliveryRequest<P extends DeliveryPayload> {
     // per request whether to wait, and how long, says so here
     private final DeliveryOfflineBehavior offlineBehavior;
     private final Long reconnectWindowSeconds;
+    private final String parentEventId;
 
     public boolean isForEveryMachine() {
         return audience == DeliveryAudience.EVERY_MACHINE;

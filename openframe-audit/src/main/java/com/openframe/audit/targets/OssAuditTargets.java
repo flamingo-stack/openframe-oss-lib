@@ -77,10 +77,12 @@ public class OssAuditTargets implements AuditTargetCatalog {
                 AuditTarget.of(SOFTWARE_SCHEDULE, SoftwareSchedule.class, SoftwareSchedule::getName),
                 AuditTarget.of(EXECUTION, ScriptExecution.class, ScriptExecution::getExecutionId)
                         .withIdField("executionId")
-                        .withDeviceId(ScriptExecution::getMachineId),
+                        .withDeviceId(ScriptExecution::getMachineId)
+                        .withMaskedFields(Set.of("stdout", "stderr")),
                 AuditTarget.of(EXECUTION, CommandExecution.class, CommandExecution::getExecutionId)
                         .withIdField("executionId")
-                        .withDeviceId(CommandExecution::getMachineId),
+                        .withDeviceId(CommandExecution::getMachineId)
+                        .withMaskedFields(Set.of("stdout", "stderr")),
                 AuditTarget.of(TAG, Tag.class, Tag::getKey),
                 AuditTarget.of(KB_ARTICLE, KnowledgeBaseItem.class, KnowledgeBaseItem::getName)
                         .withMaskedFields(Set.of("content")),

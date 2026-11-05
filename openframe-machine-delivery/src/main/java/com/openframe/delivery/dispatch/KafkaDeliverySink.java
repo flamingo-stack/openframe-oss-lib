@@ -29,7 +29,8 @@ public class KafkaDeliverySink implements DeliverySink {
         String machineId = request.getMachineId();
         DeliveryPayload payload = request.getPayload();
         JsonNode command = objectMapper.valueToTree(payload);
-        DeliveryDispatchMessage message = new DeliveryDispatchMessage(audience, machineId, command, request.getDueAt());
+        DeliveryDispatchMessage message = new DeliveryDispatchMessage(audience, machineId, command, request.getDueAt(),
+                request.getParentEventId());
         try {
             producer.sendAndAwaitMessage(topic, message, keyOf(request));
         } catch (RuntimeException kafkaDown) {

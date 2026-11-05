@@ -1,5 +1,9 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
@@ -26,10 +30,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_SCHEDULE_RUN;
+import static com.openframe.data.document.audit.AuditTargetType.SOFTWARE_SCHEDULE;
 
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -46,6 +54,8 @@ public class SoftwareScheduleFireDispatcher {
     private final PackageUpdateEligibilityService packageUpdateEligibility;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
     private final PackageAutoUpdatePolicyService autoUpdatePolicyService;
+    private final AuditCapture auditCapture;
+    private final AuditRecorder auditRecorder;
 
     public void dispatch(SoftwareSchedule schedule, List<String> machineIds, Instant now) {
         if (schedule.getPackages() == null || schedule.getPackages().isEmpty()
@@ -54,6 +64,15 @@ public class SoftwareScheduleFireDispatcher {
                     schedule.getId());
             return;
         }
+        Map<String, Object> details = new HashMap<>();
+        details.put("action", schedule.getAction());
+        details.put("machineIds", machineIds);
+        AuditContext author = auditRecorder.context(AuditActor.system(schedule.getCreatedBy()));
+        auditRecorder.within(author, () -> auditCapture.runWithoutCompare(SOFTWARE_SCHEDULE_RUN, SOFTWARE_SCHEDULE,
+                schedule.getId(), details, () -> fire(schedule, machineIds)));
+    }
+
+    private void fire(SoftwareSchedule schedule, List<String> machineIds) {
         Map<String, OsType> osTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         Set<String> orderMachines = packageUpdateEligibility.eligibleMachines(schedule.getAction(), machineIds);
         for (SoftwareSchedulePackage pkg : schedule.getPackages()) {
@@ -88,6 +107,7 @@ public class SoftwareScheduleFireDispatcher {
         List<String> scriptTargets = targets.stream().filter(id -> !orderMachines.contains(id)).toList();
         RunningExecutionRows rows = RunningExecutionRows.builder()
                 .tenantId(schedule.getTenantId())
+                .parentEventId(auditRecorder.currentEventId())
                 .executionId(executionId)
                 .scriptId(script.getId())
                 .privilegeLevel(script.getPrivilegeLevel())

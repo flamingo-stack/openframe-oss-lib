@@ -12,6 +12,7 @@ import java.util.List;
 public class RunningExecutionRows {
 
     String tenantId;
+    String parentEventId;
     String executionId;
     String scriptId;
     String scheduleId;

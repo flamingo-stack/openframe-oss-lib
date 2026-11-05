@@ -25,4 +25,6 @@ public @interface Audited {
     String condition() default "";
 
     String tenantId() default "";
+
+    String targetName() default "";
 }

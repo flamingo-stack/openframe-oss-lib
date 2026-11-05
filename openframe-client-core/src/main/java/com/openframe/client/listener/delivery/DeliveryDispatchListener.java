@@ -3,7 +3,10 @@ package com.openframe.client.listener.delivery;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.audit.AuditCapture;
 import com.openframe.client.service.delivery.LocalDeliverySink;
+import com.openframe.data.document.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.ProcessedCommand;
 import com.openframe.data.repository.delivery.ProcessedCommandRepository;
@@ -24,6 +27,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_DELIVERY_END;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
@@ -42,6 +46,7 @@ public class DeliveryDispatchListener {
     private final ObjectMapper objectMapper;
     private final DeliveryMetrics metrics;
     private final ProcessedCommandRepository processedCommandRepository;
+    private final AuditCapture auditCapture;
 
     // a bad message is logged and skipped; a Mongo failure propagates and the record is retried until the row is written
     @KafkaListener(
@@ -88,6 +93,7 @@ public class DeliveryDispatchListener {
                 .audience(message.getAudience())
                 .payload(payload)
                 .dueAt(message.getDueAt())
+                .parentEventId(message.getParentEventId())
                 .build();
         sink.accept(request);
         processedCommandRepository.save(new ProcessedCommand(dispatchId, Instant.now()));
@@ -109,5 +115,12 @@ public class DeliveryDispatchListener {
     private void reject(String reason, DeliveryDispatchMessage message, Exception cause) {
         metrics.recordDispatchRejected(reason);
         log.error("Delivery hand-off rejected, {}: {}", reason, message, cause);
+        auditCapture.record(AuditEntry.builder()
+                .action(DEVICE_DELIVERY_END)
+                .outcome(AuditOutcome.FAILURE)
+                .reason(reason)
+                .targetId(message.getMachineId())
+                .parentEventId(message.getParentEventId())
+                .build());
     }
 }

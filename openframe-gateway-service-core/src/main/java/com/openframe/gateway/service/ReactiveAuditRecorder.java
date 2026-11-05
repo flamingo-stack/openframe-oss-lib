@@ -83,7 +83,7 @@ public class ReactiveAuditRecorder {
         String routedTenantId = TenantRoutingHeaders.tenantId(request);
         String tenantId = actor.tenantFor(entry.getTenantId(), auditTenants.superTenantId(),
                 () -> StringUtils.hasText(routedTenantId) ? routedTenantId : auditTenants.servedTenantId());
-        AuditEvent event = auditEventMapper.toEvent(entry, actor, source, tenantId);
+        AuditEvent event = auditEventMapper.toEvent(entry, actor, source, tenantId, null);
         return Mono.when(nameOf(actor).doOnNext(event::setActorName),
                         onBehalfOfNameOf(actor).doOnNext(event::setOnBehalfOfName))
                 .thenReturn(event);

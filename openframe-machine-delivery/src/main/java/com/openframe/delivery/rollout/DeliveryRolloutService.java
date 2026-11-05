@@ -1,5 +1,8 @@
 package com.openframe.delivery.rollout;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.data.document.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.delivery.DeliveryRolloutStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDeliveryRollout;
@@ -35,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_DELIVERY_RUN;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 
@@ -53,6 +57,7 @@ public class DeliveryRolloutService {
     private final DeliveryPayloadJson payloadJson;
     private final DeliverySink sink;
     private final DeliveryMetrics metrics;
+    private final AuditRecorder auditRecorder;
 
     public void advance() {
         List<MachineDeliveryRollout> running = repository.findByStatus(DeliveryRolloutStatus.RUNNING);
@@ -134,7 +139,24 @@ public class DeliveryRolloutService {
         } catch (RuntimeException thisMachineOnly) {
             metrics.recordRolloutMachineSkipped(rollout.getType());
             log.error("Delivery rollout skipped a machine: id={} machineId={}", rollout.getId(), machine.getMachineId(), thisMachineOnly);
+            recordRun(machine, rollout, AuditOutcome.FAILURE, thisMachineOnly.getClass().getSimpleName());
         }
+    }
+
+    private void recordRun(Machine machine, MachineDeliveryRollout rollout, AuditOutcome outcome, String reason) {
+        String machineId = machine.getMachineId();
+        auditRecorder.record(AuditEntry.builder()
+                .action(DEVICE_DELIVERY_RUN)
+                .outcome(outcome)
+                .reason(reason)
+                .targetId(machineId)
+                .targetName(machine.getHostname())
+                .organizationId(machine.getOrganizationId())
+                .deviceId(machineId)
+                .parentEventId(rollout.getParentEventId())
+                .details(Map.of("type", rollout.getType(), "targetId", rollout.getTargetId(),
+                        "sequence", rollout.getSequence()))
+                .build());
     }
 
     private void dispatchToMachine(Machine machine, MachineDeliveryRollout rollout, DeliverySpec<DeliverySeed, DeliveryPayload> spec) {
@@ -151,8 +173,10 @@ public class DeliveryRolloutService {
                 .targetId(targetId)
                 .machineId(machine.getMachineId())
                 .payload(payload)
+                .parentEventId(rollout.getParentEventId())
                 .build();
         sink.accept(request);
+        recordRun(machine, rollout, AuditOutcome.SUCCESS, null);
     }
 
     private static boolean isLastBatch(List<Machine> machines, int batchSize) {

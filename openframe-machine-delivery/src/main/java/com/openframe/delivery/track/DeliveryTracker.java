@@ -54,12 +54,9 @@ public class DeliveryTracker {
         String id = DeliveryId.of(type, targetId, machineId);
         Instant now = Instant.now();
         Instant expiresAt = expiresAt(type, now);
-        boolean done = repository.markDone(id, dispatchId, DeliveryStatus.COMPLETABLE, now, expiresAt);
-        if (done) {
-            log.info("Delivery DONE: type={} targetId={} machineId={} dispatchId={}", type, targetId, machineId, dispatchId);
-        } else {
-            log.debug("Delivery completion ignored, no row for this dispatch: id={} dispatchId={}", id, dispatchId);
-        }
+        Optional<MachineDelivery> done = repository.markDone(id, dispatchId, DeliveryStatus.COMPLETABLE, now, expiresAt);
+        done.ifPresentOrElse(closer::done,
+                () -> log.debug("Delivery completion ignored, no row for this dispatch: id={} dispatchId={}", id, dispatchId));
     }
 
     public void done(DeliveryType type, String targetId, String machineId) {

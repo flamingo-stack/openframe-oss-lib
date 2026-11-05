@@ -1,5 +1,6 @@
 package com.openframe.data.nats.packageupdate;
 
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
@@ -36,6 +37,7 @@ public class PackageUpdateDispatchService {
     private final PackageUpdateDeviceStateRepository deviceStateRepository;
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final AuditRecorder auditRecorder;
 
     public void dispatchAdminUpdateNow(RunningExecutionRows execution, BrewPackageType brewPackageType) {
         dispatch(execution, brewPackageType, PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT,
@@ -67,18 +69,21 @@ public class PackageUpdateDispatchService {
                          PackageUpdateMode mode, Integer forceCountdownSeconds, Long deadlineSeconds) {
         String tenantId = tenantIdProvider.getTenantId();
         String requestId = UUID.randomUUID().toString();
+        String parentEventId = auditRecorder.currentEventId();
         Instant now = Instant.now();
         // the device state is unique per request and machine, so a repeated id would fail the whole dispatch
         List<String> targets = execution.getMachineIds().stream().distinct().toList();
 
         scriptExecutionRepository.saveQueued(execution.toBuilder()
                 .tenantId(tenantId)
+                .parentEventId(parentEventId)
                 .machineIds(targets)
                 .packageUpdateRequestId(requestId)
                 .build());
 
         requestRepository.save(PackageUpdateRequest.builder()
                 .tenantId(tenantId)
+                .parentEventId(parentEventId)
                 .requestId(requestId)
                 .executionId(execution.getExecutionId())
                 .action(SoftwareAction.UPDATE)

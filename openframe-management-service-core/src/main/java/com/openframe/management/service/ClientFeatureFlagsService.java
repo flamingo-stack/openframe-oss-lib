@@ -1,5 +1,7 @@
 package com.openframe.management.service;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditCapture;
 import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.nats.delivery.ClientFeatureFlagsDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeliveryRouter;
@@ -10,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_FEATURE_FLAGS_SET;
+import static com.openframe.data.document.audit.AuditTargetType.DEVICE;
 import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
@@ -19,6 +23,7 @@ public class ClientFeatureFlagsService {
 
     private final OpenFrameClientConfigurationService clientConfigurationService;
     private final DeliveryRouter deliveryRouter;
+    private final AuditCapture auditCapture;
 
     // runs on every management start: only a change of the flags starts a rollout
     public void process(Map<String, ClientFeatureFlag> flags) {
@@ -40,7 +45,10 @@ public class ClientFeatureFlagsService {
 
     private void rollOut(Map<String, ClientFeatureFlag> flags) {
         ClientFeatureFlagsDeliverySeed everyMachine = ClientFeatureFlagsDeliverySeed.forEveryMachine(flags);
-        boolean carried = deliveryRouter.dispatch(everyMachine);
+        AuditCall call = AuditCall.of(DEVICE_FEATURE_FLAGS_SET, DEVICE, null, Map.of())
+                .withCompare(false)
+                .withDetailsFromResult(sent -> Map.of("flags", flags, "carried", sent));
+        boolean carried = auditCapture.capture(call, () -> deliveryRouter.dispatch(everyMachine));
         if (carried) {
             log.info("Client feature flags sent to every machine: {}", flags);
         }

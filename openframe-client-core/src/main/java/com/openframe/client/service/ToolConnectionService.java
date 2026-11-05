@@ -1,9 +1,12 @@
 package com.openframe.client.service;
 
+import com.openframe.audit.AuditCapture;
 import com.openframe.client.exception.InvalidAgentIdException;
 import com.openframe.client.exception.InvalidToolTypeException;
 import com.openframe.client.exception.MachineNotFoundException;
 import com.openframe.client.service.agentregistration.transformer.ToolAgentIdTransformerService;
+import com.openframe.data.document.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
@@ -16,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+
+import static com.openframe.data.document.audit.AuditAction.DEVICE_DELIVERY_END;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +31,7 @@ public class ToolConnectionService {
     private final ToolConnectionRepository toolConnectionRepository;
     private final MachineRepository machineRepository;
     private final ToolAgentIdTransformerService toolAgentIdTransformerService;
+    private final AuditCapture auditCapture;
 
     @Transactional
     public void disconnectAll(String machineId) {
@@ -82,6 +89,7 @@ public class ToolConnectionService {
             toolConnectionRepository.save(toolConnection);
 
             log.info("Updated existing tool connection with machineId {} tool {} agentToolId {} rawAgentId {}", openframeAgentId, toolType, transformedAgentToolId, agentId);
+            recordConnected(openframeAgentId, toolType, transformedAgentToolId);
         } else {
             // Connection is already CONNECTED
             String currentAgentToolId = toolConnection.getAgentToolId();
@@ -110,6 +118,16 @@ public class ToolConnectionService {
         toolConnectionRepository.save(connection);
 
         log.info("Saved tool connection for machine {} tool {} agentToolId {}", openframeAgentId, toolType, agentToolId);
+        recordConnected(openframeAgentId, toolType, connection.getAgentToolId());
+    }
+
+    private void recordConnected(String machineId, ToolType toolType, String agentToolId) {
+        auditCapture.record(AuditEntry.builder()
+                .action(DEVICE_DELIVERY_END)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(machineId)
+                .details(Map.of("toolType", toolType, "agentToolId", agentToolId))
+                .build());
     }
 
     private void validateMachineExists(String machineId) {

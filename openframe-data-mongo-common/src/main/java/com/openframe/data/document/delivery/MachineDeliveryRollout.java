@@ -22,6 +22,7 @@ public class MachineDeliveryRollout implements TenantScoped {
     @Id
     private String id;
     private String tenantId;
+    private String parentEventId;
 
     private DeliveryType type;
     private String targetId;

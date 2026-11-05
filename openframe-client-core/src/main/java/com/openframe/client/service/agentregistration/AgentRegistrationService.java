@@ -1,5 +1,6 @@
 package com.openframe.client.service.agentregistration;
 
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.exception.InvalidClientSecretException;
@@ -54,6 +55,7 @@ public class AgentRegistrationService {
     private final ToolConnectionService toolConnectionService;
     private final AgentRegistrationClientFeatureFlagsService agentRegistrationClientFeatureFlagsService;
     private final AgentRegistrationClientUpdateService agentRegistrationClientUpdateService;
+    private final AuditRecorder auditRecorder;
 
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
@@ -144,7 +146,7 @@ public class AgentRegistrationService {
 
         saveInstalledAgent(machineId, request);
         registrationTagAssignmentService.assignTags(machineId, request.getTags());
-        agentRegistrationToolInstallationService.process(machineId);
+        agentRegistrationToolInstallationService.process(machineId, auditRecorder.context());
         agentRegistrationClientFeatureFlagsService.process(machineId);
         agentRegistrationClientUpdateService.process(machineId);
         agentRegistrationProcessor.postProcessAgentRegistration(machine, request);

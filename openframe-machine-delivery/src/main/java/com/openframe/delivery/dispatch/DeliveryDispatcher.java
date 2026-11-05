@@ -1,5 +1,6 @@
 package com.openframe.delivery.dispatch;
 
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
@@ -23,6 +24,7 @@ public class DeliveryDispatcher {
     private final DeliverySpecRegistry registry;
     // ObjectProvider: the dispatcher boots in services with neither NATS nor Kafka, where no sink bean exists
     private final ObjectProvider<DeliverySink> sink;
+    private final AuditRecorder auditRecorder;
 
     public void dispatch(DeliverySeed seed) {
         DeliveryType type = seed.getType();
@@ -53,7 +55,7 @@ public class DeliveryDispatcher {
         String targetId = request.getTargetId();
         DeliveryRef delivery = new DeliveryRef(type, targetId, dispatchId);
         payload.setDelivery(delivery);
-        sink.getObject().accept(request);
+        sink.getObject().accept(request.toBuilder().parentEventId(auditRecorder.currentEventId()).build());
     }
 
     private static boolean isWildcardOnASingleMachineType(DeliveryRequest<? extends DeliveryPayload> request, DeliverySpec<?, ?> spec) {

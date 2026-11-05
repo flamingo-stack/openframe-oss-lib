@@ -1,8 +1,12 @@
 package com.openframe.client.listener;
 
+import java.util.List;
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.client.service.ToolConnectionService;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.data.nats.model.ToolConnectionMessage;
 import io.nats.client.Connection;
@@ -23,16 +27,20 @@ public class ToolConnectionListener extends AbstractJetStreamPushListener {
 
     // Manual constructor is required because the superclass AbstractJetStreamPushListener
     // requires an explicit super(natsConnection) call, which @RequiredArgsConstructor cannot express.
+    private final AuditRecorder auditRecorder;
+
     public ToolConnectionListener(
             Connection natsConnection,
             ObjectMapper objectMapper,
             ToolConnectionService toolConnectionService,
-            NatsTopicMachineIdExtractor machineIdExtractor
+            NatsTopicMachineIdExtractor machineIdExtractor,
+            AuditRecorder auditRecorder
     ) {
         super(natsConnection);
         this.objectMapper = objectMapper;
         this.toolConnectionService = toolConnectionService;
         this.machineIdExtractor = machineIdExtractor;
+        this.auditRecorder = auditRecorder;
     }
 
     @Override
@@ -83,7 +91,9 @@ public class ToolConnectionListener extends AbstractJetStreamPushListener {
             log.debug("Processing tool connection: machineId={} toolType={} agentToolId={} (delivery={})", machineId, toolType, agentToolId, deliveredCount);
 
             // Process the tool connection
-            toolConnectionService.addToolConnection(machineId, toolType, agentToolId, lastAttempt);
+            AuditContext device = auditRecorder.context(AuditActor.fromAgent(machineId, List.of(), null));
+            auditRecorder.within(device,
+                    () -> toolConnectionService.addToolConnection(machineId, toolType, agentToolId, lastAttempt));
 
             // Acknowledge successful processing
             message.ack();

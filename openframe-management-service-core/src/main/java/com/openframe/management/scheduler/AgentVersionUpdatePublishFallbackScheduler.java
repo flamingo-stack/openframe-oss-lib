@@ -1,5 +1,7 @@
 package com.openframe.management.scheduler;
 
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
@@ -27,6 +29,7 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     private final OpenFrameClientUpdatePublisher openFrameClientUpdatePublisher;
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolAgentUpdateUpdatePublisher toolAgentUpdateUpdatePublisher;
+    private final AuditRecorder auditRecorder;
 
     @Value("${openframe.agent-version-update-publish-fallback.max-attempts:5}")
     private int maxPublishAttempts;
@@ -54,7 +57,7 @@ public class AgentVersionUpdatePublishFallbackScheduler {
         OpenFrameClientConfiguration config = openFrameClientConfigurationService.get();
         PublishState publishState = config.getPublishState();
         if (shouldRetryPublish(publishState)) {
-            openFrameClientUpdatePublisher.publish(config);
+            auditRecorder.within(childrenOf(publishState), () -> openFrameClientUpdatePublisher.publish(config));
         }
     }
 
@@ -64,12 +67,17 @@ public class AgentVersionUpdatePublishFallbackScheduler {
             try {
                 PublishState publishState = agent.getPublishState();
                 if (shouldRetryPublish(publishState)) {
-                    toolAgentUpdateUpdatePublisher.publish(agent);
+                    auditRecorder.within(childrenOf(publishState), () -> toolAgentUpdateUpdatePublisher.publish(agent));
                 }
             } catch (Exception e) {
                 log.error("Failed to publish tool agent update: agentId={}", agent.getId(), e);
             }
         }
+    }
+
+    private AuditContext childrenOf(PublishState publishState) {
+        String parentEventId = publishState == null ? null : publishState.getParentEventId();
+        return auditRecorder.context().withParentEventId(parentEventId);
     }
 
     private boolean shouldRetryPublish(PublishState publishState) {

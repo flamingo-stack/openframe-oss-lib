@@ -1,5 +1,8 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.Machine;
@@ -21,6 +24,10 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
+import static com.openframe.data.document.audit.AuditTargetType.DEVICE;
 
 /**
  * Orchestrates one package-update status event: load state, drop duplicates/stale events,
@@ -39,6 +46,8 @@ public class PackageUpdateStatusProcessor {
     private final DeliveryDispatcher deliveryDispatcher;
     private final DeliveryTracker deliveryTracker;
     private final PackageAutoUpdateRetry autoUpdateRetry;
+    private final AuditCapture auditCapture;
+    private final AuditRecorder auditRecorder;
 
     public void process(String machineId, PackageUpdateStatusMessage event) {
         Machine machine = machineRepository.findByMachineId(machineId).orElse(null);
@@ -116,7 +125,10 @@ public class PackageUpdateStatusProcessor {
         }
         String requestId = state.getRequestId();
         if (deadlineBefore == null) {
-            deliveryDispatcher.schedule(PackageUpdateWire.deadlineForce(machineId, request), deadlineAt);
+            Map<String, Object> details = Map.of("requestId", requestId, "reason", "deadline-force", "dueAt", deadlineAt);
+            AuditContext order = auditRecorder.context().withParentEventId(request.getParentEventId());
+            auditRecorder.within(order, () -> auditCapture.runWithoutCompare(SOFTWARE_UPDATE, DEVICE, machineId, details,
+                    () -> deliveryDispatcher.schedule(PackageUpdateWire.deadlineForce(machineId, request), deadlineAt)));
             log.info("[package-update] deadline force scheduled requestId={} machineId={} deadlineAt={}",
                     requestId, machineId, deadlineAt);
             return;

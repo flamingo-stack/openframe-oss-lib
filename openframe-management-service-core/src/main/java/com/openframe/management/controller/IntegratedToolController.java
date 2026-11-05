@@ -1,5 +1,7 @@
 package com.openframe.management.controller;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditCapture;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.IntegratedToolService;
@@ -15,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.openframe.data.document.audit.AuditAction.PLATFORM_TENANT_TOOL_REGISTER;
+import static com.openframe.data.document.audit.AuditTargetType.INTEGRATED_TOOL;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
 @Slf4j
@@ -26,6 +30,7 @@ public class IntegratedToolController {
     private final IntegratedToolService toolService;
     private final DebeziumService debeziumService;
     private final TenantIdProvider tenantIdProvider;
+    private final AuditCapture auditCapture;
     private final List<IntegratedToolPostSaveHook> postSaveHooks;
 
     @GetMapping
@@ -55,51 +60,58 @@ public class IntegratedToolController {
             @PathVariable String key,
             @RequestBody SaveToolRequest request) {
         try {
-            IntegratedTool tool = request.getTool();
-            String tenantId = tenantIdProvider.getTenantId();
-            // Reuse this tenant's existing _id (update in place); otherwise force a fresh unique _id.
-            // The request payload may carry _id == key, but _id is global in the shared multi-tenant DB —
-            // keeping it would make save() replace another tenant's doc by _id (last-writer-wins ownership
-            // flip). Uniqueness is on (tenantId, key) via tenant_key_idx.
-            Optional<IntegratedTool> existingTool = toolService.getToolByKey(key);
-            existingTool.ifPresentOrElse(
-                    existing -> {
-                        tool.setId(existing.getId());
-                        // The chart's register Job re-posts the tool on every sync without the API key
-                        // FleetMdmSetupScheduler minted; don't wipe the stored one with null.
-                        if (tool.getCredentials() != null && tool.getCredentials().getApiKey() == null
-                                && existing.getCredentials() != null) {
-                            tool.getCredentials().setApiKey(existing.getCredentials().getApiKey());
-                        }
-                    },
-                    () -> tool.setId(null));
-            tool.setKey(key);
-            tool.setTenantId(tenantId);
-            tool.setEnabled(true);
-
-            IntegratedTool savedTool;
-            if (existingTool.isPresent() && existingTool.get().equals(tool)) {
-                savedTool = existingTool.get();
-                log.info("Tool configuration unchanged, not saving: {}", key);
-            } else {
-                savedTool = toolService.saveTool(tool);
-                log.info("Successfully saved tool configuration for: {}", key);
-            }
-
-            debeziumService.createOrUpdateDebeziumConnector(savedTool.getDebeziumConnectors());
-
-            for (IntegratedToolPostSaveHook hook : postSaveHooks) {
-                try {
-                    hook.onToolSaved(key, savedTool);
-                } catch (Exception hookEx) {
-                    log.warn("Post-save hook failed for toolKey={}: {}", key, hookEx.getMessage(), hookEx);
-                }
-            }
+            AuditCall call = new AuditCall(PLATFORM_TENANT_TOOL_REGISTER, INTEGRATED_TOOL, () -> null,
+                    saved -> ((IntegratedTool) saved).getId(), true, _ -> Map.of("key", key), true, _ -> true,
+                    _ -> null, _ -> null);
+            IntegratedTool savedTool = auditCapture.capture(call, () -> register(key, request.getTool()));
             return ResponseEntity.ok(Map.of("status", "success", "tool", savedTool));
         } catch (Exception e) {
             log.error("Failed to save tool: {}", key, e);
             return ResponseEntity.status(INTERNAL_SERVER_ERROR)
                     .body(Map.of("status", "error", "message", e.getMessage()));
         }
+    }
+
+    private IntegratedTool register(String key, IntegratedTool tool) {
+        String tenantId = tenantIdProvider.getTenantId();
+        // Reuse this tenant's existing _id (update in place); otherwise force a fresh unique _id.
+        // The request payload may carry _id == key, but _id is global in the shared multi-tenant DB —
+        // keeping it would make save() replace another tenant's doc by _id (last-writer-wins ownership
+        // flip). Uniqueness is on (tenantId, key) via tenant_key_idx.
+        Optional<IntegratedTool> existingTool = toolService.getToolByKey(key);
+        existingTool.ifPresentOrElse(
+                existing -> {
+                    tool.setId(existing.getId());
+                    // The chart's register Job re-posts the tool on every sync without the API key
+                    // FleetMdmSetupScheduler minted; don't wipe the stored one with null.
+                    if (tool.getCredentials() != null && tool.getCredentials().getApiKey() == null
+                            && existing.getCredentials() != null) {
+                        tool.getCredentials().setApiKey(existing.getCredentials().getApiKey());
+                    }
+                },
+                () -> tool.setId(null));
+        tool.setKey(key);
+        tool.setTenantId(tenantId);
+        tool.setEnabled(true);
+
+        IntegratedTool savedTool;
+        if (existingTool.isPresent() && existingTool.get().equals(tool)) {
+            savedTool = existingTool.get();
+            log.info("Tool configuration unchanged, not saving: {}", key);
+        } else {
+            savedTool = toolService.saveTool(tool);
+            log.info("Successfully saved tool configuration for: {}", key);
+        }
+
+        debeziumService.createOrUpdateDebeziumConnector(savedTool.getDebeziumConnectors());
+
+        for (IntegratedToolPostSaveHook hook : postSaveHooks) {
+            try {
+                hook.onToolSaved(key, savedTool);
+            } catch (Exception hookEx) {
+                log.warn("Post-save hook failed for toolKey={}: {}", key, hookEx.getMessage(), hookEx);
+            }
+        }
+        return savedTool;
     }
 }

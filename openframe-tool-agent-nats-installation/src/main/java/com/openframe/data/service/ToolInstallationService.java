@@ -1,5 +1,7 @@
 package com.openframe.data.service;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditCapture;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.nats.delivery.ToolInstallationDeliverySeed;
@@ -10,7 +12,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_TOOL_AGENT_INSTALL;
+import static com.openframe.data.document.audit.AuditTargetType.DEVICE;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 
 @Service
@@ -22,6 +27,7 @@ public class ToolInstallationService {
     private final IntegratedToolService integratedToolService;
     private final ToolCommandParamsResolver toolCommandParamsResolver;
     private final DeliveryRouter deliveryRouter;
+    private final AuditCapture auditCapture;
 
     public void process(String machineId, IntegratedToolAgent toolAgent) {
         process(machineId, toolAgent, false);
@@ -43,7 +49,11 @@ public class ToolInstallationService {
             toolAgent.setRunCommandArgs(toolCommandParamsResolver.process(toolId, runCommandArgs));
 
             ToolInstallationDeliverySeed seed = new ToolInstallationDeliverySeed(machineId, toolAgent, tool, reinstall);
-            boolean carried = deliveryRouter.dispatch(seed);
+            AuditCall call = AuditCall.of(DEVICE_TOOL_AGENT_INSTALL, DEVICE, machineId, Map.of())
+                    .withCompare(false)
+                    .withDetailsFromResult(sent -> Map.of("toolAgent", toolAgent.getKey(), "reinstall", reinstall,
+                            "carried", sent));
+            boolean carried = auditCapture.capture(call, () -> deliveryRouter.dispatch(seed));
             if (carried) {
                 log.info("Published {} agent installation message for machine {}", toolId, machineId);
             }

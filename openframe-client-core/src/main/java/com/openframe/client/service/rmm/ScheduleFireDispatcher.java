@@ -1,5 +1,10 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.audit.AuditCall;
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -34,6 +39,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +48,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static com.openframe.data.document.audit.AuditAction.SCRIPT_SCHEDULE_RUN;
+import static com.openframe.data.document.audit.AuditTargetType.SCRIPT_SCHEDULE;
 
 @Component
 @RequiredArgsConstructor
@@ -55,6 +64,8 @@ public class ScheduleFireDispatcher {
     private final DeliveryRouter deliveryRouter;
     private final MachineRepository machineRepository;
     private final DeviceOnlineDispatchRepository dispatchRepository;
+    private final AuditCapture auditCapture;
+    private final AuditRecorder auditRecorder;
     private final ScriptDeliveryRetryStore retryStore;
 
     public void dispatch(ScheduleScript schedule, Instant now) {
@@ -162,28 +173,42 @@ public class ScheduleFireDispatcher {
 
     // rule: what the batch does on its route for a machine that is not online, skip or wait for the reconnect
     private void dispatch(ScheduleScript schedule, List<String> machineIds, Instant now, ScheduleOfflineRule rule) {
+        AuditCall call = AuditCall.of(SCRIPT_SCHEDULE_RUN, SCRIPT_SCHEDULE, schedule.getId(), Map.of())
+                .withCompare(false)
+                .withRecordsResult(Objects::nonNull)
+                .withDetailsFromResult(executionId -> fireDetails(schedule, machineIds, executionId));
+        AuditContext author = auditRecorder.context(AuditActor.system(schedule.getCreatedBy()));
+        auditRecorder.within(author, () -> auditCapture.capture(call, () -> fire(schedule, machineIds, now, rule)));
+    }
+
+    private static Map<String, Object> fireDetails(ScheduleScript schedule, List<String> machineIds, Object executionId) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("executionId", executionId);
+        details.put("trigger", schedule.getTrigger());
+        details.put("machineIds", machineIds);
+        return details;
+    }
+
+    private String fire(ScheduleScript schedule, List<String> machineIds, Instant now, ScheduleOfflineRule rule) {
         List<String> scriptIds = schedule.getScriptIds();
         if (scriptIds == null || scriptIds.isEmpty() || machineIds == null || machineIds.isEmpty()) {
             log.info("Schedule scheduleId={} has no scripts or no target devices — nothing dispatched",
                     schedule.getId());
-            return;
+            return null;
         }
-
         List<Script> scripts = resolveRunnableScripts(schedule.getTenantId(), scriptIds);
         if (scripts.isEmpty()) {
             log.warn("Schedule scheduleId={} has no runnable scripts (all missing/inactive) — nothing dispatched",
                     schedule.getId());
-            return;
+            return null;
         }
-
-        // One executionId for the whole fire, shared across every script and machine.
         Fire fire = new Fire(schedule, UUID.randomUUID().toString(), scripts, machineIds, now, rule);
         saveHeader(fire);
         saveLeafRows(fire);
         publish(fire);
-
         log.info("Dispatched schedule fire scheduleId={} executionId={} scripts={} machines={}",
                 fire.scheduleId(), fire.executionId(), scripts.size(), machineIds.size());
+        return fire.executionId();
     }
 
     /**
@@ -200,6 +225,7 @@ public class ScheduleFireDispatcher {
     private void saveHeader(Fire fire) {
         scheduleScriptExecutionRepository.save(ScheduleScriptExecution.builder()
                 .tenantId(fire.tenantId())
+                .parentEventId(auditRecorder.currentEventId())
                 .executionId(fire.executionId())
                 .scheduleId(fire.scheduleId())
                 .initiatedBy(fire.initiatedBy())
@@ -211,9 +237,11 @@ public class ScheduleFireDispatcher {
 
     /** One RUNNING leaf row per (script, machine); mirrors the api-lib dispatch. */
     private void saveLeafRows(Fire fire) {
+        String parentEventId = auditRecorder.currentEventId();
         List<ScriptExecution> rows = fire.scripts().stream()
                 .flatMap(script -> fire.machineIds().stream().map(machineId -> ScriptExecution.builder()
                         .tenantId(fire.tenantId())
+                        .parentEventId(parentEventId)
                         .executionId(fire.executionId())
                         .scriptId(script.getId())
                         .scheduleId(fire.scheduleId())

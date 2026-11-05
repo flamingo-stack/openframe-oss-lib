@@ -44,6 +44,7 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
     private static final String FIELD_ERROR = "error";
 
     private final CommandExecutionRepository commandExecutionRepository;
+    private final ExecutionEndRecorder executionEnds;
     private final RmmExecutionMetrics executionMetrics;
 
     @Override
@@ -113,6 +114,8 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
         row.setStderrTruncated(truncStderr.truncated);
 
         commandExecutionRepository.save(row);
+        executionEnds.ended(new ExecutionEndRecorder.ExecutionEnd(row.getTenantId(), row.getExecutionId(), null,
+                row.getMachineId(), row.getInitiatedBy(), row.getParentEventId(), newStatus, exitCode, timedOut, error));
         executionMetrics.recordCommandCompleted(newStatus, row.getDispatchedAt(), now);
         log.info("Transitioned CommandExecution row: executionId={} machineId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), row.getMachineId(), newStatus, exitCode, timedOut);

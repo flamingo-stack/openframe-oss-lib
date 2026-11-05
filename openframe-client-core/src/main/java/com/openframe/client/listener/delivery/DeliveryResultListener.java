@@ -1,7 +1,11 @@
 package com.openframe.client.listener.delivery;
 
+import java.util.List;
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.nats.delivery.DeliveryResultMessage;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.delivery.metrics.DeliveryMetrics;
@@ -28,19 +32,22 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
     private final NatsTopicMachineIdExtractor machineIdExtractor;
     private final DeliveryTracker deliveryTracker;
     private final DeliveryMetrics metrics;
+    private final AuditRecorder auditRecorder;
 
     public DeliveryResultListener(
             Connection natsConnection,
             ObjectMapper objectMapper,
             NatsTopicMachineIdExtractor machineIdExtractor,
             DeliveryTracker deliveryTracker,
-            DeliveryMetrics metrics
+            DeliveryMetrics metrics,
+            AuditRecorder auditRecorder
     ) {
         super(natsConnection);
         this.objectMapper = objectMapper;
         this.machineIdExtractor = machineIdExtractor;
         this.deliveryTracker = deliveryTracker;
         this.metrics = metrics;
+        this.auditRecorder = auditRecorder;
     }
 
     @Override
@@ -82,7 +89,8 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
                 message.ack();
                 return;
             }
-            apply(machineId, report);
+            AuditContext device = auditRecorder.context(AuditActor.fromAgent(machineId, List.of(), null));
+            auditRecorder.within(device, () -> apply(machineId, report));
             message.ack();
         } catch (JacksonException | IllegalArgumentException permanentlyBad) {
             metrics.recordResultRejected(REJECTED_MALFORMED);

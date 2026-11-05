@@ -22,8 +22,9 @@ public class DeliveryDispatchMessage implements KafkaMessage {
     // when the command is due to reach the machine; absent = at once. A client-service older than this field ignores
     // it and publishes at once, so it is deployed before any service schedules over Kafka
     private Instant dueAt;
+    private String parentEventId;
 
     public DeliveryDispatchMessage(DeliveryAudience audience, String machineId, JsonNode payload) {
-        this(audience, machineId, payload, null);
+        this(audience, machineId, payload, null, null);
     }
 }

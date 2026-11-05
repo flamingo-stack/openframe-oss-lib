@@ -1,9 +1,11 @@
 package com.openframe.audit.targets;
 
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditTargetType;
 import lombok.With;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -17,6 +19,7 @@ public record AuditTarget<T>(AuditTargetType type,
                              Set<String> ignoredFields,
                              Set<String> maskedFields,
                              boolean secretId,
+                             Map<String, AuditAction> enableActions,
                              Container<?, T> container) {
 
     private static final String MONGO_ID_FIELD = "_id";
@@ -24,13 +27,13 @@ public record AuditTarget<T>(AuditTargetType type,
 
     public static <T> AuditTarget<T> of(AuditTargetType type, Class<T> documentType, Function<T, String> name) {
         return new AuditTarget<>(type, documentType, MONGO_ID_FIELD, name, _ -> null, _ -> null, Set.of(), Set.of(),
-                false, null);
+                false, Map.of(), null);
     }
 
     public static <T> AuditTarget<T> embedded(AuditTargetType type, Class<T> elementType, Container<?, T> container,
                                               Function<T, String> name) {
         return new AuditTarget<>(type, elementType, ELEMENT_ID_FIELD, name, _ -> null, _ -> null, Set.of(), Set.of(),
-                false, container);
+                false, Map.of(), container);
     }
 
     public String nameOf(Object document) {

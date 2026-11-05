@@ -33,10 +33,10 @@ public class AgentLogKeyService {
                 .orElseThrow(AgentLogKeyNotFoundException::new);
     }
 
-    public void createIfMissing() {
+    public boolean createIfMissing() {
         if (logKeyRepository.existsAny()) {
             log.info("Agent log key already exists. Skipping key generation.");
-            return;
+            return false;
         }
 
         AgentLogKey logKey = new AgentLogKey();
@@ -45,6 +45,7 @@ public class AgentLogKeyService {
 
         AgentLogKey savedKey = logKeyRepository.save(logKey);
         log.info("Generated agent log key with ID: {}", savedKey.getId());
+        return true;
     }
 
 }

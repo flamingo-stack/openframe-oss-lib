@@ -25,6 +25,10 @@
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-nats</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-audit</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>com.openframe.oss</groupId>

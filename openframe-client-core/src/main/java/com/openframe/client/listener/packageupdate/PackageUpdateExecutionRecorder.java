@@ -1,5 +1,7 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.client.service.rmm.ExecutionEndRecorder;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
@@ -29,6 +31,7 @@ public class PackageUpdateExecutionRecorder {
     static final String UNDELIVERED_ERROR = "The device did not receive the update";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
+    private final ExecutionEndRecorder executionEnds;
 
     public void record(PackageUpdateRequest request, String machineId, PackageUpdateStatusMessage event) {
         ScriptExecution row = historyRow(request, machineId).orElse(null);
@@ -54,6 +57,12 @@ public class PackageUpdateExecutionRecorder {
         }
         row.setStatusChangedAt(now);
         scriptExecutionRepository.save(row);
+        if (event.getState() == PackageUpdateStatusMessage.State.DONE) {
+            executionEnds.ended(row, AuditOutcome.SUCCESS, null);
+        }
+        if (event.getState() == PackageUpdateStatusMessage.State.FAILED) {
+            executionEnds.ended(row, AuditOutcome.FAILURE, row.getError());
+        }
     }
 
     public void recordUndelivered(PackageUpdateRequest request, String machineId, DeliveryFailure failure) {
@@ -65,6 +74,7 @@ public class PackageUpdateExecutionRecorder {
         update(row, ExecutionStatus.FAILED, now, null, null, UNDELIVERED_ERROR + " (" + failure + ")");
         row.setStatusChangedAt(now);
         scriptExecutionRepository.save(row);
+        executionEnds.ended(row, AuditOutcome.FAILURE, row.getError());
     }
 
     private Optional<ScriptExecution> historyRow(PackageUpdateRequest request, String machineId) {

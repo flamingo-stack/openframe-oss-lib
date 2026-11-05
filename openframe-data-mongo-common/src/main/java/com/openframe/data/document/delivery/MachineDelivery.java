@@ -28,6 +28,7 @@ public class MachineDelivery implements TenantScoped {
     private String targetId;
     private String machineId;
     private String tenantId;
+    private String parentEventId;
 
     private DeliveryStatus status;
     private int attempts;

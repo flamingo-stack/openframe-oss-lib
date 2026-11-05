@@ -85,6 +85,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         List<ScriptExecution> rows = request.getMachineIds().stream()
                 .map(machineId -> ScriptExecution.builder()
                         .tenantId(request.getTenantId())
+                        .parentEventId(request.getParentEventId())
                         .executionId(request.getExecutionId())
                         .scriptId(request.getScriptId())
                         .scheduleId(request.getScheduleId())

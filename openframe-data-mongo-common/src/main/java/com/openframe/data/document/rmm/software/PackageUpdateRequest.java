@@ -27,6 +27,7 @@ public class PackageUpdateRequest implements TenantScoped {
     private String id;
 
     private String tenantId;
+    private String parentEventId;
 
     private String requestId;
 

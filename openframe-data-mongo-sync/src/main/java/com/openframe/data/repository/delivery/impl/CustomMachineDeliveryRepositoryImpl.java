@@ -15,6 +15,7 @@ import org.bson.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -157,31 +158,35 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     }
 
     @Override
-    public boolean markDone(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
+    public Optional<MachineDelivery> markDone(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt,
+                                              Instant expiresAt) {
         Update update = closed(DeliveryStatus.DONE, finishedAt, expiresAt);
-        return updateOne(thisDispatch(id, from, dispatchId), update);
+        return closeOne(thisDispatch(id, from, dispatchId), update);
     }
 
     @Override
-    public boolean markCancelled(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant finishedAt, Instant expiresAt) {
+    public Optional<MachineDelivery> markCancelled(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant finishedAt,
+                                                   Instant expiresAt) {
         Update update = closed(DeliveryStatus.CANCELLED, finishedAt, expiresAt);
-        return updateOne(sameDispatch(id, from, dispatchedAt), update);
+        return closeOne(sameDispatch(id, from, dispatchedAt), update);
     }
 
     @Override
-    public boolean markFailed(String id, Set<DeliveryStatus> from, Instant dispatchedAt, DeliveryFailure failure, Instant finishedAt, Instant expiresAt) {
+    public Optional<MachineDelivery> markFailed(String id, Set<DeliveryStatus> from, Instant dispatchedAt, DeliveryFailure failure,
+                                                Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.FAILED, finishedAt, expiresAt)
                 .set(FIELD_FAILURE, failure);
-        return updateOne(sameDispatch(id, from, dispatchedAt), update);
+        return closeOne(sameDispatch(id, from, dispatchedAt), update);
     }
 
     @Override
-    public boolean markFailed(String id, String dispatchId, Set<DeliveryStatus> from, DeliveryFailure failure, String error, Instant finishedAt, Instant expiresAt) {
+    public Optional<MachineDelivery> markFailed(String id, String dispatchId, Set<DeliveryStatus> from, DeliveryFailure failure,
+                                                String error, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.FAILED, finishedAt, expiresAt)
                 .set(FIELD_FAILURE, failure)
                 .set(FIELD_ERROR, error);
         Criteria agentHadIt = publishedDispatch(id, from, dispatchId);
-        return updateOne(agentHadIt, update);
+        return closeOne(agentHadIt, update);
     }
 
     // back to PENDING for a later run; the dispatchId stays until that run is published, so a late DONE still closes the row
@@ -293,5 +298,11 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         Query query = new Query(criteria);
         UpdateResult result = mongoTemplate.updateFirst(query, update, MachineDelivery.class);
         return result.getModifiedCount() > 0;
+    }
+
+    private Optional<MachineDelivery> closeOne(Criteria criteria, Update update) {
+        Query query = new Query(criteria);
+        FindAndModifyOptions returnClosed = FindAndModifyOptions.options().returnNew(true);
+        return Optional.ofNullable(mongoTemplate.findAndModify(query, update, returnClosed, MachineDelivery.class));
     }
 }

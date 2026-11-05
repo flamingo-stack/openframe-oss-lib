@@ -42,6 +42,7 @@ public class ScriptExecution implements TenantScoped {
     private String id;
 
     private String tenantId;
+    private String parentEventId;
 
     @Indexed
     private String executionId;

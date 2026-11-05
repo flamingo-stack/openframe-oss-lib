@@ -1,5 +1,10 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
+import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.document.rmm.script.ExecutionSource;
@@ -26,8 +31,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_INSTALL;
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
+import static com.openframe.data.document.audit.AuditTargetType.DEVICE;
 
 @Component
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -44,6 +55,8 @@ public class SoftwareBundleOnlineDispatcher {
     private final PackageUpdateEligibilityService packageUpdateEligibility;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
     private final PackageAutoUpdatePolicyService autoUpdatePolicyService;
+    private final AuditCapture auditCapture;
+    private final AuditRecorder auditRecorder;
 
     public void dispatch(SoftwareBundle bundle, Machine machine) {
         if (bundle.getPackages() == null || bundle.getPackages().isEmpty()) {
@@ -54,6 +67,18 @@ public class SoftwareBundleOnlineDispatcher {
                     bundle.getId(), machine.getMachineId());
             return;
         }
+        AuditAction action = bundle.getAction().select(SOFTWARE_INSTALL, SOFTWARE_UPDATE);
+        List<String> packages = bundle.getPackages().stream().map(SoftwareBundlePackage::getPackageName).toList();
+        Map<String, Object> details = new HashMap<>();
+        details.put("bundleId", bundle.getId());
+        details.put("packages", packages);
+        AuditContext submit = auditRecorder.context(AuditActor.system(bundle.getCreatedBy()))
+                .withParentEventId(bundle.getParentEventId());
+        auditRecorder.within(submit, () -> auditCapture.runWithoutCompare(action, DEVICE, machine.getMachineId(), details,
+                () -> dispatchPackages(bundle, machine)));
+    }
+
+    private void dispatchPackages(SoftwareBundle bundle, Machine machine) {
         boolean viaOrder = packageUpdateEligibility.isEligible(bundle.getAction(), machine);
         for (SoftwareBundlePackage pkg : bundle.getPackages()) {
             dispatchPackage(bundle, pkg, machine, viaOrder);
@@ -86,6 +111,7 @@ public class SoftwareBundleOnlineDispatcher {
         String executionId = SoftwareExecutionId.forBundle(bundle.getId(), pkg.getPackageManager(), pkg.getPackageName());
         RunningExecutionRows rows = RunningExecutionRows.builder()
                 .tenantId(bundle.getTenantId())
+                .parentEventId(auditRecorder.currentEventId())
                 .executionId(executionId)
                 .scriptId(script.getId())
                 .machineIds(List.of(machineId))

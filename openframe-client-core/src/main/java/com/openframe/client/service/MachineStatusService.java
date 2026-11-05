@@ -1,12 +1,19 @@
 package com.openframe.client.service;
 
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.event.DeviceCameOnlineEvent;
 import com.openframe.client.event.DeviceFirstConnectedEvent;
 import com.openframe.client.exception.MachineNotFoundException;
+import com.openframe.data.document.audit.AuditActor;
+import com.openframe.data.document.audit.AuditChange;
+import com.openframe.data.document.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.MachineRepository;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -14,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_FIRST_CONNECTION_START;
 import static com.openframe.data.document.device.DeviceStatus.OFFLINE;
 import static com.openframe.data.document.device.DeviceStatus.ONLINE;
 import static com.openframe.data.document.device.DeviceStatus.PENDING;
@@ -25,6 +33,7 @@ public class MachineStatusService {
 
     private final MachineRepository machineRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuditRecorder auditRecorder;
 
     public void updateToOnline(String machineId, Instant eventTimestamp) {
         update(machineId, ONLINE, eventTimestamp);
@@ -74,15 +83,19 @@ public class MachineStatusService {
             return;
         }
         boolean firstConnect = previousStatus == PENDING && (newStatus == ONLINE || newStatus == OFFLINE);
+        boolean neverConnected = firstConnect && machine.getFirstConnectedAt() == null;
         machine.setStatus(newStatus);
         machine.setTelemetryStatus(telemetry);
         machine.setLastSeen(eventTimestamp);
-        if (firstConnect && machine.getFirstConnectedAt() == null) {
+        if (neverConnected) {
             machine.setFirstConnectedAt(eventTimestamp);
         }
         machineRepository.save(machine);
         log.debug("Updated machineId={} to status={} at {}", machine.getMachineId(), newStatus, eventTimestamp);
 
+        if (neverConnected) {
+            recordFirstConnection(machine, previousStatus);
+        }
         if (firstConnect) {
             log.info("Device first connected: machineId={}, transition {} -> {}", machine.getMachineId(), previousStatus, newStatus);
             eventPublisher.publishEvent(new DeviceFirstConnectedEvent(this, machine));
@@ -92,6 +105,20 @@ public class MachineStatusService {
             log.info("Device came online (offline->online): machineId={}", machine.getMachineId());
             eventPublisher.publishEvent(new DeviceCameOnlineEvent(this, machine));
         }
+    }
+
+    private void recordFirstConnection(Machine machine, DeviceStatus previousStatus) {
+        String machineId = machine.getMachineId();
+        AuditActor device = AuditActor.fromAgent(machineId, List.of(), machine.getTenantId());
+        auditRecorder.record(AuditEntry.builder()
+                .action(DEVICE_FIRST_CONNECTION_START)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(machineId)
+                .targetName(machine.getHostname())
+                .organizationId(machine.getOrganizationId())
+                .deviceId(machineId)
+                .changes(Map.of("status", new AuditChange(previousStatus, machine.getStatus())))
+                .build(), device);
     }
 
     /**

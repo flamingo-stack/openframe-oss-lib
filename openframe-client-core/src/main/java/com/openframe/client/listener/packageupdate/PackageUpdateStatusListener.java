@@ -1,10 +1,14 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
 import io.nats.client.Connection;
 import io.nats.client.Message;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -26,17 +30,19 @@ public class PackageUpdateStatusListener extends AbstractJetStreamPushListener {
     private final ObjectMapper objectMapper;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
     private final PackageUpdateStatusProcessor processor;
+    private final AuditRecorder auditRecorder;
 
     public PackageUpdateStatusListener(
             Connection natsConnection,
             ObjectMapper objectMapper,
             NatsTopicMachineIdExtractor machineIdExtractor,
-            PackageUpdateStatusProcessor processor
-    ) {
+            PackageUpdateStatusProcessor processor,
+            AuditRecorder auditRecorder) {
         super(natsConnection);
         this.objectMapper = objectMapper;
         this.machineIdExtractor = machineIdExtractor;
         this.processor = processor;
+        this.auditRecorder = auditRecorder;
     }
 
     @Override
@@ -77,7 +83,8 @@ public class PackageUpdateStatusListener extends AbstractJetStreamPushListener {
                 message.ack();
                 return;
             }
-            processor.process(machineId, event);
+            AuditContext device = auditRecorder.context(AuditActor.fromAgent(machineId, List.of(), null));
+            auditRecorder.within(device, () -> processor.process(machineId, event));
             message.ack();
         } catch (JacksonException | IllegalArgumentException permanentlyBad) {
             log.error("Package-update status rejected, malformed: subject={} payload={}", subject, payload, permanentlyBad);

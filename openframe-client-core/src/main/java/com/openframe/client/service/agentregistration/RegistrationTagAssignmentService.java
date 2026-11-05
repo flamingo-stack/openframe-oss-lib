@@ -1,5 +1,6 @@
 package com.openframe.client.service.agentregistration;
 
+import com.openframe.audit.AuditCapture;
 import com.openframe.client.dto.agent.AgentRegistrationTagInput;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
@@ -15,6 +16,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+
+import static com.openframe.data.document.audit.AuditAction.DEVICE_TAG_ADD;
+import static com.openframe.data.document.audit.AuditTargetType.DEVICE;
+import static java.util.Objects.requireNonNullElse;
 
 /**
  * Handles tag creation and assignment during agent registration.
@@ -33,6 +39,7 @@ public class RegistrationTagAssignmentService {
 
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
+    private final AuditCapture auditCapture;
 
     /**
      * Creates tags (if they don't exist) and assigns them to the newly registered device.
@@ -49,21 +56,10 @@ public class RegistrationTagAssignmentService {
 
         for (AgentRegistrationTagInput tagInput : tags) {
             try {
-                TagValidation.validateKey(tagInput.getKey());
-                TagValidation.validateValues(tagInput.getValues(), tagInput.getKey());
-
-                Tag tag = findOrCreateTag(tagInput.getKey(), tagInput.getValues(), now);
-
-                TagAssignment assignment = TagAssignment.builder()
-                        .entityId(machineId)
-                        .tagId(tag.getId())
-                        .entityType(TagEntityType.DEVICE)
-                        .values(tagInput.getValues() != null ? tagInput.getValues() : List.of())
-                        .taggedAt(now)
-                        .build();
-
-                tagAssignmentRepository.save(assignment);
-                log.info("Assigned tag '{}' to machine {} during registration", tagInput.getKey(), machineId);
+                String key = tagInput.getKey();
+                List<String> values = requireNonNullElse(tagInput.getValues(), List.of());
+                auditCapture.runWithoutCompare(DEVICE_TAG_ADD, DEVICE, machineId, Map.of("key", key, "values", values),
+                        () -> assignTag(machineId, key, values, now));
             } catch (Exception e) {
                 log.error("Failed to assign tag '{}' to machine {} during registration: {}",
                         tagInput.getKey(), machineId, e.getMessage(), e);
@@ -76,6 +72,21 @@ public class RegistrationTagAssignmentService {
      * If the tag already exists and new values are provided, appends any new values
      * to the tag's predefined options list (deduplicating).
      */
+    private void assignTag(String machineId, String key, List<String> values, Instant now) {
+        TagValidation.validateKey(key);
+        TagValidation.validateValues(values, key);
+        Tag tag = findOrCreateTag(key, values, now);
+        TagAssignment assignment = TagAssignment.builder()
+                .entityId(machineId)
+                .tagId(tag.getId())
+                .entityType(TagEntityType.DEVICE)
+                .values(values)
+                .taggedAt(now)
+                .build();
+        tagAssignmentRepository.save(assignment);
+        log.info("Assigned tag '{}' to machine {} during registration", key, machineId);
+    }
+
     private Tag findOrCreateTag(String key, List<String> values, Instant now) {
         Tag existing = tagRepository.findByKeyAndEntityType(key, TagEntityType.DEVICE);
         if (existing != null) {

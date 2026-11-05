@@ -1,7 +1,10 @@
 package com.openframe.client.service;
 
+import com.openframe.audit.AuditCapture;
 import com.openframe.client.exception.InvalidAgentIdException;
 import com.openframe.client.exception.MachineNotFoundException;
+import com.openframe.data.document.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.repository.device.MachineRepository;
@@ -13,6 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import static com.openframe.data.document.audit.AuditAction.DEVICE_DELIVERY_END;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +28,7 @@ public class InstalledAgentService {
 
     private final InstalledAgentRepository installedAgentRepository;
     private final MachineRepository machineRepository;
+    private final AuditCapture auditCapture;
 
     @Transactional
     public void addInstalledAgent(String machineId, String agentType, String version, boolean lastAttempt) {
@@ -60,6 +68,8 @@ public class InstalledAgentService {
             String machineId,
             String agentType
     ) {
+        boolean changed = installedAgent.getStatus() != ConnectionStatus.CONNECTED
+                || !Objects.equals(installedAgent.getVersion(), version);
         installedAgent.setVersion(version);
         installedAgent.setStatus(ConnectionStatus.CONNECTED);
         installedAgent.setUpdatedAt(Instant.now().toString());
@@ -67,6 +77,18 @@ public class InstalledAgentService {
 
         log.info("Updated existing installed agent: machineId={} agentType={} version={}",
                 machineId, agentType, version);
+        if (changed) {
+            recordInstalled(machineId, agentType, version);
+        }
+    }
+
+    private void recordInstalled(String machineId, String agentType, String version) {
+        auditCapture.record(AuditEntry.builder()
+                .action(DEVICE_DELIVERY_END)
+                .outcome(AuditOutcome.SUCCESS)
+                .targetId(machineId)
+                .details(Map.of("agentType", agentType, "version", version))
+                .build());
     }
 
     private void addNewInstalledAgent(String machineId, String agentType, String version) {
@@ -84,6 +106,7 @@ public class InstalledAgentService {
 
         log.info("Saved new installed agent: machineId={} agentType={} version={}",
                 machineId, agentType, version);
+        recordInstalled(machineId, agentType, version);
     }
 
     private void validateMachineExists(String machineId) {

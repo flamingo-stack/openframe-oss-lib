@@ -1,5 +1,8 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.rmm.software.PackageAutoUpdatePolicy;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -18,8 +21,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
+import static com.openframe.data.document.audit.AuditAction.SOFTWARE_UPDATE;
+import static com.openframe.data.document.audit.AuditTargetType.DEVICE;
 
 // Orders a failed auto-update again: the same request, due later in the delivery engine, so the device keeps one
 // history row and the run reads the outcome of its last attempt. The engine's own re-run keeps the sequence, which the
@@ -36,6 +43,8 @@ public class PackageAutoUpdateRetry {
     private static final String TURNED_OFF_BY = "package-auto-update";
 
     private final PackageAutoUpdatePolicyRepository policyRepository;
+    private final AuditCapture auditCapture;
+    private final AuditRecorder auditRecorder;
     private final DeliveryDispatcher deliveryDispatcher;
 
     @Value("${openframe.rmm.software.package-update.retry.max-attempts}")
@@ -92,7 +101,10 @@ public class PackageAutoUpdateRetry {
         PackageUpdateDeliverySeed seed = PackageUpdateWire.seed(machineId, requestId, request.getSource(),
                 request.getPackageManager(), request.getPackageName(), request.getBrewPackageType(), request.getMode(),
                 request.getForceCountdownSeconds());
-        deliveryDispatcher.schedule(seed, dueAt);
+        Map<String, Object> details = Map.of("requestId", requestId, "reason", "auto-update retry", "dueAt", dueAt);
+        AuditContext order = auditRecorder.context().withParentEventId(request.getParentEventId());
+        auditRecorder.within(order, () -> auditCapture.runWithoutCompare(SOFTWARE_UPDATE, DEVICE, machineId, details,
+                () -> deliveryDispatcher.schedule(seed, dueAt)));
         int retries = state.getRetries() + 1;
         state.setRetries(retries);
         // this attempt arms its own deadline

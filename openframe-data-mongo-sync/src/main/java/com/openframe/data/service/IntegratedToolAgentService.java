@@ -104,13 +104,13 @@ public class IntegratedToolAgentService {
     }
 
     @RetryOnOptimisticLockingFailure
-    public void updateConfigurationFields(IntegratedToolAgentConfiguration configuration) {
-        String configurationKey = configuration.getId();
-        agentRepository.findByKey(configurationKey)
-                .ifPresentOrElse(
-                        existing -> mergeAndSave(existing, configuration),
-                        () -> createFromConfiguration(configuration)
-        );
+    public boolean updateConfigurationFields(IntegratedToolAgentConfiguration configuration, String parentEventId) {
+        Optional<IntegratedToolAgent> existing = agentRepository.findByKey(configuration.getId());
+        if (existing.isEmpty()) {
+            createFromConfiguration(configuration);
+            return false;
+        }
+        return mergeAndSave(existing.get(), configuration, parentEventId);
     }
 
     private void createFromConfiguration(IntegratedToolAgentConfiguration configuration) {
@@ -123,7 +123,8 @@ public class IntegratedToolAgentService {
         agentRepository.save(agent);
     }
 
-    private void mergeAndSave(IntegratedToolAgent existing, IntegratedToolAgentConfiguration configuration) {
+    private boolean mergeAndSave(IntegratedToolAgent existing, IntegratedToolAgentConfiguration configuration,
+                                 String parentEventId) {
         String existingId = existing.getId();
         boolean releaseAgent = existing.isReleaseVersion();
         String existingVersion = existing.getVersion();
@@ -137,13 +138,15 @@ public class IntegratedToolAgentService {
             existing.setVersion(configurationVersion);
         }
 
-        if (versionChanged || assetChanged) {
-            existing.setPublishState(PublishState.pending());
+        boolean changed = versionChanged || assetChanged;
+        if (changed) {
+            existing.setPublishState(PublishState.pending(parentEventId));
             log.info("Marked tool agent {} for publish: versionChanged={}, assetChanged={}",
                     existingId, versionChanged, assetChanged);
         }
 
         agentRepository.save(existing);
+        return changed;
     }
 
     private void applyConfiguration(IntegratedToolAgent agent, IntegratedToolAgentConfiguration configuration) {
@@ -195,20 +198,21 @@ public class IntegratedToolAgentService {
     }
 
     @RetryOnOptimisticLockingFailure
-    public void updateReleaseAgentVersion(String id, String newVersion) {
+    public boolean updateReleaseAgentVersion(String id, String newVersion, String parentEventId) {
         IntegratedToolAgent agent = getByUuid(id);
         boolean releaseAgent = agent.isReleaseVersion();
         if (!releaseAgent) {
             log.warn("updateReleaseAgentVersion called for non-release agent {}, skipping", id);
-            return;
+            return false;
         }
         String oldVersion = agent.getVersion();
         if (Objects.equals(oldVersion, newVersion)) {
-            return;
+            return false;
         }
         agent.setVersion(newVersion);
-        agent.setPublishState(PublishState.pending());
+        agent.setPublishState(PublishState.pending(parentEventId));
         agentRepository.save(agent);
         log.info("Updated release agent {} version {} -> {} and marked for publish", id, oldVersion, newVersion);
+        return true;
     }
 }

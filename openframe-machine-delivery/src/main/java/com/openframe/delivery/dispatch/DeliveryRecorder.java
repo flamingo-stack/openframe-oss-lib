@@ -103,6 +103,7 @@ public class DeliveryRecorder {
                 .payloadId(payloadId)
                 .offlineBehavior(request.getOfflineBehavior())
                 .reconnectWindowSeconds(request.getReconnectWindowSeconds())
+                .parentEventId(request.getParentEventId())
                 .dispatchedAt(runAt)
                 .dueAt(dueAt)
                 .expiresAt(expiresAt)

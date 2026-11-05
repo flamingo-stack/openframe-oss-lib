@@ -1,5 +1,7 @@
 package com.openframe.client.service.agentregistration;
 
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.config.AsyncConfig;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.service.IntegratedToolAgentService;
@@ -18,11 +20,13 @@ public class AgentRegistrationToolInstallationService {
 
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolInstallationService toolInstallationService;
+    private final AuditRecorder auditRecorder;
 
     @Async(AsyncConfig.TOOL_INSTALL_EXECUTOR)
-    public void process(String machineId) {
+    public void process(String machineId, AuditContext context) {
         List<IntegratedToolAgent> toolAgents = integratedToolAgentService.getAllEnabled();
-        toolAgents.forEach(toolAgent -> toolInstallationService.process(machineId, toolAgent));
+        auditRecorder.within(context,
+                () -> toolAgents.forEach(toolAgent -> toolInstallationService.process(machineId, toolAgent)));
     }
 
 

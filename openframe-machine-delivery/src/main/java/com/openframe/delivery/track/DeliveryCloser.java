@@ -1,5 +1,8 @@
 package com.openframe.delivery.track;
 
+import com.openframe.audit.AuditCapture;
+import com.openframe.data.document.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
@@ -14,8 +17,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
+import static com.openframe.data.document.audit.AuditAction.DEVICE_DELIVERY_END;
 
 @Slf4j
 @Component
@@ -26,6 +32,13 @@ public class DeliveryCloser {
     private final DeliveryProperties properties;
     private final DeliveryMetrics metrics;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuditCapture auditCapture;
+
+    public void done(MachineDelivery delivery) {
+        log.info("Delivery DONE: type={} targetId={} machineId={} dispatchId={}", delivery.getType(),
+                delivery.getTargetId(), delivery.getMachineId(), delivery.getDispatchId());
+        recordEnd(delivery, AuditOutcome.SUCCESS, null);
+    }
 
     public void fail(MachineDelivery delivery, DeliveryFailure failure, Set<DeliveryStatus> from, Instant now) {
         DeliveryType type = delivery.getType();
@@ -45,21 +58,18 @@ public class DeliveryCloser {
         }
         Instant expiresAt = expiresAt(type, now);
 
-        boolean stillIn = repository.markFailed(id, from, dispatchedAt, failure, now, expiresAt);
-        if (!stillIn) {
+        Optional<MachineDelivery> failed = repository.markFailed(id, from, dispatchedAt, failure, now, expiresAt);
+        if (failed.isEmpty()) {
             log.debug("Delivery moved on before the failure could be recorded: id={}", id);
             return;
         }
-        delivery.setStatus(DeliveryStatus.FAILED);
-        delivery.setFailure(failure);
-        delivery.setFinishedAt(now);
-        delivery.setExpiresAt(expiresAt);
-
-        String targetId = delivery.getTargetId();
-        String machineId = delivery.getMachineId();
+        MachineDelivery closed = failed.get();
+        String targetId = closed.getTargetId();
+        String machineId = closed.getMachineId();
         metrics.recordFailed(type, failure);
         log.warn("Delivery FAILED: type={} targetId={} machineId={} attempts={} reason={}",
-                type, targetId, machineId, delivery.getAttempts(), failure);
+                type, targetId, machineId, closed.getAttempts(), failure);
+        recordEnd(closed, AuditOutcome.FAILURE, failure.name());
         eventPublisher.publishEvent(new DeliveryFailedEvent(type, targetId, machineId, failure));
     }
 
@@ -72,14 +82,16 @@ public class DeliveryCloser {
             return;
         }
         Instant expiresAt = expiresAt(type, now);
-        boolean stillOpen = repository.markFailed(id, dispatchId, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, error, now, expiresAt);
-        if (!stillOpen) {
+        Optional<MachineDelivery> failed = repository.markFailed(id, dispatchId, DeliveryStatus.OPEN,
+                DeliveryFailure.AGENT_ERROR, error, now, expiresAt);
+        if (failed.isEmpty()) {
             log.debug("Delivery failure from agent ignored, no open row for this dispatch: id={} dispatchId={}", id, dispatchId);
             return;
         }
         metrics.recordFailed(type, DeliveryFailure.AGENT_ERROR);
         log.warn("Delivery FAILED by agent: type={} targetId={} machineId={} dispatchId={} error={}",
                 type, targetId, machineId, dispatchId, error);
+        recordEnd(failed.get(), AuditOutcome.FAILURE, DeliveryFailure.AGENT_ERROR + ": " + error);
         eventPublisher.publishEvent(new DeliveryFailedEvent(type, targetId, machineId, DeliveryFailure.AGENT_ERROR));
     }
 
@@ -88,11 +100,23 @@ public class DeliveryCloser {
         Instant expiresAt = expiresAt(type, now);
         Instant dispatchedAt = delivery.getDispatchedAt();
         String id = delivery.getId();
-        boolean cancelled = repository.markCancelled(id, from, dispatchedAt, now, expiresAt);
-        if (cancelled) {
+        repository.markCancelled(id, from, dispatchedAt, now, expiresAt).ifPresent(cancelled -> {
             log.info("Delivery CANCELLED: type={} targetId={} machineId={} reason={}",
-                    type, delivery.getTargetId(), delivery.getMachineId(), reason);
-        }
+                    type, cancelled.getTargetId(), cancelled.getMachineId(), reason);
+            recordEnd(cancelled, AuditOutcome.REFUSED, reason);
+        });
+    }
+
+    private void recordEnd(MachineDelivery delivery, AuditOutcome outcome, String reason) {
+        auditCapture.record(AuditEntry.builder()
+                .action(DEVICE_DELIVERY_END)
+                .outcome(outcome)
+                .reason(reason)
+                .targetId(delivery.getMachineId())
+                .parentEventId(delivery.getParentEventId())
+                .details(Map.of("type", delivery.getType(), "targetId", delivery.getTargetId(),
+                        "dispatchId", delivery.getDispatchId()))
+                .build());
     }
 
     // the primary is read only when the policy allows a second run at all

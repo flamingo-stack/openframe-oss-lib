@@ -1,6 +1,8 @@
 package com.openframe.management.initializer;
 
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.toolagent.IntegratedToolAgentConfiguration;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.service.IntegratedToolAgentService;
@@ -16,8 +18,13 @@ import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+
+import static com.openframe.data.document.audit.AuditAction.DEVICE_TOOL_AGENT_UPDATE;
+import static com.openframe.data.document.audit.AuditTargetType.DEVICE;
 
 @Component
 @Order(20)
@@ -31,6 +38,8 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
     private final IntegratedToolAgentService integratedToolAgentService;
     private final AgentConfigurationProperties agentConfigurationProperties;
     private final ClientVersionsProperties clientVersionsProperties;
+    private final AuditCapture auditCapture;
+    private final AuditRecorder auditRecorder;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -64,7 +73,12 @@ public class IntegratedToolAgentInitializer implements ApplicationRunner {
 
             applyVersionFromProperties(configuration);
 
-            integratedToolAgentService.updateConfigurationFields(configuration);
+            Map<String, Object> details = new HashMap<>();
+            details.put("toolAgent", configurationId);
+            details.put("version", configuration.getVersion());
+            auditCapture.runWhenChanged(DEVICE_TOOL_AGENT_UPDATE, DEVICE, null, details,
+                    () -> integratedToolAgentService.updateConfigurationFields(configuration,
+                            auditRecorder.currentEventId()));
             log.info("Applied agent configuration: {} from {}", configurationId, agentConfigurationFilePath);
         } catch (Exception e) {
             String errorMessage = e.getMessage();

@@ -22,6 +22,7 @@ public class SoftwareBundle implements TenantScoped {
     private String id;
 
     private String tenantId;
+    private String parentEventId;
     private SoftwareAction action;
     private SoftwareBundleMode mode;
     private SoftwareBundleStatus status;

@@ -44,6 +44,10 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-audit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
             <artifactId>fleetmdm</artifactId>
         </dependency>
 

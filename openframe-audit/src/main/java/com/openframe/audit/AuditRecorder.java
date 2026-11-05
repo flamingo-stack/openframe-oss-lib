@@ -1,10 +1,14 @@
 package com.openframe.audit;
 
+import com.openframe.audit.targets.AuditTarget;
+import com.openframe.audit.targets.AuditTargets;
+import com.openframe.core.util.Sha256;
 import com.openframe.data.document.apikey.ApiKey;
 import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.document.audit.AuditEntry;
 import com.openframe.data.document.audit.AuditEvent;
 import com.openframe.data.document.audit.AuditSource;
+import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.user.User;
 import com.openframe.data.mapper.AuditEventMapper;
@@ -58,6 +62,7 @@ public class AuditRecorder {
     private final MachineRepository machineRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final AuditTenants auditTenants;
+    private final AuditTargets targets;
     private final AuditEventMapper auditEventMapper;
     private final ObjectMapper objectMapper;
     @Value("${openframe.audit.enabled}")
@@ -69,7 +74,15 @@ public class AuditRecorder {
     }
 
     public AuditContext context(AuditActor actor) {
-        return new AuditContext(actor, source());
+        AuditContext declared = DECLARED_CONTEXT.get();
+        return declared == null
+                ? new AuditContext(actor, source(), null)
+                : new AuditContext(actor, declared.source(), declared.parentEventId());
+    }
+
+    public String currentEventId() {
+        AuditContext declared = DECLARED_CONTEXT.get();
+        return declared == null ? null : declared.parentEventId();
     }
 
     public AuditSource source() {
@@ -79,11 +92,11 @@ public class AuditRecorder {
                 header(request, REQUEST_ID_HEADER), jwt == null ? null : jwt.getClaimAsString(SESSION_CLAIM));
     }
 
-    public <T> T within(AuditContext context, Supplier<T> work) {
+    public <R, E extends Throwable> R within(AuditContext context, AuditedWork<R, E> work) throws E {
         AuditContext outer = DECLARED_CONTEXT.get();
-        DECLARED_CONTEXT.set(context);
+        DECLARED_CONTEXT.set(underCurrentEvent(context));
         try {
-            return work.get();
+            return work.run();
         } finally {
             if (outer == null) {
                 DECLARED_CONTEXT.remove();
@@ -102,7 +115,7 @@ public class AuditRecorder {
 
     public <T> Supplier<T> inCurrentContext(Supplier<T> work) {
         AuditContext context = context();
-        return () -> within(context, work);
+        return () -> within(context, work::get);
     }
 
     public AuditActor userActor(String userId, String email, List<String> roles, String tenantId) {
@@ -116,31 +129,51 @@ public class AuditRecorder {
                         principal.getTenantId(), auditTenants.superTenantId());
     }
 
-    public void record(AuditEntry entry) {
-        record(entry, (AuditContext) null);
+    public String record(AuditEntry entry) {
+        return record(entry, (AuditContext) null);
     }
 
-    public void record(AuditEntry entry, AuditActor actor) {
-        record(entry, context(actor));
+    public String record(AuditEntry entry, AuditActor actor) {
+        return record(entry, context(actor));
     }
 
-    public void record(AuditEntry entry, AuditContext context) {
+    public String record(AuditEntry entry, AuditContext context) {
         Assert.state(entry.getAction() != null, "An audit entry needs an action");
         Assert.state(entry.getOutcome() != null, "An audit entry needs an outcome");
         if (!enabled) {
-            return;
+            return null;
         }
         try {
-            save(eventOf(entry, Objects.requireNonNullElseGet(context, this::context)));
+            AuditContext given = context == null ? context() : underCurrentEvent(context);
+            return save(eventOf(entry, given));
         } catch (RuntimeException e) {
             log.error("Audit event not recorded for {}", entry.getAction().getName(), e);
+            return null;
         }
+    }
+
+    private AuditContext underCurrentEvent(AuditContext context) {
+        String currentEventId = currentEventId();
+        return context != null && context.parentEventId() == null && currentEventId != null
+                ? context.withParentEventId(currentEventId)
+                : context;
+    }
+
+    public String targetIdOf(AuditTargetType targetType, String targetId) {
+        return targetId == null && targetType == AuditTargetType.TENANT ? auditTenants.servedTenantId() : targetId;
     }
 
     private AuditEvent eventOf(AuditEntry entry, AuditContext context) {
         AuditActor actor = context.actor();
         String tenantId = auditTenants.tenantFor(actor, entry.getTenantId());
-        AuditEvent event = auditEventMapper.toEvent(entry, actor, context.source(), tenantId);
+        AuditTargetType targetType = Objects.requireNonNullElse(entry.getTargetType(), entry.getAction().getTargetType());
+        String targetId = targetIdOf(targetType, entry.getTargetId());
+        boolean secretId = targets.find(targetType).stream().anyMatch(AuditTarget::secretId);
+        AuditEntry stored = entry.toBuilder()
+                .targetType(targetType)
+                .targetId(secretId && targetId != null ? Sha256.hex(targetId) : targetId)
+                .build();
+        AuditEvent event = auditEventMapper.toEvent(stored, actor, context.source(), tenantId, context.parentEventId());
         event.setActorName(nameOf(actor));
         event.setOnBehalfOfName(onBehalfOfNameOf(actor));
         event.setApproverName(actor.approver() == null ? null : nameOf(actor.approver()));
@@ -193,11 +226,12 @@ public class AuditRecorder {
         return lookup(() -> machineRepository.findByMachineId(machineId)).map(Machine::getHostname).orElse(null);
     }
 
-    private void save(AuditEvent event) {
+    private String save(AuditEvent event) {
         try {
-            auditEventRepository.insert(event);
+            return auditEventRepository.insert(event).getId();
         } catch (DataAccessException e) {
             log.error("Audit event not stored: {}", asJson(event), e);
+            return null;
         }
     }
 

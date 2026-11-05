@@ -1,5 +1,6 @@
 package com.openframe.management.service;
 
+import com.openframe.audit.AuditCapture;
 import com.openframe.data.document.apikey.APIKeyType;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.ToolApiKey;
@@ -9,7 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.Optional;
+
+import static com.openframe.data.document.audit.AuditAction.PLATFORM_TENANT_TOOL_REGISTER;
+import static com.openframe.data.document.audit.AuditTargetType.INTEGRATED_TOOL;
 
 @Slf4j
 @Service
@@ -19,25 +24,29 @@ public class FleetMdmSetupService {
     public static final String FLEET_API_TOKEN_KEY_NAME = "Fleet API Token";
 
     private final FleetApiKeyResolver fleetApiKeyResolver;
+    private final AuditCapture auditCapture;
     private final IntegratedToolRepository toolRepository;
 
     public void setupAndSaveApiToken(IntegratedTool tool) {
+        auditCapture.runWhenChanged(PLATFORM_TENANT_TOOL_REGISTER, INTEGRATED_TOOL, tool.getId(),
+                Map.of("change", "fleetApiToken"), () -> setup(tool));
+    }
+
+    private boolean setup(IntegratedTool tool) {
         if (hasApiToken(tool)) {
             log.debug("Fleet MDM tool already has API token, skipping setup");
-            return;
+            return false;
         }
-
         log.info("Fleet MDM tool found without API token — starting setup");
         String token = fleetApiKeyResolver.resolve(tool);
-
         ToolApiKey apiKey = new ToolApiKey();
         apiKey.setKey(token);
         apiKey.setType(APIKeyType.BEARER_TOKEN);
         apiKey.setKeyName(FLEET_API_TOKEN_KEY_NAME);
-
         tool.getCredentials().setApiKey(apiKey);
         toolRepository.save(tool);
         log.info("Fleet API token saved to IntegratedTool '{}'", tool.getId());
+        return true;
     }
 
     private boolean hasApiToken(IntegratedTool tool) {

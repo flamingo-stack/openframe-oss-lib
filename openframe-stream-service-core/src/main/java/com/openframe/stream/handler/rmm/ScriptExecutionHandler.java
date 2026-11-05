@@ -38,6 +38,7 @@ public class ScriptExecutionHandler implements MessageHandler<DeserializedDebezi
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionAggregator scheduleScriptExecutionAggregator;
     private final DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
+    private final ExecutionEndRecorder executionEnds;
     private final RmmExecutionMetrics executionMetrics;
 
     @Override
@@ -149,6 +150,8 @@ public class ScriptExecutionHandler implements MessageHandler<DeserializedDebezi
         row.setStderrTruncated(truncStderr.truncated);
 
         scriptExecutionRepository.save(row);
+        executionEnds.ended(new ExecutionEndRecorder.ExecutionEnd(row.getTenantId(), row.getExecutionId(), row.getScriptId(),
+                row.getMachineId(), row.getInitiatedBy(), row.getParentEventId(), newStatus, exitCode, timedOut, error));
         executionMetrics.recordScriptCompleted(newStatus, row.getSource(), row.getPackageManager(), row.getDispatchedAt(), now);
         log.info("Transitioned Execution row: executionId={} status={}→{} exitCode={} timedOut={}",
                 row.getExecutionId(), previous, newStatus, exitCode, timedOut);

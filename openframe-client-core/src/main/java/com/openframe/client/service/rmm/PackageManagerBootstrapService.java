@@ -1,6 +1,8 @@
 package com.openframe.client.service.rmm;
 
 import java.util.List;
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.device.DeviceStatus;
@@ -25,8 +27,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+
+import static com.openframe.data.document.audit.AuditAction.DEVICE_PACKAGE_MANAGER_INSTALL;
+import static com.openframe.data.document.audit.AuditTargetType.DEVICE;
 
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.package-manager-bootstrap.enabled", havingValue = "true")
@@ -39,6 +45,8 @@ public class PackageManagerBootstrapService {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScriptBootstrapNatsPublisher scriptBootstrapNatsPublisher;
     private final EncryptionService encryptionService;
+    private final AuditCapture auditCapture;
+    private final AuditRecorder auditRecorder;
 
     @Value("${openframe.rmm.package-manager-bootstrap.cooldown-seconds}")
     private long cooldownSeconds;
@@ -75,7 +83,9 @@ public class PackageManagerBootstrapService {
             return;
         }
 
-        dispatch(tenantId, machineId, packageManager, script);
+        Map<String, Object> details = Map.of("packageManager", packageManager, "scriptId", script.getId());
+        auditCapture.runWithoutCompare(DEVICE_PACKAGE_MANAGER_INSTALL, DEVICE, machineId, details,
+                () -> dispatch(tenantId, machineId, packageManager, script));
     }
 
     private boolean isSuppressed(String tenantId, String machineId, String scriptId) {
@@ -106,6 +116,7 @@ public class PackageManagerBootstrapService {
 
         scriptExecutionRepository.save(ScriptExecution.builder()
                 .tenantId(tenantId)
+                .parentEventId(auditRecorder.currentEventId())
                 .executionId(executionId)
                 .scriptId(script.getId())
                 .machineId(machineId)

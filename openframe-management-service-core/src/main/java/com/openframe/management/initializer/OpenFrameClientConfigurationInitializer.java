@@ -1,6 +1,9 @@
 package com.openframe.management.initializer;
 
+import java.util.Map;
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.audit.AuditCapture;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,9 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_CLIENT_UPDATE;
+import static com.openframe.data.document.audit.AuditTargetType.DEVICE;
+
 @Component
 @Order(30)
 @RequiredArgsConstructor
@@ -23,6 +29,8 @@ public class OpenFrameClientConfigurationInitializer implements ApplicationRunne
 
     private final ObjectMapper objectMapper;
     private final OpenFrameClientConfigurationService clientConfigurationService;
+    private final AuditCapture auditCapture;
+    private final AuditRecorder auditRecorder;
 
     @Override
     public void run(ApplicationArguments args) throws IOException {
@@ -30,7 +38,8 @@ public class OpenFrameClientConfigurationInitializer implements ApplicationRunne
         ClassPathResource resource = new ClassPathResource(CONFIG_FILE);
         OpenFrameClientConfiguration fromConfig = objectMapper.readValue(resource.getInputStream(), OpenFrameClientConfiguration.class);
 
-        clientConfigurationService.updateConfigurationFields(fromConfig);
+        auditCapture.runWhenChanged(DEVICE_CLIENT_UPDATE, DEVICE, null, Map.of("change", "downloadConfiguration"),
+                () -> clientConfigurationService.updateConfigurationFields(fromConfig, auditRecorder.currentEventId()));
 
         log.info("Initialized OpenFrame client configuration");
     }

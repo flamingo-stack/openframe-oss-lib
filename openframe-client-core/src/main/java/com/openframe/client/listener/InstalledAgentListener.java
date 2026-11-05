@@ -1,8 +1,12 @@
 package com.openframe.client.listener;
 
+import java.util.List;
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.data.nats.model.InstalledAgentMessage;
 import io.nats.client.Connection;
@@ -19,17 +23,20 @@ public class InstalledAgentListener extends AbstractJetStreamPushListener {
     private final ObjectMapper objectMapper;
     private final InstalledAgentService installedAgentService;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
+    private final AuditRecorder auditRecorder;
 
     public InstalledAgentListener(
             Connection natsConnection,
             ObjectMapper objectMapper,
             InstalledAgentService installedAgentService,
-            NatsTopicMachineIdExtractor machineIdExtractor
+            NatsTopicMachineIdExtractor machineIdExtractor,
+            AuditRecorder auditRecorder
     ) {
         super(natsConnection);
         this.objectMapper = objectMapper;
         this.installedAgentService = installedAgentService;
         this.machineIdExtractor = machineIdExtractor;
+        this.auditRecorder = auditRecorder;
     }
 
     @Override
@@ -75,7 +82,9 @@ public class InstalledAgentListener extends AbstractJetStreamPushListener {
                     machineId, agentType, version, deliveredCount);
 
             // Process the installed agent
-            installedAgentService.addInstalledAgent(machineId, agentType, version, lastAttempt);
+            AuditContext device = auditRecorder.context(AuditActor.fromAgent(machineId, List.of(), null));
+            auditRecorder.within(device,
+                    () -> installedAgentService.addInstalledAgent(machineId, agentType, version, lastAttempt));
 
             // Acknowledge successful processing
             message.ack();

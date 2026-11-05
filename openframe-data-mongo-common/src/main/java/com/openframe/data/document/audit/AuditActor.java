@@ -22,6 +22,10 @@ public record AuditActor(AuditActorType type, String id, String name, String ema
         return new AuditActor(SYSTEM, null, null, null, List.of(), null, null, null);
     }
 
+    public static AuditActor system(String onBehalfOfId) {
+        return new AuditActor(SYSTEM, null, null, null, List.of(), null, onBehalfOfId, null);
+    }
+
     public static AuditActor staff(String id) {
         return new AuditActor(STAFF, id, null, null, List.of(), null, null, null);
     }

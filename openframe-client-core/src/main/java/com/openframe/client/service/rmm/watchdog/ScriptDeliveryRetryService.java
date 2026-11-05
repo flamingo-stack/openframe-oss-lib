@@ -1,6 +1,7 @@
 package com.openframe.client.service.rmm.watchdog;
 
 import com.openframe.client.metrics.ScriptExecutionWatchdogMetrics;
+import com.openframe.client.service.rmm.ExecutionEndRecorder;
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore;
 import com.openframe.client.service.rmm.ScriptDeliveryRetryStore.RetryState;
 import com.openframe.data.document.delivery.DeliveryFailure;
@@ -45,6 +46,7 @@ public class ScriptDeliveryRetryService {
     private final DeliveryRepublisherRegistry deliveryRepublisherRegistry;
     private final MachineRepository machineRepository;
     private final DeliveryTracker deliveryTracker;
+    private final ExecutionEndRecorder executionEnds;
 
     @Value("${openframe.rmm.execution.retry.size}")
     private int retrySize;
@@ -198,6 +200,7 @@ public class ScriptDeliveryRetryService {
             return;
         }
         scriptExecutionRepository.saveAll(failed);
+        failed.forEach(executionEnds::expired);
         headerWatchdogService.finalizeAffectedHeaders(failed);
     }
 }

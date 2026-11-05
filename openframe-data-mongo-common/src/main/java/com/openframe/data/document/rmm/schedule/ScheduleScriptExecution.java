@@ -36,6 +36,7 @@ public class ScheduleScriptExecution implements TenantScoped {
     private String id;
 
     private String tenantId;
+    private String parentEventId;
 
     /** Correlation id shared with every leaf {@link ScriptExecution} row this fire produced. */
     @Indexed

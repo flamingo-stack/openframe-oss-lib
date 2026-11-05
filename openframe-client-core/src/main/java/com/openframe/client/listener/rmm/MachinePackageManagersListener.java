@@ -1,8 +1,11 @@
 package com.openframe.client.listener.rmm;
 
 import tools.jackson.databind.ObjectMapper;
+import com.openframe.audit.AuditContext;
+import com.openframe.audit.AuditRecorder;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.client.service.rmm.MachinePackageManagersService;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.data.nats.rmm.model.MachinePackageManagersMessage;
@@ -14,6 +17,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import static org.springframework.util.CollectionUtils.isEmpty;
@@ -25,18 +29,20 @@ public class MachinePackageManagersListener extends AbstractJetStreamPushListene
 
     private final ObjectMapper objectMapper;
     private final MachinePackageManagersService packageManagersService;
+    private final AuditRecorder auditRecorder;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
 
     public MachinePackageManagersListener(
             Connection natsConnection,
             ObjectMapper objectMapper,
             MachinePackageManagersService packageManagersService,
-            NatsTopicMachineIdExtractor machineIdExtractor
-    ) {
+            NatsTopicMachineIdExtractor machineIdExtractor,
+            AuditRecorder auditRecorder) {
         super(natsConnection);
         this.objectMapper = objectMapper;
         this.packageManagersService = packageManagersService;
         this.machineIdExtractor = machineIdExtractor;
+        this.auditRecorder = auditRecorder;
     }
 
     @Override
@@ -80,7 +86,8 @@ public class MachinePackageManagersListener extends AbstractJetStreamPushListene
             }
 
             log.debug("Processing package-managers report: machineId={} packageManagers={}", machineId, packageManagers);
-            packageManagersService.apply(machineId, report);
+            AuditContext device = auditRecorder.context(AuditActor.fromAgent(machineId, List.of(), null));
+            auditRecorder.within(device, () -> packageManagersService.apply(machineId, report));
 
             message.ack();
         } catch (JacksonException | IllegalArgumentException permanentlyBad) {

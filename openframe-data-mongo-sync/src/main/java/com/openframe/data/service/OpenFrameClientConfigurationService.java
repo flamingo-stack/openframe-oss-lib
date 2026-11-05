@@ -75,25 +75,27 @@ public class OpenFrameClientConfigurationService {
     }
 
     @RetryOnOptimisticLockingFailure
-    public void updateVersion(String newVersion) {
+    public boolean updateVersion(String newVersion, String parentEventId) {
         OpenFrameClientConfiguration config = get();
         String oldVersion = config.getVersion();
         if (Objects.equals(oldVersion, newVersion)) {
-            return;
+            return false;
         }
         config.setVersion(newVersion);
-        config.setPublishState(PublishState.pending());
+        config.setPublishState(PublishState.pending(parentEventId));
         save(config);
         log.info("Updated client configuration version {} -> {} and marked for publish", oldVersion, newVersion);
+        return true;
     }
 
     @RetryOnOptimisticLockingFailure
-    public void updateConfigurationFields(OpenFrameClientConfiguration fromConfig) {
-        repository.findByTenantId(tenantIdProvider.getTenantId())
-                .ifPresentOrElse(
-                        existing -> mergeAndSave(existing, fromConfig),
-                        () -> createForTenant(fromConfig)
-                );
+    public boolean updateConfigurationFields(OpenFrameClientConfiguration fromConfig, String parentEventId) {
+        Optional<OpenFrameClientConfiguration> existing = find();
+        if (existing.isEmpty()) {
+            createForTenant(fromConfig);
+            return false;
+        }
+        return mergeAndSave(existing.get(), fromConfig, parentEventId);
     }
 
     private void createForTenant(OpenFrameClientConfiguration fromConfig) {
@@ -105,7 +107,8 @@ public class OpenFrameClientConfigurationService {
         save(fromConfig);
     }
 
-    private void mergeAndSave(OpenFrameClientConfiguration existing, OpenFrameClientConfiguration fromConfig) {
+    private boolean mergeAndSave(OpenFrameClientConfiguration existing, OpenFrameClientConfiguration fromConfig,
+                                 String parentEventId) {
         List<DownloadConfiguration> existingDownloadConfiguration = existing.getDownloadConfiguration();
         List<DownloadConfiguration> fromConfigDownloadConfiguration = fromConfig.getDownloadConfiguration();
         boolean downloadChanged = !Objects.equals(existingDownloadConfiguration, fromConfigDownloadConfiguration);
@@ -113,10 +116,11 @@ public class OpenFrameClientConfigurationService {
         existing.setDownloadConfiguration(fromConfigDownloadConfiguration);
 
         if (downloadChanged) {
-            existing.setPublishState(PublishState.pending());
+            existing.setPublishState(PublishState.pending(parentEventId));
             log.info("Marked client configuration for publish: downloadChanged=true");
         }
 
         save(existing);
+        return downloadChanged;
     }
 }

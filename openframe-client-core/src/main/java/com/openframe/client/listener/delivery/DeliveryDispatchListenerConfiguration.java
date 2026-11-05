@@ -1,5 +1,8 @@
 package com.openframe.client.listener.delivery;
 
+import com.openframe.audit.AuditRecorder;
+import com.openframe.data.document.audit.AuditEntry;
+import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.kafka.config.KafkaJsonSerdes;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +27,8 @@ import org.springframework.util.backoff.FixedBackOff;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.openframe.data.document.audit.AuditAction.DEVICE_DELIVERY_END;
+
 // @EnableKafka travels with the @KafkaListener it enables: client-service scans no package that carries one, and a
 // @KafkaListener without it is ignored without a word (seen on a feature tenant: no consumer thread, nothing consumed)
 @Slf4j
@@ -39,6 +44,7 @@ public class DeliveryDispatchListenerConfiguration {
     static final BackOff ANYTHING_ELSE = new FixedBackOff(1_000L, 10);
 
     private final DeliveryMetrics metrics;
+    private final AuditRecorder auditRecorder;
 
     @Bean(CONTAINER_FACTORY)
     public ConcurrentKafkaListenerContainerFactory<Object, Object> deliveryDispatchListenerContainerFactory(
@@ -81,5 +87,11 @@ public class DeliveryDispatchListenerConfiguration {
         metrics.recordDispatchRejected(REJECTED_UNRECOVERABLE);
         log.error("Delivery hand-off given up, record skipped: machineId={} topic={} offset={}",
                 record.key(), record.topic(), record.offset(), failure);
+        auditRecorder.record(AuditEntry.builder()
+                .action(DEVICE_DELIVERY_END)
+                .outcome(AuditOutcome.FAILURE)
+                .reason(failure.getClass().getSimpleName())
+                .details(Map.of("key", String.valueOf(record.key()), "topic", record.topic(), "offset", record.offset()))
+                .build());
     }
 }
