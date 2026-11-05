@@ -26,7 +26,9 @@ class SignupSourceCookieTest {
         Touchpoint attribution = SignupSourceCookie.read(withCookie("id=" + DOWNLOAD_ID
                 + "&utm_source=google&utm_medium=cpc&utm_campaign=spring-launch&utm_content=hero-banner"
                 + "&utm_term=rmm-software&fbclid=IwAR0fb&gclid=Cj0KCQg&rdt_cid=t2-rdt&li_fat_id=li-fat-7"
-                + "&ref=acme-msp&referrer=www.google.com&landing_url=openframe.ai"));
+                + "&ref=acme-msp&referrer=www.google.com&landing_url=openframe.ai"
+                + "&gbraid=0AAAAApQxGbRaId&wbraid=CjkKCQjwWbRaId&fbc=fb.1.1729900000000.IwAR2FbClickId"
+                + "&fbp=fb.1.1729900000000.1234567890&rdt_uuid=1729900000000.6F1C2B3A-4d5e-6f70-8192-A3B4C5D6E7F8"));
 
         assertThat(attribution).isEqualTo(Touchpoint.builder()
                 .downloadId(DOWNLOAD_ID)
@@ -42,17 +44,6 @@ class SignupSourceCookieTest {
                 .ref("acme-msp")
                 .referrer("www.google.com")
                 .landingUrl("openframe.ai")
-                .build());
-    }
-
-    @Test
-    void read_gatewayCookieWithAdCookiesAndBraidIds_mapsThemAsWritten() {
-        Touchpoint attribution = SignupSourceCookie.read(withCookie("id=" + DOWNLOAD_ID
-                + "&gbraid=0AAAAApQxGbRaId&wbraid=CjkKCQjwWbRaId&fbc=fb.1.1729900000000.IwAR2FbClickId"
-                + "&fbp=fb.1.1729900000000.1234567890&rdt_uuid=1729900000000.6F1C2B3A-4d5e-6f70-8192-A3B4C5D6E7F8"));
-
-        assertThat(attribution).isEqualTo(Touchpoint.builder()
-                .downloadId(DOWNLOAD_ID)
                 .gbraid("0AAAAApQxGbRaId")
                 .wbraid("CjkKCQjwWbRaId")
                 .fbc("fb.1.1729900000000.IwAR2FbClickId")
