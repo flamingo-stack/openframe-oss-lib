@@ -14,6 +14,13 @@ import { ModelDisplay } from './model-display';
 import type { ChatInputRef, ModelDisplayProps } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 
+/**
+ * The top strip's corners: the card's radius (`rounded-md`, `--radius` - 2px) less the card's 1px border, so the strip
+ * meets the border's inner curve. At the card's own radius it sits 1px inside that curve and leaves a sliver of the
+ * card's fill at each corner. The card cannot clip it instead: the picker and the memory popover float out of it.
+ */
+const TOP_STRIP_ROUNDING_CLASS = 'rounded-t-[calc(var(--radius)_-_3px)]';
+
 /** Why the composer takes no input, in the user's words — shown where the prompt would be. */
 export interface ChatComposerLock {
   placeholder: string;
@@ -248,7 +255,7 @@ export function ChatComposer({
     // `border-b`) stack flush above the input; the card owns the border
     // / radius / focus ring. No `overflow-hidden` so the picker and the
     // memory popover can float above the input (whichever strip comes
-    // first gets `rounded-t`).
+    // first gets `TOP_STRIP_ROUNDING_CLASS`).
     // `has-[[data-editor]:focus]` (not `focus-within`) so the accent
     // border reacts ONLY to the composer editor — not the picker's search
     // input or item buttons, which also live inside this card. The editor
@@ -264,7 +271,7 @@ export function ChatComposer({
         resolveIcon={resolveContextIcon}
         disabled={sending || locked}
         leading={contextLeading}
-        className="rounded-t-md"
+        className={TOP_STRIP_ROUNDING_CLASS}
       />
       {selected.length > 0 && (
         <ChatContextChipStrip
@@ -275,7 +282,7 @@ export function ChatComposer({
           className={cn(
             'border-b border-ods-border bg-ods-bg p-2',
             // Only the TOP strip rounds into the card corner.
-            memory.length === 0 && !contextLeading && 'rounded-t-md',
+            memory.length === 0 && !contextLeading && TOP_STRIP_ROUNDING_CLASS,
           )}
         />
       )}
