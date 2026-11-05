@@ -143,9 +143,23 @@ public class SoftwareInventoryService {
                 });
     }
 
+    // Fleet lists a title only after its periodic host count, so a title just seen on a device can be unknown there
+    // while a policy already names it: the policy is enough to turn off, and nothing is written for an unknown id.
     public SoftwareResponse turnOffAutoUpdate(String softwareId, String actor) {
+        Optional<SoftwareResponse> title = findById(softwareId);
+        boolean inFleet = title.isPresent();
+        if (!isKnown(softwareId, inFleet)) {
+            throw new NotFoundException("Software not found: " + softwareId);
+        }
         autoUpdateService.turnOff(softwareId, actor);
-        return findById(softwareId).orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
+        SoftwareResponse software = title.orElseGet(() -> autoUpdateService.titleFromPolicies(softwareId));
+        List<SoftwareResponse> rows = List.of(software);
+        applyStatuses(rows);
+        return software;
+    }
+
+    private boolean isKnown(String softwareId, boolean inFleet) {
+        return inFleet || autoUpdateService.hasPolicy(softwareId);
     }
 
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,

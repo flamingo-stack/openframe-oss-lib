@@ -42,6 +42,22 @@ public class SoftwareAutoUpdateService {
         log.info("Auto-update turned off softwareId={} policies={} actor={}", softwareId, turnedOff, actor);
     }
 
+    public boolean hasPolicy(String softwareId) {
+        return policyRepository.existsByTenantIdAndSoftwareId(tenantIdProvider.getTenantId(), softwareId);
+    }
+
+    // A title Fleet does not list yet, named after the package its policies update.
+    public SoftwareResponse titleFromPolicies(String softwareId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<String> softwareIds = List.of(softwareId);
+        String name = policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, softwareIds).stream()
+                .map(PackageAutoUpdatePolicy::getPackageName)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(softwareId);
+        return SoftwareResponse.builder().id(softwareId).name(name).build();
+    }
+
     public void applyToSoftware(List<SoftwareResponse> rows) {
         List<String> softwareIds = ids(rows, SoftwareResponse::getId);
         if (softwareIds.isEmpty()) {
