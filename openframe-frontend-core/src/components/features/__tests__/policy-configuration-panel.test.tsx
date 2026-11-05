@@ -42,6 +42,43 @@ describe('PolicyConfigurationPanel', () => {
     expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
   });
 
+  it("centres a rule's level on its row and greys its tool icon", () => {
+    render(
+      <PolicyConfigurationPanel
+        categories={categories}
+        editMode={false}
+        onPolicyPermissionChange={() => {}}
+        onCategoryPermissionChange={() => {}}
+      />,
+    );
+    open();
+    const levels = screen.getAllByText('Ask User');
+    const column = levels.map(name => (name.parentElement as HTMLElement).parentElement as HTMLElement);
+    expect(
+      column.some(box => box.className.includes('content-md:flex') && box.className.includes('items-center')),
+    ).toBe(true);
+    expect(column.every(box => !box.className.includes('content-md:block'))).toBe(true);
+    const tile = (screen.getByText('Download files from web').parentElement as HTMLElement)
+      .previousElementSibling as HTMLElement;
+    expect(tile.className).toContain('text-ods-text-secondary');
+  });
+
+  it("lights an open category's rules frame with its header on hover", () => {
+    render(
+      <PolicyConfigurationPanel
+        categories={categories}
+        editMode={false}
+        onPolicyPermissionChange={() => {}}
+        onCategoryPermissionChange={() => {}}
+      />,
+    );
+    open();
+    const header = (screen.getByText('File Downloads').parentElement as HTMLElement).parentElement as HTMLElement;
+    const frame = header.nextElementSibling as HTMLElement;
+    expect(header.className).toContain('peer');
+    expect(frame.className).toContain('peer-hover:bg-ods-bg-hover');
+  });
+
   it('counts a category with one rule in the singular', () => {
     render(
       <PolicyConfigurationPanel

@@ -109,8 +109,8 @@ const PolicyRow: FC<{
 
   return (
     <div className="flex items-start gap-[var(--spacing-system-m)] border-b border-ods-border bg-ods-bg px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] last:border-b-0 content-md:items-center">
-      {/* Tool Icon */}
-      <div className={ICON_TILE_CLASS}>
+      {/* Tool Icon: grey, as the category's (Figma 1608-49526) */}
+      <div className={cn(ICON_TILE_CLASS, 'text-ods-text-secondary')}>
         <ToolIcon toolType={policy.toolName} size={16} />
       </div>
 
@@ -122,11 +122,12 @@ const PolicyRow: FC<{
         <p className="truncate text-ods-text-secondary text-h6" title={policy.commandPattern}>
           {policy.commandPattern}
         </p>
-        {level && <div className="mt-[var(--spacing-system-xsf)] content-md:hidden">{level}</div>}
+        {level && <div className="mt-[var(--spacing-system-xsf)] flex content-md:hidden">{level}</div>}
       </div>
 
-      {/* Approval Level column (desktop only) */}
-      {level && <div className="hidden shrink-0 content-md:block">{level}</div>}
+      {/* Approval Level column (desktop only). A flex box, not a block: a block's line box around the inline level
+          stood taller than the level and set it above the row's centre. */}
+      {level && <div className="hidden shrink-0 items-center content-md:flex">{level}</div>}
     </div>
   );
 };
@@ -174,7 +175,11 @@ const CategorySection: FC<{
       {/* Category Header */}
       <div
         {...loadingItemProps(props)}
-        className={cn(CATEGORY_HEADER_CLASS, !loading && 'cursor-pointer transition-colors hover:bg-ods-bg-hover')}
+        className={cn(
+          CATEGORY_HEADER_CLASS,
+          'peer',
+          !loading && 'cursor-pointer transition-colors hover:bg-ods-bg-hover',
+        )}
         onClick={loading ? undefined : () => onToggle(category.id)}
       >
         {/* Category Icon (static: the host's, else the default shield) */}
@@ -247,12 +252,15 @@ const CategorySection: FC<{
       <div
         style={{
           ...containerStyle,
-          transition: `${containerStyle.transition}, opacity 300ms ease-in-out, visibility 300ms`,
+          // background-color: the header's hover, in step with the header (`transition-colors`, 150ms).
+          transition: `${containerStyle.transition}, opacity 300ms ease-in-out, visibility 300ms, background-color 150ms cubic-bezier(0.4, 0, 0.2, 1)`,
           // visibility drops collapsed content from the tab order and a11y
           // tree; its discrete transition delays hiding until the fade ends.
           visibility: isExpanded ? 'visible' : 'hidden',
         }}
-        className={isExpanded ? 'opacity-100' : 'opacity-0'}
+        // Hovering the header lights the open category whole: the frame around its rules with the header, not the
+        // header alone over an unlit frame.
+        className={cn(isExpanded ? 'opacity-100' : 'opacity-0', !loading && 'peer-hover:bg-ods-bg-hover')}
       >
         <div ref={innerRef} className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
           <div className="overflow-hidden rounded-md border border-ods-border">
