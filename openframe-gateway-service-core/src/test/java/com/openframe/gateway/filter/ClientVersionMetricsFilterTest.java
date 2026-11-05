@@ -18,8 +18,6 @@ import reactor.core.publisher.Mono;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.ORIGIN;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -117,14 +115,12 @@ class ClientVersionMetricsFilterTest {
 
     @Test
     void filter_noClientHeaderWindowsAppOrigin_countedAsLegacyDesktop(CapturedOutput output) {
-        GatewayTrafficMetrics metrics = mock(GatewayTrafficMetrics.class);
-        filter = new ClientVersionMetricsFilter(metrics);
-
         runAs(SUB, MockServerHttpRequest.get(API_PATH)
                 .header(TENANT_HEADER, "tenant-a")
                 .header(ORIGIN, "http://tauri.localhost"));
 
-        verify(metrics).recordClientRequest("legacy-desktop", "-", "-");
+        assertThat(forwarded).isTrue();
+        assertThat(requests("legacy-desktop", "-", "-")).isEqualTo(1.0);
         assertThat(output.getOut()).contains("Client seen: tenantId=tenant-a sub=user-1 kind=legacy-desktop shell=- bundle=-");
     }
 
