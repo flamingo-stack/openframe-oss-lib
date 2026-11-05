@@ -18,6 +18,7 @@ import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
@@ -34,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -116,8 +118,9 @@ public class ScriptDispatchService {
         // so we never half-dispatch.
         deviceService.verifyDispatchable(machineIds);
 
-        // Resolve the saved script once; every machine shares it.
-        ScriptResponse script = scriptService.get(input.getScriptId());
+        // Resolve the saved script once; every machine shares it. An unsaved draft replaces only
+        // its body and shell, so the run keeps the script's stored env vars.
+        ScriptResponse script = withDraft(scriptService.get(input.getScriptId()), input.getScriptBody(), input.getShell());
         String executionId = UUID.randomUUID().toString();
 
         return dispatchBatch(executionId, script, machineIds, input.getPrivilegeLevel(),
@@ -292,6 +295,17 @@ public class ScriptDispatchService {
                 executionId, script.getId(), machineIds.size(), script.getShell(), privilegeLevel);
         return DispatchResponse.builder()
                 .executionId(executionId)
+                .build();
+    }
+
+    private static ScriptResponse withDraft(ScriptResponse script, String draftBody, ScriptShell draftShell) {
+        if (!StringUtils.hasText(draftBody)) {
+            return script;
+        }
+        ScriptShell shell = draftShell != null ? draftShell : script.getShell();
+        return script.toBuilder()
+                .scriptBody(draftBody)
+                .shell(shell)
                 .build();
     }
 

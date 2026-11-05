@@ -12,7 +12,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Data
-@Builder
+@Builder(toBuilder = true)
 public class ScriptResponse {
 
     private String id;
