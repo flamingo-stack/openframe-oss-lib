@@ -702,6 +702,8 @@ export interface DialogItem {
    *  `UnifiedChatState.activeDialog`, the host's own record of the open
    *  conversation; rows of the active list never carry it. */
   archived?: boolean;
+  /** The backend has not generated its title yet and will soon: a chat that refreshes reads it again sooner. */
+  awaitsTitle?: boolean;
 }
 
 // ========== Chat Sidebar Props ==========

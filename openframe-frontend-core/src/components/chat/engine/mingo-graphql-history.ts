@@ -73,6 +73,20 @@ const DIALOGS_BY_LAST_ACTIVITY = { field: 'lastActivityAt', direction: 'DESC' } 
 /** A dialog the list has not named yet: the backend names it once its first message is answered. */
 const UNTITLED_DIALOG = 'New Chat';
 
+/** How long after its creation an untitled dialog still waits for the title the backend generates. */
+const TITLE_WAIT_MS = 10 * 60_000;
+
+/** Untitled and young: its generated title is on its way. */
+function awaitsGeneratedTitle(node: MingoDialogNode): boolean {
+  if (node.title) return false;
+  const age = Date.now() - new Date(node.createdAt).getTime();
+  return Number.isFinite(age) && age >= 0 && age < TITLE_WAIT_MS;
+}
+
+function streamStateOf(node: MingoDialogNode): ChatDialogRecord['streamState'] {
+  return node.streamState === 'IDLE' || node.streamState === 'STREAMING' ? node.streamState : null;
+}
+
 /** A dialog as the lib's list rows and header read it. */
 export function dialogItemOfNode(node: MingoDialogNode, imageUrlOf?: (image: MingoImage) => string | null): DialogItem {
   const user = node.owner?.user;
@@ -82,6 +96,7 @@ export function dialogItemOfNode(node: MingoDialogNode, imageUrlOf?: (image: Min
     id: node.dialogId,
     archived: node.status === 'ARCHIVED',
     title: node.title || UNTITLED_DIALOG,
+    ...(awaitsGeneratedTitle(node) ? { awaitsTitle: true } : {}),
     timestamp: new Date(node.lastActivityAt ?? node.createdAt),
     ...(node.owner?.userId
       ? {
@@ -152,7 +167,11 @@ export function createMingoGraphqlDialogs(
     fetchDialog: async (dialogId: string): Promise<ChatDialogRecord | null> => {
       const data = await post<{ dialog: MingoDialogNode | null }>(MINGO_DIALOG_QUERY, { id: dialogId });
       if (!data.dialog) return null;
-      return { dialog: dialogItemOfNode(data.dialog, imageUrlOf), tokenUsage: tokenUsageOf(data.dialog, chatType) };
+      return {
+        dialog: dialogItemOfNode(data.dialog, imageUrlOf),
+        tokenUsage: tokenUsageOf(data.dialog, chatType),
+        streamState: streamStateOf(data.dialog),
+      };
     },
     renameDialog: (dialogId: string, title: string) =>
       mutate(MINGO_RENAME_DIALOG_MUTATION, 'renameDialog', { id: dialogId, title }),

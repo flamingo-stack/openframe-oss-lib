@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { fn } from 'storybook/test';
 
 import { EmbeddableChat, type EmbeddableChatHandle } from '../components/chat/embeddable-chat';
+import { ChatEngineProvider } from '../components/chat/engine/chat-engine-context';
 import { QuickActionChipButton } from '../components/chat/quick-action-chip';
 import type { UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import { PackageCheckIcon } from '../components/icons-v2-generated';
@@ -53,7 +54,7 @@ const MESSAGES_ROWS: StoryRow[] = [
 ];
 const MESSAGES = MESSAGES_ROWS.map(storyMessage);
 
-/** A static Mingo thread through the `mingoState` injection path: no transport. */
+/** A static Mingo thread through a host's engine (`ChatEngineProvider`): no transport. */
 function createState(conversation: boolean): UnifiedChatState {
   const noop = () => {};
   const asyncNoop = async () => {};
@@ -167,37 +168,43 @@ function Shell({ page: initialPage }: { page: Page }) {
       {/* The dock: no fixed height and no overflow clipping, so the composer's
           menus can open above it over the page. */}
       <div className="mx-auto w-full max-w-[900px] shrink-0">
-        <EmbeddableChat
-          ref={chatRef}
-          shell="inline"
-          appearance="v2"
-          closable={false}
-          open
-          onOpenChange={fn()}
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={page === 'home' ? NEW_CHAT : CONVERSATION}
-          mingoDialogCapabilities={{ canRename: true, canArchive: true, onCopyLink: fn() }}
-          threadContainer={onChat ? chatPage : null}
-          renameMode="inline"
-          showModel={page !== 'home'}
-          onModelClick={fn()}
-          modelTooltip="Change in Settings → AI Settings"
-          composerPlaceholder={page === 'home' ? 'Ask Mingo or describe a task…' : 'Reply to Mingo…'}
-          onDialogCreated={fn()}
-          composerMenuItems={
-            page === 'home'
-              ? undefined
-              : [
-                  {
-                    id: 'compact',
-                    label: 'Compact Chat Memory',
-                    icon: <PackageCheckIcon className="h-full w-full text-ods-text-secondary" />,
-                    onClick: fn(),
-                  },
-                ]
-          }
-        />
+        <ChatEngineProvider
+          engine={{
+            ...(page === 'home' ? NEW_CHAT : CONVERSATION),
+            dialogCapabilities: { canRename: true, canArchive: true, onCopyLink: fn() },
+          }}
+        >
+          <EmbeddableChat
+            ref={chatRef}
+            shell="inline"
+            appearance="v2"
+            closable={false}
+            open
+            onOpenChange={fn()}
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+
+            threadContainer={onChat ? chatPage : null}
+            renameMode="inline"
+            showModel={page !== 'home'}
+            onModelClick={fn()}
+            modelTooltip="Change in Settings → AI Settings"
+            composerPlaceholder={page === 'home' ? 'Ask Mingo or describe a task…' : 'Reply to Mingo…'}
+            onDialogCreated={fn()}
+            composerMenuItems={
+              page === 'home'
+                ? undefined
+                : [
+                    {
+                      id: 'compact',
+                      label: 'Compact Chat Memory',
+                      icon: <PackageCheckIcon className="h-full w-full text-ods-text-secondary" />,
+                      onClick: fn(),
+                    },
+                  ]
+            }
+          />
+        </ChatEngineProvider>
       </div>
     </div>
   );

@@ -5,8 +5,8 @@
  * not change, so an inline object literal from a host can be used as a
  * dependency without invalidating everything downstream of it on every render.
  *
- * Hosts write props inline (`mingoDialogCapabilities={{ canRename: true, … }}`),
- * which is a fresh object each render. Feed one into a `useMemo` dependency and
+ * An object derived each render (the citation numbers of a message's parts) is
+ * a fresh object each render. Feed one into a `useMemo` dependency and
  * that memo — and anything memoized on its result — recomputes forever. This
  * latches the reference and only swaps it when a shallow comparison of the
  * OWN enumerable keys actually differs.

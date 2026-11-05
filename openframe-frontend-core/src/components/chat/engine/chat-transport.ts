@@ -5,6 +5,13 @@
  * it reads and keeps its dialogs (`ChatHistoryBackend`). Everything a chunk does, every rule about the thread, is the
  * engine's (`useChatEngine`).
  *
+ * A transport is one of two kinds, fixed for the life of an engine:
+ *
+ *   - a LIVE TAIL (`ChatLiveTailTransport`): a send is published, and the answer arrives on a subscription to the
+ *     dialog (the NATS WebSocket, JetStream, the Tauri bridge). OpenFrame Mingo and the Fae client.
+ *   - a STREAM (`ChatStreamTransport`): a send is a request whose response IS the answer, a UI message stream (the hub's
+ *     SSE chat). The server may mint the dialog on the first send and say so in the stream (`dialogIdOf`).
+ *
  * The live tail is a HOOK (`useLiveTail`), because every live transport is one: the NATS WebSocket subscription, the
  * JetStream consumer, the Tauri bridge's. The engine calls it once per render; the function may be a new one each
  * render, as long as the hooks it calls are always the same.
@@ -15,6 +22,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ChatAttachment } from '../../../chat-protocol/attachment';
+import type { ChatFilePart, ChatMessage, ChatToolPart } from '../../../chat-protocol/chat-message';
+import type { UiChunk } from '../../../chat-protocol/ui-chunks';
 import type { NatsBeforeReconnect } from '../../../nats/shared-connection';
 import { useJetStreamDialogSubscription } from '../hooks/use-jetstream-dialog-subscription';
 import { useNatsDialogSubscription } from '../hooks/use-nats-dialog-subscription';
@@ -25,6 +35,7 @@ import type {
   FetchDialogsResult,
   UnifiedSendMessageOptions,
 } from '../types/unified-chat-state.types';
+import type { WireCommandOverride } from '../utils/slash-dispatch-utils';
 
 /** What the engine asks of a live tail. */
 export interface ChatLiveTailOptions {
@@ -47,8 +58,9 @@ export interface ChatLiveTailOptions {
 
 export type UseChatLiveTail = (options: ChatLiveTailOptions) => void;
 
-/** How a chat reaches its backend. */
-export interface ChatTransport {
+/** How a chat whose answers arrive on a live tail reaches its backend. */
+export interface ChatLiveTailTransport {
+  kind?: 'live-tail';
   useLiveTail: UseChatLiveTail;
   /** Whether the tail replays what it missed itself. Otherwise the engine back-fills from `fetchChunks` on reconnect. */
   replays?: boolean;
@@ -77,6 +89,63 @@ export interface ChatTransport {
   rejectEscalation?: (offerId: string) => void | Promise<void>;
 }
 
+/** One turn a stream transport sends: a message, or the answer to an approval card. */
+export type ChatStreamTurn =
+  | {
+      kind: 'message';
+      /** The open dialog, or null: the server mints one and names it in the stream (`dialogIdOf`). */
+      dialogId: string | null;
+      text: string;
+      /** What the composer attached, as the message's file parts. */
+      files: ChatFilePart[];
+      /** Narrows retrieval to one record (a card's "Discuss"). */
+      commandOverride?: WireCommandOverride;
+    }
+  | {
+      kind: 'approval';
+      dialogId: string | null;
+      /** The card's message: the answer continues it. */
+      message: ChatMessage;
+      /** The parts answered: the row named, and when it is in a batch, every row of the batch still waiting. */
+      parts: ChatToolPart[];
+      approved: boolean;
+      reason?: string;
+    };
+
+/** The server answered a turn and refused it: nothing ran. Its words, when it gave any, are `serverMessage`. */
+export class ChatTurnRefused extends Error {
+  constructor(
+    message: string,
+    readonly serverMessage: string | null,
+  ) {
+    super(message);
+    this.name = 'ChatTurnRefused';
+  }
+}
+
+/** How a chat whose answer is the response to its request reaches its backend. */
+export interface ChatStreamTransport {
+  kind: 'stream';
+  /**
+   * Send one turn, resolving to the answer as UI message chunks. Rejects with `ChatTurnRefused` when the server refused
+   * it, and with anything else when nobody knows whether it ran (a 5xx, a request that got no answer). An abort of
+   * `signal` ends the stream.
+   */
+  openTurn: (turn: ChatStreamTurn, signal: AbortSignal) => Promise<AsyncIterable<UiChunk>>;
+  /** The dialog a chunk names: the server mints the dialog on the first send and says which in the stream. */
+  dialogIdOf?: (chunk: UiChunk) => string | null;
+  /** The file parts a send's attachments become: the user's bubble draws them, the request carries them. */
+  filePartsOf?: (attachments: readonly ChatAttachment[]) => ChatFilePart[];
+  /**
+   * Retrieval can be narrowed to one record: a card's "Discuss" sends a prompt that does not name the record and narrows
+   * by its table (`commandOverride.entityIdFilter`). The table of a document type; null when it has none.
+   */
+  tableIdForDocumentType?: (documentType: string) => string | null;
+}
+
+/** How a chat reaches its backend. */
+export type ChatTransport = ChatLiveTailTransport | ChatStreamTransport;
+
 /** Page parameters of `fetchDialogMessages`. */
 export interface FetchDialogMessagesParams {
   dialogId: string;
@@ -84,11 +153,17 @@ export interface FetchDialogMessagesParams {
   limit?: number;
 }
 
-/** One page of persisted messages. `tokenUsage`, when a backend answers it with the page, fills the composer's readout. */
+/**
+ * One page of persisted messages: the backend's rows (`messages`, decoded by the engine), or rows already in the
+ * standard's message shape (`thread`). `tokenUsage`, when a backend answers it with the page, fills the composer's
+ * readout. `missing`: the backend answered that this dialog is not one the caller can read (deleted, someone else's).
+ */
 export interface FetchDialogMessagesResult {
-  messages: HistoricalMessage[];
+  messages?: HistoricalMessage[];
+  thread?: ChatMessage[];
   nextCursor: string | null;
   tokenUsage?: DialogTokenUsage | null;
+  missing?: boolean;
 }
 
 /** What a new dialog is created for: the app's name for it, the intent it opens for, the first message it will get. */
@@ -104,6 +179,8 @@ export interface ChatCreateDialogOptions {
 export interface ChatDialogRecord {
   dialog: DialogItem;
   tokenUsage?: DialogTokenUsage | null;
+  /** Whether an answer is being written on the backend now: an IDLE record read after the composer locked releases it. */
+  streamState?: 'IDLE' | 'STREAMING' | null;
 }
 
 /** How a chat reads and keeps its dialogs. Every field is a capability: absent, its affordance is hidden. */
@@ -123,6 +200,12 @@ export interface ChatHistoryBackend {
   archiveDialog?: (dialogId: string) => Promise<void>;
   fetchArchivedDialogs?: (params: FetchDialogsParams) => Promise<FetchDialogsResult>;
   unarchiveDialog?: (dialogId: string) => Promise<void>;
+}
+
+/** A remembered open dialog, read once when the engine mounts and written on every change (the hub keeps it locally). */
+export interface ChatRememberedDialog {
+  load: () => string | null;
+  save: (dialogId: string | null) => void;
 }
 
 /** The NATS client a tail connects with. */

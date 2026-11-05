@@ -44,10 +44,9 @@ export interface FetchDialogsResult {
 }
 
 /**
- * Dialog-management capabilities a transport exposes to `EmbeddableChat`.
- * Structurally identical to the host-injected `mingoDialogCapabilities`
- * prop — one shape, whether the list is host-owned (openframe `mingoState`)
- * or adapter-owned (`UnifiedChatState.dialogCapabilities`).
+ * Dialog-management capabilities a chat engine exposes to `EmbeddableChat`
+ * (`UnifiedChatState.dialogCapabilities`), whether the engine is the panel's
+ * own or one a host provides (`ChatEngineProvider`).
  */
 export interface ChatDialogCapabilities {
   /** Show "Rename Chat" in the row ⋯ menu and the conversation header. */
@@ -380,6 +379,9 @@ export interface UnifiedChatState {
 
   /** The thread's tail is a context compaction still running: the composer stays locked, as for a turn. */
   isCompacting?: boolean;
+
+  /** Read the open dialog's history again (a ticket reopened elsewhere), through the same door as its first read. */
+  reloadHistory?: () => void;
 
   /** Delete a dialog from history. No-op (resolves) when the adapter doesn't
    *  expose `deleteDialog`.

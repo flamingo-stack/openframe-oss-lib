@@ -5,6 +5,7 @@ import { fn } from 'storybook/test';
 
 import { MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from '../components/chat/chat-dimensions';
 import { EmbeddableChat } from '../components/chat/embeddable-chat';
+import { ChatEngineProvider } from '../components/chat/engine/chat-engine-context';
 import type { UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import {
   BracketCurlyIcon,
@@ -309,7 +310,7 @@ const MINGO_MESSAGES_ROWS: StoryRow[] = [
 ];
 const MINGO_MESSAGES = MINGO_MESSAGES_ROWS.map(storyMessage);
 
-/** A static Mingo thread through the `mingoState` injection path: no transport. */
+/** A static Mingo thread through a host's engine (`ChatEngineProvider`): no transport. */
 function createMingoState(): UnifiedChatState {
   const noop = () => {};
   const asyncNoop = async () => {};
@@ -384,22 +385,24 @@ function RealMingo({
 }: AppLayoutSidePanelRenderState & { thread: 'conversation' | 'new' }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <EmbeddableChat
-        shell="inline"
-        closable={canClose}
-        open
-        onOpenChange={open => {
-          if (!open) close();
-        }}
-        appearance="v2"
-        onCollapse={collapsesTo ? collapse : undefined}
-        collapseTo={collapsesTo === 'column' ? 'column' : 'list'}
-        onExpand={canExpand ? expand : undefined}
-        defaultActiveMode="mingo"
-        showInternalTrigger={false}
-        mingoState={thread === 'new' ? NEW_CHAT_STATE : MINGO_STATE}
-        mingoDialogCapabilities={MINGO_CAPABILITIES}
-      />
+      <ChatEngineProvider
+        engine={{ ...(thread === 'new' ? NEW_CHAT_STATE : MINGO_STATE), dialogCapabilities: MINGO_CAPABILITIES }}
+      >
+        <EmbeddableChat
+          shell="inline"
+          closable={canClose}
+          open
+          onOpenChange={open => {
+            if (!open) close();
+          }}
+          appearance="v2"
+          onCollapse={collapsesTo ? collapse : undefined}
+          collapseTo={collapsesTo === 'column' ? 'column' : 'list'}
+          onExpand={canExpand ? expand : undefined}
+          defaultActiveMode="mingo"
+          showInternalTrigger={false}
+        />
+      </ChatEngineProvider>
     </div>
   );
 }

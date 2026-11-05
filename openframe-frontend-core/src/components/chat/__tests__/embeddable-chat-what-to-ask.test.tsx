@@ -19,6 +19,7 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
 import type { ChatMessage } from '../../../chat-protocol/chat-message';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { WhatToAskContent } from '../hooks/use-what-to-ask';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
@@ -127,25 +128,27 @@ function Host({
     },
     dialogTokenUsage: null,
     connectionState: 'connected',
+    dialogCapabilities: {
+      canRename: true,
+      fetchArchivedDialogs: () => Promise.resolve({ dialogs: [], nextCursor: null }),
+    },
   };
   return (
-    <EmbeddableChat
-      ref={handleRef}
-      shell="inline"
-      appearance="v2"
-      defaultOpen
-      defaultActiveMode="mingo"
-      showInternalTrigger={false}
-      mingoState={state}
-      mingoDialogCapabilities={{
-        canRename: true,
-        fetchArchivedDialogs: () => Promise.resolve({ dialogs: [], nextCursor: null }),
-      }}
-      composerLock={locked ? { placeholder: 'Out of balance' } : null}
-      whatToAsk={whatToAsk}
-      onWhatToAsk={onWhatToAsk}
-      chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
-    />
+    <ChatEngineProvider engine={state}>
+      <EmbeddableChat
+        ref={handleRef}
+        shell="inline"
+        appearance="v2"
+        defaultOpen
+        defaultActiveMode="mingo"
+        showInternalTrigger={false}
+
+        composerLock={locked ? { placeholder: 'Out of balance' } : null}
+        whatToAsk={whatToAsk}
+        onWhatToAsk={onWhatToAsk}
+        chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
+      />
+    </ChatEngineProvider>
   );
 }
 

@@ -93,8 +93,9 @@ describe('useChatEngine over a replaying tail', () => {
         contextItems: [{ type: 'DEVICE', id: 'm1', label: 'Mac' }],
       }),
     );
+    // The answer's placeholder holds nothing yet, and a thread is drawn without an empty bubble.
     const drawn = texts(result.current.messages);
-    expect(drawn[drawn.length - 2]).toEqual(['user', 'next']);
+    expect(drawn[drawn.length - 1]).toEqual(['user', 'next']);
   });
 
   it("draws a history page's assistant rows as the assistant it is given", async () => {

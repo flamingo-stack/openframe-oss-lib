@@ -10,6 +10,7 @@ import { NO_CHAT_WIRE, readChatWire } from '../../../chat-protocol/__fixtures__/
 import { encodeUiChunk, encodeUiDone, type UiChunk } from '../../../chat-protocol/ui-chunks';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import { useSseChatAdapter } from '../hooks/use-sse-chat-adapter';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 import { ASK_AI_OPEN_WITH_REF_EVENT } from '../utils/ask-ai-events';
@@ -37,13 +38,9 @@ function Host({ onState }: { onState: (state: UnifiedChatState) => void }) {
   onState(state);
   return (
     <DialogPrimitive.Root open>
-      <EmbeddableChat
-        shell="none"
-        defaultOpen
-        defaultActiveMode="mingo"
-        showInternalTrigger={false}
-        mingoState={state}
-      />
+      <ChatEngineProvider engine={state}>
+        <EmbeddableChat shell="none" defaultOpen defaultActiveMode="mingo" showInternalTrigger={false} />
+      </ChatEngineProvider>
     </DialogPrimitive.Root>
   );
 }

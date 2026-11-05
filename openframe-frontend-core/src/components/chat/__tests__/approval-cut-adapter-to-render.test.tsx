@@ -11,7 +11,9 @@ import { NO_CHAT_WIRE, readChatWire } from '../../../chat-protocol/__fixtures__/
 import { CHAT_INTERRUPTED_NOTICE, encodeUiChunk, encodeUiDone } from '../../../chat-protocol/ui-chunks';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
-import { APPROVAL_OUTCOME_UNKNOWN, useSseChatAdapter } from '../hooks/use-sse-chat-adapter';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
+import { APPROVAL_OUTCOME_UNKNOWN } from '../engine/use-stream-turns';
+import { useSseChatAdapter } from '../hooks/use-sse-chat-adapter';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 // The chat wire the hub serves (`chat-wire.json`): the cases that read it are skipped when this run cannot read the hub.
@@ -39,13 +41,9 @@ function Host({ onState }: { onState: (state: UnifiedChatState) => void }) {
   onState(state);
   return (
     <DialogPrimitive.Root open>
-      <EmbeddableChat
-        shell="none"
-        defaultOpen
-        defaultActiveMode="mingo"
-        showInternalTrigger={false}
-        mingoState={state}
-      />
+      <ChatEngineProvider engine={state}>
+        <EmbeddableChat shell="none" defaultOpen defaultActiveMode="mingo" showInternalTrigger={false} />
+      </ChatEngineProvider>
     </DialogPrimitive.Root>
   );
 }

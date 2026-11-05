@@ -14,7 +14,7 @@ import {
   redeliveryGate,
   type ChatHistoryBackend,
   type ChatLiveTailOptions,
-  type ChatTransport,
+  type ChatLiveTailTransport,
   type FetchDialogMessagesResult,
 } from '../chat-transport';
 import { useChatEngine, type UseChatEngineConfig } from '../use-chat-engine';
@@ -29,9 +29,14 @@ const persisted: HistoricalMessage[] = [
   },
 ];
 
-function setup(config: Partial<UseChatEngineConfig> & { history?: ChatHistoryBackend } = {}) {
+function setup(
+  config: Partial<Omit<UseChatEngineConfig, 'transport'>> & {
+    history?: ChatHistoryBackend;
+    transport?: Partial<ChatLiveTailTransport>;
+  } = {},
+) {
   const tail: { current: ChatLiveTailOptions | null } = { current: null };
-  const transport: ChatTransport = {
+  const transport: ChatLiveTailTransport = {
     replays: true,
     useLiveTail: options => {
       tail.current = options;
@@ -157,7 +162,7 @@ describe('useChatEngine: sending', () => {
     const publish = vi.fn();
     const { result, tail } = setup({
       dialogId: 'd1',
-      transport: { awaitsSubscription: true, publish } as unknown as ChatTransport,
+      transport: { awaitsSubscription: true, publish },
     });
     await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
     let sent: Promise<void | boolean> | undefined;
@@ -177,7 +182,7 @@ describe('useChatEngine: sending', () => {
     const { result } = setup({
       dialogId: 'd1',
       sendFailureText: () => 'Could not send.',
-      transport: { publish } as unknown as ChatTransport,
+      transport: { publish },
     });
     await waitFor(() => expect(result.current.messages).toHaveLength(1));
     await act(async () => {
@@ -214,7 +219,7 @@ describe('useChatEngine: sending', () => {
     const { result, tail } = setup({
       dialogId: 'd1',
       onActionError,
-      transport: { approveEscalation } as unknown as ChatTransport,
+      transport: { approveEscalation },
     });
     await waitFor(() => expect(tail.current?.fromSeq).toBe(7));
     act(() => {

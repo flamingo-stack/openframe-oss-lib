@@ -19,6 +19,7 @@ import { createMingoDecoder } from '../../../chat-protocol/message-decoder';
 import type { UiChunk } from '../../../chat-protocol/ui-chunks';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import { createChatStreamReducer, type ChatStreamReducer } from '../stream/chat-stream-reducer';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
@@ -97,19 +98,17 @@ function chat(messages: UnifiedChatState['messages'], isLoading: boolean, over: 
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
         <DialogPrimitive.Root open>
-          <EmbeddableChat
-            shell="none"
-            defaultOpen
-            defaultActiveMode="mingo"
-            showInternalTrigger={false}
-            mingoState={createState({
+          <ChatEngineProvider
+            engine={createState({
               activeDialogId: 'd-1',
               messages,
               isLoading,
               streamingPhase: isLoading ? 'streaming' : 'idle',
               ...over,
             })}
-          />
+          >
+            <EmbeddableChat shell="none" defaultOpen defaultActiveMode="mingo" showInternalTrigger={false} />
+          </ChatEngineProvider>
         </DialogPrimitive.Root>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>

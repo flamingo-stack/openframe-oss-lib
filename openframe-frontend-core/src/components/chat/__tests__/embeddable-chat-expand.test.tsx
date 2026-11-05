@@ -15,6 +15,7 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
 
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { DialogItem } from '../types/component.types';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
@@ -91,21 +92,24 @@ function Host({
     actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
+    // An engine's panel owns a list.
+    dialogCapabilities: {},
   };
   return (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ChatRuntimeContext.Provider value={runtime}>
-        <EmbeddableChat
-          shell="inline"
-          appearance="v2"
-          closable={false}
-          open
-          onOpenChange={vi.fn()}
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          onExpand={onExpand}
-          mingoState={state}
-        />
+        <ChatEngineProvider engine={state}>
+          <EmbeddableChat
+            shell="inline"
+            appearance="v2"
+            closable={false}
+            open
+            onOpenChange={vi.fn()}
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+            onExpand={onExpand}
+          />
+        </ChatEngineProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>
   );

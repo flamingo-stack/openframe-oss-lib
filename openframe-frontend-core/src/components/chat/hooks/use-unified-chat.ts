@@ -2,11 +2,12 @@
 
 /**
  * useUnifiedChat — the single public entry point for the unified chat
- * surface. Dispatches between the SSE/Guide adapter and the chat engine
- * (`useChatEngine`, Mingo over a live-tail transport) based on the active
- * mode. Always calls both underlying
- * hooks (React rules of hooks) but only one is "live": the inactive
- * one stays idle (no streams, no subscriptions) while preserving its
+ * surface. Both modes run the one chat engine (`useChatEngine`): Guide over
+ * the hub's stream transport (`useSseChatAdapter`), Mingo over a live tail,
+ * or the engine a host provided above (`ChatEngineProvider`), which then
+ * stands for the Mingo mode and this hook runs no second one. Always calls
+ * both underlying hooks (React rules of hooks) but only one is "live": the
+ * inactive one stays idle (no streams, no subscriptions) while preserving its
  * local message buffer so a mode-flip restores the user to exactly
  * where they left off.
  *
@@ -20,12 +21,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useChatEngineContext } from '../engine/chat-engine-context';
 import { natsWsLiveTail } from '../engine/chat-transport';
 import { useChatEngine, type UseChatEngineConfig } from '../engine/use-chat-engine';
-import { EMPTY_DIALOG_CAPABILITIES } from '../types/unified-chat-state.types';
-import type { ChatDialogCapabilities, UnifiedChatState } from '../types/unified-chat-state.types';
+import type { UnifiedChatState } from '../types/unified-chat-state.types';
 import { useSseChatAdapter, type UseSseChatAdapterOptions } from './use-sse-chat-adapter';
-import { useStableShallow } from './use-stable-shallow';
 
 // =============================================================================
 // Modes
@@ -61,32 +61,6 @@ export interface UseUnifiedChatModes {
 export interface UseUnifiedChatOptions {
   modes: UseUnifiedChatModes;
   activeMode: ChatMode;
-
-  /**
-   * Pre-built Mingo-mode state, supplied by the host instead of letting
-   * the internal `useNatsChatAdapter` own it. When provided AND the active
-   * mode is `'mingo'`, this object is used verbatim as the active state and
-   * the internal NATS adapter stays idle (the host should also omit
-   * `modes.mingo` so no live subscription is opened here).
-   *
-   * This is the seam that lets a host keep chat data/streaming in its own
-   * store + cache (so it survives the panel unmounting) rather than in this
-   * hook's local React state. Guide mode is unaffected.
-   */
-  mingoStateOverride?: UnifiedChatState;
-
-  /**
-   * Conversation-list capabilities the host adds to a `mingoStateOverride`'s
-   * own: laid over the state's `dialogCapabilities` (the host's win), so a host
-   * that injects an engine's state adds what only it knows (the link to copy,
-   * Compact) without losing the engine's search, rename and archive.
-   *
-   * Supplying the override AT ALL declares that its panel owns a conversation
-   * list — an override with no capabilities still resolves to an empty object,
-   * never `undefined`, so such a host keeps its list surface exactly as before.
-   * Ignored unless the override is the active state.
-   */
-  injectedDialogCapabilities?: ChatDialogCapabilities;
 }
 
 // =============================================================================
@@ -115,7 +89,9 @@ function createDisabledEngineConfig(): UseChatEngineConfig {
 // =============================================================================
 
 export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState {
-  const { modes, activeMode, mingoStateOverride, injectedDialogCapabilities } = options;
+  const { modes, activeMode } = options;
+  // The engine a host runs once for its session: it is the Mingo mode, and none is run here beside it.
+  const hostEngine = useChatEngineContext();
 
   // The disabled fallback is built once, so a guide-only consumer doesn't churn the engine's state every render.
   const [disabledEngineConfig] = useState<UseChatEngineConfig>(createDisabledEngineConfig);
@@ -124,36 +100,17 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
   // plus an `active` flag that gates its live network work. Both
   // hooks are always called — only one is doing real work.
   const sseActive = activeMode === 'guide' && modes.guide !== undefined;
-  const natsActive = activeMode === 'mingo' && modes.mingo !== undefined;
+  const natsActive = activeMode === 'mingo' && modes.mingo !== undefined && hostEngine === null;
 
   const sseState = useSseChatAdapter(modes.guide ?? EMPTY_SSE_OPTIONS, {
     active: sseActive,
   });
   const natsState = useChatEngine(modes.mingo ?? disabledEngineConfig, { active: natsActive });
 
-  // Host-injected Mingo state wins when present: the internal `natsState`
-  // still runs (rules of hooks) but is idle (no `modes.mingo` → not active),
-  // and we hand the host's store-backed state straight through as active.
-  const activeState = activeMode === 'guide' ? sseState : (mingoStateOverride ?? natsState);
-  // The ONE place the injected state's capabilities are defaulted, because this
-  // is the ONE place that decides which state won. `EmbeddableChat` therefore
-  // reads a single resolved `dialogCapabilities` and never re-derives it from
-  // the mode.
-  const activeStateIsInjected = activeState === mingoStateOverride;
-  // Latched: hosts write the companion prop inline, and a fresh object each
-  // render would invalidate the state memo below (and every memo a consumer
-  // hangs off its identity) forever.
-  const stableInjected = useStableShallow(injectedDialogCapabilities);
-  const ownCapabilities = activeState.dialogCapabilities;
-  const injectedCapabilities = useMemo<ChatDialogCapabilities>(() => {
-    if (!stableInjected) return ownCapabilities ?? EMPTY_DIALOG_CAPABILITIES;
-    if (!ownCapabilities) return stableInjected;
-    return { ...ownCapabilities, ...stableInjected };
-  }, [ownCapabilities, stableInjected]);
-  const dialogCapabilities = activeStateIsInjected ? injectedCapabilities : ownCapabilities;
+  const activeState = activeMode === 'guide' ? sseState : (hostEngine ?? natsState);
+  const { dialogCapabilities } = activeState;
 
-  // Live ref to the active state. The injected `mingoState` (and the SSE/NATS
-  // adapters) hand back a NEW state object on EVERY streaming chunk
+  // Live ref to the active state. The engines hand back a NEW state object on EVERY streaming chunk
   // (`messages`/`streamingPhase`/`tokenUsage` change), so binding the forwards
   // below to `[activeState]` would recreate them each chunk. That churn
   // cascades into consumers' memo deps — most visibly `renderEntityCard` in

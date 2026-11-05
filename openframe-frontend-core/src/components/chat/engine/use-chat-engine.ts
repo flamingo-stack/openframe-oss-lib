@@ -1,13 +1,14 @@
 'use client';
 
 /**
- * useChatEngine: THE chat of every live-tail transport (the NATS WebSocket, JetStream, the Tauri bridge), as one
- * `UnifiedChatState`. A host hands it a transport (`ChatTransport`) and a history backend (`ChatHistoryBackend`), and
- * optionally the thread store to keep its threads in.
+ * useChatEngine: THE web chat, for every host (the hubs, OpenFrame Mingo, the Fae client), as one `UnifiedChatState`. A
+ * host hands it a transport (`ChatTransport`) and a history backend (`ChatHistoryBackend`), and optionally the thread
+ * store to keep its threads in.
  *
- *   transport.useLiveTail ─→ catch-up buffer ─→ useChatChunkProcessor ─→ ChatThreadStore (the reducers)
- *   history.fetchDialogMessages ─→ processHistoricalMessages ─→ store.hydrate
- *   transport.publish / stop / approve / reject ←─ the state's commands
+ *   live tail:  transport.useLiveTail ─→ catch-up buffer ─→ useChatChunkProcessor ─→ ChatThreadStore (the reducers)
+ *               transport.publish / stop / approve / reject ←─ the state's commands
+ *   stream:     transport.openTurn ─→ UiChunk ─→ ChatThreadStore (`useStreamTurns`), a send and an approval each a turn
+ *   history:    history.fetchDialogMessages ─→ processHistoricalMessages ─→ store.hydrate
  *
  * The store decides how long a thread lives. Without one the engine keeps its own, for the life of the component; a host
  * that hands in a module-level store (`createChatThreadStore`) keeps its threads across unmounts, so a chat reopened
@@ -23,19 +24,25 @@
  * `startNewDialog`), the composer lock of a compaction, a publish that waits for the tail (`awaitsSubscription`), the
  * optimistic answers of approvals and escalation offers, and a failed send's row.
  *
+ * What a chat did beside this before, each host on its own, is here too: the list's first page and the open dialog's
+ * record read again on a timer (`refresh`), a composer locked by a turn whose end never arrived released by an idle
+ * record, a history read again on request (`reloadHistory`), the viewer's own direct message closing the turn it opened,
+ * a card's Display (`slashCommands`), the link to copy (`copyDialogLink`) and the faces of history rows (`avatarUrlOf`).
+ *
  * `active` gates the network work (the tail, the back-fill, the list), so the unified chat can keep an engine mounted for
- * a mode that is not showing. The thread is kept.
+ * a mode that is not showing. The thread is kept. The transport's kind is fixed for the life of the engine.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { approvalRequestIdOf, type ChatMessage } from '../../../chat-protocol/chat-message';
+import { approvalRequestIdOf, type ChatMessage, type ChatMessageMetadata } from '../../../chat-protocol/chat-message';
+import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
 import type { ChatRef } from '../chat-ref.types';
 import { useChunkCatchup } from '../hooks/use-chunk-catchup';
 import { useManagedDialogList } from '../hooks/use-managed-dialog-list';
 import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
 import type { ChatApprovalStatus, ChunkData } from '../types';
 import type { AssistantType } from '../types/chat.types';
-import type { DialogItem } from '../types/component.types';
+import type { DialogItem, SlashCommandSummary } from '../types/component.types';
 import type { ChatMessageActions } from '../types/message.types';
 import type {
   ChatConnectionState,
@@ -43,25 +50,36 @@ import type {
   ChatNewDialogOptions,
   UnifiedChatState,
   UnifiedSendMessageOptions,
+  UnifiedUsageBreakdown,
 } from '../types/unified-chat-state.types';
 import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
 import { isCompactingTail } from '../utils/extract-incomplete-message-state';
 import { processHistoricalMessages } from '../utils/process-historical-messages';
+import { formatSingularLookupInvocation, sanitizeTitleForChat } from '../utils/slash-dispatch-utils';
 import {
   findLatestPendingId,
   pendingApprovalIdOf,
   pendingOfferIdOf,
+  threadForDisplay,
   withThreadAuthor,
   type ThreadAuthorNames,
 } from '../utils/thread-display';
 import { createChatThreadStore, type ChatThreadStore } from './chat-thread-store';
-import type { ChatDialogRecord, ChatHistoryBackend, ChatTransport, FetchDialogMessagesResult } from './chat-transport';
+import type {
+  ChatDialogRecord,
+  ChatHistoryBackend,
+  ChatRememberedDialog,
+  ChatTransport,
+  FetchDialogMessagesResult,
+  UseChatLiveTail,
+} from './chat-transport';
 import {
   useChatChunkProcessor,
   type ChatChunkObservers,
   type ChatDirectMessageRules,
 } from './use-chat-chunk-processor';
 import { useChatThread } from './use-chat-thread';
+import { useStreamTurns } from './use-stream-turns';
 
 export interface UseChatEngineConfig {
   transport: ChatTransport;
@@ -112,6 +130,38 @@ export interface UseChatEngineConfig {
   onActionError?: (action: ChatEngineAction, error: unknown) => void;
   /** Log what each chunk became. Read on every chunk. */
   debug?: () => boolean;
+  /** Where the open dialog is remembered across reloads (the hub keeps it locally). Read once, when the engine mounts. */
+  rememberDialog?: ChatRememberedDialog;
+  /** "Copy Chat Link" in the header and on every row: the host owns the address and the clipboard. */
+  copyDialogLink?: (dialog: DialogItem) => void;
+  /** A list that settled empty and unsearched lands on the composer: a public panel's first-time visitor asks at once. */
+  emptyListSkipsToCompose?: boolean;
+  /** The slash-command catalog: a card's "Display" runs the command of its table that declares the `display` action. */
+  slashCommands?: readonly SlashCommandSummary[];
+  /** The table of a document type, for Display and, over a stream, Discuss. Default the lib's map. */
+  tableIdForDocumentType?: (documentType: string) => string | null;
+  /** A row author's face as a full address: history rows carry the stored, relative one. */
+  avatarUrlOf?: (stored: string) => string | null | undefined;
+  /** The list's first page, the open dialog's record and a locked composer, asked about again on a timer. */
+  refresh?: ChatEngineRefresh;
+}
+
+/**
+ * What the engine asks again, and how often: titles a server generates, row statuses and dialogs started elsewhere
+ * arrive with no event, and a turn's end can be lost (a tail that died with it).
+ */
+export interface ChatEngineRefresh {
+  /** The list's first page and the open dialog's record are read again this often. */
+  intervalMs: number;
+  /** Sooner while a dialog the list or the record shows waits for its generated title (`DialogItem.awaitsTitle`). */
+  awaitingTitleMs?: number;
+  /**
+   * While the composer is locked, the open dialog's record is read this often, and one that says no answer is being
+   * written (`streamState: 'IDLE'`), read after the lock and after the last chunk, releases it.
+   */
+  busyMs?: number;
+  /** Whether a read may run now (a session that is signed out or hidden asks nothing). Default always. */
+  allowed?: () => boolean;
 }
 
 /** A card's answer the engine sends. */
@@ -124,6 +174,97 @@ export interface UseChatEngineOptions {
 
 /** The key of the "no dialog selected" thread. */
 const DRAFT_DIALOG_KEY = '__draft__';
+
+/** A stream transport has no tail. */
+const NO_TAIL_PORT: { useLiveTail: UseChatLiveTail } = { useLiveTail: () => undefined };
+
+/** A chat with no slash-command catalog has nothing to display a row with. */
+const NO_COMMANDS: readonly SlashCommandSummary[] = [];
+
+/** A one-thread chat selects nothing. */
+const NO_SELECTION = (_id: string | null): void => undefined;
+
+/** The slash-command action that shows a row's body in the chat verbatim. */
+const DISPLAY_ACTION_ID = 'display';
+
+function supportsDisplay(command: SlashCommandSummary): boolean {
+  return command.actions.some(action => action.id === DISPLAY_ACTION_ID);
+}
+
+/**
+ * The chat message that displays `reference`, or null when the catalog has no command for it: the command of the row's
+ * own table (`sourceRepo`, when a row knows it), else of its document type's, that declares the `display` action.
+ */
+export function displayCommandFor(
+  reference: ChatRef,
+  commands: readonly SlashCommandSummary[],
+  tableIdForDocumentType: (documentType: string) => string | null = defaultTableIdForDocumentType,
+): string | null {
+  const tableIds = [reference.sourceRepo, tableIdForDocumentType(reference.type)];
+  const command = tableIds
+    .filter((tableId): tableId is string => Boolean(tableId))
+    .map(tableId => commands.find(candidate => candidate.primarySourceId === tableId && supportsDisplay(candidate)))
+    .find((candidate): candidate is SlashCommandSummary => Boolean(candidate));
+  if (!command) return null;
+  // The slug is what the backend resolves fastest; the title the fallback and the id the last resort.
+  const slug = typeof reference.metadata?.slug === 'string' ? reference.metadata.slug : '';
+  const value = slug || sanitizeTitleForChat(reference.title) || reference.id;
+  return formatSingularLookupInvocation(`${command.id} ${DISPLAY_ACTION_ID}`, value);
+}
+
+/** The newest answer that has reported usage: the live turn's, or until it reports, the one before it. */
+function latestUsageOf(messages: readonly ChatMessage[]): NonNullable<ChatMessageMetadata['usage']> | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const usage = messages[i].metadata?.usage;
+    if (messages[i].role === 'assistant' && usage) return usage;
+  }
+  return null;
+}
+
+function isWireRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** The `breakdown` on a turn's usage is an opaque wire blob; these readers hand back what `UnifiedUsageBreakdown` holds. */
+function readTokenPair(value: unknown): { input: number; output: number } | undefined {
+  if (!isWireRecord(value) || typeof value.input !== 'number') return undefined;
+  // A pair that omitted `output` must not put `undefined` into a `number` field and NaN any downstream sum.
+  return { input: value.input, output: typeof value.output === 'number' ? value.output : 0 };
+}
+
+function readRoutedAnswer(value: unknown): { model: string; complexity: string; thinkingBudget: number } | undefined {
+  if (!isWireRecord(value) || typeof value.model !== 'string') return undefined;
+  return {
+    model: value.model,
+    complexity: typeof value.complexity === 'string' ? value.complexity : '',
+    thinkingBudget: typeof value.thinkingBudget === 'number' ? value.thinkingBudget : 0,
+  };
+}
+
+function usageBreakdownOf(raw: unknown): UnifiedUsageBreakdown | null {
+  if (!isWireRecord(raw)) return null;
+  return {
+    haikuRewriter: readTokenPair(raw.haikuRewriter),
+    haikuClassifier: readTokenPair(raw.haikuClassifier),
+    haikuSummarizer: readTokenPair(raw.haikuSummarizer),
+    routedAnswer: readRoutedAnswer(raw.routedAnswer),
+  };
+}
+
+/** A row's author face as a full address. One object per row, so the message memo holds. */
+const avatarResolved = new WeakMap<ChatMessage, { of: unknown; message: ChatMessage }>();
+function withAvatarUrl(message: ChatMessage, avatarUrlOf: (stored: string) => string | null | undefined): ChatMessage {
+  const cached = avatarResolved.get(message);
+  if (cached && cached.of === avatarUrlOf) return cached.message;
+  const author = message.metadata?.author;
+  const avatar = author?.avatar ? avatarUrlOf(author.avatar) : undefined;
+  const resolved =
+    !author?.avatar || !avatar || avatar === author.avatar
+      ? message
+      : { ...message, metadata: { ...message.metadata, author: { ...author, avatar } } };
+  avatarResolved.set(message, { of: avatarUrlOf, message: resolved });
+  return resolved;
+}
 
 /** How long a send waits for the tail to subscribe to its dialog (`awaitsSubscription`). */
 const SUBSCRIPTION_WAIT_MS = 30_000;
@@ -180,14 +321,24 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     sendFailureText = errorText,
     onActionError,
     debug,
+    rememberDialog,
+    copyDialogLink,
+    emptyListSkipsToCompose = false,
+    slashCommands = NO_COMMANDS,
+    tableIdForDocumentType = defaultTableIdForDocumentType,
+    avatarUrlOf,
+    refresh,
   } = config;
-  const { fetchDialogs, fetchDialogMessages, fetchArchivedDialogs, unarchiveDialog } = history;
+  const { fetchDialogs, fetchDialogMessages, fetchArchivedDialogs } = history;
+  // The kind is fixed for the engine's life: a live tail is a hook, called on every render or never.
+  const stream = transport.kind === 'stream' ? transport : null;
+  const liveTail = transport.kind === 'stream' ? null : transport;
 
   // The transport and the history as a host passes them, often a new object each render: every command reads them
   // here, so the state's commands keep their identity (the message memo compares `actions` by reference).
-  const portsRef = useRef({ transport, history, sendFailureText, onActionError, transformChunk });
+  const portsRef = useRef({ transport, history, sendFailureText, onActionError, transformChunk, rememberDialog });
   useEffect(() => {
-    portsRef.current = { transport, history, sendFailureText, onActionError, transformChunk };
+    portsRef.current = { transport, history, sendFailureText, onActionError, transformChunk, rememberDialog };
   });
 
   // ─── Active dialog ────────────────────────────────────────────────────────
@@ -196,14 +347,29 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   // leaves it to the engine.
   const isManagedMode = fetchDialogs !== undefined;
   const isControlled = !isManagedMode && controlledDialogId !== undefined;
-  const [internalDialogId, setInternalDialogId] = useState<string | null>(null);
+  const [internalDialogId, setInternalDialogId] = useState<string | null>(() => rememberDialog?.load() ?? null);
   const dialogId = isControlled ? (controlledDialogId ?? null) : internalDialogId;
+  // A stream chat with no list is one thread: the dialog its server minted is the engine's own business, never shown.
+  const showsDialogs = !stream || isManagedMode;
+
+  // The remembered dialog follows the selection.
+  useEffect(() => {
+    if (!isControlled) portsRef.current.rememberDialog?.save(internalDialogId);
+  }, [isControlled, internalDialogId]);
 
   // The committed dialog, for async continuations: one whose dialog is no longer active must not touch the new one.
   const currentDialogIdRef = useRef<string | null>(dialogId);
   useEffect(() => {
     currentDialogIdRef.current = dialogId;
   });
+
+  // A dialog a stream's server minted mid-turn: its thread stays under the key the turn writes into (the draft's), until
+  // the dialog is left.
+  const [mintedAlias, setMintedAlias] = useState<{ dialogId: string; key: string } | null>(null);
+  const keyOfDialog = useCallback(
+    (id: string | null): string => (id ? (mintedAlias?.dialogId === id ? mintedAlias.key : id) : DRAFT_DIALOG_KEY),
+    [mintedAlias],
+  );
 
   // ─── The thread ───────────────────────────────────────────────────────────
   // Approval statuses are id-keyed and GLOBAL across dialogs (a resolved approval must not come back actionable after a
@@ -213,8 +379,40 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     createChatThreadStore<string>({ options: () => ({ approvalStatuses: globalApprovalStatuses }) }),
   );
   const store = config.store ?? ownStore;
-  const dialogKey = dialogId ?? DRAFT_DIALOG_KEY;
+  const dialogKey = keyOfDialog(dialogId);
+  const dialogKeyRef = useRef(dialogKey);
+  useEffect(() => {
+    dialogKeyRef.current = dialogKey;
+  });
+  const keyOfDialogRef = useRef(keyOfDialog);
+  useEffect(() => {
+    keyOfDialogRef.current = keyOfDialog;
+  });
   const { state } = useChatThread(store, dialogKey);
+
+  /** The turn the open thread is in ends here: its message closed, the composer free. */
+  const closeTurn = useCallback(
+    (key: string) => {
+      store.mutate(key, r => {
+        r.apply({ chunks: [{ type: 'finish' }] });
+        r.setPhase('idle');
+      });
+    },
+    [store],
+  );
+
+  // The viewer's own direct message came back and no answer follows it: the turn the send opened is closed, so what
+  // comes next is not written into its placeholder, and the lock it took is lowered.
+  const chunkObservers = useMemo<ChatChunkObservers>(
+    () => ({
+      ...observers,
+      onOwnDirectEcho: seq => {
+        closeTurn(dialogKeyRef.current);
+        observers?.onOwnDirectEcho?.(seq);
+      },
+    }),
+    [observers, closeTurn],
+  );
 
   useEffect(() => {
     Object.assign(globalApprovalStatuses, state.approvalStatuses);
@@ -222,7 +420,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
 
   const processChunk = useChatChunkProcessor({
     thread: store.bind(dialogKey),
-    ...(observers ? { observers } : {}),
+    observers: chunkObservers,
     ...directMessages,
     ...(debug ? { debug } : {}),
   });
@@ -234,7 +432,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   const handleOfferRef = useRef<(offerId: string, approve: boolean) => Promise<void>>(async () => {});
   useEffect(() => {
     handleApproveRef.current = async (id: string) => {
-      const { approve } = portsRef.current.transport;
+      const port = portsRef.current.transport;
+      const approve = port.kind === 'stream' ? undefined : port.approve;
       if (!approve) return;
       // An approval hands the turn back to the agent: lock the composer now. Only the click that took the lock may
       // release it on a failure.
@@ -258,7 +457,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       }
     };
     handleRejectRef.current = async (id: string, reason?: string) => {
-      const { reject } = portsRef.current.transport;
+      const port = portsRef.current.transport;
+      const reject = port.kind === 'stream' ? undefined : port.reject;
       if (!reject) return;
       // No lock: a rejection keeps the composer free for a correction.
       const key = dialogKey;
@@ -274,8 +474,9 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     };
     // An offer resolves on the click, for the same reason: a failure puts it back as it was, asking again.
     handleOfferRef.current = async (offerId: string, approve: boolean) => {
-      const { approveEscalation, rejectEscalation } = portsRef.current.transport;
-      const answer = approve ? approveEscalation : rejectEscalation;
+      const port = portsRef.current.transport;
+      if (port.kind === 'stream') return;
+      const answer = approve ? port.approveEscalation : port.rejectEscalation;
       if (!answer) return;
       const key = dialogKey;
       store.mutate(key, r => r.projectApprovalResolution(offerId, approve ? 'approved' : 'rejected'));
@@ -292,11 +493,47 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     };
   });
 
+  // ─── The open dialog's own record ─────────────────────────────────────────
+  // A dialog reached by link, notification or reload is not necessarily in the list (archived, or past the pages read):
+  // its record gives the panel its title, owner and archived state, and says when the dialog does not resolve.
+  const [recordEntry, setRecordEntry] = useState<DialogRecordEntry | null>(null);
+  /** What a command just changed on a dialog, laid on its record (a rename, a restore) so the panel says it at once. */
+  const patchRecord = useCallback((id: string, patch: Partial<DialogItem>) => {
+    setRecordEntry(prev =>
+      prev && prev.dialogId === id && prev.record
+        ? { ...prev, record: { ...prev.record, dialog: { ...prev.record.dialog, ...patch } } }
+        : prev,
+    );
+  }, []);
+
   // ─── Dialog list (managed mode) ───────────────────────────────────────────
   const [isCreatingDialog, setIsCreatingDialog] = useState<boolean>(false);
   // The list's server-side search and owner scope: a change of either reloads its first page.
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogScope, setDialogScope] = useState<'my' | 'all'>('my');
+  // The backend's commands, each laying what it changed on the open dialog's record once it succeeded.
+  const backendRename = history.renameDialog;
+  const renameOnBackend = useMemo(
+    () =>
+      backendRename &&
+      (async (id: string, title: string) => {
+        await backendRename(id, title);
+        patchRecord(id, { title });
+      }),
+    [backendRename, patchRecord],
+  );
+  const backendArchive = history.archiveDialog;
+  const archiveOnBackend = useMemo(
+    () =>
+      backendArchive &&
+      (async (id: string) => {
+        await backendArchive(id);
+        patchRecord(id, { archived: true });
+      }),
+    [backendArchive, patchRecord],
+  );
+  // Leaving a dialog is the engine's, through the selection: a stream's open request goes with it.
+  const leaveDialogRef = useRef<(id: string) => void>(() => undefined);
   const {
     dialogs,
     isDialogsLoading,
@@ -308,11 +545,14 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     archiveDialog,
     deleteDialog,
     upsertDialogTop,
+    bumpDialogToTop,
+    patchDialog,
+    applyFreshFirstPage,
   } = useManagedDialogList({
     autoLoad: active,
     fetchDialogs,
-    renameDialog: history.renameDialog,
-    archiveDialog: history.archiveDialog,
+    renameDialog: renameOnBackend,
+    archiveDialog: archiveOnBackend,
     deleteDialog: history.deleteDialog,
     pageSize: dialogsPageSize,
     search: searchQuery || undefined,
@@ -320,9 +560,21 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     logTag: '[useChatEngine]',
     onDialogRemoved: (id, reason) => {
       if (reason === 'deleted') store.drop(id);
-      if (isManagedMode && internalDialogId === id) setInternalDialogId(null);
+      if (isManagedMode) leaveDialogRef.current(id);
     },
   });
+  const backendUnarchive = history.unarchiveDialog;
+  // A restored dialog is back in the list, and its record no longer says archived.
+  const unarchiveDialog = useMemo(
+    () =>
+      backendUnarchive &&
+      (async (id: string) => {
+        await backendUnarchive(id);
+        patchRecord(id, { archived: false });
+        reloadDialogs();
+      }),
+    [backendUnarchive, patchRecord, reloadDialogs],
+  );
 
   // ─── History ──────────────────────────────────────────────────────────────
   // Every page fact is TAGGED with its dialog, so a switch resets them by no longer matching: nothing is written from
@@ -349,33 +601,37 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       ? historySeq.seq
       : undefined;
 
-  // ─── The open dialog's own record ─────────────────────────────────────────
-  // A dialog reached by link, notification or reload is not necessarily in the list (archived, or past the pages read):
-  // its record gives the panel its title, owner and archived state, and says when the dialog does not resolve.
   const { fetchDialog } = history;
-  const [recordEntry, setRecordEntry] = useState<DialogRecordEntry | null>(null);
   const openRecord = recordEntry && recordEntry.dialogId === dialogId ? recordEntry : null;
+  /** How many times the open record was asked for again (the refresh timer): each one reads it once more. */
+  const [recordReads, setRecordReads] = useState(0);
   useEffect(() => {
     if (!active || !dialogId || !fetchDialog) return undefined;
     let current = true;
+    const key = keyOfDialogRef.current(dialogId);
     fetchDialog(dialogId)
       .then(record => {
         if (!current) return;
         setRecordEntry({ dialogId, record, error: record ? null : 'This conversation could not be found.' });
+        // A title the list does not have yet (generated since the list was read).
+        if (record) patchDialog(dialogId, { title: record.dialog.title });
         // The dialog's usage until the stream says more.
-        if (record?.tokenUsage && !store.snapshotOf(dialogId).state.dialogTokenUsage) {
-          store.mutate(dialogId, r => r.setDialogTokenUsage(record.tokenUsage ?? null));
+        if (record?.tokenUsage && !store.snapshotOf(key).state.dialogTokenUsage) {
+          store.mutate(key, r => r.setDialogTokenUsage(record.tokenUsage ?? null));
         }
       })
       .catch((err: unknown) => {
         if (!current) return;
         console.error('[useChatEngine] fetchDialog failed:', err);
-        setRecordEntry({ dialogId, record: null, error: errorText(err) });
+        // A read again that failed keeps what the first one said.
+        setRecordEntry(prev =>
+          prev && prev.dialogId === dialogId && prev.record ? prev : { dialogId, record: null, error: errorText(err) },
+        );
       });
     return () => {
       current = false;
     };
-  }, [active, dialogId, fetchDialog, store]);
+  }, [active, dialogId, fetchDialog, store, patchDialog, recordReads]);
 
   // The list's scope follows the open dialog once: someone else's dialog is on no tab but everyone's. Reconciled during
   // render, so the tab that cannot list it never shows for a frame; never back, which would fight a person's own pick.
@@ -394,7 +650,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   const hasConnectedOnceRef = useRef(false);
 
   // The back-fill of a tail that does not replay: chunks emitted while the engine was inactive or before the tail came up.
-  const backfills = !transport.replays;
+  const backfills = liveTail !== null && !liveTail.replays;
   const {
     processChunk: catchupProcessChunk,
     catchUpChunks,
@@ -405,7 +661,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   } = useChunkCatchup({
     dialogId: active && backfills ? dialogId : null,
     onChunkReceived: (chunk: ChunkData) => processChunk(chunk),
-    fetchChunks: transport.fetchChunks,
+    fetchChunks: liveTail?.fetchChunks,
   });
 
   // Monotonic guard: a slow page for a dialog the user has left must not land on the one they switched to.
@@ -428,9 +684,12 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     [fetchDialogMessages, messagesPageSize],
   );
 
+  // A dialog the backend says the caller cannot read, opened with nothing sent into it: it is left (`leaveDialogRef`).
+  const isStream = stream !== null;
   const applyHistoryPage = useCallback(
     (id: string, cursor: string | undefined, page: FetchDialogMessagesResult | 'failed' | null): void => {
       if (page === null) return;
+      const key = keyOfDialogRef.current(id);
       if (cursor === undefined) setLoadedFor(id);
       if (page === 'failed') {
         if (cursor === undefined) {
@@ -443,25 +702,40 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       }
       if (cursor === undefined) setHistoryFailedFor(prev => (prev === id ? null : prev));
       setOlderFailedFor(prev => (prev === id ? null : prev));
-      const { messages: processed } = processHistoricalMessages(page.messages, {
-        assistantName,
-        ...(assistantAvatar !== undefined ? { assistantAvatar } : {}),
-        assistantType,
-        chatTypeFilter,
-        approvalStatuses: store.snapshotOf(id).state.approvalStatuses,
-      });
+      if (cursor === undefined && page.missing) {
+        // Deleted, or no longer the caller's (claimed by an account this browser is signed out of): kept open, every
+        // later send would go into a dialog the server refuses to record. Unless the viewer has already written in it.
+        if (store.snapshotOf(key).messages.length === 0 && currentDialogIdRef.current === id) {
+          leaveDialogRef.current(id);
+        }
+        return;
+      }
+      const processed =
+        page.thread ??
+        processHistoricalMessages(page.messages ?? [], {
+          assistantName,
+          ...(assistantAvatar !== undefined ? { assistantAvatar } : {}),
+          assistantType,
+          chatTypeFilter,
+          approvalStatuses: store.snapshotOf(key).state.approvalStatuses,
+        }).messages;
       if (cursor === undefined) {
-        // The first page: THE hydration door. Adoption is armed only while a back-fill is still buffering, the replay
-        // that would consume it.
-        store.hydrate(id, processed, { expectingReplay: backfills && isBufferingActive() });
+        if (isStream && store.snapshotOf(key).messages.length > 0) {
+          // A send that went out before the history landed: nothing typed is lost, the history goes before it.
+          store.mutate(key, r => r.prependMessages(processed));
+        } else {
+          // The first page: THE hydration door. Adoption is armed only while a back-fill is still buffering, the replay
+          // that would consume it.
+          store.hydrate(key, processed, { expectingReplay: backfills && isBufferingActive() });
+        }
         setHistorySeq({ dialogId: id, seq: maxStreamSeq(processed) });
       } else {
-        store.mutate(id, r => r.prependMessages(processed));
+        store.mutate(key, r => r.prependMessages(processed));
       }
-      if (page.tokenUsage !== undefined) store.mutate(id, r => r.setDialogTokenUsage(page.tokenUsage ?? null));
+      if (page.tokenUsage !== undefined) store.mutate(key, r => r.setDialogTokenUsage(page.tokenUsage ?? null));
       setCursorEntry({ dialogId: id, cursor: page.nextCursor });
     },
-    [store, assistantName, assistantAvatar, assistantType, chatTypeFilter, isBufferingActive, backfills],
+    [store, assistantName, assistantAvatar, assistantType, chatTypeFilter, isBufferingActive, backfills, isStream],
   );
 
   const loadDialogHistory = useCallback(
@@ -474,25 +748,37 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   // read, so (re)entering one keeps its thread and its tail starts at the stream's start.
   const createdDialogsRef = useRef(new Set<string>());
 
-  // Reset and reload when the active dialog changes.
+  // Reset when the active dialog changes, and read its history once the engine is active: a dialog restored while the
+  // engine was idle (a mode not showing) is read when it becomes active.
   const prevDialogIdRef = useRef<string | null | undefined>(undefined);
+  const requestedForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (prevDialogIdRef.current === dialogId) return;
-    prevDialogIdRef.current = dialogId;
-    // Invalidates an in-flight page of the previous dialog, the clear path too.
-    historyLoadSeqRef.current += 1;
-    if (dialogId && createdDialogsRef.current.delete(dialogId)) {
-      setLoadedFor(dialogId);
-      setHistorySeq({ dialogId, seq: 0 });
-      return;
+    if (prevDialogIdRef.current !== dialogId) {
+      prevDialogIdRef.current = dialogId;
+      requestedForRef.current = null;
+      // Invalidates an in-flight page of the previous dialog, the clear path too.
+      historyLoadSeqRef.current += 1;
+      if (dialogId && createdDialogsRef.current.delete(dialogId)) {
+        requestedForRef.current = dialogId;
+        setLoadedFor(dialogId);
+        setHistorySeq({ dialogId, seq: 0 });
+        return;
+      }
+      // A clean slate for the (re)entered dialog; the statuses survive, topped up with the global map (the reducer's
+      // precedence: what the stream learned wins).
+      store.restart(dialogKey);
+      store.mergeApprovalStatuses(dialogKey, globalApprovalStatuses);
     }
-    // A clean slate for the (re)entered dialog; the statuses survive, topped up with the global map (the reducer's
-    // precedence: what the stream learned wins).
-    store.restart(dialogKey);
-    store.mergeApprovalStatuses(dialogKey, globalApprovalStatuses);
-    if (!active || !dialogId) return;
+    if (!active || !dialogId || requestedForRef.current === dialogId) return;
+    requestedForRef.current = dialogId;
     void loadDialogHistory(dialogId);
   }, [active, dialogId, dialogKey, store, globalApprovalStatuses, loadDialogHistory]);
+
+  /** The open dialog's history read again (a reopened ticket): its first page through the hydration door. */
+  const reloadHistory = useCallback(() => {
+    const id = currentDialogIdRef.current;
+    if (id) void loadDialogHistory(id);
+  }, [loadDialogHistory]);
 
   // The initial back-fill of a fresh dialog, beside the history: it buffers the raw chunks the tail may have missed.
   useEffect(() => {
@@ -583,11 +869,15 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     [settleSubscriptionWaiters],
   );
 
-  transport.useLiveTail({
+  // When the tail last delivered: a record that says the backend is idle is believed only if nothing came after it was asked.
+  const lastEventAtRef = useRef(0);
+  const tailPort = liveTail ?? NO_TAIL_PORT;
+  tailPort.useLiveTail({
     enabled: active && dialogId != null,
     dialogId,
     fromSeq,
     onEvent: (raw, messageType) => {
+      lastEventAtRef.current = Date.now();
       const payload = portsRef.current.transformChunk ? portsRef.current.transformChunk(raw) : raw;
       // Through the back-fill buffer, so its dedupe sees the live tail too; a replaying tail goes straight in.
       if (backfills) catchupProcessChunk(payload as ChunkData, messageType);
@@ -607,16 +897,58 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
 
   // "connecting" until the dialog's tail has produced an event; derived, so a switch reads "connecting" on its own.
   const connectionState: ChatConnectionState =
-    !active || !dialogId ? 'connected' : connectedForDialog === dialogId ? 'connected' : 'connecting';
+    !liveTail || !active || !dialogId ? 'connected' : connectedForDialog === dialogId ? 'connected' : 'connecting';
+
+  // ─── A stream's turns ─────────────────────────────────────────────────────
+  const streamTurns = useStreamTurns({
+    transport: stream,
+    store,
+    currentKey: () => dialogKeyRef.current,
+    currentDialogId: () => currentDialogIdRef.current,
+    // The server named the dialog this turn created: it is open, its thread the one the turn is writing, and its
+    // history is this turn (a read of it would put the same turn in twice once the server has stored it).
+    onMinted: (newId, key, hidden) => {
+      createdDialogsRef.current.add(newId);
+      setMintedAlias({ dialogId: newId, key });
+      setInternalDialogId(newId);
+      currentDialogIdRef.current = newId;
+      // The list shows it at once; the end-of-turn reload swaps in the server's title (the server owns titles).
+      if (isManagedMode && !hidden) upsertDialogTop({ id: newId, title: NEW_DIALOG_TITLE, timestamp: new Date() });
+    },
+    // The list follows the transcript: a first turn reads the list again (the row is stored by the time the stream
+    // ends), a later one moves its row to the top, as the server orders it.
+    onSettled: minted => {
+      if (!isManagedMode) return;
+      if (minted) reloadDialogs();
+      else if (currentDialogIdRef.current) bumpDialogToTop(currentDialogIdRef.current);
+    },
+  });
+  const {
+    send: sendTurn,
+    answer: answerTurn,
+    stop: stopTurn,
+    abort: abortStream,
+    streamOpen,
+    writingMessageId: writingMessageOfTurn,
+  } = streamTurns;
 
   // ─── Commands ─────────────────────────────────────────────────────────────
   /** Open a dialog the engine owns the selection of. A controlled host is told nothing: its `dialogId` is the dialog. */
   const openDialog = useCallback(
     (id: string | null) => {
-      if (!isControlled) setInternalDialogId(id);
+      if (isControlled || id === currentDialogIdRef.current) return;
+      // A stream still writing belongs to the thread being left.
+      abortStream();
+      setMintedAlias(null);
+      setInternalDialogId(id);
     },
-    [isControlled],
+    [isControlled, abortStream],
   );
+  useEffect(() => {
+    leaveDialogRef.current = id => {
+      if (currentDialogIdRef.current === id) openDialog(null);
+    };
+  });
 
   /** Create a dialog and open it; the list shows it at once. Null when it could not be created. */
   const createAndOpenDialog = useCallback(
@@ -660,6 +992,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
     async (key: string, targetDialogId: string | null, text: string, sendOptions: UnifiedSendMessageOptions) => {
       const { transport: port, sendFailureText: failureText } = portsRef.current;
       try {
+        if (port.kind === 'stream') throw new Error('A stream transport sends its own turns.');
         if (port.awaitsSubscription && targetDialogId && !(await awaitSubscription(targetDialogId))) {
           throw new Error('The chat could not connect. Please try again.');
         }
@@ -680,6 +1013,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
 
   const sendMessage = useCallback(
     async (text: string, sendOptions?: UnifiedSendMessageOptions): Promise<boolean> => {
+      if (isStream) return sendTurn(text, sendOptions);
       const hidden = sendOptions?.hidden ?? false;
       const send = { ...sendOptions, hidden };
       // A send with no dialog open creates one first, when the backend can: the message goes into it.
@@ -704,22 +1038,46 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       store.pushOptimisticSend(dialogKey, text, { hidden });
       return publishInto(dialogKey, dialogId, text, send);
     },
-    [store, dialogKey, dialogId, isControlled, createAndOpenDialog, publishInto, sendSupersedesPending],
+    [
+      store,
+      dialogKey,
+      dialogId,
+      isControlled,
+      createAndOpenDialog,
+      publishInto,
+      sendSupersedesPending,
+      isStream,
+      sendTurn,
+    ],
   );
 
   const stopMessage = useCallback(() => {
+    if (isStream) {
+      stopTurn();
+      return;
+    }
     store.mutate(dialogKey, r => r.setPhase('idle'));
-    const { stop } = portsRef.current.transport;
+    const port = portsRef.current.transport;
+    const stop = port.kind === 'stream' ? undefined : port.stop;
     if (stop && dialogId) {
       void stop(dialogId).catch((err: unknown) => {
         console.error('[useChatEngine] stop failed:', err);
       });
     }
-  }, [store, dialogKey, dialogId]);
+  }, [store, dialogKey, dialogId, isStream, stopTurn]);
 
   const clearMessages = useCallback(() => {
+    if (isStream) {
+      // A new chat: whatever is still streaming belongs to the thread being left, and the next send goes out with no
+      // dialog, so the server mints a fresh one.
+      abortStream();
+      store.flush();
+      store.mutate(dialogKey, r => r.reset());
+      openDialog(null);
+      return;
+    }
     store.mutate(dialogKey, r => r.clearThread());
-  }, [store, dialogKey]);
+  }, [store, dialogKey, isStream, abortStream, openDialog]);
 
   const selectDialog = openDialog;
 
@@ -772,65 +1130,197 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   }, []);
 
   // An escalation answer is offered only when the transport has one; the presence, not the function, is the capability.
-  const canApproveEscalation = transport.approveEscalation !== undefined;
-  const canRejectEscalation = transport.rejectEscalation !== undefined;
-  // What a message's controls do: a stable object, the message memo compares it by reference.
-  const actions = useMemo<ChatMessageActions>(
+  const canApproveEscalation = liveTail?.approveEscalation !== undefined;
+  const canRejectEscalation = liveTail?.rejectEscalation !== undefined;
+  // What a message's controls do: a stable object, the message memo compares it by reference. A stream answers no card
+  // while its request is open: the card's buttons read the absence (a turn may be loading while paused on its own card,
+  // so the gate is the stream's and not the panel's).
+  const asks = useMemo<ChatMessageActions>(
     () => ({
-      approve: id => handleApproveRef.current(id),
-      reject: (id, reason) => handleRejectRef.current(id, reason),
-      ...(canApproveEscalation
-        ? { approveEscalation: (offerId: string) => handleOfferRef.current(offerId, true) }
-        : {}),
-      ...(canRejectEscalation ? { rejectEscalation: (offerId: string) => handleOfferRef.current(offerId, false) } : {}),
       selectAsk: label => void sendMessage(label).catch(logSendFailure),
       pickSuggestion: prompt => void sendMessage(prompt).catch(logSendFailure),
     }),
-    [canApproveEscalation, canRejectEscalation, sendMessage, logSendFailure],
-  );
-
-  // "Ask" on a card: the agent has no record-filtered retrieval, so the prompt names the record and the agent reads it.
-  const discussRef = useCallback(
-    (reference: ChatRef) => {
-      void sendMessage(buildDiscussPrompt(reference, { includeReference: true })).catch(logSendFailure);
-    },
     [sendMessage, logSendFailure],
   );
+  const answers = useMemo<ChatMessageActions>(
+    () =>
+      isStream
+        ? { ...asks, approve: id => answerTurn(id, true), reject: (id, reason) => answerTurn(id, false, reason) }
+        : {
+            approve: id => handleApproveRef.current(id),
+            reject: (id, reason) => handleRejectRef.current(id, reason),
+            ...(canApproveEscalation
+              ? { approveEscalation: (offerId: string) => handleOfferRef.current(offerId, true) }
+              : {}),
+            ...(canRejectEscalation
+              ? { rejectEscalation: (offerId: string) => handleOfferRef.current(offerId, false) }
+              : {}),
+            ...asks,
+          },
+    [asks, isStream, answerTurn, canApproveEscalation, canRejectEscalation],
+  );
+  const actions = isStream && streamOpen ? asks : answers;
 
-  const { streamingPhase, writingMessageId, dialogTokenUsage = null, liveModel = null } = state;
-  // The thread as drawn: a row with no author of its own gets the chat's voice.
+  // "Ask" on a card. Over a stream retrieval narrows to the record (`entityIdFilter`), so the prompt need not name it;
+  // an agent on a live tail has no record-filtered retrieval, so the prompt names the record and the agent reads it.
+  const discussRef = useCallback(
+    (reference: ChatRef) => {
+      if (!isStream) {
+        void sendMessage(buildDiscussPrompt(reference, { includeReference: true })).catch(logSendFailure);
+        return;
+      }
+      const tableId = tableIdForDocumentType(reference.type);
+      const refId = (reference.id ?? '').trim();
+      if (!tableId || !refId) {
+        console.warn(`[useChatEngine] discussRef: no table or id for type="${reference.type}"; ignoring click`);
+        return;
+      }
+      void sendTurn(buildDiscussPrompt(reference), { commandOverride: { entityIdFilter: { tableId, id: refId } } });
+    },
+    [sendMessage, logSendFailure, isStream, tableIdForDocumentType, sendTurn],
+  );
+
+  // "Display" on a card: the catalog's display command of the row's table. Absent, not stubbed, while the catalog has
+  // none: the affordance is gated on its presence.
+  const canDisplay = slashCommands.some(supportsDisplay);
+  const displayRef = useMemo<UnifiedChatState['displayRef']>(() => {
+    if (!canDisplay) return undefined;
+    return (reference: ChatRef) => {
+      const text = displayCommandFor(reference, slashCommands, tableIdForDocumentType);
+      if (!text) {
+        console.warn(
+          `[useChatEngine] displayRef: no display command for type="${reference.type}" sourceRepo="${reference.sourceRepo}"; ignoring click`,
+        );
+        return;
+      }
+      void sendMessage(text).catch(logSendFailure);
+    };
+  }, [canDisplay, slashCommands, tableIdForDocumentType, sendMessage, logSendFailure]);
+
+  const { streamingPhase, dialogTokenUsage = null, liveModel = null } = state;
+  const writingMessageId = isStream ? writingMessageOfTurn(state.writingMessageId ?? null) : state.writingMessageId;
+  // The thread as drawn: one copy of each card (a live tail's history and its replay both hold them), a row with no
+  // author of its own given the chat's voice, and every face a full address.
   // `authors` is read by value, so a host that builds it inline does not redraw the thread each render.
   const hasAuthors = authors !== undefined;
   const authorName = authors?.assistant.name;
   const authorAvatar = authors?.assistant.avatar;
   const ownName = authors?.names.own ?? '';
   const otherName = authors?.names.other ?? '';
-  const messages = useMemo(
-    () =>
-      hasAuthors
-        ? state.messages.map(message =>
-            withThreadAuthor(message, { name: authorName, avatar: authorAvatar }, { own: ownName, other: otherName }),
-          )
-        : state.messages,
-    [state.messages, hasAuthors, authorName, authorAvatar, ownName, otherName],
-  );
-  // A compaction still running locks the composer as a turn does.
+  const messages = useMemo(() => {
+    const thread = isStream ? state.messages : threadForDisplay(state.messages);
+    if (!hasAuthors && !avatarUrlOf) return thread;
+    return thread.map(message => {
+      const authored = hasAuthors
+        ? withThreadAuthor(message, { name: authorName, avatar: authorAvatar }, { own: ownName, other: otherName })
+        : message;
+      return avatarUrlOf ? withAvatarUrl(authored, avatarUrlOf) : authored;
+    });
+  }, [state.messages, isStream, hasAuthors, authorName, authorAvatar, ownName, otherName, avatarUrlOf]);
+  // A compaction still running locks the composer as a turn does; a stream's `finish` ends the phase before its reader
+  // has stopped, and until it has a send would be refused, so the composer offers none.
   const isCompacting = isCompactingTail(state.messages);
-  const isLoading = streamingPhase !== 'idle' || isCompacting;
+  const isLoading = streamingPhase !== 'idle' || isCompacting || streamOpen;
   const hasMoreMessages = messagesNextCursor != null && olderFailedFor !== dialogId;
   // The open dialog's record: what the list may not hold.
   const activeDialog: DialogItem | null = openRecord?.record?.dialog ?? null;
 
-  // Always present: this engine's panel owns a dialog list. Each field is gated on its own callback.
+  // ─── Asked again on a timer ───────────────────────────────────────────────
+  const { intervalMs: refreshMs, awaitingTitleMs, busyMs, allowed: refreshAllowed } = refresh ?? {};
+  const refreshAllowedRef = useRef(refreshAllowed);
+  useEffect(() => {
+    refreshAllowedRef.current = refreshAllowed;
+  });
+  const awaitingTitle = dialogs.some(dialog => dialog.awaitsTitle) || activeDialog?.awaitsTitle === true;
+  const listRefreshMs = awaitingTitle && awaitingTitleMs ? awaitingTitleMs : refreshMs;
+  const listSearch = searchQuery || undefined;
+  useEffect(() => {
+    if (!active || !listRefreshMs) return undefined;
+    let current = true;
+    const timer = setInterval(() => {
+      if (refreshAllowedRef.current && !refreshAllowedRef.current()) return;
+      if (fetchDialogs) {
+        fetchDialogs({
+          limit: dialogsPageSize,
+          ...(listSearch !== undefined ? { search: listSearch } : {}),
+          ...(dialogScopes ? { scope: dialogScope } : {}),
+        })
+          .then(page => {
+            if (current) applyFreshFirstPage(page);
+          })
+          .catch(() => {
+            // The next tick asks again; the list on screen stays as it is.
+          });
+      }
+      setRecordReads(count => count + 1);
+    }, listRefreshMs);
+    return () => {
+      current = false;
+      clearInterval(timer);
+    };
+  }, [
+    active,
+    listRefreshMs,
+    fetchDialogs,
+    dialogsPageSize,
+    listSearch,
+    dialogScopes,
+    dialogScope,
+    applyFreshFirstPage,
+  ]);
+
+  // A locked composer whose turn's end never arrived (a tail that died with it, an approval that was answered and never
+  // went on): an IDLE record, asked for after the lock and after the last chunk, with nothing arriving while it was read,
+  // releases it.
+  const busy = streamingPhase !== 'idle';
+  const busySinceRef = useRef(0);
+  useEffect(() => {
+    if (busy) busySinceRef.current = Date.now();
+  }, [busy, dialogId]);
+  useEffect(() => {
+    if (!active || !busy || !busyMs || !dialogId || !fetchDialog || isStream) return undefined;
+    let current = true;
+    const id = dialogId;
+    const timer = setInterval(() => {
+      if (refreshAllowedRef.current && !refreshAllowedRef.current()) return;
+      const askedAt = Date.now();
+      if (askedAt - busySinceRef.current < busyMs) return;
+      void fetchDialog(id)
+        .then(record => {
+          if (!current || currentDialogIdRef.current !== id) return;
+          const nothingSince = lastEventAtRef.current < askedAt && busySinceRef.current < askedAt;
+          if (record?.streamState === 'IDLE' && nothingSince) closeTurn(keyOfDialogRef.current(id));
+        })
+        .catch(() => {
+          // Asked again on the next tick.
+        });
+    }, busyMs);
+    return () => {
+      current = false;
+      clearInterval(timer);
+    };
+  }, [active, busy, busyMs, dialogId, fetchDialog, isStream, closeTurn]);
+
+  // ─── The conversation list's capabilities ─────────────────────────────────
+  // A live-tail chat's panel owns a dialog list, one with no affordances without `fetchDialogs`; a stream chat with no
+  // list is one thread, and reports none. Each field is gated on its own callback.
   const { compactDialog } = history;
-  const dialogCapabilities = useMemo<ChatDialogCapabilities>(
-    () => ({
-      canRename: isManagedMode && !!history.renameDialog,
-      canArchive: isManagedMode && !!history.archiveDialog,
-      fetchArchivedDialogs: isManagedMode ? fetchArchivedDialogs : undefined,
-      unarchiveDialog: isManagedMode ? unarchiveDialog : undefined,
-      ...(isManagedMode ? { searchQuery, onSearchChange: setSearchQuery } : {}),
-      ...(isManagedMode && compactDialog
+  const dialogCapabilities = useMemo<ChatDialogCapabilities | undefined>(() => {
+    if (!isManagedMode) {
+      return isStream
+        ? undefined
+        : { canRename: false, canArchive: false, fetchArchivedDialogs: undefined, unarchiveDialog: undefined };
+    }
+    return {
+      canRename: !!history.renameDialog,
+      canArchive: !!history.archiveDialog,
+      fetchArchivedDialogs,
+      unarchiveDialog,
+      searchQuery,
+      onSearchChange: setSearchQuery,
+      ...(copyDialogLink ? { onCopyLink: copyDialogLink } : {}),
+      ...(emptyListSkipsToCompose ? { emptyListSkipsToCompose } : {}),
+      ...(compactDialog
         ? {
             compactDialog: (dialog: DialogItem) => {
               void compactDialog(dialog.id).catch((err: unknown) => {
@@ -839,17 +1329,24 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
             },
           }
         : {}),
-    }),
-    [
-      isManagedMode,
-      history.renameDialog,
-      history.archiveDialog,
-      fetchArchivedDialogs,
-      unarchiveDialog,
-      searchQuery,
-      compactDialog,
-    ],
-  );
+    };
+  }, [
+    isManagedMode,
+    isStream,
+    history.renameDialog,
+    history.archiveDialog,
+    fetchArchivedDialogs,
+    unarchiveDialog,
+    searchQuery,
+    copyDialogLink,
+    emptyListSkipsToCompose,
+    compactDialog,
+  ]);
+
+  // ─── What a turn says about its model and its tokens ──────────────────────
+  // Over a stream each answer reports its own usage; over a live tail the dialog's running usage does.
+  const turnUsage = useMemo(() => (isStream ? latestUsageOf(state.messages) : null), [isStream, state.messages]);
+  const usageBreakdown = useMemo(() => usageBreakdownOf(turnUsage?.breakdown), [turnUsage]);
 
   return useMemo<UnifiedChatState>(
     () => ({
@@ -863,18 +1360,21 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       stopMessage,
       clearMessages,
       discussRef,
-      // The model: a live `message-metadata` chunk, else the host's baseline. Tokens: the dialog's usage.
+      displayRef,
+      reloadHistory,
+      // The model: a live `message-metadata` chunk, else the host's baseline.
       currentProvider: liveModel?.provider ?? modelProvider ?? null,
       currentModelLabel: liveModel?.modelLabel ?? modelLabel ?? null,
       currentContextWindowMaxTokens: dialogTokenUsage?.contextSize ?? liveModel?.contextWindowMaxTokens ?? null,
-      currentInputTokens: dialogTokenUsage?.inputTokensSize ?? null,
-      currentOutputTokens: dialogTokenUsage?.outputTokensSize ?? null,
-      currentCacheHitRatePct: null,
-      currentUsageBreakdown: null,
+      currentInputTokens: turnUsage ? (turnUsage.inputTokens ?? null) : (dialogTokenUsage?.inputTokensSize ?? null),
+      currentOutputTokens: turnUsage ? (turnUsage.outputTokens ?? null) : (dialogTokenUsage?.outputTokensSize ?? null),
+      currentContextTokens: turnUsage?.contextTokens ?? null,
+      currentCacheHitRatePct: turnUsage?.hit_rate_pct ?? null,
+      currentUsageBreakdown: usageBreakdown,
       dialogs,
-      activeDialogId: dialogId,
+      activeDialogId: showsDialogs ? dialogId : null,
       activeDialog,
-      selectDialog,
+      selectDialog: showsDialogs ? selectDialog : NO_SELECTION,
       startNewDialog,
       deleteDialog,
       renameDialog,
@@ -882,7 +1382,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       isDialogsLoading: isDialogsLoading || isCreatingDialog,
       dialogsError,
       reloadDialogs,
-      isMessagesLoading,
+      isMessagesLoading: showsDialogs && isMessagesLoading,
+      ...(isStream ? { isHydratingHistory: isMessagesLoading } : {}),
       hasMoreDialogs,
       loadMoreDialogs,
       ...(dialogScopes ? { dialogScope, setDialogScope } : {}),
@@ -905,8 +1406,11 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       stopMessage,
       clearMessages,
       discussRef,
+      displayRef,
+      reloadHistory,
       dialogs,
       dialogId,
+      showsDialogs,
       activeDialog,
       dialogScopes,
       dialogScope,
@@ -922,6 +1426,7 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       reloadDialogs,
       isCreatingDialog,
       isMessagesLoading,
+      isStream,
       hasMoreDialogs,
       loadMoreDialogs,
       hasMoreMessages,
@@ -931,6 +1436,8 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
       liveModel,
       modelProvider,
       modelLabel,
+      turnUsage,
+      usageBreakdown,
       connectionState,
     ],
   );

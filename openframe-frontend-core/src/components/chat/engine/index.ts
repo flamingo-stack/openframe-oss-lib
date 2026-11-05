@@ -5,6 +5,7 @@
  * its transport (NATS WebSocket, JetStream, the Tauri bridge, the hub's SSE) and its configuration.
  */
 
+export { ChatEngineProvider, useChatEngineContext, type ChatEngineProviderProps } from './chat-engine-context';
 export {
   createChatThreadStore,
   type BoundChatThread,
@@ -29,6 +30,7 @@ export {
 } from './use-chat-chunk-processor';
 export { useChatThread } from './use-chat-thread';
 export {
+  ChatTurnRefused,
   jetStreamLiveTail,
   natsWsLiveTail,
   redeliveryGate,
@@ -37,18 +39,25 @@ export {
   type ChatDialogRecord,
   type ChatHistoryBackend,
   type ChatLiveTailOptions,
+  type ChatLiveTailTransport,
   type ChatNatsConnection,
+  type ChatRememberedDialog,
+  type ChatStreamTransport,
+  type ChatStreamTurn,
   type ChatTransport,
   type FetchDialogMessagesParams,
   type FetchDialogMessagesResult,
   type UseChatLiveTail,
 } from './chat-transport';
 export {
+  displayCommandFor,
   useChatEngine,
   type ChatEngineAction,
+  type ChatEngineRefresh,
   type UseChatEngineConfig,
   type UseChatEngineOptions,
 } from './use-chat-engine';
+export { APPROVAL_OUTCOME_UNKNOWN, APPROVAL_REFUSED } from './use-stream-turns';
 export {
   createMingoGraphqlDialogs,
   createMingoGraphqlHistory,

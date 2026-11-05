@@ -15,6 +15,7 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
 
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { ChatContextPickerConfig } from '../types/context-item.types';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
@@ -81,19 +82,20 @@ function renderChat(contextPicker: ChatContextPickerConfig | undefined) {
   render(
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
-        <EmbeddableChat
-          ref={handle}
-          shell="inline"
-          appearance="v2"
-          closable={false}
-          open
-          onOpenChange={vi.fn()}
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={newChatState()}
-          contextPicker={contextPicker}
-          rail="none"
-        />
+        <ChatEngineProvider engine={newChatState()}>
+          <EmbeddableChat
+            ref={handle}
+            shell="inline"
+            appearance="v2"
+            closable={false}
+            open
+            onOpenChange={vi.fn()}
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+            contextPicker={contextPicker}
+            rail="none"
+          />
+        </ChatEngineProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,
   );

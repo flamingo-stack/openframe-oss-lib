@@ -76,6 +76,7 @@ import { ChatMessageSources } from './chat-message-sources';
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context';
 import { ChatPanelHeader, type ChatPanelHeaderProps } from './chat-panel-header';
 import type { ChatRef } from './chat-ref.types';
+import { useChatEngineContext } from './engine/chat-engine-context';
 import { renderChatInlineEntityCard } from './entity-cards/dispatch';
 import type { ChatCardDispatchExtras } from './entity-cards/dispatch';
 import { GuideModeBanner } from './guide-mode-banner';
@@ -104,11 +105,7 @@ import { RecordActionsProvider } from './record-actions';
 import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
-import type {
-  ChatDialogCapabilities,
-  UnifiedChatState,
-  UnifiedSendMessageOptions,
-} from './types/unified-chat-state.types';
+import type { ChatDialogCapabilities, UnifiedSendMessageOptions } from './types/unified-chat-state.types';
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
 import { chatDayLabel } from './utils/chat-day-label';
 import { resolveIcon } from './utils/icon-library';
@@ -186,7 +183,7 @@ export interface EmbeddableChatProps {
    * static visual — every hover state and click is blocked (via
    * `pointer-events-none` on the panel body) and the composer no longer
    * auto-focuses. Use it to embed the chat as a marketing/hero mock (e.g. a
-   * scripted `mingoState` thread) that should look live but not respond to the
+   * scripted engine's thread) that should look live but not respond to the
    * cursor. Scrolling is intentionally disabled too. Defaults to `false`.
    */
   previewMode?: boolean;
@@ -227,34 +224,6 @@ export interface EmbeddableChatProps {
    * history (each mode keeps its own local thread).
    */
   modes?: UseUnifiedChatModes;
-
-  /**
-   * Pre-built Mingo-mode state, supplied by the host instead of letting the
-   * built-in NATS adapter own it. When provided, the panel renders Mingo mode
-   * from this object and opens no subscription of its own — the host keeps
-   * chat data + streaming in its own store/cache so it survives the panel
-   * unmounting (no `keepMounted` needed). The host should then NOT pass
-   * `modes.mingo` (Guide-mode wiring via `modes.guide` is unaffected).
-   */
-  mingoState?: UnifiedChatState;
-
-  /**
-   * Dialog-management capabilities for injected Mingo mode (`mingoState`).
-   *
-   * Laid over the injected state's own `dialogCapabilities` (these win), so a
-   * host that injects an engine's state adds what only it knows (Copy link,
-   * Compact) and keeps the engine's search, rename and archive. A state with
-   * none of its own takes these alone. Default OFF: the row ⋯ menu and the
-   * archive page appear only when the state or the host opts in, so nothing
-   * advertises an action nobody wired. Ignored unless `mingoState` is set.
-   *
-   * Same shape an adapter reports through `UnifiedChatState.dialogCapabilities`
-   * (`ChatDialogCapabilities`) — one type, whether the list is host-owned or
-   * adapter-owned. `onCopyLink` adds "Copy Chat Link" to the header ⋯ menu and
-   * every row menu; the host owns the URL shape and the clipboard write.
-   * `compactDialog` adds "Compact Chat Memory" to the same menus.
-   */
-  mingoDialogCapabilities?: ChatDialogCapabilities;
 
   /**
    * Controlled active-mode. When provided, `onActiveModeChange` MUST
@@ -462,7 +431,7 @@ export interface EmbeddableChatProps {
    * Host content pinned between the thread and the composer: the thread
    * scrolls above it, the composer stays below, and it keeps its place while
    * the thread grows (e.g. a guided tour the host attaches to one
-   * conversation, deciding by `mingoState.activeDialogId`). Rendered wherever
+   * conversation, deciding by its engine's `activeDialogId`). Rendered wherever
    * the composer is - a conversation or the new-chat surface - and never on
    * the chat list. Sized by its content: a tall block is the host's to cap or
    * scroll. `null`/unset leaves the layout as it was.
@@ -517,7 +486,7 @@ export interface EmbeddableChatProps {
    * Its ⋯ is the chat's, Compact included. The composer never remounts
    * when this changes, so the draft, staged context, picker and uploads
    * survive it; the thread remounts in each new container and opens on the
-   * latest message (its data is the host's `mingoState`). Meant for
+   * latest message (its data is the host's engine, `ChatEngineProvider`). Meant for
    * `shell="inline"`; the host must not clip the composer's root — the
    * context picker, `@` / slash menus and the memory popover open above it.
    * The portalled thread paints no background: the host paints the area that
@@ -586,6 +555,12 @@ export interface EmbeddableChatProps {
    * dialog the host creates itself (outside this panel's sends).
    */
   onDialogCreated?: (dialogId: string) => void;
+  /**
+   * Called as a send from this panel goes out (the composer, a quick-action chip, a clarification card, the Guide
+   * launcher prompt), with the dialog it goes into, or null when it will create one. What a host does around a send
+   * (raise the conversation over the page, follow the chat it creates) is here; the send itself is the engine's.
+   */
+  onMessageSent?: (send: { dialogId: string | null }) => void;
   /**
    * Host-set ghost text in the composer: the same non-destructive preview a
    * hovered quick-action chip shows (the prompt that clicking it would send),
@@ -834,8 +809,6 @@ function EmbeddableChatInner({
   extras,
   tableIdForDocumentType,
   modes,
-  mingoState,
-  mingoDialogCapabilities,
   activeMode: controlledActiveMode,
   onActiveModeChange,
   activeAgentSlug,
@@ -878,6 +851,7 @@ function EmbeddableChatInner({
   renameMode = 'modal',
   safeAreaBottom = true,
   onDialogCreated,
+  onMessageSent,
   composerPreviewText = null,
   handleRef,
 }: EmbeddableChatProps & { handleRef?: React.Ref<EmbeddableChatHandle> }) {
@@ -1018,9 +992,11 @@ function EmbeddableChatInner({
     return { guide: guideOptions };
   }, [modes, tableIdForDocumentType]);
 
-  // "Does Mingo mode exist?" — true via either the callback config OR injected
-  // state. Gates the guide↔mingo back-chevron and the guide-mode banner.
-  const hasMingoMode = !!effectiveModes.mingo || !!mingoState;
+  // The engine a host runs once for its session (`ChatEngineProvider`): it is this panel's Mingo mode.
+  const hostEngine = useChatEngineContext();
+  // "Does Mingo mode exist?" — true via either the callback config OR the host's engine. Gates the guide↔mingo
+  // back-chevron and the guide-mode banner.
+  const hasMingoMode = !!effectiveModes.mingo || !!hostEngine;
 
   // Initial active mode picks the first configured slot when neither
   // controlled `activeMode` nor `defaultActiveMode` is provided. Guide
@@ -1160,8 +1136,6 @@ function EmbeddableChatInner({
   } = useUnifiedChat({
     modes: effectiveModes,
     activeMode,
-    mingoStateOverride: mingoState,
-    injectedDialogCapabilities: mingoDialogCapabilities,
   });
 
   // THE conversation-list gate. `dialogCapabilities` is present iff the ACTIVE
@@ -1181,9 +1155,14 @@ function EmbeddableChatInner({
   // switch. Every send path goes through here — the composer, a clarification
   // card, a quick-action chip, the Guide launcher prompt.
   const [namingNewChat, setNamingNewChat] = useState(false);
+  const onMessageSentRef = useRef(onMessageSent);
+  useEffect(() => {
+    onMessageSentRef.current = onMessageSent;
+  });
   const sendMessage = useCallback(
     async (text: string, options?: UnifiedSendMessageOptions) => {
       if (activeDialogId == null) setNamingNewChat(true);
+      onMessageSentRef.current?.({ dialogId: activeDialogId ?? null });
       try {
         return await sendMessageRaw(text, options);
       } finally {
@@ -1523,7 +1502,7 @@ function EmbeddableChatInner({
   // this is correct.
   //
   // Mingo mode is EXCLUDED on purpose: its bubbles can belong to DIFFERENT
-  // participants, whose name/avatar come from the host (`mingoState` messages) —
+  // participants, whose name/avatar come from the host's engine messages —
   // a different identity source. Overlaying the current viewer's identity there
   // stamped the viewer's photo onto EVERY user's bubble (the reported bug). When
   // not in guide mode these stay `undefined`, so Mingo bubbles use only their
@@ -1802,7 +1781,7 @@ function EmbeddableChatInner({
   // history has loaded (`hasMessages`). Driving the surface + content branch
   // off this makes the normal-chat open animate identically to the archived
   // one instead of lagging behind the message fetch.
-  // In `previewMode`, the host drives the whole state (`mingoStateOverride`) and
+  // In `previewMode`, the host drives the whole state (its engine) and
   // there is no dialog manager to set `isOpeningDialog`. So an embedded preview
   // that wants a message-list skeleton (real header + composer, skeleton bubbles)
   // signals it via `isMessagesLoading` — treat that as an open conversation so

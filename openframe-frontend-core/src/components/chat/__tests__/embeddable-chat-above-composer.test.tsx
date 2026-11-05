@@ -23,6 +23,7 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
 
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
@@ -81,6 +82,8 @@ function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
     actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
+    // An engine's panel owns a list.
+    dialogCapabilities: {},
     ...overrides,
   };
 }
@@ -91,15 +94,16 @@ function renderPanel(state: UnifiedChatState, aboveComposer?: ReactNode, threadC
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
         <DialogPrimitive.Root open>
-          <EmbeddableChat
-            shell="none"
-            defaultOpen
-            defaultActiveMode="mingo"
-            showInternalTrigger={false}
-            mingoState={state}
-            aboveComposer={aboveComposer}
-            threadContainer={threadContainer}
-          />
+          <ChatEngineProvider engine={state}>
+            <EmbeddableChat
+              shell="none"
+              defaultOpen
+              defaultActiveMode="mingo"
+              showInternalTrigger={false}
+              aboveComposer={aboveComposer}
+              threadContainer={threadContainer}
+            />
+          </ChatEngineProvider>
         </DialogPrimitive.Root>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,

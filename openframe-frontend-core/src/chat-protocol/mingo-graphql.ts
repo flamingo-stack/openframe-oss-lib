@@ -333,6 +333,103 @@ export const MINGO_DIALOG_QUERY = `
   }
 `;
 
+// ─── The chat's commands ─────────────────────────────────────────────────────
+// What every OpenFrame chat sends to the ai-agent's `/chat/graphql` (OpenFrame's Mingo and tickets, the Fae client). A
+// refused command answers HTTP 200 with `userErrors`, whose `code` is the one the REST endpoints these replace answered.
+
+/** Create a dialog: `dialog.dialogId` is the raw id NATS subjects (`chat.<dialogId>.*`) are keyed by. */
+export const MINGO_CREATE_DIALOG_MUTATION = `
+  mutation CreateDialog($input: CreateDialogInput!) {
+    createDialog(input: $input) {
+      dialog { dialogId }
+      userErrors { field message code }
+    }
+  }
+`;
+
+/** Send a message into a dialog: the answer arrives on the dialog's live tail. */
+export const MINGO_SEND_MESSAGE_MUTATION = `
+  mutation SendMessage($input: SendMessageInput!) {
+    sendMessage(input: $input) {
+      userErrors { field message code }
+    }
+  }
+`;
+
+/** Stop the running answer. Without one: `ILLEGAL_STATE`. */
+export const MINGO_STOP_DIALOG_GENERATION_MUTATION = `
+  mutation StopDialogGeneration($input: StopDialogGenerationInput!) {
+    stopDialogGeneration(input: $input) {
+      userErrors { field message code }
+    }
+  }
+`;
+
+/** Approve or reject a pending tool approval, by its raw request id. */
+export const MINGO_RESOLVE_APPROVAL_REQUEST_MUTATION = `
+  mutation ResolveApprovalRequest($input: ResolveApprovalRequestInput!) {
+    resolveApprovalRequest(input: $input) {
+      userErrors { field message code }
+    }
+  }
+`;
+
+/** Switch a dialog between the AI answering and a person answering (admin tokens only). */
+export const MINGO_UPDATE_DIALOG_MODE_MUTATION = `
+  mutation UpdateDialogMode($input: UpdateDialogModeInput!) {
+    updateDialogMode(input: $input) {
+      userErrors { field message code }
+    }
+  }
+`;
+
+/** Who the ai-agent answers for, and the chat a message goes into. */
+export type MingoAgentType = 'ADMIN' | 'CLIENT';
+export type MingoDialogMode = 'AI' | 'DIRECT';
+
+/** An entity a message carries as context: a device, a ticket, an incident. */
+export interface MingoContextItemInput {
+  type: string;
+  id: string;
+}
+
+export interface MingoCreateDialogInput {
+  agentType?: MingoAgentType;
+  ticketId?: string;
+  insightId?: string;
+  mode?: MingoDialogMode;
+  /** ADMIN dialogs in AI mode only: Mingo opens the dialog with a canned greeting for this intent. */
+  intent?: string;
+}
+
+export interface MingoSendMessageInput {
+  dialogId: string;
+  content: string;
+  chatType: MingoChatType;
+  contextItems?: MingoContextItemInput[];
+  currentView?: MingoContextItemInput;
+  recentViews?: MingoContextItemInput[];
+  /** The list page open when the message was sent, so "these" means the rows matching its filters. */
+  currentList?: object;
+  /** The page open when the message was sent: its kind and the name the user sees. */
+  currentPage?: object;
+}
+
+export interface MingoStopDialogGenerationInput {
+  id: string;
+  chatType: MingoChatType;
+}
+
+export interface MingoResolveApprovalRequestInput {
+  id: string;
+  approve: boolean;
+}
+
+export interface MingoUpdateDialogModeInput {
+  id: string;
+  mode: MingoDialogMode;
+}
+
 export const MINGO_RENAME_DIALOG_MUTATION = `
   mutation RenameDialog($input: RenameDialogInput!) {
     renameDialog(input: $input) {
@@ -414,7 +511,7 @@ export interface MingoDialogsConnection {
 
 /** A mutation's own refusals. */
 export interface MingoUserErrors {
-  userErrors?: Array<{ field?: string | null; message: string; code?: string | null }> | null;
+  userErrors?: Array<{ field?: string[] | null; message: string; code?: string | null }> | null;
 }
 
 /** A mutation that refused says why: its first user error's message. */

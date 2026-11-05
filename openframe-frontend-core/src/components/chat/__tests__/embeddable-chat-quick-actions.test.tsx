@@ -13,6 +13,7 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
 
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
@@ -75,17 +76,18 @@ function renderChat({ onClick }: { onClick?: () => void } = {}) {
   render(
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
-        <EmbeddableChat
-          shell="inline"
-          appearance="v2"
-          defaultOpen
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={emptyState(sendMessage)}
-          mingoWelcome={{
-            quickActions: [{ id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick }],
-          }}
-        />
+        <ChatEngineProvider engine={emptyState(sendMessage)}>
+          <EmbeddableChat
+            shell="inline"
+            appearance="v2"
+            defaultOpen
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+            mingoWelcome={{
+              quickActions: [{ id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick }],
+            }}
+          />
+        </ChatEngineProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,
   );

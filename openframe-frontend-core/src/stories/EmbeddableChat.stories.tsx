@@ -5,6 +5,7 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { within, userEvent } from 'storybook/test';
 import { EmbeddableChat } from '../components/chat/embeddable-chat';
+import { ChatEngineProvider } from '../components/chat/engine/chat-engine-context';
 import type { FetchDialogMessagesResult } from '../components/chat/engine/chat-transport';
 import { natsWsEngineConfig, type UseNatsChatAdapterConfig } from '../components/chat/hooks/use-nats-chat-adapter';
 import type { SlashCommandSummary } from '../components/chat/hooks/use-slash-commands';
@@ -842,7 +843,7 @@ const SCRIPTED_MESSAGES = SCRIPTED_MESSAGES_ROWS.map(storyMessage);
 
 /**
  * Fully-stubbed `UnifiedChatState` factory. This is the "inject a static Mingo
- * thread" path (`EmbeddableChat`'s `mingoState` prop): the panel renders this
+ * thread" path (a host's engine, `ChatEngineProvider`): the panel renders this
  * object directly and opens NO NATS subscription. Every action is a no-op so
  * the scene stays read-only. `isLoading: true` + `streamingPhase: 'thinking'`
  * drives the trailing "Mingo is working" dots loader under the command block.
@@ -896,7 +897,7 @@ function createScriptedMingoState(): UnifiedChatState {
  * "Check machines with weak password" → a PowerShell `run_script` command block
  * (executing) → Mingo working (dots).
  *
- * Rendered via the `mingoState` injection path with `shell="none"`, so the chat
+ * Rendered through a host's engine (`ChatEngineProvider`) with `shell="none"`, so the chat
  * body sits inline inside our own 440-wide framed box (matching the Figma
  * frame) with zero backend — no NATS, no fetch, fully static + read-only.
  *
@@ -917,15 +918,17 @@ export const ScriptedConversation: Story = {
     <DialogPrimitive.Root open>
       <div className="fixed inset-0 z-[10] flex items-center justify-center bg-ods-bg p-6">
         <div className="h-[560px] w-[440px] overflow-hidden rounded-[6px] border border-ods-border shadow-2xl">
-          <EmbeddableChat
-            shell="none"
-            defaultOpen
-            defaultActiveMode="mingo"
-            showInternalTrigger={false}
-            previewMode
-            mingoState={createScriptedMingoState()}
-            mingoDialogCapabilities={{ canRename: true, canArchive: true }}
-          />
+          <ChatEngineProvider
+            engine={{ ...createScriptedMingoState(), dialogCapabilities: { canRename: true, canArchive: true } }}
+          >
+            <EmbeddableChat
+              shell="none"
+              defaultOpen
+              defaultActiveMode="mingo"
+              showInternalTrigger={false}
+              previewMode
+            />
+          </ChatEngineProvider>
         </div>
       </div>
     </DialogPrimitive.Root>

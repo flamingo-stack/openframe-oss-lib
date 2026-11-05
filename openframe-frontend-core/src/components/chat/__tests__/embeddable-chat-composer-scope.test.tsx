@@ -49,6 +49,7 @@ vi.mock('../hooks/use-slash-commands', async importOriginal => {
 
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
@@ -70,7 +71,7 @@ const MESSAGE: UnifiedChatState['messages'][number] = {
   parts: [{ type: 'text', text: 'hello' }],
 };
 
-/** The injected-state path (`mingoState`): the panel renders this object and
+/** A host's engine (`ChatEngineProvider`): the panel renders this object and
  *  opens no transport, so the test drives `activeDialogId` by re-rendering. */
 function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
   const noop = () => {};
@@ -112,6 +113,7 @@ function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
     actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
+    dialogCapabilities: { canRename: true, canArchive: true },
     ...overrides,
   };
 }
@@ -120,15 +122,15 @@ function Harness({ state, handleRef }: { state: UnifiedChatState; handleRef?: Re
   return (
     <ChatRuntimeContext.Provider value={runtime}>
       <DialogPrimitive.Root open>
-        <EmbeddableChat
-          ref={handleRef}
-          shell="none"
-          defaultOpen
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={state}
-          mingoDialogCapabilities={{ canRename: true, canArchive: true }}
-        />
+        <ChatEngineProvider engine={state}>
+          <EmbeddableChat
+            ref={handleRef}
+            shell="none"
+            defaultOpen
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+          />
+        </ChatEngineProvider>
       </DialogPrimitive.Root>
     </ChatRuntimeContext.Provider>
   );

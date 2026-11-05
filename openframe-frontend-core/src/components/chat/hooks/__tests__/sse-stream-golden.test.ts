@@ -21,8 +21,9 @@ import {
 } from '../../../../chat-protocol/chat-message';
 import { encodeUiChunk, encodeUiDone, STREAM_CLOSE_GRACE_MS, type UiChunk } from '../../../../chat-protocol/ui-chunks';
 import { ChatRuntimeContext, type ChatRuntime } from '../../../../contexts/chat-runtime-context';
+import { APPROVAL_REFUSED } from '../../engine/use-stream-turns';
 import { approvalBatchViewOf } from '../../utils/tool-part-display';
-import { APPROVAL_REFUSED, useSseChatAdapter } from '../use-sse-chat-adapter';
+import { useSseChatAdapter } from '../use-sse-chat-adapter';
 
 // The chat wire the hub serves (`chat-wire.json`): the cases that read it are skipped when this run cannot read the hub.
 const WIRE = await readChatWire();
