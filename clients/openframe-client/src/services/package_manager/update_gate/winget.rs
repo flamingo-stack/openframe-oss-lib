@@ -42,29 +42,34 @@ function Invoke-Com($target, $member, $kind, $arguments) {
 # An MSI that leaves InstallLocation and DisplayIcon empty still knows where its shortcuts point: the key file of
 # each shortcut's component, read from the cached package.
 function Get-MsiShortcutTargets($codes) {
-    $msi = New-Object -ComObject WindowsInstaller.Installer
+    $targets = @()
+    $errors = @()
+    try {
+        $msi = New-Object -ComObject WindowsInstaller.Installer
+    } catch {
+        return @{ targets = $targets; errors = @("WindowsInstaller.Installer: $(($_.Exception.Message -split "`r?`n")[0])") }
+    }
     $query = 'SELECT `Component`.`ComponentId` FROM `Shortcut`, `Component` WHERE `Shortcut`.`Component_` = `Component`.`Component`'
-    @(
-        foreach ($code in $codes) {
-            if ($code -notmatch '^\{[0-9A-Fa-f-]{36}\}$') { continue }
-            try {
-                $package = [string](Invoke-Com $msi 'ProductInfo' 'GetProperty' @($code, 'LocalPackage'))
-                if (-not $package) { continue }
-                $database = Invoke-Com $msi 'OpenDatabase' 'InvokeMethod' @($package, 0)
-                $view = Invoke-Com $database 'OpenView' 'InvokeMethod' @($query)
-                [void](Invoke-Com $view 'Execute' 'InvokeMethod' @())
-                while ($record = Invoke-Com $view 'Fetch' 'InvokeMethod' @()) {
-                    $component = [string](Invoke-Com $record 'StringData' 'GetProperty' @(1))
-                    $path = [string](Invoke-Com $msi 'ComponentPath' 'GetProperty' @($code, $component))
-                    if ($path) { $path }
-                }
-                [void](Invoke-Com $view 'Close' 'InvokeMethod' @())
-            } catch {
-                # not fatal: the other sources may still find the app, so the reason goes to stderr for the log
-                [Console]::Error.WriteLine("MSI shortcuts of ${code}: $($_.Exception.Message)")
+    foreach ($code in $codes) {
+        if ($code -notmatch '^\{[0-9A-Fa-f-]{36}\}$') { continue }
+        try {
+            $package = [string](Invoke-Com $msi 'ProductInfo' 'GetProperty' @($code, 'LocalPackage'))
+            if (-not $package) { continue }
+            $database = Invoke-Com $msi 'OpenDatabase' 'InvokeMethod' @($package, 0)
+            $view = Invoke-Com $database 'OpenView' 'InvokeMethod' @($query)
+            [void](Invoke-Com $view 'Execute' 'InvokeMethod' @())
+            while ($record = Invoke-Com $view 'Fetch' 'InvokeMethod' @()) {
+                $component = [string](Invoke-Com $record 'StringData' 'GetProperty' @(1))
+                $path = [string](Invoke-Com $msi 'ComponentPath' 'GetProperty' @($code, $component))
+                # ComponentPath also answers with registry key paths such as 21:\Software\...; only a file locates the app.
+                if ($path -match '^[A-Za-z]:\\') { $targets += $path }
             }
+            [void](Invoke-Com $view 'Close' 'InvokeMethod' @())
+        } catch {
+            $errors += "$code : $(($_.Exception.Message -split "`r?`n")[0])"
         }
-    )
+    }
+    @{ targets = $targets; errors = $errors }
 }
 
 $rows = @(Get-WinGetPackage)
@@ -85,6 +90,7 @@ $packages = @(
                     ForEach-Object { @{ executable = [string]$_.Executable; appListEntry = [string]$_.VisualElements.AppListEntry } })
             }
         }
+        $msiShortcuts = Get-MsiShortcutTargets $codes
         @{
             id = $id
             installed = $true
@@ -92,7 +98,8 @@ $packages = @(
             uninstallCommand = [string]$version.GetMetadata([Enum]::Parse($field, 'StandardUninstallCommand'))
             arpInstallLocation = Get-ArpValue $codes 'InstallLocation'
             arpDisplayIcon = Get-ArpValue $codes 'DisplayIcon'
-            msiShortcutTargets = @(Get-MsiShortcutTargets $codes)
+            msiShortcutTargets = @($msiShortcuts.targets)
+            msiShortcutErrors = @($msiShortcuts.errors)
             appxApplications = $applications
         }
     }
@@ -142,6 +149,8 @@ struct Package {
     /// Key files of the MSI's shortcut components, for an MSI that records no install location.
     #[serde(default)]
     msi_shortcut_targets: Vec<String>,
+    #[serde(default)]
+    msi_shortcut_errors: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -182,10 +191,6 @@ async fn run(ids: &[String]) -> Result<Output, Undetermined> {
             result.stderr.trim()
         )));
     }
-    let problems = result.stderr.trim();
-    if !problems.is_empty() {
-        warn!(%problems, "Update gate identity script reported problems");
-    }
     serde_json::from_str(result.stdout.trim())
         .map_err(|e| Undetermined::Resolver(format!("unparseable output: {e}")))
 }
@@ -222,7 +227,12 @@ fn identity(package: &Package, shortcuts: &[Shortcut]) -> Result<AppIdentity, Un
             .filter_map(|image| image.parent().map(Path::to_path_buf)),
     )
     .find(|dir| is_app_dir(dir))
-    .ok_or(Undetermined::NoInstallLocation)?;
+    .ok_or_else(|| {
+        if !package.msi_shortcut_errors.is_empty() {
+            warn!(package = %package.id, errors = ?package.msi_shortcut_errors, "MSI shortcut lookup failed");
+        }
+        Undetermined::NoInstallLocation
+    })?;
 
     let mut names: Vec<String> = if package.appx_applications.is_empty() {
         shortcuts
