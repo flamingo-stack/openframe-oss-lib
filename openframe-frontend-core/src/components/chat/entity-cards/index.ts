@@ -115,6 +115,8 @@ export {
   renderChatInlineEntityCard,
   ChatCardLoader,
   chatCardLabel,
+  RecordChip,
+  type RecordChipProps,
   type ChatCardRenderOptions,
   type ChatCardDispatchExtras,
 } from './dispatch';

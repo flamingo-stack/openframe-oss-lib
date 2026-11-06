@@ -165,7 +165,15 @@ jobs:
       - name: Format
         run: npm run format
 
+      # The chat wire and the record-link vectors are the hub's contracts, read from the hub that serves them
+      # (chat-protocol/__fixtures__/hub-contracts.ts). With the secret they are required; a fork's pull request has none,
+      # so they are skipped there. FLAMINGO_HUB_CONTRACTS_URL points them at a hub preview before its contracts reach
+      # production.
       - name: Test
+        env:
+          FLAMINGO_HUB_BASE_URL: ${{ secrets.FLAMINGO_HUB_SECRET != '' && (vars.FLAMINGO_HUB_CONTRACTS_URL || vars.FLAMINGO_HUB_BASE_URL) || '' }}
+          FLAMINGO_HUB_SECRET: ${{ secrets.FLAMINGO_HUB_SECRET }}
+          FLAMINGO_HUB_CONTRACTS_REQUIRED: ${{ secrets.FLAMINGO_HUB_SECRET != '' && '1' || '' }}
         run: npm run test:run
 
       - name: Build

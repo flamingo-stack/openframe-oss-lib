@@ -4,7 +4,6 @@
 import { createElement, forwardRef, lazy, Suspense, useEffect, useState } from 'react';
 import type { EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
 import { ASK_AI_OPEN_EVENTS, askAiOpenIsHeld, holdAskAiOpens, onAskAiIntent } from './utils/ask-ai-events';
-export * from './approval-request-message';
 export * from './approval-batch-message';
 export * from './escalation-offer-message';
 export * from './ticket-escalated-message';
@@ -66,8 +65,6 @@ export * from './chat-list-empty-state';
 export * from './chat-top-navigation';
 export * from './onboarding-carousel';
 export type { ChatRef } from './chat-ref.types';
-export { remarkCardLinks } from './remark-card-links';
-export { remarkMentionChips } from './remark-mention-chips';
 
 // Card-supporting UI migrated from hub `components/shared/*` + `components/blog/*`
 export {
@@ -85,9 +82,6 @@ export {
   ChatAttachmentChipStrip,
   type ChatAttachmentAddButtonProps,
   type ChatAttachmentChipStripProps,
-  type StagedAttachment,
-  CHAT_ATTACHMENT_MIME_TYPES,
-  CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER,
 } from './chat-attachment-bar';
 
 // Entity-cards (12 refactored + 4 moved + supporting primitives)
@@ -103,6 +97,9 @@ export * from './hooks';
 // (Phase 3 of the chat unification; ONE accumulation path for SSE + NATS
 // + history replay).
 export * from './stream';
+
+// THE chat engine: one thread store, one chunk processor, one React binding, for every web chat.
+export * from './engine';
 
 // Chat utilities
 export * from './utils';
@@ -153,4 +150,6 @@ export {
 } from './utils/ask-ai-events';
 export { chatDayLabel } from './utils/chat-day-label';
 export * from './proxy-credentials-panel';
-export { InlineChip } from './inline-chip';
+export { InlineChip, INLINE_CHIP_LINKED_CLASS, type InlineChipAnchor } from './inline-chip';
+export { ChatMessageSources } from './chat-message-sources';
+export { RecordActionsProvider, type RecordActionHandlers, useRecordActions } from './record-actions';

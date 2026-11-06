@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citedSourceNumbers, formatCitationChips, stripCitationChips } from '../citation-chip';
-
-describe('formatCitationChips', () => {
-  it('writes each number once, ascending', () => {
-    expect(formatCitationChips([3, 1, 3])).toBe('[1][3]');
-    expect(formatCitationChips([])).toBe('');
-  });
-});
+import { citationChipRunScanner, stripCitationChips } from '../citation-chip';
 
 describe('stripCitationChips', () => {
   it('removes a run with the space before it, before punctuation and mid-sentence', () => {
@@ -23,11 +16,9 @@ describe('stripCitationChips', () => {
   });
 });
 
-describe('citedSourceNumbers', () => {
-  it('reads every chip of a run, in first-mention order', () => {
-    expect(citedSourceNumbers('B [3]. A [1, 2] and again [3][1].')).toEqual([3, 1, 2]);
-  });
-  it('reads no index in prose', () => {
-    expect(citedSourceNumbers('argv[1] is the path')).toEqual([]);
+describe('citationChipRunScanner', () => {
+  it('finds each run standing apart from a word, with what precedes it', () => {
+    const runs = [...'see [1][2], then array[3] and [4, 5].'.matchAll(citationChipRunScanner())].map(m => m[0].trim());
+    expect(runs).toEqual(['[1][2]', '[4, 5]']);
   });
 });

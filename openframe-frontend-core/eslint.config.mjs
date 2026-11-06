@@ -231,6 +231,9 @@ export default defineConfig([
       // tone a `currentColor` glyph inherits (secondary on outline). Its class IS the contract, so the test walks up
       // from the icon.
       'src/components/ui/__tests__/button-icon-tone.test.tsx',
+      // Where a line can break inside an inline chip: what holds its last word to its action
+      // are role-less boxes whose nesting and classes ARE the contract, so the test walks them from the text.
+      'src/components/chat/__tests__/inline-chip.test.tsx',
       // The file manager table's box is a role-less <div>, and what is under test is its height: the parent's
       // (`h-full`), never an inline one measured from the window, and the rows' scroll box inside it. No `screen`
       // query reaches either, so the test walks up from the header label and a row.

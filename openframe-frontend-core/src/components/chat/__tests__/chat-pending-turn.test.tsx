@@ -19,8 +19,8 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { ChatMessage, ChatPart } from '../../../chat-protocol/chat-message';
 import { createChatStreamReducer } from '../stream/chat-stream-reducer';
-import type { Message } from '../types/message.types';
 import {
   AUTO_CONTINUATION_DIRECTIVE_PREFIX,
   buildAutoContinuationDirective,
@@ -51,23 +51,22 @@ vi.mock('use-stick-to-bottom', () => ({
 // Row stub that renders the author label the way the real component does
 // (`Name:`), so "labeled row with no body" is directly assertable.
 vi.mock('../chat-message-enhanced', () => ({
-  ChatMessageEnhanced: ({ name, content }: { name?: string; content: unknown }) => (
-    <div data-testid="row">
+  ChatMessageEnhanced: ({ name, parts, isTyping }: { name?: string; parts: ChatPart[]; isTyping?: boolean }) => (
+    <div data-testid="row" data-typing={isTyping ? 'yes' : 'no'}>
       <span data-testid="row-name">{name ?? ''}</span>
-      <span data-testid="row-body">
-        {typeof content === 'string'
-          ? content
-          : Array.isArray(content)
-            ? content
-                .map(s => (s && (s as { type?: string }).type === 'text' ? (s as { text: string }).text : '[seg]'))
-                .join('')
-            : ''}
-      </span>
+      <span data-testid="row-body">{parts.map(part => (part.type === 'text' ? part.text : '[part]')).join('')}</span>
     </div>
   ),
 }));
 
 import { ChatMessageList } from '../chat-message-list';
+
+const row = (id: string, role: ChatMessage['role'], name: string, text: string): ChatMessage => ({
+  id,
+  role,
+  metadata: { author: { name } },
+  parts: [{ type: 'text', text }],
+});
 
 class ObserverStub {
   observe() {}
@@ -84,9 +83,8 @@ const bodies = () => screen.queryAllByTestId('row-body').map(n => n.textContent)
 
 describe('approval sends mint no visible user row', () => {
   it('beginSseSend with empty text pushes only the assistant placeholder', () => {
-    const r = createChatStreamReducer({ transport: 'sse' });
-    // What `cardApprove` triggers: ('', { hidden: true, approvalAction }).
-    r.beginSseSend({ text: '', hidden: true, assistantName: 'Mingo AI' });
+    const r = createChatStreamReducer();
+    r.beginSseSend({ text: '', hidden: true });
 
     expect(r.state.messages).toHaveLength(1);
     expect(r.state.messages[0].role).toBe('assistant');
@@ -95,7 +93,7 @@ describe('approval sends mint no visible user row', () => {
   });
 
   it('pushOptimisticSend with empty text likewise mints no user row', () => {
-    const r = createChatStreamReducer({ transport: 'nats' });
+    const r = createChatStreamReducer();
     r.pushOptimisticSend('', true);
 
     expect(r.state.messages).toHaveLength(1);
@@ -103,12 +101,12 @@ describe('approval sends mint no visible user row', () => {
   });
 
   it('a normal send still mints the user row', () => {
-    const r = createChatStreamReducer({ transport: 'sse' });
-    r.beginSseSend({ text: 'hello', assistantName: 'Mingo AI' });
+    const r = createChatStreamReducer();
+    r.beginSseSend({ text: 'hello' });
 
     expect(r.state.messages).toHaveLength(2);
-    expect(r.state.messages[0]).toMatchObject({ role: 'user', content: 'hello' });
-    expect(r.state.messages[0].hidden).toBeUndefined();
+    expect(r.state.messages[0]).toMatchObject({ role: 'user', parts: [{ type: 'text', text: 'hello' }] });
+    expect(r.state.messages[0].metadata?.hidden).toBeUndefined();
   });
 });
 
@@ -117,20 +115,20 @@ describe('hidden rows that carry text', () => {
     const directive = buildAutoContinuationDirective('create_ticket', { ticketId: '42' });
     expect(directive.startsWith(AUTO_CONTINUATION_DIRECTIVE_PREFIX)).toBe(true);
 
-    const r = createChatStreamReducer({ transport: 'sse' });
-    r.beginSseSend({ text: directive, hidden: true, assistantName: 'Mingo AI' });
+    const r = createChatStreamReducer();
+    r.beginSseSend({ text: directive, hidden: true });
 
     const userRow = r.state.messages.find(m => m.role === 'user');
-    expect(userRow?.content).toBe(directive);
-    expect(userRow?.hidden).toBe(true);
+    expect(userRow?.parts).toEqual([{ type: 'text', text: directive }]);
+    expect(userRow?.metadata?.hidden).toBe(true);
   });
 
   it('never renders — the raw directive text must not reach the transcript', () => {
     const directive = buildAutoContinuationDirective('create_ticket', { ticketId: '42' });
-    const messages: Message[] = [
-      { id: 'u1', role: 'user', name: 'Michael Assraf', content: 'my laptop is dead' },
-      { id: 'h1', role: 'user', name: 'Michael Assraf', content: directive, hidden: true },
-      { id: 'a1', role: 'assistant', name: 'Mingo', content: 'Opened a ticket.' },
+    const messages: ChatMessage[] = [
+      row('u1', 'user', 'Michael Assraf', 'my laptop is dead'),
+      { ...row('h1', 'user', 'Michael Assraf', directive), metadata: { hidden: true } },
+      row('a1', 'assistant', 'Mingo', 'Opened a ticket.'),
     ];
     const { container } = render(<ChatMessageList dialogId="d" messages={messages} />);
 
@@ -142,12 +140,10 @@ describe('hidden rows that carry text', () => {
 // ─── Render-level contracts ────────────────────────────────────────────────
 
 describe('a thinking turn has exactly ONE pending affordance', () => {
-  const pending: Message[] = [
-    { id: 'u1', role: 'user', name: 'Michael Assraf', content: 'what is broken?' },
-    // `Message` carries its body in `content` — there is no `segments` field
-    // on it (that is `UnifiedChatMessage`), and the render path never reads
-    // one. An empty `content` IS the empty pending turn.
-    { id: 'a1', role: 'assistant', name: 'Mingo', content: '' },
+  const pending: ChatMessage[] = [
+    row('u1', 'user', 'Michael Assraf', 'what is broken?'),
+    // Parts of nothing the body draws ARE the empty pending turn.
+    { id: 'a1', role: 'assistant', metadata: { author: { name: 'Mingo' } }, parts: [] },
   ];
 
   it('does not render the empty labeled assistant row while typing', () => {
@@ -162,39 +158,70 @@ describe('a thinking turn has exactly ONE pending affordance', () => {
   });
 
   it('renders the assistant row as soon as it carries text', () => {
-    const withText: Message[] = [
-      pending[0],
-      { id: 'a1', role: 'assistant', name: 'Mingo', content: [{ type: 'text', text: 'Chec' }] },
-    ];
+    const withText: ChatMessage[] = [pending[0], row('a1', 'assistant', 'Mingo', 'Chec')];
     render(<ChatMessageList dialogId="d" messages={withText} isTyping />);
     expect(names()).toEqual(['Michael Assraf', 'Mingo']);
   });
 
-  it('renders the assistant row when it carries a NON-text segment (tool call)', () => {
-    const withTool: Message[] = [
+  it('does not take a turn of sources alone for one that has drawn something', () => {
+    const withSources: ChatMessage[] = [
       pending[0],
       {
         id: 'a1',
         role: 'assistant',
-        name: 'Mingo',
-        // The REAL `ToolExecutionSegment` shape — `{ type, data }`, not flat
-        // fields. The previous fixture put `toolExecutionRequestId` / `status`
-        // at the top level and needed an `as` cast to compile at all (the cast
-        // was the tell: the two types did not overlap). It passed only because
-        // the empty-pending-turn predicate looks at segment TYPE; the moment it
-        // inspected `data`, this test would have kept passing while the real
-        // path broke.
-        content: [
+        metadata: { author: { name: 'Mingo' } },
+        parts: [{ type: 'source-url', sourceId: 'record://blog_post/1', url: 'https://x.test/a', title: 'A' }],
+      },
+    ];
+    render(<ChatMessageList dialogId="d" messages={withSources} isTyping />);
+    expect(names()).toEqual(['Michael Assraf']);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+  });
+
+  it('does not take a turn of whitespace alone for one that has drawn something', () => {
+    const withWhitespace: ChatMessage[] = [
+      pending[0],
+      { id: 'a1', role: 'assistant', metadata: { author: { name: 'Mingo' } }, parts: [{ type: 'text', text: '\n\n' }] },
+    ];
+    render(<ChatMessageList dialogId="d" messages={withWhitespace} isTyping />);
+    expect(names()).toEqual(['Michael Assraf']);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+  });
+
+  it('renders the assistant row when it carries a stage of the turn', () => {
+    const withStage: ChatMessage[] = [
+      pending[0],
+      {
+        id: 'a1',
+        role: 'assistant',
+        metadata: {
+          author: { name: 'Mingo' },
+          progress: [{ id: 't:searching', stage: 'searching', count: 3, state: 'running' }],
+        },
+        parts: [],
+      },
+    ];
+    render(<ChatMessageList dialogId="d" messages={withStage} isTyping />);
+    expect(names()).toEqual(['Michael Assraf', 'Mingo']);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('renders the assistant row when it carries a NON-text part (tool call)', () => {
+    const withTool: ChatMessage[] = [
+      pending[0],
+      {
+        id: 'a1',
+        role: 'assistant',
+        metadata: { author: { name: 'Mingo' } },
+        parts: [
           {
-            type: 'tool_execution',
-            data: {
-              type: 'EXECUTING_TOOL',
-              integratedToolType: 'SHELL',
-              toolFunction: 'run_command',
-              toolTitle: 'Run command',
-              parameters: { cmd: 'ls' },
-              toolExecutionRequestId: 'e1',
-            },
+            type: 'dynamic-tool',
+            toolName: 'run_command',
+            toolCallId: 'e1',
+            title: 'Run command',
+            state: 'input-available',
+            input: { cmd: 'ls' },
+            toolMetadata: { integratedToolType: 'SHELL' },
           },
         ],
       },
@@ -209,13 +236,278 @@ describe('a thinking turn has exactly ONE pending affordance', () => {
   });
 });
 
-describe('the SYSTEM name-only row is a legitimate label-without-body', () => {
-  it('still renders', () => {
-    const messages: Message[] = [
-      { id: 'u1', role: 'user', name: 'Michael Assraf', content: 'hi' },
-      { id: 's1', role: 'user', name: 'Technician joined', content: '', authorType: 'system' },
+describe('a single card that was approved, while its tool runs', () => {
+  const question = row('u1', 'user', 'Michael Assraf', 'close it');
+  const answered = (parts: ChatPart[]): ChatMessage[] => [
+    question,
+    {
+      id: 'a1',
+      role: 'assistant',
+      metadata: { author: { name: 'Mingo' } },
+      parts: [{ type: 'text', text: 'I can close that.' }, ...parts],
+    },
+  ];
+  const card = (approved: boolean, batchId?: string): ChatPart => ({
+    type: 'dynamic-tool',
+    toolName: 'update_ticket',
+    toolCallId: 'p1',
+    title: 'Close',
+    state: 'approval-responded',
+    input: {},
+    approval: { id: 'p1', approved, ...(batchId ? { descriptor: { batchId } } : {}) },
+  });
+
+  it('the footer says the turn is working: the card has no icon of its own', () => {
+    render(<ChatMessageList dialogId="d" messages={answered([card(true)])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+  });
+
+  it('not while its answer is on its way: the card says Approving, and a loader appearing would move it', () => {
+    const sent = { ...card(true), toolMetadata: { answerSent: true } } as ChatPart;
+    render(<ChatMessageList dialogId="d" messages={answered([sent])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('not for a batch: its rows say it themselves', () => {
+    render(<ChatMessageList dialogId="d" messages={answered([card(true, 'b1')])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('not for a rejection: nothing runs', () => {
+    render(<ChatMessageList dialogId="d" messages={answered([card(false)])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('not for a card still waiting on the user', () => {
+    const pending: ChatPart = {
+      type: 'dynamic-tool',
+      toolName: 'update_ticket',
+      toolCallId: 'p1',
+      state: 'approval-requested',
+      input: {},
+      approval: { id: 'p1' },
+    };
+    render(<ChatMessageList dialogId="d" messages={answered([pending])} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  describe('once the tool has answered, and the turn goes on', () => {
+    const done: ChatPart = {
+      type: 'dynamic-tool',
+      toolName: 'update_ticket',
+      toolCallId: 'p1',
+      state: 'output-available',
+      input: {},
+      output: {},
+      approval: { id: 'p1', approved: true },
+    };
+
+    it('the footer says so: no row does until what follows comes', () => {
+      render(<ChatMessageList dialogId="d" messages={answered([done])} isTyping />);
+      expect(screen.queryAllByRole('status')).toHaveLength(1);
+    });
+
+    it('a tool that failed leaves the same gap', () => {
+      const failed: ChatPart = {
+        type: 'dynamic-tool',
+        toolName: 'update_ticket',
+        toolCallId: 'p1',
+        state: 'output-error',
+        input: {},
+        errorText: 'No.',
+      };
+      render(<ChatMessageList dialogId="d" messages={answered([failed])} isTyping />);
+      expect(screen.queryAllByRole('status')).toHaveLength(1);
+    });
+
+    it('not once the turn is over', () => {
+      render(<ChatMessageList dialogId="d" messages={answered([done])} />);
+      expect(screen.queryAllByRole('status')).toHaveLength(0);
+    });
+
+    it('not once text follows it', () => {
+      render(<ChatMessageList dialogId="d" messages={answered([done, { type: 'text', text: 'Closed.' }])} isTyping />);
+      expect(screen.queryAllByRole('status')).toHaveLength(0);
+    });
+  });
+});
+
+describe('a turn whose only cards wait on another tier', () => {
+  const cardOf = (toolCallId: string, approvalType: string, batchId?: string): ChatPart => ({
+    type: 'dynamic-tool',
+    toolName: 'x',
+    toolCallId,
+    state: 'approval-requested',
+    input: {},
+    approval: { id: toolCallId, descriptor: { approvalType, ...(batchId ? { batchId } : {}) } },
+  });
+  const turn = (parts: ChatPart[]): ChatMessage[] => [
+    row('u1', 'user', 'Client', 'please do it'),
+    { id: 'a1', role: 'assistant', metadata: { author: { name: 'Fae' } }, parts },
+  ];
+  const clientSide = (parts: ChatPart[], isTyping = false) =>
+    render(
+      <ChatMessageList dialogId="d" messages={turn(parts)} displayApprovalTypes={['CLIENT']} isTyping={isTyping} />,
+    );
+
+  it('draws no row, typing or not', () => {
+    const { unmount } = clientSide([cardOf('r1', 'USER')]);
+    expect(names()).toEqual(['Client']);
+    unmount();
+    clientSide([cardOf('r1', 'USER')], true);
+    expect(names()).toEqual(['Client']);
+  });
+
+  it('nor for a batch one of whose rows waits, or with only sources beside it', () => {
+    clientSide([
+      { type: 'source-url', sourceId: 'record://blog_post/1', url: 'https://x.test/a', title: 'A' },
+      cardOf('r1', 'USER', 'b1'),
+      cardOf('r2', 'CLIENT', 'b1'),
+    ]);
+    expect(names()).toEqual(['Client']);
+  });
+
+  it('a card this side answers draws its row', () => {
+    clientSide([cardOf('r1', 'CLIENT')]);
+    expect(names()).toEqual(['Client', 'Fae']);
+  });
+
+  it('text beside it draws its row', () => {
+    clientSide([{ type: 'text', text: 'Asking your admin.' }, cardOf('r1', 'USER')]);
+    expect(names()).toEqual(['Client', 'Fae']);
+  });
+
+  it('a cut turn draws its row: the notice has to go somewhere', () => {
+    const messages: ChatMessage[] = [
+      row('u1', 'user', 'Client', 'please do it'),
+      {
+        id: 'a1',
+        role: 'assistant',
+        metadata: { author: { name: 'Fae' }, finishReason: 'interrupted' },
+        parts: [cardOf('r1', 'USER')],
+      },
+    ];
+    render(<ChatMessageList dialogId="d" messages={messages} displayApprovalTypes={['CLIENT']} />);
+    expect(names()).toEqual(['Client', 'Fae']);
+  });
+});
+
+describe('the message a turn writes, named by its transport', () => {
+  const thread = [
+    row('u1', 'user', 'Michael Assraf', 'close it'),
+    row('a1', 'assistant', 'Mingo', 'I can close that.'),
+    row('u2', 'user', 'Michael Assraf', 'what is your name?'),
+    row('a2', 'assistant', 'Mingo', 'I am Mingo.'),
+  ];
+  const typing = () => screen.getAllByTestId('row').map(element => element.dataset.typing);
+
+  it('is the one streaming, wherever it sits: a finished answer below it is left alone', () => {
+    render(<ChatMessageList dialogId="d" messages={thread} isTyping writingMessageId="a1" />);
+    expect(typing()).toEqual(['no', 'yes', 'no', 'no']);
+  });
+
+  it('named by none, it is the last', () => {
+    const { rerender } = render(<ChatMessageList dialogId="d" messages={thread} isTyping writingMessageId={null} />);
+    expect(typing()).toEqual(['no', 'no', 'no', 'yes']);
+    rerender(<ChatMessageList dialogId="d" messages={thread} isTyping />);
+    expect(typing()).toEqual(['no', 'no', 'no', 'yes']);
+  });
+
+  it('is the empty row the footer speaks for, and an empty row it does not name stays a row', () => {
+    const empty = { ...thread[1], parts: [] };
+    const withEmpty = [thread[0], empty, thread[2], thread[3]];
+    const { rerender } = render(<ChatMessageList dialogId="d" messages={withEmpty} isTyping writingMessageId="a1" />);
+    expect(screen.getAllByTestId('row')).toHaveLength(3);
+    rerender(<ChatMessageList dialogId="d" messages={withEmpty} isTyping writingMessageId="a2" />);
+    expect(screen.getAllByTestId('row')).toHaveLength(4);
+  });
+
+  it('a turn that named a message which has drawn says nothing of the question below it', () => {
+    const endsInQuestion = thread.slice(0, 3);
+    const { rerender } = render(<ChatMessageList dialogId="d" messages={endsInQuestion} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+    rerender(<ChatMessageList dialogId="d" messages={endsInQuestion} isTyping writingMessageId="a1" />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+});
+
+describe('a card saying Approving anywhere in the thread', () => {
+  const row1 = row('u1', 'user', 'Michael Assraf', 'close it');
+  const tool = { type: 'dynamic-tool', toolName: 'update_ticket', title: 'Close', input: {} } as const;
+  const inFlight = (id: string, batchId?: string): ChatPart => ({
+    ...tool,
+    toolCallId: id,
+    state: 'approval-responded',
+    approval: { id, approved: true, ...(batchId ? { descriptor: { batchId } } : {}) },
+    toolMetadata: { answerSent: true },
+  });
+  const assistant = (id: string, parts: ChatPart[]): ChatMessage => ({ id, role: 'assistant', parts });
+
+  it('keeps the loader off when the thread ends in a question below it', () => {
+    const messages = [row1, assistant('a1', [inFlight('p1')]), row('u2', 'user', 'Michael Assraf', 'never mind')];
+    render(<ChatMessageList dialogId="d" messages={messages} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('keeps it off beside a row of its batch that has answered', () => {
+    const answeredRow: ChatPart = {
+      ...tool,
+      toolCallId: 'p2',
+      state: 'output-available',
+      output: {},
+      approval: { id: 'p2', approved: true, descriptor: { batchId: 'b1' } },
+    };
+    render(
+      <ChatMessageList dialogId="d" messages={[row1, assistant('a1', [inFlight('p1', 'b1'), answeredRow])]} isTyping />,
+    );
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+
+  it('and only then: the same row with its answer in, and the footer speaks again', () => {
+    const answeredRow: ChatPart = {
+      ...tool,
+      toolCallId: 'p2',
+      state: 'output-available',
+      output: {},
+      approval: { id: 'p2', approved: true, descriptor: { batchId: 'b1' } },
+    };
+    render(<ChatMessageList dialogId="d" messages={[row1, assistant('a1', [answeredRow])]} isTyping />);
+    expect(screen.queryAllByRole('status')).toHaveLength(1);
+  });
+});
+
+describe('a row keeps its identity, whatever it holds below it', () => {
+  const thread = [row('u1', 'user', 'Michael Assraf', 'close it'), row('a1', 'assistant', 'Mingo', 'Closed.')];
+  const strip = () => <aside data-testid="strip" />;
+
+  it('content arriving below a row, or leaving it, remounts neither the row nor another', () => {
+    const { rerender } = render(<ChatMessageList dialogId="d" messages={thread} />);
+    const [user, assistant] = screen.getAllByTestId('row');
+
+    rerender(<ChatMessageList dialogId="d" messages={thread} renderAfterMessage={strip} />);
+    expect(screen.getAllByTestId('strip')).toHaveLength(2);
+    expect(screen.getAllByTestId('row')[0]).toBe(user);
+    expect(screen.getAllByTestId('row')[1]).toBe(assistant);
+
+    rerender(<ChatMessageList dialogId="d" messages={thread} />);
+    expect(screen.queryByTestId('strip')).toBeNull();
+    expect(screen.getAllByTestId('row')[0]).toBe(user);
+    expect(screen.getAllByTestId('row')[1]).toBe(assistant);
+  });
+});
+
+describe('a system line is a row of its own', () => {
+  it('still renders, with its words in the body', () => {
+    const messages: ChatMessage[] = [
+      row('u1', 'user', 'Michael Assraf', 'hi'),
+      {
+        id: 's1',
+        role: 'system',
+        metadata: { author: { authorType: 'system' } },
+        parts: [{ type: 'text', text: 'Technician joined' }],
+      },
     ];
     render(<ChatMessageList dialogId="d" messages={messages} isTyping />);
-    expect(names()).toContain('Technician joined');
+    expect(bodies()).toContain('Technician joined');
   });
 });

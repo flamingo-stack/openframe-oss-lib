@@ -15,12 +15,12 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
 
 import { ChatRuntimeContext, type ChatRuntime } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -64,10 +64,11 @@ function createState(): UnifiedChatState {
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
+    // An engine's panel owns a list.
+    dialogCapabilities: {},
   };
 }
 
@@ -76,15 +77,16 @@ describe('EmbeddableChat inline shell', () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <ChatRuntimeContext.Provider value={runtime}>
-          <EmbeddableChat
-            shell="inline"
-            closable={false}
-            open
-            onOpenChange={vi.fn()}
-            defaultActiveMode="mingo"
-            showInternalTrigger={false}
-            mingoState={createState()}
-          />
+          <ChatEngineProvider engine={createState()}>
+            <EmbeddableChat
+              shell="inline"
+              closable={false}
+              open
+              onOpenChange={vi.fn()}
+              defaultActiveMode="mingo"
+              showInternalTrigger={false}
+            />
+          </ChatEngineProvider>
         </ChatRuntimeContext.Provider>
       </QueryClientProvider>,
     );
@@ -97,16 +99,17 @@ describe('EmbeddableChat inline shell', () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <ChatRuntimeContext.Provider value={runtime}>
-          <EmbeddableChat
-            shell="inline"
-            appearance="v2"
-            closable={false}
-            open
-            onOpenChange={vi.fn()}
-            defaultActiveMode="mingo"
-            showInternalTrigger={false}
-            mingoState={createState()}
-          />
+          <ChatEngineProvider engine={createState()}>
+            <EmbeddableChat
+              shell="inline"
+              appearance="v2"
+              closable={false}
+              open
+              onOpenChange={vi.fn()}
+              defaultActiveMode="mingo"
+              showInternalTrigger={false}
+            />
+          </ChatEngineProvider>
         </ChatRuntimeContext.Provider>
       </QueryClientProvider>,
     );
@@ -116,20 +119,28 @@ describe('EmbeddableChat inline shell', () => {
 
   it('v2: the v2 header over a conversation', () => {
     const state = createState();
-    state.messages = [{ id: 'm-1', role: 'user', content: 'hello', timestamp: new Date('2026-01-01T00:00:00Z') }];
+    state.messages = [
+      {
+        id: 'm-1',
+        role: 'user',
+        metadata: { createdAt: new Date('2026-01-01T00:00:00Z').toISOString() },
+        parts: [{ type: 'text', text: 'hello' }],
+      },
+    ];
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <ChatRuntimeContext.Provider value={runtime}>
-          <EmbeddableChat
-            shell="inline"
-            appearance="v2"
-            closable={false}
-            open
-            onOpenChange={vi.fn()}
-            defaultActiveMode="mingo"
-            showInternalTrigger={false}
-            mingoState={state}
-          />
+          <ChatEngineProvider engine={state}>
+            <EmbeddableChat
+              shell="inline"
+              appearance="v2"
+              closable={false}
+              open
+              onOpenChange={vi.fn()}
+              defaultActiveMode="mingo"
+              showInternalTrigger={false}
+            />
+          </ChatEngineProvider>
         </ChatRuntimeContext.Provider>
       </QueryClientProvider>,
     );

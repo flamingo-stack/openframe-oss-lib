@@ -26,7 +26,13 @@ public class Notification {
     private String title;
     private String description;
     private String createdAt;
-    private Boolean read;
+    /** UNREAD, READ, or ARCHIVED (read automatically when its ticket or dialog was archived). */
+    private String status;
+
+    /** Read, by the person or by its ticket's or dialog's archive. */
+    public boolean isRead() {
+        return "READ".equals(status) || "ARCHIVED".equals(status);
+    }
     private String category;
     private String type;
     private Map<String, Object> attributes;

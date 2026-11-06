@@ -5,7 +5,7 @@
  * ## Why this exists
  *
  * A fetch-mode entity card (`dispatch.tsx` → `useChatCardItem`) expands a
- * compact `[card://<type>:<id>]` marker by fetching the type's public list
+ * compact record link (`record://<type>/<id>`) by fetching the type's public list
  * endpoint with an `?ids=` (or `?task_ids=`) filter and matching the row
  * back by id. The per-type URL SHAPE is non-obvious — `task_ids` for the
  * ClickUp-backed types, `pageSize` for blog, `&limit=N&filter=all` for the

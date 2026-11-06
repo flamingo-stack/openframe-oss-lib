@@ -71,6 +71,8 @@ export interface ProductRelease {
   id: number;
   title: string;
   slug: string;
+  /** Where the release opens, as the server answers it (absolute). */
+  url?: string | null;
   version: string;
   summary: string | null;
   content: string | null;

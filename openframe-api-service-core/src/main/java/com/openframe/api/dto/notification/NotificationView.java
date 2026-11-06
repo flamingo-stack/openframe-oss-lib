@@ -12,4 +12,4 @@ import java.util.Map;
 public record NotificationView(String id, NotificationSeverity severity, String title, String description,
                                Instant createdAt, NotificationCategory category,
                                String type, Map<String, String> attributes,
-                               boolean read, ReadStatus status)     {}
+                               ReadStatus status) {}

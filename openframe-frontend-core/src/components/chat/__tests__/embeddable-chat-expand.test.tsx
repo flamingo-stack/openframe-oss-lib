@@ -15,13 +15,13 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
 
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { DialogItem } from '../types/component.types';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -47,7 +47,16 @@ function Host({
   const noop = () => {};
   const asyncNoop = async () => {};
   const state: UnifiedChatState = {
-    messages: activeDialogId ? [{ id: 'm-1', role: 'user', content: 'hello', timestamp: new Date(0) }] : [],
+    messages: activeDialogId
+      ? [
+          {
+            id: 'm-1',
+            role: 'user',
+            metadata: { createdAt: new Date(0).toISOString() },
+            parts: [{ type: 'text', text: 'hello' }],
+          },
+        ]
+      : [],
     isLoading: false,
     streamingPhase: 'idle',
     sendMessage: asyncNoop,
@@ -80,25 +89,27 @@ function Host({
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
+    // An engine's panel owns a list.
+    dialogCapabilities: {},
   };
   return (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ChatRuntimeContext.Provider value={runtime}>
-        <EmbeddableChat
-          shell="inline"
-          appearance="v2"
-          closable={false}
-          open
-          onOpenChange={vi.fn()}
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          onExpand={onExpand}
-          mingoState={state}
-        />
+        <ChatEngineProvider engine={state}>
+          <EmbeddableChat
+            shell="inline"
+            appearance="v2"
+            closable={false}
+            open
+            onOpenChange={vi.fn()}
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+            onExpand={onExpand}
+          />
+        </ChatEngineProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>
   );

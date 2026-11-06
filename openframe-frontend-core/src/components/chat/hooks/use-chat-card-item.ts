@@ -31,6 +31,8 @@ export interface UseChatCardItemResult<T = unknown> {
   /** True only after a fetch actually completed — false for disabled
    *  queries (no list URL for the type / empty id). */
   isFetched: boolean;
+  /** The read answered 404: this host holds no such row, or cannot read that type at all. A 200 with no row is not this. */
+  notFound: boolean;
 }
 
 // `extractItems` / `extractItemId` hoisted to `src/utils/extract-items.ts`
@@ -44,8 +46,8 @@ export function useChatCardItem<T = unknown>(type: string, id: string): UseChatC
   const url = runtime.endpoints.buildListUrl(type, [id]);
   const query = useQuery({
     queryKey: ['chat-card-item', type, id],
-    queryFn: async (): Promise<T | null> => {
-      if (!url) return null;
+    queryFn: async (): Promise<{ row: T | null; notFound: boolean }> => {
+      if (!url) return { row: null, notFound: false };
       // Go through `embedAuthedFetch` (NOT bare `fetch`) so the request
       // rides the same auth path as the chat stream/commands: it consults
       // the host-registered `EmbedAuthAdapter` (cookie `credentials:'include'`
@@ -53,6 +55,9 @@ export function useChatCardItem<T = unknown>(type: string, id: string): UseChatC
       // sent no credentials, so list endpoints behind the gateway returned
       // 401 and the card rendered blank.
       const res = await embedAuthedFetch(url);
+      // A 404 is an answer: this host holds no such row, or cannot read that type at all (a conversation read on another
+      // platform). Asking again would get the same answer, three more times.
+      if (res.status === 404) return { row: null, notFound: true };
       // THROW on non-OK (was `return null`): callers must be able to
       // tell "fetched fine, entity absent" (→ deleted tombstone) from
       // "fetch failed" (401 refresh miss, 5xx, 429 → transient; render
@@ -64,7 +69,7 @@ export function useChatCardItem<T = unknown>(type: string, id: string): UseChatC
       const data: unknown = await res.json();
       const items = extractCardItems(type, data);
       const match = items.find(it => extractItemId(type, it) === id);
-      return (match ?? null) as T | null;
+      return { row: (match ?? null) as T | null, notFound: false };
     },
     enabled: !!url && id.length > 0,
     // ALWAYS FRESH — no freshness window. Card entities are mutable
@@ -79,7 +84,7 @@ export function useChatCardItem<T = unknown>(type: string, id: string): UseChatC
     gcTime: 30 * 60 * 1000,
   });
   return {
-    item: query.data ?? undefined,
+    item: query.data?.row ?? undefined,
     isLoading: query.isLoading,
     isError: query.isError,
     // True only after the query actually completed a fetch. DISABLED
@@ -88,5 +93,6 @@ export function useChatCardItem<T = unknown>(type: string, id: string): UseChatC
     // read that as "fetched fine, entity absent" (tombstone gate in
     // entity-cards/dispatch.tsx).
     isFetched: query.isFetched,
+    notFound: query.data?.notFound ?? false,
   };
 }

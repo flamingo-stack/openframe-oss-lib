@@ -1,6 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Message } from '../types/message.types';
+import { type ChatMessage, textOfParts } from '../../../chat-protocol/chat-message';
 
 const scrollToBottom = vi.fn();
 const stopScroll = vi.fn();
@@ -44,10 +44,10 @@ vi.mock('use-stick-to-bottom', () => ({
 vi.mock('../chat-message-enhanced', async () => {
   const { forwardRef } = await import('react');
   return {
-    ChatMessageEnhanced: forwardRef<HTMLDivElement, { content: string; selfAuthorType?: string }>(
-      ({ content, selfAuthorType }, ref) => (
+    ChatMessageEnhanced: forwardRef<HTMLDivElement, { parts: ChatMessage['parts']; selfAuthorType?: string }>(
+      ({ parts, selfAuthorType }, ref) => (
         <div ref={ref} data-self-author-type={selfAuthorType}>
-          {content}
+          {textOfParts(parts)}
         </div>
       ),
     ),
@@ -105,11 +105,11 @@ const setGeometry = (geo: { scrollHeight: number; clientHeight: number; scrollTo
 // jsdom has no layout, so `scrollIntoView` is undefined.
 Element.prototype.scrollIntoView = vi.fn();
 
-const msg = (id: string, role: Message['role']): Message => ({
+const msg = (id: string, role: ChatMessage['role']): ChatMessage => ({
   id,
   role,
-  content: `body of ${id}`,
-  timestamp: new Date(),
+  metadata: { createdAt: new Date().toISOString() },
+  parts: [{ type: 'text', text: `body of ${id}` }],
 });
 
 describe('ChatMessageList thread owner', () => {
@@ -409,7 +409,7 @@ describe('ChatMessageList bottom-follow intent', () => {
     const { rerender } = render(<ChatMessageList dialogId="d1" messages={initial} />);
     const sent = [...initial, msg('m3', 'user')];
     rerender(<ChatMessageList dialogId="d1" messages={sent} />);
-    const anchored: Message = { ...msg('m4', 'assistant'), scrollAnchor: 'top' };
+    const anchored: ChatMessage = { ...msg('m4', 'assistant'), metadata: { scrollAnchor: 'top' } };
     rerender(<ChatMessageList dialogId="d1" messages={[...sent, anchored]} />);
     scrollToBottom.mockClear();
     fireResize();

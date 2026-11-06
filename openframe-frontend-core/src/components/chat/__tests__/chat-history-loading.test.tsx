@@ -101,12 +101,30 @@ describe('chat parts switch themselves', () => {
     const { container: loaded } = render(
       <ChatMessageList
         messages={[
-          { id: '1', role: 'user', content: 'Hi', timestamp: new Date() },
-          { id: '2', role: 'assistant', content: 'Hello', timestamp: new Date() },
+          { id: '1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] },
+          { id: '2', role: 'assistant', parts: [{ type: 'text', text: 'Hello' }] },
         ]}
       />,
     );
     expect(items(loaded)).toHaveLength(2);
+  });
+
+  it('one box per message, with or without content below its row: the column`s direct child, and one item to the gate', () => {
+    const messages = [
+      { id: 'u', role: 'user' as const, parts: [{ type: 'text' as const, text: 'q' }] },
+      { id: 'a', role: 'assistant' as const, parts: [{ type: 'text' as const, text: 'a' }] },
+    ];
+    const strip = () => <aside />;
+    const { container, rerender } = render(<ChatMessageList messages={messages} />);
+    const boxes = () => [...items(container)];
+    const first = boxes()[0];
+    expect(boxes()).toHaveLength(messages.length);
+    expect(first.className).toContain('grid-cols-1');
+    expect(first.className).toContain('min-w-0');
+    expect(first.parentElement?.className).toContain('flex-col');
+    rerender(<ChatMessageList messages={messages} renderAfterMessage={strip} />);
+    expect(boxes()).toHaveLength(messages.length);
+    expect(boxes()[0]).toBe(first);
   });
 
   it('MingoOnboardingCard draws its skeleton while loading', () => {

@@ -1,50 +1,39 @@
 'use client';
 
 /**
- * One-component-fits-all "Ask" affordance shared across the three
- * chat-adjacent surfaces (source chips, inline cards, search results).
- *
- * Before this primitive, the same semantic action was implemented three
- * different ways:
- *   - Source chip: inline `<button>` next to the chip
- *   - Source chip dropdown row: secondaryAction icon-button
- *   - Inline card: UI-Kit `<Button variant="transparent">Ask</Button>`
- *   - Search results: nothing (asymmetric — no Ask)
- *
- * Three icon sizes, three different opacity rules, three different DOM
- * shapes for the same action. Centralized here as a single `Button`-
- * backed wrapper so the DOM + a11y + hover behavior live in one place.
- * The `density` prop picks the visual variant; the icon/label/click
- * semantics are identical across all three.
+ * A record's "Ask Mingo" (or "Display") as a button, for the surfaces that show it beside the record rather than in its
+ * "⋯" menu: the footer of a card and a row of the sources strip. It draws the action it is given, never decides it:
+ * the action, its label and its icon come from `recordDiscussAction` (entity-cards/dispatch.tsx), the same that builds
+ * the record's menu row, so the button and the menu can never offer different things. The `density` picks the look.
  */
 
-import { MessageSquare, FileText } from 'lucide-react';
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/button';
 import { TextHold } from '../ui/layout-hold';
 import { useLoadingScope } from '../ui/loading-scope';
 import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
-import type { ChatRef } from './chat-ref.types';
+
+/** A record's "Ask Mingo"/"Display" action (`recordDiscussAction`), the same for its card, its chip and its row. */
+export interface CardDiscussAction {
+  label: string;
+  icon: React.ReactNode;
+  run: () => void;
+  /** Held while a turn runs: the row keeps its place, and the "⋯" that may hold nothing else stays. */
+  disabled?: boolean;
+}
 
 export type SourceActionDensity = 'inline' | 'card' | 'list-row';
 
 export interface SourceActionButtonProps {
-  /** The row to drill into when clicked. The button is HIDDEN when this
-   *  is null (e.g. row has no primary key — Ask can't fire). */
-  chatRef: ChatRef | null;
-  /** Click handler. Receives the chatRef. When undefined the button is
-   *  hidden — same as null chatRef. */
-  onDiscuss?: (ref: ChatRef) => void;
+  /** The record's action (`recordDiscussAction`); none draws nothing. */
+  action: CardDiscussAction | undefined;
+  /** The record's name, for the button's accessible name. */
+  title: string;
   /** Visual density / layout. Defaults to `'inline'`. */
   density?: SourceActionDensity;
   /** Optional className appended to the outer element. */
   className?: string;
-  /** Button text label override. Defaults to `'Ask'`. The Display variant
-   *  on inline cards passes `'Display'` here. Density `'inline'` shows
-   *  the icon only — the label is used for aria-label / title even when
-   *  it doesn't render visibly. */
-  label?: string;
   /** Draw the action's loading form: the same box, its icon and label as skeleton bars. */
   loading?: boolean;
 }
@@ -153,40 +142,30 @@ export function FooterAction({
 }
 
 export function SourceActionButton({
-  chatRef,
-  onDiscuss,
+  action,
+  title,
   density = 'inline',
   className,
-  label = 'Ask',
   loading,
 }: SourceActionButtonProps): React.ReactElement | null {
-  if (!chatRef || !onDiscuss) return null;
-
-  // Label-driven icon. "Display" reads as a verbatim-content action so a
-  // FileText icon reinforces "show me the body" semantics; the default
-  // "Ask" stays MessageSquare for the conversational connotation. Any
-  // future label adds an entry to this map.
-  const isDisplay = label === 'Display';
-  const verbLabel = isDisplay ? `Display ${chatRef.title || 'this item'}` : `Ask about ${chatRef.title || 'this item'}`;
+  if (!action) return null;
+  const verbLabel = `${action.label}: ${title || 'this item'}`;
   const handle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onDiscuss(chatRef);
+    if (!action.disabled) action.run();
   };
   const styles = DENSITY_STYLES[density];
-  const IconComponent = isDisplay ? FileText : MessageSquare;
-  const icon = <IconComponent className={styles.iconSize} />;
-
   return (
     <FooterAction
-      label={label}
-      icon={icon}
+      label={action.label}
+      icon={<span className={cn('inline-flex [&>*]:!size-full', styles.iconSize)}>{action.icon}</span>}
       size={styles.size}
       showLabel={styles.showLabel}
       onClick={handle}
       ariaLabel={verbLabel}
       title={verbLabel}
-      className={`${styles.className}${className ? ` ${className}` : ''}`}
+      className={`${styles.className}${action.disabled ? 'pointer-events-none opacity-40' : ''}${className ? ` ${className}` : ''}`}
       loading={loading}
     />
   );

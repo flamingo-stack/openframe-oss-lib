@@ -12,4 +12,4 @@ export { formatRelativePath } from './format-relative-path';
 export { useDocSearch, type UseDocSearchConfig } from './use-doc-search';
 export { resolveSearchResultAction, type SearchResultAction } from './resolve-search-result-action';
 export { mapDocSearchResults } from './map-doc-search-results';
-export type { DocSearchResult } from './types';
+export type { DocSearchResult } from '../../../chat-protocol/doc-search';
