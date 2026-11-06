@@ -7,6 +7,7 @@ import { useLoadingScope } from '../ui/loading-scope';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
 import { MingoChatHistory } from './mingo-chat-history';
+import { ChatListLoadError } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
 interface ChatArchivePageBaseProps {
@@ -22,6 +23,13 @@ interface ChatArchivePageBaseProps {
   hasMore?: boolean;
   /** Fetch the next page. */
   onLoadMore?: () => void;
+  /** The first page failed with nothing to show: "Couldn’t load your chats"
+   *  (`ChatListLoadError`) instead of the empty state. Ignored while archived
+   *  chats are listed (they stay on screen) and while `isLoading` (a retry's
+   *  skeleton shows). */
+  loadError?: boolean;
+  /** "Try again" under the load error. Without it the error has no button. */
+  onRetry?: () => void;
   /** The archive's page size: how many rows the first-load loading state draws. Default
    *  `CHAT_HISTORY_PAGE_SIZE`. */
   pageSize?: number;
@@ -62,6 +70,8 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
     isFetching = false,
     hasMore = false,
     onLoadMore,
+    loadError = false,
+    onRetry,
     pageSize,
   } = props;
   // ONE switch: a first page with nothing to show yet (in flight at all, or the page's loading state) is the list's
@@ -117,6 +127,12 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
             isLoadingMore={isLoading && dialogs.length > 0}
             onLoadMore={onLoadMore}
           />
+        ) : loadError ? (
+          // A failed first page: the wording every Mingo chat list uses, with
+          // the host's retry — never the "No Archived Chats" empty state, which
+          // would claim there is nothing archived. A retry in flight is the
+          // first load again (above), so the click on "Try again" shows.
+          <ChatListLoadError onRetry={onRetry} className="min-h-0 flex-1 justify-center p-[var(--spacing-system-l)]" />
         ) : (
           // Empty state — mirrors the "Current Chats" rail empty state
           // (Figma 113:60939): centred 24px muted glyph + h4 title + h6 caption.

@@ -3,6 +3,7 @@
 import { createElement } from 'react';
 
 import Image from '../embed-shims/next-image';
+import { fixedImageSlot } from '../styles/image-sizes';
 import { cn } from '../utils/cn';
 import { AGENT_GLYPH_COLOR, AGENT_PICTURE_CLASS, useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
@@ -25,9 +26,6 @@ export interface AgentMarkProps {
   color?: string;
 }
 
-// A mark is at most 48px on screen; twice that covers dense screens.
-const MARK_IMAGE_SIZES = '96px';
-
 /**
  * An AI agent's mark: the icon its IDENTITY holds, and nothing else.
  *
@@ -44,7 +42,8 @@ export function AgentMark({ agent, className = '', color = AGENT_GLYPH_COLOR }: 
   if (identity?.url) {
     return (
       <span aria-hidden="true" className={cn('relative inline-block overflow-hidden rounded-full', className)}>
-        <Image src={identity.url} alt="" fill sizes={MARK_IMAGE_SIZES} className={AGENT_PICTURE_CLASS} />
+        {/* A mark is at most 48px on screen; the image-size table's 96px box covers dense screens. */}
+        <Image src={identity.url} alt="" fill sizes={fixedImageSlot('mark')} className={AGENT_PICTURE_CLASS} />
       </span>
     );
   }

@@ -305,7 +305,7 @@ Variants: `primary`, `secondary`, `outline`, `footer-link` (minimal, zero-paddin
 
 ### Skeleton
 
-`Skeleton`, `SkeletonText`, `SkeletonCard`, `SkeletonGrid`, `SkeletonButton`, `SkeletonHeading`, `SkeletonList`, `SkeletonNavigation`. All use `bg-ods-bg-secondary`.
+`Skeleton`, `SkeletonText`, `SkeletonCard`, `SkeletonGrid`, `SkeletonButton`, `SkeletonHeading`, `SkeletonList`, `SkeletonNavigation`. All draw the shared skeleton surface (`bg-ods-skeleton`, `skeleton-surface.ts`).
 
 ### Tooltip
 

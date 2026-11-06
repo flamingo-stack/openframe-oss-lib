@@ -5,7 +5,7 @@ import { useState } from 'react';
 import type { NavGroup, SiteNav } from '../../types/navigation';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
-import { SocialIconRow } from '../social-icon-row';
+import { SocialIconRow, siteNavSocialLinks } from '../social-icon-row';
 import { Button } from '../ui/button';
 import { NavItemRow } from './nav-item-row';
 import { defaultRenderSiteNavLink, NAV_FOCUS_CLASS, navLinkLabel, type SiteNavLinkRenderer } from './site-nav-link';
@@ -155,18 +155,10 @@ export function SiteFooter({
 
   const columns = nav.footerColumns;
   const accordion = columns.length > ACCORDION_OVER;
+  // The site's feeds close the footer's row: the header draws `brand.social` alone.
+  const footerSocial = [...nav.brand.social, ...(nav.brand.feeds ?? [])];
   const socialRow =
-    social ??
-    (nav.brand.social.length > 0 ? (
-      <SocialIconRow
-        compact
-        links={nav.brand.social.map(link => ({
-          platform: link.iconName ?? link.id,
-          href: link.href,
-          label: link.label,
-        }))}
-      />
-    ) : null);
+    social ?? (footerSocial.length > 0 ? <SocialIconRow compact links={siteNavSocialLinks(footerSocial)} /> : null);
 
   return (
     <footer

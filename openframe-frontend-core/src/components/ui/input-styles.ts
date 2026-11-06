@@ -3,6 +3,8 @@
  * `Input` and by `InteractiveSkeleton.Input`, so a field's skeleton is the field's box.
  */
 export const INPUT_HEIGHT_CLASS = 'h-11 md:h-12';
+/** The same steps as a FLOOR, for a block that sits in a row of fields but may wrap its text (`CheckboxBlock`). */
+export const INPUT_MIN_HEIGHT_CLASS = 'min-h-11 md:min-h-12';
 export const INPUT_RADIUS_CLASS = 'rounded-[6px]';
 /** A field's value (or placeholder) while it is read: the `text-h4` bar in the field's value slot. Read by `Input`,
  *  `SelectTrigger` and `InputTrigger`, so every field draws the same bar. */

@@ -11,7 +11,7 @@ const meta: Meta<typeof BlogCard> = {
     docs: {
       description: {
         component:
-          'Card for the `blog_post` doc type. Has two densities — `sm` is the compact horizontal chat-inline form (~80px tall), `default` is the full vertical catalog card. The card composes its own `<a>` from `href`; callers resolve the URL via `buildContentURL` or `useNavLink`.',
+          'Card for the `blog_post` doc type. Has two densities — `sm` is the compact horizontal chat-inline form (~80px tall), `default` is the full vertical catalog card. The card composes its own `<a>` from `href`; callers resolve the URL via `buildContentURL` or `useNavLinkViaRuntime`.',
       },
     },
   },

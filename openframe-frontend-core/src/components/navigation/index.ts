@@ -42,9 +42,23 @@ export type { UseScrollSpyOptions } from '../docs/use-scroll-spy';
 
 export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar';
 export type { NavigationSidebarProps } from './navigation-sidebar';
+export { NavigationSidebarActionRow } from './navigation-sidebar-grouped';
+export type { NavigationSidebarActionRowProps } from './navigation-sidebar-grouped';
+export { resolveNavigationActive } from './navigation-sidebar-match';
+export type { NavigationActiveState, ResolveNavigationActiveOptions } from './navigation-sidebar-match';
+export { AccountPopover } from './account-popover';
+export type {
+  AccountPopoverDivider,
+  AccountPopoverEntry,
+  AccountPopoverItem,
+  AccountPopoverProps,
+} from './account-popover';
 
 export { AppHeader } from './app-header';
 export type { AppHeaderProps, HeaderLoadingCell } from './app-header';
+export type { AppHeaderCell } from './app-header';
+export { NotificationsBellButton } from './notifications-bell-button';
+export type { NotificationsBellButtonProps } from './notifications-bell-button';
 
 export { AppLayout } from './app-layout';
 export { useAppLayoutDrawerContainer } from './app-layout-context';
@@ -76,6 +90,10 @@ export { HeaderButton } from './header-button';
 export type { HeaderButtonProps } from './header-button';
 export { UnreadDot, UnreadCountBadge } from './unread-dot';
 export type { UnreadDotProps, UnreadCountBadgeProps } from './unread-dot';
+export { CountPill } from './count-pill';
+export type { CountPillProps } from './count-pill';
+export { UnreadNotificationsIndicator, unreadNotificationsLabel } from './unread-notifications-indicator';
+export type { UnreadNotificationsIndicatorProps } from './unread-notifications-indicator';
 export { NavigationItemBadge } from './navigation-item-badge';
 export type { NavigationItemBadgeProps } from './navigation-item-badge';
 export { TicketAlertsButton } from './ticket-alerts-button';
@@ -107,6 +125,11 @@ export type {
   NavigationItem,
   NavigationSidebarConfig,
   NavigationSidebarItem,
+  NavigationSidebarLocation,
+  NavigationSidebarMatch,
+  NavigationSidebarMatchRule,
+  NavigationSidebarSlot,
+  NavigationSidebarSlotState,
   SiteNav,
   SiteNavPrimaryCta,
   SlidingSidebarConfig,

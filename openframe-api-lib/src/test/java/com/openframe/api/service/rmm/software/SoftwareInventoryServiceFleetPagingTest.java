@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
@@ -13,6 +14,8 @@ import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
 import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
+import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -36,6 +39,7 @@ import java.util.Map;
 
 import static com.openframe.api.service.rmm.fleet.HostInventoryFixtures.title;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -58,13 +62,20 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
+    @Mock private DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
+    @Mock private TenantSoftwareReadModelQuery tenantSoftwareReadModelQuery;
+    @Mock private SoftwareAutoUpdateService autoUpdateService;
+    @Mock private SoftwareCatalogStatus catalogStatus;
+    @Mock private TagAssignmentRepository tagAssignmentRepository;
+    @Mock private OrganizationRepository organizationRepository;
 
     private SoftwareInventoryService service;
 
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader);
+                tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }
@@ -91,6 +102,46 @@ class SoftwareInventoryServiceFleetPagingTest {
         assertThat(result.hasNext()).isTrue();
         assertThat(result.hasPrevious()).isTrue();
         verifyNoInteractions(deviceCountEnricher);
+        verify(autoUpdateService).applyToSoftware(result.items());   // AUTO-UPDATE for the page only
+    }
+
+    @Test
+    void turnOffAutoUpdate_unknownSoftware_notFound_nothingTurnedOff() {
+        // execution / verifications
+        assertThatThrownBy(() -> service.turnOffAutoUpdate("not-a-title", "admin@x"))
+                .isInstanceOf(NotFoundException.class);
+        verify(autoUpdateService, never()).turnOff(anyString(), anyString());
+    }
+
+    @Test
+    void turnOffAutoUpdate_titleFleetDoesNotListYet_turnsOffItsPolicies() {
+        // setup: on a device, so a policy names it, but not yet counted by Fleet
+        when(autoUpdateService.hasPolicy("3522")).thenReturn(true);
+        SoftwareResponse fromPolicy = SoftwareResponse.builder().id("3522").name("7zip.7zip").build();
+        when(autoUpdateService.titleFromPolicies("3522")).thenReturn(fromPolicy);
+
+        // execution
+        SoftwareResponse result = service.turnOffAutoUpdate("3522", "admin@x");
+
+        // verifications
+        assertThat(result).isSameAs(fromPolicy);
+        verify(autoUpdateService).turnOff("3522", "admin@x");
+        verify(autoUpdateService).applyToSoftware(List.of(fromPolicy));
+    }
+
+    @Test
+    void turnOffAutoUpdate_knownTitle_turnsOffThenReturnsIt() {
+        // setup
+        SoftwareTitle chrome = fleetTitle("Chrome", 42L, 7);
+        when(fleet.getSoftwareTitle(42L)).thenReturn(chrome);
+
+        // execution
+        SoftwareResponse result = service.turnOffAutoUpdate("42", "admin@x");
+
+        // verifications
+        assertThat(result.getName()).isEqualTo("Chrome");
+        verify(autoUpdateService).turnOff("42", "admin@x");
+        verify(autoUpdateService, never()).titleFromPolicies(anyString());
     }
 
     @Test
@@ -140,7 +191,7 @@ class SoftwareInventoryServiceFleetPagingTest {
 
         // execution
         PageResult<SoftwareVulnerabilityResponse> result =
-                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
+                service.listVulnerabilitiesForSoftware("42", null, null, 0, 50, null, true);
 
         // verifications
         assertThat(result.items())
@@ -160,7 +211,7 @@ class SoftwareInventoryServiceFleetPagingTest {
 
         // execution
         PageResult<SoftwareVulnerabilityResponse> result =
-                service.listVulnerabilitiesForSoftware("42", null, 0, 50, null, true);
+                service.listVulnerabilitiesForSoftware("42", null, null, 0, 50, null, true);
 
         // verifications
         assertThat(result.items()).extracting(SoftwareVulnerabilityResponse::getCveId, SoftwareVulnerabilityResponse::getDiscoveredAt)
@@ -179,7 +230,7 @@ class SoftwareInventoryServiceFleetPagingTest {
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(Map.of(10L, machine("m-10"), 11L, machine("m-11")));
 
         // execution
-        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 50);
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 50, null);
 
         // verifications
         assertThat(result.items())

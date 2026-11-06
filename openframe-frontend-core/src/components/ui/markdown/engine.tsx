@@ -33,10 +33,16 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import type { PluggableList } from 'unified';
 import type { ResolveLinkResult } from '../../../types/doc-source';
+import { readAppOrigins, SERVER_APP_ORIGINS, subscribeAppOrigins } from '../../../utils/app-origins';
 import { cn } from '../../../utils/cn';
-import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import {
+  TextLineSkeleton,
+  TextLinesByBreakpointSkeleton,
+  type TextLinesByBreakpoint,
+} from '../../loading/unified-skeleton';
 import { LoadingItems, useLoadingScope } from '../loading-scope';
 import { buildBaseComponents, MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
+import { MarkdownMediaOriginsContext } from './external-media-notice';
 import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
 import {
   buildEffectiveTagSet,
@@ -172,6 +178,13 @@ export interface MarkdownEngineProps {
    */
   extraAllowedHtmlTags?: string[];
   /**
+   * Let images and other media load from any origin. Off (the default), they
+   * load only from the app itself: the content is treated as untrusted, and a
+   * third-party image URL leaks whatever it carries the moment it renders. See
+   * `RehypeStripUnsafeOptions` in ./sanitize.ts.
+   */
+  allowRemoteMedia?: boolean;
+  /**
    * Set true for the actively streaming message ONLY. Enables atomic-block
    * memoization + fence tail-completion + an aria-live wrapper. The caller
    * MUST flip back to false on completion — that final render is one
@@ -184,8 +197,8 @@ export interface MarkdownEngineProps {
    * sections, each a heading and its paragraphs. Unset, one paragraph of `skeletonLines` lines.
    */
   skeletonSections?: number;
-  /** Lines of the one paragraph a loading body draws when it names no sections. Default 3. */
-  skeletonLines?: number;
+  /** Lines of the one paragraph a loading body draws when it names no sections, per width. Default 3 at every width. */
+  skeletonLines?: TextLinesByBreakpoint;
   /** A loading body opens with its own `# ` title (a legal document's): its title row is drawn first. */
   skeletonTitle?: boolean;
   /** The content is still being read: the body draws its skeleton (the `skeleton*` shape). A loading scope does the
@@ -194,27 +207,30 @@ export interface MarkdownEngineProps {
 }
 
 /** Lines a loading body draws when its caller names no shape. */
-export const MARKDOWN_SKELETON_LINES = 3;
+export const MARKDOWN_SKELETON_LINES: TextLinesByBreakpoint = { phone: 3, md: 3, lg: 3 };
 /** Paragraphs under each heading of a loading body, and their lines. */
-const SKELETON_SECTION_PARAGRAPHS = [3, 2] as const;
+const SKELETON_SECTION_PARAGRAPHS: readonly TextLinesByBreakpoint[] = [
+  { phone: 3, md: 3, lg: 3 },
+  { phone: 2, md: 2, lg: 2 },
+];
 /**
- * Lines a typical body's opening line set takes, on a phone (below `content-md`) and from `content-md`: a document's
+ * Lines a typical body's opening line set takes, per width: a document's
  * `# ` title wraps on a phone, and the opening paragraph every post and legal document starts with runs a few lines.
  * Typical lengths, never one record's: a longer record growing past them is a settle below its own lines.
  */
-const SKELETON_TITLE_LINES = { phone: 2, wide: 1 } as const;
-const SKELETON_LEAD_LINES = { phone: 5, wide: 3 } as const;
+const SKELETON_TITLE_LINES: TextLinesByBreakpoint = { phone: 2, md: 1, lg: 1 };
+const SKELETON_LEAD_LINES: TextLinesByBreakpoint = { phone: 5, md: 3, lg: 3 };
 /** The renderer's own frame: read by the engine and by its skeleton. */
 /** The renderer's root class, on the rendered document and on every skeleton of one: it names a markdown body. */
 export const MARKDOWN_RENDERER_CLASS = 'simple-markdown-renderer';
 const RENDERER_CLASS = MARKDOWN_RENDERER_CLASS;
-const CONTENT_WRAPPER_CLASS = 'content-wrapper max-w-none';
+const CONTENT_WRAPPER_CLASS = 'max-w-none';
 /**
  * The rendered body. `[&>*:last-child]:mb-0`: the last block never pushes what follows the document further down.
- * Prose's own last-child reset has zero specificity, so a block that sets its own margin (a table's `my-6`) kept it,
- * and a document's distance to the next section depended on which block it ended with.
+ * Without it a block that sets its own margin (a table's `my-6`) kept it, and a document's distance to the next
+ * section depended on which block it ended with.
  */
-const ARTICLE_CLASS = 'prose prose-lg max-w-none [&>*:last-child]:mb-0';
+const ARTICLE_CLASS = 'max-w-none [&>*:last-child]:mb-0';
 
 /**
  * One memoized completed block of a streaming message. Parent-level memos
@@ -260,6 +276,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
   additionalRemarkPlugins,
   textSize,
   extraAllowedHtmlTags,
+  allowRemoteMedia = false,
   streaming = false,
 }) => {
   const textSizes = useMemo(() => resolveTextSizeConfig(textSize), [textSize]);
@@ -308,6 +325,10 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     [additionalRemarkPlugins],
   );
 
+  // What "from the app" means for media: the server's answer while hydrating (only relative URLs), the page's own and
+  // the host's sanctioned origins after that, and again whenever a host registers its auth adapter later.
+  const appOrigins = useSyncExternalStore(subscribeAppOrigins, readAppOrigins, () => SERVER_APP_ORIGINS);
+
   const rehypeHighlight = useHighlightPlugin(processedContent);
   const { rehypePlugins, liveRehypePlugins } = useMemo(() => {
     const schema = buildSanitizeSchema({
@@ -315,9 +336,15 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     });
     // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
     // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
-    // defense-in-depth (srcset scanning, iframe[srcdoc]); the fence label
-    // goes on after sanitizing and before highlight, which runs last.
-    const safe: PluggableList = [rehypeRaw, [rehypeSanitize, schema], rehypeStripUnsafe, rehypeLabelBareFences];
+    // defense-in-depth (srcset scanning, iframe[srcdoc]) and drops media from
+    // outside the app; the fence label goes on after sanitizing and before
+    // highlight, which runs last.
+    const safe: PluggableList = [
+      rehypeRaw,
+      [rehypeSanitize, schema],
+      [rehypeStripUnsafe, { allowRemoteMedia, appOrigins }],
+      rehypeLabelBareFences,
+    ];
     // No language detection: it ran highlightAuto over every registered
     // grammar for each unlabelled fence (~2.5x the cost of opening a
     // thread) and often guessed wrong (PowerShell shown as "VBNET").
@@ -333,7 +360,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
       // `rehypePlugins`.
       liveRehypePlugins: safe,
     };
-  }, [extraTagsKey, rehypeHighlight]);
+  }, [extraTagsKey, allowRemoteMedia, appOrigins, rehypeHighlight]);
 
   const components: Components = useMemo(
     () => ({
@@ -408,7 +435,11 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
           override the cascade with the weaker `break-word` for this subtree. */}
       <div className={CONTENT_WRAPPER_CLASS}>
         <article className={ARTICLE_CLASS}>
-          <HeadingIdMapContext.Provider value={headingIds}>{body}</HeadingIdMapContext.Provider>
+          <HeadingIdMapContext.Provider value={headingIds}>
+            <MarkdownMediaOriginsContext.Provider value={allowRemoteMedia ? null : appOrigins}>
+              {body}
+            </MarkdownMediaOriginsContext.Provider>
+          </HeadingIdMapContext.Provider>
         </article>
       </div>
     </div>
@@ -443,28 +474,12 @@ export const MarkdownEngine = memo(function MarkdownEngineGate(props: MarkdownEn
   return <MarkdownEngineImpl {...props} />;
 });
 
-/** A paragraph of `lines` lines at the body's own paragraph type, as one bar of its line height. */
-function ParagraphBar({ lines, className }: { lines: number; className: string }) {
+/** A paragraph of its `lines` per width at the body's own paragraph type. */
+function ParagraphBar({ lines, className }: { lines: TextLinesByBreakpoint; className: string }) {
   return (
     <div className={className}>
-      <TextLineSkeleton type="inherit" lines={lines} className="w-full" />
+      <TextLinesByBreakpointSkeleton lines={lines} />
     </div>
-  );
-}
-
-/** Lines of a text run per breakpoint: on a phone, and from `content-md`. */
-interface SkeletonLinesByBreakpoint {
-  phone: number;
-  wide: number;
-}
-
-/** A text run of the lines it takes on a phone and from `content-md` (the content area's own steps). */
-function LinesByBreakpoint({ lines, as = 'div' }: { lines: SkeletonLinesByBreakpoint; as?: 'div' | 'span' }) {
-  return (
-    <>
-      <TextLineSkeleton type="inherit" as={as} lines={lines.phone} className="w-full content-md:hidden" />
-      <TextLineSkeleton type="inherit" as={as} lines={lines.wide} className="hidden w-full content-md:flex" />
-    </>
   );
 }
 
@@ -482,7 +497,7 @@ export function MarkdownEngineSkeleton({
   className = '',
 }: {
   sections?: number;
-  lines?: number;
+  lines?: TextLinesByBreakpoint;
   textSize?: TextSizeConfig;
   /** The body opens with its own `# ` title (a legal document's, demoted to an `h2`): its H1 row is drawn first. */
   title?: boolean;
@@ -498,12 +513,12 @@ export function MarkdownEngineSkeleton({
         <div className={ARTICLE_CLASS}>
           {title && (
             <h2 className={cn(MARKDOWN_H1_CLASS, textSizes.h1)}>
-              <LinesByBreakpoint lines={SKELETON_TITLE_LINES} as="span" />
+              <TextLinesByBreakpointSkeleton lines={SKELETON_TITLE_LINES} as="span" />
             </h2>
           )}
           {sections ? (
             <div className={paragraphClass}>
-              <LinesByBreakpoint lines={SKELETON_LEAD_LINES} />
+              <TextLinesByBreakpointSkeleton lines={SKELETON_LEAD_LINES} />
             </div>
           ) : null}
           {sections ? (

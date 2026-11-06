@@ -619,8 +619,9 @@ function TicketTagRow({ tags }: { tags: string[] }) {
 
 /**
  * A board card while it is read: the card's own shell, its title and device lines as bars of their own type steps,
- * the priority and assignee marks, a typical tag row and the number and time line, in the body's order. The board card draws it itself (`ticket={null}` or a
- * loading scope).
+ * the priority and assignee marks, the number and time line and the activity line ("No activity for 2 days"), in the
+ * body's order. A typical card has no tags (none of 70 measured tickets had one) and does have an activity line (every
+ * one did). The board card draws it itself (`ticket={null}` or a loading scope).
  */
 function TicketCardSkeleton({ className, ...props }: { className?: string; [key: `data-${string}`]: unknown }) {
   return (
@@ -638,11 +639,11 @@ function TicketCardSkeleton({ className, ...props }: { className?: string; [key:
           <UnifiedSkeleton className="size-8 rounded-full" />
         </div>
       </div>
-      <div className="flex h-8 items-start gap-[var(--spacing-system-xxs)]">
-        <Tag loading label="" />
-        <Tag loading label="" />
-      </div>
       <TextLineSkeleton type="h6" className={cn(TICKET_CARD_META_CLASS, 'w-1/3')} />
+      <div className="flex items-center gap-[var(--spacing-system-xxs)] text-h6">
+        <UnifiedSkeleton className="size-4 shrink-0 rounded-sm" />
+        <TextLineSkeleton type="inherit" className="w-1/2" />
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useChatRuntime } from '../contexts/chat-runtime-context';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 import { usePathname } from '../embed-shims/next-navigation';
 import { useSelfFetch } from '../hooks/use-self-fetch';
@@ -16,6 +17,7 @@ import { isAnnouncementOnSurface } from '../utils/announcement-surface';
 import { getAppType } from '../utils/app-config';
 import { pickReadableTextColor } from '../utils/color-analysis';
 import { pathMatchesAny } from '../utils/path-pattern';
+import { executeNavigationImperative, executeNewTabNavigation } from './chat/utils/execute-navigation';
 import { EntityIcon } from './icon-display';
 import { AnnouncementBarView } from './ui/announcement-bar-view';
 import { Button } from './ui/button';
@@ -89,6 +91,8 @@ export function AnnouncementBar({
   // `usePathname` on a Next host, the embedder's registered router elsewhere).
   // Read HERE so every host gets `excluded_paths` with no wiring of its own.
   const pathname = usePathname();
+  // The CTA is followed through the lib's navigation executor, with the host's runtime when there is one.
+  const runtime = useChatRuntime();
 
   // Optional endpoint runtime: no provider → no URL → fetching disabled.
   const endpoints = useEndpointsRuntime();
@@ -200,7 +204,7 @@ export function AnnouncementBar({
     if (previewMode || !announcement?.cta_url) return;
     // Scheme guard: cta_url is admin-entered data — only http(s) (absolute or
     // relative) may navigate. A `javascript:` value would otherwise execute
-    // via location.href / window.open (stored XSS).
+    // via a navigation (stored XSS).
     let safeUrl: string;
     try {
       // Resolve against the CURRENT page (not the origin) so path-relative and
@@ -211,11 +215,9 @@ export function AnnouncementBar({
     } catch {
       return;
     }
-    if (announcement.cta_target === '_blank') {
-      window.open(safeUrl, '_blank', 'noopener,noreferrer');
-    } else {
-      window.location.href = safeUrl;
-    }
+    // The admin chose the tab (`cta_target`).
+    if (announcement.cta_target === '_blank') executeNewTabNavigation({ runtime, href: safeUrl });
+    else executeNavigationImperative({ runtime, href: safeUrl, openIn: 'same-tab' });
   };
 
   // Never had anything to show: render nothing. Dismissal AND deactivation

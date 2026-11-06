@@ -1,5 +1,6 @@
 package com.openframe.notification.spec;
 
+import com.openframe.data.document.user.UserRole;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +28,7 @@ class AudienceTest {
 
         assertThat(explicit.userIds).isEmpty();
         assertThat(explicit.excludedUserIds).containsExactly("assignee");
-        assertThat(declared.allActiveAdmins).isTrue();
+        assertThat(declared.activeRoles).containsExactly(UserRole.ADMIN);
         assertThat(declared.excludedUserIds).containsExactly("actor");
         assertThat(Audience.users("a").except(null).userIds).containsExactly("a");
     }
@@ -42,7 +43,17 @@ class AudienceTest {
 
         assertThat(audience.userIds).containsExactlyInAnyOrder("a", "b");
         assertThat(audience.machineIds).containsExactly("m-1");
-        assertThat(audience.allActiveAdmins).isTrue();
+        assertThat(audience.activeRoles).containsExactly(UserRole.ADMIN);
+    }
+
+    @Test
+    @DisplayName("allActive(role) declares the role as it is, and the marker survives andUsers/except")
+    void role_marker_is_kept_as_declared() {
+        Audience owners = Audience.allActive(UserRole.OWNER).andUsers(List.of("a")).except("actor");
+
+        assertThat(owners.activeRoles).containsExactly(UserRole.OWNER);
+        assertThat(owners.userIds).containsExactly("a");
+        assertThat(owners.excludedUserIds).containsExactly("actor");
     }
 
     @Test
@@ -51,6 +62,6 @@ class AudienceTest {
 
         assertThat(none.userIds).isEmpty();
         assertThat(none.machineIds).isEmpty();
-        assertThat(none.allActiveAdmins).isFalse();
+        assertThat(none.activeRoles).isEmpty();
     }
 }

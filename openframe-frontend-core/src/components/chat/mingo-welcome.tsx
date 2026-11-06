@@ -10,8 +10,8 @@ import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { MingoChatHistory } from './mingo-chat-history';
+import { MingoQuickActionWall } from './mingo-quick-action-wall';
 import { QuickActionChipButton } from './quick-action-chip';
-import { QuickActionWall } from './quick-action-wall';
 import type { DialogItem } from './types/component.types';
 
 // =============================================================================
@@ -33,9 +33,8 @@ export interface MingoQuickAction {
   /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip. */
   variant?: 'primary' | 'outline';
   onClick?: () => void;
-  /** Full prompt text previewed as ghost text in the composer on hover/focus.
-   *  The chip `label` is short; this reveals what the action will actually ask.
-   *  Omitted → falls back to `label`. */
+  /** The full prompt the action asks: in `EmbeddableChat` a click sends it. The
+   *  chip `label` is short. Omitted → falls back to `label`. */
   prompt?: string;
 }
 
@@ -55,11 +54,6 @@ export interface MingoWelcomeProps {
   promoStorage?: 'local' | 'session';
   /** Extra quick-action chips appended after the "Start Guide Chat" chip. */
   quickActions?: ReadonlyArray<MingoQuickAction>;
-  /** Pointer/keyboard focus enters a quick-action chip — e.g. preview the
-   *  action's full `prompt` in the composer input. */
-  onQuickActionHover?: (action: MingoQuickAction) => void;
-  /** Pointer/keyboard focus leaves the chip — e.g. restore the composer. */
-  onQuickActionHoverEnd?: () => void;
   /** Returning-user variation: the user already has chats. Hides the
    *  "New to OpenFrame?" notification entirely and renders the "Start Guide
    *  Chat" chip in the muted `outline` style instead of the accent yellow. */
@@ -88,10 +82,9 @@ export interface MingoWelcomeProps {
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
   onStartGuideChat?: () => void;
-  /** Agent this empty state belongs to — forwarded to the quick-action
-   *  {@link QuickActionWall} so a built-in agent (`'fae'`/`'mingo'`) caps the
-   *  brick stack at 2 rows. Defaults to `'mingo'` (this is the Mingo surface). */
-  agentSlug?: string;
+  /** The host is still reading the quick actions: the set draws its loading form in every slot, so the empty state
+   *  keeps its height when they land. */
+  quickActionsLoading?: boolean;
   /** Appended to the root element. */
   className?: string;
 }
@@ -137,8 +130,6 @@ export function MingoWelcome({
   promoStorageKey = DEFAULT_PROMO_STORAGE_KEY,
   promoStorage = 'local',
   quickActions,
-  onQuickActionHover,
-  onQuickActionHoverEnd,
   hasExistingChats = false,
   dialogHistory,
   isLoadingHistory = false,
@@ -146,7 +137,7 @@ export function MingoWelcome({
   loadError = false,
   onRetry,
   onStartGuideChat,
-  agentSlug = 'mingo',
+  quickActionsLoading = false,
   className,
 }: MingoWelcomeProps) {
   // Greeting never weaves the user's name in — always the plain "Hey, I'm
@@ -234,7 +225,7 @@ export function MingoWelcome({
             <AlertCircleIcon className="h-8 w-8 shrink-0 text-ods-text-secondary" />
             <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
               <p className="text-ods-text-primary text-h4">Couldn’t load your chats</p>
-              <p className="text-body-sm text-ods-text-secondary">
+              <p className="text-ods-text-secondary">
                 Something went wrong reaching the server. Check your connection and try again.
               </p>
             </div>
@@ -316,18 +307,12 @@ export function MingoWelcome({
             </div>
           )}
 
-          {/* Quick actions. "Start Guide Chat" stays pinned above the wall — it's
-          the primary mode switch and must never scroll out of reach. The rest
-          render in the shared {@link QuickActionWall} in BRICK mode (the SAME
-          chip wall the website hero uses): 2 stacked row marquees under left/
-          right edge fades, so a long agent action set gets "reach" without
-          squeezing the composer. `pauseOnHover` freezes the hovered row so a
-          moving chip never dodges a click; hover/focus previews the action's
-          full prompt in the composer. */}
-          {/* The standalone chip sits one WALL PITCH above the wall, so it reads
-              as that wall's first row rather than a separate control. */}
-          {(onStartGuideChat || (quickActions && quickActions.length > 0)) && (
-            <div className="flex shrink-0 flex-col gap-[var(--chip-wall-gap)]">
+          {/* Quick actions. "Start Guide Chat" stays pinned above the set: it is the primary mode switch and must
+              never move out of reach. The rest are the static {@link QuickActionSet} (fixed slots, "More" for the
+              rest); a click puts the action's prompt into the composer. The standalone chip sits one
+              chip gap above the set, so it reads as its first row rather than a separate control. */}
+          {(onStartGuideChat || (quickActions && quickActions.length > 0) || quickActionsLoading) && (
+            <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xs)]">
               {onStartGuideChat && (
                 <QuickActionChipButton
                   label="Start Guide Chat"
@@ -337,28 +322,10 @@ export function MingoWelcome({
                   className="self-start"
                 />
               )}
-              {quickActions && quickActions.length > 0 && (
-                <QuickActionWall
-                  chips={quickActions.map(action => ({
-                    id: action.id,
-                    label: action.label,
-                    icon: action.icon,
-                    variant: action.variant,
-                    onSelect: action.onClick,
-                    onHoverStart: () => onQuickActionHover?.(action),
-                    onHoverEnd: () => onQuickActionHoverEnd?.(),
-                  }))}
-                  agentSlug={agentSlug}
-                  rows={4}
-                  pauseOnHover
-                  dragScroll
-                  fade={['left', 'right']}
-                  fadeSize={{ left: 32 }}
-                  fadeColor="var(--color-bg)"
-                  copyGap="var(--spacing-system-xxs)"
-                  className="max-h-44 shrink-0"
-                />
-              )}
+              <MingoQuickActionWall
+                quickActions={quickActions ?? []}
+                loading={quickActionsLoading && !quickActions?.length}
+              />
             </div>
           )}
         </div>

@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import Image from '../embed-shims/next-image';
 import { useToast } from '../hooks/use-toast';
+import { IMAGE_SLOT } from '../styles/image-sizes';
 import { errorMessage } from '../utils/common';
 import { IMAGE_FILE_ACCEPT } from '../utils/media-type';
 import { Button } from './ui/button';
@@ -172,7 +173,14 @@ export function HeroImageUploader({
           className="group relative flex aspect-square h-auto w-full items-center justify-center overflow-hidden md:aspect-auto md:h-full"
           style={{ height: heightStyle }}
         >
-          <Image src={imageUrl} className={`object-${objectFit}`} alt="Cover" fill sizes="100vw" unoptimized />
+          <Image
+            src={imageUrl}
+            className={`object-${objectFit}`}
+            alt="Cover"
+            fill
+            sizes={IMAGE_SLOT.full}
+            unoptimized
+          />
           <div className="absolute inset-0 flex items-center justify-center gap-4 rounded-lg bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
             {showReplaceButton && (
               <Button

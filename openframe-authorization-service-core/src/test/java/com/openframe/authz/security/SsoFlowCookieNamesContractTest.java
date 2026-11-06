@@ -3,7 +3,6 @@ package com.openframe.authz.security;
 import com.openframe.authz.security.flow.InviteSsoHandler;
 import com.openframe.authz.security.flow.LoginSsoHandler;
 import com.openframe.authz.security.flow.SsoFlowHandler;
-import com.openframe.authz.security.flow.TenantRegSsoHandler;
 import com.openframe.core.constants.SsoFlowCookieNames;
 import org.junit.jupiter.api.Test;
 
@@ -19,9 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SsoFlowCookieNamesContractTest {
 
     private static final List<SsoFlowHandler> HANDLERS = List.of(
-            new TenantRegSsoHandler(null, null, null),
-            new InviteSsoHandler(null, null),
-            new LoginSsoHandler(null, null, null, null, null, null, null, null));
+            new InviteSsoHandler(null, null, null),
+            new LoginSsoHandler(null, null, null, null, null, null, null, null, null));
 
     @Test
     void shouldListExactlyTheCookiesOfTheFlowHandlers() {

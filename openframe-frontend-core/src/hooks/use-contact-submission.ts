@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
+import { executeNavigationImperative } from '../components/chat/utils/execute-navigation';
+import { isRelativeHref } from '../components/chat/utils/new-tab-rel';
+import { useChatRuntime } from '../contexts/chat-runtime-context';
 import { useRequiredEndpointsRuntime } from '../contexts/endpoints-runtime-context';
-import { useRouter } from '../embed-shims/next-navigation';
 import { apiErrorMessage } from '../utils/common';
 import { contentFetch } from '../utils/embed-content-fetch';
 import { useToast } from './use-toast';
@@ -46,7 +48,7 @@ interface ContactFormData {
 export function useContactSubmission(options: ContactSubmissionOptions = {}) {
   const { userId, successRedirectUrl, successToastMessage, onSuccess } = options;
   const { toast } = useToast();
-  const router = useRouter();
+  const runtime = useChatRuntime();
   // Endpoint URL injected via context — hub provides hub default, embedded
   // app provides its proxied path. Throws if no provider is mounted.
   const { contactUrl } = useRequiredEndpointsRuntime();
@@ -109,15 +111,18 @@ export function useContactSubmission(options: ContactSubmissionOptions = {}) {
     console.log('🚀 Contact submission successful, redirecting to:', successRedirectUrl);
     const timer = setTimeout(() => {
       console.log('🎯 Performing redirect now to:', successRedirectUrl);
-      if (successRedirectUrl.startsWith('http')) {
-        window.location.href = successRedirectUrl;
-      } else {
-        router.push(successRedirectUrl);
-      }
+      // A relative redirect is the host's own page (`hostRoute`): it replaces this page in every mode, an embedded
+      // form's included. An absolute one follows the navigation rule.
+      executeNavigationImperative({
+        runtime,
+        href: successRedirectUrl,
+        openIn: 'same-tab',
+        hostRoute: isRelativeHref(successRedirectUrl),
+      });
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [isSuccess, successRedirectUrl, router]);
+  }, [isSuccess, successRedirectUrl, runtime]);
 
   // Call onSuccess callback if provided
   useEffect(() => {

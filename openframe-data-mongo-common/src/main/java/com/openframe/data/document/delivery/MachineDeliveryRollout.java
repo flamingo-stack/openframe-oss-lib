@@ -26,6 +26,8 @@ public class MachineDeliveryRollout implements TenantScoped {
     private DeliveryType type;
     private String targetId;
     private String payloadJson;
+    // the body without the delivery block: a start with the same hash while this one runs is the same order again
+    private String bodyHash;
     private int sequence;
 
     private DeliveryRolloutStatus status;

@@ -352,7 +352,7 @@ export function DatePickerCalendar({
       cellInner,
       'flex items-center justify-center',
       'cursor-pointer border-none bg-transparent outline-none',
-      'font-inherit text-inherit',
+      'text-inherit',
     ),
     // Painted through the `todayTint` modifier instead — see `isUnclaimedToday`.
     today: '',

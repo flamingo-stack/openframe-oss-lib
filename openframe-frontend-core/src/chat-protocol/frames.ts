@@ -18,7 +18,7 @@
  * Server-safe: no React, no browser APIs beyond TextEncoder/TextDecoder.
  */
 
-import type { ChatProgressStage } from './progress';
+import type { ToolType } from '../types/tool.types';
 
 // =============================================================================
 // Sentinel constants
@@ -84,11 +84,17 @@ export interface RoutedAnswerBreakdown {
  *  within ~200ms, before any upstream byte arrives. */
 export interface StatusThinkingFrame {
   status: 'thinking';
-  /** What the turn is doing right now (`./progress`): a fixed vocabulary, shown
-   *  as one line while the user waits. May be sent again as the stage moves. */
-  stage?: ChatProgressStage;
-  /** How many of the thing the stage works on (sources searched, results read). */
-  count?: number;
+}
+
+/** A step of the turn (`./progress`), in the chunk shape a NATS tool run has: the decoder reads it with
+ *  `decodeNatsChunk` and the chat draws it as that run's row. */
+export interface ToolExecutionFrame {
+  type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL';
+  integratedToolType: ToolType;
+  toolFunction: string;
+  title: string;
+  toolExecutionRequestId: string;
+  success?: boolean;
 }
 
 /** Per-turn metadata frame. The emitter sends `options.metadata`
@@ -231,7 +237,8 @@ export type SseLeadingFrame =
   | ToolErrorFrame
   | ApprovalRequestFrame
   | ApprovalBatchFrame
-  | DecisionResolvedFrame;
+  | DecisionResolvedFrame
+  | ToolExecutionFrame;
 
 // =============================================================================
 // Trailing usage frame

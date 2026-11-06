@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import static org.springframework.http.HttpHeaders.SET_COOKIE;
 
 /**
- * Writes the short-lived SSO flow cookies ({@code of_sso_reg}, {@code of_sso_invite}).
+ * Writes the short-lived SSO flow cookies ({@code of_sso_invite}, {@code of_sso_login}).
  * <p>
  * SameSite is configurable because it depends on how the provider returns the authorization
  * response. Google and Microsoft use the query response mode, so the callback is a top-level GET

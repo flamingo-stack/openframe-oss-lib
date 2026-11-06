@@ -1,7 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HubSpotMeetingScheduler, type HubSpotMeetingSchedulerProps } from '../components/meeting-scheduler';
-import type { MeetingAvailability } from '../schemas/meeting-booking-schema';
+import {
+  HubSpotMeetingScheduler,
+  MeetingSchedulerModal,
+  type HubSpotMeetingSchedulerProps,
+  type MeetingSchedulerModalProps,
+} from '../components/meeting-scheduler';
+import type { MeetingAvailability, SchedulingLink } from '../schemas/meeting-booking-schema';
 import { availabilityWith, fillIdentity } from './fixtures/meeting-booking';
 
 /** A slot two hours from now, on the hour — inside the month the calendar opens on. */
@@ -115,5 +120,73 @@ describe('HubSpotMeetingScheduler — modal layout', () => {
     expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
     fireEvent.click(await timeChip());
     expect(await screen.findByLabelText(/^Email/)).toBeInTheDocument();
+  });
+});
+
+const link: SchedulingLink = {
+  id: '1',
+  link: 'https://meetings.example.com/onboarding',
+  slug: 'onboarding',
+  purpose: 'openframe-users',
+  title: 'Onboarding call',
+  description: null,
+  kind: 'personal',
+  durationsMinutes: [30, 45],
+  hosts: [],
+  nextAvailableMs: SLOT_MS,
+};
+
+const bookingWindow = (props: Partial<MeetingSchedulerModalProps> = {}) => (
+  <MeetingSchedulerModal isOpen onClose={vi.fn()} title="Book an Onboarding Call" link={link} {...props} />
+);
+
+describe('MeetingSchedulerModal', () => {
+  it('is the titled window around the scheduler in its modal layout', async () => {
+    render(bookingWindow());
+    expect(screen.getByText('Book an Onboarding Call')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
+    expect(await timeChip()).toBeInTheDocument();
+  });
+
+  it('with no link to book it says so instead of drawing the scheduler', () => {
+    render(bookingWindow({ link: null, emptyMessage: 'No onboarding calls can be booked right now.' }));
+    expect(screen.getByText('No onboarding calls can be booked right now.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
+  });
+
+  it('while the link is read the scheduler holds its place, not the empty line', () => {
+    render(bookingWindow({ link: null, loading: true }));
+    expect(screen.queryByText('No calls can be booked right now.')).not.toBeInTheDocument();
+  });
+
+  it('Cancel closes the window', () => {
+    const onClose = vi.fn();
+    render(bookingWindow({ onClose }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('a confirmed booking toasts, reports the booking and closes the window', async () => {
+    const confirmation = { meetingId: '1', title: 'Onboarding call', startTimeMs: SLOT_MS, durationMs: 1_800_000 };
+    book.mockResolvedValue({ ok: true, confirmation });
+    const onClose = vi.fn();
+    const onBooked = vi.fn();
+    render(bookingWindow({ onClose, onBooked }));
+    fireEvent.click(await timeChip());
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByLabelText(/^Email/);
+    fillIdentity();
+    const submit = screen.getByRole('button', { name: 'Confirm Booking' });
+    await waitFor(() => expect(submit).not.toBeDisabled());
+    fireEvent.click(submit);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(onBooked).toHaveBeenCalledWith(confirmation);
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Call booked',
+        variant: 'success',
+        description: expect.stringContaining('Onboarding call - ') as unknown,
+      }),
+    );
   });
 });

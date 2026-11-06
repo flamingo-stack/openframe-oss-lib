@@ -3,6 +3,7 @@ package com.openframe.stream.model.fleet.debezium;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.IntegratedToolType;
+import com.openframe.data.model.enums.MessageType;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,6 +16,7 @@ import java.util.Set;
 @NoArgsConstructor
 public class DeserializedDebeziumMessage extends CommonDebeziumMessage {
 
+    private MessageType messageType;
     private UnifiedEventType unifiedEventType;
     private String ingestDay;
     private String toolEventId;

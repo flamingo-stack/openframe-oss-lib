@@ -44,3 +44,25 @@ export const AppLayoutDrawerCoordinationContext = createContext<AppLayoutDrawerC
 export function useAppLayoutDrawerCoordination(): AppLayoutDrawerCoordination | null {
   return useContext(AppLayoutDrawerCoordinationContext);
 }
+
+/**
+ * The composer dock's height while AppLayout has one, 0 otherwise: what a page's
+ * window-pinned bottom bar rises by (`PageActions` on a phone), so it does not cover
+ * the composer.
+ *
+ * A context rather than a CSS variable on the page column. The dock grows with the
+ * draft (every new line, a staged attachment), and an inherited custom property
+ * there made WebKit restyle the whole page on each change; this way only the bars
+ * that read it re-render.
+ */
+export const ComposerDockHeightContext = createContext(0);
+
+export function useComposerDockHeight(): number {
+  return useContext(ComposerDockHeightContext);
+}
+
+/**
+ * Marks the navigation sidebar's root, so a popup opened from a button inside it can
+ * start past the sidebar's edge instead of over it (the compact time tracker).
+ */
+export const NAVIGATION_SIDEBAR_ATTRIBUTE = 'data-navigation-sidebar';

@@ -21,6 +21,7 @@
 
 import { useState, type ReactNode } from 'react';
 import Image from '../../embed-shims/next-image';
+import { AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
@@ -100,8 +101,8 @@ function ChatMessageRowLoaded(props: ChatMessageRowProps) {
           src={src}
           alt={displayName}
           className={cn(AVATAR_BOX_CLASS, 'object-cover')}
-          width={40}
-          height={40}
+          width={AVATAR_SIZE_PX.md}
+          height={AVATAR_SIZE_PX.md}
           onError={() => setFailedSrc(resolvedAvatar ?? null)}
         />
       ) : (

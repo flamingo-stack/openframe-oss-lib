@@ -279,7 +279,7 @@ export function ScheduleScriptPickerCard({
         </Accordion>
       ) : (
         <div className="flex flex-col items-start gap-[var(--spacing-system-lf)] content-md:flex-row">
-          <div className="w-full min-w-0 flex-1 [&_label]:text-h4">
+          <div className="w-full min-w-0 flex-1">
             <Controller
               name={`scripts.${index}.args`}
               control={control}
@@ -291,12 +291,13 @@ export function ScheduleScriptPickerCard({
                   valuePlaceholder="Enter Value (empty=flag)"
                   addButtonLabel="Add Script Argument"
                   titleLabel="Script Arguments"
+                  labelVariant="large"
                   disabled={runParamsLocked}
                 />
               )}
             />
           </div>
-          <div className="w-full min-w-0 flex-1 [&_label]:text-h4">
+          <div className="w-full min-w-0 flex-1">
             <Controller
               name={`scripts.${index}.envVars`}
               control={control}
@@ -309,6 +310,7 @@ export function ScheduleScriptPickerCard({
                   addButtonLabel="Add Environment Var"
                   addSecretButtonLabel="Add Secret"
                   titleLabel="Environment Vars"
+                  labelVariant="large"
                   disabled={runParamsLocked}
                 />
               )}

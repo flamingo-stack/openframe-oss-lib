@@ -5,6 +5,7 @@ use std::time::Duration;
 use tracing::{info, warn};
 
 use crate::config::update_config::TEMP_LEFTOVER_MIN_AGE_SECS;
+use crate::platform::directories::get_update_staging_directory;
 
 #[derive(Clone)]
 pub struct UpdateCleanupService {
@@ -17,7 +18,7 @@ impl UpdateCleanupService {
         Ok(Self::for_binary(exe_path))
     }
 
-    /// For an uninstall started from a copy that is not the installed binary.
+    /// For a binary other than the running one.
     pub fn for_binary(exe_path: PathBuf) -> Self {
         Self { exe_path }
     }
@@ -32,7 +33,7 @@ impl UpdateCleanupService {
             Err(e) => warn!("Failed to cleanup old backups: {:#}", e),
         }
 
-        cleaned += self.sweep_temp_leftovers(Some(Duration::from_secs(TEMP_LEFTOVER_MIN_AGE_SECS)));
+        cleaned += self.sweep_temp_leftovers(Duration::from_secs(TEMP_LEFTOVER_MIN_AGE_SECS));
 
         if cleaned > 0 {
             info!("Cleanup: removed {} old files", cleaned);
@@ -79,14 +80,24 @@ impl UpdateCleanupService {
         Ok(cleaned)
     }
 
-    /// Temp-dir leftovers of the script-based updater (`openframe-update-*`
-    /// staging dirs, `openframe-updater-*.ps1|.sh`). `min_age` = `None` removes
-    /// them regardless of age (uninstall); otherwise anything younger is kept
-    /// because an update may still be using it.
-    pub fn sweep_temp_leftovers(&self, min_age: Option<Duration>) -> usize {
+    /// Update leftovers older than `min_age` in the staging dir and in the
+    /// temp dir older clients used; anything younger may still be in use.
+    pub fn sweep_temp_leftovers(&self, min_age: Duration) -> usize {
         let temp_dir = std::env::temp_dir();
+        let staging_dir = get_update_staging_directory();
+        let mut cleaned = Self::sweep_update_leftovers(&temp_dir, Some(min_age));
+        if staging_dir != temp_dir {
+            cleaned += Self::sweep_update_leftovers(&staging_dir, Some(min_age));
+        }
+        cleaned
+    }
+
+    /// Leftovers of the script-based updater in `dir` (`openframe-update-*`
+    /// staged binaries and dirs, `openframe-updater-*.ps1|.sh`). `min_age` =
+    /// `None` removes them regardless of age (uninstall).
+    pub fn sweep_update_leftovers(dir: &Path, min_age: Option<Duration>) -> usize {
         let mut cleaned = 0;
-        let Ok(entries) = fs::read_dir(&temp_dir) else {
+        let Ok(entries) = fs::read_dir(dir) else {
             return 0;
         };
         for entry in entries.flatten() {

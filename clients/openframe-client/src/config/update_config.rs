@@ -8,12 +8,6 @@ pub const HTTP_CLIENT_TIMEOUT_SECS: u64 = 120; // control-plane (auth, registrat
 pub const AWAITING_AUTH_POLL_SECS: u64 = 15; // unauthenticated service polling for the config `auth` writes
 pub const DOWNLOAD_CLIENT_TIMEOUT_SECS: u64 = 300; // binary downloads (GitHub, tool API)
 
-// Consumer retry
-pub const CONSUMER_RETRY_ATTEMPTS_PER_CYCLE: u32 = 5;
-pub const INITIAL_RETRY_DELAY_MS: u64 = 1000; // 1 second
-pub const MAX_RETRY_DELAY_MS: u64 = 30000; // 30 seconds
-pub const CONSUMER_CYCLE_PAUSE_MS: u64 = 30000; // 30 seconds pause between retry cycles
-
 // Reconnection
 pub const RECONNECTION_DELAY_MS: u64 = 5000; // 5 seconds
 
@@ -50,13 +44,8 @@ pub const ALLOW_DOWNGRADE: bool = false;
 pub const UPDATER_TRANSCRIPTS_KEPT: usize = 5;
 /// Minimum age before a temp update leftover is swept (a live updater's files are younger).
 pub const TEMP_LEFTOVER_MIN_AGE_SECS: u64 = 3600;
-
-// NATS message settings
-pub const CONSUMER_ACK_WAIT_SECS: u64 = 120;
-pub const CONSUMER_MAX_DELIVER: i64 = 10; // Maximum delivery attempts
-pub const UNINSTALL_CONSUMER_MAX_DELIVER: i64 = 20; // Larger budget: uninstall may defer behind a long install holding the tool lock
-pub const RESTART_CONSUMER_MAX_DELIVER: i64 = 20; // Larger budget: restart may defer behind a long install holding the tool lock
+/// How long the started staged binary may take to answer `--version`; an antivirus scan inside the process start is not counted.
+pub const STAGED_VERSION_PROBE_TIMEOUT_SECS: u64 = 30;
 
 // Client-before-tool update ordering
-pub const CLIENT_UPDATE_PENDING_TTL_SECS: u64 = 300; // > ack_wait (120s) so the flag survives redelivery gaps of a deferred client update
-pub const PROGRESS_ACK_INTERVAL_SECS: u64 = 60; // well inside ack_wait (120s)
+pub const CLIENT_UPDATE_PENDING_TTL_SECS: u64 = 300;

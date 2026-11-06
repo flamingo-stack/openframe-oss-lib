@@ -13,6 +13,7 @@ import com.openframe.api.service.rmm.schedule.ScheduleRunService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.api.service.user.InvitationService;
 import com.openframe.api.service.user.UserService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.service.OrganizationService;
@@ -48,7 +49,7 @@ import static org.mockito.Mockito.when;
         properties = "dgs.graphql.schema-locations=classpath:test-schema/api-nodes.graphqls")
 @MockitoBean(types = {OrganizationService.class, ToolService.class, TagService.class, ToolConnectionService.class,
         InstalledAgentService.class, ScriptService.class, ScriptExecutionService.class, ScheduleScriptService.class,
-        ScheduleRunService.class, UserService.class})
+        ScheduleRunService.class, UserService.class, InvitationService.class})
 class NodeDataFetcherDgsTest {
 
     private static final String MACHINE_ID = "machine-1";

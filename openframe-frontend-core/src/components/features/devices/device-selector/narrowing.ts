@@ -8,8 +8,8 @@ export const EMPTY_NARROWING: DeviceSelectorNarrowing = { columnFilters: [], tag
  *
  * The component speaks in table column filters and `key:value` chips because
  * that is what its controls produce; the owner's device fields take a
- * `DeviceFilterInput`. A plain-text chip (no colon) stays on screen but carries
- * no filter, same as the devices page.
+ * `DeviceFilterInput`. A chip without a colon carries no filter, same as the
+ * devices page.
  */
 export function narrowingToFilter(narrowing: DeviceSelectorNarrowing): DeviceFilterInput {
   const column = (id: string) => narrowing.columnFilters.find(f => f.id === id)?.value as string[] | undefined;

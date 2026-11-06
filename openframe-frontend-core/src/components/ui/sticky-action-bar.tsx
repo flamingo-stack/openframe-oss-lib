@@ -76,7 +76,7 @@ export function StickyActionBar({ visible, children, className }: StickyActionBa
       aria-hidden={!visible}
       inert={!visible}
       className={cn(
-        'duration-[180ms] ease-[cubic-bezier(.2,0,0,1)] fixed inset-x-0 bottom-0 z-[44] border-t border-ods-border bg-ods-bg px-4 pt-3 transition-transform motion-reduce:transition-none',
+        'fixed inset-x-0 bottom-0 z-[44] border-t border-ods-border bg-ods-bg px-4 pt-3 transition-transform motion-reduce:transition-none',
         'pb-[calc(1rem+env(safe-area-inset-bottom))]',
         visible ? 'translate-y-0' : 'pointer-events-none translate-y-full',
         className,

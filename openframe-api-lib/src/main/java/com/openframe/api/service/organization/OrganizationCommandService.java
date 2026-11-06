@@ -4,12 +4,17 @@ import com.openframe.api.dto.organization.CreateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationStatusRequest;
 import com.openframe.api.mapper.OrganizationMapper;
+import com.openframe.api.validation.ContractPeriodValidator;
+import com.openframe.api.validation.ValidContractPeriod;
+import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * Facade service for organization command operations (Create, Update, Delete).
@@ -54,7 +59,19 @@ public class OrganizationCommandService {
         
         // Update with request data (only non-null fields)
         Organization toUpdate = organizationMapper.updateEntity(existing, request);
+        // A partial update can pair a new end date with a stored start date, which the request alone cannot see.
+        requireContractEndNotBeforeStart(toUpdate);
         return organizationService.updateOrganization(toUpdate);
+    }
+
+    private void requireContractEndNotBeforeStart(Organization organization) {
+        boolean endsBeforeStart = ContractPeriodValidator.endsBeforeStart(
+                organization.getContractStartDate(), organization.getContractEndDate());
+        if (endsBeforeStart) {
+            ValidationException.FieldError fieldError =
+                    new ValidationException.FieldError(ValidContractPeriod.FIELD, ValidContractPeriod.MESSAGE);
+            throw new ValidationException(ValidContractPeriod.MESSAGE, List.of(fieldError));
+        }
     }
 
     /**

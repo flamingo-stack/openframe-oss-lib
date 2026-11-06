@@ -87,7 +87,7 @@ function createState(overrides: Partial<UnifiedChatState>): UnifiedChatState {
   };
 }
 
-function renderPanel(state: UnifiedChatState, aboveComposer?: ReactNode) {
+function renderPanel(state: UnifiedChatState, aboveComposer?: ReactNode, threadContainer?: HTMLElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -100,6 +100,7 @@ function renderPanel(state: UnifiedChatState, aboveComposer?: ReactNode) {
             showInternalTrigger={false}
             mingoState={state}
             aboveComposer={aboveComposer}
+            threadContainer={threadContainer}
           />
         </DialogPrimitive.Root>
       </ChatRuntimeContext.Provider>
@@ -145,5 +146,19 @@ describe('EmbeddableChat - aboveComposer', () => {
     const slot = screen.getByTestId('chat-above-composer');
     expect(slot).toHaveClass('min-h-0', 'shrink', 'flex', 'flex-col');
     expect(slot).not.toHaveClass('shrink-0');
+  });
+
+  // Portalled out, the thread and the block share no column, so the block never gives way:
+  // the thread's floor would overflow its node and hide the end of the conversation.
+  it('sets no floor on a thread portalled away from the block', () => {
+    const node = document.createElement('div');
+    document.body.appendChild(node);
+    renderPanel(createState({ activeDialogId: 'd-1', messages: [MESSAGE] }), <p>Getting started</p>, node);
+
+    const panel = screen.getByTestId('chat-content-panel');
+    expect(node).toContainElement(panel);
+    expect(panel).toHaveClass('flex-1', 'min-h-0');
+    expect(panel).not.toHaveClass('min-h-32');
+    node.remove();
   });
 });

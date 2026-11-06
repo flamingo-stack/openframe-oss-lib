@@ -46,11 +46,6 @@ pub struct ToolOpGuard {
 }
 
 impl ToolOps {
-    pub async fn lock(&self, tool_agent_id: &str) -> ToolLock {
-        let lock = self.lock_for(tool_agent_id).lock_owned().await;
-        self.tool_lock(tool_agent_id, lock)
-    }
-
     pub fn try_lock(&self, tool_agent_id: &str) -> Result<ToolLock, Busy> {
         let lock = self
             .lock_for(tool_agent_id)
@@ -123,12 +118,6 @@ impl ToolLock {
             tool_agent_id: self.tool_agent_id,
             _lock: self.lock,
         }
-    }
-}
-
-impl From<ToolLock> for ToolOpGuard {
-    fn from(lock: ToolLock) -> Self {
-        lock.mark_busy()
     }
 }
 

@@ -6,9 +6,11 @@ import com.openframe.api.integration.support.GraphQlIntegrationTestApplication;
 import com.openframe.api.integration.support.NotificationFixtures;
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.notification.readstate.NotificationReadStateService;
+import com.openframe.notification.spec.NotificationEntityRef;
 import graphql.ExecutionResult;
 import graphql.relay.Relay;
 import org.junit.jupiter.api.*;
@@ -224,6 +226,80 @@ class NotificationDataFetcherIT extends BaseMongoIntegrationTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> counts = (List<Map<String, Object>>) res.<Map<String, Object>>getData().get("unreadCountsByCategory");
         assertThat(counts).extracting(c -> c.get("category")).containsExactlyInAnyOrder("TICKETS", "MINGO");
+    }
+
+    @Test
+    @DisplayName("Given UNREAD rows of ALICE about devices machine-1 and machine-2 plus an entity-less one, and a row of BOB about machine-1, when notifications runs with filter.entity = (DEVICE, machine-1), then only ALICE's machine-1 row comes back and filteredCount is 1")
+    void entity_filter_lists_only_that_devices_rows_of_the_caller() {
+        loginAsAdmin(ALICE);
+        Notification onMachine1 = mongoTemplate.save(NotificationFixtures.basic("RECORDING_FAILED"));
+        Notification onMachine2 = mongoTemplate.save(NotificationFixtures.basic("RECORDING_EXPIRES_IN_7_DAYS"));
+        Notification storage = mongoTemplate.save(NotificationFixtures.basic("RECORDING_STORAGE_FULL"));
+        createDeviceRow(onMachine1, MACHINE_1, ALICE);
+        createDeviceRow(onMachine1, MACHINE_1, "user-bob");
+        createDeviceRow(onMachine2, "machine-2", ALICE);
+        readStateService.createForAudience(storage.getId(), NotificationCategory.DEVICES, "title", RecipientType.USER, Set.of(ALICE));
+
+        ExecutionResult res = queryExecutor.execute("""
+                query { notifications(first: 10, filter: { entity: { type: DEVICE, id: "machine-1" } }) {
+                    edges { node { title } } filteredCount } }
+                """);
+        assertThat(res.getErrors()).isEmpty();
+        assertThat(edges(res)).extracting(NotificationDataFetcherIT::edgeNodeTitle).containsExactly("RECORDING_FAILED");
+        assertThat(filteredCount(res)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Given an UNREAD row of ALICE about machine-1, when markNotificationsReadForEntity(DEVICE, machine-1) runs, then the entity filter with read=false is empty and with read=true lists the row")
+    void entity_filter_combines_with_read_after_mark_read_for_entity() {
+        loginAsAdmin(ALICE);
+        Notification onMachine1 = mongoTemplate.save(NotificationFixtures.basic("RECORDING_FAILED"));
+        createDeviceRow(onMachine1, MACHINE_1, ALICE);
+
+        ExecutionResult marked = queryExecutor.execute(
+                "mutation { markNotificationsReadForEntity(entityType: DEVICE, entityId: \"machine-1\") }");
+        assertThat(marked.getErrors()).isEmpty();
+        assertThat(((Number) marked.<Map<String, Object>>getData().get("markNotificationsReadForEntity")).longValue())
+                .isEqualTo(1L);
+
+        ExecutionResult unread = queryExecutor.execute("""
+                query { notifications(first: 10, filter: { read: false, entity: { type: DEVICE, id: "machine-1" } }) {
+                    edges { node { title } } filteredCount } }
+                """);
+        assertThat(unread.getErrors()).isEmpty();
+        assertThat(edges(unread)).isEmpty();
+        assertThat(filteredCount(unread)).isZero();
+
+        ExecutionResult read = queryExecutor.execute("""
+                query { notifications(first: 10, filter: { read: true, entity: { type: DEVICE, id: "machine-1" } }) {
+                    edges { node { title read } } filteredCount } }
+                """);
+        assertThat(read.getErrors()).isEmpty();
+        assertThat(edges(read)).extracting(NotificationDataFetcherIT::edgeNodeTitle).containsExactly("RECORDING_FAILED");
+        assertThat(filteredCount(read)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Given an entity filter with a blank id, when notifications runs, then the query is rejected with an error and no rows")
+    void entity_filter_blank_id_is_rejected() {
+        loginAsAdmin(ALICE);
+
+        ExecutionResult res = queryExecutor.execute("""
+                query { notifications(first: 10, filter: { entity: { type: DEVICE, id: " " } }) { edges { node { title } } } }
+                """);
+        assertThat(res.getErrors()).isNotEmpty();
+    }
+
+    private void createDeviceRow(Notification notification, String machineId, String userId) {
+        NotificationEntityRef device = NotificationEntityRef.of(NotificationEntityType.DEVICE, machineId).orElseThrow();
+        readStateService.createForAudience(notification.getId(), NotificationCategory.DEVICES, "title", device,
+                RecipientType.USER, Set.of(userId));
+    }
+
+    private static int filteredCount(ExecutionResult res) {
+        Map<String, Object> data = res.getData();
+        Map<?, ?> connection = (Map<?, ?>) data.get("notifications");
+        return ((Number) connection.get("filteredCount")).intValue();
     }
 
     @SuppressWarnings("unchecked")
