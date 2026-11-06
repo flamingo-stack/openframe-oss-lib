@@ -54,6 +54,17 @@ describe('ApprovalRequestNotificationTile escalation', () => {
     expect(screen.getByRole('button', { name: 'Approve' }).className).toContain('bg-ods-warning');
   });
 
+  it('reads the band before the buttons, and marks the folded chevron with the "!"', () => {
+    renderTile(approval(ESCALATED));
+    const band = screen.getByRole('note');
+    const approve = screen.getByRole('button', { name: 'Approve' });
+    expect(band.compareDocumentPosition(approve) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelectorAll('[data-escalation-mark]')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Show command section' }));
+    // Open, the command row draws the mark instead.
+    expect(document.querySelector('[data-escalation-mark]')).toBeNull();
+  });
+
   it('keeps the one band when the commands open', () => {
     renderTile(approval(ESCALATED));
     fireEvent.click(screen.getByRole('button', { name: 'Show command section' }));
@@ -63,6 +74,7 @@ describe('ApprovalRequestNotificationTile escalation', () => {
   it('is a plain approval when nothing was escalated', () => {
     renderTile(approval({ decision: 'POLICY', approvalLevel: 'ASK_USER', policyLevel: 'ASK_USER' }));
     expect(screen.queryByText('Mingo Escalated')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-escalation-mark]')).toBeNull();
     expect(screen.getByRole('button', { name: 'Approve' }).className).not.toContain('bg-ods-warning');
   });
 });

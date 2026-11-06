@@ -245,6 +245,7 @@ export default defineConfig([
       // A radio row's hover stays off while the pointer is on its trailing control: the contract is the row's class and
       // the role-less wrapper the rule keys on, so the test walks from the label and the button.
       'src/components/ui/__tests__/radio-group-block-trailing.test.tsx',
+      'src/components/features/notifications/__tests__/approval-tile-escalation.test.tsx',
       // A page drawn only in the browser loads the complete stylesheet: the contract is the <link> RouteStyle appends
       // to <head>, outside anything it renders, which no `screen` query reaches.
       'src/__tests__/route-styles-client.test.tsx',

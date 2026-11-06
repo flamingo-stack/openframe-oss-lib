@@ -7,6 +7,7 @@ import { ExpandChevron } from '../../chat/expand-chevron';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
 import { PolicyEscalationAlert, isPolicyEscalated } from '../../chat/policy-review';
 import type { ChatApprovalStatus } from '../../chat/types';
+import { AlertCircleIcon } from '../../icons-v2-generated';
 import { Button } from '../../ui/button';
 import {
   APPROVAL_BUTTON_CLASS,
@@ -86,8 +87,8 @@ export function ApprovalRequestNotificationTile({
     type: notification.type ?? 'Approval Required',
   };
 
-  // What Mingo escalated is read with the commands folded away, as the chat shows it under the command row, and is
-  // approved in the warning colour.
+  // What Mingo escalated is read with the commands folded away, in the chat block's order (Figma 1375-114530): the
+  // "!" beside the chevron, the "Mingo Escalated" band before the buttons, Approve in the warning colour.
   const escalatedCalls = batchData.toolCalls.filter(call => isPolicyEscalated(call.policyReview));
   const escalated = escalatedCalls.length > 0;
   const commandWord = batchData.toolCalls.length > 1 ? 'commands' : 'command';
@@ -124,67 +125,76 @@ export function ApprovalRequestNotificationTile({
       timeLabel={timeLabel}
       paused={pinned || processing}
       actions={
-        <div className="flex w-full items-center gap-[var(--spacing-system-xs)]">
-          {status === 'pending' ? (
-            <>
-              <Button
-                variant={escalated ? 'warning' : 'accent'}
-                size="small"
-                onClick={() => resolve('approved', onApprove)}
-                disabled={processing}
-                data-pressed={approvePressed || undefined}
-                className={cn(
-                  'transition-[filter,transform] duration-200 motion-reduce:transition-none',
-                  lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS,
-                  approvePressed && 'scale-[0.98] brightness-75',
+        <>
+          {!lockscreen &&
+            escalatedCalls.map(call => (
+              // Edge to edge, as under the chat's command row: the tile's padding cancelled, a rule above and below.
+              <PolicyEscalationAlert
+                key={call.toolExecutionRequestId}
+                review={call.policyReview}
+                className="-mx-[var(--spacing-system-s)] border-y border-ods-border"
+              />
+            ))}
+          <div className="flex w-full items-center gap-[var(--spacing-system-xs)]">
+            {status === 'pending' ? (
+              <>
+                <Button
+                  variant={escalated ? 'warning' : 'accent'}
+                  size="small"
+                  onClick={() => resolve('approved', onApprove)}
+                  disabled={processing}
+                  data-pressed={approvePressed || undefined}
+                  className={cn(
+                    'transition-[filter,transform] duration-200 motion-reduce:transition-none',
+                    lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS,
+                    approvePressed && 'scale-[0.98] brightness-75',
+                  )}
+                >
+                  Approve
+                </Button>
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={() => resolve('rejected', onReject)}
+                  disabled={processing}
+                  className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS}
+                >
+                  Reject
+                </Button>
+              </>
+            ) : (
+              <span className="flex min-w-0 items-center gap-[var(--spacing-system-xsf)]">
+                <ApprovalStatusTag status={status} />
+                {approval.resolvedByName ? (
+                  <span className="truncate text-ods-text-secondary text-h6">by {approval.resolvedByName}</span>
+                ) : null}
+              </span>
+            )}
+            {!lockscreen && (
+              <span className="ml-auto flex shrink-0 items-center gap-[var(--spacing-system-xs)]">
+                {escalated && !expanded && (
+                  // Decorative: the band above says it in words. Open, each command row draws its own.
+                  <AlertCircleIcon className="size-4 text-ods-warning" aria-hidden data-escalation-mark />
                 )}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="outline"
-                size="small"
-                onClick={() => resolve('rejected', onReject)}
-                disabled={processing}
-                className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS}
-              >
-                Reject
-              </Button>
-            </>
-          ) : (
-            <span className="flex min-w-0 items-center gap-[var(--spacing-system-xsf)]">
-              <ApprovalStatusTag status={status} />
-              {approval.resolvedByName ? (
-                <span className="truncate text-ods-text-secondary text-h6">by {approval.resolvedByName}</span>
-              ) : null}
-            </span>
-          )}
-          {!lockscreen && (
-            <Button
-              variant="outline"
-              size="small"
-              onClick={() => {
-                setExpanded(prev => !prev);
-                setPinned(true);
-              }}
-              aria-expanded={expanded}
-              aria-label={toggleLabel}
-              className={APPROVAL_TOGGLE_BUTTON_CLASS}
-            >
-              <ExpandChevron expanded={expanded} />
-            </Button>
-          )}
-        </div>
+                <Button
+                  variant="outline"
+                  size="small"
+                  onClick={() => {
+                    setExpanded(prev => !prev);
+                    setPinned(true);
+                  }}
+                  aria-expanded={expanded}
+                  aria-label={toggleLabel}
+                  className={APPROVAL_TOGGLE_BUTTON_CLASS}
+                >
+                  <ExpandChevron expanded={expanded} />
+                </Button>
+              </span>
+            )}
+          </div>
+        </>
       }
     >
-      {!lockscreen &&
-        escalatedCalls.map(call => (
-          <PolicyEscalationAlert
-            key={call.toolExecutionRequestId}
-            review={call.policyReview}
-            className="border-t border-ods-border"
-          />
-        ))}
       {!lockscreen && (
         <div style={containerStyle}>
           {/* Divider lives inside the measured element — useCollapsible caps the
