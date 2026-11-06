@@ -75,12 +75,12 @@ export interface DocSourceDal<Client = unknown> {
  * Doc-source registry id. The lib's `<DocViewer>` is generic over this union
  * — the hub's `DOC_SOURCES` registry defines the actual ids. Listed here as a
  * type-only union so the lib can flow the id into `DocRenderHandlers.sourceId`
- * without callers having to cast `string` → `'openframe-docs' | 'data-room-docs'`.
+ * without callers having to cast `string` to the union.
  *
  * Adding a new source = add the id here AND register it in the hub. The lib
  * never reaches into the registry — this is purely a type-narrowing handle.
  */
-export type DocSourceId = 'openframe-docs' | 'data-room-docs';
+export type DocSourceId = 'openframe-docs' | 'data-room-docs' | 'company-policies';
 
 /**
  * Result returned by the resolve-link endpoint. Discriminator-style: `success`
