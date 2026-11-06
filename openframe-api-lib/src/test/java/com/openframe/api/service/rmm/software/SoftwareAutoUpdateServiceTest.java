@@ -5,7 +5,7 @@ import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.PackageAutoUpdatePolicy;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
-import com.openframe.data.nats.packageupdate.PackageAutoUpdateRetryWithdrawal;
+import com.openframe.data.nats.packageupdate.PackageAutoUpdateWithdrawal;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +36,7 @@ class SoftwareAutoUpdateServiceTest {
 
     @Mock private PackageAutoUpdatePolicyRepository policyRepository;
     @Mock private TenantIdProvider tenantIdProvider;
-    @Mock private PackageAutoUpdateRetryWithdrawal retryWithdrawal;
+    @Mock private PackageAutoUpdateWithdrawal withdrawal;
 
     @InjectMocks private SoftwareAutoUpdateService service;
 
@@ -100,17 +100,17 @@ class SoftwareAutoUpdateServiceTest {
     }
 
     @Test
-    void turnOff_withdrawsRetriesStillWaiting_afterThePoliciesAreOff() {
+    void turnOff_withdrawsWhatTheEngineStillHolds_afterThePoliciesAreOff() {
         PackageAutoUpdatePolicy m1 = policy("m1", "chrome", false);
         PackageAutoUpdatePolicy m2 = policy("m2", "chrome", false);
         when(policyRepository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("chrome"))).thenReturn(List.of(m1, m2));
 
         service.turnOff("chrome", "admin@x");
 
-        InOrder order = inOrder(policyRepository, retryWithdrawal);
+        InOrder order = inOrder(policyRepository, withdrawal);
         order.verify(policyRepository).disableBySoftwareId(TENANT, "chrome", "admin@x");
-        order.verify(retryWithdrawal).withdraw(eq(m1), any());
-        order.verify(retryWithdrawal).withdraw(eq(m2), any());
+        order.verify(withdrawal).withdraw(eq(m1), any());
+        order.verify(withdrawal).withdraw(eq(m2), any());
     }
 
     @Test

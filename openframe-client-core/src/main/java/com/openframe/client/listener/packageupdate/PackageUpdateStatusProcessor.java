@@ -38,7 +38,7 @@ public class PackageUpdateStatusProcessor {
     private final PackageUpdateExecutionRecorder executionRecorder;
     private final DeliveryDispatcher deliveryDispatcher;
     private final DeliveryTracker deliveryTracker;
-    private final PackageAutoUpdateRetry autoUpdateRetry;
+    private final PackageAutoUpdateTurnOff autoUpdateTurnOff;
 
     public void process(String machineId, PackageUpdateStatusMessage event) {
         Machine machine = machineRepository.findByMachineId(machineId).orElse(null);
@@ -68,8 +68,7 @@ public class PackageUpdateStatusProcessor {
         Instant deadlineBefore = state.getDeadlineAt();
         PackageUpdateDeviceStateReducer.apply(state, request, event);
         driveDeadlineForce(state, request, deadlineBefore, machineId);
-        autoUpdateRetry.scheduleIfDue(state, request);
-        autoUpdateRetry.turnOffIfPackageRemoved(state, request);
+        autoUpdateTurnOff.turnOffIfPackageRemoved(state, request);
         executionRecorder.record(request, machineId, event);
         deviceStateRepository.save(state);
         log.info("[package-update] status applied requestId={} machineId={} eventId={} state={} status={} "
@@ -101,7 +100,6 @@ public class PackageUpdateStatusProcessor {
 
         PackageUpdateRequest request = requestRepository.findByTenantIdAndRequestId(tenantId, requestId).orElse(null);
         PackageUpdateDeviceStateReducer.applyUndelivered(state, failure);
-        autoUpdateRetry.scheduleIfDue(state, request);
         executionRecorder.recordUndelivered(request, machineId, failure);
         deviceStateRepository.save(state);
         log.warn("[package-update] order not delivered requestId={} machineId={} reason={}", requestId, machineId, failure);
@@ -121,12 +119,20 @@ public class PackageUpdateStatusProcessor {
                     requestId, machineId, deadlineAt);
             return;
         }
-        if (isTerminal(state) && Instant.now().isBefore(deadlineAt)) {
+        if (!isTerminal(state)) {
+            return;
+        }
+        if (Instant.now().isBefore(deadlineAt)) {
             deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, PackageUpdateDeliverySeed.deadlineTargetId(requestId),
                     machineId, "update finished before its deadline");
             log.info("[package-update] deadline force withdrawn requestId={} machineId={} status={}",
                     requestId, machineId, state.getStatus());
+            return;
         }
+        // the force's own row takes the agent's result; the WAIT row would wait for one until its timeout
+        deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, requestId, machineId, "finished by the deadline force");
+        log.info("[package-update] wait order withdrawn, the deadline force finished it requestId={} machineId={} status={}",
+                requestId, machineId, state.getStatus());
     }
 
     private PackageUpdateDeviceState newState(String tenantId, String requestId, String machineId) {

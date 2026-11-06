@@ -14,15 +14,15 @@ import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
-import com.openframe.data.nats.packageupdate.PackageAutoUpdateRetryWithdrawal;
+import com.openframe.data.nats.packageupdate.PackageAutoUpdateWithdrawal;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
+import com.openframe.data.nats.packageupdate.PackageUpdateEligibilityService;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
-import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -54,7 +54,7 @@ public class PackageAutoUpdateTrigger {
     private final ScriptRepository scriptRepository;
     private final SoftwareActionResultRepository actionResultRepository;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
-    private final PackageAutoUpdateRetryWithdrawal retryWithdrawal;
+    private final PackageAutoUpdateWithdrawal withdrawal;
     private final TenantIdProvider tenantIdProvider;
 
     public void run() {
@@ -91,8 +91,8 @@ public class PackageAutoUpdateTrigger {
             return;
         }
         Script script = updateScript(tenantId, pkg.manager());
-        // a retry still waiting would replace this order on the agent
-        due.forEach(policy -> retryWithdrawal.withdraw(policy, "a newer version is ordered"));
+        // a re-run of the previous order, still held by the engine, would replace this one on the agent
+        due.forEach(policy -> withdrawal.withdraw(policy, "a newer version is ordered"));
 
         String executionId = SoftwareExecutionId.forAutoUpdate(tenantId, pkg.manager(), pkg.name(), version);
         recordJob(tenantId, executionId, pkg, version, machineIds(due));
@@ -108,9 +108,9 @@ public class PackageAutoUpdateTrigger {
                 .softwareAction(SoftwareAction.UPDATE)
                 .build();
         bySettings(due).forEach((settings, group) -> {
-            packageUpdateDispatchService.dispatchAutoUpdate(rows.toBuilder().machineIds(machineIds(group)).build(),
-                    pkg.brewType(), settings);
-            policyRepository.markOrdered(group.stream().map(PackageAutoUpdatePolicy::getId).toList(), version);
+            String requestId = packageUpdateDispatchService.dispatchAutoUpdate(
+                    rows.toBuilder().machineIds(machineIds(group)).build(), pkg.brewType(), settings);
+            policyRepository.markOrdered(group.stream().map(PackageAutoUpdatePolicy::getId).toList(), version, requestId);
         });
         log.info("Auto-update ordered package={}/{} version={} machines={} executionId={}",
                 pkg.manager(), pkg.name(), version, due.size(), executionId);
