@@ -15,7 +15,7 @@ import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
 import com.openframe.data.document.rmm.software.SoftwareExecutionId;
-import com.openframe.data.nats.packageupdate.PackageAutoUpdateRetryWithdrawal;
+import com.openframe.data.nats.packageupdate.PackageAutoUpdateWithdrawal;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
@@ -24,7 +24,7 @@ import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageCatalogVersions;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
-import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
+import com.openframe.data.nats.packageupdate.PackageUpdateEligibilityService;
 import com.openframe.data.service.rmm.software.WingetPackageManagerHandler;
 import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,7 +71,7 @@ class PackageAutoUpdateTriggerTest {
     private final PackageAutoUpdateTrigger trigger = new PackageAutoUpdateTrigger(policyRepository, catalogVersions,
             eligibility,
             new PackageManagerRegistry(List.of(new BrewPackageManagerHandler(), new WingetPackageManagerHandler())),
-            scriptRepository, actionResultRepository, dispatchService, new PackageAutoUpdateRetryWithdrawal(deliveryTracker), tenantIdProvider);
+            scriptRepository, actionResultRepository, dispatchService, new PackageAutoUpdateWithdrawal(deliveryTracker), tenantIdProvider);
 
     @BeforeEach
     void setUp() {
@@ -92,6 +92,7 @@ class PackageAutoUpdateTriggerTest {
                 chrome("p2", "m2", "151.0.7922.98", WAIT),
                 chrome("p3", "m3", LATEST, WAIT)));
         when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of("m1", "m2"));
+        when(dispatchService.dispatchAutoUpdate(any(), any(), any())).thenReturn("req-new");
 
         trigger.run();
 
@@ -115,7 +116,7 @@ class PackageAutoUpdateTriggerTest {
             assertThat(rows.getSoftwareAction()).isEqualTo(SoftwareAction.UPDATE);
             assertThat(rows.getScriptId()).isEqualTo("brew-update-id");
         });
-        verify(policyRepository).markOrdered(List.of("p1", "p2"), LATEST);
+        verify(policyRepository).markOrdered(List.of("p1", "p2"), LATEST, "req-new");
     }
 
     @Test
@@ -157,9 +158,9 @@ class PackageAutoUpdateTriggerTest {
 
         trigger.run();
 
-        verify(policyRepository, never()).markOrdered(List.of("p0"), "142.0.7444.60");
+        verify(policyRepository, never()).markOrdered(eq(List.of("p0")), eq("142.0.7444.60"), any());
         verify(dispatchService).dispatchAutoUpdate(any(), eq(BrewPackageType.CASK), eq(WAIT));
-        verify(policyRepository).markOrdered(List.of("p1"), LATEST);
+        verify(policyRepository).markOrdered(eq(List.of("p1")), eq(LATEST), any());
     }
 
     @Test
@@ -171,31 +172,32 @@ class PackageAutoUpdateTriggerTest {
         trigger.run();
 
         verify(dispatchService, never()).dispatchAutoUpdate(any(), any(), any());
-        verify(policyRepository, never()).markOrdered(any(), any());
+        verify(policyRepository, never()).markOrdered(any(), any(), any());
     }
 
     @Test
-    @DisplayName("a retry waiting for an older version is withdrawn before the new order, so it cannot replace it on the agent")
-    void newVersion_withdrawsAWaitingRetry() {
-        PackageAutoUpdatePolicy waitingRetry = chrome("p1", "m1", "151", WAIT);
-        waitingRetry.setRetryRequestId("req-old");
-        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(waitingRetry, chrome("p2", "m2", "151", WAIT)));
+    @DisplayName("what the engine still holds of the previous order is withdrawn before the new one, so a re-run of it cannot replace the new order on the agent")
+    void newVersion_withdrawsThePreviousOrderFirst() {
+        PackageAutoUpdatePolicy previous = chrome("p1", "m1", "151", WAIT);
+        previous.setRequestId("req-old");
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(previous, chrome("p2", "m2", "151", WAIT)));
         when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of("m1", "m2"));
 
         trigger.run();
 
         InOrder order = inOrder(deliveryTracker, dispatchService);
         order.verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-old"), eq("m1"), any());
+        order.verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-old:deadline"), eq("m1"), any());
         order.verify(dispatchService).dispatchAutoUpdate(any(), any(), any());
-        verify(deliveryTracker, times(1)).cancel(any(), any(), any(), any());
+        verify(deliveryTracker, times(2)).cancel(any(), any(), any(), any());   // p2 was never ordered: nothing to withdraw
     }
 
     @Test
-    @DisplayName("a device not ordered in this pass keeps its waiting retry")
-    void ineligibleDevice_keepsItsRetry() {
-        PackageAutoUpdatePolicy waitingRetry = chrome("p1", "m1", "151", WAIT);
-        waitingRetry.setRetryRequestId("req-old");
-        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(waitingRetry));
+    @DisplayName("a device not ordered in this pass keeps what the engine holds for it")
+    void ineligibleDevice_keepsItsPreviousOrder() {
+        PackageAutoUpdatePolicy previous = chrome("p1", "m1", "151", WAIT);
+        previous.setRequestId("req-old");
+        when(policyRepository.findByTenantIdAndEnabledTrue(TENANT)).thenReturn(List.of(previous));
         when(eligibility.eligibleConnectedMachines(eq(SoftwareAction.UPDATE), anyCollection())).thenReturn(Set.of());
 
         trigger.run();
@@ -224,8 +226,8 @@ class PackageAutoUpdateTriggerTest {
         verify(dispatchService, times(2)).dispatchAutoUpdate(any(), eq(BrewPackageType.CASK), any());
         verify(dispatchService).dispatchAutoUpdate(any(), any(), eq(WAIT));
         verify(dispatchService).dispatchAutoUpdate(any(), any(), eq(FORCE));
-        verify(policyRepository).markOrdered(List.of("p2"), LATEST);
-        verify(policyRepository).markOrdered(List.of("p3"), LATEST);
+        verify(policyRepository).markOrdered(eq(List.of("p2")), eq(LATEST), any());
+        verify(policyRepository).markOrdered(eq(List.of("p3")), eq(LATEST), any());
     }
 
     private static PackageAutoUpdatePolicy chrome(String id, String machineId, String lastVersion,

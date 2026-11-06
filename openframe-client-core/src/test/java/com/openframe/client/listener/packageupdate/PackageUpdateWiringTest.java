@@ -33,7 +33,7 @@ class PackageUpdateWiringTest {
             .withBean(ScriptExecutionRepository.class, () -> mock(ScriptExecutionRepository.class))
             .withUserConfiguration(PackageUpdateStatusListener.class, PackageUpdateStatusProcessor.class,
                     PackageUpdateExecutionRecorder.class, PackageUpdateDeliveryFailureListener.class,
-                    PackageAutoUpdateRetry.class);
+                    PackageAutoUpdateTurnOff.class);
 
     @Test
     void packageUpdateOff_nothingOfTheFeatureRuns() {
@@ -43,29 +43,21 @@ class PackageUpdateWiringTest {
             assertThat(context).doesNotHaveBean(PackageUpdateStatusProcessor.class);
             assertThat(context).doesNotHaveBean(PackageUpdateExecutionRecorder.class);
             assertThat(context).doesNotHaveBean(PackageUpdateDeliveryFailureListener.class);
-            assertThat(context).doesNotHaveBean(PackageAutoUpdateRetry.class);
+            assertThat(context).doesNotHaveBean(PackageAutoUpdateTurnOff.class);
         });
     }
 
-    @Test
-    void packageUpdateOn_withoutTheRetryLimits_failsAtStart() {
-        runner.withPropertyValues("openframe.rmm.software.package-update.enabled=true")
-                .run(context -> assertThat(context).hasFailed());
-    }
-
-    // the deadline force and the retry ride the delivery engine: the retry limits are the only keys of its own
+    // the deadline force and the re-runs ride the delivery engine: the feature has no keys of its own beyond the switch
     @Test
     void packageUpdateOn_allOfItRuns() {
-        runner.withPropertyValues("openframe.rmm.software.package-update.enabled=true",
-                        "openframe.rmm.software.package-update.retry.max-attempts=3",
-                        "openframe.rmm.software.package-update.retry.backoff-seconds=21600")
+        runner.withPropertyValues("openframe.rmm.software.package-update.enabled=true")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasSingleBean(PackageUpdateStatusListener.class);
                     assertThat(context).hasSingleBean(PackageUpdateStatusProcessor.class);
                     assertThat(context).hasSingleBean(PackageUpdateExecutionRecorder.class);
                     assertThat(context).hasSingleBean(PackageUpdateDeliveryFailureListener.class);
-                    assertThat(context).hasSingleBean(PackageAutoUpdateRetry.class);
+                    assertThat(context).hasSingleBean(PackageAutoUpdateTurnOff.class);
                 });
     }
 }
