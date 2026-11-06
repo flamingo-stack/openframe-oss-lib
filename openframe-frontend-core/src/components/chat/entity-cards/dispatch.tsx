@@ -1735,6 +1735,9 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   data_room_doc: refHydratedEntry('data_room_doc', 'Data-room doc', (displayRef, opts) => (
     <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
   )),
+  policy_doc: refHydratedEntry('policy_doc', 'Company policy', (displayRef, opts) => (
+    <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+  )),
   markdown: refHydratedEntry('markdown', 'Doc page (markdown)', (displayRef, opts) => (
     <DataRoomDocChatCard chatRef={displayRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
   )),
