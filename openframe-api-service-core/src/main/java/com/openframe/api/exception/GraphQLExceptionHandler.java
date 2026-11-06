@@ -18,6 +18,7 @@ import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,8 @@ import java.util.concurrent.CompletableFuture;
 @Component
 @Slf4j
 public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
+
+    private static final String CONFLICT_MESSAGE = "This item was changed by someone else. Reload it and try again.";
 
     @Override
     public CompletableFuture<DataFetcherExceptionHandlerResult> handleException(
@@ -38,6 +41,10 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             ErrorCode code = AccessDeniedErrorCode.forCurrentCaller();
             log.warn("GraphQL access denied ({}): {}", code.getCode(), exception.getMessage());
             return result(buildError(AccessDeniedErrorCode.MESSAGE, code), path);
+        }
+        if (exception instanceof OptimisticLockingFailureException) {
+            log.warn("GraphQL conflict: {}", exception.getMessage());
+            return result(buildError(CONFLICT_MESSAGE, ErrorCode.CONFLICT), path);
         }
         if (exception instanceof InvalidRelayIdException) {
             String message = exception.getMessage();

@@ -1,4 +1,4 @@
-package com.openframe.management.config;
+package com.openframe.data.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.retry.annotation.EnableRetry;

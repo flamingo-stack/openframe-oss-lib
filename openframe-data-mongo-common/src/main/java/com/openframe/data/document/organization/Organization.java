@@ -6,10 +6,12 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.FieldNameConstants;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.math.BigDecimal;
@@ -21,6 +23,7 @@ import java.time.LocalDate;
  */
 @Data
 @SuperBuilder
+@FieldNameConstants
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "organizations")
@@ -99,8 +102,8 @@ public class Organization implements TenantScoped {
      */
     private Instant statusChangedAt;
 
-    @Builder.Default
-    private Long version = 0L;
+    @Version
+    private Long version;
 
     /**
      * Check if the contract is currently active
