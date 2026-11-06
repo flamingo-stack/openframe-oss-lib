@@ -7,6 +7,8 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.time.Instant;
+
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class PackageMatch {
@@ -38,11 +40,11 @@ public class PackageMatch {
         return !candidatesFound;
     }
 
-    public SoftwarePackageMatch toStored() {
+    public SoftwarePackageMatch toStored(Instant matchedAt) {
         if (isMatched()) {
-            return new SoftwarePackageMatch(PackageMatchState.MATCHED, entry.getManager(), entry.getPackageId());
+            return new SoftwarePackageMatch(PackageMatchState.MATCHED, entry.getManager(), entry.getPackageId(), matchedAt);
         }
         return new SoftwarePackageMatch(hasNoPackage() ? PackageMatchState.NO_PACKAGE : PackageMatchState.AMBIGUOUS,
-                null, null);
+                null, null, matchedAt);
     }
 }

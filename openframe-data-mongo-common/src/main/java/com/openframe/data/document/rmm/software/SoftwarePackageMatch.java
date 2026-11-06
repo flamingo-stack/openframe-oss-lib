@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
 // what the package matcher said about a software title when the read model was last projected
 @Data
 @Builder
@@ -16,4 +18,5 @@ public class SoftwarePackageMatch {
     private PackageMatchState state;
     private PackageManagerType manager;
     private String packageId;
+    private Instant matchedAt;
 }

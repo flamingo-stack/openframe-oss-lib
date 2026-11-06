@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -285,5 +286,26 @@ class SoftwareCatalogStatusTest {
         SoftwareResponse program = row(name, SoftwareSource.UNMANAGED, currentVersion, 0);
         program.setFleetSource(FleetSource.PROGRAMS);
         return program;
+    }
+
+    @Test
+    void apply_rowWithoutKeyLists_matcherGetsEmptyListsAndNoSystemComponent() {
+        // setup
+        SoftwareResponse chrome = program("Google Chrome", "142.0");
+        List<InstalledProgram> asked = new ArrayList<>();
+        when(packageMatcher.match(anyList())).thenAnswer(invocation -> {
+            asked.addAll(invocation.getArgument(0));
+            return new IdentityHashMap<>();
+        });
+
+        // execution
+        status().apply(List.of(chrome));
+
+        // verifications
+        assertThat(asked).hasSize(1);
+        assertThat(asked.getFirst().getProductCodes()).isEmpty();
+        assertThat(asked.getFirst().getPackageFamilyNames()).isEmpty();
+        assertThat(asked.getFirst().isSystemComponent()).isFalse();
+        assertThat(asked.getFirst().getStoredMatch()).isNull();
     }
 }

@@ -1,6 +1,7 @@
 package com.openframe.api.util;
 
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareInstalledVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,21 @@ class FleetSoftwareMapperTest {
         assertThat(row.getPublisher()).isEqualTo("Google LLC");
         assertThat(row.getUpgradeCode()).isEqualTo("{UPGRADE}");
         assertThat(row.getProductCodes()).isNull();
+        assertThat(row.getSystemComponent()).isNull();
+    }
+
+    // a title whose hosts all left has no versions: the keys come back empty, the flag unknown, nothing throws
+    @Test
+    void toResponse_titleWithoutVersions_emptyKeys() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setName("Gone");
+        title.setSource("programs");
+
+        SoftwareResponse row = FleetSoftwareMapper.toResponse(title);
+
+        assertThat(row.getPublisher()).isNull();
+        assertThat(FleetSoftwareMapper.distinctText(null, HostSoftwareInstalledVersion::getArpKey)).isEmpty();
+        assertThat(FleetSoftwareMapper.allFlagged(null, HostSoftwareInstalledVersion::getSystemComponent)).isNull();
         assertThat(row.getSystemComponent()).isNull();
     }
 }

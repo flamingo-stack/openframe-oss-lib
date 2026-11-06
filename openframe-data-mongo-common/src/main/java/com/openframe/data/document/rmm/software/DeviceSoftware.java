@@ -56,6 +56,7 @@ public class DeviceSoftware implements TenantScoped {
     private List<String> packageFamilyNames;
     private Boolean systemComponent;
     private List<String> installerTypes;
+    private boolean machineConnected;
 
     private Instant updatedAt;
 }

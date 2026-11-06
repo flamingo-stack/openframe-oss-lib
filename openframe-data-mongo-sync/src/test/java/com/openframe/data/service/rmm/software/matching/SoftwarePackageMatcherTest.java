@@ -12,9 +12,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -81,10 +81,10 @@ class SoftwarePackageMatcherTest {
                 .thenReturn(List.of(chromeEntry));
 
         // execution
-        Optional<PackageMatch> match = matcher().match(chrome);
+        PackageMatch match = matcher().match(List.of(chrome)).get(chrome);
 
         // verifications
-        assertThat(match).map(PackageMatch::getEntry).contains(chromeEntry);
+        assertThat(match.getEntry()).isSameAs(chromeEntry);
     }
 
     @Test
@@ -114,18 +114,19 @@ class SoftwarePackageMatcherTest {
         when(wingetMatcher.match(List.of(chrome))).thenReturn(List.of(fresh));
 
         // execution
-        Optional<PackageMatch> match = matcher(wingetMatcher).match(chrome);
+        PackageMatch match = matcher(wingetMatcher).match(List.of(chrome)).get(chrome);
 
         // verifications
-        assertThat(match).contains(fresh);
+        assertThat(match).isSameAs(fresh);
     }
 
     @Test
     void toStored_everyOutcome() {
-        assertThat(PackageMatch.of(wingetPackage("Google.Chrome")).toStored())
-                .isEqualTo(new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.WINGET, "Google.Chrome"));
-        assertThat(PackageMatch.noPackage().toStored().getState()).isEqualTo(PackageMatchState.NO_PACKAGE);
-        assertThat(PackageMatch.ambiguous().toStored().getState()).isEqualTo(PackageMatchState.AMBIGUOUS);
+        Instant now = Instant.now();
+        assertThat(PackageMatch.of(wingetPackage("Google.Chrome")).toStored(now))
+                .isEqualTo(new SoftwarePackageMatch(PackageMatchState.MATCHED, PackageManagerType.WINGET, "Google.Chrome", now));
+        assertThat(PackageMatch.noPackage().toStored(now).getState()).isEqualTo(PackageMatchState.NO_PACKAGE);
+        assertThat(PackageMatch.ambiguous().toStored(now).getState()).isEqualTo(PackageMatchState.AMBIGUOUS);
     }
 
     private SoftwarePackageMatcher matcher(PackageMatcher... beans) {
@@ -139,7 +140,7 @@ class SoftwarePackageMatcherTest {
     private static InstalledProgram stored(String name, PackageMatchState state, String packageId) {
         PackageManagerType manager = packageId == null ? null : PackageManagerType.WINGET;
         return InstalledProgram.builder().name(name).fleetSource(FleetSource.PROGRAMS)
-                .storedMatch(new SoftwarePackageMatch(state, manager, packageId))
+                .storedMatch(new SoftwarePackageMatch(state, manager, packageId, null))
                 .build();
     }
 

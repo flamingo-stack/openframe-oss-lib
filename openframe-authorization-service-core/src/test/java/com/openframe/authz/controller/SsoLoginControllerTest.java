@@ -1,6 +1,7 @@
 package com.openframe.authz.controller;
 
  import com.openframe.authz.dto.Touchpoint;
+import com.openframe.authz.dto.Visit;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoFlowCookies;
@@ -301,27 +302,24 @@ class SsoLoginControllerTest {
     }
 
     @Test
-    void completeSsoRegistrationByTicket_appAndTicketCarrySource_registersAppFieldsOverTicketCookie() {
-        ticketPeeks(new PendingSignup("Founder@NewCo.com", "Fo", "Under", "google", true, null, null, null,
-                Touchpoint.builder()
-                        .downloadId("download-from-cookie")
-                        .utmSource("google")
-                        .gclid("gclid-1")
-                        .build()));
+    void completeSsoRegistrationByTicket_appAndTicketCarrySource_registersTheAppsOwnFieldsAndTheTicketsCookieApart() {
+        Touchpoint ticketCookie = Touchpoint.builder()
+                .downloadId("download-from-cookie")
+                .lastVisit(Visit.builder().utmSource("google").gclid("gclid-1").build())
+                .build();
+        Touchpoint appFields = Touchpoint.builder()
+                .downloadId("download-from-app")
+                .heardFrom("search")
+                .build();
+        ticketPeeks(new PendingSignup("Founder@NewCo.com", "Fo", "Under", "google", true, null, null, null, ticketCookie));
         registrationSucceeds();
 
         controller.completeSsoRegistrationByTicket(new SsoLoginController.SignupTicketCompleteRequest("tk", "New Co", "NewCo",
-                Touchpoint.builder()
-                        .downloadId("download-from-app")
-                        .heardFrom("search")
-                        .build()));
+                appFields));
 
-        assertThat(registeredRequest().getAttribution()).isEqualTo(Touchpoint.builder()
-                .downloadId("download-from-app")
-                .heardFrom("search")
-                .utmSource("google")
-                .gclid("gclid-1")
-                .build());
+        assertThat(registeredRequest())
+                .returns(appFields, TenantRegistrationRequest::getAttribution)
+                .returns(ticketCookie, TenantRegistrationRequest::getDownloadCookie);
     }
 
     private void ticketPeeks(PendingSignup pendingSignup) {
