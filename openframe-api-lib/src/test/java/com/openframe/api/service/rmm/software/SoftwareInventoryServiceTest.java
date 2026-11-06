@@ -171,7 +171,7 @@ class SoftwareInventoryServiceTest {
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response); // meta null -> single page in the scan
         simulateEnricherSetsCount(1);
 
-        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, sort("cveCount", SortDirection.DESC), null);
+        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, sort("cveCount", SortDirection.DESC), null, null);
 
         assertThat(result.items()).extracting(SoftwareResponse::getName)
                 .containsExactly("Chrome", "Alpha", "Bravo"); // 40 first; the two 5s by name ascending
@@ -212,7 +212,7 @@ class SoftwareInventoryServiceTest {
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
         simulateEnricherSetsCount(2);
 
-        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, null, null);
+        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, null, null, null);
 
         assertThat(result.items()).hasSize(1);
         // The critical invariant: user sees the enricher-provided count, not Fleet's raw 31.
@@ -250,7 +250,7 @@ class SoftwareInventoryServiceTest {
     @DisplayName("listSoftware: an unknown sort field is a client error (BadRequest), not a Fleet call")
     void listSoftware_unknownSortField_throwsBadRequest() {
         BadRequestException ex = org.junit.jupiter.api.Assertions.assertThrows(BadRequestException.class,
-                () -> service.listSoftware("", 0, 20, sort("bogus", SortDirection.ASC), null));
+                () -> service.listSoftware("", 0, 20, sort("bogus", SortDirection.ASC), null, null));
 
         assertThat(ex.getMessage()).contains("bogus").contains("cveCount");
         org.mockito.Mockito.verifyNoInteractions(fleet);
@@ -373,7 +373,7 @@ class SoftwareInventoryServiceTest {
             return null;
         }).when(deviceCountEnricher).enrichFromHostSoftware(anyList(), any(), any(), any(), any());
 
-        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, null, null);
+        PageResult<SoftwareResponse> result = service.listSoftware("", 0, 20, null, null, null);
 
         assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Keep");
     }
@@ -390,7 +390,7 @@ class SoftwareInventoryServiceTest {
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
         simulateEnricherSetsCount(1);
 
-        service.listSoftware("", 0, 20, null, null);
+        service.listSoftware("", 0, 20, null, null, null);
 
         org.mockito.ArgumentCaptor<java.util.function.Function<FleetSoftware, java.util.stream.Stream<String>>> keysOf =
                 org.mockito.ArgumentCaptor.forClass(java.util.function.Function.class);
@@ -537,6 +537,44 @@ class SoftwareInventoryServiceTest {
 
         // verifications
         assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Google Chrome");
+    }
+
+    @Test
+    void listSoftwareForDevice_manageableOnly_keepsTheTitlesAManagerManages() {
+        // setup
+        stubInventory(
+                List.of(title(10L, "Google Chrome", "programs", "141.0"), title(11L, "Contoso Tool", "programs", "1.0"),
+                        title(12L, "node", "homebrew_packages", "20.1")),
+                List.of());
+        catalogMatchesWinget("Google Chrome");
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setManageable(true);
+
+        // execution
+        PageResult<SoftwareResponse> result =
+                service.listSoftwareForDevice(MACHINE_ID, filter, null, FIRST_PAGE, PAGE_SIZE, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Google Chrome", "node");
+    }
+
+    @Test
+    void listSoftwareForDevice_notManageable_keepsTheTitlesNoManagerManages() {
+        // setup
+        stubInventory(
+                List.of(title(10L, "Google Chrome", "programs", "141.0"), title(11L, "Contoso Tool", "programs", "1.0"),
+                        title(12L, "node", "homebrew_packages", "20.1")),
+                List.of());
+        catalogMatchesWinget("Google Chrome");
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setManageable(false);
+
+        // execution
+        PageResult<SoftwareResponse> result =
+                service.listSoftwareForDevice(MACHINE_ID, filter, null, FIRST_PAGE, PAGE_SIZE, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Contoso Tool");
     }
 
     @Test
@@ -772,7 +810,7 @@ class SoftwareInventoryServiceTest {
         when(response.getSoftwareTitles()).thenReturn(List.of());
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
 
-        service.listSoftware(null, 0, 20, null, null);
+        service.listSoftware(null, 0, 20, null, null, null);
 
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftware(anyList());
@@ -907,6 +945,27 @@ class SoftwareInventoryServiceTest {
 
         // verifications
         assertThat(rows).extracting(row -> row.getDevice().getMachineId()).containsExactly("m-1");
+    }
+
+    @Test
+    void listDevicesForSoftware_manageable_splitsTheDevicesByWhetherWingetManagesTheTitleThere() {
+        // setup
+        Machine present = withWinget(device("m-1", "1.0"), PackageManagerState.PRESENT);
+        Machine unsupported = withWinget(device("m-2", "1.0"), PackageManagerState.UNSUPPORTED);
+        stubDevices("programs", present, unsupported);
+        catalogMatchesWinget(null);
+        SoftwareOnDeviceFilterInput only = new SoftwareOnDeviceFilterInput();
+        only.setManageable(true);
+        SoftwareOnDeviceFilterInput rest = new SoftwareOnDeviceFilterInput();
+        rest.setManageable(false);
+
+        // execution
+        List<SoftwareOnDeviceResponse> manageable = service.listDevicesForSoftware("42", only, null, 0, 50, null).items();
+        List<SoftwareOnDeviceResponse> notManageable = service.listDevicesForSoftware("42", rest, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(manageable).extracting(row -> row.getDevice().getMachineId()).containsExactly("m-1");
+        assertThat(notManageable).extracting(row -> row.getDevice().getMachineId()).containsExactly("m-2");
     }
 
     @Test
