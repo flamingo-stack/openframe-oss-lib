@@ -4,6 +4,7 @@ import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.repository.organization.publishing.OrganizationAggregateSpec;
 import com.openframe.data.repository.organization.publishing.OrganizationOnTicketsProjection;
+import com.openframe.data.repository.ticket.TicketProjectionRepository;
 import com.openframe.publishing.api.OutboxPublisher;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import com.openframe.publishing.config.EventsAutoConfiguration;
@@ -101,7 +102,7 @@ class OrganizationPublishingSwitchedOffIT {
     @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class, OutboxAutoConfiguration.class,
             OutboxIndexAutoConfiguration.class})
     @EnableMongoRepositories(basePackageClasses = OrganizationRepository.class)
-    @Import({OrganizationAggregateSpec.class, OrganizationOnTicketsProjection.class})
+    @Import({OrganizationAggregateSpec.class, OrganizationOnTicketsProjection.class, TicketProjectionRepository.class})
     static class TestApplication {
     }
 }
