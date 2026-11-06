@@ -5,6 +5,7 @@ import { cn } from '../../../utils/cn';
 import { ApprovalBatchMessage, ApprovalStatusTag } from '../../chat/approval-batch-message';
 import { ExpandChevron } from '../../chat/expand-chevron';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
+import { PolicyEscalationAlert, isPolicyEscalated } from '../../chat/policy-review';
 import type { ChatApprovalStatus } from '../../chat/types';
 import { Button } from '../../ui/button';
 import {
@@ -85,6 +86,10 @@ export function ApprovalRequestNotificationTile({
     type: notification.type ?? 'Approval Required',
   };
 
+  // What Mingo escalated is read with the commands folded away, as the chat shows it under the command row, and is
+  // approved in the warning colour.
+  const escalatedCalls = batchData.toolCalls.filter(call => isPolicyEscalated(call.policyReview));
+  const escalated = escalatedCalls.length > 0;
   const commandWord = batchData.toolCalls.length > 1 ? 'commands' : 'command';
   const toggleLabel = `${expanded ? 'Hide' : 'Show'} ${commandWord} section`;
 
@@ -123,7 +128,7 @@ export function ApprovalRequestNotificationTile({
           {status === 'pending' ? (
             <>
               <Button
-                variant="accent"
+                variant={escalated ? 'warning' : 'accent'}
                 size="small"
                 onClick={() => resolve('approved', onApprove)}
                 disabled={processing}
@@ -172,6 +177,14 @@ export function ApprovalRequestNotificationTile({
         </div>
       }
     >
+      {!lockscreen &&
+        escalatedCalls.map(call => (
+          <PolicyEscalationAlert
+            key={call.toolExecutionRequestId}
+            review={call.policyReview}
+            className="border-t border-ods-border"
+          />
+        ))}
       {!lockscreen && (
         <div style={containerStyle}>
           {/* Divider lives inside the measured element — useCollapsible caps the
@@ -182,6 +195,7 @@ export function ApprovalRequestNotificationTile({
                 data={batchData}
                 showExecutionStatus={false}
                 showFooterActions={false}
+                showEscalationAlerts={false}
                 maxBodyHeight="50vh"
                 className="mb-0 rounded-none border-0"
               />

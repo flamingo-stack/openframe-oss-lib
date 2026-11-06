@@ -66,6 +66,11 @@ export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement
    * notification tile. Explanation bullets still render.
    */
   showFooterActions?: boolean;
+  /**
+   * Draw the "Mingo Escalated" band under each escalated command. Turn off when the host draws it itself — the
+   * approval notification tile shows it while its commands are folded away. Defaults to on.
+   */
+  showEscalationAlerts?: boolean;
 }
 
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS);
@@ -139,12 +144,21 @@ interface ToolCallRowProps {
   batchStatus: ApprovalBatchSegment['status'];
   execution: ApprovalBatchExecutionState | undefined;
   showExecutionStatus: boolean;
+  showEscalationAlert: boolean;
 }
 
 // ADMIN-only row: command preview header, expandable args/result. The client
 // variant never renders tool calls — see the `variant === 'client'` branch of
 // `<ApprovalBatchMessage>`.
-function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExecutionStatus }: ToolCallRowProps) {
+function ToolCallRow({
+  call,
+  expanded,
+  onToggle,
+  batchStatus,
+  execution,
+  showExecutionStatus,
+  showEscalationAlert,
+}: ToolCallRowProps) {
   const command = getCommandText(call);
   const args = getArgEntries(call);
   const toolType = (call.toolType as ToolType) || 'OPENFRAME';
@@ -210,7 +224,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
       </div>
 
       {/* Outside the collapsible part: an escalation is read before anyone opens the command. */}
-      <PolicyEscalationAlert review={review} className="border-t border-ods-border" />
+      {showEscalationAlert && <PolicyEscalationAlert review={review} className="border-t border-ods-border" />}
     </div>
   );
 }
@@ -319,6 +333,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       assistantType: _assistantType,
       variant = 'admin',
       showFooterActions = true,
+      showEscalationAlerts = true,
       ...props
     },
     ref,
@@ -451,6 +466,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
                 setExpandedId(prev => (prev === call.toolExecutionRequestId ? null : call.toolExecutionRequestId))
               }
               batchStatus={status}
+              showEscalationAlert={showEscalationAlerts}
               execution={data.executions?.[call.toolExecutionRequestId]}
               showExecutionStatus={showExecutionStatus}
             />
