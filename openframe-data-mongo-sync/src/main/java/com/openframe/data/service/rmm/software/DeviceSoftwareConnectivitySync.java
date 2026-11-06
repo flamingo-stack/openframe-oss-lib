@@ -29,14 +29,12 @@ public class DeviceSoftwareConnectivitySync {
         }
         Set<Long> affectedTitles = new HashSet<>();
         Set<String> affectedCves = new HashSet<>();
-        int changed = 0;
+        boolean anyToFlip = false;
         for (DeviceSoftware row : rows) {
             if (row.isMachineConnected() == connected) {
                 continue;
             }
-            row.setMachineConnected(connected);
-            deviceSoftwareRepository.save(row);
-            changed++;
+            anyToFlip = true;
             if (row.getSoftwareTitleId() != null) {
                 affectedTitles.add(row.getSoftwareTitleId());
             }
@@ -44,9 +42,11 @@ public class DeviceSoftwareConnectivitySync {
                 affectedCves.addAll(row.getVulnerabilities());
             }
         }
-        if (changed == 0) {
+        if (!anyToFlip) {
             return;
         }
+        // one bulk write for the whole machine
+        long changed = deviceSoftwareRepository.setMachineConnectedByTenantIdAndMachineId(tenantId, machineId, connected);
         affectedTitles.forEach(titleId -> softwareProjector.project(tenantId, titleId));
         affectedCves.forEach(cve -> vulnerabilityProjector.project(tenantId, cve));
         int titleCount = affectedTitles.size();

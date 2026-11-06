@@ -5,17 +5,15 @@ import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -30,8 +28,8 @@ class DeviceSoftwareConnectivitySyncTest {
     @InjectMocks private DeviceSoftwareConnectivitySync sync;
 
     @Test
-    @DisplayName("leaving CONNECTED flips the machine's rows to disconnected and re-projects every title and CVE")
-    void disconnect_flipsRowsAndReprojects() {
+    @DisplayName("leaving CONNECTED flips the machine's rows in one bulk write and re-projects every title and CVE")
+    void disconnect_bulkFlipsAndReprojects() {
         when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
                 DeviceSoftware.builder().machineId("m1").softwareTitleId(42L).machineConnected(true)
                         .vulnerabilities(List.of("CVE-1", "CVE-2")).build(),
@@ -40,10 +38,7 @@ class DeviceSoftwareConnectivitySyncTest {
 
         sync.onConnectivityChanged("t1", "m1", false);
 
-        ArgumentCaptor<DeviceSoftware> saved = ArgumentCaptor.forClass(DeviceSoftware.class);
-        verify(deviceSoftwareRepository, times(2)).save(saved.capture());
-        assertThat(saved.getAllValues()).noneMatch(DeviceSoftware::isMachineConnected);
-
+        verify(deviceSoftwareRepository).setMachineConnectedByTenantIdAndMachineId("t1", "m1", false);
         verify(softwareProjector).project("t1", 42L);
         verify(softwareProjector).project("t1", 99L);
         verify(vulnerabilityProjector).project("t1", "CVE-1");  // once, de-duplicated across the two titles
@@ -51,16 +46,14 @@ class DeviceSoftwareConnectivitySyncTest {
     }
 
     @Test
-    @DisplayName("restoring to CONNECTED flips rows back to connected")
-    void reconnect_flipsRowsBack() {
+    @DisplayName("restoring to CONNECTED flips rows back in one bulk write")
+    void reconnect_bulkFlipsBack() {
         when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
                 DeviceSoftware.builder().machineId("m1").softwareTitleId(42L).machineConnected(false).build()));
 
         sync.onConnectivityChanged("t1", "m1", true);
 
-        ArgumentCaptor<DeviceSoftware> saved = ArgumentCaptor.forClass(DeviceSoftware.class);
-        verify(deviceSoftwareRepository).save(saved.capture());
-        assertThat(saved.getValue().isMachineConnected()).isTrue();
+        verify(deviceSoftwareRepository).setMachineConnectedByTenantIdAndMachineId("t1", "m1", true);
         verify(softwareProjector).project("t1", 42L);
     }
 
@@ -72,7 +65,7 @@ class DeviceSoftwareConnectivitySyncTest {
 
         sync.onConnectivityChanged("t1", "m1", false);
 
-        verify(deviceSoftwareRepository, never()).save(any());
+        verify(deviceSoftwareRepository, never()).setMachineConnectedByTenantIdAndMachineId(any(), any(), anyBoolean());
         verifyNoInteractions(softwareProjector, vulnerabilityProjector);
     }
 
@@ -83,7 +76,7 @@ class DeviceSoftwareConnectivitySyncTest {
 
         sync.onConnectivityChanged("t1", "m1", true);
 
-        verify(deviceSoftwareRepository, never()).save(any());
+        verify(deviceSoftwareRepository, never()).setMachineConnectedByTenantIdAndMachineId(any(), any(), anyBoolean());
         verifyNoInteractions(softwareProjector, vulnerabilityProjector);
     }
 
