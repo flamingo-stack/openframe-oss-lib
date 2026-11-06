@@ -34,6 +34,8 @@ public class AuditAspect {
         String condition = audited.condition();
         String tenantExpression = audited.tenantId();
         String nameExpression = audited.targetName();
+        String organizationExpression = audited.organizationId();
+        String deviceExpression = audited.deviceId();
         boolean idFromResult = expressions.readsResult(idExpression);
         boolean idFromArguments = StringUtils.hasText(idExpression) && !idFromResult;
         AuditTargetType targetType = audited.targetType().length > 0
@@ -50,7 +52,9 @@ public class AuditAspect {
                 audited.compare(),
                 result -> records(condition, method, arguments, result),
                 result -> valueAfterCall(tenantExpression, method, arguments, result),
-                result -> valueAfterCall(nameExpression, method, arguments, result));
+                result -> valueAfterCall(nameExpression, method, arguments, result),
+                result -> valueAfterCall(organizationExpression, method, arguments, result),
+                result -> valueAfterCall(deviceExpression, method, arguments, result));
         return auditCapture.capture(call, joinPoint::proceed);
     }
 

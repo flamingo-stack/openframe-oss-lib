@@ -18,8 +18,16 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-data-mongo-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-data-redis</artifactId>
         </dependency>
 
         <dependency>

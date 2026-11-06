@@ -1,9 +1,13 @@
 package com.openframe.audit;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.audit.targets.AuditTarget;
+import com.openframe.audit.targets.AuditTargetRepository;
 import com.openframe.audit.targets.AuditTargets;
 import com.openframe.core.util.Sha256;
 import com.openframe.data.document.apikey.ApiKey;
+import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.document.audit.AuditEntry;
 import com.openframe.data.document.audit.AuditEvent;
@@ -20,11 +24,11 @@ import com.openframe.data.service.AuditTenants;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -37,17 +41,19 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 import static com.openframe.core.constants.HttpHeaders.X_API_KEY_ID;
 import static com.openframe.core.constants.HttpHeaders.X_USER_ID;
 import static com.openframe.data.document.audit.AuditActorType.FAE;
 import static com.openframe.data.document.audit.AuditRequestContext.ACTOR_ATTRIBUTE;
-import static com.openframe.data.document.audit.AuditRequestContext.CLIENT_IP_HEADER;
-import static com.openframe.data.document.audit.AuditRequestContext.REQUEST_ID_HEADER;
 import static com.openframe.data.document.audit.AuditRequestContext.SESSION_CLAIM;
 
 @Slf4j
@@ -56,6 +62,11 @@ import static com.openframe.data.document.audit.AuditRequestContext.SESSION_CLAI
 public class AuditRecorder {
 
     private static final ThreadLocal<AuditContext> DECLARED_CONTEXT = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> CAPTURING = new ThreadLocal<>();
+    private static final Set<Throwable> CAPTURED_FAILURES =
+            Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
+    private static final Duration ONCE_WINDOW = Duration.ofMinutes(1);
+    private static final int ONCE_KEYS = 10_000;
 
     private final AuditEventRepository auditEventRepository;
     private final UserRepository userRepository;
@@ -63,10 +74,19 @@ public class AuditRecorder {
     private final ApiKeyRepository apiKeyRepository;
     private final AuditTenants auditTenants;
     private final AuditTargets targets;
+    private final AuditTargetRepository targetRepository;
+    private final AuditOutcomeResolver outcomeResolver;
     private final AuditEventMapper auditEventMapper;
     private final ObjectMapper objectMapper;
     @Value("${openframe.audit.enabled}")
     private final boolean enabled;
+    private final Cache<String, Boolean> unresolvedFailures = Caffeine.newBuilder()
+            .maximumSize(ONCE_KEYS)
+            .build();
+    private final Cache<String, Boolean> recordedOnce = Caffeine.newBuilder()
+            .expireAfterWrite(ONCE_WINDOW)
+            .maximumSize(ONCE_KEYS)
+            .build();
 
     public AuditContext context() {
         return Objects.requireNonNullElseGet(DECLARED_CONTEXT.get(),
@@ -88,8 +108,16 @@ public class AuditRecorder {
     public AuditSource source() {
         HttpServletRequest request = currentRequest();
         Jwt jwt = currentJwt();
-        return new AuditSource(header(request, CLIENT_IP_HEADER), header(request, HttpHeaders.USER_AGENT),
-                header(request, REQUEST_ID_HEADER), jwt == null ? null : jwt.getClaimAsString(SESSION_CLAIM));
+        return AuditSource.fromHeaders(name -> header(request, name),
+                jwt == null ? loginSessionId(request) : jwt.getClaimAsString(SESSION_CLAIM));
+    }
+
+    private static String loginSessionId(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        HttpSession session = request.getSession(false);
+        return session == null ? null : Sha256.hex(session.getId());
     }
 
     public <R, E extends Throwable> R within(AuditContext context, AuditedWork<R, E> work) throws E {
@@ -104,6 +132,27 @@ public class AuditRecorder {
                 DECLARED_CONTEXT.set(outer);
             }
         }
+    }
+
+    <R, E extends Throwable> R capturing(AuditContext context, AuditedWork<R, E> work) throws E {
+        boolean outermost = CAPTURING.get() == null;
+        CAPTURING.set(Boolean.TRUE);
+        try {
+            return within(context, work);
+        } finally {
+            if (outermost) {
+                CAPTURING.remove();
+            }
+        }
+    }
+
+    void markCaptured(Throwable failure) {
+        CAPTURED_FAILURES.add(failure);
+    }
+
+    public boolean captured(Throwable failure) {
+        return CAPTURED_FAILURES.contains(failure)
+                || failure.getCause() != null && CAPTURED_FAILURES.contains(failure.getCause());
     }
 
     public void within(AuditContext context, Runnable work) {
@@ -138,18 +187,136 @@ public class AuditRecorder {
     }
 
     public String record(AuditEntry entry, AuditContext context) {
+        return write(entry, context, true);
+    }
+
+    String recordCaptured(AuditEntry entry, AuditContext context) {
+        return write(entry, context, false);
+    }
+
+    public void recordFailure(AuditEntry.AuditEntryBuilder entry, Throwable failure) {
+        record(failed(entry, failure));
+    }
+
+    public void recordUnresolvedFailure(AuditEntry entry, String condition) {
+        String key = conditionKey(entry.getAction(), condition);
+        if (!enabled || unresolvedFailures.asMap().putIfAbsent(key, Boolean.TRUE) != null) {
+            return;
+        }
+        if (record(entry) == null) {
+            unresolvedFailures.invalidate(key);
+        }
+    }
+
+    public void recordUnresolvedFailure(AuditEntry.AuditEntryBuilder entry, Throwable failure, String condition) {
+        recordUnresolvedFailure(failed(entry, failure), condition);
+    }
+
+    public void failureResolved(AuditAction action, String condition) {
+        unresolvedFailures.invalidate(conditionKey(action, condition));
+    }
+
+    private static String conditionKey(AuditAction action, String condition) {
+        return action.getName() + ":" + condition;
+    }
+
+    private AuditEntry failed(AuditEntry.AuditEntryBuilder entry, Throwable failure) {
+        ActionOutcome outcome = outcomeResolver.ofFailure(failure);
+        return entry.outcome(outcome.outcome()).reason(outcome.reason()).build();
+    }
+
+    private String write(AuditEntry entry, AuditContext context, boolean loadTarget) {
         Assert.state(entry.getAction() != null, "An audit entry needs an action");
         Assert.state(entry.getOutcome() != null, "An audit entry needs an outcome");
         if (!enabled) {
             return null;
         }
+        if (targetTypeOf(entry) == null) {
+            log.error("Audit skipped: {} has no fixed target type, so the entry must name one",
+                    entry.getAction().getName());
+            return null;
+        }
         try {
             AuditContext given = context == null ? context() : underCurrentEvent(context);
-            return save(eventOf(entry, given));
+            AuditEntry complete = loadTarget ? withTargetFields(entry) : entry;
+            return save(eventOf(complete, given, namesOf(given.actor())));
         } catch (RuntimeException e) {
             log.error("Audit event not recorded for {}", entry.getAction().getName(), e);
             return null;
         }
+    }
+
+    public void recordUnlessCaptured(AuditEntry entry) {
+        if (CAPTURING.get() == null) {
+            record(entry);
+        }
+    }
+
+    public void recordOnceUnlessCaptured(AuditEntry entry, String key) {
+        if (CAPTURING.get() == null) {
+            recordOnce(entry, key);
+        }
+    }
+
+    public String currentEndpoint() {
+        HttpServletRequest request = currentRequest();
+        return request == null ? null : request.getMethod() + " " + request.getRequestURI();
+    }
+
+    public void recordOnce(AuditEntry entry, String key) {
+        recordOnce(entry, key, this::context);
+    }
+
+    public void recordOnce(AuditEntry entry, String key, AuditActor actor) {
+        recordOnce(entry, key, () -> context(actor));
+    }
+
+    private void recordOnce(AuditEntry entry, String key, Supplier<AuditContext> contextOf) {
+        if (!enabled) {
+            return;
+        }
+        try {
+            AuditContext context = contextOf.get();
+            AuditActor actor = context.actor();
+            String onceKey = String.join(":", entry.getAction().getName(), key,
+                    Objects.requireNonNullElse(auditTenants.tenantFor(actor, entry.getTenantId()), "-"),
+                    Objects.requireNonNullElse(actor.id(), "-"));
+            if (recordedOnce.asMap().putIfAbsent(onceKey, Boolean.TRUE) == null) {
+                record(entry, context);
+            }
+        } catch (RuntimeException e) {
+            log.error("Audit event not recorded for {}", entry.getAction().getName(), e);
+        }
+    }
+
+    public void recordAll(List<AuditEntry> entries) {
+        entries.forEach(entry -> {
+            Assert.state(entry.getAction() != null, "An audit entry needs an action");
+            Assert.state(entry.getOutcome() != null, "An audit entry needs an outcome");
+        });
+        if (!enabled || entries.isEmpty()) {
+            return;
+        }
+        List<AuditEvent> events = List.of();
+        try {
+            AuditContext context = context();
+            ActorNames names = namesOf(context.actor());
+            events = entries.stream().map(entry -> eventOf(withTargetFields(entry), context, names)).toList();
+            auditEventRepository.insert(events);
+        } catch (RuntimeException e) {
+            String dropped = events.isEmpty()
+                    ? entries.toString()
+                    : events.stream().map(this::asJson).toList().toString();
+            log.error("Audit events not recorded: {}", dropped, e);
+        }
+    }
+
+    private record ActorNames(String actor, String onBehalfOf, String approver) {
+    }
+
+    private ActorNames namesOf(AuditActor actor) {
+        return new ActorNames(nameOf(actor), onBehalfOfNameOf(actor),
+                actor.approver() == null ? null : nameOf(actor.approver()));
     }
 
     private AuditContext underCurrentEvent(AuditContext context) {
@@ -160,13 +327,49 @@ public class AuditRecorder {
     }
 
     public String targetIdOf(AuditTargetType targetType, String targetId) {
-        return targetId == null && targetType == AuditTargetType.TENANT ? auditTenants.servedTenantId() : targetId;
+        if (targetId != null) {
+            return targetId;
+        }
+        boolean keyedByTenant = targetType == AuditTargetType.TENANT
+                || targets.find(targetType).stream().anyMatch(AuditTarget::keyedByTenant);
+        return keyedByTenant ? auditTenants.isolatedTenantId() : null;
     }
 
-    private AuditEvent eventOf(AuditEntry entry, AuditContext context) {
+    private AuditEntry withTargetFields(AuditEntry entry) {
+        boolean complete = entry.getTargetName() != null && entry.getOrganizationId() != null
+                && entry.getDeviceId() != null;
+        AuditTargetType targetType = targetTypeOf(entry);
+        String targetId = targetIdOf(targetType, entry.getTargetId());
+        if (complete || targetType == null || targetId == null) {
+            return entry;
+        }
+        try {
+            return targetRepository.load(targets.find(targetType), targetId)
+                    .map(loaded -> entry.toBuilder()
+                            .targetName(firstNonNull(entry.getTargetName(), loaded.name()))
+                            .organizationId(firstNonNull(entry.getOrganizationId(), loaded.organizationId()))
+                            .deviceId(firstNonNull(entry.getDeviceId(), loaded.deviceId()))
+                            .build())
+                    .orElse(entry);
+        } catch (RuntimeException e) {
+            log.error("Audit target {} not read, {} is stored without its name", targetId,
+                    entry.getAction().getName(), e);
+            return entry;
+        }
+    }
+
+    private static AuditTargetType targetTypeOf(AuditEntry entry) {
+        return entry.getTargetType() != null ? entry.getTargetType() : entry.getAction().getTargetType();
+    }
+
+    private static String firstNonNull(String value, String fallback) {
+        return value != null ? value : fallback;
+    }
+
+    private AuditEvent eventOf(AuditEntry entry, AuditContext context, ActorNames names) {
         AuditActor actor = context.actor();
         String tenantId = auditTenants.tenantFor(actor, entry.getTenantId());
-        AuditTargetType targetType = Objects.requireNonNullElse(entry.getTargetType(), entry.getAction().getTargetType());
+        AuditTargetType targetType = targetTypeOf(entry);
         String targetId = targetIdOf(targetType, entry.getTargetId());
         boolean secretId = targets.find(targetType).stream().anyMatch(AuditTarget::secretId);
         AuditEntry stored = entry.toBuilder()
@@ -174,9 +377,9 @@ public class AuditRecorder {
                 .targetId(secretId && targetId != null ? Sha256.hex(targetId) : targetId)
                 .build();
         AuditEvent event = auditEventMapper.toEvent(stored, actor, context.source(), tenantId, context.parentEventId());
-        event.setActorName(nameOf(actor));
-        event.setOnBehalfOfName(onBehalfOfNameOf(actor));
-        event.setApproverName(actor.approver() == null ? null : nameOf(actor.approver()));
+        event.setActorName(names.actor());
+        event.setOnBehalfOfName(names.onBehalfOf());
+        event.setApproverName(names.approver());
         return event;
     }
 

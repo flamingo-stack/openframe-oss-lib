@@ -22,6 +22,7 @@ public record AuditTarget<T>(AuditTargetType type,
                              Map<String, AuditAction> enableActions,
                              Container<?, T> container) {
 
+    public static final String TENANT_ID_FIELD = "tenantId";
     private static final String MONGO_ID_FIELD = "_id";
     private static final String ELEMENT_ID_FIELD = "id";
 
@@ -34,6 +35,10 @@ public record AuditTarget<T>(AuditTargetType type,
                                               Function<T, String> name) {
         return new AuditTarget<>(type, elementType, ELEMENT_ID_FIELD, name, _ -> null, _ -> null, Set.of(), Set.of(),
                 false, Map.of(), container);
+    }
+
+    public boolean keyedByTenant() {
+        return TENANT_ID_FIELD.equals(idField);
     }
 
     public String nameOf(Object document) {

@@ -4,6 +4,7 @@ import com.github.f4b6a3.ulid.UlidCreator;
 import com.openframe.audit.targets.AuditTarget;
 import com.openframe.audit.targets.AuditTargetRepository;
 import com.openframe.audit.targets.AuditTargets;
+import com.openframe.audit.targets.LoadedTarget;
 import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditChange;
 import com.openframe.data.document.audit.AuditEntry;
@@ -15,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -26,14 +26,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
 
 @Slf4j
 @Service
@@ -105,37 +103,6 @@ public class AuditCapture {
         return capture(call, work::getAsBoolean);
     }
 
-    public String record(AuditEntry entry) {
-        Assert.state(entry.getAction() != null, "An audit entry needs an action");
-        Assert.state(entry.getOutcome() != null, "An audit entry needs an outcome");
-        if (!enabled) {
-            return null;
-        }
-        AuditAction action = entry.getAction();
-        AuditTargetType targetType = entry.getTargetType() != null ? entry.getTargetType() : action.getTargetType();
-        if (targetType == null) {
-            log.error("Audit skipped: {} has no fixed target type, so the entry must name one", action.getName());
-            return null;
-        }
-        List<AuditTarget<?>> candidates = targets.find(targetType);
-        String targetId = recorder.targetIdOf(targetType, entry.getTargetId());
-        AuditEntry.AuditEntryBuilder stored = entry.toBuilder().targetType(targetType).targetId(targetId);
-        Snapshot current = read(action, candidates, targetId);
-        if (current != null) {
-            safely("target fields", action, () -> fill(stored, entry, current));
-        }
-        return recorder.record(stored.build());
-    }
-
-    private static Void fill(AuditEntry.AuditEntryBuilder stored, AuditEntry entry, Snapshot current) {
-        AuditTarget<?> target = current.target();
-        Object document = current.document();
-        stored.targetName(firstNonNull(entry.getTargetName(), target.nameOf(document)))
-                .organizationId(firstNonNull(entry.getOrganizationId(), target.organizationIdOf(document)))
-                .deviceId(firstNonNull(entry.getDeviceId(), target.deviceIdOf(document)));
-        return null;
-    }
-
     public <R, E extends Throwable> R capture(AuditCall call, AuditedWork<R, E> work) throws E {
         if (!enabled) {
             return work.run();
@@ -147,17 +114,18 @@ public class AuditCapture {
         List<AuditTarget<?>> candidates = targets.find(call.targetType());
         boolean compares = call.compare() && call.action().getKind() == AuditKind.CHANGE;
         String targetIdBeforeCall = safely("target id", call.action(), () -> targetIdBefore(call));
-        Snapshot before = compares ? read(call.action(), candidates, targetIdBeforeCall) : null;
+        LoadedTarget before = compares ? read(call.action(), candidates, targetIdBeforeCall) : null;
         AuditContext context = safely("context", call.action(), recorder::context);
         String eventId = UlidCreator.getUlid().toString();
         AuditContext declared = context == null ? null : context.withParentEventId(eventId);
         R result;
         try {
-            result = recorder.within(declared, work);
+            result = recorder.capturing(declared, work);
         } catch (Throwable failure) {
-            Snapshot seen = before != null ? before : read(call.action(), candidates, targetIdBeforeCall);
+            LoadedTarget seen = before != null ? before : read(call.action(), candidates, targetIdBeforeCall);
             record(call, context, () -> entry(call, targetIdBeforeCall, seen, null, null,
                     outcomeResolver.ofFailure(failure)).id(eventId).build());
+            recorder.markCaptured(failure);
             throw failure;
         }
         if (Boolean.FALSE.equals(safely("condition", call.action(), () -> call.recordsResult().test(result)))) {
@@ -169,8 +137,8 @@ public class AuditCapture {
         if (call.action().getKind() == AuditKind.SENSITIVE_READ && readAlreadyRecorded(call, targetId)) {
             return result;
         }
-        Snapshot after = read(call.action(), candidates, targetId);
-        Snapshot current = before != null ? before : after;
+        LoadedTarget after = read(call.action(), candidates, targetId);
+        LoadedTarget current = before != null ? before : after;
         Map<String, AuditChange> changes = compares && before != null && after != null
                 ? safely("changes", call.action(), () -> changesOf(before, after)) : null;
         ActionOutcome outcome = safely("outcome", call.action(), () -> outcomeResolver.ofResult(result));
@@ -190,7 +158,7 @@ public class AuditCapture {
     }
 
     private AuditEntry.AuditEntryBuilder entry(AuditCall call, String targetId,
-                                               Snapshot current, Map<String, AuditChange> changes, Object result,
+                                               LoadedTarget current, Map<String, AuditChange> changes, Object result,
                                                ActionOutcome outcome) {
         Map<String, Object> details = new HashMap<>(Objects.requireNonNullElse(
                 safely("details", call.action(), () -> call.detailsFromResult().apply(result)), Map.of()));
@@ -206,27 +174,28 @@ public class AuditCapture {
                 .targetId(targetId)
                 .details(details.isEmpty() ? null : details)
                 .changes(CollectionUtils.isEmpty(changes) ? null : changes);
-        String loadedName = null;
-        if (current != null) {
-            loadedName = current.target().nameOf(current.document());
-            entry.organizationId(current.target().organizationIdOf(current.document()))
-                    .deviceId(current.target().deviceIdOf(current.document()));
-        }
-        String name = loadedName != null
-                ? loadedName
-                : safely("target name", call.action(), () -> call.targetNameOf().apply(result));
-        return entry.targetName(name);
+        String loadedName = current == null ? null : current.name();
+        String loadedOrganizationId = current == null ? null : current.organizationId();
+        String loadedDeviceId = current == null ? null : current.deviceId();
+        return entry.targetName(orAfterCall(loadedName, "target name", call, call.targetNameOf(), result))
+                .organizationId(orAfterCall(loadedOrganizationId, "organization id", call, call.organizationIdOf(), result))
+                .deviceId(orAfterCall(loadedDeviceId, "device id", call, call.deviceIdOf(), result));
     }
 
-    private static boolean recordsEnabledFields(AuditCall call, boolean compares, Snapshot before, Snapshot after,
-                                                ActionOutcome outcome) {
+    private static String orAfterCall(String loaded, String step, AuditCall call, Function<Object, String> value,
+                                      Object result) {
+        return loaded != null ? loaded : safely(step, call.action(), () -> value.apply(result));
+    }
+
+    private static boolean recordsEnabledFields(AuditCall call, boolean compares, LoadedTarget before,
+                                                LoadedTarget after, ActionOutcome outcome) {
         boolean created = before == null && call.targetIdInResult()
                 && call.action().getName().endsWith(CREATE_SUFFIX);
         return compares && after != null && (before != null || created)
                 && outcome != null && outcome.outcome() == AuditOutcome.SUCCESS;
     }
 
-    private List<AuditAction> enabledActions(Snapshot before, Snapshot after) {
+    private List<AuditAction> enabledActions(LoadedTarget before, LoadedTarget after) {
         Document beforeFields = before == null ? new Document() : targetRepository.storedFieldsOf(before.document());
         Document afterFields = targetRepository.storedFieldsOf(after.document());
         return after.target().enableActions().entrySet().stream()
@@ -236,7 +205,7 @@ public class AuditCapture {
                 .toList();
     }
 
-    private Map<String, AuditChange> changesOf(Snapshot before, Snapshot after) {
+    private Map<String, AuditChange> changesOf(LoadedTarget before, LoadedTarget after) {
         AuditTarget<?> target = after.target();
         Document beforeFields = targetRepository.storedFieldsOf(before.document());
         Document afterFields = targetRepository.storedFieldsOf(after.document());
@@ -253,26 +222,15 @@ public class AuditCapture {
                         LinkedHashMap::new));
     }
 
-    private Snapshot read(AuditAction action, List<AuditTarget<?>> candidates, String targetId) {
+    private LoadedTarget read(AuditAction action, List<AuditTarget<?>> candidates, String targetId) {
         if (targetId == null) {
             return null;
         }
-        return safely("target read", action, () -> candidates.stream()
-                .map(target -> snapshotOf(target, targetId))
-                .flatMap(Optional::stream)
-                .findFirst()
-                .orElse(null));
-    }
-
-    private <T> Optional<Snapshot> snapshotOf(AuditTarget<T> target, String targetId) {
-        return targetRepository.findOnPrimary(target, targetId).map(document -> new Snapshot(target, document));
+        return safely("target read", action, () -> targetRepository.load(candidates, targetId).orElse(null));
     }
 
     private void record(AuditCall call, AuditContext context, Supplier<AuditEntry> entry) {
-        safely("recording", call.action(), () -> {
-            recorder.record(entry.get(), context);
-            return null;
-        });
+        safely("recording", call.action(), () -> recorder.recordCaptured(entry.get(), context));
     }
 
     @SuppressWarnings("unchecked")
@@ -296,12 +254,5 @@ public class AuditCapture {
             log.error("Audit {} failed for {}", step, action.getName(), e);
             return null;
         }
-    }
-
-    private static String firstNonNull(String value, String fallback) {
-        return value != null ? value : fallback;
-    }
-
-    private record Snapshot(AuditTarget<?> target, Object document) {
     }
 }

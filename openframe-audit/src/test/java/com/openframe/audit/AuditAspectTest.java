@@ -35,7 +35,7 @@ class AuditAspectTest {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         context.register(ProxyConfiguration.class, AuditAspect.class, AuditExpressions.class, RelayIdCodec.class,
                 TicketEndpoints.class);
-        context.registerBean(AuditCapture.class, () -> auditCapture);
+        context.getBeanFactory().registerSingleton("auditCapture", auditCapture);
         context.refresh();
         endpoints = context.getBean(TicketEndpoints.class);
     }

@@ -44,6 +44,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.core.OAuth2Token;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
@@ -57,6 +58,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
 import java.util.Locale;
+import java.util.Objects;
 
 import com.openframe.authz.util.AuthUserPrincipals;
 
@@ -197,8 +199,11 @@ public class AuthorizationServerConfig {
 
                     claims.put("roles", UserRole.effective(user.getRoles()).stream()
                             .map(UserRole::name).toList());
-                    if (context.getAuthorization() != null) {
-                        claims.put(AuditRequestContext.SESSION_CLAIM, context.getAuthorization().getId());
+                    OAuth2Authorization authorization = context.getAuthorization();
+                    if (authorization != null) {
+                        claims.put(AuditRequestContext.SESSION_CLAIM, Objects.requireNonNullElse(
+                                authorization.getAttribute(AuditRequestContext.SESSION_ATTRIBUTE),
+                                authorization.getId()));
                     }
                 });
             }

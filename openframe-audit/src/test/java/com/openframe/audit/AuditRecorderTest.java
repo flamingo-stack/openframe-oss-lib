@@ -1,6 +1,11 @@
 package com.openframe.audit;
 
+import com.openframe.audit.targets.AuditTarget;
+import com.openframe.audit.targets.AuditTargetRepository;
+import com.openframe.audit.targets.AuditTargets;
+import com.openframe.audit.targets.LoadedTarget;
 import com.openframe.data.document.apikey.ApiKey;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.document.audit.AuditAction;
 import com.openframe.data.document.audit.AuditActorType;
 import com.openframe.data.document.audit.AuditChange;
@@ -8,14 +13,17 @@ import com.openframe.data.document.audit.AuditEntry;
 import com.openframe.data.document.audit.AuditEvent;
 import com.openframe.data.document.audit.AuditOutcome;
 import com.openframe.data.document.audit.AuditRequestContext;
+import com.openframe.data.document.audit.AuditSource;
 import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.User;
 import com.openframe.data.mapper.AuditEventMapperImpl;
 import com.openframe.data.repository.apikey.ApiKeyRepository;
 import com.openframe.data.repository.audit.AuditEventRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.user.UserRepository;
+import com.openframe.data.service.AuditTenants;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +33,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -44,6 +53,11 @@ import static com.openframe.core.constants.HttpHeaders.X_USER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -61,6 +75,7 @@ class AuditRecorderTest {
     @Mock private MachineRepository machineRepository;
     @Mock private ApiKeyRepository apiKeyRepository;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private AuditTargetRepository targetRepository;
     @Captor private ArgumentCaptor<AuditEvent> eventCaptor;
 
     private AuditRecorder recorder;
@@ -68,6 +83,7 @@ class AuditRecorderTest {
     @BeforeEach
     void setUp() {
         recorder = recorder(SUPER_TENANT_ID, true);
+        lenient().when(auditEventRepository.insert(any(AuditEvent.class))).thenAnswer(call -> call.getArgument(0));
     }
 
     @AfterEach
@@ -291,9 +307,260 @@ class AuditRecorderTest {
         verifyNoInteractions(auditEventRepository);
     }
 
+    @Test
+    void fillsTheTargetNameOrganizationAndDeviceFromTheStoredTarget() {
+        AuditTarget<User> userTarget = AuditTarget.of(AuditTargetType.USER, User.class, User::fullName)
+                .withOrganizationId(_ -> "org-7")
+                .withDeviceId(_ -> "device-7");
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+        when(targetRepository.load(anyList(), eq("user-9")))
+                .thenReturn(Optional.of(new LoadedTarget(userTarget, user("Ola", "Nowak"))));
+
+        recorder(SUPER_TENANT_ID, true, new AuditTargets(List.of(() -> List.of(userTarget))))
+                .record(AuditEntry.builder()
+                        .action(AuditAction.USER_UPDATE)
+                        .outcome(AuditOutcome.SUCCESS)
+                        .targetId("user-9")
+                        .build());
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getTargetName()).isEqualTo("Ola Nowak");
+        assertThat(event.getOrganizationId()).isEqualTo("org-7");
+        assertThat(event.getDeviceId()).isEqualTo("device-7");
+    }
+
+    @Test
+    void keepsTheNameTheCallerGaveOverTheStoredOne() {
+        AuditTarget<User> userTarget = AuditTarget.of(AuditTargetType.USER, User.class, User::fullName);
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+        when(targetRepository.load(anyList(), eq("user-9")))
+                .thenReturn(Optional.of(new LoadedTarget(userTarget, user("Ola", "Nowak"))));
+
+        recorder(SUPER_TENANT_ID, true, new AuditTargets(List.of(() -> List.of(userTarget))))
+                .record(AuditEntry.builder()
+                        .action(AuditAction.USER_UPDATE)
+                        .outcome(AuditOutcome.SUCCESS)
+                        .targetId("user-9")
+                        .targetName("Name at the time")
+                        .build());
+
+        assertThat(savedEvent().getTargetName()).isEqualTo("Name at the time");
+    }
+
+    @Test
+    void storesTheEventWithoutItsNameWhenTheTargetCannotBeRead() {
+        AuditTarget<User> userTarget = AuditTarget.of(AuditTargetType.USER, User.class, User::fullName);
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+        when(targetRepository.load(anyList(), eq("user-9")))
+                .thenThrow(new DataAccessResourceFailureException("mongo down"));
+
+        recorder(SUPER_TENANT_ID, true, new AuditTargets(List.of(() -> List.of(userTarget))))
+                .record(AuditEntry.builder()
+                        .action(AuditAction.USER_UPDATE)
+                        .outcome(AuditOutcome.SUCCESS)
+                        .targetId("user-9")
+                        .build());
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getTargetId()).isEqualTo("user-9");
+        assertThat(event.getTargetName()).isNull();
+    }
+
+    @Test
+    void storesTheHashOfASecretTargetId() {
+        AuditTarget<Invitation> invitationTarget =
+                AuditTarget.of(AuditTargetType.INVITATION, Invitation.class, Invitation::getEmail).withSecretId(true);
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+
+        recorder(SUPER_TENANT_ID, true, new AuditTargets(List.of(() -> List.of(invitationTarget))))
+                .record(AuditEntry.builder()
+                        .action(AuditAction.INVITATION_REVOKE)
+                        .outcome(AuditOutcome.SUCCESS)
+                        .targetId("join-secret")
+                        .targetName("new@acme.com")
+                        .build());
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getTargetId()).hasSize(64).doesNotContain("join-secret");
+        assertThat(event.getTargetName()).isEqualTo("new@acme.com");
+    }
+
+    @Test
+    void skipsAnEntryWithoutATargetType() {
+        recorder.record(entry(AuditAction.LINK_CREATE));
+
+        verifyNoInteractions(auditEventRepository);
+    }
+
+    @Test
+    void recordsNothingWhenAuditIsOff() {
+        new AuditRecorder(auditEventRepository, userRepository, machineRepository, apiKeyRepository,
+                new AuditTenants(tenantIdProvider, SUPER_TENANT_ID, true), new AuditTargets(List.of()),
+                targetRepository, outcomeResolver(), new AuditEventMapperImpl(), new ObjectMapper(), false)
+                .record(entry(AuditAction.TICKET_ARCHIVE));
+
+        verifyNoInteractions(auditEventRepository);
+    }
+
+    @Test
+    void recordsWithTheActorTheRequestDeclared() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute(AuditRequestContext.ACTOR_ATTRIBUTE, AuditActor.staff("staff-2"));
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+
+        recorder.record(entry(AuditAction.TICKET_ARCHIVE));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.STAFF);
+        assertThat(event.getActorId()).isEqualTo("staff-2");
+    }
+
+    @Test
+    void recordsInsideADeclaredContextWithItsActorSourceAndParent() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+        AuditContext context = new AuditContext(AuditActor.mingo(USER_ID),
+                new AuditSource("203.0.113.5", "Mingo", "request-7", "session-7"), "parent-7");
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user("Anna", "Kowalski")));
+
+        recorder.within(context, () -> recorder.record(entry(AuditAction.TICKET_ARCHIVE)));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.MINGO);
+        assertThat(event.getOnBehalfOfName()).isEqualTo("Anna Kowalski");
+        assertThat(event.getSourceIp()).isEqualTo("203.0.113.5");
+        assertThat(event.getSessionId()).isEqualTo("session-7");
+        assertThat(event.getParentEventId()).isEqualTo("parent-7");
+        assertThat(recorder.currentEventId()).isNull();
+    }
+
+    @Test
+    void recordsTheSessionTheCallerNamesInsteadOfTheTokenOne() {
+        signIn(jwt(USER_ID, "anna@acme.com", List.of("ADMIN"), SERVED_TENANT_ID, null, null));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user("Anna", "Kowalski")));
+        AuditActor anna = recorder.userActor(USER_ID, "anna@acme.com", List.of("ADMIN"), SERVED_TENANT_ID);
+
+        recorder.record(entry(AuditAction.AUTH_LOGOUT),
+                new AuditContext(anna, recorder.source().withSessionId("ended-session"), null));
+
+        assertThat(savedEvent().getSessionId()).isEqualTo("ended-session");
+    }
+
+    @Test
+    void recordsTheSameRefusalOnceAMinutePerKeyAndActor() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+        AuditEntry denial = AuditEntry.builder()
+                .action(AuditAction.AUTH_ACCESS_DENY)
+                .outcome(AuditOutcome.REFUSED)
+                .build();
+
+        recorder.recordOnce(denial, "GET /api/users");
+        recorder.recordOnce(denial, "GET /api/users");
+        recorder.recordOnce(denial, "GET /api/devices");
+
+        verify(auditEventRepository, times(2)).insert(any(AuditEvent.class));
+    }
+
+    @Test
+    void recordsARepeatedFailureOnceUntilItIsResolved() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+        AuditEntry failure = AuditEntry.builder()
+                .action(AuditAction.TICKET_ARCHIVE)
+                .outcome(AuditOutcome.FAILURE)
+                .build();
+
+        recorder.recordUnresolvedFailure(failure, "invoice-1");
+        recorder.recordUnresolvedFailure(failure, "invoice-1");
+        verify(auditEventRepository).insert(any(AuditEvent.class));
+
+        recorder.failureResolved(AuditAction.TICKET_ARCHIVE, "invoice-1");
+        recorder.recordUnresolvedFailure(failure, "invoice-1");
+        verify(auditEventRepository, times(2)).insert(any(AuditEvent.class));
+    }
+
+    @Test
+    void recordsTheFailureAgainWhenItsEventWasNotStored() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+        when(auditEventRepository.insert(any(AuditEvent.class)))
+                .thenThrow(new DataAccessResourceFailureException("mongo down"))
+                .thenAnswer(call -> call.getArgument(0));
+        AuditEntry failure = AuditEntry.builder()
+                .action(AuditAction.TICKET_ARCHIVE)
+                .outcome(AuditOutcome.FAILURE)
+                .build();
+
+        recorder.recordUnresolvedFailure(failure, "invoice-1");
+        recorder.recordUnresolvedFailure(failure, "invoice-1");
+        recorder.recordUnresolvedFailure(failure, "invoice-1");
+
+        verify(auditEventRepository, times(2)).insert(any(AuditEvent.class));
+    }
+
+    @Test
+    void recordsAJobUnderItsName() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+
+        recorder.within(recorder.context(AuditActor.system("script-watchdog")),
+                () -> recorder.record(entry(AuditAction.TICKET_ARCHIVE)));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getActorType()).isEqualTo(AuditActorType.SYSTEM);
+        assertThat(event.getActorId()).isEqualTo("script-watchdog");
+        assertThat(event.getActorName()).isEqualTo("script-watchdog");
+    }
+
+    @Test
+    void recordsAFailureOutsideACaptureAndSkipsItInside() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+        AuditEntry denial = AuditEntry.builder()
+                .action(AuditAction.AUTH_ACCESS_DENY)
+                .outcome(AuditOutcome.REFUSED)
+                .build();
+
+        recorder.capturing(null, () -> {
+            recorder.recordUnlessCaptured(denial);
+            return null;
+        });
+        verify(auditEventRepository, never()).insert(any(AuditEvent.class));
+
+        recorder.recordUnlessCaptured(denial);
+        verify(auditEventRepository).insert(any(AuditEvent.class));
+    }
+
+    @Test
+    void knowsAFailureACaptureAlreadyRecordedAlsoWhenItIsWrapped() {
+        RuntimeException failure = new IllegalStateException("refused");
+        recorder.markCaptured(failure);
+
+        assertThat(recorder.captured(failure)).isTrue();
+        assertThat(recorder.captured(new RuntimeException(failure))).isTrue();
+        assertThat(recorder.captured(new IllegalStateException("another"))).isFalse();
+    }
+
+    @Test
+    void recordsAFailureWithTheOutcomeOfItsException() {
+        when(tenantIdProvider.getTenantId()).thenReturn(SERVED_TENANT_ID);
+
+        recorder.recordFailure(AuditEntry.builder().action(AuditAction.TICKET_ARCHIVE),
+                new IllegalArgumentException("Ticket is archived"));
+
+        AuditEvent event = savedEvent();
+        assertThat(event.getOutcome()).isEqualTo(AuditOutcome.REFUSED);
+        assertThat(event.getReason()).isEqualTo("Ticket is archived");
+    }
+
     private AuditRecorder recorder(String superTenantId, boolean servesOneTenant) {
+        return recorder(superTenantId, servesOneTenant, new AuditTargets(List.of()));
+    }
+
+    private AuditRecorder recorder(String superTenantId, boolean servesOneTenant, AuditTargets targets) {
         return new AuditRecorder(auditEventRepository, userRepository, machineRepository, apiKeyRepository,
-                tenantIdProvider, new AuditEventMapperImpl(), new ObjectMapper(), superTenantId, servesOneTenant);
+                new AuditTenants(tenantIdProvider, superTenantId, servesOneTenant), targets, targetRepository,
+                outcomeResolver(), new AuditEventMapperImpl(), new ObjectMapper(), true);
+    }
+
+    private static AuditOutcomeResolver outcomeResolver() {
+        return new AuditOutcomeResolver(List.of(), new ExceptionHandlerStatuses(new StaticApplicationContext()));
     }
 
     private AuditEvent savedEvent() {

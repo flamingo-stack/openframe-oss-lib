@@ -27,4 +27,8 @@ public @interface Audited {
     String tenantId() default "";
 
     String targetName() default "";
+
+    String organizationId() default "";
+
+    String deviceId() default "";
 }

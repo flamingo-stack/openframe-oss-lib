@@ -76,11 +76,9 @@ public class OssAuditTargets implements AuditTargetCatalog {
                         .withMaskedFields(Set.of("scriptCustomParams")),
                 AuditTarget.of(SOFTWARE_SCHEDULE, SoftwareSchedule.class, SoftwareSchedule::getName),
                 AuditTarget.of(EXECUTION, ScriptExecution.class, ScriptExecution::getExecutionId)
-                        .withIdField("executionId")
                         .withDeviceId(ScriptExecution::getMachineId)
                         .withMaskedFields(Set.of("stdout", "stderr")),
                 AuditTarget.of(EXECUTION, CommandExecution.class, CommandExecution::getExecutionId)
-                        .withIdField("executionId")
                         .withDeviceId(CommandExecution::getMachineId)
                         .withMaskedFields(Set.of("stdout", "stderr")),
                 AuditTarget.of(TAG, Tag.class, Tag::getKey),

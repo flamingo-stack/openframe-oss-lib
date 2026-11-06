@@ -3,15 +3,18 @@ package com.openframe.audit;
 import com.openframe.audit.targets.AuditTarget;
 import com.openframe.audit.targets.AuditTargetRepository;
 import com.openframe.audit.targets.AuditTargets;
+import com.openframe.audit.targets.LoadedTarget;
 import com.openframe.core.exception.ForbiddenException;
 import com.openframe.data.document.audit.AuditAction;
+import com.openframe.data.document.audit.AuditActor;
 import com.openframe.data.document.audit.AuditChange;
 import com.openframe.data.document.audit.AuditEntry;
 import com.openframe.data.document.audit.AuditOutcome;
+import com.openframe.data.document.audit.AuditSource;
 import com.openframe.data.document.audit.AuditTargetType;
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.user.Invitation;
 import org.bson.Document;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,18 +22,25 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
-import java.util.Set;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -46,19 +56,31 @@ class AuditCaptureTest {
                     .withDeviceId(Ticket::getDeviceId)
                     .withIgnoredFields(Set.of("lastActivityAt"))
                     .withMaskedFields(Set.of("description"));
-    private static final AuditTarget<Invitation> INVITATION_TARGET =
-            AuditTarget.of(AuditTargetType.INVITATION, Invitation.class, Invitation::getEmail).withSecretId(true);
+    private static final AuditContext REQUEST_CONTEXT = new AuditContext(AuditActor.staff("staff-1"),
+            new AuditSource("203.0.113.1", "Chrome", "request-1", "session-1"), null);
 
     @Mock private AuditTargetRepository targetRepository;
     @Mock private AuditRecorder recorder;
     @Captor private ArgumentCaptor<AuditEntry> entryCaptor;
+    @Captor private ArgumentCaptor<AuditContext> contextCaptor;
 
     private AuditCapture capture;
 
     @BeforeEach
     void setUp() {
-        AuditTargets targets = new AuditTargets(List.of(() -> List.of(TICKET_TARGET, INVITATION_TARGET)));
-        capture = new AuditCapture(targets, targetRepository, new AuditOutcomeResolver(), recorder);
+        AuditTargets targets = new AuditTargets(List.of(() -> List.of(TICKET_TARGET)));
+        AuditOutcomeResolver outcomeResolver = new AuditOutcomeResolver(List.of(),
+                new ExceptionHandlerStatuses(new StaticApplicationContext()));
+        capture = new AuditCapture(targets, targetRepository, outcomeResolver, recorder, true);
+        lenient().when(recorder.context()).thenReturn(REQUEST_CONTEXT);
+        lenient().when(recorder.targetIdOf(any(), any())).thenAnswer(call -> call.getArgument(1));
+        lenient().when(recorder.capturing(any(), any()))
+                .thenAnswer(call -> call.<AuditedWork<Object, RuntimeException>>getArgument(1).run());
+    }
+
+    @AfterEach
+    void clearRequest() {
+        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
@@ -66,7 +88,7 @@ class AuditCaptureTest {
         Ticket before = ticket("Printer offline");
         Ticket after = ticket("Printer offline");
         after.setDescription("new text");
-        storedOnPrimary(before, after);
+        stored(before, after);
         when(targetRepository.storedFieldsOf(before)).thenReturn(fields("OPEN", "old text", "10:00"));
         when(targetRepository.storedFieldsOf(after)).thenReturn(fields("ARCHIVED", "new text", "10:05"));
 
@@ -91,8 +113,7 @@ class AuditCaptureTest {
     void marksAnUpdateThatChangedNothing() {
         Ticket before = ticket("Printer offline");
         Ticket after = ticket("Printer offline");
-        after.setDescription("same stored fields");
-        storedOnPrimary(before, after);
+        stored(before, after);
         when(targetRepository.storedFieldsOf(before)).thenReturn(fields("OPEN", "text", "10:00"));
         when(targetRepository.storedFieldsOf(after)).thenReturn(fields("OPEN", "text", "10:05"));
 
@@ -104,11 +125,27 @@ class AuditCaptureTest {
     }
 
     @Test
+    void recordsUnderTheCallersContextAndGivesItsOwnEventIdToEventsRecordedInside() {
+        stored(ticket("Printer offline"), ticket("Printer offline"));
+        when(targetRepository.storedFieldsOf(any())).thenReturn(fields("OPEN", "text", "10:00"));
+
+        capture.run(AuditAction.TICKET_ARCHIVE, TICKET_ID, () -> "archived");
+
+        AuditEntry entry = recordedEntry();
+        verify(recorder).recordCaptured(any(), contextCaptor.capture());
+        assertThat(contextCaptor.getValue()).isEqualTo(REQUEST_CONTEXT);
+        verify(recorder).capturing(contextCaptor.capture(), any());
+        assertThat(contextCaptor.getValue()).isEqualTo(REQUEST_CONTEXT.withParentEventId(entry.getId()));
+        assertThat(entry.getId()).hasSize(26);
+    }
+
+    @Test
     void takesTheIdOfACreatedRecordFromTheResult() {
-        Ticket created = ticket("New ticket");
-        when(targetRepository.findOnPrimary(TICKET_TARGET, "ticket-2")).thenReturn(Optional.of(created));
-        AuditCall call = new AuditCall(AuditAction.TICKET_CREATE, AuditTargetType.TICKET, () -> null,
-                result -> (String) result, _ -> Map.of(), true);
+        when(targetRepository.load(anyList(), eq("ticket-2")))
+                .thenReturn(Optional.of(new LoadedTarget(TICKET_TARGET, ticket("New ticket"))));
+        AuditCall call = AuditCall.of(AuditAction.TICKET_CREATE, AuditTargetType.TICKET, null, Map.of())
+                .withTargetIdFromResult(result -> (String) result)
+                .withTargetIdInResult(true);
 
         String result = capture.capture(call, () -> "ticket-2");
 
@@ -117,14 +154,13 @@ class AuditCaptureTest {
         assertThat(entry.getTargetId()).isEqualTo("ticket-2");
         assertThat(entry.getTargetName()).isEqualTo("New ticket");
         assertThat(entry.getChanges()).isNull();
-        verify(targetRepository, times(1)).findOnPrimary(any(), any());
+        verify(targetRepository, times(1)).load(any(), any());
     }
 
     @Test
     void namesARecordGoneAfterTheCallFromTheReadBeforeIt() {
-        Ticket before = ticket("Old ticket");
-        when(targetRepository.findOnPrimary(TICKET_TARGET, TICKET_ID))
-                .thenReturn(Optional.of(before))
+        when(targetRepository.load(anyList(), eq(TICKET_ID)))
+                .thenReturn(Optional.of(new LoadedTarget(TICKET_TARGET, ticket("Old ticket"))))
                 .thenReturn(Optional.empty());
 
         capture.run(AuditAction.TICKET_ARCHIVE, TICKET_ID, () -> { });
@@ -136,9 +172,9 @@ class AuditCaptureTest {
     }
 
     @Test
-    void recordsARefusalAndRethrowsIt() {
-        Ticket before = ticket("Printer offline");
-        when(targetRepository.findOnPrimary(TICKET_TARGET, TICKET_ID)).thenReturn(Optional.of(before));
+    void recordsARefusalMarksItRecordedAndRethrowsIt() {
+        when(targetRepository.load(anyList(), eq(TICKET_ID)))
+                .thenReturn(Optional.of(new LoadedTarget(TICKET_TARGET, ticket("Printer offline"))));
         ForbiddenException refusal = new ForbiddenException("Only admins can archive tickets");
 
         assertThatThrownBy(() -> capture.run(AuditAction.TICKET_ARCHIVE, TICKET_ID, () -> {
@@ -149,7 +185,8 @@ class AuditCaptureTest {
         assertThat(entry.getOutcome()).isEqualTo(AuditOutcome.REFUSED);
         assertThat(entry.getReason()).isEqualTo("Only admins can archive tickets");
         assertThat(entry.getTargetName()).isEqualTo("Printer offline");
-        verify(targetRepository, times(1)).findOnPrimary(any(), any());
+        verify(recorder).markCaptured(refusal);
+        verify(targetRepository, times(1)).load(any(), any());
     }
 
     @Test
@@ -164,12 +201,12 @@ class AuditCaptureTest {
         assertThat(entry.getOutcome()).isEqualTo(AuditOutcome.FAILURE);
         assertThat(entry.getReason()).isEqualTo("RuntimeException");
         assertThat(entry.getTargetId()).isEqualTo("policy-1");
-        verifyNoInteractions(targetRepository);
+        assertThat(entry.getTargetName()).isNull();
     }
 
     @Test
     void keepsTheActionWorkingWhenTheTargetReadFails() {
-        when(targetRepository.findOnPrimary(TICKET_TARGET, TICKET_ID))
+        when(targetRepository.load(anyList(), eq(TICKET_ID)))
                 .thenThrow(new DataAccessResourceFailureException("mongo down"));
 
         String result = capture.run(AuditAction.TICKET_ARCHIVE, TICKET_ID, () -> "archived");
@@ -182,7 +219,7 @@ class AuditCaptureTest {
 
     @Test
     void keepsTheActionWorkingWhenRecordingFails() {
-        doThrow(new IllegalStateException("broken recorder")).when(recorder).record(any(), any());
+        doThrow(new IllegalStateException("broken recorder")).when(recorder).recordCaptured(any(), any());
 
         String result = capture.run(AuditAction.FLEET_POLICY_DELETE, "policy-1", () -> "deleted");
 
@@ -190,50 +227,47 @@ class AuditCaptureTest {
     }
 
     @Test
-    void storesTheHashOfASecretId() {
-        Invitation invitation = new Invitation();
-        invitation.setEmail("new@acme.com");
-        when(targetRepository.findOnPrimary(eq(INVITATION_TARGET), eq("join-secret")))
-                .thenReturn(Optional.of(invitation));
-        when(targetRepository.storedFieldsOf(invitation)).thenReturn(new Document("email", "new@acme.com"));
-
-        capture.run(AuditAction.INVITATION_REVOKE, "join-secret", () -> { });
-
-        AuditEntry entry = recordedEntry();
-        assertThat(entry.getTargetId()).hasSize(64).doesNotContain("join-secret");
-        assertThat(entry.getTargetName()).isEqualTo("new@acme.com");
-    }
-
-    @Test
     void namesTheFactInsteadOfComparingWhenTheChangeLivesElsewhere() {
-        Ticket ticket = ticket("Printer offline");
-        when(targetRepository.findOnPrimary(TICKET_TARGET, TICKET_ID)).thenReturn(Optional.of(ticket));
-        AuditCall call = new AuditCall(AuditAction.TICKET_TAG_ADD, AuditTargetType.TICKET, () -> TICKET_ID,
-                _ -> null, _ -> Map.of("tagId", "tag-1"), false);
+        when(targetRepository.load(anyList(), eq(TICKET_ID)))
+                .thenReturn(Optional.of(new LoadedTarget(TICKET_TARGET, ticket("Printer offline"))));
 
-        capture.capture(call, () -> null);
+        capture.runWithoutCompare(AuditAction.TICKET_TAG_ADD, AuditTargetType.TICKET, TICKET_ID,
+                Map.of("tagId", "tag-1"), () -> null);
 
         AuditEntry entry = recordedEntry();
         assertThat(entry.getChanges()).isNull();
         assertThat(entry.getDetails()).containsExactly(Map.entry("tagId", "tag-1"));
         assertThat(entry.getTargetName()).isEqualTo("Printer offline");
-        verify(targetRepository, times(1)).findOnPrimary(any(), any());
+        verify(targetRepository, times(1)).load(any(), any());
     }
 
     @Test
-    void doesNotCompareASensitiveRead() {
-        Ticket ticket = ticket("Printer offline");
-        when(targetRepository.findOnPrimary(TICKET_TARGET, TICKET_ID)).thenReturn(Optional.of(ticket));
-        AuditCall call = new AuditCall(AuditAction.TICKET_ATTACHMENT_DOWNLOAD, AuditTargetType.TICKET,
-                () -> TICKET_ID, _ -> null, _ -> Map.of(), true);
+    void recordsAChangeOnlyWhenTheWorkSaysItHappened() {
+        lenient().when(targetRepository.load(anyList(), eq(TICKET_ID))).thenReturn(Optional.empty());
 
-        capture.capture(call, () -> "signed-url");
+        boolean unchanged = capture.runWhenChanged(AuditAction.TICKET_TAG_ADD, AuditTargetType.TICKET, TICKET_ID,
+                Map.of(), () -> false);
+        assertThat(unchanged).isFalse();
+        verify(recorder, never()).recordCaptured(any(), any());
+
+        boolean changed = capture.runWhenChanged(AuditAction.TICKET_TAG_ADD, AuditTargetType.TICKET, TICKET_ID,
+                Map.of(), () -> true);
+        assertThat(changed).isTrue();
+        verify(recorder).recordCaptured(any(), any());
+    }
+
+    @Test
+    void recordsASensitiveReadOncePerRequest() {
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+        when(targetRepository.load(anyList(), eq(TICKET_ID)))
+                .thenReturn(Optional.of(new LoadedTarget(TICKET_TARGET, ticket("Printer offline"))));
+
+        capture.run(AuditAction.TICKET_ATTACHMENT_DOWNLOAD, TICKET_ID, () -> "signed-url");
+        capture.run(AuditAction.TICKET_ATTACHMENT_DOWNLOAD, TICKET_ID, () -> "signed-url");
 
         AuditEntry entry = recordedEntry();
         assertThat(entry.getChanges()).isNull();
-        assertThat(entry.getDetails()).isNull();
         assertThat(entry.getTargetName()).isEqualTo("Printer offline");
-        verify(targetRepository, times(1)).findOnPrimary(any(), any());
     }
 
     @Test
@@ -242,14 +276,14 @@ class AuditCaptureTest {
         verifyNoInteractions(targetRepository, recorder);
     }
 
-    private void storedOnPrimary(Ticket before, Ticket after) {
-        when(targetRepository.findOnPrimary(TICKET_TARGET, TICKET_ID))
-                .thenReturn(Optional.of(before))
-                .thenReturn(Optional.of(after));
+    private void stored(Ticket before, Ticket after) {
+        when(targetRepository.load(anyList(), eq(TICKET_ID)))
+                .thenReturn(Optional.of(new LoadedTarget(TICKET_TARGET, before)))
+                .thenReturn(Optional.of(new LoadedTarget(TICKET_TARGET, after)));
     }
 
     private AuditEntry recordedEntry() {
-        verify(recorder).record(entryCaptor.capture(), any());
+        verify(recorder).recordCaptured(entryCaptor.capture(), any());
         return entryCaptor.getValue();
     }
 

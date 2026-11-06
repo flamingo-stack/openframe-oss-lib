@@ -24,6 +24,10 @@ public class AuditTenants {
         return servesOneTenant || !StringUtils.hasText(superTenantId) ? tenantIdProvider.getTenantId() : superTenantId;
     }
 
+    public String isolatedTenantId() {
+        return servesOneTenant ? tenantIdProvider.getTenantId() : null;
+    }
+
     public String tenantFor(AuditActor actor, String requestedTenantId) {
         return actor.tenantFor(requestedTenantId, superTenantId, this::servedTenantId);
     }

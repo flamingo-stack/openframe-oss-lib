@@ -6,19 +6,25 @@ import com.openframe.core.exception.ForbiddenException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.audit.AuditOutcome;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AuditOutcomeResolverTest {
 
-    private final AuditOutcomeResolver resolver = new AuditOutcomeResolver();
+    private final AuditOutcomeResolver resolver = new AuditOutcomeResolver(List.of(), exceptionHandlerStatuses());
 
     @Test
     void plainResultIsSuccess() {
@@ -103,5 +109,78 @@ class AuditOutcomeResolverTest {
     @Test
     void failureWithoutMessageIsNamedByItsType() {
         assertThat(resolver.ofFailure(new NullPointerException()).reason()).isEqualTo("NullPointerException");
+    }
+
+    @Test
+    void failureTheServiceExceptionHandlerAnswersWithAClientErrorIsRefused() {
+        assertThat(resolver.ofFailure(new RegistrationBlockedException("This domain is already in use")))
+                .isEqualTo(new ActionOutcome(AuditOutcome.REFUSED, "This domain is already in use"));
+    }
+
+    @Test
+    void failureThatDeclaresItsOwnClientErrorStatusIsRefused() {
+        assertThat(resolver.ofFailure(new GoneException("Link expired")))
+                .isEqualTo(new ActionOutcome(AuditOutcome.REFUSED, "Link expired"));
+    }
+
+    @Test
+    void failureTheServiceExceptionHandlerAnswersWithAServerErrorIsFailure() {
+        assertThat(resolver.ofFailure(new UpstreamException("Stripe is down")))
+                .isEqualTo(new ActionOutcome(AuditOutcome.FAILURE, "UpstreamException"));
+    }
+
+    @Test
+    void serviceFailureStatusWinsOverTheExceptionHandler() {
+        AuditFailureStatus platformFailure = failure -> failure instanceof RegistrationBlockedException
+                ? Optional.of(HttpStatusCode.valueOf(500)) : Optional.empty();
+        AuditOutcomeResolver withServiceStatus = new AuditOutcomeResolver(List.of(platformFailure),
+                exceptionHandlerStatuses());
+
+        assertThat(withServiceStatus.ofFailure(new RegistrationBlockedException("Closed")).outcome())
+                .isEqualTo(AuditOutcome.FAILURE);
+    }
+
+    private static ExceptionHandlerStatuses exceptionHandlerStatuses() {
+        StaticApplicationContext context = new StaticApplicationContext();
+        context.registerSingleton("serviceExceptionHandler", ServiceExceptionHandler.class);
+        context.refresh();
+        ExceptionHandlerStatuses statuses = new ExceptionHandlerStatuses(context);
+        statuses.afterSingletonsInstantiated();
+        return statuses;
+    }
+
+    @RestControllerAdvice
+    static class ServiceExceptionHandler {
+
+        @ExceptionHandler(RegistrationBlockedException.class)
+        @ResponseStatus(HttpStatus.CONFLICT)
+        public String blocked(RegistrationBlockedException e) {
+            return e.getMessage();
+        }
+
+        @ExceptionHandler(UpstreamException.class)
+        @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+        public String upstream(UpstreamException e) {
+            return e.getMessage();
+        }
+    }
+
+    static class RegistrationBlockedException extends RuntimeException {
+        RegistrationBlockedException(String message) {
+            super(message);
+        }
+    }
+
+    static class UpstreamException extends RuntimeException {
+        UpstreamException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.GONE)
+    static class GoneException extends RuntimeException {
+        GoneException(String message) {
+            super(message);
+        }
     }
 }

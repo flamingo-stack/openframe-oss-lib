@@ -16,7 +16,6 @@ import org.springframework.web.ErrorResponse;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 import static com.openframe.data.document.audit.AuditOutcome.FAILURE;
 import static com.openframe.data.document.audit.AuditOutcome.REFUSED;
@@ -26,10 +25,8 @@ import static com.openframe.data.document.audit.AuditOutcome.SUCCESS;
 @RequiredArgsConstructor
 public class AuditOutcomeResolver {
 
-    private static final Set<HttpStatusCode> NOT_ANSWERED =
-            Set.of(HttpStatus.TOO_MANY_REQUESTS, HttpStatus.REQUEST_TIMEOUT);
-
     private final List<AuditFailureStatus> failureStatuses;
+    private final ExceptionHandlerStatuses exceptionHandlerStatuses;
 
     public ActionOutcome ofResult(Object result) {
         if (result instanceof HasUserErrors payload && !CollectionUtils.isEmpty(payload.userErrorMessages())) {
@@ -37,26 +34,17 @@ public class AuditOutcomeResolver {
             return new ActionOutcome(outcome, String.join("; ", payload.userErrorMessages()));
         }
         if (result instanceof ResponseEntity<?> response && response.getStatusCode().isError()) {
-            return new ActionOutcome(outcomeOf(response.getStatusCode()), null);
+            return new ActionOutcome(AuditOutcome.ofStatus(response.getStatusCode().value()), null);
         }
         return new ActionOutcome(SUCCESS, null);
     }
 
     public ActionOutcome ofFailure(Throwable failure) {
-        AuditOutcome outcome = outcomeOf(statusOf(failure));
+        HttpStatusCode status = statusOf(failure);
+        AuditOutcome outcome = AuditOutcome.ofStatus(status == null ? null : status.value());
         String type = failure.getClass().getSimpleName();
         String reason = outcome == FAILURE ? type : Objects.requireNonNullElse(failure.getMessage(), type);
         return new ActionOutcome(outcome, reason);
-    }
-
-    private static AuditOutcome outcomeOf(HttpStatusCode status) {
-        if (status == null || NOT_ANSWERED.contains(status)) {
-            return FAILURE;
-        }
-        if (status.is2xxSuccessful()) {
-            return SUCCESS;
-        }
-        return status.is4xxClientError() ? REFUSED : FAILURE;
     }
 
     private HttpStatusCode statusOf(Throwable failure) {
@@ -71,6 +59,7 @@ public class AuditOutcomeResolver {
                     .map(failureStatus -> failureStatus.statusOf(failure))
                     .flatMap(Optional::stream)
                     .findFirst()
+                    .or(() -> exceptionHandlerStatuses.statusOf(failure))
                     .orElse(null);
         };
     }

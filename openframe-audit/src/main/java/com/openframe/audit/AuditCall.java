@@ -19,7 +19,9 @@ public record AuditCall(AuditAction action,
                         boolean compare,
                         Predicate<Object> recordsResult,
                         Function<Object, String> tenantIdOf,
-                        Function<Object, String> targetNameOf) {
+                        Function<Object, String> targetNameOf,
+                        Function<Object, String> organizationIdOf,
+                        Function<Object, String> deviceIdOf) {
 
     public static AuditCall of(AuditAction action, String targetId) {
         return of(action, targetId, Map.of());
@@ -32,6 +34,6 @@ public record AuditCall(AuditAction action,
     public static AuditCall of(AuditAction action, AuditTargetType targetType, String targetId,
                                Map<String, Object> details) {
         return new AuditCall(action, targetType, () -> targetId, _ -> null, false, _ -> details, true, _ -> true,
-                _ -> null, _ -> null);
+                _ -> null, _ -> null, _ -> null, _ -> null);
     }
 }
