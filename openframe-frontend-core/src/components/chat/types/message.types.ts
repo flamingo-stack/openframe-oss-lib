@@ -55,6 +55,30 @@ export const SCROLL_ANCHOR = { TOP: 'top', BOTTOM: 'bottom' } as const;
 
 export type ScrollAnchor = (typeof SCROLL_ANCHOR)[keyof typeof SCROLL_ANCHOR];
 
+// ========== Policy Review Types ==========
+
+/** A rule that raised the level; `type` is `HARD_DENY` | `SOFT_DENY`. */
+export interface PolicyReviewRuleData {
+  code: string;
+  label: string;
+  type?: string;
+}
+
+/**
+ * Why the security policy gave a tool call its approval level. `source` is `REGEX` | `CLASSIFIER`,
+ * `decision` is `POLICY` | `FALLBACK` | `SOFT_DENY` | `HARD_DENY`; kept strings so a value added on
+ * the backend still renders.
+ */
+export interface PolicyReviewData {
+  source?: string;
+  decision?: string;
+  approvalLevel?: string;
+  policyLevel?: string;
+  operationCodes?: string[];
+  matchedRules?: PolicyReviewRuleData[];
+  reason?: string;
+}
+
 // ========== Tool Execution Types ==========
 
 export interface ToolExecutionData {
@@ -72,6 +96,8 @@ export interface ToolExecutionData {
   parameters?: Record<string, unknown>;
   result?: string;
   success?: boolean;
+  /** The AI guardrail's review of an RMM command. Only sent on `EXECUTING_TOOL`, like `toolExplanation`. */
+  policyReview?: PolicyReviewData;
   /**
    * The words of the row's status line where it is drawn as a card (the
    * end-client view): e.g. "Fixed on its own". Omitted: "Working on it",
@@ -100,6 +126,8 @@ export interface ExecutingToolState {
   toolTitle?: string;
   /** Mirrors {@link ToolExecutionData.toolExplanation}; absent on `EXECUTED_TOOL`. */
   toolExplanation?: string;
+  /** Mirrors {@link ToolExecutionData.policyReview}; absent on `EXECUTED_TOOL`. */
+  policyReview?: PolicyReviewData;
   parameters?: Record<string, unknown>;
 }
 
@@ -211,6 +239,7 @@ export interface PendingToolCallData {
   requiresApproval: boolean;
   approvalType?: string | null;
   toolCallArguments?: Record<string, unknown> | null;
+  policyReview?: PolicyReviewData;
 }
 
 /**
@@ -517,6 +546,8 @@ export interface ExecutingToolMessageData extends MessageDataBase {
   title?: string;
   /** Backend-issued human-readable explanation (what/why) of the tool call. */
   toolExplanation?: string;
+  /** The AI guardrail's review of an RMM command (wire shape; normalized on read). */
+  policyReview?: unknown;
   parameters?: Record<string, unknown>;
   toolExecutionRequestId?: string;
 }

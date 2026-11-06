@@ -30,6 +30,7 @@ import type {
   ChatApprovalStatus,
   ExecutingToolState,
 } from '../types';
+import { withPolicyReview } from './policy-review';
 
 export interface AccumulatorCallbacks {
   /** See `ApprovalResolutionHandler` (message.types) — the SSOT for the
@@ -197,6 +198,7 @@ export class MessageSegmentAccumulator {
         toolFunction: toolData.toolFunction,
         toolTitle: toolData.toolTitle,
         toolExplanation: toolData.toolExplanation,
+        ...(toolData.policyReview ? { policyReview: toolData.policyReview } : {}),
         parameters: toolData.parameters,
       });
       this.segments.push(segment);
@@ -225,6 +227,9 @@ export class MessageSegmentAccumulator {
           toolTitle: toolData.toolTitle ?? existingExecuting?.data.toolTitle ?? executingTool?.toolTitle,
           toolExplanation:
             toolData.toolExplanation ?? existingExecuting?.data.toolExplanation ?? executingTool?.toolExplanation,
+          ...withPolicyReview(
+            toolData.policyReview ?? existingExecuting?.data.policyReview ?? executingTool?.policyReview,
+          ),
           parameters: toolData.parameters || executingTool?.parameters,
         },
       };

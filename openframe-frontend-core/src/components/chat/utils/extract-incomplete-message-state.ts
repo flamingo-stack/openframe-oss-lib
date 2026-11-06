@@ -5,6 +5,7 @@
 
 import type { InitializeExtras } from '../stream/chat-stream-reducer';
 import type { ProcessedMessage, MessageSegment, PendingApproval, ExecutingToolState } from '../types';
+import { withPolicyReview } from './policy-review';
 
 /**
  * What the realtime accumulator needs to RESUME an unfinished turn.
@@ -51,6 +52,7 @@ export function extractIncompleteMessageState(
             toolFunction: segment.data.toolFunction,
             toolTitle: segment.data.toolTitle,
             toolExplanation: segment.data.toolExplanation,
+            ...withPolicyReview(segment.data.policyReview),
             parameters: segment.data.parameters,
           });
           hasIncompleteState = true;

@@ -13,6 +13,7 @@ import { StatusLine } from '../ui/status-line';
 import { CHAT_BLOCK_CLASS, CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
+import { PolicyReviewBlock } from './policy-review-block';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
 import type {
   ApprovalBlockVariant,
@@ -405,7 +406,8 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       );
     }
 
-    const showFooterBlock = explanations.length > 0 || showFooterActions;
+    const reviewedCalls = data.toolCalls.filter(call => !!call.policyReview);
+    const showFooterBlock = explanations.length > 0 || reviewedCalls.length > 0 || showFooterActions;
 
     return (
       <div
@@ -444,6 +446,12 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
                   <li key={i}>{expl}</li>
                 ))}
               </ul>
+            )}
+
+            {reviewedCalls.map(call =>
+              call.policyReview ? (
+                <PolicyReviewBlock key={call.toolExecutionRequestId} review={call.policyReview} />
+              ) : null,
             )}
 
             {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
