@@ -2,6 +2,7 @@ package com.openframe.data.service.rmm.software.matching;
 
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -188,7 +189,7 @@ class WingetPackageMatcherTest {
         return InstalledProgram.builder()
                 .name(name)
                 .publisher(publisher)
-                .fleetSource("programs")
+                .fleetSource(FleetSource.PROGRAMS)
                 .upgradeCode(upgradeCode)
                 .productCodes(productCode == null ? List.of() : List.of(productCode))
                 .build();
@@ -198,7 +199,7 @@ class WingetPackageMatcherTest {
     void match_msixPackage_byItsPackageFamilyName() {
         // setup
         InstalledProgram xaml = InstalledProgram.builder()
-                .name("Microsoft.UI.Xaml.2.8").publisher("Microsoft Platform Extensions").fleetSource("programs")
+                .name("Microsoft.UI.Xaml.2.8").publisher("Microsoft Platform Extensions").fleetSource(FleetSource.PROGRAMS)
                 .packageFamilyNames(List.of("Microsoft.UI.Xaml.2.8_8wekyb3d8bbwe"))
                 .build();
         PackageCatalogEntry xaml28 = wingetPackage("Microsoft.UI.Xaml.2.8", List.of(), List.of());
@@ -221,7 +222,7 @@ class WingetPackageMatcherTest {
     void match_systemComponent_noPackageWithoutASearch() {
         // setup
         InstalledProgram refreshManager = InstalledProgram.builder()
-                .name("Adobe Refresh Manager").publisher("Adobe Systems Incorporated").fleetSource("programs")
+                .name("Adobe Refresh Manager").publisher("Adobe Systems Incorporated").fleetSource(FleetSource.PROGRAMS)
                 .productCodes(List.of("{AC76BA86-0804-1033-1959-018244601180}")).systemComponent(true)
                 .build();
 
