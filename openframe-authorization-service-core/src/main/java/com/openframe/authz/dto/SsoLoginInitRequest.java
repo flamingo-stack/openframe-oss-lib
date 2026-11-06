@@ -19,6 +19,10 @@ public class SsoLoginInitRequest {
     /** Optional final redirect target (absolute or allowed host). */
     private String redirectTo;
 
-    /** Mobile-app flow: forwarded to the BFF {@code /oauth/continue} — see {@link SsoTenantRegistrationInitRequest#isAuthMobile()}. */
+    /**
+     * Mobile-app flow: forwarded to the BFF {@code /oauth/continue} after finalization so the
+     * callback attaches the one-time ticket the app exchanges for tokens (same contract as
+     * {@code /oauth/login?authMobile=true}).
+     */
     private boolean authMobile;
 }

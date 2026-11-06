@@ -39,6 +39,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.repository.support.MongoRepositoryFactory;
@@ -101,7 +102,13 @@ class MachineFieldLevelWritesIT {
         template = new MongoTemplate(client, "test");
         storedMachines = new MongoRepositoryFactory(template).getRepository(MachineRepository.class,
                 RepositoryFragments.just(new CustomMachineRepositoryImpl(template)));
-        machineWriter = new MachineWriter(template);
+        machineWriter = new MachineWriter(template, absent(), absent());
+    }
+
+    // Publishing off: no OutboxPublisher bean.
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> absent() {
+        return mock(ObjectProvider.class);
     }
 
     @AfterAll

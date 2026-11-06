@@ -112,7 +112,7 @@ class SsoLoginControllerTest {
         assertThat(response.getHeader("Location")).endsWith("/oauth2/authorization/google?tenant=sso-onboarding");
         assertThat(response.getHeaders("Set-Cookie")).anyMatch(h -> h.startsWith("of_sso_login=cookie-value"));
         assertThat(response.getCookies()).filteredOn(c -> c.getMaxAge() == 0).extracting(Cookie::getName)
-                .containsExactlyInAnyOrder(SsoFlowCookieNames.OF_SSO_REG, SsoFlowCookieNames.OF_SSO_INVITE);
+                .containsExactly(SsoFlowCookieNames.OF_SSO_INVITE);
     }
 
     @Test

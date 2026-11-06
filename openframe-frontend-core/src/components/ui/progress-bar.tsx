@@ -27,6 +27,12 @@ type ProgressBarProps = {
   height?: number; // desktop height (px)
   mobileHeight?: number; // mobile height (px)
   inverted?: boolean; // if true, high values are good (green), low values are bad (red)
+  /**
+   * `threshold` (default): the fill takes the success, warning or error colour by the thresholds. `neutral`: the fill
+   * is the secondary text colour at every value, for a count that is progress, not a health reading (a sign-off
+   * count), so a partial bar never reads as an error.
+   */
+  tone?: 'threshold' | 'neutral';
   /** The value is still being read: the bar draws its `ProgressBarSkeleton` at its own height. A loading scope does
    *  the same. */
   loading?: boolean;
@@ -42,6 +48,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   height = PROGRESS_BAR_HEIGHT.desktop,
   mobileHeight = PROGRESS_BAR_HEIGHT.mobile,
   inverted = false,
+  tone = 'threshold',
   loading: loadingProp,
 }) => {
   // ONE switch: in a page's loading state (or while the host reads the value) the bar is its skeleton.
@@ -76,6 +83,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
   // Pick color based on thresholds using ODS design tokens
   const getColor = () => {
+    if (tone === 'neutral') return 'var(--color-text-secondary)';
     if (inverted) {
       // Inverted: high values = good (green), low values = bad (red)
       // For battery health: 100% = green, <30% = red

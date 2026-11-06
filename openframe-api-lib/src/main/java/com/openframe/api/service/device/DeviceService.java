@@ -355,7 +355,7 @@ public class DeviceService {
             return;
         }
         if (status == DeviceStatus.DELETED) {
-            deletedMachineCleanup.removeFromSchedules(machine.getTenantId(), machineId);
+            deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
         }
 
         // Field-level: a whole-document save would overwrite what other writers set on the machine since the read

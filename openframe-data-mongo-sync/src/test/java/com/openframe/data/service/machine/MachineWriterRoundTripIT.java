@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -29,6 +30,7 @@ import static com.openframe.data.service.machine.MachineFields.OS_UUID;
 import static com.openframe.data.service.machine.MachineFields.SERIAL_NUMBER;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 // An external directory integration writes the directory summary through MachineWriter, and the OSS GraphQL and Mongo device filters
 // read it back, so the stored shape is the contract: enums by name, lists as arrays.
@@ -47,10 +49,16 @@ class MachineWriterRoundTripIT extends BaseMongoIntegrationTest {
 
     private MachineWriter writer;
 
+    // Publishing off: no OutboxPublisher bean.
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> absent() {
+        return mock(ObjectProvider.class);
+    }
+
     @BeforeEach
     void setUp() {
         mongoTemplate.dropCollection(Machine.class);
-        writer = new MachineWriter(mongoTemplate);
+        writer = new MachineWriter(mongoTemplate, absent(), absent());
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setTenantId("tenant-1");
