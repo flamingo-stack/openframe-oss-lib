@@ -134,6 +134,8 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getSource()).isEqualTo("apps");
         assertThat(saved.getVersions()).containsExactly("1.0", "2.0");
         assertThat(saved.getUpdatedAt()).isNotNull();
+        // a new row is written for a device reporting software, so it counts until a lifecycle change says otherwise
+        assertThat(saved.isMachineConnected()).isTrue();
 
         ArgumentCaptor<DeviceSoftware> deleted = ArgumentCaptor.forClass(DeviceSoftware.class);
         verify(deviceSoftwareRepository).delete(deleted.capture());

@@ -19,6 +19,7 @@ import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -131,7 +132,8 @@ class MachineFieldLevelWritesIT {
     void updateStatusByMachineId_concurrentDirectoryAndFleetSetAfterTheRead_survives() {
         // setup
         DeviceService service = new DeviceService(interleavingMachines, mock(DeletedMachineCleanup.class),
-                machineWriter, mock(TagRepository.class), mock(TagAssignmentRepository.class),
+                mock(DeviceSoftwareConnectivitySync.class), machineWriter, mock(TagRepository.class),
+                mock(TagAssignmentRepository.class),
                 mock(DeviceStatusProcessor.class), mock(DeviceFilterOptionMapper.class),
                 mock(TenantIdProvider.class), mock(ApplicationEventPublisher.class));
 

@@ -111,6 +111,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             DeviceSoftware deviceSoftware = deviceSoftwareRepository
                     .findByTenantIdAndMachineIdAndSoftwareTitleId(host.tenantId(), host.machineId(), titleId)
                     .orElseGet(DeviceSoftware::new);
+            boolean newRow = deviceSoftware.getId() == null;
             deviceSoftware.setTenantId(host.tenantId());
             deviceSoftware.setMachineId(host.machineId());
             deviceSoftware.setSoftwareTitleId(titleId);
@@ -119,6 +120,9 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftware.setVersions(versionsOf(title));
             deviceSoftware.setVulnerabilities(vulnerabilities);
             deviceSoftware.setUpdatedAt(now);
+            if (newRow) {
+                deviceSoftware.setMachineConnected(true);
+            }
             deviceSoftwareRepository.save(deviceSoftware);
             affectedTitles.add(titleId);
             affectedCves.addAll(vulnerabilities);
