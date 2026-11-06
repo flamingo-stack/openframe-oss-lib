@@ -1,7 +1,7 @@
 'use client';
 
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
-import { type ComponentPropsWithoutRef, type ComponentRef, type ReactNode, forwardRef } from 'react';
+import { type ComponentPropsWithoutRef, type ComponentRef, type ReactNode, forwardRef, useState } from 'react';
 
 import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
@@ -126,6 +126,10 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
       loading && options.length === 0 ? Array.from({ length: skeletonCount }, () => null) : options;
     const isGrouped = variant === 'grouped';
     const isHorizontal = orientation === 'horizontal';
+    // The options the block first showed loaded. One added after that (a row the user's action brought in) fades in, as
+    // new rows do across the system; the first options, and the skeleton's swap to them, do not.
+    const [firstOptions, setFirstOptions] = useState<ReadonlySet<string> | null>(null);
+    if (!loading && firstOptions === null) setFirstOptions(new Set(options.map(option => option.value)));
     return (
       <div className={cn('relative flex w-full flex-col', className)}>
         <RadioGroupPrimitive.Root
@@ -215,7 +219,13 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                     )
                   )}
                 </div>
-                {option?.trailing && <div className="ml-auto flex shrink-0 items-center">{option.trailing}</div>}
+                {/* The row's full height, its content centred whatever the row aligns (a design may top-align the dot with
+                    the label); a trailing node can still place itself (`self-start`). */}
+                {option?.trailing && (
+                  <div data-radio-trailing className="ml-auto flex shrink-0 items-center self-stretch">
+                    {option.trailing}
+                  </div>
+                )}
               </>
             );
             return (
@@ -236,6 +246,10 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                   // CheckboxBlock — the border stays put so an unselected row
                   // never flashes "selected" under the cursor.
                   interactive && 'hover:bg-ods-bg-hover active:bg-ods-bg-active',
+                  // A control in `trailing` (a button, a menu) is its own target: on it, the row is not hovered or
+                  // pressed, so the row never looks like what the click will do.
+                  interactive &&
+                    '[&:has([data-radio-trailing]_:active)]:bg-ods-card [&:has([data-radio-trailing]_:hover)]:bg-ods-card',
                   isGrouped
                     ? cn(
                         'bg-ods-card px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs,8px)]',
@@ -254,6 +268,10 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                   // `Tag`'s label is a span too, and it went invisible against
                   // its own fill.
                   isDisabled && 'bg-ods-bg',
+                  option &&
+                    firstOptions !== null &&
+                    !firstOptions.has(option.value) &&
+                    'duration-300 animate-in fade-in slide-in-from-top-2 motion-reduce:animate-none',
                   // With a footer the option stacks: its row, then the footer.
                   hasFooter && 'flex-col items-stretch gap-[var(--spacing-system-sf)]',
                   itemClassName,

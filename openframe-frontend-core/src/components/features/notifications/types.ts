@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { policyReviewField } from '../../../chat-protocol/policy-review';
 import type { NotificationSeverity } from '../../../utils/notifications';
 import { APPROVAL_STATUS, type ApprovalBatchData, type ChatApprovalStatus } from '../../chat/types';
 
@@ -73,6 +74,8 @@ export interface ApprovalToolCallMeta {
   requiresApproval?: boolean;
   approvalType?: string | null;
   toolCallArguments?: Record<string, unknown> | null;
+  /** The guardrail review, as the wire sends it: normalized into the batch by `approvalMetaToBatchData`. */
+  policyReview?: unknown;
 }
 
 /** Approval payload stashed in `notification.meta` for an approval-request notification. */
@@ -138,6 +141,7 @@ export function approvalMetaToBatchData(approval: ApprovalNotificationMeta): App
       requiresApproval: tc.requiresApproval ?? true,
       approvalType: tc.approvalType ?? null,
       toolCallArguments: tc.toolCallArguments ?? null,
+      ...policyReviewField(tc.policyReview),
     })),
   };
 }

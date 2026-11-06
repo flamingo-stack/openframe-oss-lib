@@ -11,6 +11,7 @@ import { StatusLine, type StatusLineTone } from '../ui/status-line';
 import { CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
+import { PolicyEscalationAlert, PolicyReviewRows, hasPolicyReviewRows, isPolicyEscalated } from './policy-review';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
 import type { ToolExecutionDisplayProps } from './types';
 import { COMMAND_BODY_ARG_KEYS } from './utils/tool-call-helpers';
@@ -56,6 +57,9 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     }, [message.parameters, variant]);
 
     const hasResult = isExecuted && typeof message.result === 'string' && message.result.length > 0;
+    // Admin-only detail, like the command: the end-client card is the static row below, which draws no body.
+    const review = message.policyReview;
+    const reviewRows = hasPolicyReviewRows(review);
 
     // A remote (MCP) read-only tool deliberately publishes NO parameters and NO
     // result — the backend hides both, and sends a human title instead. There is
@@ -67,9 +71,15 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     // remote rather than one of ours — and guarded on there being a title to
     // show, so a title-less row keeps the old behaviour rather than collapsing
     // to a blank line.
-    const isConciseRemoteRead = !message.integratedToolType && !!previewText && argEntries.length === 0 && !hasResult;
+    const isConciseRemoteRead =
+      !message.integratedToolType &&
+      !!previewText &&
+      argEntries.length === 0 &&
+      !hasResult &&
+      !reviewRows &&
+      !isPolicyEscalated(review);
     const isStaticRow = isClientView || isConciseRemoteRead;
-    const hasBody = argEntries.length > 0 || hasResult || isExecuting;
+    const hasBody = argEntries.length > 0 || reviewRows || hasResult || isExecuting;
     // A run with no arguments and no result has nothing behind a chevron either:
     // its header stays, with no chevron and no click target, so the row never
     // opens onto an empty box. (A run still executing has a body: its live
@@ -166,17 +176,23 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
                     {argEntries.map(([key, value]) => (
                       <ArgRow key={key} argKey={key} value={value} />
                     ))}
+                    {reviewRows && (
+                      <PolicyReviewRows
+                        review={review}
+                        className={argEntries.length > 0 ? 'mt-[var(--spacing-system-xsf)]' : undefined}
+                      />
+                    )}
                     {hasResult && (
                       <ResultBlock
                         result={message.result}
-                        className={argEntries.length > 0 ? 'mt-[var(--spacing-system-xsf)]' : undefined}
+                        className={argEntries.length > 0 || reviewRows ? 'mt-[var(--spacing-system-xsf)]' : undefined}
                       />
                     )}
                     {isExecuting && (
                       <div
                         className={cn(
                           'flex w-full flex-col items-start gap-[var(--spacing-system-xxs)]',
-                          argEntries.length > 0 && 'mt-[var(--spacing-system-xsf)]',
+                          (argEntries.length > 0 || reviewRows) && 'mt-[var(--spacing-system-xsf)]',
                         )}
                       >
                         <span className="text-ods-text-secondary">Result:</span>
@@ -187,6 +203,9 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
                 )}
               </div>
             </div>
+
+            {/* A run Mingo escalated (approved, then run) keeps saying so, outside the collapsible part. */}
+            <PolicyEscalationAlert review={review} className="border-t border-ods-border" />
           </>
         )}
       </div>
