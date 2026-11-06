@@ -185,8 +185,10 @@ public class SoftwareInventoryService {
         return inFleet || autoUpdateService.hasPolicy(softwareId);
     }
 
+    // manageable: the titles a package manager manages (true) or the others (false). A Fleet page cannot be narrowed
+    // by it and leaves it out, like the other catalog filters; the read model and the full fetch apply it
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
-                                                     SortInput sort, Boolean vulnerable) {
+                                                     SortInput sort, Boolean vulnerable, Boolean manageable) {
         String field = sort == null ? null : sort.getField();
         boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
         if (field != null && !SORTABLE.contains(field)) {
@@ -194,7 +196,8 @@ public class SoftwareInventoryService {
         }
         if (softwareReadModel) {
             String tenantId = tenantIdProvider.getTenantId();
-            return withStatuses(tenantSoftwareReadModelQuery.listSoftware(tenantId, search, page, perPage, sort, vulnerable));
+            return withStatuses(tenantSoftwareReadModelQuery.listSoftware(tenantId, search, page, perPage, sort,
+                    vulnerable, manageable));
         }
         if (fleetPaging) {
             return withStatuses(softwarePageFromFleet(search, page, perPage, sort, vulnerable));
@@ -207,10 +210,19 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> withDevices = all.stream()
                 .filter(row -> deviceCount(row) > 0)
                 .toList();
+        boolean statusesOnEveryRow = manageable != null;
+        if (statusesOnEveryRow) {
+            // the filter reads the source the catalog sets, so the statuses go on every row before the page is cut
+            applyStatuses(withDevices);
+        }
+        List<SoftwareResponse> chosen = withDevices.stream()
+                .filter(row -> manageable(manageable, row.getSource()))
+                .toList();
         List<SoftwareResponse> ordered = field == null
-                ? withDevices
-                : withDevices.stream().sorted(comparatorFor(field, desc)).toList();
-        return withStatuses(paginateList(ordered, page, perPage));
+                ? chosen
+                : chosen.stream().sorted(comparatorFor(field, desc)).toList();
+        PageResult<SoftwareResponse> result = paginateList(ordered, page, perPage);
+        return statusesOnEveryRow ? result : withStatuses(result);
     }
 
     private PageResult<SoftwareResponse> withStatuses(PageResult<SoftwareResponse> page) {
@@ -488,12 +500,18 @@ public class SoftwareInventoryService {
                 && selected(filter.getDeviceStatuses(), device.getStatus())
                 && selected(filter.getInstalledBy(), row.getInstalledBy())
                 && selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate())
+                && manageable(filter.getManageable(), row.getInstalledBy())
                 && (tagged == null || tagged.contains(device.getMachineId()));
     }
 
     // nothing chosen in a dropdown matches every row; a row without a value matches no choice
     private static <T> boolean selected(List<T> chosen, T value) {
         return isEmpty(chosen) || (value != null && chosen.contains(value));
+    }
+
+    // a package manager manages the row when its source names one; UNMANAGED or unknown is not manageable
+    private static boolean manageable(Boolean wanted, SoftwareSource source) {
+        return wanted == null || wanted == (source != null && source != SoftwareSource.UNMANAGED);
     }
 
     public PageResult<SoftwareResponse> listSoftwareForDevice(String machineId, SoftwareFilterInput filter,
@@ -618,7 +636,8 @@ public class SoftwareInventoryService {
     private static boolean matchesCatalogFilter(SoftwareResponse row, SoftwareFilterInput filter) {
         return filter == null
                 || (selected(filter.getSources(), row.getSource())
-                && selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate()));
+                && selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate())
+                && manageable(filter.getManageable(), row.getSource()));
     }
 
     private static boolean meetsMinSeverity(SoftwareResponse row, SoftwareCveSeverity min) {

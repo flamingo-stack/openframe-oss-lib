@@ -20,6 +20,7 @@ import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
+import com.openframe.data.repository.rmm.software.SoftwareTitleQuery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -164,10 +165,7 @@ public class TenantSoftwareReadModelQuery {
     }
 
     public List<SoftwareResponse> allForFilters(String tenantId, String search) {
-        Page<Software> page = isBlank(search)
-                ? softwareRepository.findByTenantIdAndDevicesCountGreaterThan(tenantId, 0, Pageable.unpaged())
-                : softwareRepository.findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(
-                        tenantId, search.toLowerCase(), 0, Pageable.unpaged());
+        Page<Software> page = softwareRepository.findTitles(titles(tenantId, search, null, null), Pageable.unpaged());
         return page.getContent().stream().map(TenantSoftwareReadModelQuery::toResponse).toList();
     }
 
@@ -181,32 +179,22 @@ public class TenantSoftwareReadModelQuery {
     }
 
     public PageResult<SoftwareResponse> listSoftware(String tenantId, String search, int page, Integer perPage,
-                                                     SortInput sort, Boolean vulnerable) {
+                                                     SortInput sort, Boolean vulnerable, Boolean manageable) {
         int size = perPage == null || perPage <= 0 ? DEFAULT_PER_PAGE : perPage;
         int pageIndex = Math.max(page, 0);
         Pageable pageable = PageRequest.of(pageIndex, size, sortOf(sort));
 
-        boolean vuln = Boolean.TRUE.equals(vulnerable);
-        boolean hasSearch = !isBlank(search);
-        String nameLower = hasSearch ? search.toLowerCase() : null;
-
-        Page<Software> result;
-        if (hasSearch && vuln) {
-            result = softwareRepository
-                    .findByTenantIdAndNameLowerContainingAndCveCountGreaterThanAndDevicesCountGreaterThan(
-                            tenantId, nameLower, 0, 0, pageable);
-        } else if (hasSearch) {
-            result = softwareRepository
-                    .findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(tenantId, nameLower, 0, pageable);
-        } else if (vuln) {
-            result = softwareRepository
-                    .findByTenantIdAndCveCountGreaterThanAndDevicesCountGreaterThan(tenantId, 0, 0, pageable);
-        } else {
-            result = softwareRepository.findByTenantIdAndDevicesCountGreaterThan(tenantId, 0, pageable);
-        }
+        Page<Software> result = softwareRepository.findTitles(titles(tenantId, search, vulnerable, manageable), pageable);
 
         List<SoftwareResponse> rows = result.getContent().stream().map(TenantSoftwareReadModelQuery::toResponse).toList();
         return new PageResult<>(rows, result.hasNext(), pageIndex > 0, (int) result.getTotalElements(), pageIndex);
+    }
+
+    // "manageable" reads the match the projector stored, the same one the catalog status resolves on the rows
+    private static SoftwareTitleQuery titles(String tenantId, String search, Boolean vulnerable, Boolean manageable) {
+        String nameLower = isBlank(search) ? null : search.toLowerCase();
+        return new SoftwareTitleQuery(tenantId, nameLower, Boolean.TRUE.equals(vulnerable), manageable,
+                FleetSoftwareCategory.managerSources());
     }
 
     private Sort sortOf(SortInput sort) {

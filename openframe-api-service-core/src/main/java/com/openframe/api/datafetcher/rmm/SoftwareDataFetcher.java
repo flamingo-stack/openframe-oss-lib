@@ -51,8 +51,9 @@ public class SoftwareDataFetcher {
         Boolean vulnerable = filter != null && filter.getMinSeverity() != null
                 && filter.getMinSeverity() != SoftwareCveSeverity.NONE
                 ? Boolean.TRUE : null;
+        Boolean manageable = filter == null ? null : filter.getManageable();
         return PageCursors.toConnection(softwareInventoryService.listSoftware(
-                search, page, perPage, sort, vulnerable));
+                search, page, perPage, sort, vulnerable, manageable));
     }
 
     @DgsQuery
