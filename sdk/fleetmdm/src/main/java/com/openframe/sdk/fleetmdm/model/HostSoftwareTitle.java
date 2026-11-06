@@ -13,6 +13,8 @@ public class HostSoftwareTitle {
     private Long id;
     private String name;
     private String source;
+    @JsonProperty("upgrade_code")
+    private String upgradeCode;
 
     @JsonProperty("installed_versions")
     private List<HostSoftwareInstalledVersion> installedVersions;

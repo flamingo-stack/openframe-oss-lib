@@ -12,6 +12,8 @@ import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
@@ -26,6 +28,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -188,5 +191,22 @@ class SoftwareInventoryServiceReadModelTest {
 
         assertThat(service.listDevicesForSoftware("7", null, null, 0, 20, null).items()).isEmpty();
         assertThat(service.listDevicesForSoftware("8", null, null, 0, 20, null).items().getFirst().getInstalledBy()).isNull();
+    }
+
+    @Test
+    void listDevicesForSoftware_wingetMatch_managedOnlyWhereWingetRuns() {
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "9")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "9")).thenReturn(row("9", SoftwareSource.WINGET));
+        SoftwareOnDeviceResponse withWinget = onDevice("m1");
+        withWinget.getDevice().setPackageManagers(Map.of(PackageManagerType.WINGET, PackageManagerState.PRESENT));
+        SoftwareOnDeviceResponse withoutWinget = onDevice("m2");
+        withoutWinget.getDevice().setPackageManagers(Map.of(PackageManagerType.WINGET, PackageManagerState.MISSING));
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(eq(TENANT), eq("9"), any(), any()))
+                .thenReturn(List.of(withWinget, withoutWinget));
+
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("9", null, null, 0, 20, null);
+
+        assertThat(result.items()).extracting(SoftwareOnDeviceResponse::getInstalledBy)
+                .containsExactly(SoftwareSource.WINGET, null);
     }
 }
