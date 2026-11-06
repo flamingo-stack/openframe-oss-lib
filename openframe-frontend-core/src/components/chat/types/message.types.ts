@@ -3,6 +3,7 @@
  * Contains all message structures, segments, and content types
  */
 
+import type { ApprovalLevel } from '../../../types/permissions';
 import type { ChatRef } from '../chat-ref.types';
 import type { QuickActionIconSpec } from '../quick-action-chip';
 import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from './chat.types';
@@ -55,6 +56,36 @@ export const SCROLL_ANCHOR = { TOP: 'top', BOTTOM: 'bottom' } as const;
 
 export type ScrollAnchor = (typeof SCROLL_ANCHOR)[keyof typeof SCROLL_ANCHOR];
 
+// ========== Policy Review Types ==========
+
+/** One guardrail rule the command review matched (ai-agent `PolicyReviewRule`). */
+export interface PolicyReviewRuleData {
+  code: string;
+  /** The rule's name when it matched; the history keeps the name it had then. */
+  label: string;
+}
+
+/**
+ * Why the security policy gave a tool call its approval level (ai-agent `PolicyReview`). Sent only while
+ * the semantic guardrail is on, on approval tool calls and on `EXECUTING_TOOL`. Enum values stay open
+ * strings: the backend is narrowing `decision` (`SOFT_DENY` / `HARD_DENY` become `DENY`), and a value
+ * this build does not know must not drop the review. Normalized by `chat-protocol/policy-review`.
+ */
+export interface PolicyReviewData {
+  /** `CLASSIFIER` (the AI review) or `REGEX`. */
+  source?: string;
+  /** `POLICY`, `FALLBACK` (no rule of the policy matched), or a deny by a matched guardrail rule. */
+  decision?: string;
+  /** The level in force for this call. */
+  approvalLevel?: ApprovalLevel;
+  /** The level the organization's policy sets; differs from `approvalLevel` when a rule raised it. */
+  policyLevel?: ApprovalLevel;
+  operationCodes: string[];
+  matchedRules: PolicyReviewRuleData[];
+  /** The review's one-line reason; absent from a regex review. */
+  reason?: string;
+}
+
 // ========== Tool Execution Types ==========
 
 export interface ToolExecutionData {
@@ -69,6 +100,9 @@ export interface ToolExecutionData {
    * the accumulator restores it onto the merged `EXECUTED_TOOL` segment.
    */
   toolExplanation?: string;
+  /** The security policy's review of this call. Only sent on `EXECUTING_TOOL`, restored onto `EXECUTED_TOOL` like
+   *  `toolExplanation`. */
+  policyReview?: PolicyReviewData;
   parameters?: Record<string, unknown>;
   result?: string;
   success?: boolean;
@@ -100,6 +134,8 @@ export interface ExecutingToolState {
   toolTitle?: string;
   /** Mirrors {@link ToolExecutionData.toolExplanation}; absent on `EXECUTED_TOOL`. */
   toolExplanation?: string;
+  /** Mirrors {@link ToolExecutionData.policyReview}; absent on `EXECUTED_TOOL`. */
+  policyReview?: PolicyReviewData;
   parameters?: Record<string, unknown>;
 }
 
@@ -211,6 +247,8 @@ export interface PendingToolCallData {
   requiresApproval: boolean;
   approvalType?: string | null;
   toolCallArguments?: Record<string, unknown> | null;
+  /** Why the policy gave this call its approval level; absent while the semantic guardrail is off. */
+  policyReview?: PolicyReviewData;
 }
 
 /**
@@ -517,6 +555,8 @@ export interface ExecutingToolMessageData extends MessageDataBase {
   title?: string;
   /** Backend-issued human-readable explanation (what/why) of the tool call. */
   toolExplanation?: string;
+  /** WIRE shape of the policy review: normalized by `normalizePolicyReview` on the way in. */
+  policyReview?: unknown;
   parameters?: Record<string, unknown>;
   toolExecutionRequestId?: string;
 }
@@ -539,8 +579,8 @@ export interface ApprovalRequestMessageData extends MessageDataBase {
   approvalType?: string;
   command?: string;
   explanation?: string;
-  /** Present when the approval is a batch of tool calls (new format). */
-  toolCalls?: PendingToolCallData[];
+  /** Present when the approval is a batch of tool calls (new format). WIRE shape: the review is normalized on replay. */
+  toolCalls?: Array<Omit<PendingToolCallData, 'policyReview'> & { policyReview?: unknown }>;
 }
 
 export interface ApprovalResultMessageData extends MessageDataBase {

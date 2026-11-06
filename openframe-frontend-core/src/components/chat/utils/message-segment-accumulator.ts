@@ -8,6 +8,7 @@
  * - Creating approval segments when results arrive
  */
 
+import { keptPolicyReview } from '../../../chat-protocol/policy-review';
 import { applyApprovalStatusToSegment, nextBatchExecution, withBatchExecution } from '../stream/message-mutations';
 import type {
   AskOptionData,
@@ -197,6 +198,7 @@ export class MessageSegmentAccumulator {
         toolFunction: toolData.toolFunction,
         toolTitle: toolData.toolTitle,
         toolExplanation: toolData.toolExplanation,
+        ...keptPolicyReview(toolData.policyReview),
         parameters: toolData.parameters,
       });
       this.segments.push(segment);
@@ -225,6 +227,7 @@ export class MessageSegmentAccumulator {
           toolTitle: toolData.toolTitle ?? existingExecuting?.data.toolTitle ?? executingTool?.toolTitle,
           toolExplanation:
             toolData.toolExplanation ?? existingExecuting?.data.toolExplanation ?? executingTool?.toolExplanation,
+          ...keptPolicyReview(toolData.policyReview, existingExecuting?.data.policyReview, executingTool?.policyReview),
           parameters: toolData.parameters || executingTool?.parameters,
         },
       };

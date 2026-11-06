@@ -3,24 +3,18 @@
 import type { ComponentType } from 'react';
 import type { ApprovalLevel } from '../../types/permissions';
 import { cn } from '../../utils/cn';
-import { HeadsetIcon } from '../icons-v2-generated/audio-and-visual/headset-icon';
 import { BannedIcon } from '../icons-v2-generated/security/banned-icon';
+import { ShieldCheckIcon } from '../icons-v2-generated/security/shield-check-icon';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
-import { UserIcon } from '../icons-v2-generated/users/user-icon';
+import { UserCheckIcon } from '../icons-v2-generated/users/user-check-icon';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { TOGGLE_GROUP_CLASS, ToggleGroup, ToggleGroupItem } from '../toggle-group';
 import { TextHold } from '../ui/layout-hold';
 import { useLoadingScope } from '../ui/loading-scope';
-import { TOGGLE_SIZE_CLASS } from '../ui/toggle';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { TabSelector } from '../ui/tab-selector';
 import { TouchFriendlyTooltip } from '../ui/touch-friendly-tooltip';
 
-/**
- * The approval levels, in the order a choice reads: the two that need nobody
- * (allow, never) side by side, then the two that ask someone (a technician,
- * the user) side by side.
- */
-export const APPROVAL_LEVELS: readonly ApprovalLevel[] = ['ALLOW', 'DENY', 'ASK_TECHNICIAN', 'ASK_USER'];
+/** The approval levels, from the freest to the strictest, as the guardrails settings order them (Figma 4365-22670). */
+export const APPROVAL_LEVELS: readonly ApprovalLevel[] = ['ALLOW', 'ASK_USER', 'ASK_TECHNICIAN', 'DENY'];
 
 export interface ApprovalLevelMeta {
   /** The level's name, as every surface writes it. */
@@ -47,30 +41,47 @@ export const APPROVAL_LEVEL_META: Record<ApprovalLevel, ApprovalLevelMeta> = {
   ASK_USER: {
     label: 'Ask User',
     hint: 'Asks the person at the computer first.',
-    Icon: UserIcon,
+    Icon: UserCheckIcon,
     toneClassName: 'text-ods-warning',
   },
   ASK_TECHNICIAN: {
     label: 'Ask Technician',
     hint: 'Asks a technician first. Nothing runs until they approve.',
-    Icon: HeadsetIcon,
+    Icon: ShieldCheckIcon,
     toneClassName: 'text-ods-warning',
   },
   DENY: { label: 'Restrict', hint: 'Never runs.', Icon: BannedIcon, toneClassName: 'text-ods-error' },
 };
 
-const ICON_PX = 16;
+/** A read-only level's icon (Figma 1608-49531: 24px, before the name). */
+const ICON_PX = 24;
 
 /** The view's layout, read by the view and by its skeleton, so the skeleton is the view's size. */
 const READ_ONLY_ROW_CLASS = 'inline-flex shrink-0 items-center gap-[var(--spacing-system-xxs)]';
-const EDITABLE_ROW_CLASS = 'flex shrink-0 items-center gap-[var(--spacing-system-sf)]';
+/** Editable: the name after the strip on a phone, before it from `content-md` (Figma 4365-22461 / 4365-22663). */
+const EDITABLE_ROW_CLASS =
+  'flex shrink-0 items-center gap-[var(--spacing-system-xxs)] content-md:gap-[var(--spacing-system-m)]';
+const EDITABLE_NAME_ORDER_CLASS = 'order-last content-md:order-none';
+/** A read-only level's icon box: 16px on a phone, 24 from `content-md` (Figma 555-39573 / 1608-49531). */
+const READ_ONLY_ICON_BOX_CLASS = '[&>*]:!size-4 content-md:[&>*]:!size-6';
+/** Read-only, the name is the row's value (h4, primary); editable, a caption in the level's colour beside the strip. */
+const READ_ONLY_NAME_CLASS = 'whitespace-nowrap text-ods-text-primary text-h4';
 const LEVEL_NAME_CLASS = 'whitespace-nowrap text-h6';
-/** An editable level's button: the small toggle with tighter sides. */
-const LEVEL_BUTTON_CLASS = 'px-2';
+/** An editable level's icon (Figma: 20px in the segment). */
+const EDITABLE_ICON_PX = 20;
 /** The longest level name: the skeleton's name bar is exactly its width (the component's own words, unseen). */
 const LONGEST_LEVEL_LABEL = APPROVAL_LEVELS.map(level => APPROVAL_LEVEL_META[level].label).reduce((a, b) =>
   b.length > a.length ? b : a,
 );
+
+/** The strip's four levels: the one in force (none while loading) in the primary colour, the others secondary (Figma 4365-22670). */
+function levelItems(inForce: ApprovalLevel | undefined) {
+  return APPROVAL_LEVELS.map(level => {
+    const { label, Icon } = APPROVAL_LEVEL_META[level];
+    const tone = level === inForce ? 'text-ods-text-primary' : 'text-ods-text-secondary';
+    return { id: level, ariaLabel: label, icon: <Icon size={EDITABLE_ICON_PX} className={tone} aria-hidden /> };
+  });
+}
 
 export interface ApprovalLevelViewProps {
   /** The level in force. */
@@ -100,13 +111,11 @@ export interface ApprovalLevelViewProps {
 
 /**
  * THE way a level is shown, read-only or editable, by one prop: the level's
- * name in its colour, then its icon (read-only) or the four levels' icons as a
- * single-choice group (editable; arrow keys move, like every toggle group).
- * Name, icon, colour and tooltip are `APPROVAL_LEVEL_META`'s in both, so a
- * rule reads the same on a page that shows it and on one that lets it change.
- *
- * Editable, each icon has its level's name as its accessible name and a
- * tooltip with what the level means (hover or keyboard focus; a tap selects).
+ * icon in its colour, then its name (read-only, Figma 1608-49531), or its name
+ * in its colour, then the four levels' icons in a compact `TabSelector` strip,
+ * the one in force filled (editable, Figma 4365-22670). Name, icon and colour
+ * are `APPROVAL_LEVEL_META`'s in both. Editable, each icon has its level's name
+ * as its accessible name.
  */
 export function ApprovalLevelView({
   value,
@@ -124,18 +133,16 @@ export function ApprovalLevelView({
     return <ApprovalLevelSkeleton editable={canEdit} showLabel={showLabel} className={className} />;
   }
   const current = APPROVAL_LEVEL_META[value];
-  const name = showLabel ? <span className={cn(LEVEL_NAME_CLASS, current.toneClassName)}>{current.label}</span> : null;
 
   if (!canEdit) {
     const icon = (
-      <span className={cn('inline-flex shrink-0', current.toneClassName)}>
+      <span className={cn('inline-flex shrink-0', READ_ONLY_ICON_BOX_CLASS, current.toneClassName)}>
         <current.Icon size={ICON_PX} aria-hidden />
         {!showLabel && <span className="sr-only">{current.label}</span>}
       </span>
     );
     return (
       <span className={cn(READ_ONLY_ROW_CLASS, className)}>
-        {name}
         {showLabel ? (
           icon
         ) : (
@@ -143,49 +150,32 @@ export function ApprovalLevelView({
             {icon}
           </TouchFriendlyTooltip>
         )}
+        {showLabel && <span className={READ_ONLY_NAME_CLASS}>{current.label}</span>}
       </span>
     );
   }
 
+  const name = showLabel ? (
+    <span className={cn(LEVEL_NAME_CLASS, EDITABLE_NAME_ORDER_CLASS, current.toneClassName)}>{current.label}</span>
+  ) : null;
+
   return (
     <div className={cn(EDITABLE_ROW_CLASS, className)}>
       {name}
-      <TooltipProvider delayDuration={150}>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
+      {/* The settings design's segmented control: one strip, the level in force filled (Figma 4365-22670). */}
+      <div role="group" aria-labelledby={labelledBy}>
+        <TabSelector
+          variant="secondary"
+          size="compact"
           value={value}
           disabled={disabled}
-          // Clicking the level in force reports '' (deselect): a rule always has a level.
-          onValueChange={(next: string) => {
-            if (next && next !== value) onChange?.(next as ApprovalLevel);
+          onValueChange={next => {
+            if (next !== value) onChange?.(next as ApprovalLevel);
           }}
-          aria-labelledby={labelledBy}
-        >
-          {APPROVAL_LEVELS.map(level => {
-            const { label, hint, Icon, toneClassName } = APPROVAL_LEVEL_META[level];
-            return (
-              // A plain tooltip (hover and keyboard focus): a tap must SELECT the level, and on
-              // touch the name beside the group says what is in force.
-              <Tooltip key={level}>
-                <TooltipTrigger asChild>
-                  <ToggleGroupItem
-                    value={level}
-                    aria-label={label}
-                    className={cn(LEVEL_BUTTON_CLASS, level === value && toneClassName)}
-                  >
-                    <Icon size={ICON_PX} aria-hidden />
-                  </ToggleGroupItem>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs">
-                  <b>{label}</b>: {hint}
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
-        </ToggleGroup>
-      </TooltipProvider>
+          items={levelItems(value)}
+          className="w-auto"
+        />
+      </div>
     </div>
   );
 }
@@ -200,35 +190,41 @@ interface ApprovalLevelSkeletonProps {
 
 /**
  * `ApprovalLevelView`'s own skeleton (a level chip, not a whole view): a level while it is read: the view's own row, the name a bar at its type step (the longest name's width), and the
- * read-only icon's box or the editable group's four small toggle boxes. Inert: nothing in it can be picked.
+ * read-only icon's box or the editable strip itself, disabled. Inert: nothing in it can be picked.
  */
 function ApprovalLevelSkeleton({ editable = false, showLabel = true, className }: ApprovalLevelSkeletonProps) {
-  const name = showLabel ? (
-    <span className={LEVEL_NAME_CLASS}>
-      <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>
-    </span>
-  ) : null;
   if (!editable) {
     return (
       <span aria-hidden className={cn(READ_ONLY_ROW_CLASS, className)}>
-        {name}
-        <UnifiedSkeleton as="span" className="inline-block shrink-0 rounded-sm" width={ICON_PX} height={ICON_PX} />
+        <span className={cn('inline-flex shrink-0', READ_ONLY_ICON_BOX_CLASS)}>
+          <UnifiedSkeleton as="span" className="inline-block shrink-0 rounded-sm" width={ICON_PX} height={ICON_PX} />
+        </span>
+        {showLabel && (
+          <span className={READ_ONLY_NAME_CLASS}>
+            <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>
+          </span>
+        )}
       </span>
     );
   }
+  const name = showLabel ? (
+    <span className={cn(LEVEL_NAME_CLASS, EDITABLE_NAME_ORDER_CLASS)}>
+      <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>
+    </span>
+  ) : null;
   return (
     <div aria-hidden inert className={cn(EDITABLE_ROW_CLASS, className)}>
       {name}
-      <div className={TOGGLE_GROUP_CLASS}>
-        {APPROVAL_LEVELS.map(level => (
-          <UnifiedSkeleton
-            key={level}
-            // The small toggle's height and its tighter sides around one icon (`box-content`: the padding adds).
-            className={cn(TOGGLE_SIZE_CLASS.sm, LEVEL_BUTTON_CLASS, 'box-content shrink-0 rounded-md')}
-            width={ICON_PX}
-          />
-        ))}
-      </div>
+      {/* The real strip, inert, with no level in force yet. */}
+      <TabSelector
+        variant="secondary"
+        size="compact"
+        value=""
+        disabled
+        onValueChange={() => {}}
+        items={levelItems(undefined)}
+        className="w-auto"
+      />
     </div>
   );
 }
