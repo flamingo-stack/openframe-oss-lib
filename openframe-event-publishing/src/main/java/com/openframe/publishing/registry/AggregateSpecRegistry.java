@@ -76,6 +76,16 @@ public class AggregateSpecRegistry {
                 .toList();
     }
 
+    // The type whose events the projection applies.
+    public String resolveType(Projection<?, ?> projection) {
+        for (AggregateSpec<?, ?> spec : byType.values()) {
+            if (spec.projections().contains(projection)) {
+                return spec.getType();
+            }
+        }
+        throw new IllegalArgumentException("No spec has the projection " + projection.name());
+    }
+
     // Each spec has a projection, and each projection name is unique: it is a mode key, a job id and a metric tag.
     private void requireProjections() {
         Set<String> names = new HashSet<>();

@@ -3,6 +3,7 @@ package com.openframe.data.repository.organization.publishing;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
 import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.ticket.TicketProjectionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -12,7 +13,7 @@ import static org.mockito.Mockito.mock;
 
 class OrganizationAggregateSpecTest {
 
-    private final OrganizationOnTicketsProjection organizationOnTickets = new OrganizationOnTicketsProjection(mock(OrganizationRepository.class));
+    private final OrganizationOnTicketsProjection organizationOnTickets = new OrganizationOnTicketsProjection(mock(OrganizationRepository.class), mock(TicketProjectionRepository.class));
     private final OrganizationAggregateSpec spec = new OrganizationAggregateSpec(organizationOnTickets);
 
     @Test
