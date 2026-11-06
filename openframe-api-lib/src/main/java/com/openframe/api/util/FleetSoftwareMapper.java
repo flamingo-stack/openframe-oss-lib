@@ -37,9 +37,6 @@ public class FleetSoftwareMapper {
                 .fleetSource(title.getSource())
                 .publisher(firstText(versions, SoftwareTitleVersion::getVendor))
                 .upgradeCode(title.getUpgradeCode())
-                .productCodes(distinctText(versions, SoftwareTitleVersion::getArpKey))
-                .packageFamilyNames(distinctText(versions, SoftwareTitleVersion::getPackageFamilyName))
-                .systemComponent(allFlagged(versions, SoftwareTitleVersion::getSystemComponent))
                 .build();
     }
 
