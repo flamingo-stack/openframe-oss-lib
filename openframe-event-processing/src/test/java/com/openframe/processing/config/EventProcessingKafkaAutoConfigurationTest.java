@@ -2,9 +2,11 @@ package com.openframe.processing.config;
 
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
+import com.openframe.processing.exception.ProjectionConflictException;
 import com.openframe.processing.fixture.Widgets.RecordingProjection;
 import com.openframe.processing.fixture.Widgets.WidgetSpec;
-import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
+import com.openframe.publishing.config.EventsAutoConfiguration;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
@@ -14,6 +16,8 @@ import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoCon
 import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.data.mongodb.MongoDatabaseFactory;
+import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
@@ -29,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class EventProcessingKafkaAutoConfigurationTest {
 
@@ -37,14 +42,17 @@ class EventProcessingKafkaAutoConfigurationTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                     EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-            .withUserConfiguration(AggregateSpecRegistry.class)
+            .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class))
+            .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
             .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
             .withPropertyValues("openframe.events.enabled=true",
                     "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                     "openframe.events.processing.kafka.topic-prefix=events.",
                     "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-",
                     "openframe.events.processing.kafka.listener.auto-startup=false")
-            .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
+            .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+            .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+            .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class));
 
     @Test
     void theProjectionConsumer_readsFromEarliest_inSmallPolls_byDefault() {
@@ -79,6 +87,15 @@ class EventProcessingKafkaAutoConfigurationTest {
         });
     }
 
+    // The stream reads the same publish switch as the publishing services: a type nobody publishes has no topic to read.
+    @Test
+    void aTypeWhosePublishIsOff_getsNoListener() {
+        runner.withPropertyValues("openframe.events.topics.organizations.enabled=false").run(context -> {
+            KafkaListenerEndpointRegistry registry = context.getBean(KafkaListenerEndpointRegistry.class);
+            assertThat(registry.getListenerContainers()).isEmpty();
+        });
+    }
+
     @Test
     void twoProjectionsOfAType_getTwoListeners_onTheSameTopic_inTheirOwnGroups() {
         runner.withAllowBeanDefinitionOverriding(true)
@@ -93,6 +110,21 @@ class EventProcessingKafkaAutoConfigurationTest {
                             "openframe-saas-stream.processing-organizations.widget-on-tickets");
                     assertThat(listeners).allSatisfy(listener ->
                             assertThat(listener.getTopics()).containsExactly("events." + ORGANIZATIONS));
+                });
+    }
+
+    // A library such as saas-lib adds a projection as a bean, not through the spec; it gets a listener all the same.
+    @Test
+    void aProjectionBeanOfAPublishedEvent_getsItsOwnListener() {
+        runner.withBean(RecordingProjection.class, () -> new RecordingProjection("widget-on-devices"))
+                .run(context -> {
+                    KafkaListenerEndpointRegistry registry = context.getBean(KafkaListenerEndpointRegistry.class);
+                    List<String> groupIds = registry.getListenerContainers().stream()
+                            .map(container -> container.getContainerProperties().getGroupId())
+                            .toList();
+                    assertThat(groupIds).containsExactlyInAnyOrder(
+                            "openframe-saas-stream.processing-organizations.widget-on-organizations",
+                            "openframe-saas-stream.processing-organizations.widget-on-devices");
                 });
     }
 
@@ -113,12 +145,15 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class))
+                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                         "openframe.events.processing.kafka.topic-prefix=events.")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+                .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class))
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().hasStackTraceContaining("openframe.events.processing.kafka.group-prefix is required"));
     }
@@ -149,12 +184,15 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class))
+                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.topic-prefix=events.",
                         "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+                .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class))
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().rootCause().hasMessageContaining("bootstrap-servers is required"));
     }
@@ -169,7 +207,8 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class))
+                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
@@ -177,16 +216,19 @@ class EventProcessingKafkaAutoConfigurationTest {
                         "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-",
                         "openframe.events.processing.kafka.listener.auto-startup=false")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+                .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class))
                 .run(context -> assertThat(findOnlyListener(context).getTopics()).containsExactly("events.organizations"));
     }
 
     @Test
-    void onlyMongoDown_isRetried_andTheWrapperIsNeverRetried_whateverItsCause() {
+    void onlyMongoDownAndALastingConflict_areRetried_andTheWrapperIsNeverRetried_whateverItsCause() {
         runner.run(context -> {
             DefaultErrorHandler errorHandler = errorHandlerOf(context);
 
             // removeClassification returns how a type was classified: true retried, false not, null the default (not retried).
             assertThat(errorHandler.removeClassification(MongoUnavailableException.class)).isTrue();
+            assertThat(errorHandler.removeClassification(ProjectionConflictException.class)).isTrue();
             assertThat(errorHandler.removeClassification(EventProcessingFailedException.class)).isFalse();
             assertThat(errorHandler.removeClassification(OptimisticLockingFailureException.class)).isNull();
         });

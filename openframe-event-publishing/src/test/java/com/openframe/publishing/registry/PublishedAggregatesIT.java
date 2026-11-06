@@ -131,7 +131,7 @@ class PublishedAggregatesIT {
         return version.longValue();
     }
 
-    // A published document has exactly one repository; this one only satisfies that startup check.
+    // The repository whose writes publish; the backfill itself reads through the template.
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @EnableMongoRepositories(basePackageClasses = PublishedAggregatesIT.class, considerNestedRepositories = true,

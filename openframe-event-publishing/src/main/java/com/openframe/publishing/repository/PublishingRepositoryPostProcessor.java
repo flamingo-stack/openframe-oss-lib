@@ -63,12 +63,13 @@ public class PublishingRepositoryPostProcessor implements BeanPostProcessor, Bea
     }
 
     // From the bean definitions' types, never the spec beans: a spec needs its projection, which may need this very repository.
+    // A subclass document, such as AuthUser of User, publishes with its parent's spec.
     private boolean hasSpecFor(Class<?> documentClass) {
         String[] specNames = beanFactory.getBeanNamesForType(AggregateSpec.class, true, false);
         for (String specName : specNames) {
             Class<?> specClass = beanFactory.getType(specName, false);
             Class<?> specDocument = specClass == null ? null : PublishedDocuments.classOfSpecClass(specClass);
-            if (documentClass.equals(specDocument)) {
+            if (specDocument != null && specDocument.isAssignableFrom(documentClass)) {
                 return true;
             }
         }

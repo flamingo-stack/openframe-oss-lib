@@ -12,6 +12,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -128,6 +129,18 @@ public class OutboxPublisher {
         });
     }
 
+    // A write beside the documents that changes what their projections read (a directory link): raises their version, then publishes.
+    public <R> R republishByIds(AggregateSpec<?, ?> spec, Collection<?> ids, Supplier<R> write) {
+        log.debug("republishByIds of {}: starting", spec.getType());
+        return whenPublishing(spec, write, () -> {
+            R result = write.get();
+            increaseVersions(spec, ids);
+            List<?> changed = findByIds(spec, ids);
+            insertChangedRows(spec, changed);
+            return result;
+        });
+    }
+
     // The backfill's write: the documents' current state, read and written in one transaction; returns the version of each row.
     public Map<String, Long> publishCurrent(AggregateSpec<?, ?> spec, Collection<?> ids) {
         log.debug("publishCurrent of {}: starting", spec.getType());
@@ -226,6 +239,18 @@ public class OutboxPublisher {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static PublishedEvent eventOf(AggregateSpec spec, Object document) {
         return spec.toEvent(document);
+    }
+
+    private void increaseVersions(AggregateSpec<?, ?> spec, Collection<?> ids) {
+        if (ids.isEmpty()) {
+            return;
+        }
+        Class<?> documentClass = PublishedDocuments.classOf(spec);
+        String versionField = documents.findVersionField(documentClass);
+        Criteria idIn = Criteria.where(ID_FIELD).in(ids);
+        Query byIds = Query.query(idIn);
+        Update increment = new Update().inc(versionField, 1);
+        mongoOperations.updateMulti(byIds, increment, documentClass);
     }
 
     private List<?> findByIds(AggregateSpec<?, ?> spec, Collection<?> ids) {

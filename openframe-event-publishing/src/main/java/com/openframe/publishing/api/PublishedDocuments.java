@@ -67,6 +67,12 @@ public class PublishedDocuments {
         return String.valueOf(identifier);
     }
 
+    public String findVersionField(Class<?> documentClass) {
+        MongoPersistentEntity<?> entity = entityOf(documentClass);
+        MongoPersistentProperty versionProperty = entity.getRequiredVersionProperty();
+        return versionProperty.getFieldName();
+    }
+
     // The startup check refuses a published document without @Version.
     public long versionOf(Object document) {
         Class<?> documentClass = document.getClass();

@@ -15,6 +15,10 @@ public interface AggregateSpec<D, E extends PublishedEvent> {
     /** Turns a saved document into the event other services receive; only the fields they need. */
     E toEvent(D document);
 
-    /** The projections of this document in other collections, for example the organization name on tickets. */
+    /**
+     * The projections of this document in other collections that this module can name, for example the organization name
+     * on tickets. A projection in another library is a {@code Projection} bean of this spec's event class instead; the
+     * registry adds it.
+     */
     List<Projection<E, ?>> projections();
 }

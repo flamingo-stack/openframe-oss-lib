@@ -5,7 +5,6 @@ import com.openframe.event.jobs.core.service.EventJobService;
 import com.openframe.event.jobs.core.service.EventJobTicker;
 import com.openframe.event.jobs.reconciliation.config.properties.ReconciliationProperties;
 import com.openframe.event.jobs.reconciliation.scheduler.ReconciliationJob;
-import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.config.EventsProperties;
 import com.openframe.publishing.config.PublishedAggregateTopics;
@@ -23,7 +22,6 @@ import java.util.Set;
 
 import static com.openframe.event.jobs.reconciliation.fixture.Projections.named;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -65,12 +63,8 @@ class ReconciliationConfigurationTest {
         List<Projection<?, ?>> organizationProjections = List.of(named("organization-on-tickets"));
         List<Projection<?, ?>> userProjections = List.of(named("user-on-tickets"));
         when(specRegistry.types()).thenReturn(types);
-        AggregateSpec<?, ?> organizations = mock(AggregateSpec.class);
-        doReturn(organizationProjections).when(organizations).projections();
-        AggregateSpec<?, ?> users = mock(AggregateSpec.class);
-        doReturn(userProjections).when(users).projections();
-        doReturn(organizations).when(specRegistry).specOf("organizations");
-        doReturn(users).when(specRegistry).specOf("users");
+        when(specRegistry.getProjections("organizations")).thenReturn(organizationProjections);
+        when(specRegistry.getProjections("users")).thenReturn(userProjections);
         return specRegistry;
     }
 

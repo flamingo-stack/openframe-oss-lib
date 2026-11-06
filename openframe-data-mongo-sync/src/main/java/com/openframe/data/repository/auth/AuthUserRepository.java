@@ -30,7 +30,8 @@ public interface AuthUserRepository extends MongoRepository<AuthUser, String>, C
      * Find single user by email within a specific tenant regardless of status
      */
     Optional<AuthUser> findByEmailAndTenantId(String email, String tenantId);
-    void deleteByTenantId(String tenantId);
+
+    List<AuthUser> deleteByTenantId(String tenantId);
 
     /**
      * Find users that still need a CRM sync (never synced or changed since last sync).
