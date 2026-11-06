@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareType;
@@ -68,14 +69,21 @@ class DeviceSoftwareReadModelQueryTest {
     void rowsForDevice_carriesTheProgramKeysAndTheStoredMatch() {
         Software chrome = software(3L, "Google Chrome", "programs", on("m1", "130.0"));
         chrome.setVendor("Google LLC");
+        chrome.setUpgradeCode("{UPGRADE}");
         chrome.setArpKeys(List.of("Google Chrome"));
-        chrome.setPackageMatch(new SoftwarePackageMatch(PackageMatchState.NO_PACKAGE, null, null));
+        chrome.setPackageFamilyNames(List.of("google.chrome_x"));
+        chrome.setSystemComponent(false);
+        chrome.setPackageMatch(new SoftwarePackageMatch(PackageMatchState.NO_PACKAGE, null, null, null));
         when(softwareRepository.findByTenantIdAndInstallationsMachineId("t1", "m1")).thenReturn(List.of(chrome));
 
         SoftwareResponse row = query.rowsForDevice("t1", "m1", null).getFirst();
 
+        assertThat(row.getFleetSource()).isEqualTo(FleetSource.PROGRAMS);
         assertThat(row.getPublisher()).isEqualTo("Google LLC");
+        assertThat(row.getUpgradeCode()).isEqualTo("{UPGRADE}");
         assertThat(row.getProductCodes()).containsExactly("Google Chrome");
+        assertThat(row.getPackageFamilyNames()).containsExactly("google.chrome_x");
+        assertThat(row.getSystemComponent()).isFalse();
         assertThat(row.getPackageMatch().getState()).isEqualTo(PackageMatchState.NO_PACKAGE);
     }
 }

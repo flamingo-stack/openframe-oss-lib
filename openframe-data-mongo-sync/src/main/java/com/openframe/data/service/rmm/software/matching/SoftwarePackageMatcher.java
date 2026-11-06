@@ -40,10 +40,6 @@ public class SoftwarePackageMatcher {
         this.catalogRepository = catalogRepository;
     }
 
-    public Optional<PackageMatch> match(InstalledProgram program) {
-        return Optional.ofNullable(match(List.of(program)).get(program));
-    }
-
     // keyed by identity: two programs can be equal; a program no matcher takes is left out
     public Map<InstalledProgram, PackageMatch> match(List<InstalledProgram> programs) {
         Map<InstalledProgram, PackageMatch> matches = new IdentityHashMap<>();

@@ -1,5 +1,8 @@
 package com.openframe.data.document.rmm.software;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
 import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Function;
@@ -7,6 +10,8 @@ import java.util.function.Function;
 import static java.util.stream.Collectors.toMap;
 
 // the osquery table Fleet took a software row from, as Fleet names it in `source`; OTHER for a table we do not know
+@Getter
+@RequiredArgsConstructor
 public enum FleetSource {
     APPS("apps"),
     PROGRAMS("programs"),
@@ -33,14 +38,6 @@ public enum FleetSource {
             .collect(toMap(FleetSource::getFleetName, Function.identity()));
 
     private final String fleetName;
-
-    FleetSource(String fleetName) {
-        this.fleetName = fleetName;
-    }
-
-    public String getFleetName() {
-        return fleetName;
-    }
 
     public static FleetSource of(String fleetName) {
         return fleetName == null ? OTHER : BY_FLEET_NAME.getOrDefault(fleetName, OTHER);
