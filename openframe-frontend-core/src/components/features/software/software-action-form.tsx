@@ -76,8 +76,9 @@ export interface SoftwareActionFormProps<TRef extends string = string> {
    */
   showUpdateSettings?: boolean;
   /**
-   * "Update Settings" offer Wait & notify and the countdowns, which need the devices to notify the user. Default
-   * false: Force Update alone, and that is what is submitted, a Wait & notify in `initialValues` included.
+   * The update settings offer the deadlines after the first try and the countdowns, which need the devices to notify
+   * the user. Default false: "Force update right away" or "Update when app closes", and that is what is submitted, a
+   * deadline in `initialValues` included.
    */
   updateUserNotifications?: boolean;
   /** The "Device Selection" heading over the picker. Default true; a host that titles the picker itself passes false. */

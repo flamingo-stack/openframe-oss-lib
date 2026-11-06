@@ -1,26 +1,15 @@
 'use client';
 
 import { InfoCircleIcon } from '../../icons-v2-generated';
-import {
-  Alert,
-  CheckboxBlock,
-  Label,
-  RadioGroupBlock,
-  type RadioGroupBlockOption,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../ui';
+import { Alert, CheckboxBlock, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui';
 
 /** What an update does on a device where the app is running. */
 export type SoftwareUpdateMode = 'WAIT' | 'FORCE';
 
-/** "If the app is running": one update's behaviour on a device where the app is open. */
+/** "Deadline if app is open": one update's behaviour on a device where the app is open. */
 export interface SoftwareUpdatePolicy {
   mode: SoftwareUpdateMode;
-  /** WAIT only: "Countdown after the deadline". Off, the update waits for the user however long it takes. */
+  /** WAIT only: a deadline after the first try. Off, the update waits until the app closes, however long it takes. */
   deadlineEnabled: boolean;
   /** WAIT only: seconds after the first try before the countdown starts. */
   deadlineSeconds: number;
@@ -72,78 +61,92 @@ export const DEFAULT_SOFTWARE_UPDATE_SETTINGS: SoftwareUpdateSettingsValues = {
 };
 
 /**
- * Without user notifications there is no one to wait for and no countdown to show: an update on a device where the
- * app is running closes it and updates. Wait & notify falls back to Force Update, and its deadline goes with it;
- * `countdownSeconds` is kept, since the input requires it.
+ * Without user notifications nobody can be asked to update, or told the app is about to close: an update on a device
+ * where the app is running closes it ("Force update right away"), or waits until the user closes it ("Update when app
+ * closes"). A deadline is the prompt's offer (postpone until then), which nobody can show, so it falls back to Force
+ * Update; `countdownSeconds` is kept, since the input requires it.
  */
-function forceWithoutNotifications(policy: SoftwareUpdatePolicy): SoftwareUpdatePolicy {
-  return policy.mode === 'FORCE' && !policy.deadlineEnabled
-    ? policy
-    : { ...policy, mode: 'FORCE', deadlineEnabled: false };
+function withoutNotifications(policy: SoftwareUpdatePolicy): SoftwareUpdatePolicy {
+  return policy.mode === 'WAIT' && policy.deadlineEnabled
+    ? { ...policy, mode: 'FORCE', deadlineEnabled: false }
+    : policy;
 }
 
 /**
- * The settings as the form can offer them: unchanged with user notifications, Force Update for both policies without
- * them (a draft or a saved policy on Wait & notify reads as Force Update). What the fields draw and the form submits.
+ * The settings as the form can offer them: unchanged with user notifications; without them, a deadline on either policy
+ * reads as Force Update (a draft or a saved policy included). What the fields draw and the form submits.
  */
 export function availableSoftwareUpdateSettings(
   settings: SoftwareUpdateSettingsValues,
   userNotifications: boolean,
 ): SoftwareUpdateSettingsValues {
   if (userNotifications) return settings;
-  const policy = forceWithoutNotifications(settings.policy);
-  const autoUpdatePolicy = forceWithoutNotifications(settings.autoUpdatePolicy);
+  const policy = withoutNotifications(settings.policy);
+  const autoUpdatePolicy = withoutNotifications(settings.autoUpdatePolicy);
   return policy === settings.policy && autoUpdatePolicy === settings.autoUpdatePolicy
     ? settings
     : { ...settings, policy, autoUpdatePolicy };
 }
 
-const WAIT_OPTION: RadioGroupBlockOption = {
-  value: 'WAIT',
-  label: 'Wait & notify',
-  description: 'The user gets Update now or Ask Later. If they close the app, it updates then.',
-};
+/** The "Deadline if app is open" choices that are not a deadline. */
+const FORCE_NOW = 'FORCE';
+const WHEN_APP_CLOSES = 'WHEN_APP_CLOSES';
 
-const FORCE_OPTION: RadioGroupBlockOption = {
-  value: 'FORCE',
-  label: 'Force Update',
-  description: 'The user gets a short countdown, then the app closes and updates.',
-};
+/** "Deadline if app is open" as one value: Force now, a deadline (its seconds), or waiting for the app to close. */
+function deadlineValue(policy: SoftwareUpdatePolicy): string {
+  if (policy.mode === 'FORCE') return FORCE_NOW;
+  return policy.deadlineEnabled ? String(policy.deadlineSeconds) : WHEN_APP_CLOSES;
+}
 
-/** Force Update with no countdown first: what a device does while there are no user notifications. */
-const FORCE_ONLY_OPTION: RadioGroupBlockOption = {
-  ...FORCE_OPTION,
-  description: 'The app closes and updates.',
-};
+function withDeadline(policy: SoftwareUpdatePolicy, value: string): SoftwareUpdatePolicy {
+  if (value === FORCE_NOW) return { ...policy, mode: 'FORCE', deadlineEnabled: false };
+  if (value === WHEN_APP_CLOSES) return { ...policy, mode: 'WAIT', deadlineEnabled: false };
+  return { ...policy, mode: 'WAIT', deadlineEnabled: true, deadlineSeconds: Number(value) };
+}
+
+/** The deadlines in the order the design lists them: right away, after the first try, never (the app closing). */
+function deadlineOptions(userNotifications: boolean): ReadonlyArray<{ value: string; label: string }> {
+  return [
+    { value: FORCE_NOW, label: 'Force update right away' },
+    ...(userNotifications
+      ? SOFTWARE_UPDATE_DEADLINE_OPTIONS.map(option => ({ value: String(option.seconds), label: option.label }))
+      : []),
+    { value: WHEN_APP_CLOSES, label: 'Update when app closes' },
+  ];
+}
 
 const SAME_SETTINGS_DESCRIPTION: Record<SoftwareUpdateMode, string> = {
-  WAIT: 'Auto-updates follow "If the app is running" above. Uncheck to set them separately.',
+  WAIT: 'Auto-updates follow "Deadline if app is open" above. Uncheck to set them separately.',
   FORCE: 'Later releases will also be force-updated.',
 };
 
 const groupLabelClass = 'text-h5 text-ods-text-secondary';
 
-function SecondsSelect({
+function SettingSelect({
+  id,
   label,
   value,
   options,
   onChange,
 }: {
+  id: string;
   label: string;
-  value: number;
-  options: ReadonlyArray<{ seconds: number; label: string }>;
-  onChange: (seconds: number) => void;
+  value: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  onChange: (value: string) => void;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-      <Label className="text-h4">{label}</Label>
-      <Select value={String(value)} onValueChange={next => onChange(Number(next))}>
-        <SelectTrigger aria-label={label}>
+      <Label htmlFor={id} className="text-h4">
+        {label}
+      </Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={id} aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {options.map(option => (
-            <SelectItem key={option.seconds} value={String(option.seconds)}>
+            <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
           ))}
@@ -153,71 +156,45 @@ function SecondsSelect({
   );
 }
 
-/** "If the app is running" with its deadline and countdown. */
+/** "Deadline if app is open" and "Countdown before closing" (design 1572:2004, its dropdowns 1572:3193 / 1572:4431). */
 function UpdatePolicyFields({
   name,
-  label,
   policy,
   userNotifications,
   onChange,
 }: {
-  /** The radio group's name: two policies on one page must not share it. */
+  /** Prefixes the fields' ids: two policies on one page must not share them. */
   name: string;
-  label: string;
   policy: SoftwareUpdatePolicy;
-  /** Off, Force Update is the only choice and it has no countdown to set. */
+  /**
+   * Off, the deadline offers only what needs nobody warned (right away, or when the app closes) and there is no
+   * countdown to set: the user would not see it.
+   */
   userNotifications: boolean;
   onChange: (policy: SoftwareUpdatePolicy) => void;
 }) {
-  const waits = policy.mode === 'WAIT';
-  const deadline = waits && policy.deadlineEnabled;
-  const countdown = (
-    <SecondsSelect
-      label="Countdown"
-      value={policy.countdownSeconds}
-      options={SOFTWARE_UPDATE_COUNTDOWN_OPTIONS}
-      onChange={countdownSeconds => onChange({ ...policy, countdownSeconds })}
-    />
-  );
+  // Waiting for the app to close never closes it, so there is nothing to count down to.
+  const closesApp = policy.mode === 'FORCE' || policy.deadlineEnabled;
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-m)]">
-      <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-        <span className={groupLabelClass}>{label}</span>
-        <RadioGroupBlock
-          name={name}
-          aria-label={label}
-          variant="grouped"
-          value={policy.mode}
-          onValueChange={mode => onChange({ ...policy, mode: mode as SoftwareUpdateMode })}
-          options={userNotifications ? [WAIT_OPTION, FORCE_OPTION] : [FORCE_ONLY_OPTION]}
-          itemClassName="py-[var(--spacing-system-sf)]"
+    <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3 content-md:items-start">
+      <SettingSelect
+        id={`${name}-deadline`}
+        label="Deadline if app is open"
+        value={deadlineValue(policy)}
+        options={deadlineOptions(userNotifications)}
+        onChange={value => onChange(withDeadline(policy, value))}
+      />
+      {userNotifications && closesApp && (
+        <SettingSelect
+          id={`${name}-countdown`}
+          label="Countdown before closing"
+          value={String(policy.countdownSeconds)}
+          options={SOFTWARE_UPDATE_COUNTDOWN_OPTIONS.map(option => ({
+            value: String(option.seconds),
+            label: option.label,
+          }))}
+          onChange={value => onChange({ ...policy, countdownSeconds: Number(value) })}
         />
-      </div>
-      {waits ? (
-        <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
-          <CheckboxBlock
-            id={`${name}-deadline`}
-            checked={policy.deadlineEnabled}
-            onCheckedChange={deadlineEnabled => onChange({ ...policy, deadlineEnabled })}
-            label="Countdown after the deadline"
-            description="If the update still isn’t installed by the deadline, the user gets a countdown and then it installs."
-          />
-          {deadline && (
-            <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3 content-md:items-start">
-              <SecondsSelect
-                label="Deadline"
-                value={policy.deadlineSeconds}
-                options={SOFTWARE_UPDATE_DEADLINE_OPTIONS}
-                onChange={deadlineSeconds => onChange({ ...policy, deadlineSeconds })}
-              />
-              {countdown}
-            </div>
-          )}
-        </div>
-      ) : (
-        userNotifications && (
-          <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3">{countdown}</div>
-        )
       )}
     </div>
   );
@@ -227,16 +204,17 @@ export interface SoftwareUpdateSettingsFieldsProps {
   value: SoftwareUpdateSettingsValues;
   onChange: (value: SoftwareUpdateSettingsValues) => void;
   /**
-   * The devices can notify the user: Wait & notify, its deadline and the countdowns are offered. Default false, as
-   * today, when the client has no notifications: Force Update alone, with nothing to set.
+   * The devices can notify the user: the deadlines after the first try and the countdowns are offered. Default false,
+   * as today, when the client has no notifications: "Force update right away" or "Update when app closes", nothing
+   * else to set.
    */
   userNotifications?: boolean;
 }
 
 /**
- * Update Software's "Update Settings" (design 988:21462, the separate auto-update
- * rules 1034:8173): what happens on a device where the app is running, and
- * whether later releases are installed the same way.
+ * Update Software's update settings (design 1572:2004; the separate auto-update rules 1034:8173): what happens on a
+ * device where the app is running, under the timing, and whether later releases are installed the same way. No heading
+ * of their own: the deadline and the countdown read as part of when the update runs.
  */
 export function SoftwareUpdateSettingsFields({
   value: settings,
@@ -245,14 +223,9 @@ export function SoftwareUpdateSettingsFields({
 }: SoftwareUpdateSettingsFieldsProps) {
   const value = availableSoftwareUpdateSettings(settings, userNotifications);
   return (
-    <section aria-labelledby="software-update-settings" className="flex flex-col gap-[var(--spacing-system-l)]">
-      <h2 id="software-update-settings" className="pt-[var(--spacing-system-l)] text-ods-text-primary text-h2">
-        Update Settings
-      </h2>
-
+    <section aria-label="Update Settings" className="flex flex-col gap-[var(--spacing-system-l)]">
       <UpdatePolicyFields
         name="updatePolicy"
-        label="If the app is running"
         policy={value.policy}
         userNotifications={userNotifications}
         onChange={policy => onChange({ ...value, policy })}
@@ -278,10 +251,10 @@ export function SoftwareUpdateSettingsFields({
                 description={SAME_SETTINGS_DESCRIPTION[value.policy.mode]}
               />
               {!value.sameForAutoUpdate && (
-                <div className="rounded-[6px] border border-ods-border p-[var(--spacing-system-m)]">
+                <div className="flex flex-col gap-[var(--spacing-system-xsf)] rounded-[6px] border border-ods-border p-[var(--spacing-system-m)]">
+                  <span className={groupLabelClass}>For auto-updates</span>
                   <UpdatePolicyFields
                     name="autoUpdatePolicy"
-                    label="For auto-updates"
                     policy={value.autoUpdatePolicy}
                     userNotifications={userNotifications}
                     onChange={autoUpdatePolicy => onChange({ ...value, autoUpdatePolicy })}

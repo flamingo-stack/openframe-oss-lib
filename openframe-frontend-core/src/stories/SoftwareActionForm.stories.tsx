@@ -52,12 +52,15 @@ export const EmptyInstall: Story = {
   },
 };
 
-/** Update Software as it opens while the devices cannot notify the user: "Update Settings" offer Force Update alone. */
+/**
+ * Update Software as it opens while the devices cannot notify the user: "Deadline if app is open" offers Force update
+ * right away or Update when app closes, and there is no countdown.
+ */
 export const EmptyUpdate: Story = {
   args: { ...EmptyInstall.args, action: 'UPDATE', showUpdateSettings: true },
 };
 
-/** With user notifications: Wait & notify, its deadline and the countdowns, on the server's defaults. */
+/** With user notifications: every deadline and the countdown, on the server's defaults (7 days, 5 minutes). */
 export const EmptyUpdateWithNotifications: Story = {
   args: { ...EmptyUpdate.args, updateUserNotifications: true },
 };
