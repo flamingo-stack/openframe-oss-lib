@@ -242,6 +242,12 @@ public class TenantSoftwareReadModelQuery {
         row.setName(sw.getName());
         row.setSource(category.source());
         row.setFleetSource(fleetSource);
+        row.setPublisher(sw.getVendor());
+        row.setUpgradeCode(sw.getUpgradeCode());
+        row.setProductCodes(sw.getArpKeys());
+        row.setPackageFamilyNames(sw.getPackageFamilyNames());
+        row.setSystemComponent(sw.getSystemComponent());
+        row.setPackageMatch(sw.getPackageMatch());
         row.setType(type);
         row.setCurrentVersion(currentVersion);
         row.setLatestVersion(sw.getLatestVersion());

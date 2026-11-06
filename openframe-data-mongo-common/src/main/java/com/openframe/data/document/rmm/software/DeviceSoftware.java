@@ -49,5 +49,13 @@ public class DeviceSoftware implements TenantScoped {
 
     private String source;
 
+    // what the Windows programs table reports, as the OpenFrame Fleet returns it; empty for other sources
+    private String vendor;
+    private String upgradeCode;
+    private List<String> arpKeys;
+    private List<String> packageFamilyNames;
+    private Boolean systemComponent;
+    private List<String> installerTypes;
+
     private Instant updatedAt;
 }

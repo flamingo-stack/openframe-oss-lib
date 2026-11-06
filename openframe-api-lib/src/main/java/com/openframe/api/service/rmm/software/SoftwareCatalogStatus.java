@@ -3,8 +3,9 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
-import com.openframe.api.service.rmm.software.matching.PackageMatch;
-import com.openframe.api.service.rmm.software.matching.SoftwarePackageMatcher;
+import com.openframe.data.service.rmm.software.matching.InstalledProgram;
+import com.openframe.data.service.rmm.software.matching.PackageMatch;
+import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
@@ -16,6 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -49,8 +51,30 @@ public class SoftwareCatalogStatus {
             return;
         }
         Map<String, PackageCatalogEntry> brewPackages = brewPackagesByToken(rows);
-        Map<SoftwareResponse, PackageMatch> matches = packageMatcher.match(rows);
+        Map<SoftwareResponse, PackageMatch> matches = matches(rows);
         rows.forEach(row -> apply(row, brewPackages, matches));
+    }
+
+    private Map<SoftwareResponse, PackageMatch> matches(List<SoftwareResponse> rows) {
+        Map<InstalledProgram, SoftwareResponse> rowByProgram = new IdentityHashMap<>();
+        rows.forEach(row -> rowByProgram.put(programOf(row), row));
+        Map<SoftwareResponse, PackageMatch> matches = new IdentityHashMap<>();
+        packageMatcher.match(List.copyOf(rowByProgram.keySet()))
+                .forEach((program, match) -> matches.put(rowByProgram.get(program), match));
+        return matches;
+    }
+
+    static InstalledProgram programOf(SoftwareResponse row) {
+        return InstalledProgram.builder()
+                .fleetSource(row.getFleetSource())
+                .name(row.getName())
+                .publisher(row.getPublisher())
+                .upgradeCode(row.getUpgradeCode())
+                .productCodes(row.getProductCodes() == null ? List.of() : row.getProductCodes())
+                .packageFamilyNames(row.getPackageFamilyNames() == null ? List.of() : row.getPackageFamilyNames())
+                .systemComponent(Boolean.TRUE.equals(row.getSystemComponent()))
+                .storedMatch(row.getPackageMatch())
+                .build();
     }
 
     private static void apply(SoftwareResponse row, Map<String, PackageCatalogEntry> brewPackages,

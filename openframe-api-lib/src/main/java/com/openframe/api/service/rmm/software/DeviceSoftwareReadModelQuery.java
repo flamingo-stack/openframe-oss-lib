@@ -49,6 +49,12 @@ public class DeviceSoftwareReadModelQuery {
         row.setOlderVersionsCount(olderVersions);
         row.setSource(category.source());
         row.setFleetSource(fleetSource);
+        row.setPublisher(sw.getVendor());
+        row.setUpgradeCode(sw.getUpgradeCode());
+        row.setProductCodes(sw.getArpKeys());
+        row.setPackageFamilyNames(sw.getPackageFamilyNames());
+        row.setSystemComponent(sw.getSystemComponent());
+        row.setPackageMatch(sw.getPackageMatch());
         row.setType(type);
         row.setDevicesCount(sw.getDevicesCount());
         row.setVulnerabilitySummary(summary);

@@ -1,6 +1,8 @@
-package com.openframe.api.service.rmm.software.matching;
+package com.openframe.data.service.rmm.software.matching;
 
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
+import com.openframe.data.document.rmm.software.PackageMatchState;
+import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -34,5 +36,13 @@ public class PackageMatch {
 
     public boolean hasNoPackage() {
         return !candidatesFound;
+    }
+
+    public SoftwarePackageMatch toStored() {
+        if (isMatched()) {
+            return new SoftwarePackageMatch(PackageMatchState.MATCHED, entry.getManager(), entry.getPackageId());
+        }
+        return new SoftwarePackageMatch(hasNoPackage() ? PackageMatchState.NO_PACKAGE : PackageMatchState.AMBIGUOUS,
+                null, null);
     }
 }
