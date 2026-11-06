@@ -34,6 +34,14 @@ export interface DeviceRow extends DeviceNameSource {
   organizationImageUrl?: string | null;
   organizationImageHash?: string | null;
   tags?: DeviceTag[];
+  /** Who the device is tied to in a directory: PRIMARY, SHARED or NONE. The USER column reads it. */
+  directoryUserLink?: string;
+  /** The primary user's name; only PRIMARY has one. */
+  directoryUserName?: string | null;
+  /** How many users are tied to it: "N recent users" when SHARED. */
+  directoryUserCount?: number;
+  /** The directories that know the device besides the agent. The SOURCES column reads it. */
+  directorySources?: readonly string[];
   /** The viewer's unread notifications about this device. Absent or 0: no indicator. */
   unreadNotificationCount?: number;
 }
@@ -63,6 +71,10 @@ export interface DeviceFilters {
   organizationIds: DeviceFilterTag[];
   tagKeys: TagFilterOption[];
   filteredCount: number;
+  /** Behind the USER funnel; only hosts that draw the directory columns read it. */
+  userLinks?: DeviceFilterValue[];
+  /** Behind the SOURCES funnel; only hosts that draw the directory columns read it. */
+  directorySources?: DeviceFilterValue[];
 }
 
 /** What narrows a device list, in the backend's field names. */
@@ -73,4 +85,6 @@ export interface DeviceFilterInput {
   organizationIds?: string[];
   tagKeys?: string[];
   tagValues?: string[];
+  userLinks?: string[];
+  directorySources?: string[];
 }
