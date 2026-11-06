@@ -13,6 +13,7 @@ import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.util.SoftwareVersions;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
@@ -241,7 +242,7 @@ public class TenantSoftwareReadModelQuery {
         row.setId(id);
         row.setName(sw.getName());
         row.setSource(category.source());
-        row.setFleetSource(fleetSource);
+        row.setFleetSource(FleetSource.of(fleetSource));
         row.setPublisher(sw.getVendor());
         row.setUpgradeCode(sw.getUpgradeCode());
         row.setProductCodes(sw.getArpKeys());

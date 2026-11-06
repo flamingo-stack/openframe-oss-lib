@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm.software.matching;
 
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
 import lombok.Builder;
 import lombok.Getter;
@@ -12,7 +13,7 @@ import java.util.List;
 @Builder
 public class InstalledProgram {
 
-    private final String fleetSource;
+    private final FleetSource fleetSource;
     private final String name;
     private final String publisher;
     private final String upgradeCode;

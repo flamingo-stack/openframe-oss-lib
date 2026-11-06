@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm.software;
 
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -134,7 +135,7 @@ class SoftwareProjectorTest {
 
         projector.project("t1", 7L);
 
-        assertThat(program.getValue().getFleetSource()).isEqualTo("programs");
+        assertThat(program.getValue().getFleetSource()).isEqualTo(FleetSource.PROGRAMS);
         assertThat(program.getValue().getPublisher()).isEqualTo("Google LLC");
         assertThat(program.getValue().getProductCodes())
                 .containsExactly("Google Chrome", "{8A69D345-D564-463C-AFF1-A69D9E530F96}");

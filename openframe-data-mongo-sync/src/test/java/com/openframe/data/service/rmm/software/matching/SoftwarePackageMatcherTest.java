@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm.software.matching;
 
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageMatchState;
@@ -32,7 +33,7 @@ class SoftwarePackageMatcherTest {
     @Test
     void match_windowsPrograms_matchedByTheWingetMatcher() {
         // setup
-        InstalledProgram chrome = program("Google Chrome", "programs");
+        InstalledProgram chrome = program("Google Chrome", FleetSource.PROGRAMS);
         PackageMatch match = PackageMatch.noPackage();
         when(wingetMatcher.getManager()).thenReturn(PackageManagerType.WINGET);
         when(wingetMatcher.match(List.of(chrome))).thenReturn(List.of(match));
@@ -48,8 +49,8 @@ class SoftwarePackageMatcherTest {
     void match_programsNoMatcherTakes_leftOut() {
         // setup
         when(wingetMatcher.getManager()).thenReturn(PackageManagerType.WINGET);
-        List<InstalledProgram> programs = List.of(program("Google Chrome", "apps"),
-                program("googlechrome", "chocolatey_packages"), program("xz", null));
+        List<InstalledProgram> programs = List.of(program("Google Chrome", FleetSource.APPS),
+                program("googlechrome", FleetSource.CHOCOLATEY_PACKAGES), program("xz", FleetSource.OTHER));
 
         // execution
         Map<InstalledProgram, PackageMatch> matches = matcher(wingetMatcher).match(programs);
@@ -64,7 +65,7 @@ class SoftwarePackageMatcherTest {
         SoftwarePackageMatcher packageMatcher = matcher();
 
         // execution
-        Map<InstalledProgram, PackageMatch> matches = packageMatcher.match(List.of(program("Google Chrome", "programs")));
+        Map<InstalledProgram, PackageMatch> matches = packageMatcher.match(List.of(program("Google Chrome", FleetSource.PROGRAMS)));
 
         // verifications
         assertThat(matches).isEmpty();
@@ -131,13 +132,13 @@ class SoftwarePackageMatcherTest {
         return new SoftwarePackageMatcher(provider(beans), catalogRepository);
     }
 
-    private static InstalledProgram program(String name, String fleetSource) {
+    private static InstalledProgram program(String name, FleetSource fleetSource) {
         return InstalledProgram.builder().name(name).fleetSource(fleetSource).build();
     }
 
     private static InstalledProgram stored(String name, PackageMatchState state, String packageId) {
         PackageManagerType manager = packageId == null ? null : PackageManagerType.WINGET;
-        return InstalledProgram.builder().name(name).fleetSource("programs")
+        return InstalledProgram.builder().name(name).fleetSource(FleetSource.PROGRAMS)
                 .storedMatch(new SoftwarePackageMatch(state, manager, packageId))
                 .build();
     }

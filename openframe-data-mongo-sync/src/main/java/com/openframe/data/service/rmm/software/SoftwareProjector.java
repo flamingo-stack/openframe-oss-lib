@@ -1,6 +1,7 @@
 package com.openframe.data.service.rmm.software;
 
 import com.openframe.core.util.SoftwareVersions;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -77,7 +78,7 @@ public class SoftwareProjector {
     // the title's keys are the union over its devices: one program can sit under different ARP keys
     private static InstalledProgram programOf(DeviceSoftware sample, List<DeviceSoftware> installed) {
         return InstalledProgram.builder()
-                .fleetSource(sample.getSource())
+                .fleetSource(FleetSource.of(sample.getSource()))
                 .name(sample.getName())
                 .publisher(first(installed, DeviceSoftware::getVendor))
                 .upgradeCode(first(installed, DeviceSoftware::getUpgradeCode))

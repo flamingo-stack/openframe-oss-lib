@@ -10,6 +10,7 @@ import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
@@ -247,7 +248,7 @@ class TenantSoftwareReadModelQueryTest {
 
         SoftwareResponse row = query.get(TENANT, "7");
 
-        assertThat(row.getFleetSource()).isEqualTo("programs");
+        assertThat(row.getFleetSource()).isEqualTo(FleetSource.PROGRAMS);
         assertThat(row.getPublisher()).isEqualTo("Google LLC");
         assertThat(row.getUpgradeCode()).isEqualTo("{UPGRADE}");
         assertThat(row.getProductCodes()).containsExactly("Google Chrome");

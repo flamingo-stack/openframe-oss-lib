@@ -2,6 +2,7 @@ package com.openframe.data.service.rmm.software.matching;
 
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageMatchState;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
@@ -27,8 +28,8 @@ import static java.util.stream.Collectors.toSet;
 public class SoftwarePackageMatcher {
 
     // the osquery table Fleet took a row from, and the package manager that can match such a row
-    private static final Map<String, PackageManagerType> MANAGER_BY_FLEET_SOURCE =
-            Map.of("programs", PackageManagerType.WINGET);
+    private static final Map<FleetSource, PackageManagerType> MANAGER_BY_FLEET_SOURCE =
+            Map.of(FleetSource.PROGRAMS, PackageManagerType.WINGET);
 
     private final Map<PackageManagerType, PackageMatcher> matchers;
     private final PackageCatalogRepository catalogRepository;

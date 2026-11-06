@@ -29,6 +29,7 @@ import com.openframe.api.service.rmm.vulnerability.FleetGlobalVulnerabilityMappe
 import com.openframe.api.util.FleetSoftwareMapper;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.api.util.FleetVulnerabilityMapper;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -573,7 +574,7 @@ public class SoftwareInventoryService {
                 .currentVersion(installedVersion(installed))
                 .olderVersionsCount(Math.max(0, installed.size() - 1))
                 .vulnerabilitySummary(summarizeDeviceSoftware(title, inventory))
-                .fleetSource(title.getSource())
+                .fleetSource(FleetSource.of(title.getSource()))
                 .publisher(FleetSoftwareMapper.firstText(installed, HostSoftwareInstalledVersion::getVendor))
                 .upgradeCode(title.getUpgradeCode())
                 .productCodes(FleetSoftwareMapper.distinctText(installed, HostSoftwareInstalledVersion::getArpKey))
