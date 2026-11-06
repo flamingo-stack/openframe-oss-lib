@@ -16,8 +16,8 @@ export interface PdfViewerProps {
   loading?: boolean;
 }
 
-/** The header's two actions, Preview and Download: what its loading form draws. */
-const PDF_ACTIONS_SKELETON_COUNT = 2;
+/** The header's loading form: Preview and Download, the viewer's two actions. */
+const PDF_VIEWER_SKELETON_ACTIONS = 2;
 
 export function PdfViewer({ src, fileName, onPreview, onDownload, height, loading = false }: PdfViewerProps) {
   const displayName = fileName || 'PDF Document';
@@ -65,7 +65,7 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height, loadin
         </div>
       }
       src={src}
-      loadingActionCount={PDF_ACTIONS_SKELETON_COUNT}
+      loadingActionCount={PDF_VIEWER_SKELETON_ACTIONS}
       loading={loading}
       height={height}
     />

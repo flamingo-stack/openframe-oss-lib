@@ -72,8 +72,8 @@ export interface EmbedViewerFrameProps {
   loadingActionCount?: number;
 }
 
-/** The buttons the header's loading form draws when the viewer states none: one action. */
-const EMBED_ACTIONS_SKELETON_COUNT = 1;
+/** The header's loading form draws one button by default: most viewers have one action (the PDF viewer passes two). */
+export const EMBED_VIEWER_SKELETON_ACTIONS = 1;
 
 export function EmbedViewerFrame({
   icon,
@@ -92,7 +92,7 @@ export function EmbedViewerFrame({
   sandbox,
   className,
   fullscreenControl,
-  loadingActionCount = EMBED_ACTIONS_SKELETON_COUNT,
+  loadingActionCount = EMBED_VIEWER_SKELETON_ACTIONS,
 }: EmbedViewerFrameProps) {
   // ONE switch for the whole frame (header included): a page's loading scope, or the standard `loading` prop. The body
   // alone also waits while the viewer resolves where its frame points.
