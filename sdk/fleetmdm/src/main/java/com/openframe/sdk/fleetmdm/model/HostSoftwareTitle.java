@@ -18,6 +18,4 @@ public class HostSoftwareTitle {
 
     @JsonProperty("installed_versions")
     private List<HostSoftwareInstalledVersion> installedVersions;
-    @JsonProperty("upgrade_code")
-    private String upgradeCode;
 }
