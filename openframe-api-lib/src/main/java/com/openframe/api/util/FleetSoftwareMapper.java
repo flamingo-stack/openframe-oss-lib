@@ -1,5 +1,6 @@
 package com.openframe.api.util;
 
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
@@ -34,7 +35,7 @@ public class FleetSoftwareMapper {
                 .olderVersionsCount(olderVersionsCount(versions))
                 .devicesCount(title.getHostsCount())
                 .vulnerabilitySummary(rollUpVulnerabilities(versions))
-                .fleetSource(title.getSource())
+                .fleetSource(FleetSource.of(title.getSource()))
                 .publisher(firstText(versions, SoftwareTitleVersion::getVendor))
                 .upgradeCode(title.getUpgradeCode())
                 .build();

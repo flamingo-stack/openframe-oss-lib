@@ -6,6 +6,7 @@ import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
 import com.openframe.data.service.rmm.software.matching.InstalledProgram;
 import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -282,7 +283,7 @@ class SoftwareCatalogStatusTest {
 
     private static SoftwareResponse program(String name, String currentVersion) {
         SoftwareResponse program = row(name, SoftwareSource.UNMANAGED, currentVersion, 0);
-        program.setFleetSource("programs");
+        program.setFleetSource(FleetSource.PROGRAMS);
         return program;
     }
 }
