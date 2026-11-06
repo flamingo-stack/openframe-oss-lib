@@ -68,6 +68,7 @@ public class WingetCatalogFetcher {
                 .upgradeCodes(indexEntry.getUpgradeCodes())
                 .normalizedNames(indexEntry.getNormalizedNames())
                 .normalizedPublishers(indexEntry.getNormalizedPublishers())
+                .packageFamilyNames(indexEntry.getPackageFamilyNames())
                 .build();
     }
 

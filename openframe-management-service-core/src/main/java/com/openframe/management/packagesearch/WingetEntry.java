@@ -20,4 +20,5 @@ class WingetEntry {
     private final List<String> upgradeCodes;
     private final List<String> normalizedNames;
     private final List<String> normalizedPublishers;
+    private final List<String> packageFamilyNames;
 }

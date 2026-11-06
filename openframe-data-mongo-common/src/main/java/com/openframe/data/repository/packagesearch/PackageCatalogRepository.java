@@ -16,9 +16,10 @@ public interface PackageCatalogRepository extends MongoRepository<PackageCatalog
     List<PackageCatalogEntry> findByManagerAndPackageIdIn(PackageManagerType manager, Collection<String> packageIds);
 
     @Query("{ 'manager': ?0, '$or': [ { 'productCodes': { '$in': ?1 } }, { 'upgradeCodes': { '$in': ?2 } },"
-            + " { 'normalizedNames': { '$in': ?3 } } ] }")
+            + " { 'packageFamilyNames': { '$in': ?3 } }, { 'normalizedNames': { '$in': ?4 } } ] }")
     List<PackageCatalogEntry> findByManagerAndAnyMatchingKey(PackageManagerType manager, Collection<String> productCodes,
                                                              Collection<String> upgradeCodes,
+                                                             Collection<String> packageFamilyNames,
                                                              Collection<String> normalizedNames);
 
     long deleteByManagerAndUpdatedAtBefore(PackageManagerType manager, Instant updatedAt);

@@ -1,4 +1,4 @@
-package com.openframe.api.service.rmm.software.matching;
+package com.openframe.data.service.rmm.software.matching;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

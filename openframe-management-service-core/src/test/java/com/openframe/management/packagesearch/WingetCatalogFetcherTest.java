@@ -58,6 +58,7 @@ class WingetCatalogFetcherTest {
         // verifications
         assertThat(entry.getUpgradeCodes()).containsExactly(UPGRADE_CODE);
         assertThat(entry.getNormalizedNames()).containsExactly("lemonadeserver(X64)", "lemonadeserver");
+        assertThat(entry.getPackageFamilyNames()).containsExactly("amd.lemonadeserver_8wekyb3d8bbwe");
     }
 
     private static WingetEntry indexEntry(String latestVersion, String latestDisplayVersion) {
@@ -68,6 +69,7 @@ class WingetCatalogFetcherTest {
                 .latestDisplayVersion(latestDisplayVersion)
                 .upgradeCodes(List.of(UPGRADE_CODE))
                 .normalizedNames(List.of("lemonadeserver(X64)", "lemonadeserver"))
+                .packageFamilyNames(List.of("amd.lemonadeserver_8wekyb3d8bbwe"))
                 .build();
     }
 }

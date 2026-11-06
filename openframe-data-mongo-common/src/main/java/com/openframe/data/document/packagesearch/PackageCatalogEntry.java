@@ -24,6 +24,7 @@ import java.util.List;
 @CompoundIndexes({
         @CompoundIndex(name = "manager_productCodes", def = "{'manager': 1, 'productCodes': 1}"),
         @CompoundIndex(name = "manager_upgradeCodes", def = "{'manager': 1, 'upgradeCodes': 1}"),
+        @CompoundIndex(name = "manager_packageFamilyNames", def = "{'manager': 1, 'packageFamilyNames': 1}"),
         @CompoundIndex(name = "manager_normalizedNames", def = "{'manager': 1, 'normalizedNames': 1}")
 })
 @TypeAlias("packageCatalogEntry")
@@ -49,6 +50,7 @@ public class PackageCatalogEntry {
     // winget: lower-case keys it matches an installed program by, as its index keeps them
     private List<String> productCodes;
     private List<String> upgradeCodes;
+    private List<String> packageFamilyNames;
     private List<String> normalizedNames;
     private List<String> normalizedPublishers;
     private Instant updatedAt;

@@ -574,7 +574,11 @@ public class SoftwareInventoryService {
                 .olderVersionsCount(Math.max(0, installed.size() - 1))
                 .vulnerabilitySummary(summarizeDeviceSoftware(title, inventory))
                 .fleetSource(title.getSource())
+                .publisher(FleetSoftwareMapper.firstText(installed, HostSoftwareInstalledVersion::getVendor))
                 .upgradeCode(title.getUpgradeCode())
+                .productCodes(FleetSoftwareMapper.distinctText(installed, HostSoftwareInstalledVersion::getArpKey))
+                .packageFamilyNames(FleetSoftwareMapper.distinctText(installed, HostSoftwareInstalledVersion::getPackageFamilyName))
+                .systemComponent(FleetSoftwareMapper.allFlagged(installed, HostSoftwareInstalledVersion::getSystemComponent))
                 .build();
     }
 

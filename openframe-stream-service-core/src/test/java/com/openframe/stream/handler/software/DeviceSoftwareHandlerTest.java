@@ -195,4 +195,53 @@ class DeviceSoftwareHandlerTest {
         verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS);
         verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, 555L);
     }
+
+    @Test
+    void handle_reconcile_keepsWhatTheWindowsProgramsTableReports() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        HostSoftwareTitle chrome = title(42L, "Google Chrome", "programs", "130.0", "129.0");
+        chrome.setUpgradeCode("{UPGRADE}");
+        HostSoftwareInstalledVersion exe = chrome.getInstalledVersions().get(0);
+        exe.setVendor("Google LLC");
+        exe.setArpKey("Google Chrome");
+        exe.setInstallerType("exe");
+        exe.setSystemComponent(false);
+        HostSoftwareInstalledVersion msi = chrome.getInstalledVersions().get(1);
+        msi.setArpKey("{8A69D345-D564-463C-AFF1-A69D9E530F96}");
+        msi.setPackageFamilyName("");
+        msi.setInstallerType("msi");
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(chrome));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
+                .thenReturn(Optional.empty());
+
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
+        verify(deviceSoftwareRepository).save(captor.capture());
+        DeviceSoftware saved = captor.getValue();
+        assertThat(saved.getUpgradeCode()).isEqualTo("{UPGRADE}");
+        assertThat(saved.getVendor()).isEqualTo("Google LLC");
+        assertThat(saved.getArpKeys()).containsExactly("Google Chrome", "{8A69D345-D564-463C-AFF1-A69D9E530F96}");
+        assertThat(saved.getPackageFamilyNames()).isEmpty();
+        assertThat(saved.getInstallerTypes()).containsExactly("exe", "msi");
+        assertThat(saved.getSystemComponent()).isFalse();
+    }
+
+    @Test
+    void handle_reconcile_noVersionReportsTheFlag_systemComponentUnknown() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS))
+                .thenReturn(List.of(title(42L, "Slack", "apps", "4.0")));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
+                .thenReturn(Optional.empty());
+
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
+        verify(deviceSoftwareRepository).save(captor.capture());
+        assertThat(captor.getValue().getSystemComponent()).isNull();
+        assertThat(captor.getValue().getVendor()).isNull();
+    }
 }

@@ -34,4 +34,47 @@ class FleetSoftwareMapperTest {
         v.setVersion(version);
         return v;
     }
+
+    @Test
+    void toResponse_windowsProgram_keysFromItsVersions() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(7L);
+        title.setName("Google Chrome");
+        title.setSource("programs");
+        title.setUpgradeCode("{UPGRADE}");
+        SoftwareTitleVersion exe = new SoftwareTitleVersion();
+        exe.setVersion("130.0");
+        exe.setVendor("Google LLC");
+        exe.setArpKey("Google Chrome");
+        exe.setSystemComponent(false);
+        SoftwareTitleVersion msi = new SoftwareTitleVersion();
+        msi.setVersion("129.0");
+        msi.setArpKey("{8A69D345-D564-463C-AFF1-A69D9E530F96}");
+        msi.setPackageFamilyName("");
+        title.setVersions(List.of(exe, msi));
+
+        SoftwareResponse row = FleetSoftwareMapper.toResponse(title);
+
+        assertThat(row.getPublisher()).isEqualTo("Google LLC");
+        assertThat(row.getUpgradeCode()).isEqualTo("{UPGRADE}");
+        assertThat(row.getProductCodes()).containsExactly("Google Chrome", "{8A69D345-D564-463C-AFF1-A69D9E530F96}");
+        assertThat(row.getPackageFamilyNames()).isEmpty();
+        assertThat(row.getSystemComponent()).isFalse();
+    }
+
+    @Test
+    void toResponse_noVersionReportsTheFlag_systemComponentUnknown() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setName("Slack");
+        title.setSource("apps");
+        SoftwareTitleVersion version = new SoftwareTitleVersion();
+        version.setVersion("4.0");
+        title.setVersions(List.of(version));
+
+        SoftwareResponse row = FleetSoftwareMapper.toResponse(title);
+
+        assertThat(row.getSystemComponent()).isNull();
+        assertThat(row.getPublisher()).isNull();
+        assertThat(row.getProductCodes()).isEmpty();
+    }
 }

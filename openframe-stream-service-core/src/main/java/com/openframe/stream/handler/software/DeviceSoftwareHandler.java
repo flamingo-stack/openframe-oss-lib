@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
@@ -117,6 +118,12 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftware.setName(title.getName());
             deviceSoftware.setSource(title.getSource());
             deviceSoftware.setVersions(versionsOf(title));
+            deviceSoftware.setUpgradeCode(title.getUpgradeCode());
+            deviceSoftware.setVendor(firstOf(title, HostSoftwareInstalledVersion::getVendor));
+            deviceSoftware.setArpKeys(valuesOf(title, HostSoftwareInstalledVersion::getArpKey));
+            deviceSoftware.setPackageFamilyNames(valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName));
+            deviceSoftware.setInstallerTypes(valuesOf(title, HostSoftwareInstalledVersion::getInstallerType));
+            deviceSoftware.setSystemComponent(systemComponentOf(title));
             deviceSoftware.setVulnerabilities(vulnerabilities);
             deviceSoftware.setUpdatedAt(now);
             deviceSoftwareRepository.save(deviceSoftware);
@@ -144,6 +151,25 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+    }
+
+    private static String firstOf(HostSoftwareTitle title, Function<HostSoftwareInstalledVersion, String> value) {
+        return installedVersionsOf(title).stream().map(value).filter(v -> !isBlank(v)).findFirst().orElse(null);
+    }
+
+    private static List<String> valuesOf(HostSoftwareTitle title, Function<HostSoftwareInstalledVersion, String> value) {
+        return installedVersionsOf(title).stream().map(value).filter(v -> !isBlank(v)).distinct().toList();
+    }
+
+    // null until a version reports the flag; true only when every reporting version has it set
+    private static Boolean systemComponentOf(HostSoftwareTitle title) {
+        List<Boolean> flags = installedVersionsOf(title).stream()
+                .map(HostSoftwareInstalledVersion::getSystemComponent).filter(Objects::nonNull).toList();
+        return flags.isEmpty() ? null : flags.stream().allMatch(Boolean::booleanValue);
+    }
+
+    private static List<HostSoftwareInstalledVersion> installedVersionsOf(HostSoftwareTitle title) {
+        return title.getInstalledVersions() == null ? List.of() : title.getInstalledVersions();
     }
 
     private static List<String> vulnerabilitiesOf(HostSoftwareTitle title) {

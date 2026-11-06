@@ -33,6 +33,7 @@ class WingetIndexReader {
     private static final String NORMALIZED_NAMES_QUERY = "SELECT package, norm_name FROM norm_names2";
     private static final String PRODUCT_CODES_QUERY = "SELECT package, productcode FROM productcodes2";
     private static final String NORMALIZED_PUBLISHERS_QUERY = "SELECT package, norm_publisher FROM norm_publishers2";
+    private static final String PACKAGE_FAMILY_NAMES_QUERY = "SELECT package, pfn FROM pfns2";
 
     List<WingetEntry> read(byte[] msixBytes) {
         Path tempMsix;
@@ -87,7 +88,8 @@ class WingetIndexReader {
                     readValuesByPackage(connection, PRODUCT_CODES_QUERY),
                     readValuesByPackage(connection, UPGRADE_CODES_QUERY),
                     readValuesByPackage(connection, NORMALIZED_NAMES_QUERY),
-                    readValuesByPackage(connection, NORMALIZED_PUBLISHERS_QUERY));
+                    readValuesByPackage(connection, NORMALIZED_PUBLISHERS_QUERY),
+                    readValuesByPackage(connection, PACKAGE_FAMILY_NAMES_QUERY));
             return readEntries(connection, keys);
         }
     }
@@ -138,6 +140,7 @@ class WingetIndexReader {
                 .upgradeCodes(keys.of(keys.getUpgradeCodes(), rowId))
                 .normalizedNames(keys.of(keys.getNormalizedNames(), rowId))
                 .normalizedPublishers(keys.of(keys.getNormalizedPublishers(), rowId))
+                .packageFamilyNames(keys.of(keys.getPackageFamilyNames(), rowId))
                 .build();
     }
 
@@ -149,6 +152,7 @@ class WingetIndexReader {
         private final Map<Long, List<String>> upgradeCodes;
         private final Map<Long, List<String>> normalizedNames;
         private final Map<Long, List<String>> normalizedPublishers;
+        private final Map<Long, List<String>> packageFamilyNames;
 
         List<String> of(Map<Long, List<String>> keysByPackage, long rowId) {
             return keysByPackage.getOrDefault(rowId, List.of());

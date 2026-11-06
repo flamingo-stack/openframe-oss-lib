@@ -3,8 +3,9 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
-import com.openframe.api.service.rmm.software.matching.PackageMatch;
-import com.openframe.api.service.rmm.software.matching.SoftwarePackageMatcher;
+import com.openframe.data.service.rmm.software.matching.InstalledProgram;
+import com.openframe.data.service.rmm.software.matching.PackageMatch;
+import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -23,6 +24,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -260,9 +262,14 @@ class SoftwareCatalogStatusTest {
     }
 
     private void stubMatch(SoftwareResponse row, PackageMatch match) {
-        Map<SoftwareResponse, PackageMatch> matches = new IdentityHashMap<>();
-        matches.put(row, match);
-        when(packageMatcher.match(List.of(row))).thenReturn(matches);
+        when(packageMatcher.match(anyList())).thenAnswer(invocation -> {
+            List<InstalledProgram> programs = invocation.getArgument(0);
+            Map<InstalledProgram, PackageMatch> matches = new IdentityHashMap<>();
+            programs.stream()
+                    .filter(program -> row.getName().equals(program.getName()))
+                    .forEach(program -> matches.put(program, match));
+            return matches;
+        });
     }
 
     private static PackageCatalogEntry wingetPackage(String id, String version) {

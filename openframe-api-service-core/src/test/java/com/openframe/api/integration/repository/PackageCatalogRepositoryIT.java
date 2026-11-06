@@ -239,7 +239,7 @@ class PackageCatalogRepositoryIT {
     }
 
     @Test
-    void findByManagerAndAnyMatchingKey_anyOfTheThreeKeys_onePackageOnce() {
+    void findByManagerAndAnyMatchingKey_anyOfTheFourKeys_onePackageOnce() {
         // setup
         PackageCatalogRepository catalog = springRepository();
         PackageCatalogEntry chrome = winget("Google.Chrome", "Google Chrome");
@@ -249,18 +249,21 @@ class PackageCatalogRepositoryIT {
         acrobat.setUpgradeCodes(List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"));
         PackageCatalogEntry git = winget("Git.Git", "Git");
         git.setNormalizedNames(List.of("git"));
+        PackageCatalogEntry xaml = winget("Microsoft.UI.Xaml.2.8", "Microsoft.UI.Xaml.2.8");
+        xaml.setPackageFamilyNames(List.of("microsoft.ui.xaml.2.8_8wekyb3d8bbwe"));
         PackageCatalogEntry brewGit = brew("git", "git", 1, null);
         brewGit.setNormalizedNames(List.of("git"));
-        repository.upsertAll(List.of(chrome, acrobat, git, brewGit));
+        repository.upsertAll(List.of(chrome, acrobat, git, xaml, brewGit));
 
         // execution
         List<PackageCatalogEntry> found = catalog.findByManagerAndAnyMatchingKey(WINGET, List.of("google chrome"),
-                List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"), List.of("googlechrome", "git"));
+                List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"), List.of("microsoft.ui.xaml.2.8_8wekyb3d8bbwe"),
+                List.of("googlechrome", "git"));
 
         // verifications
         assertThat(found)
                 .extracting(PackageCatalogEntry::getPackageId)
-                .containsExactlyInAnyOrder("Google.Chrome", "Adobe.Acrobat.Reader.64-bit", "Git.Git");
+                .containsExactlyInAnyOrder("Google.Chrome", "Adobe.Acrobat.Reader.64-bit", "Microsoft.UI.Xaml.2.8", "Git.Git");
     }
 
     @Test
@@ -271,7 +274,8 @@ class PackageCatalogRepositoryIT {
         new MongoPersistentEntityIndexResolver(mappingContext).resolveIndexFor(PackageCatalogEntry.class)
                 .forEach(indexes::ensureIndex);
         Document query = Document.parse("{ 'manager': 'WINGET', '$or': [ { 'productCodes': { '$in': ['a'] } },"
-                + " { 'upgradeCodes': { '$in': ['b'] } }, { 'normalizedNames': { '$in': ['c'] } } ] }");
+                + " { 'upgradeCodes': { '$in': ['b'] } }, { 'packageFamilyNames': { '$in': ['d'] } },"
+                + " { 'normalizedNames': { '$in': ['c'] } } ] }");
 
         // execution
         Document plan = mongoTemplate.getDb().runCommand(new Document("explain",
@@ -279,7 +283,7 @@ class PackageCatalogRepositoryIT {
 
         // verifications
         assertThat(plan.toJson()).doesNotContain("COLLSCAN").contains("manager_productCodes",
-                "manager_upgradeCodes", "manager_normalizedNames");
+                "manager_upgradeCodes", "manager_packageFamilyNames", "manager_normalizedNames");
     }
 
     private static PackageCatalogRepository springRepository() {

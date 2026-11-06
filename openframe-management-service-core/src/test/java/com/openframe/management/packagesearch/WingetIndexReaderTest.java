@@ -55,9 +55,9 @@ class WingetIndexReaderTest {
         // verifications
         assertThat(entries)
                 .extracting(WingetEntry::getLatestDisplayVersion, WingetEntry::getProductCodes, WingetEntry::getUpgradeCodes,
-                        WingetEntry::getNormalizedNames, WingetEntry::getNormalizedPublishers)
+                        WingetEntry::getNormalizedNames, WingetEntry::getNormalizedPublishers, WingetEntry::getPackageFamilyNames)
                 .containsExactly(tuple("154.0.1.9001", List.of("mozilla firefox 154.0.1 (x64 en-us)"), List.of(UPGRADE_CODE),
-                        List.of("mozillafirefox", "mozillafirefox(X64)"), List.of("mozilla")));
+                        List.of("mozillafirefox", "mozillafirefox(X64)"), List.of("mozilla"), List.of("mozilla.firefox_n80bbvh6b1yt2")));
     }
 
     @Test
@@ -97,6 +97,7 @@ class WingetIndexReaderTest {
             statement.execute("INSERT INTO norm_names2(norm_name, package) VALUES ('mozillafirefox(X64)', 1)");
             statement.execute("INSERT INTO productcodes2(productcode, package) VALUES ('mozilla firefox 154.0.1 (x64 en-us)', 1)");
             statement.execute("INSERT INTO norm_publishers2(norm_publisher, package) VALUES ('mozilla', 1)");
+            statement.execute("INSERT INTO pfns2(pfn, package) VALUES ('mozilla.firefox_n80bbvh6b1yt2', 1)");
         }
         return db;
     }
@@ -115,6 +116,8 @@ class WingetIndexReaderTest {
                     + "PRIMARY KEY(productcode, package)) WITHOUT ROWID");
             statement.execute("CREATE TABLE norm_publishers2(norm_publisher TEXT NOT NULL, package INT64 NOT NULL, "
                     + "PRIMARY KEY(norm_publisher, package)) WITHOUT ROWID");
+            statement.execute("CREATE TABLE pfns2(pfn TEXT NOT NULL, package INT64 NOT NULL, "
+                    + "PRIMARY KEY(pfn, package)) WITHOUT ROWID");
         }
     }
 

@@ -1,4 +1,4 @@
-package com.openframe.api.service.rmm.software.matching;
+package com.openframe.data.service.rmm.software.matching;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

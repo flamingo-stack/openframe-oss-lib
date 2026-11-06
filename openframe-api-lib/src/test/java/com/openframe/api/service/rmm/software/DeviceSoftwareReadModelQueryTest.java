@@ -5,6 +5,8 @@ import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareType;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
+import com.openframe.data.document.rmm.software.PackageMatchState;
+import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -60,5 +62,20 @@ class DeviceSoftwareReadModelQueryTest {
         assertThat(query.rowsForDevice("t1", "m1", "chrome")).extracting(SoftwareResponse::getName)
                 .containsExactly("Google Chrome");
         assertThat(query.rowsForDevice("t1", "m1", " ")).hasSize(3);
+    }
+
+    @Test
+    void rowsForDevice_carriesTheProgramKeysAndTheStoredMatch() {
+        Software chrome = software(3L, "Google Chrome", "programs", on("m1", "130.0"));
+        chrome.setVendor("Google LLC");
+        chrome.setArpKeys(List.of("Google Chrome"));
+        chrome.setPackageMatch(new SoftwarePackageMatch(PackageMatchState.NO_PACKAGE, null, null));
+        when(softwareRepository.findByTenantIdAndInstallationsMachineId("t1", "m1")).thenReturn(List.of(chrome));
+
+        SoftwareResponse row = query.rowsForDevice("t1", "m1", null).getFirst();
+
+        assertThat(row.getPublisher()).isEqualTo("Google LLC");
+        assertThat(row.getProductCodes()).containsExactly("Google Chrome");
+        assertThat(row.getPackageMatch().getState()).isEqualTo(PackageMatchState.NO_PACKAGE);
     }
 }
