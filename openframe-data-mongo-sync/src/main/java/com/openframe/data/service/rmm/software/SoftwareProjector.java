@@ -35,7 +35,7 @@ public class SoftwareProjector {
         if (tenantId == null || softwareTitleId == null) {
             return;
         }
-        List<DeviceSoftware> installed = deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId(tenantId, softwareTitleId);
+        List<DeviceSoftware> installed = deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue(tenantId, softwareTitleId);
         if (installed.isEmpty()) {
             softwareRepository.deleteByTenantIdAndSoftwareTitleId(tenantId, softwareTitleId);
             return;

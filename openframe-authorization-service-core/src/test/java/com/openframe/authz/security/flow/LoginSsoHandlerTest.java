@@ -2,6 +2,7 @@ package com.openframe.authz.security.flow;
 
 import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
 import com.openframe.authz.dto.Touchpoint;
+import com.openframe.authz.dto.Visit;
 import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
@@ -257,12 +258,12 @@ class LoginSsoHandlerTest {
     }
 
     @Test
-    void handle_unknownAppUserWithSourceCookie_parksCookieSourceInTicket() throws Exception {
+    void handle_unknownAppUserWithDownloadCookie_parksCookieSourceInTicket() throws Exception {
         when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.empty());
         when(ssoOidcUserService.autoProvisionTenantForDomain("ada@acme.com")).thenReturn(Optional.empty());
         when(ssoIdentityService.subjectOf(eq("google"), anyMap())).thenReturn(Optional.of("g-1"));
         when(signupTicketService.create("ada@acme.com", "Ada", "", "google", true, "g-1",
-                Touchpoint.builder().downloadId("dl-1").utmSource("producthunt").build()))
+                Touchpoint.builder().downloadId("dl-1").lastVisit(Visit.builder().utmSource("producthunt").build()).build()))
                 .thenReturn("ticket/1");
         MockHttpServletRequest request = request("com.openframe.app://auth", true);
         request.setCookies(loginCookie("com.openframe.app://auth", true),

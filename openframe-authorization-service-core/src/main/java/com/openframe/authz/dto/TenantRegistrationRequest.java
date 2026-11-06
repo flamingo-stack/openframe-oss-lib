@@ -52,6 +52,9 @@ public class TenantRegistrationRequest extends CoreUserRequest {
 
     private Touchpoint attribution;
 
+    @JsonIgnore
+    private Touchpoint downloadCookie;
+
     /**
      * Set by the SSO signup flow when the identity provider has already verified the email
      * (claim-aware). Never bound from the HTTP request: the JSON registration endpoint receives
