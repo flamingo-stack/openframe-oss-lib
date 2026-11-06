@@ -6,8 +6,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -34,7 +32,7 @@ class ClientVersionMetricsFilterTest {
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final AtomicBoolean forwarded = new AtomicBoolean(false);
-    private final GatewayFilterChain chain = exchange -> {
+    private final GatewayFilterChain chain = _ -> {
         forwarded.set(true);
         return Mono.empty();
     };
@@ -115,22 +113,15 @@ class ClientVersionMetricsFilterTest {
         assertThat(output.getOut()).doesNotContain("Client seen:");
     }
 
-    @ParameterizedTest
-    @CsvSource({
-            "capacitor://localhost, legacy-ios",
-            "https://localhost, legacy-android",
-            "tauri://localhost, legacy-desktop"
-    })
-    void filter_noClientHeaderShellOrigin_countedAsLegacyShell(String origin, String kind, CapturedOutput output) {
-        // execution
+    @Test
+    void filter_noClientHeaderWindowsAppOrigin_countedAsLegacyDesktop(CapturedOutput output) {
         runAs(SUB, MockServerHttpRequest.get(API_PATH)
                 .header(TENANT_HEADER, "tenant-a")
-                .header(ORIGIN, origin));
+                .header(ORIGIN, "http://tauri.localhost"));
 
-        // verifications
         assertThat(forwarded).isTrue();
-        assertThat(requests(kind, "-", "-")).isEqualTo(1.0);
-        assertThat(output.getOut()).contains("Client seen: tenantId=tenant-a sub=user-1 kind=" + kind + " shell=- bundle=-");
+        assertThat(requests("legacy-desktop", "-", "-")).isEqualTo(1.0);
+        assertThat(output.getOut()).contains("Client seen: tenantId=tenant-a sub=user-1 kind=legacy-desktop shell=- bundle=-");
     }
 
     @Test

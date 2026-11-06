@@ -2,9 +2,9 @@ package com.openframe.core.constants;
 
 import java.util.List;
 
-public final class SignupSourceParams {
+public final class DownloadParams {
 
-    private SignupSourceParams() {
+    private DownloadParams() {
     }
 
     public static final String COOKIE = "of_src";
@@ -17,13 +17,24 @@ public final class SignupSourceParams {
     public static final String UTM_TERM = "utm_term";
     public static final String FBCLID = "fbclid";
     public static final String GCLID = "gclid";
+    public static final String GBRAID = "gbraid";
+    public static final String WBRAID = "wbraid";
     public static final String RDT_CID = "rdt_cid";
     public static final String LI_FAT_ID = "li_fat_id";
+    public static final String FBC = "fbc";
+    public static final String FBP = "fbp";
+    public static final String RDT_UUID = "rdt_uuid";
     public static final String REF = "ref";
     public static final String REFERRER = "referrer";
     public static final String LANDING_URL = "landing_url";
+    public static final String LANDED_AT = "landed_at";
+    public static final String CLICKED_AT = "clicked_at";
+    public static final String FIRST_VISIT = "first_visit";
+    public static final String LAST_VISIT = "last_visit";
+    public static final String LATEST_CLICKS_META = "latest_clicks.meta";
+    public static final String LATEST_CLICKS_GOOGLE = "latest_clicks.google";
+    public static final String LATEST_CLICKS_REDDIT = "latest_clicks.reddit";
+    public static final String LATEST_CLICKS_LINKEDIN = "latest_clicks.linkedin";
 
-    public static final List<String> SOURCE = List.of(UTM_SOURCE, UTM_MEDIUM, UTM_CAMPAIGN, UTM_CONTENT, UTM_TERM,
-            FBCLID, GCLID, RDT_CID, LI_FAT_ID, REF, REFERRER, LANDING_URL);
     public static final List<String> URLS = List.of(REFERRER, LANDING_URL);
 }
