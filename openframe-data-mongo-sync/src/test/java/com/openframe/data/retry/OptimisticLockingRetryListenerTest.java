@@ -5,8 +5,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.retry.support.RetryTemplate;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +23,7 @@ class OptimisticLockingRetryListenerTest {
 
     private final RetryTemplate retryTemplate = RetryTemplate.builder()
             .maxAttempts(3)
-            .retryOn(OptimisticLockingFailureException.class)
+            .retryOn(List.of(OptimisticLockingFailureException.class, TransientDataAccessResourceException.class))
             .noBackoff()
             .withListener(new OptimisticLockingRetryListener())
             .build();
@@ -49,6 +51,15 @@ class OptimisticLockingRetryListenerTest {
 
         assertThat(output.toString().split(EXHAUSTED, -1)).hasSize(2);
         assertThat(output).contains(OptimisticLockingRetryListener.UPDATE_NOT_SAVED_MARKER);
+    }
+
+    @Test
+    void aFailoverUntilTheLastAttempt_logsTheUpdateAsNotSaved(CapturedOutput output) {
+        assertThatThrownBy(() -> retryTemplate.execute(context -> {
+            throw new TransientDataAccessResourceException("primary stepped down");
+        })).isInstanceOf(TransientDataAccessResourceException.class);
+
+        assertThat(output).contains(ATTEMPT_FAILED, OptimisticLockingRetryListener.UPDATE_NOT_SAVED_MARKER);
     }
 
     @Test

@@ -2,12 +2,13 @@ package com.openframe.data.retry;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.RetryContext;
 import org.springframework.retry.RetryListener;
 import org.springframework.stereotype.Component;
 
-// Logs only conflicts: "OLE retry exhausted" must mean a lost background update, never another exception of the method.
+// Logs only what it retries, conflicts and failovers: "retry exhausted" must mean a lost background update, never another exception.
 @Slf4j
 @Component("optimisticLockingRetryListener")
 public class OptimisticLockingRetryListener implements RetryListener {
@@ -20,7 +21,7 @@ public class OptimisticLockingRetryListener implements RetryListener {
     public <T, E extends Throwable> void onError(RetryContext context,
                                                  RetryCallback<T, E> callback,
                                                  Throwable throwable) {
-        if (!(throwable instanceof OptimisticLockingFailureException)) {
+        if (!isRetried(throwable)) {
             return;
         }
         int attempt = context.getRetryCount();
@@ -39,9 +40,14 @@ public class OptimisticLockingRetryListener implements RetryListener {
         String method = String.valueOf(context.getAttribute(METHOD_NAME_KEY));
         if (throwable == null) {
             log.info("OLE retry succeeded on {} after {} retry(ies)", method, attempts);
-        } else if (throwable instanceof OptimisticLockingFailureException) {
+        } else if (isRetried(throwable)) {
             log.error("{} OLE retry exhausted on {} after {} retry(ies), update not saved: {}",
                     UPDATE_NOT_SAVED_MARKER, method, attempts, throwable.toString());
         }
+    }
+
+    private static boolean isRetried(Throwable throwable) {
+        return throwable instanceof OptimisticLockingFailureException
+            || throwable instanceof TransientDataAccessResourceException;
     }
 }
