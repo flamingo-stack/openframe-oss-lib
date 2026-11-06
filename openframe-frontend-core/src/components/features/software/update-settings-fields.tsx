@@ -71,49 +71,60 @@ export const DEFAULT_SOFTWARE_UPDATE_SETTINGS: SoftwareUpdateSettingsValues = {
   autoUpdatePolicy: DEFAULT_SOFTWARE_UPDATE_POLICY,
 };
 
+/** Force Update, with a 7-day deadline ready for when Wait is picked: what the form opens with without notifications. */
+const FORCE_UPDATE_POLICY: SoftwareUpdatePolicy = {
+  ...DEFAULT_SOFTWARE_UPDATE_POLICY,
+  mode: 'FORCE',
+  deadlineEnabled: false,
+};
+
 /**
- * Without user notifications there is no one to wait for and no countdown to show: an update on a device where the
- * app is running closes it and updates. Wait & notify falls back to Force Update, and its deadline goes with it;
- * `countdownSeconds` is kept, since the input requires it.
+ * What the form opens with. With user notifications, the server's own defaults. Without them, Force Update: an app is
+ * never closed unannounced a week later, and nobody is promised a prompt that cannot be shown.
  */
-function forceWithoutNotifications(policy: SoftwareUpdatePolicy): SoftwareUpdatePolicy {
-  return policy.mode === 'FORCE' && !policy.deadlineEnabled
-    ? policy
-    : { ...policy, mode: 'FORCE', deadlineEnabled: false };
+export function defaultSoftwareUpdateSettings(userNotifications: boolean): SoftwareUpdateSettingsValues {
+  if (userNotifications) return DEFAULT_SOFTWARE_UPDATE_SETTINGS;
+  return { ...DEFAULT_SOFTWARE_UPDATE_SETTINGS, policy: FORCE_UPDATE_POLICY, autoUpdatePolicy: FORCE_UPDATE_POLICY };
 }
 
 /**
- * The settings as the form can offer them: unchanged with user notifications, Force Update for both policies without
- * them (a draft or a saved policy on Wait & notify reads as Force Update). What the fields draw and the form submits.
+ * The two modes and their deadline, worded by what the device can do. With user notifications the user is asked and
+ * warned. Without them nothing is shown on the device: Wait waits until the user closes the app, a deadline closes it
+ * without warning, and Force closes it at once. The countdown is then a silent pause before the close, so it is not
+ * offered; `countdownSeconds` still goes out, since the input requires it.
  */
-export function availableSoftwareUpdateSettings(
-  settings: SoftwareUpdateSettingsValues,
-  userNotifications: boolean,
-): SoftwareUpdateSettingsValues {
-  if (userNotifications) return settings;
-  const policy = forceWithoutNotifications(settings.policy);
-  const autoUpdatePolicy = forceWithoutNotifications(settings.autoUpdatePolicy);
-  return policy === settings.policy && autoUpdatePolicy === settings.autoUpdatePolicy
-    ? settings
-    : { ...settings, policy, autoUpdatePolicy };
+interface ModeCopy {
+  wait: RadioGroupBlockOption;
+  force: RadioGroupBlockOption;
+  deadline: { label: string; description: string };
 }
 
-const WAIT_OPTION: RadioGroupBlockOption = {
-  value: 'WAIT',
-  label: 'Wait & notify',
-  description: 'The user gets Update now or Ask Later. If they close the app, it updates then.',
-};
-
-const FORCE_OPTION: RadioGroupBlockOption = {
-  value: 'FORCE',
-  label: 'Force Update',
-  description: 'The user gets a short countdown, then the app closes and updates.',
-};
-
-/** Force Update with no countdown first: what a device does while there are no user notifications. */
-const FORCE_ONLY_OPTION: RadioGroupBlockOption = {
-  ...FORCE_OPTION,
-  description: 'The app closes and updates.',
+const MODE_COPY: Record<'notified' | 'silent', ModeCopy> = {
+  notified: {
+    wait: {
+      value: 'WAIT',
+      label: 'Wait & notify',
+      description: 'The user gets Update now or Ask Later. If they close the app, it updates then.',
+    },
+    force: {
+      value: 'FORCE',
+      label: 'Force Update',
+      description: 'The user gets a short countdown, then the app closes and updates.',
+    },
+    deadline: {
+      label: 'Countdown after the deadline',
+      description:
+        'If the update still isn’t installed by the deadline, the user gets a countdown and then it installs.',
+    },
+  },
+  silent: {
+    wait: { value: 'WAIT', label: 'Wait', description: 'The update waits until the user closes the app.' },
+    force: { value: 'FORCE', label: 'Force Update', description: 'The app closes and updates.' },
+    deadline: {
+      label: 'Close the app after a deadline',
+      description: 'If the app is still open by the deadline, it is closed without warning and updated.',
+    },
+  },
 };
 
 const SAME_SETTINGS_DESCRIPTION: Record<SoftwareUpdateMode, string> = {
@@ -165,13 +176,14 @@ function UpdatePolicyFields({
   name: string;
   label: string;
   policy: SoftwareUpdatePolicy;
-  /** Off, Force Update is the only choice and it has no countdown to set. */
+  /** Off, the choices say what the device does with nobody told, and there is no countdown to set. */
   userNotifications: boolean;
   onChange: (policy: SoftwareUpdatePolicy) => void;
 }) {
+  const copy = MODE_COPY[userNotifications ? 'notified' : 'silent'];
   const waits = policy.mode === 'WAIT';
   const deadline = waits && policy.deadlineEnabled;
-  const countdown = (
+  const countdown = userNotifications && (
     <SecondsSelect
       label="Countdown"
       value={policy.countdownSeconds}
@@ -189,7 +201,7 @@ function UpdatePolicyFields({
           variant="grouped"
           value={policy.mode}
           onValueChange={mode => onChange({ ...policy, mode: mode as SoftwareUpdateMode })}
-          options={userNotifications ? [WAIT_OPTION, FORCE_OPTION] : [FORCE_ONLY_OPTION]}
+          options={[copy.wait, copy.force]}
           itemClassName="py-[var(--spacing-system-sf)]"
         />
       </div>
@@ -199,8 +211,8 @@ function UpdatePolicyFields({
             id={`${name}-deadline`}
             checked={policy.deadlineEnabled}
             onCheckedChange={deadlineEnabled => onChange({ ...policy, deadlineEnabled })}
-            label="Countdown after the deadline"
-            description="If the update still isn’t installed by the deadline, the user gets a countdown and then it installs."
+            label={copy.deadline.label}
+            description={copy.deadline.description}
           />
           {deadline && (
             <div className="grid grid-cols-1 gap-[var(--spacing-system-lf)] content-md:grid-cols-3 content-md:items-start">
@@ -227,8 +239,9 @@ export interface SoftwareUpdateSettingsFieldsProps {
   value: SoftwareUpdateSettingsValues;
   onChange: (value: SoftwareUpdateSettingsValues) => void;
   /**
-   * The devices can notify the user: Wait & notify, its deadline and the countdowns are offered. Default false, as
-   * today, when the client has no notifications: Force Update alone, with nothing to set.
+   * The devices can notify the user: Wait & notify, its countdown after the deadline and the countdowns. Default false,
+   * as today, when the client has no notifications: Wait (until the user closes the app, or a deadline closes it without
+   * warning) or Force Update, and no countdown.
    */
   userNotifications?: boolean;
 }
@@ -239,11 +252,10 @@ export interface SoftwareUpdateSettingsFieldsProps {
  * whether later releases are installed the same way.
  */
 export function SoftwareUpdateSettingsFields({
-  value: settings,
+  value,
   onChange,
   userNotifications = false,
 }: SoftwareUpdateSettingsFieldsProps) {
-  const value = availableSoftwareUpdateSettings(settings, userNotifications);
   return (
     <section aria-labelledby="software-update-settings" className="flex flex-col gap-[var(--spacing-system-l)]">
       <h2 id="software-update-settings" className="pt-[var(--spacing-system-l)] text-ods-text-primary text-h2">

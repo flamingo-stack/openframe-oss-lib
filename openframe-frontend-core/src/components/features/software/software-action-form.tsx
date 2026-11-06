@@ -10,8 +10,7 @@ import { SOFTWARE_ACTION_COPY, type SoftwareActionKind } from './software-action
 import { newSoftwareRow, type SoftwareRow } from './software-row';
 import { type PackageSearchSlotProps, SoftwareRowFields } from './software-row-fields';
 import {
-  availableSoftwareUpdateSettings,
-  DEFAULT_SOFTWARE_UPDATE_SETTINGS,
+  defaultSoftwareUpdateSettings,
   SoftwareUpdateSettingsFields,
   type SoftwareUpdateSettingsValues,
 } from './update-settings-fields';
@@ -76,8 +75,9 @@ export interface SoftwareActionFormProps<TRef extends string = string> {
    */
   showUpdateSettings?: boolean;
   /**
-   * "Update Settings" offer Wait & notify and the countdowns, which need the devices to notify the user. Default
-   * false: Force Update alone, and that is what is submitted, a Wait & notify in `initialValues` included.
+   * "Update Settings" offer Wait & notify and the countdowns, which need the devices to notify the user. Default false:
+   * Wait (with an optional deadline that closes the app without warning) or Force Update, opening on Force Update, and
+   * no countdown.
    */
   updateUserNotifications?: boolean;
   /** The "Device Selection" heading over the picker. Default true; a host that titles the picker itself passes false. */
@@ -122,7 +122,7 @@ export function SoftwareActionForm<TRef extends string = string>({
   const [time, setTime] = useState(initialValues.time ?? '');
   const [timeReference, setTimeReference] = useState<TRef>(initialValues.timeReference);
   const [updateSettings, setUpdateSettings] = useState<SoftwareUpdateSettingsValues>(
-    () => initialValues.updateSettings ?? DEFAULT_SOFTWARE_UPDATE_SETTINGS,
+    () => initialValues.updateSettings ?? defaultSoftwareUpdateSettings(updateUserNotifications),
   );
   const withUpdateSettings = action === 'UPDATE' && showUpdateSettings;
 
@@ -141,9 +141,7 @@ export function SoftwareActionForm<TRef extends string = string>({
           date,
           time,
           timeReference,
-          updateSettings: withUpdateSettings
-            ? availableSoftwareUpdateSettings(updateSettings, updateUserNotifications)
-            : undefined,
+          updateSettings: withUpdateSettings ? updateSettings : undefined,
         }),
       disabled: submitDisabled,
       loading: submitting,

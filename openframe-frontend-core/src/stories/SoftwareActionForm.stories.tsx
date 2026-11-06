@@ -52,7 +52,10 @@ export const EmptyInstall: Story = {
   },
 };
 
-/** Update Software as it opens while the devices cannot notify the user: "Update Settings" offer Force Update alone. */
+/**
+ * Update Software as it opens while the devices cannot notify the user: Force Update, or Wait (with a deadline that
+ * closes the app without warning), and no countdown.
+ */
 export const EmptyUpdate: Story = {
   args: { ...EmptyInstall.args, action: 'UPDATE', showUpdateSettings: true },
 };

@@ -38,9 +38,9 @@ export {
 export { newSoftwareRow, type SelectedPackage, type SoftwareRow } from './software-row';
 export { type PackageSearchSlotProps, SoftwareRowFields, type SoftwareRowFieldsProps } from './software-row-fields';
 export {
-  availableSoftwareUpdateSettings,
   DEFAULT_SOFTWARE_UPDATE_POLICY,
   DEFAULT_SOFTWARE_UPDATE_SETTINGS,
+  defaultSoftwareUpdateSettings,
   SOFTWARE_UPDATE_COUNTDOWN_OPTIONS,
   SOFTWARE_UPDATE_DEADLINE_OPTIONS,
   type SoftwareUpdateMode,

@@ -12,9 +12,9 @@ import {
   type SoftwareActionFormValues,
 } from '../software-action-form';
 import {
-  availableSoftwareUpdateSettings,
   DEFAULT_SOFTWARE_UPDATE_POLICY,
   DEFAULT_SOFTWARE_UPDATE_SETTINGS,
+  defaultSoftwareUpdateSettings,
   SoftwareUpdateSettingsFields,
   type SoftwareUpdateSettingsValues,
 } from '../update-settings-fields';
@@ -48,53 +48,69 @@ const base: SoftwareActionFormProps = {
   showUpdateSettings: true,
 };
 
-/** The defaults (Wait & notify) as a form without user notifications sends them. */
+/** What a form without user notifications opens with: Force Update, on both policies. */
 const FORCE_SETTINGS: SoftwareUpdateSettingsValues = {
   ...DEFAULT_SOFTWARE_UPDATE_SETTINGS,
   policy: { ...DEFAULT_SOFTWARE_UPDATE_POLICY, mode: 'FORCE', deadlineEnabled: false },
   autoUpdatePolicy: { ...DEFAULT_SOFTWARE_UPDATE_POLICY, mode: 'FORCE', deadlineEnabled: false },
 };
 
+function SilentHarness({ onValue }: { onValue?: (value: SoftwareUpdateSettingsValues) => void }) {
+  const [value, setValue] = useState(defaultSoftwareUpdateSettings(false));
+  return (
+    <SoftwareUpdateSettingsFields
+      value={value}
+      onChange={next => {
+        setValue(next);
+        onValue?.(next);
+      }}
+    />
+  );
+}
+
 describe('SoftwareUpdateSettingsFields without user notifications', () => {
-  it('offers Force Update alone, chosen, with no deadline or countdown to set', () => {
-    render(<Harness />);
-    expect(screen.getAllByRole('radio')).toHaveLength(1);
+  it('opens on Force Update, offers Wait beside it, and promises no prompt or countdown', () => {
+    render(<SilentHarness />);
     expect(screen.getByRole('radio', { name: /Force Update/ }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('radio', { name: /^Wait/ })).toBeTruthy();
     expect(screen.getByText('The app closes and updates.')).toBeTruthy();
-    expect(screen.queryByText(/Wait & notify/)).toBeNull();
-    expect(screen.queryByText(/countdown/i)).toBeNull();
-    expect(screen.queryByLabelText('Deadline')).toBeNull();
+    expect(screen.queryByText(/notify|Ask Later|countdown/i)).toBeNull();
     expect(screen.queryByLabelText('Countdown')).toBeNull();
-    expect(screen.getByText('Later releases will also be force-updated.')).toBeTruthy();
   });
 
-  it('separate auto-update settings are Force Update too, with nothing to set', () => {
-    render(<Harness />);
+  it('Wait waits for the app to close; its deadline says the app is closed without warning', () => {
+    const onValue = vi.fn<(value: SoftwareUpdateSettingsValues) => void>();
+    render(<SilentHarness onValue={onValue} />);
+    fireEvent.click(screen.getByRole('radio', { name: /^Wait/ }));
+    expect(screen.getByText('The update waits until the user closes the app.')).toBeTruthy();
+    expect(onValue.mock.lastCall?.[0].policy).toMatchObject({ mode: 'WAIT', deadlineEnabled: false });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Close the app after a deadline/ }));
+    expect(
+      screen.getByText('If the app is still open by the deadline, it is closed without warning and updated.'),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Deadline').textContent).toContain('7 days after the first try');
+    expect(screen.queryByLabelText('Countdown')).toBeNull();
+    expect(onValue.mock.lastCall?.[0].policy).toMatchObject({
+      mode: 'WAIT',
+      deadlineEnabled: true,
+      deadlineSeconds: 7 * 86_400,
+    });
+  });
+
+  it('separate auto-update settings get the same two choices', () => {
+    render(<SilentHarness />);
     fireEvent.click(screen.getByRole('checkbox', { name: /Same settings for auto-update/ }));
     expect(screen.getByText('For auto-updates')).toBeTruthy();
-    expect(screen.getAllByRole('radio')).toHaveLength(2);
-    expect(screen.getAllByRole('radio').every(radio => radio.getAttribute('aria-checked') === 'true')).toBe(true);
+    expect(screen.getAllByRole('radio', { name: /^Wait/ })).toHaveLength(2);
     expect(screen.queryByLabelText('Countdown')).toBeNull();
   });
 });
 
-describe('availableSoftwareUpdateSettings', () => {
-  it('Wait & notify reads as Force Update without its deadline, both policies; the countdown value stays', () => {
-    const waits: SoftwareUpdateSettingsValues = {
-      ...DEFAULT_SOFTWARE_UPDATE_SETTINGS,
-      autoUpdatePolicy: { ...DEFAULT_SOFTWARE_UPDATE_POLICY, countdownSeconds: 900 },
-    };
-    expect(availableSoftwareUpdateSettings(waits, false)).toEqual({
-      ...FORCE_SETTINGS,
-      autoUpdatePolicy: { ...FORCE_SETTINGS.autoUpdatePolicy, countdownSeconds: 900 },
-    });
-  });
-
-  it('with user notifications, or already on Force Update, the settings come back as they are', () => {
-    expect(availableSoftwareUpdateSettings(DEFAULT_SOFTWARE_UPDATE_SETTINGS, true)).toBe(
-      DEFAULT_SOFTWARE_UPDATE_SETTINGS,
-    );
-    expect(availableSoftwareUpdateSettings(FORCE_SETTINGS, false)).toBe(FORCE_SETTINGS);
+describe('defaultSoftwareUpdateSettings', () => {
+  it('with user notifications, the server defaults; without, Force Update on both policies', () => {
+    expect(defaultSoftwareUpdateSettings(true)).toBe(DEFAULT_SOFTWARE_UPDATE_SETTINGS);
+    expect(defaultSoftwareUpdateSettings(false)).toEqual(FORCE_SETTINGS);
   });
 });
 
@@ -155,15 +171,9 @@ describe('SoftwareActionForm update settings', () => {
     expect(onSubmit.mock.calls[0][0].updateSettings).toEqual(DEFAULT_SOFTWARE_UPDATE_SETTINGS);
   });
 
-  it('without user notifications a Wait & notify it opens with is submitted as Force Update', () => {
+  it('without user notifications it opens on Force Update and submits that', () => {
     const onSubmit = vi.fn<(values: SoftwareActionFormValues) => void>();
-    render(
-      <SoftwareActionForm
-        {...base}
-        initialValues={{ ...base.initialValues, updateSettings: DEFAULT_SOFTWARE_UPDATE_SETTINGS }}
-        onSubmit={onSubmit}
-      />,
-    );
+    render(<SoftwareActionForm {...base} onSubmit={onSubmit} />);
     expect(screen.queryByRole('radio', { name: /Wait & notify/ })).toBeNull();
     fireEvent.click(submitButton('Run Update'));
     expect(onSubmit.mock.calls[0][0].updateSettings).toEqual(FORCE_SETTINGS);
