@@ -3,7 +3,7 @@
 import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { TruncateText } from '../../ui/truncate-text';
-import { TENANT_EMPTY_VALUE, unattributedLabel, usersCountLabel } from './tenant-presentation';
+import { lowercaseUsersCountLabel, TENANT_EMPTY_VALUE, unattributedLabel } from './tenant-presentation';
 import type { TenantCustomer } from './tenant-row';
 
 export interface TenantCustomerCellProps {
@@ -59,7 +59,7 @@ export function TenantCustomerCell({
         loading={loading}
         className={unattributed ? 'text-ods-warning' : undefined}
       >
-        {unattributed ?? (neverRead ? 'Never read' : usersCountLabel(userCount))}
+        {unattributed ?? (neverRead ? 'Never read' : lowercaseUsersCountLabel(userCount))}
       </TruncateText>
     </div>
   );

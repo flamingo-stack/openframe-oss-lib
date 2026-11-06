@@ -102,8 +102,14 @@ export function formatLastRead(iso: string | null | undefined, now: Date = new D
   return now.getTime() - date.getTime() < DAY_MS ? formatRelativeTimeFrom(date, now) : formatDate(date);
 }
 
-/** "227 users" under the customer, the empty mark before the first read. */
+/** "227 Users" under the customer, the empty mark before the first read. */
 export function usersCountLabel(count: number | null | undefined): string {
+  if (count == null) return TENANT_EMPTY_VALUE;
+  return `${count} ${count === 1 ? 'User' : 'Users'}`;
+}
+
+/** The multi-customer list's count line (Figma 3025-3536): "227 users", the empty mark before the first read. */
+export function lowercaseUsersCountLabel(count: number | null | undefined): string {
   if (count == null) return TENANT_EMPTY_VALUE;
   return `${count} ${count === 1 ? 'user' : 'users'}`;
 }

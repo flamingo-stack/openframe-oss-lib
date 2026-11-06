@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { licenseSummaryLines, usersCountLabel } from './tenant-presentation';
+import { licenseSummaryLines, lowercaseUsersCountLabel, usersCountLabel } from './tenant-presentation';
 
 describe('licenseSummaryLines', () => {
   it('is the empty mark until the numbers have been read', () => {
@@ -39,9 +39,18 @@ describe('licenseSummaryLines', () => {
 });
 
 describe('usersCountLabel', () => {
-  it('counts users, and is the empty mark before the first read', () => {
-    expect(usersCountLabel(1)).toBe('1 user');
-    expect(usersCountLabel(257)).toBe('257 users');
+  it('counts Users as the single-customer list does, and is the empty mark before the first read', () => {
+    expect(usersCountLabel(0)).toBe('0 Users');
+    expect(usersCountLabel(1)).toBe('1 User');
+    expect(usersCountLabel(227)).toBe('227 Users');
     expect(usersCountLabel(null)).toBe('—');
+  });
+});
+
+describe('lowercaseUsersCountLabel', () => {
+  it('counts users as the multi-customer list does, and is the empty mark before the first read', () => {
+    expect(lowercaseUsersCountLabel(1)).toBe('1 user');
+    expect(lowercaseUsersCountLabel(257)).toBe('257 users');
+    expect(lowercaseUsersCountLabel(null)).toBe('—');
   });
 });

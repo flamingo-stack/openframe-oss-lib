@@ -12,7 +12,7 @@ export { TenantAccessCell } from './tenant-access-cell';
 export type { TenantAccessCellProps } from './tenant-access-cell';
 export { TENANT_COLUMNS, TENANTS_TABLE_COLUMNS } from './tenants-table-columns';
 export type { TenantsTableColumn } from './tenants-table-columns';
-export type { TenantCustomer, TenantLicenseSummary, TenantRow } from './tenant-row';
+export type { MultiCustomerTenantRow, TenantCustomer, TenantLicenseSummary, TenantRow } from './tenant-row';
 export {
   accessStateTag,
   formatLastRead,
