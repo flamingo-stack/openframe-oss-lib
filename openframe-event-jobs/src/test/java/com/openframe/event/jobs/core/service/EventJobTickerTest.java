@@ -52,8 +52,8 @@ class EventJobTickerTest {
     void aTick_stopsAtHalfTheLockTime_andTheRunStaysRunning() {
         // setup
         MovingClock clock = new MovingClock(NOW);
-        EventJobTicker ticker = ticker(clock);
-        EventJobBatch thirtySeconds = job -> {
+        EventJobTicker<EventJob> ticker = ticker(clock);
+        EventJobBatch<EventJob> thirtySeconds = job -> {
             batches.incrementAndGet();
             clock.advance(Duration.ofSeconds(30));
             return job;
@@ -70,8 +70,8 @@ class EventJobTickerTest {
     void aTick_endsWhenABatchFinishesTheRun() {
         // setup
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        EventJobTicker ticker = ticker(clock);
-        EventJobBatch lastBatch = job -> {
+        EventJobTicker<EventJob> ticker = ticker(clock);
+        EventJobBatch<EventJob> lastBatch = job -> {
             batches.incrementAndGet();
             return job.finishRun(EventJobStatus.DONE, NOW);
         };
@@ -87,8 +87,8 @@ class EventJobTickerTest {
     void aStoppingService_endsTheTickAfterTheCurrentBatch() {
         // setup
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        EventJobTicker ticker = ticker(clock);
-        EventJobBatch stopsTheService = job -> {
+        EventJobTicker<EventJob> ticker = ticker(clock);
+        EventJobBatch<EventJob> stopsTheService = job -> {
             batches.incrementAndGet();
             shutdown.onApplicationEvent(null);
             return job;
@@ -105,8 +105,8 @@ class EventJobTickerTest {
     void anInterruptedThread_endsTheTickAfterTheCurrentBatch() {
         // setup
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        EventJobTicker ticker = ticker(clock);
-        EventJobBatch interrupts = job -> {
+        EventJobTicker<EventJob> ticker = ticker(clock);
+        EventJobBatch<EventJob> interrupts = job -> {
             batches.incrementAndGet();
             Thread.currentThread().interrupt();
             return job;
@@ -123,8 +123,8 @@ class EventJobTickerTest {
     void mongoDown_waitsForTheNextTick_withoutCountingAFailure() {
         // setup
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        EventJobTicker ticker = ticker(clock);
-        EventJobBatch mongoDown = job -> {
+        EventJobTicker<EventJob> ticker = ticker(clock);
+        EventJobBatch<EventJob> mongoDown = job -> {
             throw new DataAccessResourceFailureException("no server");
         };
 
@@ -140,7 +140,7 @@ class EventJobTickerTest {
     void anError_isCounted_andTheNextTickTriesAgain() {
         // setup
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        EventJobTicker ticker = ticker(clock);
+        EventJobTicker<EventJob> ticker = ticker(clock);
 
         // execution
         ticker.tick("Test job", running(clock), settings, failing(), () -> failed.set(true));
@@ -157,7 +157,7 @@ class EventJobTickerTest {
     void maxFailuresInARow_setTheRunFailed_andCallOnFailed() {
         // setup
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        EventJobTicker ticker = ticker(clock);
+        EventJobTicker<EventJob> ticker = ticker(clock);
         EventJob job = running(clock);
         job.setFailures(2);
 
@@ -173,8 +173,8 @@ class EventJobTickerTest {
     void aNewerCopyOnAnotherPod_stopsTheTick_withoutCountingAFailure() {
         // setup
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        EventJobTicker ticker = ticker(clock);
-        EventJobBatch conflict = job -> {
+        EventJobTicker<EventJob> ticker = ticker(clock);
+        EventJobBatch<EventJob> conflict = job -> {
             throw new OptimisticLockingFailureException("newer copy");
         };
 
@@ -186,9 +186,9 @@ class EventJobTickerTest {
         assertThat(failed).isFalse();
     }
 
-    private EventJobTicker ticker(Clock clock) {
+    private EventJobTicker<EventJob> ticker(Clock clock) {
         EventJobService jobService = new EventJobService(jobRepository, clock);
-        return new EventJobTicker(jobService, shutdown, clock);
+        return new EventJobTicker<>(jobService, shutdown, clock);
     }
 
     private static EventJob running(Clock clock) {
@@ -196,7 +196,7 @@ class EventJobTickerTest {
         return EventJob.neverRun("test:job").startRun("run-1", now);
     }
 
-    private static EventJobBatch failing() {
+    private static EventJobBatch<EventJob> failing() {
         return job -> {
             throw new IllegalStateException("bad batch");
         };

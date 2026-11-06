@@ -17,6 +17,7 @@ public class PublishedDocuments {
     public static final String ID_FIELD = "_id";
     private static final String TENANT_PROPERTY = "tenantId";
     private static final int DOCUMENT_TYPE_ARGUMENT = 0;
+    private static final int EVENT_TYPE_ARGUMENT = 1;
 
     private final MongoOperations mongoOperations;
 
@@ -34,6 +35,13 @@ public class PublishedDocuments {
         Class<?> userClass = ClassUtils.getUserClass(specClass);
         ResolvableType specType = ResolvableType.forClass(userClass).as(AggregateSpec.class);
         return specType.getGeneric(DOCUMENT_TYPE_ARGUMENT).resolve();
+    }
+
+    // The event class a spec names, the class its records are read into.
+    public static Class<?> resolveEventClass(AggregateSpec<?, ?> spec) {
+        Class<?> specClass = ClassUtils.getUserClass(spec);
+        ResolvableType specType = ResolvableType.forClass(specClass).as(AggregateSpec.class);
+        return specType.getGeneric(EVENT_TYPE_ARGUMENT).resolve();
     }
 
     // Only the fields a tombstone needs: the id, the version and the tenant.

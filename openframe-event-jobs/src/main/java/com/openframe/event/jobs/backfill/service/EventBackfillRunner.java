@@ -23,7 +23,7 @@ public class EventBackfillRunner {
     private final EventBackfillProperties properties;
     private final PublishedAggregates publishedAggregates;
     private final EventJobService jobService;
-    private final EventJobTicker ticker;
+    private final EventJobTicker<EventJob> ticker;
     private final EventBackfillMetrics metrics;
 
     public void writeBatches(String type, EventJob job) {

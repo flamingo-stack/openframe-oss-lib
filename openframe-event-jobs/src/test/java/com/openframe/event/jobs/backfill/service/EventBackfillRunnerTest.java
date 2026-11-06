@@ -53,7 +53,7 @@ class EventBackfillRunnerTest {
         when(publishedAggregates.changedSince(any(), anyMap())).thenReturn(List.of());
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         EventJobService jobService = new EventJobService(jobRepository, clock);
-        EventJobTicker ticker = new EventJobTicker(jobService, new EventJobShutdown(), clock);
+        EventJobTicker<EventJob> ticker = new EventJobTicker<>(jobService, new EventJobShutdown(), clock);
         AggregateSpecRegistry specRegistry = mock(AggregateSpecRegistry.class);
         when(specRegistry.types()).thenReturn(Set.of(TYPE));
         EventBackfillMetrics metrics = new EventBackfillMetrics(meterRegistry, specRegistry);

@@ -1,6 +1,7 @@
 package com.openframe.processing.config;
 
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties;
+import com.openframe.processing.config.properties.LargeUpdateProperties;
 import com.openframe.processing.runner.EventProcessingMetrics;
 import com.openframe.processing.runner.ProjectionRunner;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
@@ -12,7 +13,7 @@ import org.springframework.context.annotation.Import;
 // Listed, not scanned (the projections come from the services' spec beans); off by default, so no listener runs before its topic exists.
 @AutoConfiguration(after = AggregateSpecAutoConfiguration.class)
 @ConditionalOnBooleanProperty(name = "openframe.events.enabled")
-@EnableConfigurationProperties(EventProcessingKafkaProperties.class)
+@EnableConfigurationProperties({EventProcessingKafkaProperties.class, LargeUpdateProperties.class})
 @Import({ProjectionRunner.class, EventProcessingMetrics.class})
 public class EventProcessingAutoConfiguration {
 }

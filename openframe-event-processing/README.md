@@ -27,15 +27,19 @@ events.organizations ──> ProjectionListener                one per projectio
 
 - A record's Kafka key is the aggregate's Mongo `_id` (the outbox `aggregateId`), not a business id such as
   `organizationId`. The listener passes it to the runner for the logs.
-- [`PublishedEventListeners`](src/main/java/com/openframe/processing/listener/PublishedEventListeners.java#L17)
+- [`PublishedEventListeners`](src/main/java/com/openframe/processing/listener/PublishedEventListeners.java#L16)
   registers one listener per projection of each spec at startup, all on the type's topic, so a new projection needs no
   listener class. Each has its own consumer group: a failing, slow or replayed projection never holds back the others.
 - The value is the `PublishedRecord` envelope: `tenantId`, `version`, `deleted`, `schemaVersion` and `event`. It is
   read into the spec's event class. Unknown fields are ignored, and an enum value the consumer does not know
   is read as `null`, so a newer producer does not send events to the DLT. A `schemaVersion` newer than
   `PublishedRecord.CURRENT_SCHEMA_VERSION` is refused and goes to the DLT, for a newer consumer to replay.
-- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L13) applies the record
+- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L16) applies the record
   to the listener's projection.
+- Large updates: the runner first asks the projection's `countChanges`, up to the inline limit. Below it, `apply`
+  writes inline. At the limit, or while the source already has a task, the event goes to a projection task of
+  `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. Without that
+  module's beans, a large event is still applied inline, with a WARN.
 
 ## Configuration
 
@@ -67,6 +71,8 @@ openframe:
             partitions: 1
             replication-factor: 2
             config: {cleanup.policy: delete, retention.ms: 2592000000}
+      large-updates:
+        inline-limit: 5000              # default; an event that changes this many items or more goes to a projection task
 ```
 
 - `kafka` is separate from `spring.kafka` and from the stream's `spring.saas.kafka`. The module adds its own Kafka
@@ -183,7 +189,7 @@ The service does not start when:
 
 | Metric | Tags | Meaning |
 |---|---|---|
-| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `failed`, `mongo_unavailable` | One per `apply`; the count is the number of events, the total the time spent. |
+| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `handed_over`, `failed`, `mongo_unavailable` | One per event and projection; `handed_over` means a projection task took it. The count is the number of events, the total the time spent. |
 
 ## Debugging
 
