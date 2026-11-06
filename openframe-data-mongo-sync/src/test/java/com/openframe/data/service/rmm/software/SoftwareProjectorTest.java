@@ -39,7 +39,7 @@ class SoftwareProjectorTest {
 
     @Test
     void project_noInstalls_deletesAggregate() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of());
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 42L)).thenReturn(List.of());
 
         projector.project("t1", 42L);
 
@@ -49,7 +49,7 @@ class SoftwareProjectorTest {
 
     @Test
     void project_withInstalls_buildsAggregateFromEdgesWithDistinctDevices() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 42L)).thenReturn(List.of(
                 DeviceSoftware.builder().machineId("m1")
                         .versions(List.of("1.0", "2.0")).vulnerabilities(List.of("CVE-1", "CVE-2"))
                         .name("Google Chrome").source("apps").build(),
@@ -78,7 +78,7 @@ class SoftwareProjectorTest {
 
     @Test
     void project_withInstallsNoCves_zeroCveCount() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 42L)).thenReturn(List.of(
                 DeviceSoftware.builder().machineId("m1").versions(List.of("1.0")).vulnerabilities(List.of())
                         .name("Custom App").source("programs").build()));
         lenient().when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
@@ -97,7 +97,7 @@ class SoftwareProjectorTest {
     // versions are compared per numeric segment, not as text: "10.0" sorts before "9.0" as a string
     @Test
     void project_latestVersion_isTheNumericMaximum() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 42L)).thenReturn(List.of(
                 DeviceSoftware.builder().machineId("m1").versions(List.of("9.0")).name("jq").source("apps").build(),
                 DeviceSoftware.builder().machineId("m2").versions(List.of("10.0")).name("jq").source("apps").build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
