@@ -1,6 +1,5 @@
 package com.openframe.authz.security;
 
-import com.openframe.authz.dto.Touchpoint;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -35,15 +34,6 @@ class SsoCookieCodecTest {
                 "state-2", "inv-1", true, "microsoft", "com.openframe.app://auth", true, 1L, inTenMinutes());
 
         assertThat(codec.decodeInvite(codec.encodeInvite(payload))).contains(payload);
-    }
-
-    @Test
-    void shouldRoundTripTenantRegistrationPayloadWithAttribution() {
-        Touchpoint attribution = Touchpoint.builder().utmSource("ads").gclid("g-1").build();
-        SsoTenantRegCookiePayload payload = new SsoTenantRegCookiePayload(
-                "state-3", "owner@acme.com", "Acme", "acme", "google", null, false, attribution, 1L, inTenMinutes());
-
-        assertThat(codec.decodeTenant(codec.encodeTenant(payload))).contains(payload);
     }
 
     @Test
@@ -93,12 +83,9 @@ class SsoCookieCodecTest {
         String loginToken = codec.encodeLogin(login(inTenMinutes()));
         String inviteToken = codec.encodeInvite(new SsoInviteCookiePayload(
                 "invite-state", "inv-1", false, "google", null, false, 1L, inTenMinutes()));
-        String regToken = codec.encodeTenant(new SsoTenantRegCookiePayload(
-                "reg-state", "a@acme.com", "Acme", "acme", "google", null, false, null, 1L, inTenMinutes()));
 
         assertThat(codec.decodeState(loginToken)).contains("state-1");
         assertThat(codec.decodeState(inviteToken)).contains("invite-state");
-        assertThat(codec.decodeState(regToken)).contains("reg-state");
     }
 
     @Test

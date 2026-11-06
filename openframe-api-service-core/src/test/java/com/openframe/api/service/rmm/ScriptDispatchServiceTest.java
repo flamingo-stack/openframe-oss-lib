@@ -1,5 +1,7 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.support.TestEncryption;
+import com.openframe.api.mapper.ScriptSecretSealer;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.script.BatchRunScriptInput;
 import com.openframe.api.dto.rmm.script.RunScriptInput;
@@ -17,8 +19,12 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
@@ -26,6 +32,7 @@ import com.openframe.data.nats.rmm.publisher.ScriptNatsPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -65,7 +72,7 @@ class ScriptDispatchServiceTest {
     @Mock
     private ScriptExecutionService scriptExecutionService;
     @Mock
-    private com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private com.openframe.data.nats.delivery.route.DeliveryRouter deliveryRouter;
     @Mock
     private ScheduleScriptService scheduleScriptService;
     @Mock
@@ -76,6 +83,9 @@ class ScriptDispatchServiceTest {
     private com.openframe.data.service.TenantIdProvider tenantIdProvider;
     @Mock
     private ScriptTimeoutValidator timeoutValidator;
+
+    @Mock
+    private ObjectProvider<ScriptSecretSealer> secretSealer;
 
     @InjectMocks
     private ScriptDispatchService scriptDispatchService;
@@ -402,6 +412,57 @@ class ScriptDispatchServiceTest {
         verify(scriptNatsPublisher, times(1)).publishScript(eq("machine-1"), any(ScriptMessage.class));
     }
 
+    @Test
+    @DisplayName("batchRunScript: an unsaved draft body and shell replace the saved ones, and the run keeps the script's stored env vars, secrets included")
+    void batchRunScript_draftBody_runsWithTheStoredEnvVars() {
+        ScriptEnvVarInput token = ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build();
+        ScriptResponse withSecret = ScriptResponse.builder()
+                .id(SCRIPT_ID).shell(BASH).scriptBody("df -h").defaultTimeoutSeconds(60)
+                .envVars(List.of(token))
+                .build();
+        when(scriptService.get(SCRIPT_ID)).thenReturn(withSecret);
+        BatchRunScriptInput draft = batchInput(List.of(MACHINE_ID));
+        draft.setScriptBody("Write-Output $env:TOKEN.Length");
+        draft.setShell(ScriptShell.POWERSHELL);
+
+        scriptDispatchService.batchRunScript(draft, USER_ID, ExecutionSource.AI_ASSISTANT);
+
+        ScriptMessage sent = capturePublished();
+        assertThat(sent.getCode()).isEqualTo("Write-Output $env:TOKEN.Length");
+        assertThat(sent.getShell()).isEqualTo(ScriptShell.POWERSHELL);
+        assertThat(sent.getScriptId()).isEqualTo(SCRIPT_ID);
+        assertThat(sent.getEnvVars())
+                .extracting(ScriptEnvVar::getName, ScriptEnvVar::getValue, ScriptEnvVar::isSecret)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("TOKEN", "s3cr3t", true));
+    }
+
+    @Test
+    @DisplayName("batchRunScript: a draft body without a shell keeps the saved script's shell")
+    void batchRunScript_draftWithoutShell_keepsTheSavedShell() {
+        BatchRunScriptInput draft = batchInput(List.of(MACHINE_ID));
+        draft.setScriptBody("du -sh /tmp");
+
+        scriptDispatchService.batchRunScript(draft, USER_ID, ExecutionSource.AI_ASSISTANT);
+
+        ScriptMessage sent = capturePublished();
+        assertThat(sent.getCode()).isEqualTo("du -sh /tmp");
+        assertThat(sent.getShell()).isEqualTo(BASH);
+    }
+
+    @Test
+    @DisplayName("batchRunScript: a blank draft body runs the saved body and shell")
+    void batchRunScript_blankDraft_runsTheSavedScript() {
+        BatchRunScriptInput draft = batchInput(List.of(MACHINE_ID));
+        draft.setScriptBody("  ");
+        draft.setShell(ScriptShell.POWERSHELL);
+
+        scriptDispatchService.batchRunScript(draft, USER_ID, ExecutionSource.AI_ASSISTANT);
+
+        ScriptMessage sent = capturePublished();
+        assertThat(sent.getCode()).isEqualTo("df -h");
+        assertThat(sent.getShell()).isEqualTo(BASH);
+    }
+
     private ScriptMessage capturePublished() {
         ArgumentCaptor<ScriptMessage> captor = ArgumentCaptor.forClass(ScriptMessage.class);
         verify(scriptNatsPublisher).publishScript(eq(MACHINE_ID), captor.capture());
@@ -421,7 +482,7 @@ class ScriptDispatchServiceTest {
                                 ScheduledScriptCustomParams.builder()
                                         .scriptId(SCRIPT_ID)
                                         .args(List.of("--custom", "42"))
-                                        .envVars(List.of(new ScriptEnvVar("OVERRIDE", "v", false)))
+                                        .envVars(List.of(ScriptEnvVar.builder().name("OVERRIDE").value("v").secret(false).build()))
                                         .build()))
                         .build();
         when(scheduleScriptService.get(scheduleId)).thenReturn(schedule);
@@ -438,12 +499,79 @@ class ScriptDispatchServiceTest {
 
         scriptDispatchService.runSchedule(scheduleId, USER_ID);
 
-        ArgumentCaptor<ScriptScheduleExecutionMessage> msgCaptor =
-                ArgumentCaptor.forClass(ScriptScheduleExecutionMessage.class);
-        verify(scriptScheduleNatsPublisher).publish(eq(MACHINE_ID), msgCaptor.capture());
-        ScriptScheduleExecutionItem item = msgCaptor.getValue().getScripts().get(0);
+        ArgumentCaptor<com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed> seedCaptor =
+                ArgumentCaptor.forClass(com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(MACHINE_ID);
+        assertThat(seedCaptor.getValue().getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
+        ScriptScheduleExecutionMessage batch = seedCaptor.getValue().getMessage();
+        assertThat(batch.getMachineId()).isNull();
+        assertThat(batch.getScheduleId()).isEqualTo(scheduleId);
+        ScriptScheduleExecutionItem item = batch.getScripts().get(0);
         assertThat(item.getArgs()).containsExactly("--custom", "42");
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).containsExactly("OVERRIDE");
         assertThat(item.getEnvVars()).extracting(ScriptEnvVar::getName).doesNotContain("BASE");
+    }
+    @Test
+    @DisplayName("runSchedule: with encryption on, the batch that goes to the router carries its secrets encrypted")
+    void runSchedule_secretsSealedInTheBatch() {
+        String scheduleId = "sched-1";
+        ScriptSecretSealer sealer = new ScriptSecretSealer(TestEncryption.SERVICE);
+        when(secretSealer.getIfAvailable()).thenReturn(sealer);
+        when(scheduleScriptService.get(scheduleId)).thenReturn(com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse.builder()
+                .id(scheduleId)
+                .scriptIds(List.of(SCRIPT_ID))
+                .build());
+        when(scheduleScriptDeviceService.getMachineIds(scheduleId)).thenReturn(List.of(MACHINE_ID));
+        when(scriptService.getScriptsByIds(List.of(SCRIPT_ID))).thenReturn(List.of(
+                ScriptResponse.builder()
+                        .id(SCRIPT_ID).name("disk").shell(BASH).scriptBody("df -h")
+                        .status(ACTIVE)
+                        .defaultTimeoutSeconds(60)
+                        .envVars(List.of(ScriptEnvVarInput.builder().name("TOKEN").value("s3cr3t").secret(true).build()))
+                        .privilegeLevel(PrivilegeLevel.USER)
+                        .build()));
+        when(tenantIdProvider.getTenantId()).thenReturn("tenant-1");
+
+        scriptDispatchService.runSchedule(scheduleId, USER_ID);
+
+        ArgumentCaptor<com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed> seedCaptor =
+                ArgumentCaptor.forClass(com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        ScriptEnvVar sent = seedCaptor.getValue().getMessage().getScripts().get(0).getEnvVars().get(0);
+        assertThat(sent.isEncrypted()).isTrue();
+        assertThat(sent.getValue()).isNotEqualTo("s3cr3t");
+    }
+
+    @Test
+    @DisplayName("runSchedule: a schedule that waits for offline machines sends its window with the batch")
+    void runSchedule_scheduleThatWaitsForOfflineMachines_theWindowTravelsWithTheBatch() {
+        String scheduleId = "sched-1";
+        com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse schedule =
+                com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse.builder()
+                        .id(scheduleId)
+                        .scriptIds(List.of(SCRIPT_ID))
+                        .trigger(ScheduleScriptTrigger.DATE_TIME)
+                        .offlineBehavior(ScheduleOfflineBehavior.RETRY_ON_RECONNECT)
+                        .reconnectWindowSeconds(7200L)
+                        .build();
+        when(scheduleScriptService.get(scheduleId)).thenReturn(schedule);
+        when(scheduleScriptDeviceService.getMachineIds(scheduleId)).thenReturn(List.of(MACHINE_ID));
+        when(scriptService.getScriptsByIds(List.of(SCRIPT_ID))).thenReturn(List.of(
+                ScriptResponse.builder()
+                        .id(SCRIPT_ID).name("disk").shell(BASH).scriptBody("df -h")
+                        .status(ACTIVE)
+                        .defaultTimeoutSeconds(60)
+                        .privilegeLevel(PrivilegeLevel.USER)
+                        .build()));
+        when(tenantIdProvider.getTenantId()).thenReturn("tenant-1");
+
+        scriptDispatchService.runSchedule(scheduleId, USER_ID);
+
+        ArgumentCaptor<com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed> seedCaptor =
+                ArgumentCaptor.forClass(com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed.class);
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
+        assertThat(seedCaptor.getValue().getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+        assertThat(seedCaptor.getValue().getReconnectWindowSeconds()).isEqualTo(7200L);
     }
 }

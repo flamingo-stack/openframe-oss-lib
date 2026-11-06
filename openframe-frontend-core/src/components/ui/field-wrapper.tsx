@@ -91,6 +91,11 @@ const FieldWrapper = forwardRef<HTMLDivElement, FieldWrapperProps>(
     ref,
   ) => {
     const hasChrome = label != null || error != null || errorSlot;
+    // No label and no error: the control is rendered as it is, with no element around it. A \`display: contents\`
+    // wrapper drew no box but still sat between the control and its container, so a container that spaces its
+    // children with margins (\`space-y-*\`) put the margin on the wrapper, where it does nothing: the control touched
+    // the one above it. A className keeps the wrapper (it may set the field's own display or placement).
+    if (!hasChrome && !className) return <>{children}</>;
 
     return (
       <div ref={ref} className={cn(hasChrome ? 'relative flex w-full flex-col' : 'contents', className)}>

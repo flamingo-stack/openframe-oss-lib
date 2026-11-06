@@ -10,4 +10,14 @@ import java.util.List;
 public class SoftwareOnDeviceFilters {
 
     private List<SoftwareFilterOption> statuses;
+
+    // non-null in the schema; empty when no device has a value for them
+    @Builder.Default
+    private List<SoftwareFilterOption> installedBy = List.of();
+    @Builder.Default
+    private List<SoftwareFilterOption> autoUpdateStatuses = List.of();
+    @Builder.Default
+    private List<SoftwareFilterOption> organizations = List.of();
+    @Builder.Default
+    private List<SoftwareFilterOption> deviceStatuses = List.of();
 }

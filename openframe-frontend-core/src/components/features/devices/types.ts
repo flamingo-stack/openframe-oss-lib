@@ -34,6 +34,8 @@ export interface DeviceRow extends DeviceNameSource {
   organizationImageUrl?: string | null;
   organizationImageHash?: string | null;
   tags?: DeviceTag[];
+  /** The viewer's unread notifications about this device. Absent or 0: no indicator. */
+  unreadNotificationCount?: number;
 }
 
 export interface DeviceFilterValue {

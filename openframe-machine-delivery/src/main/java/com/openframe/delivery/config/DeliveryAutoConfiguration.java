@@ -4,7 +4,10 @@ import tools.jackson.databind.ObjectMapper;
 import com.openframe.delivery.dispatch.DeliverySink;
 import com.openframe.delivery.dispatch.KafkaDeliverySink;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.kafka.producer.DualWriteKafkaProducer;
+import com.openframe.kafka.producer.MessageProducer;
 import com.openframe.kafka.producer.OssTenantKafkaProducer;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -12,6 +15,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.Objects;
 
 @AutoConfiguration(afterName = "com.openframe.kafka.config.OssTenantKafkaAutoConfiguration")
 @ComponentScan(basePackages = "com.openframe.delivery")
@@ -29,9 +34,10 @@ public class DeliveryAutoConfiguration {
         @Bean
         @ConditionalOnProperty({"openframe.delivery.dispatch-topic", "spring.oss-tenant.kafka.enabled"})
         @ConditionalOnMissingBean(DeliverySink.class)
-        DeliverySink kafkaDeliverySink(OssTenantKafkaProducer producer, ObjectMapper objectMapper,
-                                       DeliveryMetrics metrics, DeliveryProperties properties) {
-            return new KafkaDeliverySink(producer, objectMapper, metrics, properties.getDispatchTopic());
+        DeliverySink kafkaDeliverySink(OssTenantKafkaProducer producer, @Nullable DualWriteKafkaProducer dualWriteProducer,
+                                       ObjectMapper objectMapper, DeliveryMetrics metrics, DeliveryProperties properties) {
+            MessageProducer handOff = Objects.requireNonNullElse(dualWriteProducer, producer);
+            return new KafkaDeliverySink(handOff, objectMapper, metrics, properties.getDispatchTopic());
         }
     }
 }

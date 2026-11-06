@@ -77,6 +77,11 @@ export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
    * scope does the same. The card's `data-*` markers (`data-loading-item`) ride on its root in both forms.
    */
   loading?: boolean;
+  /**
+   * Whether the card lists the device's tags (default true). A card that never lists them (the device a log or a
+   * ticket names) passes false, so its loading form draws no tags row either.
+   */
+  showTags?: boolean;
 }
 
 export function DeviceCard({
@@ -87,6 +92,7 @@ export function DeviceCard({
   statusTag,
   onDeviceClick,
   loading: loadingProp,
+  showTags = true,
   className,
   ...props
 }: DeviceCardProps) {
@@ -216,7 +222,7 @@ export function DeviceCard({
 
       {/* Tags section: the card sits in a grid's first screen, so its row is drawn while loading too (one tag, a
           typical device's), never left to land later. A device with no tags draws no row once loaded. */}
-      {loading ? (
+      {!showTags ? null : loading ? (
         <div className={DEVICE_CARD_TAGS_ROW_CLASS}>
           <Tag loading label="" variant="outline" data-loading-item />
         </div>

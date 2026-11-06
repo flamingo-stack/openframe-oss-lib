@@ -81,6 +81,8 @@ export interface FileUploadProps<T extends FileUploadCandidate = File> {
   description?: string;
   /** Field label above the component */
   fieldLabel?: string;
+  /** Scale of `fieldLabel`, as on the other field controls (`FieldWrapper`'s `labelVariant`). */
+  labelVariant?: 'default' | 'large';
   /** Whether the component is disabled */
   disabled?: boolean;
   /** Error message */
@@ -157,6 +159,7 @@ export function FileUpload<T extends FileUploadCandidate = File>({
   label = 'Upload Files',
   description = '(Click Here or Drag and Drop)',
   fieldLabel,
+  labelVariant,
   disabled = false,
   error,
   className,
@@ -353,7 +356,7 @@ export function FileUpload<T extends FileUploadCandidate = File>({
   const showDropzone = multiple || !hasFiles;
 
   return (
-    <FieldWrapper label={fieldLabel} error={displayError} className={className}>
+    <FieldWrapper label={fieldLabel} labelVariant={labelVariant} error={displayError} className={className}>
       {/* Rendered even when `pickFiles` supersedes it: whether a host has a
           native picker is only knowable on the client, and dropping this node
           from the tree would make the prerendered HTML and the hydrated render

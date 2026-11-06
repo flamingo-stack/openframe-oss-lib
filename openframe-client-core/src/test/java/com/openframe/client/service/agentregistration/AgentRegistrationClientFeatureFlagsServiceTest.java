@@ -4,9 +4,9 @@ import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientFeatureFlagsDeliverySeed;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import com.openframe.delivery.config.DeliveryProperties;
-import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliverySeed;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,7 +34,7 @@ class AgentRegistrationClientFeatureFlagsServiceTest {
     private static final Map<String, ClientFeatureFlag> FLAGS = Map.of("delivery-tool-installation", new ClientFeatureFlag(true, "1.6.0"));
 
     @Mock private OpenFrameClientConfigurationService clientConfigurationService;
-    @Mock private DeliveryDispatcher deliveryDispatcher;
+    @Mock private DeliveryRouter deliveryRouter;
     @Captor private ArgumentCaptor<DeliverySeed> seedCaptor;
 
     private DeliveryProperties properties;
@@ -43,11 +43,11 @@ class AgentRegistrationClientFeatureFlagsServiceTest {
     @BeforeEach
     void setUp() {
         properties = new DeliveryProperties();
-        service = new AgentRegistrationClientFeatureFlagsService(clientConfigurationService, properties, deliveryDispatcher);
+        service = new AgentRegistrationClientFeatureFlagsService(clientConfigurationService, properties, deliveryRouter);
     }
 
     @Test
-    void process_typeOnTheEngine_currentFlagsHandedToThatMachine() {
+    void process_typeOnTheEngine_currentFlagsSentToThatMachine() {
         // setup
         properties.getEnabled().put(DeliveryType.CLIENT_FEATURE_FLAGS, true);
         when(clientConfigurationService.get()).thenReturn(OpenFrameClientConfiguration.builder().featureFlags(FLAGS).build());
@@ -56,7 +56,7 @@ class AgentRegistrationClientFeatureFlagsServiceTest {
         service.process(MACHINE_ID);
 
         // verifications
-        verify(deliveryDispatcher).dispatch(seedCaptor.capture());
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
         ClientFeatureFlagsDeliverySeed seed = (ClientFeatureFlagsDeliverySeed) seedCaptor.getValue();
         assertThat(seed.getAudience()).isEqualTo(DeliveryAudience.MACHINE);
         assertThat(seed.getMachineId()).isEqualTo(MACHINE_ID);
@@ -64,7 +64,7 @@ class AgentRegistrationClientFeatureFlagsServiceTest {
     }
 
     @Test
-    void process_configurationWithoutFlagsYet_emptySetHandedOver() {
+    void process_configurationWithoutFlagsYet_emptySetSent() {
         // setup
         properties.getEnabled().put(DeliveryType.CLIENT_FEATURE_FLAGS, true);
         when(clientConfigurationService.get()).thenReturn(OpenFrameClientConfiguration.builder().build());
@@ -73,7 +73,7 @@ class AgentRegistrationClientFeatureFlagsServiceTest {
         service.process(MACHINE_ID);
 
         // verifications
-        verify(deliveryDispatcher).dispatch(seedCaptor.capture());
+        verify(deliveryRouter).dispatch(seedCaptor.capture());
         assertThat(((ClientFeatureFlagsDeliverySeed) seedCaptor.getValue()).getFlags()).isEmpty();
     }
 
@@ -83,7 +83,7 @@ class AgentRegistrationClientFeatureFlagsServiceTest {
         service.process(MACHINE_ID);
 
         // verifications
-        verifyNoInteractions(clientConfigurationService, deliveryDispatcher);
+        verifyNoInteractions(clientConfigurationService, deliveryRouter);
     }
 
     @Test
@@ -91,7 +91,7 @@ class AgentRegistrationClientFeatureFlagsServiceTest {
         // setup
         properties.getEnabled().put(DeliveryType.CLIENT_FEATURE_FLAGS, true);
         when(clientConfigurationService.get()).thenReturn(OpenFrameClientConfiguration.builder().featureFlags(FLAGS).build());
-        doThrow(new IllegalStateException("kafka down")).when(deliveryDispatcher).dispatch(any());
+        doThrow(new IllegalStateException("kafka down")).when(deliveryRouter).dispatch(any());
 
         // execution + verifications
         assertThatCode(() -> service.process(MACHINE_ID)).doesNotThrowAnyException();

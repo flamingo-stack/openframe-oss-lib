@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated';
 import { LoadingRegion } from '../loading/loading-region';
@@ -13,6 +13,8 @@ import { SquareAvatar } from '../ui/square-avatar';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { SKELETON_TITLE_WIDTHS } from './chat-nav-sidebar';
+import { dialogTimestamp } from './mingo-chat-day-groups';
+import { useLoadMoreSentinel } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
 /**
@@ -64,8 +66,11 @@ export interface MingoChatHistoryProps {
   hasMore?: boolean;
   /** True while the next page is loading. */
   isLoadingMore?: boolean;
-  /** Fetch the next page — fired when the bottom sentinel scrolls into view. */
+  /** Fetch the next page — fired when the bottom sentinel scrolls into view, or on "Show more" (`loadMore`). */
   onLoadMore?: () => void;
+  /** How the next page loads: as the list's end scrolls into view (`'scroll'`, the default), or on a
+   *  "Show more" under it (`'button'`, a page at a time; it spins while the page loads). */
+  loadMore?: 'scroll' | 'button';
   /** The first page is still loading: the list draws its own loading state (one page of rows). Inside a
    *  `LoadingScope` it does so whatever this says. */
   loading?: boolean;
@@ -85,12 +90,6 @@ interface DialogGroup {
 // Date grouping — Today / Yesterday / Older
 // =============================================================================
 
-function dialogTime(d: DialogItem): number | null {
-  if (!d.timestamp) return null;
-  const t = typeof d.timestamp === 'string' ? Date.parse(d.timestamp) : d.timestamp.getTime();
-  return Number.isNaN(t) ? null : t;
-}
-
 function groupDialogs(dialogs: ReadonlyArray<DialogItem>): DialogGroup[] {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -100,7 +99,7 @@ function groupDialogs(dialogs: ReadonlyArray<DialogItem>): DialogGroup[] {
   const yesterday: DialogItem[] = [];
   const older: DialogItem[] = [];
   for (const d of dialogs) {
-    const t = dialogTime(d);
+    const t = dialogTimestamp(d);
     if (t !== null && t >= startOfToday) today.push(d);
     else if (t !== null && t >= startOfYesterday) yesterday.push(d);
     else older.push(d); // includes timestamp-less dialogs
@@ -363,6 +362,7 @@ export function MingoChatHistory({
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
+  loadMore = 'scroll',
   loading = false,
   pageSize = CHAT_HISTORY_PAGE_SIZE,
   className,
@@ -377,42 +377,15 @@ export function MingoChatHistory({
   const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>();
 
   // Infinite scroll — load the next page when the sentinel enters the
-  // scroll viewport.
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  // Refreshed in an unconditional effect, declared before the observer effect
-  // so it wins the same flush. Not in the render body: the only reader is the
-  // IntersectionObserver callback, which cannot fire before a commit, and a
-  // discarded render attempt must not install a loading flag that never was.
-  const onLoadMoreRef = useRef(onLoadMore);
-  const isLoadingMoreRef = useRef(isLoadingMore);
-  useEffect(() => {
-    onLoadMoreRef.current = onLoadMore;
-    isLoadingMoreRef.current = isLoadingMore;
+  // scroll viewport. Not with "Show more": the list then grows on a click only.
+  const onScroll = loadMore === 'scroll';
+  const sentinelRef = useLoadMoreSentinel({
+    hasMore: hasMore && onScroll,
+    isLoadingMore,
+    onLoadMore,
+    itemCount: dialogs.length,
+    rootRef: scrollRef,
   });
-  const dialogCount = dialogs.length;
-  useEffect(() => {
-    const root = scrollRef.current;
-    const sentinel = sentinelRef.current;
-    if (!root || !sentinel || !hasMore || typeof IntersectionObserver === 'undefined') return undefined;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !isLoadingMoreRef.current) {
-          onLoadMoreRef.current?.();
-        }
-      },
-      { root, rootMargin: '120px', threshold: 0.1 },
-    );
-    io.observe(sentinel);
-    return () => io.disconnect();
-    // `dialogCount`/`isLoadingMore` deps re-arm the observer after every page
-    // lands: `observe()` re-reports the CURRENT intersection, so a sentinel
-    // that stays in view (short host-filtered list — e.g. the "My Chats"
-    // scope keeps a handful of rows out of a 20-row page) keeps chaining
-    // loads until the viewport fills or `hasMore` flips. A continuously
-    // visible sentinel never re-crosses the threshold, so the previous
-    // [hasMore]-only observer fired exactly once per mount and the list
-    // grew by a single page per drawer open.
-  }, [hasMore, isLoadingMore, dialogCount, scrollRef]);
 
   if (isLoading) return <MingoChatHistorySkeleton rows={pageSize} className={className} />;
 
@@ -456,7 +429,20 @@ export function MingoChatHistory({
               </div>
             ))
           )}
-          {hasMore ? <div ref={sentinelRef} className="h-px shrink-0" /> : null}
+          {hasMore && onScroll ? <div ref={sentinelRef} className="h-px shrink-0" /> : null}
+          {hasMore && !onScroll && onLoadMore ? (
+            <Button
+              variant="link"
+              size="compact"
+              type="button"
+              data-tone="neutral"
+              loading={isLoadingMore}
+              onClick={onLoadMore}
+              className="self-start px-[var(--spacing-system-xs)]"
+            >
+              Show more
+            </Button>
+          ) : null}
         </div>
 
         {/* Scroll-fade — only while content is hidden in that direction. */}

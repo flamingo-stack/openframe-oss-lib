@@ -24,7 +24,7 @@
  *     equivalent runtime-context yet; bring it back when there is one.
  *
  * Everything else (debounce, `useChatRuntime` for embed-mode short-
- * circuit, embed-shim router, the action-resolver + result-mapper) is
+ * circuit, the action-resolver + result-mapper) is
  * now lib-resident.
  *
  * ## Result hrefs go through the content-href seam
@@ -40,16 +40,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useChatRuntime } from '../../../contexts/chat-runtime-context';
-import { useRouter } from '../../../embed-shims';
 import { useDebounce } from '../../../hooks/ui/use-debounce';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import { ASK_AI_OPEN_WITH_REF_EVENT } from '../../chat/utils/ask-ai-events';
-import {
-  resolveExternalNavigation,
-  stripSameOriginToPath,
-  NEW_TAB_FEATURES,
-} from '../../chat/utils/chat-nav-resolution';
+import { executeNavigationImperative, executeNewTabNavigation } from '../../chat/utils/execute-navigation';
 import type { SearchResult } from '../../ui/search-input';
 import { mapDocSearchResults } from './map-doc-search-results';
 import { resolveSearchResultAction } from './resolve-search-result-action';
@@ -153,7 +148,6 @@ export function useDocSearch(config: UseDocSearchConfig) {
   const { source, baseRoute, onNavigate, tableIds, onInPageSwap, searchEndpoint, composeContentUrl } = config;
   const tableIdsKey = tableIds && tableIds.length > 0 ? tableIds.join(',') : '';
 
-  const router = useRouter();
   // Optional chat-runtime read — when present and mode='embed' the
   // search-result row click short-circuits to a new-tab open against
   // the absolutized URL. Null/host preserves today's behavior.
@@ -255,7 +249,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
         button?: number;
       },
     ) => {
-      const action = resolveSearchResultAction(result, source, runtime?.navigation.mode, resolvedComposeContentUrl);
+      const action = resolveSearchResultAction(result, source, runtime, resolvedComposeContentUrl);
       // Modifier / non-primary mouse click → force new tab regardless of
       // same-tab/new-tab decision. The dropdown row is a `<div>`, not an
       // `<a target="_blank">`, so the browser doesn't background-tab
@@ -270,48 +264,31 @@ export function useDocSearch(config: UseDocSearchConfig) {
           modifiers.altKey ||
           (typeof modifiers.button === 'number' && modifiers.button !== 0));
       switch (action.kind) {
-        case 'navigate-same-tab': {
+        case 'navigate-same-tab':
+        case 'navigate-new-tab': {
+          // A modifier / non-primary click asks for a new tab, whatever the decision: the row is a `<div>`, not an
+          // anchor, so the browser will not do it natively. Opened the one way a new tab is opened.
           if (wantsNewTab) {
             setKeepOpen(true);
-            window.open(action.href, '_blank', NEW_TAB_FEATURES);
+            executeNewTabNavigation({ runtime, href: action.href, targetPlatform: action.targetPlatform });
             return;
           }
-          // Same-origin click:
-          //   1. If the href is under the current doc-tree's baseRoute AND
-          //      an `onInPageSwap` callback is wired AND returns true →
-          //      consider in-page swap handled.
-          //   2. Otherwise → embed-shim `router.push()` (soft RSC nav on
-          //      Next.js hosts, window.location.assign on bare hosts).
-          setKeepOpen(false);
+          // A new-tab result keeps the dropdown open, so the user can pick another without searching again.
+          setKeepOpen(action.kind === 'navigate-new-tab');
+          // The host's in-place doc swap, when the href is under the current doc tree.
           const path =
             baseRoute && action.href.startsWith(`${baseRoute}/`) ? action.href.slice(baseRoute.length + 1) : null;
-          if (path && onInPageSwap?.(path)) return;
-          router.push(stripSameOriginToPath(action.href));
+          if (action.kind === 'navigate-same-tab' && path && onInPageSwap?.(path)) return;
+          // THE click executor, given the inputs the action was decided from, so it decides the same way.
+          executeNavigationImperative({
+            runtime,
+            href: action.href,
+            path,
+            targetPlatform: action.targetPlatform,
+            hostRoute: action.hostRoute,
+          });
           return;
         }
-        case 'navigate-new-tab':
-          // Cross-origin (e.g. clicking a flamingo.run release from
-          // product-hub) — open in a new tab. Keep dropdown open so the
-          // user can pick another result without re-searching.
-          setKeepOpen(true);
-          // Embed-mode short-circuit — the row was clicked while the panel is
-          // hosted inside an embedding app, so absolutize against the
-          // embedder-supplied content origin and honor its `openExternal`
-          // override. Not the only path an embed host takes: a composed
-          // RELATIVE href resolves to `navigate-same-tab` above and never
-          // reaches `decideNewTab`, which is what lets an embedder keep its
-          // own in-app routes in-app.
-          if (runtime?.navigation.mode === 'embed') {
-            const targetPlatform = (result.metadata?.targetPlatform as string | null | undefined) ?? null;
-            resolveExternalNavigation({
-              href: action.href,
-              targetPlatform,
-              runtime,
-            }).open();
-            return;
-          }
-          window.open(action.href, '_blank', NEW_TAB_FEATURES);
-          return;
         case 'ask-ai':
           // Row is searchable-but-not-openable (cap_table positions,
           // financial-kpi snapshots, anything backed by
@@ -331,7 +308,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
           return;
       }
     },
-    [onNavigate, source, baseRoute, router, onInPageSwap, runtime, resolvedComposeContentUrl],
+    [onNavigate, source, baseRoute, onInPageSwap, runtime, resolvedComposeContentUrl],
   );
 
   // Reset keepOpen when query changes. Adjusted while rendering, not from an

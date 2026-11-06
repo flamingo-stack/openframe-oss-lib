@@ -1,6 +1,7 @@
 package com.openframe.authz.security.flow;
 
 import com.openframe.authz.dto.InvitationRegistrationRequest;
+import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.security.SsoRegistrationConstants;
@@ -39,6 +40,8 @@ class InviteSsoHandlerTest {
 
     @Mock
     private InvitationRegistrationService invitationRegistrationService;
+    @Mock
+    private SessionPrincipalBinder sessionPrincipalBinder;
 
     private final SsoCookieCodec codec = cookieCodec();
     private InviteSsoHandler handler;
@@ -47,7 +50,7 @@ class InviteSsoHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new InviteSsoHandler(codec, invitationRegistrationService);
+        handler = new InviteSsoHandler(codec, invitationRegistrationService, sessionPrincipalBinder);
     }
 
     @AfterEach
@@ -64,10 +67,14 @@ class InviteSsoHandlerTest {
 
     @Test
     void shouldRegisterImmediatelyWhenConsentPageIsNotConfigured() {
-        when(invitationRegistrationService.registerByInvitation(any())).thenReturn(activeUser("u", "tenant-9", "new@acme.com"));
+        var invited = activeUser("u", "tenant-9", "new@acme.com");
+        when(invitationRegistrationService.registerByInvitation(any())).thenReturn(invited);
+        MockHttpServletRequest request = requestWith(true, null, false);
+        var authentication = authentication("google", invitee);
 
-        handler.handle(requestWith(true, null, false), response, authentication("google", invitee));
+        handler.handle(request, response, authentication);
 
+        verify(sessionPrincipalBinder).bind(authentication, invited, request, response);
         ArgumentCaptor<InvitationRegistrationRequest> req = ArgumentCaptor.forClass(InvitationRegistrationRequest.class);
         verify(invitationRegistrationService).registerByInvitation(req.capture());
         assertThat(req.getValue().getInvitationId()).isEqualTo("inv-1");
@@ -97,6 +104,7 @@ class InviteSsoHandlerTest {
         handler.handle(request, response, authentication("google", invitee));
 
         verify(invitationRegistrationService, never()).registerByInvitation(any());
+        verify(sessionPrincipalBinder, never()).bind(any(), any(), any(), any());
         assertThat(request.getSession(false).getAttribute(SsoRegistrationConstants.SESSION_ATTR_JOIN_INVITE_ID))
                 .isEqualTo("inv-1");
         assertThat(response.getRedirectedUrl()).isEqualTo("/auth/sso-join");

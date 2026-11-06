@@ -1,5 +1,6 @@
 package com.openframe.delivery.dispatch;
 
+import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryStatus;
@@ -21,11 +22,15 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
+
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,12 +44,19 @@ class DeliveryRecorderTest {
     private static final String DISPATCH_ID = "d-1";
     private static final String ROW_ID = "CLIENT_UNINSTALL:mach-42:mach-42";
     private static final int SEQUENCE = 7;
+    private static final String PAYLOAD_ID = "tenant-1:CLIENT_UNINSTALL:abc";
+    private static final String BODY_JSON = "{\"value\":\"issued\"}";
+    private static final long OWN_WINDOW_SECONDS = 7_200L;
+    private static final long CLOCK_SLACK_SECONDS = 5L;
 
     @Mock private MachineDeliveryRepository repository;
+    @Mock private DeliveryPayloadStore payloads;
     @Mock private MachineDeliverySequenceRepository sequences;
     @Mock private MachineOnlineStatus onlineStatus;
 
     @Captor private ArgumentCaptor<MachineDelivery> deliveryCaptor;
+    @Captor private ArgumentCaptor<DeliveryPayloadBody> bodyCaptor;
+    @Captor private ArgumentCaptor<Instant> expiresAtCaptor;
 
     private DeliveryRecorder recorder;
 
@@ -62,7 +74,8 @@ class DeliveryRecorderTest {
                 .machineId(MACHINE_ID)
                 .payload(payload)
                 .build();
-        recorder = new DeliveryRecorder(repository, sequences, DeliveryTestPolicies.properties(), new DeliveryPayloadJson(new JsonMapper()), onlineStatus);
+        recorder = new DeliveryRecorder(repository, payloads, sequences, DeliveryTestPolicies.properties(), new DeliveryPayloadJson(new JsonMapper()), onlineStatus);
+        lenient().when(payloads.hold(any(), any(), any())).thenReturn(PAYLOAD_ID);
     }
 
     @Test
@@ -79,7 +92,8 @@ class DeliveryRecorderTest {
         verifyNoInteractions(sequences);
         verify(repository).upsertPending(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
-        assertThat(saved.getPayloadJson()).contains("\"sequence\":7");
+        assertThat(saved.getSequence()).isEqualTo(SEQUENCE);
+        assertThat(payload.getDelivery().getSequence()).isEqualTo(SEQUENCE);
     }
 
     @Test
@@ -116,10 +130,29 @@ class DeliveryRecorderTest {
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(saved.getAttempts()).isZero();
         assertThat(saved.getDispatchId()).isEqualTo(DISPATCH_ID);
-        assertThat(saved.getPayloadJson()).contains(VALUE).contains(DISPATCH_ID);
+        assertThat(saved.getPayloadId()).isEqualTo(PAYLOAD_ID);
+        assertThat(saved.getPayloadJson()).isNull();
         assertThat(saved.getDueAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(ACK_THRESHOLD));
         assertThat(saved.getExpiresAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(TTL));
         assertThat(saved.getErrors()).isZero();
+    }
+
+    @Test
+    void record_request_bodyHeldWithoutTheDeliveryBlock_forAsLongAsTheRow() {
+        // setup
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        recorder.record(request);
+
+        // verifications
+        verify(payloads).hold(eq(DeliveryType.CLIENT_UNINSTALL), bodyCaptor.capture(), expiresAtCaptor.capture());
+        assertThat(bodyCaptor.getValue().json()).isEqualTo(BODY_JSON);
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        Instant rowExpiresAt = deliveryCaptor.getValue().getExpiresAt();
+        assertThat(expiresAtCaptor.getValue()).isEqualTo(rowExpiresAt.plusSeconds(DeliveryRecorder.BODY_OUTLIVES_ROW_SECONDS));
     }
 
     @Test
@@ -143,6 +176,48 @@ class DeliveryRecorderTest {
     }
 
     @Test
+    void record_dueLater_heldAndAnchoredAtItsMomentWithoutAskingIfTheMachineIsOnline() {
+        // setup
+        Instant dueAt = Instant.now().plusSeconds(TTL * 2);
+        DeliveryRequest<TestPayload> scheduled = request.toBuilder().dueAt(dueAt).build();
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        DeliveryRecordOutcome outcome = recorder.record(scheduled);
+
+        // verifications
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.HELD);
+        verifyNoInteractions(onlineStatus);
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(saved.getAttempts()).isZero();
+        // the reconnect window and the ttl run from the moment, so a far moment is neither failed offline nor expired
+        assertThat(saved.getDispatchedAt()).isEqualTo(dueAt);
+        assertThat(saved.getDueAt()).isEqualTo(dueAt);
+        assertThat(saved.getExpiresAt()).isEqualTo(dueAt.plusSeconds(TTL));
+    }
+
+    @Test
+    void record_scheduledMomentAlreadyPast_recordedTheOrdinaryWay() {
+        // setup
+        DeliveryRequest<TestPayload> late = request.toBuilder().dueAt(Instant.now().minusSeconds(60)).build();
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        DeliveryRecordOutcome outcome = recorder.record(late);
+
+        // verifications
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.RECORDED);
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getDueAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(ACK_THRESHOLD));
+    }
+
+    @Test
     void record_request_sequenceStampedIntoThePayloadBeforeItIsStored() {
         // setup
         when(sequences.next()).thenReturn(SEQUENCE);
@@ -156,7 +231,7 @@ class DeliveryRecorderTest {
         assertThat(payload.getDelivery().getSequence()).isEqualTo(SEQUENCE);
         verify(repository).upsertPending(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
-        assertThat(saved.getPayloadJson()).contains("\"sequence\":7");
+        assertThat(saved.getSequence()).isEqualTo(SEQUENCE);
     }
 
     @Test
@@ -186,5 +261,51 @@ class DeliveryRecorderTest {
         // execution + verifications
         assertThatThrownBy(() -> recorder.record(forEveryMachine)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(repository, sequences);
+    }
+    @Test
+    void record_requestWithItsOwnReconnectWindow_ruleOnTheRowAndTheRowOutlivesTheWindow() {
+        // setup
+        Instant before = Instant.now();
+        request = request.toBuilder()
+                .offlineBehavior(DeliveryOfflineBehavior.RETRY_ON_RECONNECT)
+                .reconnectWindowSeconds(OWN_WINDOW_SECONDS)
+                .build();
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(false);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        recorder.record(request);
+
+        // verifications
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
+        assertThat(saved.getReconnectWindowSeconds()).isEqualTo(OWN_WINDOW_SECONDS);
+        assertThat(saved.getExpiresAt())
+                .isAfterOrEqualTo(before.plusSeconds(DeliveryTestPolicies.TTL + OWN_WINDOW_SECONDS))
+                .isBefore(before.plusSeconds(DeliveryTestPolicies.TTL + OWN_WINDOW_SECONDS + CLOCK_SLACK_SECONDS));
+    }
+
+    @Test
+    void record_requestThatSkipsOfflineMachines_ruleOnTheRowAndTheTypesTtl() {
+        // setup
+        Instant before = Instant.now();
+        request = request.toBuilder().offlineBehavior(DeliveryOfflineBehavior.SKIP).build();
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        recorder.record(request);
+
+        // verifications
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
+        assertThat(saved.getReconnectWindowSeconds()).isNull();
+        assertThat(saved.getExpiresAt())
+                .isAfterOrEqualTo(before.plusSeconds(DeliveryTestPolicies.TTL))
+                .isBefore(before.plusSeconds(DeliveryTestPolicies.TTL + CLOCK_SLACK_SECONDS));
     }
 }

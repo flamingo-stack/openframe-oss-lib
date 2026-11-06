@@ -161,10 +161,7 @@ function TicketRowLoaded({
           aria-expanded={expanded && !optimistic}
           aria-controls={`ticket-drawer-${ticket.id}`}
         />
-        <CollapsibleContent
-          id={`ticket-drawer-${ticket.id}`}
-          className="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden"
-        >
+        <CollapsibleContent id={`ticket-drawer-${ticket.id}`} className="overflow-hidden">
           <TicketDetailDrawer
             ticket={ticket}
             busy={busy}

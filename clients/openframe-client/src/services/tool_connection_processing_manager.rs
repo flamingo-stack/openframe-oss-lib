@@ -326,7 +326,8 @@ impl ToolConnectionProcessingManager {
                             continue;
                         }
 
-                        if let Err(e) = tool_connection_service
+                        // The publish already landed and nothing reads the local record, so a failed save keeps the normal cadence.
+                        match tool_connection_service
                             .save(ToolConnection {
                                 tool_agent_id: tool.tool_agent_id.clone(),
                                 agent_tool_id: agent_tool_id.clone(),
@@ -334,12 +335,13 @@ impl ToolConnectionProcessingManager {
                             })
                             .await
                         {
-                            error!(tool_id = %tool.tool_id, error = %e, "Failed to save tool connection record");
-                            sleep(Duration::from_secs(RETRY_DELAY_SECONDS)).await;
-                            continue;
+                            Ok(()) => {
+                                info!(tool_id = %tool.tool_id, agent_tool_id = %agent_tool_id, "Tool connection message published successfully and saved")
+                            }
+                            Err(e) => {
+                                error!(tool_id = %tool.tool_id, agent_tool_id = %agent_tool_id, "Tool connection message published, but saving the local record failed: {e:#}")
+                            }
                         }
-
-                        info!(tool_id = %tool.tool_id, agent_tool_id = %agent_tool_id, "Tool connection message published successfully and saved");
                         reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;
                         tokio::select! {
                             _ = sleep(Duration::from_secs(REPUBLISH_INTERVAL_SECONDS)) => {}

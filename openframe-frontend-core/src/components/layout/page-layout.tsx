@@ -85,7 +85,7 @@ export interface PageLayoutProps {
    *  ellipsis clamp (forwarded to `TitleBlock`). For content detail pages whose h1 is CMS
    *  data of arbitrary length. Additive + default-preserving. */
   titleWrap?: boolean;
-  /** With `titleWrap`, the loading title's lines per breakpoint (forwarded to `TitleBlock`). */
+  /** The loading title's lines per breakpoint (forwarded to `TitleBlock`). */
   titleSkeletonLines?: TextLinesByBreakpoint;
 }
 

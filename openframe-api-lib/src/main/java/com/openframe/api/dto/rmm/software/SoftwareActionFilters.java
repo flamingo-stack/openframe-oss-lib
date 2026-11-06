@@ -16,6 +16,7 @@ public class SoftwareActionFilters {
 
     private List<ScriptFilterOption> statuses;
     private List<ScriptFilterOption> actions;
+    private List<ScriptFilterOption> kinds;
     private List<ScriptFilterOption> engines;
     private Integer filteredCount;
 }

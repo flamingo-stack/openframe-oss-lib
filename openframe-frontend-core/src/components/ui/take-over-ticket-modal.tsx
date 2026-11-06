@@ -39,6 +39,22 @@ export interface TakeOverTicketModalProps {
   initialAssigneeId?: string | null;
   /** Confirm in-flight: buttons lock and the modal refuses to close. */
   isPending?: boolean;
+  /**
+   * Server search for the Assigned picker. When set, `assigneeOptions` is the
+   * server's answer to the query reported here and is not filtered locally:
+   * called with the raw query on every keystroke (debounce in the caller) and
+   * with `''` when the picker resets (a pick, closing it, the clear button).
+   * While `assigneesLoading`, the previous rows stay listed, and the picked
+   * assignee keeps their name and avatar after leaving `assigneeOptions`.
+   */
+  onAssigneeSearchChange?: (query: string) => void;
+  /**
+   * The pre-selected assignee as an option, for when `assigneeOptions` does
+   * not include them (a server search's first page) — the field would read
+   * the raw id otherwise. Only renders the selection; `initialAssigneeId`
+   * still decides it.
+   */
+  initialAssigneeOption?: TakeOverAssigneeOption;
   onConfirm: (selection: TakeOverTicketSelection) => void;
 }
 
@@ -76,6 +92,20 @@ export function renderTicketAssigneeOption(option: AutocompleteOption, isSelecte
 }
 
 /**
+ * The assignee options with each avatar as the option's `icon` — shared by the
+ * ticket lifecycle modals. The Assigned field leads with the SELECTED option's
+ * icon, which `Autocomplete` resolves even after a server search has dropped
+ * that option from `assigneeOptions`; an adornment looked up in the current
+ * options lost the avatar the moment that happened.
+ */
+export function withTicketAssigneeAvatars(options: TakeOverAssigneeOption[]): TakeOverAssigneeOption[] {
+  return options.map(option => ({
+    ...option,
+    icon: <SquareAvatar src={option.imageUrl} alt={option.label} fallback={option.label} size="sm" variant="round" />,
+  }));
+}
+
+/**
  * Take Over Ticket confirmation dialog (Figma openframe---tickets 8482-112154 /
  * 8482-112169): shown when a technician takes a ticket over from the AI
  * assistant. Presentational — the consumer supplies the option lists, their
@@ -97,6 +127,8 @@ export function TakeOverTicketModal({
   initialAssigneeId,
   isPending = false,
   onConfirm,
+  onAssigneeSearchChange,
+  initialAssigneeOption,
 }: TakeOverTicketModalProps) {
   const [statusId, setStatusId] = useState<string | null>(initialStatusId ?? null);
   const [assigneeId, setAssigneeId] = useState<string | null>(initialAssigneeId ?? null);
@@ -121,7 +153,6 @@ export function TakeOverTicketModal({
 
   const selectedStatusId = statusId ?? statusOptions[0]?.value ?? null;
   const selectedStatus = statusOptions.find(o => o.value === selectedStatusId);
-  const selectedAssignee = assigneeOptions.find(o => o.value === assigneeId);
 
   const handleConfirm = () => {
     if (!selectedStatusId || !assigneeId || isPending) return;
@@ -155,22 +186,13 @@ export function TakeOverTicketModal({
         <div className="min-w-0 flex-1">
           <Autocomplete
             label="Assigned"
-            options={assigneeOptions}
+            options={withTicketAssigneeAvatars(assigneeOptions)}
             value={assigneeId}
             onChange={setAssigneeId}
             placeholder="Select Technician"
             loading={assigneesLoading}
-            startAdornment={
-              selectedAssignee ? (
-                <SquareAvatar
-                  src={selectedAssignee.imageUrl}
-                  alt={selectedAssignee.label}
-                  fallback={selectedAssignee.label}
-                  size="sm"
-                  variant="round"
-                />
-              ) : undefined
-            }
+            onSearchChange={onAssigneeSearchChange}
+            selectedOptions={initialAssigneeOption ? withTicketAssigneeAvatars([initialAssigneeOption]) : undefined}
             renderOption={renderTicketAssigneeOption}
           />
         </div>

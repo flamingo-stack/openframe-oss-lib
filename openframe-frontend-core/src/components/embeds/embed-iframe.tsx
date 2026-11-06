@@ -43,8 +43,10 @@ export interface EmbedIframeProps {
   allow?: string;
   /** iframe `referrerPolicy` attribute */
   referrerPolicy?: React.IframeHTMLAttributes<HTMLIFrameElement>['referrerPolicy'];
-  /** iframe `loading` attribute */
-  loading?: 'eager' | 'lazy';
+  /** iframe `loading` attribute (eager or lazy). */
+  iframeLoading?: 'eager' | 'lazy';
+  /** The frame's source is not known yet: the frame draws its loading form. A loading scope does the same. */
+  loading?: boolean;
   /** iframe `allowFullScreen` attribute */
   allowFullScreen?: boolean;
   /**
@@ -74,7 +76,8 @@ export function EmbedIframe({
   height,
   allow,
   referrerPolicy,
-  loading,
+  iframeLoading,
+  loading = false,
   allowFullScreen,
   sandbox,
 }: EmbedIframeProps) {
@@ -87,7 +90,7 @@ export function EmbedIframe({
   const isLoaded = loadedSrc === src;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const handleLoad = useCallback(() => setLoadedSrc(src), [src]);
-  const held = useLoadingScope();
+  const held = useLoadingScope() || loading;
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -123,7 +126,7 @@ export function EmbedIframe({
           onLoad={handleLoad}
           allow={allow}
           referrerPolicy={referrerPolicy}
-          loading={loading}
+          loading={iframeLoading}
           allowFullScreen={allow?.includes('fullscreen') ? undefined : allowFullScreen}
           sandbox={sandbox}
         />

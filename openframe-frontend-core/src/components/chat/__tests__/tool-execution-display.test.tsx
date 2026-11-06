@@ -10,6 +10,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { decodeNatsChunk } from '../../../chat-protocol/nats-decoder';
+import { chatProgressFrame } from '../../../chat-protocol/progress';
 import { ToolExecutionDisplay } from '../tool-execution-display';
 import type { ToolExecutionData } from '../types/message.types';
 
@@ -62,6 +64,16 @@ describe('ToolExecutionDisplay', () => {
     expect(expander()).toBeTruthy();
   });
 
+  it("draws a hub turn's closed stage as the one-line row Mingo's tool rows use, not a card", () => {
+    const event = decodeNatsChunk(chatProgressFrame({ stage: 'searching', count: 16 }, 'done', 't1'));
+    if (event?.type !== 'tool-execution') throw new Error('not a tool-execution event');
+    render(<ToolExecutionDisplay message={event.data} assistantType="mingo" />);
+    expect(screen.getByText('Searching 16 sources')).toBeTruthy();
+    // The card layout writes its state as a "Done" line; the one-line row shows only the check mark.
+    expect(screen.queryByText('Done')).toBeNull();
+    expect(expander()).toBeNull();
+  });
+
   it('drops the expander once a local run ends with no arguments and no result', () => {
     // Its "Result:" placeholder is gone with the run, so nothing is left behind the chevron.
     render(
@@ -78,5 +90,16 @@ describe('ToolExecutionDisplay', () => {
     // Collapsing to a static row here would render a blank line.
     render(<ToolExecutionDisplay message={{ ...remoteRead, toolTitle: undefined }} assistantType="mingo" />);
     expect(expander()).toBeTruthy();
+  });
+
+  it("squares the expander's corners: the frame clips them, and the open body meets it flat", () => {
+    render(
+      <ToolExecutionDisplay
+        message={{ ...remoteRead, type: 'EXECUTED_TOOL', success: true, result: '{"tickets":[]}' }}
+        assistantType="mingo"
+      />,
+    );
+    expect(expander()).toHaveClass('rounded-none');
+    expect(expander()).not.toHaveClass('rounded-md');
   });
 });

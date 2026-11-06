@@ -4,6 +4,7 @@ import { resetDownloadsStore } from '../../../hooks/use-downloads';
 import {
   DOWNLOADS_MOBILE_TITLE,
   DOWNLOADS_TITLE,
+  OPEN_APP_LABEL,
   type AppDownload,
   type DownloadActionEvent,
   type DownloadsPublic,
@@ -89,6 +90,27 @@ describe('DownloadAppsPage', () => {
       ['installer', 'mac'],
       ['command', 'homebrew'],
     ]);
+  });
+
+  it('swaps an installer the host says was downloaded for "Open the app", leaving the others downloads', () => {
+    const onDownloadAction = vi.fn<(event: DownloadActionEvent) => void>();
+    render(
+      <DownloadAppsPage
+        initialData={DATA}
+        onDownloadAction={onDownloadAction}
+        openAppHref={download => (download.id === 'mac' ? 'openframe-console://download?id=abc' : null)}
+      />,
+    );
+    const openApp = screen.getByRole('link', { name: OPEN_APP_LABEL });
+    expect(openApp.getAttribute('href')).toBe('openframe-console://download?id=abc');
+    expect(openApp.hasAttribute('download')).toBe(false);
+    expect(screen.queryByRole('link', { name: 'Download for Mac' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Download for Windows (x64)' }).getAttribute('href')).toBe(
+      'https://gateway.test/x64',
+    );
+
+    fireEvent.click(openApp);
+    expect(onDownloadAction).not.toHaveBeenCalled();
   });
 
   it('offers the mobile app only when the host turns the desktop app off', () => {

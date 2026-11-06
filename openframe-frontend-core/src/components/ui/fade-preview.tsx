@@ -75,6 +75,18 @@ export interface FadePreviewProps {
   children: React.ReactNode;
 }
 
+/**
+ * The preview fade every fading surface shares: the content itself goes from opaque to
+ * fully transparent towards the bottom of its box, from `from` (a CSS length or
+ * percentage) down, so whatever lies behind it shows through - no colour of its own.
+ * `FadePreview` fades from `30%`; the layout's floating composer dock fades the page
+ * under it over the dock's height.
+ */
+export function previewFadeMask(from: string): Pick<React.CSSProperties, 'maskImage' | 'WebkitMaskImage'> {
+  const mask = `linear-gradient(to bottom, black ${from}, transparent 100%)`;
+  return { maskImage: mask, WebkitMaskImage: mask };
+}
+
 /** The content's box in fill mode, per breakpoint (spelled out: Tailwind only emits classes it can read). */
 const FILL_CLASSES: Record<string, string> = {
   true: 'absolute inset-0',
@@ -243,12 +255,7 @@ export function FadePreview({
           ...(!fixed
             ? { maxHeight: expanded && openHeight != null ? `${openHeight}px` : cssLength(collapsedHeight) }
             : {}),
-          ...(!expanded && needsFade
-            ? {
-                maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
-              }
-            : {}),
+          ...(!expanded && needsFade ? previewFadeMask('30%') : {}),
         }}
       >
         {children}

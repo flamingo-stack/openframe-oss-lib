@@ -139,6 +139,7 @@ export * from './dropdown-button';
 export * from './more-actions-menu';
 export * from './organization-card';
 export * from './page-actions';
+export * from './mobile-action-bar';
 export * from './service-card';
 export * from './slider';
 export * from './avatar-stack';
@@ -147,6 +148,7 @@ export * from './deleted-user-avatar';
 export * from './square-avatar';
 // THE sizes of the library's components (avatars, icons, tiles, media, text rows).
 export * from '../../styles/component-sizes';
+export * from '../../styles/image-sizes';
 export * from './tab-selector';
 export * from './tag';
 export * from './title-content-block';

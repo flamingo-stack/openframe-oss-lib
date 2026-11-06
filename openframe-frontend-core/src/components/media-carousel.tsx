@@ -2,6 +2,7 @@
 
 import { useState, useRef, memo, useCallback, type KeyboardEvent, type TouchEvent } from 'react';
 import { Image, Link } from '../embed-shims';
+import { IMAGE_SLOT } from '../styles/image-sizes';
 import { cn } from '../utils/cn';
 import type { MediaItem } from '../utils/media-carousel-utils-stub';
 import { Video } from './features/video';
@@ -226,7 +227,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
           )}
           priority={mainImagePriority}
           loading={mainImagePriority ? 'eager' : 'lazy'}
-          sizes="(max-width: 1279px) 100vw, 1428px"
+          sizes={IMAGE_SLOT.full}
           width={1428}
           height={802}
           unoptimized

@@ -3,9 +3,11 @@
 //
 // Participant sections are keyed by the employee DEPARTMENT (FK to the ONE
 // `departments` table — see department.ts); there is no function enum.
-// A doc has no status: it is READY when every section is signed off and no
-// blocking comment is open. That math lives in the hub's
+// A doc's READINESS is derived: it is ready when every section is signed off and
+// no blocking comment is open. That math lives in the hub's
 // `lib/utils/design-doc-gate.ts` (isomorphic, shared by server + client).
+// Beside it a PERSON may set a lifecycle status (`lifecycle_status`: postponed,
+// shipped, archived), which replaces readiness on every surface while it is set.
 
 // MIGRATION NOTE (2026-09-11). This file dropped `status`, `DesignDocStatus`,
 // `DesignDocStatusTransition`, `approved_at`, `dri_vacated_by`, `by_status` and
@@ -53,7 +55,15 @@ import type { EntityAuthor } from './entity-author';
 /** One value of `design_doc_vocabulary.kind` — the STRUCTURAL list (one per
  *  value column), the only design-doc vocabulary that is code. */
 export type DesignDocVocabularyKind =
-  'tier' | 'spec_mode' | 'participant_status' | 'comment_type' | 'comment_status' | 'link_type' | 'media_type';
+  | 'tier'
+  | 'spec_mode'
+  | 'participant_status'
+  | 'comment_type'
+  | 'comment_status'
+  | 'link_type'
+  | 'media_type'
+  | 'lifecycle_status'
+  | 'readiness';
 
 /** A `design_doc_vocabulary` row, as the DAL and the vocabulary API return it. */
 export interface DesignDocVocabularyOption {
@@ -107,6 +117,24 @@ export type DesignDocCommentStatus = string;
 export type DesignDocLinkType = string;
 /** A `design_doc_vocabulary.value` of kind `media_type`. */
 export type DesignDocMediaType = string;
+/**
+ * A `design_doc_vocabulary.value` of kind `lifecycle_status`: a status a PERSON sets (postponed, shipped, archived),
+ * beside the readiness the sign-offs decide. Null on a doc = active, and its readiness shows.
+ */
+export type DesignDocLifecycleStatus = string;
+/**
+ * A `design_doc_vocabulary.value` of kind `readiness`: the stage the sign-offs put a doc in (not ready, in active
+ * work, blocked, ready to build). The hub picks the row by its role; the words and the colour are the row's.
+ */
+export type DesignDocReadiness = string;
+
+/** A vocabulary value as a card shows it, resolved by the hub so a surface without the vocabulary can draw it. */
+export interface DesignDocVocabularyDisplay {
+  value: string;
+  label: string;
+  /** A `StatusBadge` colorScheme name. */
+  color_scheme: string;
+}
 
 // ---------------------------------------------------------------------------
 // Rows (as returned by the hub DAL — hydrated)
@@ -258,6 +286,15 @@ export interface DesignDoc {
   comments: DesignDocComment[];
   completion: DesignDocCompletion;
   my_open_work?: DesignDocMyOpenWork;
+  /** The status a person set (postponed, shipped, archived); null = active, its readiness shows. */
+  lifecycle_status: DesignDocLifecycleStatus | null;
+  /** That status as the vocabulary words it, resolved by the hub (null when none is set). */
+  lifecycle?: DesignDocVocabularyDisplay | null;
+  /** When the status was last set or cleared, and by whom. */
+  lifecycle_status_changed_at: string | null;
+  lifecycle_status_changed_by?: DesignDocPerson | null;
+  /** The stage its sign-offs put it in, as the vocabulary words it, resolved by the hub. */
+  readiness?: DesignDocVocabularyDisplay | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -328,6 +365,8 @@ export interface UpdateDesignDocData {
    */
   feature_lead_ids?: string[];
   links?: DesignDocLinkInput[];
+  /** A `lifecycle_status` value, or null to make the doc active again. Anyone who may edit the doc may set it. */
+  lifecycle_status?: DesignDocLifecycleStatus | null;
   /** OCC token — the `updated_at` the editor seeded from; mismatch → 409. */
   expected_updated_at?: string;
 }
@@ -358,10 +397,18 @@ export interface AddDesignDocCommentData {
   body: string;
 }
 
-/** The dashboard's readiness filter (`?ready=`). */
-export type DesignDocReadyFilter = 'ready' | 'not_ready';
+/** The dashboard's readiness filter (`?ready=`): one `readiness` value. */
+export type DesignDocReadyFilter = DesignDocReadiness;
+
+/**
+ * The dashboard's status filter (`?status=`): `active` (no lifecycle status set, the default) or one
+ * `lifecycle_status` value.
+ */
+export type DesignDocLifecycleFilter = 'active' | DesignDocLifecycleStatus;
 
 export interface DesignDocFilters {
+  /** Defaults to `active`: a doc a person postponed, shipped or archived is listed only under its own status. */
+  lifecycle?: DesignDocLifecycleFilter;
   ready?: DesignDocReadyFilter;
   /** One or more `spec_mode` values (CSV on the wire). */
   spec_mode?: string;
@@ -378,16 +425,18 @@ export interface DesignDocListResponse {
    *  filter itself — so a filtered row still shows what the other value holds. */
   facets: {
     spec_mode: Record<string, number>;
-    /** The same over readiness (`ready` / `not_ready`), MINUS the ready filter itself: the filter row's options. */
-    ready: Record<'ready' | 'not_ready', number>;
+    /** The same over readiness (each `readiness` value), MINUS the ready filter itself: the filter row's options. */
+    ready: Record<DesignDocReadiness, number>;
+    /** The same over the status filter (`active` and each `lifecycle_status` value), MINUS the status filter itself. */
+    lifecycle: Record<string, number>;
   };
 }
 
+/** Counted over ACTIVE docs (no lifecycle status), so postponed, shipped and archived docs never inflate open work. */
 export interface DesignDocStats {
   total: number;
-  /** Docs whose every section is signed off with no open blocking comment. */
-  ready: number;
-  not_ready: number;
+  /** How many active docs each `readiness` value holds, zeros included. */
+  readiness: Record<DesignDocReadiness, number>;
   waiting_on_me_docs: number;
   waiting_on_me_tasks: number;
 }

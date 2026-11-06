@@ -291,7 +291,7 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
-        verify(deletedMachineCleanup).removeFromSchedules("t-1", "m-del");
+        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
     }
 
     @Test
@@ -303,13 +303,13 @@ class DeviceServiceTest {
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
         doThrow(new RuntimeException("mongo hiccup"))
-                .when(deletedMachineCleanup).removeFromSchedules("t-1", "m-del");
+                .when(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
 
         assertThatThrownBy(() -> service().updateStatusByMachineId("m-del", DeviceStatus.DELETED))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("mongo hiccup");
 
-        verify(deletedMachineCleanup).removeFromSchedules("t-1", "m-del");
+        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
         verify(machineRepository, never()).save(any());
         assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
         verifyNoInteractions(deviceStatusProcessor);
@@ -326,7 +326,7 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
-        verify(deletedMachineCleanup, never()).removeFromSchedules(any(), any());
+        verify(deletedMachineCleanup, never()).cleanUpDeletedMachine(any(), any());
     }
 
 

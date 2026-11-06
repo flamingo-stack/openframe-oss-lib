@@ -4,6 +4,12 @@ import { type DEMO_DEVICES, DEMO_FLEET, DEMO_FLEET_SEARCH_OS, demoMinutesAgo } f
 
 type DemoDevice = (typeof DEMO_DEVICES)[keyof typeof DEMO_DEVICES];
 
+/** The viewer's unread notifications per device: the offline reception desktop's recordings failed overnight. */
+const DEMO_UNREAD_NOTIFICATIONS: Partial<Record<DemoDevice['id'], number>> = {
+  'device-reception': 2,
+  'device-leo': 1,
+};
+
 function device(
   cast: DemoCast,
   demo: DemoDevice,
@@ -24,6 +30,7 @@ function device(
     organizationId: organization.id,
     organization: organization.name,
     organizationImageUrl: organization.logoUrl,
+    unreadNotificationCount: DEMO_UNREAD_NOTIFICATIONS[demo.id],
   };
 }
 

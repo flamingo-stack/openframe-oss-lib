@@ -297,6 +297,11 @@ export function isPreviewEnv(): boolean {
   return process.env.VERCEL_ENV === 'preview';
 }
 
+/** Env-form production predicate (Vercel `VERCEL_ENV`): the production deployment, not a preview, not a local run. */
+export function isProductionEnv(env: Record<string, string | undefined> = process.env): boolean {
+  return env.VERCEL_ENV === 'production';
+}
+
 /** Host-form preview predicate (a `*.vercel.app` host). Dot-bounded suffix so a
  *  malicious `foo.vercel.app.evil.com` is NOT treated as preview. */
 export function isPreviewHost(hostname: string): boolean {
@@ -304,18 +309,37 @@ export function isPreviewHost(hostname: string): boolean {
 }
 
 /**
- * ALL unique cookie base domains (the cross-subdomain SSO mechanism).
+ * The registrable base of every site in the registry, each as `.base` and bare `base`: for each non-pseudo platform,
+ * the base of its resolved host. It reads the registry only, so it answers the same on a server and in a browser;
+ * a server's cookie rule reads it directly.
+ *
+ * Because `getPlatformProductionUrl` always yields a host (override OR default),
+ * `.flamingo.so` / `.flamingo.run` / `.openmsp.ai` / `.tmcg.miami` / `.openframe.ai`
+ * are ALWAYS present → cross-hub SSO is byte-identical to today.
+ */
+export function getPlatformBaseDomains(): string[] {
+  const baseDomains = new Set<string>();
+  for (const entry of PLATFORM_DOMAINS) {
+    if (entry.pseudo) continue;
+    const host = hostOf(getPlatformProductionUrl(entry.key));
+    if (!host) continue;
+    const base = toRegistrableBaseDomain(host);
+    if (base) {
+      baseDomains.add(`.${base}`);
+      baseDomains.add(base);
+    }
+  }
+  return Array.from(baseDomains);
+}
+
+/**
+ * ALL unique cookie base domains for the PAGE this runs on (the cross-subdomain SSO mechanism).
  *
  * NON-PURE (the sole such export): reads `typeof window` + `process.env` to
  * preserve byte-identical cookie behavior. Keeps the original three branches:
  *   1. localhost / private IP → [] (host-only cookies)
  *   2. Vercel preview (env OR host) → ['.vercel.app','vercel.app']
- *   3. production → for each non-pseudo platform, registrable base of its resolved
- *      host, emitted as both `.base` and bare `base`.
- *
- * Because `getPlatformProductionUrl` always yields a host (override OR default),
- * `.flamingo.so` / `.flamingo.run` / `.openmsp.ai` / `.tmcg.miami` / `.openframe.ai`
- * are ALWAYS present → cross-hub SSO is byte-identical to today.
+ *   3. production → `getPlatformBaseDomains`.
  */
 export function getAllPlatformBaseDomains(): string[] {
   if (typeof window === 'undefined') return [];
@@ -334,19 +358,8 @@ export function getAllPlatformBaseDomains(): string[] {
     return ['.vercel.app', 'vercel.app'];
   }
 
-  // Case 3: production — registrable base of every non-pseudo platform's resolved host
-  const baseDomains = new Set<string>();
-  for (const entry of PLATFORM_DOMAINS) {
-    if (entry.pseudo) continue;
-    const host = hostOf(getPlatformProductionUrl(entry.key));
-    if (!host) continue;
-    const base = toRegistrableBaseDomain(host);
-    if (base) {
-      baseDomains.add(`.${base}`);
-      baseDomains.add(base);
-    }
-  }
-  return Array.from(baseDomains);
+  // Case 3: production
+  return getPlatformBaseDomains();
 }
 
 // ── Cookie-domain guard + match (single owner; shared by the client cookie-domain.ts +

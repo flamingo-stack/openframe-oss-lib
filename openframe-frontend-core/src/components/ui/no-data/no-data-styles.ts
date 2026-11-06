@@ -4,10 +4,13 @@
 
 import { cva, type VariantProps } from 'class-variance-authority';
 
-// Leading-icon glyph scale: 16px on mobile, 24px on md+. Color is intentionally
+// Leading-icon glyph scale: 16px on mobile, 24px on md+. The slot is that box
+// itself, not the glyph's: a glyph still on its way (an agent's mark reads its
+// icon from the server) or drawn a frame late leaves the slot its height, so the
+// title or label beside it does not jump when it lands. Color is intentionally
 // omitted so the glyph inherits the current text color.
 export const noDataIconClasses =
-  'inline-flex shrink-0 items-center justify-center [&_svg]:h-4 [&_svg]:w-4 content-md:[&_svg]:h-6 content-md:[&_svg]:w-6';
+  'inline-flex size-4 shrink-0 items-center justify-center content-md:size-6 [&_svg]:h-4 [&_svg]:w-4 content-md:[&_svg]:h-6 content-md:[&_svg]:w-6';
 
 // Surface for the info-block group container: a transparent, bordered panel with
 // rounded corners. `overflow-hidden` keeps only the outer blocks round — inner

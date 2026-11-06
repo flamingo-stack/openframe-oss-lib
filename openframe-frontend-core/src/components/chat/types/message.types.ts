@@ -470,7 +470,7 @@ export interface ChatSource {
     targetPlatform?: string | null;
     /** In-app doc-tree path for markdown / data-room-doc rows so the
      *  grouped chip's anchor can trigger an in-page doc-tree swap via
-     *  `handleChatNavClick` (parity with single-row chips + cards). */
+     *  `executeNavigation` (parity with single-row chips + cards). */
     path?: string | null;
   }>;
   /** RagTableConfig.id for this source. */

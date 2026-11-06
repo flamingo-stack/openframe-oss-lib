@@ -73,7 +73,7 @@ import { ProductReleaseCard } from '../shared/product-release/product-release-ca
 export type CardSize = 'lg' | 'default' | 'sm';
 
 /** Anchor prop bundle the per-card link surface receives — same shape the
- *  hub's `useNavLink` returns and the chat dispatcher's anchor builders
+ *  `useNavLinkViaRuntime` returns and the chat dispatcher's anchor builders
  *  produce. `null` = non-anchor mode (no URL). */
 export interface CardLinkAnchorProps {
   href: string;
