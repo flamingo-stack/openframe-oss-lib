@@ -3,6 +3,8 @@ package com.openframe.api.util;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
+import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import lombok.experimental.UtilityClass;
@@ -24,11 +26,22 @@ public class FleetSoftwareMapper {
                 .id(Objects.toString(title.getId(), null))
                 .name(title.getName())
                 .source(FleetSoftwareCategory.of(title.getSource()).source())
+                .type(FleetSoftwareType.of(title.getSource()))
                 .currentVersion(current == null ? null : current.getVersion())
+                .latestVersion(latestVersion(versions))
                 .olderVersionsCount(olderVersionsCount(versions))
                 .devicesCount(title.getHostsCount())
                 .vulnerabilitySummary(rollUpVulnerabilities(versions))
                 .build();
+    }
+
+    // the highest version installed on the tenant's devices: Fleet does not say what the newest release is
+    private static String latestVersion(List<SoftwareTitleVersion> versions) {
+        return versions == null ? null : versions.stream()
+                .map(SoftwareTitleVersion::getVersion)
+                .filter(Objects::nonNull)
+                .max(SoftwareVersions::compare)
+                .orElse(null);
     }
 
     private static SoftwareTitleVersion pickCurrentVersion(List<SoftwareTitleVersion> versions) {

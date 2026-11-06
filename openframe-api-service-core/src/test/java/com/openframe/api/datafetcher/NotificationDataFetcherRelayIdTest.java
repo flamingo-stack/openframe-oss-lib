@@ -4,6 +4,7 @@ import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
+import com.openframe.api.service.NotificationRecipientResolver;
 import com.openframe.api.service.NotificationService;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.notification.readstate.NotificationReadStateService;
@@ -39,6 +40,7 @@ class NotificationDataFetcherRelayIdTest {
     @Mock private NotificationReadStateService readStateService;
     @Mock private GraphQLNotificationMapper notificationMapper;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
+    @Spy private NotificationRecipientResolver recipientResolver = new NotificationRecipientResolver();
 
     @InjectMocks private NotificationDataFetcher dataFetcher;
 

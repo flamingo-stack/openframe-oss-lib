@@ -169,8 +169,10 @@ export interface TitleBlockProps {
    *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
   titleWrap?: boolean;
   /**
-   * With `titleWrap`: the lines a typical title of the page takes per breakpoint, drawn by the loading title (a
-   * record's title is read; a long one growing past them is a settle). Absent: one bar.
+   * The lines a typical title of the page takes per breakpoint, drawn by the loading title (a record's title is read; a
+   * long one growing past them is a settle). Absent: one bar. Without `titleWrap` the loaded title wraps where the
+   * window is narrow, so the lines follow the viewport step (`phone` below `md`): a caller states `md: 1, lg: 1` and
+   * the phone count it measured.
    */
   titleSkeletonLines?: TextLinesByBreakpoint;
 }
@@ -247,8 +249,25 @@ export function TitleBlock({
     subtitleLoading ? null : subtitle,
   );
   const titleNode =
-    titleLoading && titleWrap && titleSkeletonLines ? (
+    titleLoading && titleSkeletonLines && titleWrap ? (
       <TextLinesByBreakpointSkeleton as="span" lines={titleSkeletonLines} />
+    ) : titleLoading && titleSkeletonLines ? (
+      // An unclamped title wraps where the WINDOW is narrow (a phone), not where a docked panel narrows the content:
+      // its loading lines follow the viewport step, the phone count below `md` and the `md` count above it.
+      <>
+        <span className="contents md:hidden">
+          <TextLinesByBreakpointSkeleton
+            as="span"
+            lines={{ phone: titleSkeletonLines.phone, md: titleSkeletonLines.phone, lg: titleSkeletonLines.phone }}
+          />
+        </span>
+        <span className="hidden md:contents">
+          <TextLinesByBreakpointSkeleton
+            as="span"
+            lines={{ phone: titleSkeletonLines.md, md: titleSkeletonLines.md, lg: titleSkeletonLines.lg }}
+          />
+        </span>
+      </>
     ) : titleLoading ? (
       <UnifiedSkeleton
         as="span"

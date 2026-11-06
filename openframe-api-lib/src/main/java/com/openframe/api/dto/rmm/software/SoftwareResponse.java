@@ -1,5 +1,6 @@
 package com.openframe.api.dto.rmm.software;
 
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,6 +15,7 @@ public class SoftwareResponse {
     private String name;
     private String publisher;
     private SoftwareSource source;
+    private SoftwareType type;
     private String currentVersion;
     private String latestVersion;
     private SoftwareVersionStatus versionStatus;
@@ -21,4 +23,5 @@ public class SoftwareResponse {
     private Integer devicesCount;
     private SoftwareVulnerabilitySummaryResponse vulnerabilitySummary;
     private Boolean cpeMatched;
+    private SoftwareAutoUpdateStatus autoUpdate;
 }

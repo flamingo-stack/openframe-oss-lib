@@ -1,5 +1,7 @@
 package com.openframe.api.dto.organization;
 
+import com.openframe.api.validation.ContractPeriod;
+import com.openframe.api.validation.ValidContractPeriod;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -15,6 +17,7 @@ import java.time.LocalDate;
  * Note: organizationId is generated automatically on the backend as UUID.
  */
 @Builder
+@ValidContractPeriod
 public record CreateOrganizationRequest(
         @NotBlank(message = "Name is required")
         String name,
@@ -37,5 +40,5 @@ public record CreateOrganizationRequest(
         LocalDate contractStartDate,
 
         LocalDate contractEndDate
-) {
+) implements ContractPeriod {
 }

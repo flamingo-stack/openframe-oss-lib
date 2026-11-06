@@ -1,6 +1,7 @@
 package com.openframe.data.repository.notification.impl;
 
 import com.openframe.data.document.notification.NotificationCategory;
+import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.ReadStatus;
@@ -126,6 +127,62 @@ class CustomNotificationRepositoryImplTest {
                 .containsEntry("status", ReadStatus.UNREAD)
                 .containsKeys("category", "title")
                 .doesNotContainKey("notificationId");
+    }
+
+    @Test
+    void findPageForRecipient_entityFilter_readStatesNarrowedToThatEntityTypeAndId() {
+        // setup
+        stubTenant();
+        stubEmptyReadStates();
+        NotificationReadStateFilter filter = NotificationReadStateFilter.builder()
+                .read(false)
+                .entityType(NotificationEntityType.DEVICE)
+                .entityId("machine-1")
+                .build();
+
+        // execution
+        repository.findPageForRecipient(RECIPIENT_ID, RecipientType.USER, filter, null, false, Sort.Direction.DESC, 10);
+
+        // verifications
+        assertThat(readStateQuery())
+                .containsEntry("entityType", NotificationEntityType.DEVICE)
+                .containsEntry("entityId", "machine-1")
+                .containsEntry("status", ReadStatus.UNREAD);
+    }
+
+    @Test
+    void findPageForRecipient_noEntityFilter_entityFieldsNotMentioned() {
+        // setup
+        stubTenant();
+        stubEmptyReadStates();
+
+        // execution
+        repository.findPageForRecipient(RECIPIENT_ID, RecipientType.USER, NotificationReadStateFilter.NONE,
+                null, false, Sort.Direction.DESC, 10);
+
+        // verifications
+        assertThat(readStateQuery()).doesNotContainKeys("entityType", "entityId");
+    }
+
+    @Test
+    void countForRecipient_entityFilter_countsWithTheSameEntityNarrowing() {
+        // setup
+        stubTenant();
+        when(mongoTemplate.count(any(Query.class), eq(NotificationReadState.class))).thenReturn(2L);
+        NotificationReadStateFilter filter = NotificationReadStateFilter.builder()
+                .entityType(NotificationEntityType.INSIGHT)
+                .entityId("insight-1")
+                .build();
+
+        // execution
+        long count = repository.countForRecipient(RECIPIENT_ID, RecipientType.USER, filter);
+
+        // verifications
+        assertThat(count).isEqualTo(2L);
+        verify(mongoTemplate).count(queryCaptor.capture(), eq(NotificationReadState.class));
+        assertThat(queryCaptor.getValue().getQueryObject())
+                .containsEntry("entityType", NotificationEntityType.INSIGHT)
+                .containsEntry("entityId", "insight-1");
     }
 
     private void stubTenant() {

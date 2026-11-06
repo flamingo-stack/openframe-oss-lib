@@ -8,6 +8,7 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
@@ -21,6 +22,7 @@ import java.util.stream.Stream;
 
 import static org.springframework.util.CollectionUtils.isEmpty;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class PackageManagerAvailability {
@@ -61,9 +63,10 @@ public class PackageManagerAvailability {
         List<String> notYetUsable = machines.stream()
                 .flatMap(machine -> notYetUsable(machine, packageManagers))
                 .toList();
+        // A MISSING or UNKNOWN state changes over time (user logs in, bootstrap finishes),
+        // so one such device must not block the whole request.
         if (!notYetUsable.isEmpty()) {
-            throw new BadRequestException("Package manager not yet usable on these devices: " + notYetUsable
-                    + ". Wait for the bootstrap to finish or remove the devices.");
+            log.info("Package manager not yet usable on these devices, accepting anyway: {}", notYetUsable);
         }
     }
 

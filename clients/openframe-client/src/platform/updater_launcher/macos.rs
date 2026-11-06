@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use super::{LaunchedUpdater, UpdaterParams};
 use crate::config::update_config::BOOT_MARKER_WAIT_SECS;
+use crate::platform::directories::get_update_staging_directory;
 use crate::platform::update_scripts::{UPDATER_PLIST_TEMPLATE, UPDATE_SCRIPT_MACOS};
 
 /// Launch bash updater script on macOS
@@ -13,7 +14,11 @@ use crate::platform::update_scripts::{UPDATER_PLIST_TEMPLATE, UPDATE_SCRIPT_MACO
 pub async fn launch_updater(params: UpdaterParams) -> Result<LaunchedUpdater> {
     info!("Launching macOS bash updater");
 
-    let script_path = std::env::temp_dir().join(format!("openframe-updater-{}.sh", Uuid::new_v4()));
+    let staging_dir = get_update_staging_directory();
+    tokio::fs::create_dir_all(&staging_dir)
+        .await
+        .context("Failed to create update staging directory")?;
+    let script_path = staging_dir.join(format!("openframe-updater-{}.sh", Uuid::new_v4()));
 
     tokio::fs::write(&script_path, UPDATE_SCRIPT_MACOS)
         .await
@@ -37,7 +42,7 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<LaunchedUpdater> {
 
     // Create a temporary plist to run the update script as a one-shot launchd job
     // This ensures the script survives when our service is stopped
-    let plist_path = std::env::temp_dir().join("com.openframe.updater.plist");
+    let plist_path = staging_dir.join("com.openframe.updater.plist");
 
     // Remove any leftover updater job from a previous failed update
     let _ = Command::new("launchctl")

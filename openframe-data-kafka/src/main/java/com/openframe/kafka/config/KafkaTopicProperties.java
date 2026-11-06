@@ -19,6 +19,6 @@ public class KafkaTopicProperties {
     public static class TopicConfig {
         private String name;
         private int partitions = 1;
-        private short replicationFactor = 1;
+        private short replicationFactor = -1;
     }
 }

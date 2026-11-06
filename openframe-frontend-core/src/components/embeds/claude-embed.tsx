@@ -19,7 +19,7 @@ export interface ClaudeEmbedProps {
   /** iframe height (CSS value), matching `FigmaEmbed`'s prop. */
   height?: string;
   /** iframe loading strategy. Defaults to `lazy`, as `FigmaEmbed` does. */
-  loading?: 'eager' | 'lazy';
+  iframeLoading?: 'eager' | 'lazy';
 }
 
 const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
@@ -51,7 +51,7 @@ const KIND_HEADING: Record<ClaudeEmbedKind, string> = {
  * a Claude Design url (no embed route), an artifact whose author has not
  * allow-listed this host, or an http host (mixed content).
  */
-export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = 'lazy' }: ClaudeEmbedProps) {
+export function ClaudeEmbed({ url, kind = 'artifact', title, height, iframeLoading = 'lazy' }: ClaudeEmbedProps) {
   // Mirror detection lives in `useClaudeMirrorSrc` (derive from
   // EndpointsRuntime + 1-byte ranged probe + background revalidation) — this
   // component stays presentational.
@@ -70,7 +70,7 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
       icon={<ClaudeIcon className="h-5 w-5 shrink-0" />}
       title={title?.trim() || KIND_HEADING[kind]}
       titleVariant="h6"
-      isLoading={isProbing}
+      resolving={isProbing}
       actions={
         <Button
           variant="outline"
@@ -89,7 +89,7 @@ export function ClaudeEmbed({ url, kind = 'artifact', title, height, loading = '
       // (unlike Figma's player) — the shell provides the toggle for both
       // the claude.ai `/embed` route and a mirror.
       fullscreenControl
-      loading={loading}
+      iframeLoading={iframeLoading}
       height={height}
       // Same frame contract Figma gets — an artifact is a real app: it copies
       // to the clipboard and can go fullscreen.

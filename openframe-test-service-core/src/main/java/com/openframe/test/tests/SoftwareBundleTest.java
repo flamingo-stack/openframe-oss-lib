@@ -267,7 +267,7 @@ public class SoftwareBundleTest extends BaseTest {
                 HOSTNAME + " is " + device.getStatus() + "; an install submitted now would wait for it and land after this run");
         String winget = DeviceApi.getPackageManagerState(device.getMachineId(), "winget");
         assumeTrue(winget == null || "PRESENT".equals(winget),
-                HOSTNAME + "'s agent reports winget=" + winget + "; submit refuses a package manager that is not yet usable (MISSING or UNKNOWN)");
+                HOSTNAME + "'s agent reports winget=" + winget + "; an install cannot run while the package manager is not yet usable (MISSING or UNKNOWN)");
         assumeTrue(MachineConfig.isConfigured() && HOSTNAME.equalsIgnoreCase(MachineConfig.getHostname()),
                 "No SSH channel to " + HOSTNAME + " (TARGET_* / test.machine); it is needed to check the package is absent first and to uninstall it after");
         assumeTrue(!new SshMachineVerifier().windowsProgramInstalled(PROGRAM),

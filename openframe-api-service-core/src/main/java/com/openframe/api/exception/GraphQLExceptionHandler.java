@@ -12,6 +12,7 @@ import com.openframe.security.authentication.AccessDeniedErrorCode;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
 import graphql.execution.DataFetcherExceptionHandlerResult;
+import graphql.execution.ResultPath;
 import graphql.execution.SimpleDataFetcherExceptionHandler;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
@@ -35,23 +36,24 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             DataFetcherExceptionHandlerParameters handlerParameters) {
 
         Throwable exception = handlerParameters.getException();
+        ResultPath path = handlerParameters.getPath();
         if (exception instanceof AccessDeniedException) {
             ErrorCode code = AccessDeniedErrorCode.forCurrentCaller();
             log.warn("GraphQL access denied ({}): {}", code.getCode(), exception.getMessage());
-            return result(buildError(AccessDeniedErrorCode.MESSAGE, code));
+            return result(buildError(AccessDeniedErrorCode.MESSAGE, code), path);
         }
         if (exception instanceof OptimisticLockingFailureException) {
             log.warn("GraphQL conflict: {}", exception.getMessage());
-            return result(buildError(CONFLICT_MESSAGE, ErrorCode.CONFLICT));
+            return result(buildError(CONFLICT_MESSAGE, ErrorCode.CONFLICT), path);
         }
         if (exception instanceof InvalidRelayIdException) {
             String message = exception.getMessage();
             log.warn("GraphQL invalid id: {}", message);
-            return result(buildError(message, ErrorCode.INVALID_ID));
+            return result(buildError(message, ErrorCode.INVALID_ID), path);
         }
         log.error("GraphQL error occurred", exception);
 
-        GraphQLError error;
+        GraphQLError.Builder<?> error;
 
         if (exception instanceof PinotQueryException) {
             error = buildError("Query failed. Please try again later.", ErrorCode.PINOT_QUERY_ERROR);
@@ -80,13 +82,14 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             error = buildError("An unexpected error occurred. Please try again later.", ErrorCode.INTERNAL_ERROR);
         }
 
-        return result(error);
+        return result(error, path);
     }
 
-    private static CompletableFuture<DataFetcherExceptionHandlerResult> result(GraphQLError error) {
+    // The path is how graphql-java knows a null non-null field already has its error; without it it adds a second one.
+    private static CompletableFuture<DataFetcherExceptionHandlerResult> result(GraphQLError.Builder<?> error, ResultPath path) {
         return CompletableFuture.completedFuture(
                 DataFetcherExceptionHandlerResult.newResult()
-                        .error(error)
+                        .error(error.path(path).build())
                         .build()
         );
     }
@@ -98,14 +101,13 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
                 .collect(Collectors.joining("; "));
     }
 
-    private GraphQLError buildError(String message, ErrorCode errorCode) {
+    private GraphQLError.Builder<?> buildError(String message, ErrorCode errorCode) {
         return GraphQLError.newError()
                 .message(message)
                 .extensions(Map.of(
                         "code", errorCode.getCode(),
                         "httpStatus", errorCode.getHttpStatus(),
                         "timestamp", System.currentTimeMillis()
-                ))
-                .build();
+                ));
     }
 }

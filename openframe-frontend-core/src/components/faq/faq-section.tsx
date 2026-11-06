@@ -3,6 +3,8 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAssistantRuntime } from '../../contexts/assistant-runtime-context';
+import { useEndpointsRuntime } from '../../contexts/endpoints-runtime-context';
+import { usePageTopic, usePageTopicStamp } from '../../contexts/page-topics-context';
 import Link from '../../embed-shims/next-link';
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
@@ -16,6 +18,7 @@ import { FAQ_ACCORDION_SKELETON_ROWS, FaqAccordion, type FaqItem } from '../faq-
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { PageTopicLabel } from '../page-topic-label';
 import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { FaqAskCard, faqAskCardShown, type FaqAskOptions } from './faq-ask-card';
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld';
@@ -30,15 +33,6 @@ export interface FaqSectionProps {
   /** Both required together for entity-attached FAQs; partial → bare /api/faqs. */
   entityType?: string;
   entityId?: number | string;
-  /**
-   * What the page this FAQ sits on is about: ANY string the host's FAQ
-   * endpoint knows. ONE topic for the whole block: the questions are the FAQs
-   * written for it (`/api/faqs?topic=`; `initialFaqs` are then the host's read
-   * of the same topic) and the "ask the assistant" card offers the questions
-   * written for it. Whoever renders the FAQ states it; the lib names none.
-   * Ignored for the questions when the FAQ is attached to an entity.
-   */
-  topic?: string;
   /**
    * Heading node above the grouped list. `undefined` → default
    * `<h2>`"Frequently Asked Questions". `null` → no heading (the host page
@@ -58,16 +52,16 @@ export interface FaqSectionProps {
   /** The `id` of the rendered section: what an in-page link to the FAQ points at (`PAGE_FAQ_SECTION_ID` for a page's own block). */
   id?: string;
   /**
-   * Print the topic's bare name in small muted text under the heading
+   * Print the page's topic (`usePageTopic`) in small muted text under the heading
    * (`pricing`), so whoever edits the FAQs can see which topic a page asks
-   * for. Default off. The section always carries it as `data-faq-topic` too.
+   * for. Default: the host's choice (`PageTopicsProvider showTopic`), else off. The section always carries it as `data-faq-topic` too.
    */
   showTopic?: boolean;
   /** Maps to /api/faqs `?count=` (the 5-tier fill target). Absent → param
    *  not sent (server default applies). */
   minResults?: number;
-  /** Fetch-URL prefix for third-party embeds / reverse proxies
-   *  ('' = same-origin relative). */
+  /** Fetch-URL prefix for third-party embeds / reverse proxies ('' = same-origin relative). Absent: the host's
+   *  `EndpointsRuntime.faqsUrl`, else the same-origin `/api/faqs`. */
   apiBaseUrl?: string;
   /**
    * A block beside the questions, in place of the "ask the assistant" card.
@@ -80,10 +74,9 @@ export interface FaqSectionProps {
    * The "ask the assistant" card beside the questions. Shown wherever the
    * host's assistant runtime says a chat is there to open
    * (`AssistantRuntimeContext`: its name, glyph, questions endpoint and
-   * opener) AND the FAQ has a topic: the block's `topic`, else the
-   * `entityType` the FAQ is attached to (`ask.topic` states another one for
-   * the card alone). No runtime or no topic: the FAQ is the single column it
-   * always was; the lib names no topic of its own. `false` switches the card off; the object
+   * opener) AND the page has a topic (`usePageTopic`: the host's map read at
+   * the page's address). No runtime or no topic: the FAQ is the single column
+   * it always was; the lib names no topic of its own. `false` switches the card off; the object
    * also states the questions to leave out, the wording and the chat it opens
    * (`onOpen`). An `aside` takes the card's place.
    */
@@ -102,6 +95,8 @@ export interface FaqSectionProps {
 }
 
 const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
+/** The hub's FAQ list, same-origin: what a host with no `apiBaseUrl` and no `faqsUrl` is asked. */
+const DEFAULT_FAQS_PATH = '/api/faqs';
 
 /** The block's layout, read by the block and by its skeleton, so the skeleton is the block's size. */
 const SECTION_DEFAULT_CLASS = 'space-y-10';
@@ -116,7 +111,6 @@ const ASIDE_GRID_CLASS =
 const ASIDE_QUESTIONS_CELL_CLASS = 'content-lg:col-start-2 content-lg:row-span-2 content-lg:row-start-1';
 const ASIDE_CELL_CLASS = 'content-lg:col-start-1 content-lg:row-start-2';
 const TOPIC_STACK_CLASS = 'space-y-1';
-const TOPIC_CLASS = 'text-ods-text-muted text-h6';
 const CATEGORY_NAV_CLASS = 'flex flex-wrap gap-2';
 /**
  * The nav's row while the categories are read (`skeletonNav`): which categories there are, and how many, is read data,
@@ -216,7 +210,7 @@ function faqHeadingNode(heading: React.ReactNode | null | undefined, showTopic: 
   return (
     <div className={TOPIC_STACK_CLASS}>
       <div>{titleNode}</div>
-      <p className={TOPIC_CLASS}>{topic}</p>
+      <PageTopicLabel />
     </div>
   );
 }
@@ -228,35 +222,27 @@ export const PAGE_FAQ_SECTION_ID = 'faq';
 const PAGE_FAQ_IN_PAGE_CLASS = 'space-y-10 pt-12 md:pt-20';
 
 /**
- * What a shared page of the lib takes as its `faq` prop: the topic the page is
- * about (REQUIRED, stated by the host, never read from the page's address) and
- * where the host serves the FAQs. The page renders `FaqSection` with it, inside
- * its own container, after its content (`pageFaqProps`).
+ * A shared page's own FAQ block (roadmap, delivery, releases, onboarding guides, downloads, legal documents): the
+ * page's questions, for its topic, after its content and inside its container. Drawn where the host names its FAQ
+ * endpoint (`EndpointsRuntime.faqsUrl`); a host that draws every page's FAQ itself (the hub's layout) names none, so a
+ * page never shows two. No page passes anything: the endpoint is the host's, the topic is the page's path.
  */
-export type PageFaqSlot = Pick<
-  FaqSectionProps,
-  'apiBaseUrl' | 'initialFaqs' | 'heading' | 'ask' | 'emitJsonLd' | 'jsonLd' | 'showTopic'
-> & { topic: string };
-
-/** The `FaqSection` props of a shared page's own FAQ block: the host's slot, as the page's `#faq` section. */
-export function pageFaqProps(faq: PageFaqSlot): FaqSectionProps {
-  return { ...faq, id: PAGE_FAQ_SECTION_ID, className: PAGE_FAQ_IN_PAGE_CLASS };
+export function SharedPageFaq() {
+  const faqsUrl = useEndpointsRuntime()?.faqsUrl;
+  return faqsUrl ? <FaqSection id={PAGE_FAQ_SECTION_ID} className={PAGE_FAQ_IN_PAGE_CLASS} /> : null;
 }
 
-/** URL composition shared with RelatedContentSection (`buildSuggestionUrl`)
- *  — byte-identical to the historical `buildFaqsUrl` output when
- *  `minResults`/`apiBaseUrl` are absent. */
+/** The FAQ request on `endpoint`: the composition shared with RelatedContentSection (`buildSuggestionUrl`). */
 function buildFaqsUrl(
+  endpoint: string,
   entityType?: string,
   entityId?: number | string,
   minResults?: number,
-  apiBaseUrl = '',
   topic?: string,
 ): string {
   // An entity's FAQs are the entity's: a topic narrows only the platform's own list.
   const entityScoped = !!entityType && entityId !== undefined && entityId !== null && entityId !== '';
-  return buildSuggestionUrl('/api/faqs', {
-    apiBaseUrl,
+  return buildSuggestionUrl(endpoint, {
     entityType,
     entityId,
     count: minResults,
@@ -554,8 +540,9 @@ interface FaqsResponse {
  *   page owns the <h1>) + `emitJsonLd` with `jsonLd` overrides for SEO.
  * - Per-entity embed: pass `entityType` + `entityId` (no `initialFaqs`); the
  *   hook self-fetches `GET /api/faqs`, and `heading` is this block's own <h2>.
- * - A page's own FAQ: pass `topic` (what the page is about); the hook
- *   self-fetches `GET /api/faqs?topic=`, and the ask card takes the same topic.
+ * - A page's own FAQ: the page's topic is read from its address
+ *   (`usePageTopic`); the hook self-fetches `GET /api/faqs?topic=`, and the ask
+ *   card takes the same topic.
  *
  * CONTRACT: the consuming app MUST implement `GET /api/faqs`. On a fetch error
  * (or zero FAQs) the component renders nothing so the host page isn't
@@ -566,29 +553,34 @@ export function FaqSection({
   initialFaqs,
   entityType,
   entityId,
-  topic,
   heading,
   emitJsonLd = false,
   jsonLd,
   className,
   id,
-  showTopic = false,
+  showTopic: showTopicProp,
   minResults,
-  apiBaseUrl = '',
+  apiBaseUrl,
   aside: asideProp,
   ask,
   skeletonShape,
   skeletonNav = false,
 }: FaqSectionProps) {
+  // The host's choice (`PageTopicsProvider showTopic`) unless this surface states its own.
+  const topicStamp = usePageTopicStamp();
+  const showTopic = showTopicProp ?? topicStamp;
   const assistant = useAssistantRuntime();
   const inScope = useLoadingScope();
-  // The host's own block wins; else the card, where a chat is there to open and the FAQ has a topic
-  // (an empty topic is no topic, as the questions request reads it).
-  const askTopic = ask === false ? undefined : ask?.topic || topic || entityType;
+  // THE page's topic, from its address: the questions and the ask card are the ones written for it.
+  const topic = usePageTopic();
+  // The host's own block wins; else the card, where a chat is there to open and the page has a topic.
   const aside =
-    asideProp ??
-    (ask !== false && askTopic && faqAskCardShown(assistant) ? <FaqAskCard {...ask} topic={askTopic} /> : undefined);
-  const url = buildFaqsUrl(entityType, entityId, minResults, apiBaseUrl, topic);
+    asideProp ?? (ask !== false && topic && faqAskCardShown(assistant) ? <FaqAskCard {...ask} /> : undefined);
+  // The endpoint: the caller's base (`apiBaseUrl`), else the host's (`EndpointsRuntime.faqsUrl`), else same-origin.
+  const runtimeFaqsUrl = useEndpointsRuntime()?.faqsUrl;
+  const endpoint =
+    apiBaseUrl !== undefined ? `${apiBaseUrl}${DEFAULT_FAQS_PATH}` : (runtimeFaqsUrl ?? DEFAULT_FAQS_PATH);
+  const url = buildFaqsUrl(endpoint, entityType, entityId, minResults, topic);
   // Memoized — useSelfFetch re-syncs on [initialData]; a fresh per-render
   // wrapper object would setState-loop under re-rendering parents.
   const initialData = useMemo<FaqsResponse | undefined>(
@@ -659,8 +651,10 @@ export function FaqSection({
 
 interface FaqSectionSkeletonProps extends Pick<
   FaqSectionProps,
-  'heading' | 'topic' | 'showTopic' | 'aside' | 'className' | 'id'
+  'heading' | 'showTopic' | 'aside' | 'className' | 'id'
 > {
+  /** The page's topic, as the loaded block prints it. */
+  topic?: string;
   /** The groups drawn, in order. Default one group with no heading, of `FAQ_SECTION_SKELETON_QUESTIONS` rows. */
   shape?: FaqSkeletonShape;
   /** Draw the category nav's row (one line of pills) whatever `sections` is: the host's FAQs are categorised. */
@@ -677,13 +671,16 @@ const DEFAULT_SKELETON_SHAPE: FaqSkeletonShape = [{}];
 function FaqSectionSkeleton({
   heading,
   topic,
-  showTopic = false,
+  showTopic: showTopicProp,
   aside,
   shape = DEFAULT_SKELETON_SHAPE,
   navRow = false,
   className,
   id,
 }: FaqSectionSkeletonProps) {
+  // The host's choice (`PageTopicsProvider showTopic`) unless this surface states its own.
+  const topicStamp = usePageTopicStamp();
+  const showTopic = showTopicProp ?? topicStamp;
   const headingNode = faqHeadingNode(heading, showTopic, topic);
   const CategoryHeading = heading === null ? 'h2' : 'h3';
   const groups = shape.length > 0 ? shape : DEFAULT_SKELETON_SHAPE;

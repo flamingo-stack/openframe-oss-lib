@@ -12,4 +12,6 @@ import java.util.Optional;
 public interface NotificationRepository extends MongoRepository<Notification, String>, CustomNotificationRepository {
 
     Optional<Notification> findByCorrelationId(String correlationId);
+
+    boolean existsByCorrelationId(String correlationId);
 }

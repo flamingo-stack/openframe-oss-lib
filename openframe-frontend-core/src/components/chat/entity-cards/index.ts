@@ -44,6 +44,15 @@ export { BlockCard, type BlockCardProps } from './block-card';
 export { ChatTicketItem, type ChatTicketItemData, type ChatTicketItemProps } from './chat-ticket-item';
 export { ChatVideoEntityCard, type ChatVideoEntityCardProps } from './chat-video-entity-card';
 export {
+  CHAT_CARD_DISCLOSURE,
+  CHAT_CARD_DISCLOSURES,
+  ChatCardDisclosureButton,
+  type ChatCardDisclosureKind,
+  ChatCardDisclosureRow,
+  chatCardDisclosureOf,
+  useChatCardDisclosure,
+} from './chat-card-disclosure';
+export {
   ProductReleaseCard,
   type ProductReleaseCardProps,
   type ProductReleaseCardSize,

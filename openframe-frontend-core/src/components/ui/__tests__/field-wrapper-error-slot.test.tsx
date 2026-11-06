@@ -8,31 +8,32 @@ import { Select, SelectTrigger, SelectValue } from '../select';
 import { Textarea } from '../textarea';
 
 /**
- * A label-less FieldWrapper is `display: contents` until `error` is set and a
- * box afterwards, and the parent's spacing lands on the box but not on
- * `contents` — so the control jumped by that spacing whenever a message came
- * or went. `errorSlot` renders the box from the first render, and the controls
- * derive it from whether the caller wrote an `error` attribute at all. These
- * pin both halves: the flag, and each control's wiring of it.
+ * A label-less FieldWrapper renders no element of its own (#2840) until `error`
+ * is set and a box afterwards, and the parent's spacing lands on the box but not
+ * on the bare control — so the control jumped by that spacing whenever a message
+ * came or went. `errorSlot` renders the box from the first render, and the
+ * controls derive it from whether the caller wrote an `error` attribute at all.
+ * These pin both halves: the flag, and each control's wiring of it.
  *
- * The wrapper is a role-less <div> and its display mode IS the contract, so
+ * The wrapper is a role-less <div> and whether it exists IS the contract, so
  * the tests walk up from the control (this file is listed in eslint.config.mjs).
  */
 
 const BOX = 'relative';
+/** What the wrapper was when it drew no box; an unlabelled field no longer has it either (#2840). */
 const TRANSPARENT = 'contents';
 
 const wrapperOf = (control: Element | null) => control?.parentElement ?? null;
 const inputWrapper = () => wrapperOf(screen.getByLabelText('Name').closest('label'));
 
 describe('FieldWrapper errorSlot', () => {
-  it('stays layout-transparent without a label, a message or a slot', () => {
-    render(
+  it('renders no wrapper without a label, a message or a slot', () => {
+    const { container } = render(
       <FieldWrapper>
         <input aria-label="n" />
       </FieldWrapper>,
     );
-    expect(wrapperOf(screen.getByLabelText('n'))).toHaveClass(TRANSPARENT);
+    expect(wrapperOf(screen.getByLabelText('n'))).toBe(container);
   });
 
   it('is a box from the first render when the slot is reserved, and stays one', () => {
@@ -53,9 +54,10 @@ describe('FieldWrapper errorSlot', () => {
 });
 
 describe('the controls reserve the slot when an error attribute is written', () => {
-  it('Input without the attribute stays transparent', () => {
+  it('Input without the attribute has no wrapper', () => {
     render(<Input aria-label="Name" />);
-    expect(inputWrapper()).toHaveClass(TRANSPARENT);
+    expect(inputWrapper()).not.toHaveClass(BOX);
+    expect(inputWrapper()).not.toHaveClass(TRANSPARENT);
   });
 
   it('Input with error={undefined} is a box before any message, and stays one', () => {
@@ -92,9 +94,10 @@ describe('the controls reserve the slot when an error attribute is written', () 
 describe('ScheduleIntervalInput forwards the slot only when its caller wires one', () => {
   const noop = () => {};
 
-  it('stays transparent without an error attribute (Stop Retry after)', () => {
+  it('has no wrapper without an error attribute (Stop Retry after)', () => {
     render(<ScheduleIntervalInput aria-label="Name" value={30} onChange={noop} />);
-    expect(inputWrapper()).toHaveClass(TRANSPARENT);
+    expect(inputWrapper()).not.toHaveClass(BOX);
+    expect(inputWrapper()).not.toHaveClass(TRANSPARENT);
   });
 
   it('is a box with error={undefined} (Repeat in)', () => {

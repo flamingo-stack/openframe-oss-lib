@@ -199,7 +199,6 @@ impl UpdateHandlerService {
             warn!("Failed to set update status to Updated: {:#}", e);
         }
 
-        self.send_nats_notification(&state.target_version).await;
         self.report_delivery(DeliveryResult::Done, None).await;
 
         self.cleanup_service.cleanup_all().await;
@@ -208,7 +207,7 @@ impl UpdateHandlerService {
             .await;
         self.state_service.clear().await?;
 
-        info!("Update completed, notified backend, cleaned up");
+        info!("Update completed, cleaned up");
         Ok(())
     }
 
@@ -311,7 +310,8 @@ impl UpdateHandlerService {
         }
     }
 
-    async fn send_nats_notification(&self, version: &str) {
+    pub async fn publish_running_version(&self) {
+        let version = env!("OPENFRAME_VERSION");
         match self.config_service.get_machine_id() {
             Ok(machine_id) => {
                 for attempt in 1..=5 {
@@ -325,10 +325,7 @@ impl UpdateHandlerService {
                         .await
                     {
                         Ok(_) => {
-                            info!(
-                                "Successfully published NATS notification for update to {}",
-                                version
-                            );
+                            info!("Successfully published running client version {}", version);
                             return;
                         }
                         Err(e) => {

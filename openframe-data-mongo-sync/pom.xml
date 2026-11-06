@@ -22,6 +22,12 @@
             <artifactId>openframe-data-mongo-common</artifactId>
         </dependency>
 
+        <!-- BlockedEmailDomainSource, which StoredBlockedEmailDomainSource implements -->
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-core</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-event-publishing</artifactId>
@@ -56,12 +62,6 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.pravin-raha</groupId>
-            <artifactId>lexorank4j</artifactId>
-            <version>0.1.0</version>
         </dependency>
 
         <dependency>

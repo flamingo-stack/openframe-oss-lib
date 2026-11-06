@@ -44,21 +44,16 @@ use crate::config::update_config::{
     DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS, SELF_RESTART_EXIT_CODE,
     SELF_RESTART_HANDOFF_SECS,
 };
-use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::command::{
     ClientUninstallHandler, ClientUpdateHandler, CommandContext, CommandListener,
-    FeatureFlagsHandler, RestartGate, ToolInstallationHandler, ToolUpdateHandler,
+    FeatureFlagsHandler, PackageUpdateHandler, RestartGate, ToolInstallationHandler,
+    ToolUpdateHandler,
 };
 use crate::listener::execution_listener::ExecutionListener;
-use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
-use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
-use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
-use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
-use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
 use crate::models::{
-    BootstrapScriptMessage, CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage,
+    BootstrapScriptMessage, CommandMessage, Feature, ScriptMessage, ScriptScheduleExecutionMessage,
     SoftwareScriptMessage,
 };
 use crate::platform::DirectoryManager;
@@ -83,9 +78,11 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::package_manager::package_update::{
+    OrderStore, PackageUpdateRunManager, RestartSignals, StatusReporter,
+};
 use crate::services::package_manager::report_publisher::PackageManagerReportPublisher;
 use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
-use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::remote_access_mode_service::RemoteAccessModeService;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
@@ -97,7 +94,6 @@ use crate::services::tool_connection_message_publisher::ToolConnectionMessagePub
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_installation_service::ToolInstallationService;
 use crate::services::tool_restart_service::ToolRestartService;
-use crate::services::tool_uninstall_service::ToolUninstallService;
 use crate::services::InstalledToolsService;
 use crate::services::MachineIdService;
 use crate::services::{
@@ -109,6 +105,8 @@ use crate::services::{
     LastKnownGoodService, LogKeyService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
+use crate::utils::in_progress::InProgress;
+use crate::utils::latch::Latch;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -169,25 +167,24 @@ impl Default for ClientConfiguration {
     }
 }
 
+struct PackageUpdate {
+    listener: CommandListener<PackageUpdateHandler>,
+    manager: PackageUpdateRunManager,
+}
+
 pub struct Client {
     config: Arc<RwLock<ClientConfiguration>>,
     directory_manager: DirectoryManager,
     registration_processor: RegistrationProcessor,
     auth_processor: InitialAuthenticationProcessor,
     nats_connection_manager: NatsConnectionManager,
-    tool_installation_message_listener: ToolInstallationMessageListener,
-    tool_uninstall_message_listener: ToolUninstallMessageListener,
-    #[allow(dead_code)] // TODO: remove when tool-restart is implemented on backend
-    tool_restart_message_listener: ToolRestartMessageListener,
-    openframe_client_update_listener: OpenFrameClientUpdateListener,
-    tool_agent_update_listener: ToolAgentUpdateListener,
-    client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
     tool_installation_listener: CommandListener<ToolInstallationHandler>,
     tool_update_listener: CommandListener<ToolUpdateHandler>,
     client_update_listener: CommandListener<ClientUpdateHandler>,
     client_uninstall_listener: CommandListener<ClientUninstallHandler>,
+    package_update: Option<PackageUpdate>,
     restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
@@ -200,7 +197,6 @@ pub struct Client {
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
     package_manager_report_run_manager: PackageManagerReportRunManager,
-    package_manager_update_run_manager: PackageManagerUpdateRunManager,
     hostname_report_publisher: HostnameReportPublisher,
     machine_timezone_run_manager: MachineTimezoneRunManager,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
@@ -389,11 +385,16 @@ impl Client {
         let tool_kill_service = ToolKillService::new();
 
         let tool_ops = ToolOps::default();
+        let package_upgrades = InProgress::default();
+        let agent_restart = Latch::default();
 
         let feature_flags_service = Arc::new(FeatureFlagsService::load(
             directory_manager.secured_dir().join("feature_flags.json"),
             env!("OPENFRAME_VERSION").to_string(),
         ));
+        let package_auto_update_enabled = feature_flags_service
+            .flags()
+            .is_enabled(Feature::PackageAutoUpdate);
 
         // Initialize tool run manager
         let tool_run_manager = ToolRunManager::new(
@@ -416,7 +417,7 @@ impl Client {
             directory_manager.clone(),
             installed_tools_service.clone(),
             tool_kill_service.clone(),
-            tool_restart_service.clone(),
+            tool_restart_service,
             initial_configuration_service.clone(),
             config_service.clone(),
             tool_ops.clone(),
@@ -483,7 +484,6 @@ impl Client {
             installed_tools_service.clone(),
             directory_manager.clone(),
             tool_run_manager.clone(),
-            tool_ops.clone(),
             tool_connection_processing_manager.clone(),
             config_service.clone(),
             installed_agent_message_publisher.clone(),
@@ -498,6 +498,7 @@ impl Client {
             last_known_good_service.clone(),
             tool_run_manager.clone(),
             tool_ops.clone(),
+            package_upgrades.view(),
             update_handler_service.clone(),
         );
 
@@ -507,63 +508,10 @@ impl Client {
             installed_tools_service.clone(),
             tool_kill_service.clone(),
             tool_run_manager.clone(),
-            tool_ops.clone(),
             directory_manager.clone(),
             config_service.clone(),
             installed_agent_message_publisher.clone(),
             tool_command_params_resolver.clone(),
-        );
-
-        // Initialize tool installation message listener
-        let tool_installation_message_listener = ToolInstallationMessageListener::new(
-            nats_connection_manager.clone(),
-            tool_installation_service.clone(),
-            config_service.clone(),
-            tool_run_manager.clone(),
-        );
-
-        let tool_uninstall_service = ToolUninstallService::new(
-            installed_tools_service.clone(),
-            tool_command_params_resolver.clone(),
-            tool_kill_service.clone(),
-            directory_manager.clone(),
-        );
-        let tool_uninstall_message_listener = ToolUninstallMessageListener::new(
-            nats_connection_manager.clone(),
-            tool_run_manager.clone(),
-            tool_ops.clone(),
-            tool_uninstall_service,
-            config_service.clone(),
-        );
-
-        // Initialize tool restart listener (shares the restart service with mesh self-heal)
-        let tool_restart_message_listener = ToolRestartMessageListener::new(
-            nats_connection_manager.clone(),
-            tool_restart_service,
-            config_service.clone(),
-            tool_run_manager.clone(),
-        );
-
-        // Initialize OpenFrame client update listener
-        let openframe_client_update_listener = OpenFrameClientUpdateListener::new(
-            nats_connection_manager.clone(),
-            openframe_client_update_service.clone(),
-            config_service.clone(),
-        );
-
-        // Initialize tool agent update listener
-        let tool_agent_update_listener = ToolAgentUpdateListener::new(
-            nats_connection_manager.clone(),
-            tool_agent_update_service.clone(),
-            config_service.clone(),
-            tool_run_manager.clone(),
-        );
-
-        // Initialize client uninstall listener (dashboard-triggered device uninstall)
-        let client_uninstall_message_listener = ClientUninstallMessageListener::new(
-            nats_connection_manager.clone(),
-            deactivation_service.clone(),
-            config_service.clone(),
         );
 
         // Relaunches the chat app on remote-access traffic so sessions reach a device whose chat has exited
@@ -586,6 +534,8 @@ impl Client {
             tool_ops.busy_tools(),
             execution_service.running_scripts(),
             tool_run_manager.client_update_pending(),
+            package_upgrades.view(),
+            agent_restart.clone(),
         );
         let command_context = CommandContext::new(
             nats_connection_manager.clone(),
@@ -595,6 +545,31 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let package_update = package_auto_update_enabled.then(|| {
+            let orders = Arc::new(OrderStore::load(
+                directory_manager.secured_dir().join("package_updates.json"),
+            ));
+            let status = StatusReporter::new(
+                nats_message_publisher.clone(),
+                result_store.clone(),
+                flush_notify.clone(),
+            );
+            let listener = CommandListener::new(
+                PackageUpdateHandler::new(orders.clone(), status.clone()),
+                command_context.clone(),
+            );
+            let manager = PackageUpdateRunManager::new(
+                orders,
+                status,
+                config_service.clone(),
+                RestartSignals {
+                    client_update: tool_run_manager.client_update_pending(),
+                    agent_restart: agent_restart.view(),
+                },
+                package_upgrades.clone(),
+            );
+            PackageUpdate { listener, manager }
+        });
         let feature_flags_listener = CommandListener::new(
             FeatureFlagsHandler::new(feature_flags_service),
             command_context.clone(),
@@ -644,6 +619,7 @@ impl Client {
             PackageManagerReportRunManager::new(PackageManagerReportPublisher::new(
                 nats_message_publisher.clone(),
                 config_service.clone(),
+                package_auto_update_enabled,
             ));
 
         let script_bootstrap_execution_listener = ExecutionListener::<BootstrapScriptMessage>::new(
@@ -679,8 +655,6 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
-        let package_manager_update_run_manager = PackageManagerUpdateRunManager::new();
-
         let hostname_report_publisher = HostnameReportPublisher::new(
             nats_message_publisher.clone(),
             config_service.clone(),
@@ -699,18 +673,13 @@ impl Client {
             registration_processor,
             auth_processor,
             nats_connection_manager,
-            tool_installation_message_listener,
-            tool_uninstall_message_listener,
-            tool_restart_message_listener,
-            openframe_client_update_listener,
-            tool_agent_update_listener,
-            client_uninstall_message_listener,
             remote_access_message_listener,
             feature_flags_listener,
             tool_installation_listener,
             tool_update_listener,
             client_update_listener,
             client_uninstall_listener,
+            package_update,
             restart_gate,
             command_execution_listener,
             script_execution_listener,
@@ -723,7 +692,6 @@ impl Client {
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
             package_manager_report_run_manager,
-            package_manager_update_run_manager,
             hostname_report_publisher,
             machine_timezone_run_manager,
             result_outbox_run_manager,
@@ -794,6 +762,8 @@ impl Client {
 
         self.nats_connection_manager.start_connection_watchdog();
 
+        self.update_handler_service.publish_running_version().await;
+
         // Handle any pending update from previous run (after NATS is connected)
         if let Err(e) = self.update_handler_service.handle_pending_update().await {
             error!("Failed to handle pending update: {:#}", e);
@@ -801,6 +771,9 @@ impl Client {
         }
 
         self.feature_flags_listener.start().await?;
+        if let Some(package_update) = &self.package_update {
+            package_update.listener.start().await?;
+        }
         let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {
             restart_gate.requested().await;
@@ -857,29 +830,9 @@ impl Client {
         self.machine_heartbeat_run_manager.start();
         self.machine_timezone_run_manager.start();
 
-        self.package_manager_update_run_manager.start();
-
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
 
-        //Start tool installation message listener in background
-        self.tool_installation_message_listener.start().await?;
-
-        self.tool_uninstall_message_listener.start().await?;
-
-        // TODO: uncomment when implemented on backend
-        // self.tool_restart_message_listener.start().await?;
-
-        // Start OpenFrame client update listener in background
-        self.openframe_client_update_listener.start().await?;
-
-        // Start tool agent update listener in background
-        self.tool_agent_update_listener.start().await?;
-
-        // Start client uninstall listener in background
-        self.client_uninstall_message_listener.start().await?;
-
-        // Delivery-engine counterparts of the JetStream listeners above; the backend picks one path per type
         self.tool_installation_listener.start().await?;
         self.tool_update_listener.start().await?;
         self.client_update_listener.start().await?;
@@ -911,6 +864,9 @@ impl Client {
         info!("Script schedule execution listener started");
 
         self.package_manager_report_run_manager.start();
+        if let Some(package_update) = &self.package_update {
+            package_update.manager.start();
+        }
 
         if let Err(e) = self.tool_run_manager.run().await {
             error!("Failed to start tool run manager: {:#}", e);

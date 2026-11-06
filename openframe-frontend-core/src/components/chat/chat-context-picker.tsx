@@ -453,6 +453,13 @@ export interface ChatContextChipStripProps {
   renderItem?: (item: ChatContextItem) => ReactNode;
   disabled?: boolean;
   className?: string;
+  /**
+   * Makes a chip's icon and label a button — e.g. the page the composer sits on,
+   * whose click asks Mingo about it. The × (`onRemove`) stays its own button.
+   */
+  onSelect?: (item: ChatContextItem) => void;
+  /** What a click on a chip does: its tooltip and accessible name, before the label (with `onSelect`). */
+  selectHint?: string;
 }
 
 /**
@@ -467,8 +474,25 @@ export function ChatContextChipStrip({
   renderItem,
   disabled = false,
   className,
+  onSelect,
+  selectHint,
 }: ChatContextChipStripProps) {
   if (items.length === 0) return null;
+  const chipFace = (item: ChatContextItem) => (
+    <>
+      {resolveIcon && (
+        <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary [&_svg]:size-4">
+          {resolveIcon(item)}
+        </span>
+      )}
+      <span
+        className="max-w-[220px] truncate font-mono font-medium uppercase tracking-[-0.28px] text-h5"
+        title={onSelect ? undefined : item.label}
+      >
+        {item.label}
+      </span>
+    </>
+  );
   return (
     // `tag` pills (Figma 1:6073): 32px tall, card surface, bordered, mono-
     // uppercase label, 16px lead icon + xmark-circle remove. Wraps to new rows.
@@ -478,24 +502,34 @@ export function ChatContextChipStrip({
         // whole pill when provided and non-null; otherwise the default pill.
         const hostNode = renderItem?.(item);
         if (hostNode != null) return <Fragment key={itemKey(item)}>{hostNode}</Fragment>;
+        const selectName = selectHint ? `${selectHint}: ${item.label}` : item.label;
         return (
           <div
             key={itemKey(item)}
-            className="flex h-8 shrink-0 items-center gap-2 rounded-md border border-ods-border bg-ods-card px-2"
+            className={cn(
+              'flex h-8 shrink-0 items-center gap-2 rounded-md border border-ods-border bg-ods-card px-2 text-ods-text-primary',
+              onSelect && 'transition-colors has-[[data-chip-select]:hover]:border-ods-border-hover',
+            )}
             role="group"
             aria-label={`Context ${item.label}`}
           >
-            {resolveIcon && (
-              <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary [&_svg]:size-4">
-                {resolveIcon(item)}
-              </span>
+            {onSelect ? (
+              <Button
+                variant="bare"
+                size="wrap"
+                type="button"
+                data-chip-select=""
+                onClick={() => onSelect(item)}
+                disabled={disabled}
+                title={selectName}
+                aria-label={selectName}
+                className="min-w-0 gap-2 text-ods-text-primary hover:text-ods-accent focus-visible:text-ods-accent [&_svg]:size-4"
+              >
+                {chipFace(item)}
+              </Button>
+            ) : (
+              chipFace(item)
             )}
-            <span
-              className="max-w-[220px] truncate font-mono font-medium uppercase tracking-[-0.28px] text-ods-text-primary text-h5"
-              title={item.label}
-            >
-              {item.label}
-            </span>
             {onRemove && (
               <Button
                 variant="bare"

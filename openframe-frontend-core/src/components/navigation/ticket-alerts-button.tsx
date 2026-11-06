@@ -28,8 +28,10 @@
  * this dedicated cell, not the bell.
  */
 
+import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { cn } from '../../utils/cn';
 import { buildTicketOpenHref } from '../../utils/dev-sections/dev-section-param-keys';
+import { executeNavigationImperative } from '../chat/utils/execute-navigation';
 import { LifeBuoyIcon } from '../icons-v2-generated/interface/life-buoy-icon';
 import { useOptionalTicketLive } from '../tickets/ticket-live-provider';
 import { HeaderButton } from './header-button';
@@ -43,25 +45,28 @@ export interface TicketAlertsButtonProps {
    *  param `HelpCenterList` derives its drawer state from; opening the
    *  drawer also smooth-scrolls the row). */
   href: string;
-  /** Host navigation (router push) — receives the FULL computed href.
-   *  Defaults to `window.location.assign`. */
-  onNavigate?: (href: string) => void;
   disabled?: boolean;
+  /**
+   * - `cell` (default): a cell of the top bar.
+   * - `compact`: `HeaderButton`'s compact cell with a 20px glyph and the same count pill,
+   *   for the navigation sidebar's foot, beside the account row (`footerSlot`).
+   */
+  variant?: 'cell' | 'compact';
   className?: string;
 }
 
-export function TicketAlertsButton({ href, onNavigate, disabled, className }: TicketAlertsButtonProps) {
+export function TicketAlertsButton({ href, disabled, variant = 'cell', className }: TicketAlertsButtonProps) {
   const live = useOptionalTicketLive();
+  const runtime = useChatRuntime();
   // Attention-only: no provider, signed out, or nothing unread → no cell.
   if (!live || !live.authed || live.unreadTotal === 0) return null;
 
   const targetId = live.nextUnreadTicketId;
   const target = targetId ? buildTicketOpenHref(href, targetId) : href;
 
-  const handleClick = () => {
-    if (onNavigate) onNavigate(target);
-    else window.location.assign(target);
-  };
+  // Followed through the lib's navigation executor: the host's `navigate` (a soft navigation, so the ticket drawer
+  // opens on its row).
+  const handleClick = () => executeNavigationImperative({ runtime, href: target });
 
   return (
     <HeaderButton
@@ -72,13 +77,14 @@ export function TicketAlertsButton({ href, onNavigate, disabled, className }: Ti
         // count pill (sidebar count-pill precedent) and by the cell only
         // existing while updates are unread — never by tinting the glyph.
         <span className="relative inline-flex">
-          <LifeBuoyIcon className="h-6 w-6" />
+          <LifeBuoyIcon className={variant === 'compact' ? 'h-5 w-5' : 'h-6 w-6'} />
           <UnreadCountBadge count={live.unreadTotal} />
         </span>
       }
       aria-label={`Support tickets — ${live.unreadTotal} unread ${live.unreadTotal === 1 ? 'update' : 'updates'}`}
       onClick={handleClick}
       disabled={disabled}
+      size={variant}
       className={cn(className)}
     />
   );

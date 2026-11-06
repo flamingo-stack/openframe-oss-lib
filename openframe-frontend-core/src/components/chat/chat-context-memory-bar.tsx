@@ -26,11 +26,16 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon } from '../icons-v2-generated/interface/ellipsis-01-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { CONTEXT_ICON_CLASS, CONTEXT_LABEL_CLASS, CONTEXT_ROW_CLASS } from './context-items-list';
 import type { ChatContextItem } from './types/context-item.types';
 
 const itemKey = (item: { type: string; id: string }) => `${item.type}:${item.id}`;
+
+/** The strip's box, loaded and loading. */
+const MEMORY_STRIP_CLASS =
+  'relative flex items-center gap-[var(--spacing-system-xs)] border-b border-ods-border bg-ods-bg p-[var(--spacing-system-xs)]';
 
 export interface ChatContextMemoryBarProps {
   /** Remembered entities, most-recent-first. Empty → the bar renders nothing. */
@@ -43,6 +48,15 @@ export interface ChatContextMemoryBarProps {
   resolveIcon?: (item: ChatContextItem) => ReactNode;
   /** External disable (e.g. while a message is streaming). */
   disabled?: boolean;
+  /** A host control at the strip's start (e.g. "Continue <chat>" over a page).
+   *  With it the strip shows even with nothing remembered — the control alone. */
+  leading?: ReactNode;
+  /**
+   * The host is reading a record it will remember (a record page whose record has not answered yet). With nothing
+   * remembered so far the strip draws its loading form at its own height, so the composer does not grow when the
+   * record lands. Ignored once there are items.
+   */
+  pending?: boolean;
   className?: string;
 }
 
@@ -51,6 +65,8 @@ export function ChatContextMemoryBar({
   onRemove,
   resolveIcon,
   disabled = false,
+  leading,
+  pending = false,
   className,
 }: ChatContextMemoryBarProps) {
   const [open, setOpen] = useState(false);
@@ -87,17 +103,29 @@ export function ChatContextMemoryBar({
     };
   }, [open]);
 
-  if (items.length === 0) return null;
+  const hasItems = items.length > 0;
+  if (!hasItems && !leading && !pending) return null;
+
+  if (!hasItems && !leading) {
+    // The loading form: the strip's own box, its count line a bar and its trigger's place kept.
+    return (
+      <div aria-hidden className={cn(MEMORY_STRIP_CLASS, className)}>
+        <p className="min-w-0 flex-1 truncate text-ods-text-secondary text-h6">
+          <TextLineSkeleton type="inherit" as="span" className="w-48 max-w-full" />
+        </p>
+        <Button variant="bare" size="icon-sm" type="button" tabIndex={-1} className="invisible shrink-0">
+          <Ellipsis01Icon size={16} />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     // `relative` anchors the popover to this strip; `bottom-full` floats it
     // above, matching the context picker's placement over the input.
     <div
       ref={rootRef}
-      className={cn(
-        'relative flex items-center gap-[var(--spacing-system-xs)] border-b border-ods-border bg-ods-bg p-[var(--spacing-system-xs)]',
-        className,
-      )}
+      className={cn(MEMORY_STRIP_CLASS, className)}
       onKeyDown={e => {
         if (e.key === 'Escape' && open) {
           e.preventDefault();
@@ -105,22 +133,27 @@ export function ChatContextMemoryBar({
         }
       }}
     >
-      <p className="min-w-0 flex-1 truncate text-ods-text-secondary text-h6">
-        {items.length} recently viewed {items.length === 1 ? 'item' : 'items'} in context
-      </p>
+      {leading}
+      {hasItems ? (
+        <p className="min-w-0 flex-1 truncate text-ods-text-secondary text-h6">
+          {items.length} recently viewed {items.length === 1 ? 'item' : 'items'} in context
+        </p>
+      ) : null}
 
-      <Button
-        variant="bare"
-        size="icon-sm"
-        type="button"
-        aria-label="Show remembered context"
-        aria-expanded={open}
-        title="Show remembered context"
-        onClick={() => setOpen(o => !o)}
-        className="shrink-0"
-      >
-        <Ellipsis01Icon size={16} />
-      </Button>
+      {hasItems && (
+        <Button
+          variant="bare"
+          size="icon-sm"
+          type="button"
+          aria-label="Show remembered context"
+          aria-expanded={open}
+          title="Show remembered context"
+          onClick={() => setOpen(o => !o)}
+          className="shrink-0"
+        >
+          <Ellipsis01Icon size={16} />
+        </Button>
+      )}
 
       {open && (
         <div

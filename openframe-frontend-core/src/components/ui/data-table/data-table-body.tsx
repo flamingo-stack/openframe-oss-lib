@@ -98,6 +98,11 @@ export interface DataTableBodyProps<T = unknown> {
    * Interactive content inside must carry `data-no-row-click`.
    */
   renderSubRow?: (item: T) => ReactNode;
+  /**
+   * While loading (`loadingCells`), call `renderSubRow` for each placeholder row too, so a host whose typical row has
+   * a sub-row draws its loading form below every loading row. Off by default: a host's sub-row may read the row.
+   */
+  loadingSubRows?: boolean;
 }
 
 /** Server snapshot: no page is loading during a server render. */
@@ -124,6 +129,7 @@ export function DataTableBody<T = unknown>({
   rowHref,
   minRows,
   renderSubRow,
+  loadingSubRows = false,
 }: DataTableBodyProps<T>) {
   const table = useDataTableContext<T>();
   const skeletonRows =
@@ -161,6 +167,9 @@ export function DataTableBody<T = unknown>({
             compact={compact}
             rowHeightClassName={rowHeightClassName}
             className={typeof rowClassName === 'function' ? rowClassName(row.original, index) : rowClassName}
+            // Opted in (`loadingSubRows`): a loading row carries what its host draws below a typical row (an approval
+            // block), in its loading form.
+            subRow={loadingSubRows ? renderSubRow?.(row.original) : undefined}
             data-loading-item
           />
         ))}

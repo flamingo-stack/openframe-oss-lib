@@ -179,11 +179,16 @@ export function TextLineSkeleton({ type, lines = 1, as = 'div', width, className
   );
 }
 
-/** The lines a text run takes per breakpoint: on a phone, from `content-md`, and from `content-lg`. */
+/**
+ * THE lines a text run takes per width: on a phone, from `content-md`, from `content-lg`, and from `content-xl` where
+ * a wide screen wraps it differently (`lg` when not given). Every loading text whose length changes with the width
+ * states its lines in this one shape.
+ */
 export interface TextLinesByBreakpoint {
   phone: number;
   md: number;
   lg: number;
+  xl?: number;
 }
 
 /**
@@ -215,8 +220,19 @@ export function TextLinesByBreakpointSkeleton({
         type={type}
         as={as}
         lines={lines.lg}
-        className={cn('hidden w-full content-lg:flex', className)}
+        className={cn(
+          lines.xl === undefined ? 'hidden w-full content-lg:flex' : 'hidden w-full content-lg:flex content-xl:hidden',
+          className,
+        )}
       />
+      {lines.xl === undefined ? null : (
+        <TextLineSkeleton
+          type={type}
+          as={as}
+          lines={lines.xl}
+          className={cn('hidden w-full content-xl:flex', className)}
+        />
+      )}
     </>
   );
 }

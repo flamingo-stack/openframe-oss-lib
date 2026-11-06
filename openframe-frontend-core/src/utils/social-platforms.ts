@@ -3,10 +3,10 @@
  * type, and the "find the link for a platform" picker.
  *
  * **This module does NOT own the list of platforms.** That list lives in the
- * `social_platforms` table and only there: it is admin-editable, it carries
+ * `channel_platforms` table and only there: it is admin-editable, it carries
  * `display_name`, `icon_name`, `base_url`, `url_pattern`, `category` and
  * `sort_order`, and the hub already reads it everywhere
- * (`lib/data/social-platforms-utils.ts`, `useSocialPlatforms`). A hardcoded
+ * (`lib/data/channel-platforms-utils.ts`, `useChannelPlatforms`). A hardcoded
  * tuple here would be a second vocabulary that drifts the first time somebody
  * adds a row — and, being a compile-time union, would reject that row outright.
  *
@@ -23,25 +23,25 @@
  */
 
 /**
- * One row of `social_platforms`, in the shape callers pass around.
+ * One row of `channel_platforms`, in the shape callers pass around.
  *
  * Deliberately a narrow READ view: the columns that decide presentation and
  * URL-building, not the OAuth or media-config columns, which have their own
  * consumers and no business here.
  */
 export interface SocialPlatformDefinition {
-  /** `social_platforms.name` — the canonical key, lowercase. */
+  /** `channel_platforms.name` — the canonical key, lowercase. */
   name: string;
-  /** `social_platforms.base_url`, e.g. `https://twitter.com/`. */
+  /** `channel_platforms.base_url`, e.g. `https://twitter.com/`. */
   baseUrl?: string | null;
-  /** `social_platforms.url_pattern`, e.g. `https://twitter.com/{username}`. */
+  /** `channel_platforms.url_pattern`, e.g. `https://twitter.com/{username}`. */
   urlPattern?: string | null;
 }
 
 /**
  * Accepted SPELLINGS that resolve onto a platform name.
  *
- * Not a vocabulary — every value here must be a `social_platforms.name`. These
+ * Not a vocabulary — every value here must be a `channel_platforms.name`. These
  * exist because external data says `x`, `fb` or `generic` where the table says
  * `twitter`, `facebook` and `website`.
  */
@@ -84,7 +84,7 @@ export function hostMatches(hostname: string | null | undefined, domain: string)
  * (`x.com`), a share domain (`youtu.be`), an invite domain (`discord.gg`).
  *
  * The ONLY hardcoded host knowledge left, and it is additive: every primary
- * host is derived from the row. Keyed by `social_platforms.name`, so a row that
+ * host is derived from the row. Keyed by `channel_platforms.name`, so a row that
  * does not exist contributes nothing. If this grows, the answer is an
  * `alt_hosts` column on the table, not a longer map here.
  */
@@ -115,7 +115,7 @@ export function socialPlatformHosts(platform: SocialPlatformDefinition): string[
 /**
  * Classify a URL by its host against the platforms the DATABASE defines.
  *
- * `platforms` is the caller's loaded `social_platforms` rows — passing them in
+ * `platforms` is the caller's loaded `channel_platforms` rows — passing them in
  * is what keeps this function pure and this module free of a platform list.
  * Returns `'website'` for a URL that parses but matches no row (the table's own
  * catch-all row), and `null` for something that is not a URL at all.

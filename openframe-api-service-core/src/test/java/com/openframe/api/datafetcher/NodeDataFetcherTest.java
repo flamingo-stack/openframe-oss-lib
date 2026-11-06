@@ -1,8 +1,10 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.service.user.UserService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.graphql.node.RelayNodeFinder;
 import com.openframe.graphql.relay.InvalidRelayIdException;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.schema.DataFetchingEnvironment;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -36,6 +39,8 @@ class NodeDataFetcherTest {
     private static final String MINIMAL_SDL = "type Query { placeholder: Boolean }";
 
     @Mock private RelayNodeFinder nodeFinder;
+    @Mock private UserService userService;
+    @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private NodeDataFetcher dataFetcher;
 

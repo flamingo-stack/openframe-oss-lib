@@ -1,5 +1,6 @@
 package com.openframe.api.relay;
 
+import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
@@ -17,6 +18,7 @@ import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.api.service.ticket.TicketService;
+import com.openframe.api.service.user.InvitationService;
 import com.openframe.api.service.user.UserService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
@@ -118,6 +120,13 @@ public class ApiNodeLoaderConfiguration {
     @Bean
     public NodeLoader<UserResponse> userNodeLoader(UserService userService) {
         return LookupNodeLoader.byRawId(NodeType.USER, UserResponse.class, rawId -> findUser(userService, rawId));
+    }
+
+    // Accepted and revoked invitations are not nodes: the invitations list shows open ones only.
+    @Bean
+    public NodeLoader<InvitationResponse> invitationNodeLoader(InvitationService invitationService) {
+        return LookupNodeLoader.byRawId(NodeType.INVITATION, InvitationResponse.class,
+                invitationService::findOpenInvitation);
     }
 
     private static Optional<Tenant> findTenant(ObjectProvider<TenantRepository> tenantRepository, String rawId) {

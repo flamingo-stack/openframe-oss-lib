@@ -6,17 +6,8 @@ import { useInView } from '../../hooks/ui/use-in-view';
 import { AssistantAskPrompts } from '../chat/assistant-ask-prompts';
 import { assistantAvailable } from '../chat/hooks/use-ask-prompts';
 
-/** The card beside a FAQ, as a host may shape it. Every field is optional. */
+/** The card beside a FAQ, as a host may shape it. Every field is optional; its topic is the page's (`usePageTopic`). */
 export interface FaqAskOptions {
-  /**
-   * What this FAQ is about: ANY string the host's questions endpoint knows (it
-   * is sent as `topic`, and reported with every click). Questions written
-   * for the topic are picked first. Absent: the FAQ's own topic
-   * (`FaqSection`'s `topic`), else the entity the FAQ is attached to (its
-   * `entityType`). With none, the FAQ has no card: the lib names no topic of
-   * its own.
-   */
-  topic?: string;
   /**
    * Ids of questions never to offer. Absent: the ones the page's other "ask"
    * surfaces show, which the card waits for. `null`: wait.
@@ -50,7 +41,7 @@ export function faqAskCardShown(assistant: AssistantRuntime | null): assistant i
  * card then leaves out every question the page above already shows. The card
  * is the same height before and after the questions arrive.
  */
-export function FaqAskCard({ topic, exclude, count, title, description, onOpen }: FaqAskOptions & { topic: string }) {
+export function FaqAskCard({ exclude, count, title, description, onOpen }: FaqAskOptions) {
   const { ref, inView } = useInView<HTMLDivElement>({ rootMargin: PICK_ROOT_MARGIN });
   const [reached, setReached] = useState(false);
   if (inView && !reached) setReached(true);
@@ -58,7 +49,6 @@ export function FaqAskCard({ topic, exclude, count, title, description, onOpen }
     <div ref={ref}>
       <AssistantAskPrompts
         variant="card"
-        topic={topic}
         count={count}
         exclude={exclude}
         enabled={reached}

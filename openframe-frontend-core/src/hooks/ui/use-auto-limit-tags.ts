@@ -44,6 +44,13 @@ export interface UseAutoLimitTagsReturn {
  * The hook reads real CSS values (padding, gap) from the middleRef container,
  * so it works regardless of responsive breakpoints or custom styling.
  */
+/**
+ * The layer the hidden measuring copies render in (\`measureRef\`, \`textMeasureRef\`): out of sight and of size zero,
+ * clipping what it holds. Each copy keeps its natural width (the hook reads \`offsetWidth\`), but nothing it holds can
+ * stretch a scrolling ancestor: unclipped, a field's chips (1,600 px in a modal) gave the modal a sideways scrollbar.
+ */
+export const MEASURE_LAYER_CLASS = 'pointer-events-none invisible absolute left-0 top-0 -z-10 h-0 w-0 overflow-hidden';
+
 export function useAutoLimitTags({
   count,
   limitTags = 'auto',

@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ChatSource } from '../../types/message.types';
-import { splitCitedSources } from '../cited-sources';
+import { groupedRowLabels, splitCitedSources } from '../cited-sources';
 
 const source = (index: number): ChatSource => ({
   index,
@@ -76,5 +76,73 @@ describe('splitCitedSources — code is not prose', () => {
     const { cited } = splitCitedSources(retrieved, 'Per the guide [1], run `argv[2]`.');
 
     expect(cited.map(row => row.index)).toEqual([1]);
+  });
+});
+
+// CU-17tkuw61kfy: an answer showed three guide cards and two doc cards, cited the guides as `[1]` (a docs page), and
+// the strip read "OpenFrame Docs (2 records)". An answer with cards cites what its cards show.
+describe('splitCitedSources, an answer with cards', () => {
+  const doc = (index: number, path: string): ChatSource => ({
+    index,
+    id: path,
+    name: path,
+    path,
+    documentType: 'markdown',
+    sourceRepo: 'openframe-docs',
+  });
+  const guides: ChatSource = {
+    index: 9,
+    name: 'Onboarding Guides (4 records)',
+    path: 'onboarding-guides/a',
+    documentType: 'onboarding_guide',
+    sourceRepo: 'onboarding-guides',
+    items: ['a', 'b', 'c', 'd'].map(id => ({ id, name: `Guide ${id}`, documentType: 'onboarding_guide' })),
+  };
+  const all = [doc(1, 'cli/quick-start.md'), doc(2, 'cli/first-steps.md'), doc(3, 'cli/prerequisites.md'), guides];
+
+  it('cites the records its cards show, whatever numbers it wrote, and counts only those', () => {
+    const answer = [
+      '[card://onboarding_guide:b]',
+      '[card://onboarding_guide:a]',
+      '[card://markdown:cli/quick-start.md]',
+      '[card://markdown:cli/prerequisites.md]',
+      'Go to Devices [1]. Install the CLI [1][2].',
+    ].join('\n\n');
+    const { cited, uncited } = splitCitedSources(all, answer);
+
+    expect(cited.map(s => s.name)).toEqual(['Onboarding Guides (2 records)', 'OpenFrame Docs (2 records)']);
+    expect(cited[0].items?.map(i => i.id)).toEqual(['b', 'a']);
+    expect(cited[1].items?.map(i => i.id)).toEqual(['cli/quick-start.md', 'cli/prerequisites.md']);
+    expect(uncited.flatMap(s => s.items?.map(i => i.id) ?? [s.id])).toEqual(['cli/first-steps.md', 'c', 'd']);
+  });
+
+  it('ignores a card whose record was not retrieved, and a card inside code', () => {
+    const { cited } = splitCitedSources(all, '`[card://markdown:cli/first-steps.md]`\n\n[card://onboarding_guide:zzz]');
+    expect(cited).toEqual([]);
+  });
+
+  it('falls back to its numbers when none of its cards shows a retrieved record', () => {
+    const { cited } = splitCitedSources(all, '[card://onboarding_guide:zzz]\n\nSee the quick start [1].');
+    expect(cited.flatMap(s => s.items?.map(i => i.id) ?? [s.id])).toEqual(['cli/quick-start.md']);
+  });
+});
+
+describe('groupedRowLabels', () => {
+  it('leaves the number off when every row shares it', () => {
+    expect(
+      groupedRowLabels([
+        { name: 'A', index: 2 },
+        { name: 'B', index: 2 },
+      ]),
+    ).toEqual(['A', 'B']);
+    expect(groupedRowLabels([{ name: 'A' }, { name: 'B' }])).toEqual(['A', 'B']);
+  });
+  it('keeps each row its own number when the rows were cited apart', () => {
+    expect(
+      groupedRowLabels([
+        { name: 'A', index: 1 },
+        { name: 'B', index: 3 },
+      ]),
+    ).toEqual(['[1] A', '[3] B']);
   });
 });

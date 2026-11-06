@@ -1,5 +1,6 @@
 package com.openframe.api.relay;
 
+import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
@@ -17,6 +18,7 @@ import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.api.service.ticket.TicketService;
+import com.openframe.api.service.user.InvitationService;
 import com.openframe.api.service.user.UserService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.installedagents.InstalledAgent;
@@ -65,6 +67,7 @@ class ApiNodeLoaderConfigurationTest {
     @Mock private ScheduleScriptService scheduleScriptService;
     @Mock private ScheduleRunService scheduleRunService;
     @Mock private UserService userService;
+    @Mock private InvitationService invitationService;
     @Mock private TenantRepository tenantRepository;
     @Mock private SoftwareBundleService softwareBundleService;
     @Mock private TicketService ticketService;
@@ -103,7 +106,8 @@ class ApiNodeLoaderConfigurationTest {
                         tuple(NodeType.TENANT, Tenant.class),
                         tuple(NodeType.SOFTWARE_BUNDLE, SoftwareBundleResponse.class),
                         tuple(NodeType.TICKET, Ticket.class),
-                        tuple(NodeType.USER, UserResponse.class));
+                        tuple(NodeType.USER, UserResponse.class),
+                        tuple(NodeType.INVITATION, InvitationResponse.class));
     }
 
     @Test
@@ -357,6 +361,33 @@ class ApiNodeLoaderConfigurationTest {
         assertThat(found).isEmpty();
     }
 
+    @Test
+    void invitationNodeLoader_openInvitation_found() {
+        // setup
+        InvitationResponse invitation = InvitationResponse.builder().id(RAW_ID).build();
+        when(invitationService.findOpenInvitation(RAW_ID)).thenReturn(Optional.of(invitation));
+        NodeLoader<InvitationResponse> loader = configuration.invitationNodeLoader(invitationService);
+
+        // execution
+        Optional<InvitationResponse> found = loader.find(principal, RAW_ID);
+
+        // verifications
+        assertThat(found).containsSame(invitation);
+    }
+
+    @Test
+    void invitationNodeLoader_acceptedOrRevoked_empty() {
+        // setup
+        when(invitationService.findOpenInvitation(RAW_ID)).thenReturn(Optional.empty());
+        NodeLoader<InvitationResponse> loader = configuration.invitationNodeLoader(invitationService);
+
+        // execution
+        Optional<InvitationResponse> found = loader.find(principal, RAW_ID);
+
+        // verifications
+        assertThat(found).isEmpty();
+    }
+
     private List<NodeLoader<?>> allLoaders() {
         return List.of(
                 configuration.machineNodeLoader(deviceService),
@@ -372,6 +403,7 @@ class ApiNodeLoaderConfigurationTest {
                 configuration.tenantNodeLoader(tenantRepositories),
                 configuration.softwareBundleNodeLoader(softwareBundleServices),
                 configuration.ticketNodeLoader(ticketServices),
-                configuration.userNodeLoader(userService));
+                configuration.userNodeLoader(userService),
+                configuration.invitationNodeLoader(invitationService));
     }
 }
