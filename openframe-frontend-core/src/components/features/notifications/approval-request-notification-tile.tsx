@@ -128,11 +128,12 @@ export function ApprovalRequestNotificationTile({
         <>
           {!lockscreen &&
             escalatedCalls.map(call => (
-              // Edge to edge, as under the chat's command row: the tile's padding cancelled, a rule above and below.
+              // Edge to edge, as under the chat's command row: the tile's padding cancelled (`w-auto`, so the stretched
+              // flex item grows into it instead of keeping the Alert's `w-full`), a rule above and below.
               <PolicyEscalationAlert
                 key={call.toolExecutionRequestId}
                 review={call.policyReview}
-                className="-mx-[var(--spacing-system-s)] border-y border-ods-border"
+                className="-mx-[var(--spacing-system-s)] w-auto border-y border-ods-border"
               />
             ))}
           <div className="flex w-full items-center gap-[var(--spacing-system-xs)]">

@@ -57,6 +57,9 @@ describe('ApprovalRequestNotificationTile escalation', () => {
   it('reads the band before the buttons, and marks the folded chevron with the "!"', () => {
     renderTile(approval(ESCALATED));
     const band = screen.getByRole('note');
+    // Edge to edge: the padding cancelled and the Alert's own w-full dropped, or it stops short of the right edge.
+    expect(band.className).toContain('w-auto');
+    expect(band.className).not.toContain('w-full');
     const approve = screen.getByRole('button', { name: 'Approve' });
     expect(band.compareDocumentPosition(approve) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.querySelectorAll('[data-escalation-mark]')).toHaveLength(1);
