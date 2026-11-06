@@ -19,6 +19,8 @@ public class SoftwareTitle {
     private String source;
 
     private String browser;
+    @JsonProperty("upgrade_code")
+    private String upgradeCode;
 
     @JsonProperty("hosts_count")
     private Integer hostsCount;

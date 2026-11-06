@@ -37,6 +37,16 @@ public class Software implements TenantScoped {
 
     private String source;
 
+    // what the Windows programs table reports, as the OpenFrame Fleet returns it; empty for other sources
+    private String vendor;
+    private String upgradeCode;
+    private List<String> arpKeys;
+    private List<String> packageFamilyNames;
+    private Boolean systemComponent;
+    private List<String> installerTypes;
+    // null until the projector matched the title, or when no matcher handles its source
+    private SoftwarePackageMatch packageMatch;
+
     private String latestVersion;
 
     private int devicesCount;
