@@ -14,9 +14,8 @@ public final class SsoFlowCookieNames {
     private SsoFlowCookieNames() {
     }
 
-    public static final String OF_SSO_REG = "of_sso_reg";
     public static final String OF_SSO_INVITE = "of_sso_invite";
     public static final String OF_SSO_LOGIN = "of_sso_login";
 
-    public static final List<String> ALL = List.of(OF_SSO_REG, OF_SSO_INVITE, OF_SSO_LOGIN);
+    public static final List<String> ALL = List.of(OF_SSO_INVITE, OF_SSO_LOGIN);
 }

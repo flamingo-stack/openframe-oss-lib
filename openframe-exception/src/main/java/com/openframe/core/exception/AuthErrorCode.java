@@ -18,7 +18,6 @@ public enum AuthErrorCode {
     PROVIDER_ERROR("SSO login failed. Please try again."),
     EMAIL_NOT_PROVIDED("Email not provided by SSO provider. Please use an account with a verified email."),
     EMAIL_NOT_VERIFIED("This account's email is not verified by the provider. Please try a different sign-in method, or contact your administrator."),
-    EMAIL_MISMATCH("This account's email doesn't match the email you entered. Please sign up with the account that matches the form email."),
     ACCOUNT_NOT_FOUND("No account found. Please sign up first."),
     ACCOUNT_INACTIVE("Your account is not active. Please contact your administrator."),
     ACCOUNT_ALREADY_LINKED("This account is already connected to an organization. Please sign in instead."),

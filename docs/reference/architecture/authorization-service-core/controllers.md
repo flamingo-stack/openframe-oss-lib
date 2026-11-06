@@ -43,7 +43,6 @@ flowchart TD
     InviteCtrl --> SsoInviteService["SsoInvitationService"]
 
     TenantRegCtrl --> TenantRegService["TenantRegistrationService"]
-    TenantRegCtrl --> SsoTenantRegService["SsoTenantRegistrationService"]
 
     TenantDiscCtrl --> TenantDiscoveryService["TenantDiscoveryService"]
     TenantDiscCtrl --> UserService["UserService"]
@@ -91,7 +90,6 @@ This controller does not perform authentication itself. Actual authentication is
 #### Endpoints
 
 - `POST /oauth/register` — Direct tenant registration
-- `GET /oauth/register/sso` — Initiate SSO-based tenant registration
 
 #### Direct Registration Flow
 
@@ -105,25 +103,7 @@ flowchart TD
 
 The controller validates the request and delegates to `TenantRegistrationService`.
 
-#### SSO Registration Flow
-
-```mermaid
-flowchart TD
-    Client["Client"] -->|"GET /oauth/register/sso"| Ctrl["TenantRegistrationController"]
-    Ctrl -->|"clearAuthState()"| AuthState["AuthStateUtils"]
-    Ctrl -->|"startRegistration()"| SsoService["SsoTenantRegistrationService"]
-    SsoService --> Data["SsoAuthorizeData"]
-    Ctrl -->|"Set Secure Cookie"| Cookie["COOKIE_SSO_REG"]
-    Ctrl -->|"seeOther()"| Redirect["SSO Provider Redirect"]
-```
-
-Key characteristics:
-
-- Clears existing authentication state
-- Generates SSO authorization data
-- Sets secure, HTTP-only cookie
-- Redirects to external SSO provider
-- Redirects to error URL on failure
+SSO signup has no endpoint of its own: it is the unknown-identity branch of `GET /oauth/login/sso` (see `SsoLoginController`), finished with `/oauth/login/sso/complete`.
 
 ---
 

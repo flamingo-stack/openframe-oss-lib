@@ -1,4 +1,4 @@
-package com.openframe.api.util;
+package com.openframe.core.util;
 
 import lombok.experimental.UtilityClass;
 

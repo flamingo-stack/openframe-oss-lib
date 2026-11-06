@@ -11,7 +11,7 @@ import java.util.Optional;
 @Repository
 public interface ToolConnectionRepository extends MongoRepository<ToolConnection, String> {
     List<ToolConnection> findByMachineId(String machineId);
-    
+
     List<ToolConnection> findByMachineIdIn(List<String> machineIds);
 
     /**
@@ -19,6 +19,9 @@ public interface ToolConnectionRepository extends MongoRepository<ToolConnection
      * Sorted by connectedAt in descending order to get the latest record
      */
     Optional<ToolConnection> findFirstByAgentToolIdOrderByConnectedAtDesc(String agentToolId);
+
+    Optional<ToolConnection> findFirstByAgentToolIdAndToolTypeOrderByConnectedAtDesc(
+            String agentToolId, ToolType toolType);
 
     Optional<ToolConnection> findFirstByTenantIdAndToolTypeAndAgentToolIdOrderByConnectedAtDesc(
             String tenantId, ToolType toolType, String agentToolId);
