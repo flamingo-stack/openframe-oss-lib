@@ -22,6 +22,17 @@
             <artifactId>openframe-data-mongo-common</artifactId>
         </dependency>
 
+        <!-- BlockedEmailDomainSource, which StoredBlockedEmailDomainSource implements -->
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-event-publishing</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb</artifactId>

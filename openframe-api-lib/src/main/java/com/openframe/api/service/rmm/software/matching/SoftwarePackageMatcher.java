@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm.software.matching;
 
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -25,8 +26,9 @@ public class SoftwarePackageMatcher {
 
     private final Map<PackageManagerType, PackageMatcher> matchers;
 
-    public SoftwarePackageMatcher(List<PackageMatcher> matchers) {
-        this.matchers = matchers.stream().collect(toMap(PackageMatcher::getManager, Function.identity()));
+    // no matcher bean yet for any manager: every row is left out and keeps its current status
+    public SoftwarePackageMatcher(ObjectProvider<PackageMatcher> matchers) {
+        this.matchers = matchers.orderedStream().collect(toMap(PackageMatcher::getManager, Function.identity()));
     }
 
     // keyed by identity: two rows can be equal; a row no matcher takes is left out

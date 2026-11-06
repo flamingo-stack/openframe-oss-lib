@@ -148,7 +148,7 @@ class SoftwareCatalogStatusTest {
     void apply_programMatchedToAWingetPackage_wingetWithItsLatestAndAutoUpdateOff() {
         // setup
         SoftwareResponse chrome = program("Google Chrome", "141.0");
-        stubMatch(chrome, PackageMatch.of(wingetPackage("Google.Chrome", "142.0", null)));
+        stubMatch(chrome, PackageMatch.of(wingetPackage("Google.Chrome", "142.0")));
 
         // execution
         status().apply(List.of(chrome));
@@ -159,21 +159,6 @@ class SoftwareCatalogStatusTest {
                         SoftwareResponse::getVersionStatus, SoftwareResponse::getAutoUpdate)
                 .containsExactly(SoftwareSource.WINGET, "142.0", SoftwareVersionStatus.OUTDATED,
                         SoftwareAutoUpdateStatus.OFF);
-    }
-
-    @Test
-    void apply_programListedUnderAnotherVersion_comparedWithThatVersion() {
-        // setup
-        SoftwareResponse lemonade = program("Lemonade Server", "26.44.1");
-        stubMatch(lemonade, PackageMatch.of(wingetPackage("AMD.LemonadeServer", "2026.44.1", "26.44.1")));
-
-        // execution
-        status().apply(List.of(lemonade));
-
-        // verifications
-        assertThat(lemonade)
-                .extracting(SoftwareResponse::getLatestVersion, SoftwareResponse::getVersionStatus)
-                .containsExactly("26.44.1", SoftwareVersionStatus.UP_TO_DATE);
     }
 
     @Test
@@ -212,7 +197,7 @@ class SoftwareCatalogStatusTest {
         // setup
         SoftwareResponse chrome = program("Google Chrome", "141.0");
         chrome.setAutoUpdate(SoftwareAutoUpdateStatus.ON);
-        stubMatch(chrome, PackageMatch.of(wingetPackage("Google.Chrome", "141.0", null)));
+        stubMatch(chrome, PackageMatch.of(wingetPackage("Google.Chrome", "141.0")));
 
         // execution
         status().apply(List.of(chrome));
@@ -280,12 +265,11 @@ class SoftwareCatalogStatusTest {
         when(packageMatcher.match(List.of(row))).thenReturn(matches);
     }
 
-    private static PackageCatalogEntry wingetPackage(String id, String version, String displayVersion) {
+    private static PackageCatalogEntry wingetPackage(String id, String version) {
         return PackageCatalogEntry.builder()
                 .manager(PackageManagerType.WINGET)
                 .packageId(id)
                 .version(version)
-                .displayVersion(displayVersion)
                 .build();
     }
 

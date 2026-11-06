@@ -24,8 +24,9 @@ public class SoftwareResponse {
     private SoftwareVulnerabilitySummaryResponse vulnerabilitySummary;
     private Boolean cpeMatched;
     private SoftwareAutoUpdateStatus autoUpdate;
-    // not in the GraphQL schema: what the package catalog is matched by
+    // not in the GraphQL schema: the osquery table Fleet took the row from, picks the package matcher
     private String fleetSource;
+    // not in the GraphQL schema: the program's MSI UpgradeCode and ARP key, what winget matches it by
     private String upgradeCode;
     private String productCode;
 }

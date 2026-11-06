@@ -5,7 +5,7 @@ import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVersionStatus;
 import com.openframe.api.service.rmm.software.matching.PackageMatch;
 import com.openframe.api.service.rmm.software.matching.SoftwarePackageMatcher;
-import com.openframe.api.util.SoftwareVersions;
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;

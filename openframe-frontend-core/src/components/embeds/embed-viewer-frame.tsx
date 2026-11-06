@@ -5,6 +5,7 @@ import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { FullscreenSwitchController } from '../../utils/fullscreen-switch';
+import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { EmbedIframe, EmbedLoadingSkeleton } from './embed-iframe';
@@ -40,21 +41,22 @@ export interface EmbedViewerFrameProps {
   /** Rendered verbatim in the header row — the caller owns its own container/state. */
   actions?: React.ReactNode;
   /** Iframe source; falsy renders the inline empty state (or the loading
-   *  state when `isLoading`) under the header. */
+   *  state when `loading` or `resolving`) under the header. */
   src: string | null | undefined;
-  /** While true AND there is no `src` yet, the body shows the shared embed
-   *  loading skeleton (`EmbedLoadingSkeleton`) instead of the empty state —
-   *  for a viewer that is still resolving where its frame points (e.g.
-   *  ClaudeEmbed probing for a self-hosted mirror), so a cold first view
-   *  reads as "loading" (identical to every other embed), not "nothing here". */
-  isLoading?: boolean;
+  /** The document is being read (the standard `loading` prop; a loading scope does the same): the whole frame is its
+   *  loading form, a skeleton title, its buttons' loading forms and the frame's loading box. */
+  loading?: boolean;
+  /** The document is known (its title shows) but the viewer is still finding where its frame points (ClaudeEmbed
+   *  probing for a self-hosted mirror): only the body is its loading box. */
+  resolving?: boolean;
   /** Large icon for the inline empty state (the viewers pass `w-16 h-16`). */
   emptyIcon?: React.ReactNode;
   emptyMessage?: string;
   height?: string;
   allow?: string;
   allowFullScreen?: boolean;
-  loading?: 'eager' | 'lazy';
+  /** iframe loading strategy (eager or lazy). */
+  iframeLoading?: 'eager' | 'lazy';
   /** iframe `sandbox` — see `EmbedIframe`. Set it for user-authored contents. */
   sandbox?: string;
   /** Wrapper classes; defaults to the sheets/pdf `space-y-4`. */
@@ -66,6 +68,8 @@ export interface EmbedViewerFrameProps {
    *  button (the Figma player) and some cannot (a self-hosted Claude
    *  artifact mirror) — the shell provides the affordance uniformly. */
   fullscreenControl?: boolean;
+  /** How many buttons `actions` draws (PDF: Preview and Download): the header's loading form draws as many. Default 1. */
+  loadingActionCount?: number;
 }
 
 export function EmbedViewerFrame({
@@ -74,19 +78,23 @@ export function EmbedViewerFrame({
   titleVariant = 'h3',
   actions,
   src,
-  isLoading: isLoadingGiven,
+  loading: loadingGiven = false,
+  resolving = false,
   emptyIcon,
   emptyMessage = 'Content not available',
   height,
   allow,
   allowFullScreen,
-  loading,
+  iframeLoading,
   sandbox,
   className,
   fullscreenControl,
+  loadingActionCount = 1,
 }: EmbedViewerFrameProps) {
-  // ONE switch: a page's loading scope, or the viewer still resolving where its frame points.
-  const isLoading = useLoadingScope() || !!isLoadingGiven;
+  // ONE switch for the whole frame (header included): a page's loading scope, or the standard `loading` prop. The body
+  // alone also waits while the viewer resolves where its frame points.
+  const loadingForm = useLoadingScope() || loadingGiven;
+  const isLoading = loadingForm || resolving;
   const frameRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -127,7 +135,11 @@ export function EmbedViewerFrame({
       <div className="flex flex-col gap-3 content-sm:flex-row content-sm:items-center content-sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
           {icon}
-          {titleVariant === 'h3' ? (
+          {loadingForm ? (
+            // The document is being read: its name is not known yet. (A viewer still resolving its frame, with a
+            // known title, keeps it.)
+            <TextLineSkeleton type={titleVariant} className="w-48 max-w-full" />
+          ) : titleVariant === 'h3' ? (
             <h2 className="truncate text-ods-text-primary text-h3">{title}</h2>
           ) : (
             <span className="truncate font-semibold text-ods-text-primary text-h6">{title}</span>
@@ -140,7 +152,15 @@ export function EmbedViewerFrame({
             fullscreen toggle, `actions` renders EXACTLY as before — the
             wrapper exists only when the toggle joins it, so pre-existing
             viewers (figma/pdf/sheets) are byte-identical. */}
-        {fullscreenControl && src ? (
+        {loadingForm ? (
+          // The actions point at the document being read: each its button's loading form, in the actions' row.
+          <div className="flex w-full items-center gap-2 content-sm:w-auto">
+            {Array.from({ length: loadingActionCount }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: loading buttons never reorder
+              <InteractiveSkeleton.Button key={i} size="small-legacy" className="flex-1 content-sm:flex-initial" />
+            ))}
+          </div>
+        ) : fullscreenControl && src ? (
           <div className="flex flex-col gap-[var(--spacing-system-xsf)] content-sm:flex-row content-sm:items-center">
             {actions}
             <Button
@@ -169,7 +189,7 @@ export function EmbedViewerFrame({
           height={isFullscreen ? 'calc(100vh - 96px)' : height}
           allow={allow}
           allowFullScreen={allowFullScreen}
-          loading={loading}
+          iframeLoading={iframeLoading}
           sandbox={sandbox}
         />
       ) : isLoading ? (

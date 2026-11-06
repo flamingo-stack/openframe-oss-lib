@@ -4,6 +4,7 @@ import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import lombok.experimental.UtilityClass;
