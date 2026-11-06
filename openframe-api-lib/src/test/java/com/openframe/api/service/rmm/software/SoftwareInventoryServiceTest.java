@@ -85,6 +85,8 @@ class SoftwareInventoryServiceTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private com.openframe.data.repository.tool.IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
+    @Mock private DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
+    @Mock private TenantSoftwareReadModelQuery tenantSoftwareReadModelQuery;
     @Mock private SoftwareAutoUpdateService autoUpdateService;
     @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
@@ -98,8 +100,8 @@ class SoftwareInventoryServiceTest {
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService, catalogStatus, tagAssignmentRepository,
-                organizationRepository);
+                tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }

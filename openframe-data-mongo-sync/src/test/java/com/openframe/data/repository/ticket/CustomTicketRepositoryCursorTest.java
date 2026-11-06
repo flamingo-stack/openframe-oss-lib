@@ -2,11 +2,14 @@ package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
+import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
+import com.openframe.publishing.api.OutboxPublisher;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.Instant;
@@ -26,7 +29,12 @@ class CustomTicketRepositoryCursorTest {
     private static final String OR_OPERATOR = "$or";
 
     private final TenantAwareMongoTemplate mongoTemplate = mock(TenantAwareMongoTemplate.class);
-    private final CustomTicketRepositoryImpl repository = new CustomTicketRepositoryImpl(mongoTemplate);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<OutboxPublisher> outboxPublisher = mock(ObjectProvider.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<TicketAggregateSpec> ticketSpec = mock(ObjectProvider.class);
+    private final CustomTicketRepositoryImpl repository = new CustomTicketRepositoryImpl(mongoTemplate, outboxPublisher,
+            ticketSpec);
 
     @Test
     @DisplayName("Given a query already restricted by ticket ids, when a cursor page is fetched sorted by _id, then both the id restriction and the cursor bound survive instead of Query rejecting the second '_id' criterion")

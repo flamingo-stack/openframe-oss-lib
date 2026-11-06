@@ -51,6 +51,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String OS_TYPE_FIELD = "osType";
     private static final String MACHINE_ID_FIELD = "machineId";
     private static final String LAST_SEEN_FIELD = "lastSeen";
+    private static final String VERSION_FIELD = "version";
     private static final String STATUS_FIELD = "status";
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
@@ -709,7 +710,9 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     @Override
     public void updateLastSeen(String machineId, Instant lastSeen) {
         Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
-        mongoTemplate.updateFirst(query, new Update().set(LAST_SEEN_FIELD, lastSeen), Machine.class);
+        // $inc by 0 stops Spring from adding its own +1, so a heartbeat never conflicts with a user edit.
+        Update update = new Update().set(LAST_SEEN_FIELD, lastSeen).inc(VERSION_FIELD, 0);
+        mongoTemplate.updateFirst(query, update, Machine.class);
     }
 
     @Override

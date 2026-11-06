@@ -5,7 +5,6 @@ import { FileDownloadCard } from '../embeds/file-download-card';
 import { GoogleSheetsViewer } from '../embeds/google-sheets-viewer';
 import { PdfViewer } from '../embeds/pdf-viewer';
 import { DocViewer, type DocViewerProps } from './doc-viewer';
-import { MarkdownSkeleton, EmbedSkeleton } from './skeletons';
 
 type DocRenderer = (content: DocContent, handlers: DocRenderHandlers) => React.ReactNode;
 
@@ -20,7 +19,7 @@ type DocRenderer = (content: DocContent, handlers: DocRenderHandlers) => React.R
  */
 export type DocumentTypeRenderers = { markdown: DocRenderer } & Partial<Record<DocumentType, DocRenderer>>;
 
-export interface DocsHubPageProps extends Omit<DocViewerProps, 'renderContent' | 'renderSkeleton' | 'showAIChat'> {
+export interface DocsHubPageProps extends Omit<DocViewerProps, 'renderContent' | 'showAIChat'> {
   /** Per-document-type renderer map. `markdown` is REQUIRED. */
   documentTypeRenderers: DocumentTypeRenderers;
 
@@ -42,32 +41,20 @@ const defaultFallbackRenderer: DocRenderer = () => (
   </div>
 );
 
-// When the DAL hasn't populated the URL field for a rich-content type, the
-// embed-viewer components render a broken iframe (empty src). Fall back to
-// the same lib-styled "Unsupported document type" panel the explicit
-// fallback uses — the surface is honest about the missing data instead of
-// pretending to load. `FileDownloadCard` handles its own missing-URL state
-// (hides the Download button), so it doesn't need this guard.
-const defaultPdfRenderer: DocRenderer = (content, handlers) =>
-  content.fileUrl ? (
-    <PdfViewer src={content.fileUrl} fileName={content.fileName} />
-  ) : (
-    defaultFallbackRenderer(content, handlers)
-  );
+// Each viewer owns both its states without a document: in a loading scope (the document is being read) it draws its
+// own loading form, otherwise its "not available" state when the DAL left the URL empty. So the renderers always
+// render the viewer, and the viewer never mounts a frame without a source.
+const defaultPdfRenderer: DocRenderer = content => (
+  <PdfViewer src={content.fileUrl ?? ''} fileName={content.fileName} />
+);
 
-const defaultGoogleSheetRenderer: DocRenderer = (content, handlers) =>
-  content.externalUrl ? (
-    <GoogleSheetsViewer externalUrl={content.externalUrl} fileName={content.fileName} />
-  ) : (
-    defaultFallbackRenderer(content, handlers)
-  );
+const defaultGoogleSheetRenderer: DocRenderer = content => (
+  <GoogleSheetsViewer externalUrl={content.externalUrl ?? ''} fileName={content.fileName} />
+);
 
-const defaultFigmaRenderer: DocRenderer = (content, handlers) =>
-  content.externalUrl ? (
-    <FigmaEmbed url={content.externalUrl} title={content.fileName} loading="eager" />
-  ) : (
-    defaultFallbackRenderer(content, handlers)
-  );
+const defaultFigmaRenderer: DocRenderer = content => (
+  <FigmaEmbed url={content.externalUrl ?? ''} title={content.fileName} iframeLoading="eager" />
+);
 
 const defaultFileRenderer: DocRenderer = content => (
   <FileDownloadCard
@@ -77,16 +64,6 @@ const defaultFileRenderer: DocRenderer = content => (
     fileUrl={content.fileUrl}
   />
 );
-
-/** The page's own loading form per document type: the markdown article's, else the embed viewer's. */
-const documentLoadingForm = (documentType: DocumentType | undefined) =>
-  !documentType || documentType === 'markdown' ? (
-    <MarkdownSkeleton />
-  ) : (
-    // Forward the documentType so the embed skeleton renders the right
-    // shape (PDF=2 buttons, sheets/figma=1 button, file=centered card).
-    <EmbedSkeleton documentType={documentType} />
-  );
 
 /**
  * Embeddable docs-hub page. Bundles `<DocViewer>` with safe defaults so the
@@ -132,7 +109,6 @@ export function DocsHubPage({
       className={className}
       sidebarLabel={sidebarLabel}
       renderContent={renderContent}
-      renderSkeleton={documentLoadingForm}
     />
   );
 }
