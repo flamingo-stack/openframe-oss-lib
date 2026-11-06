@@ -1,8 +1,6 @@
 'use client';
 
-import { InfoCircleIcon } from '../../icons-v2-generated';
 import {
-  Alert,
   CheckboxBlock,
   Label,
   RadioGroupBlock,
@@ -88,10 +86,16 @@ export function defaultSoftwareUpdateSettings(userNotifications: boolean): Softw
 }
 
 /**
- * The two modes and their deadline, worded by what the device can do. With user notifications the user is asked and
- * warned. Without them nothing is shown on the device: Wait waits until the user closes the app, a deadline closes it
- * without warning, and Force closes it at once. The countdown is then a silent pause before the close, so it is not
- * offered; `countdownSeconds` still goes out, since the input requires it.
+ * The two modes and their deadline, worded by what the device does. With user notifications the user is asked and
+ * warned. Without them the agent shows nothing on the device (no prompt, no countdown on screen; there is no end-user
+ * UI anywhere yet), so the copy says only what happens:
+ * - Wait (WAIT, no deadline): the agent reports Waiting and installs once the app is closed.
+ * - A deadline (WAIT + `deadlineSeconds`): counted from the first time the agent finds the app running; at the deadline
+ *   the backend sends the update again as FORCE (`armDeadline` / `driveDeadlineForce` in openframe-client-core), and
+ *   withdraws that if the update finished first.
+ * - Force (FORCE): the agent waits `countdownSeconds` (clamped to 60–1800 s), asks the app to close, stops it after a
+ *   10 s grace and installs (`run.rs` / `close.rs` in openframe-client). The wait is silent, so it is not offered as a
+ *   control; the copy states it, since the app is not closed at once.
  */
 interface ModeCopy {
   wait: RadioGroupBlockOption;
@@ -99,38 +103,60 @@ interface ModeCopy {
   deadline: { label: string; description: string };
 }
 
-const MODE_COPY: Record<'notified' | 'silent', ModeCopy> = {
-  notified: {
-    wait: {
-      value: 'WAIT',
-      label: 'Wait & notify',
-      description: 'The user gets Update now or Ask Later. If they close the app, it updates then.',
-    },
+/** "5 minutes": the silent wait before a forced close, worded as the countdown options word it. */
+function closeDelay(countdownSeconds: number): string {
+  const option = SOFTWARE_UPDATE_COUNTDOWN_OPTIONS.find(candidate => candidate.seconds === countdownSeconds);
+  if (option) return option.label;
+  const minutes = Math.max(1, Math.round(countdownSeconds / 60));
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+}
+
+const NOTIFIED_COPY: ModeCopy = {
+  wait: {
+    value: 'WAIT',
+    label: 'Wait & notify',
+    description: 'The user gets Update now or Ask Later. If they close the app, it updates then.',
+  },
+  force: {
+    value: 'FORCE',
+    label: 'Force Update',
+    description: 'The user gets a short countdown, then the app closes and updates.',
+  },
+  deadline: {
+    label: 'Countdown after the deadline',
+    description: 'If the update still isn’t installed by the deadline, the user gets a countdown and then it installs.',
+  },
+};
+
+function silentCopy(countdownSeconds: number): ModeCopy {
+  const delay = closeDelay(countdownSeconds);
+  return {
+    wait: { value: 'WAIT', label: 'Wait', description: 'The update waits until the user closes the app.' },
     force: {
       value: 'FORCE',
       label: 'Force Update',
-      description: 'The user gets a short countdown, then the app closes and updates.',
+      description: `The app is closed without warning ${delay} later, then updated.`,
     },
-    deadline: {
-      label: 'Countdown after the deadline',
-      description:
-        'If the update still isn’t installed by the deadline, the user gets a countdown and then it installs.',
-    },
-  },
-  silent: {
-    wait: { value: 'WAIT', label: 'Wait', description: 'The update waits until the user closes the app.' },
-    force: { value: 'FORCE', label: 'Force Update', description: 'The app closes and updates.' },
     deadline: {
       label: 'Close the app after a deadline',
-      description: 'If the app is still open by the deadline, it is closed without warning and updated.',
+      description: `If the app is still open by the deadline, it is closed without warning ${delay} later, then updated.`,
     },
-  },
-};
+  };
+}
 
 const SAME_SETTINGS_DESCRIPTION: Record<SoftwareUpdateMode, string> = {
   WAIT: 'Auto-updates follow "If the app is running" above. Uncheck to set them separately.',
   FORCE: 'Later releases will also be force-updated.',
 };
+
+/**
+ * "Keep it auto-updated", as the backend runs it (`PackageAutoUpdatePolicyService.turnOn`, `PackageAutoUpdateTrigger`):
+ * a run with it on enables a policy per device for the package, and the trigger orders each new catalog version (Brew
+ * and winget catalogs) on those devices. A run with it off leaves an earlier policy as it is: only Turn Off Auto-Update
+ * (`turnOffSoftwareAutoUpdate`) or the package leaving the device turns one off, so "off" does not mean "stop".
+ */
+const AUTO_UPDATE_DESCRIPTION =
+  'After this update, OpenFrame installs each new version from Winget or Brew on the selected devices. Leaving it off does not turn off auto-update that is already on there.';
 
 const groupLabelClass = 'text-h5 text-ods-text-secondary';
 
@@ -180,7 +206,7 @@ function UpdatePolicyFields({
   userNotifications: boolean;
   onChange: (policy: SoftwareUpdatePolicy) => void;
 }) {
-  const copy = MODE_COPY[userNotifications ? 'notified' : 'silent'];
+  const copy = userNotifications ? NOTIFIED_COPY : silentCopy(policy.countdownSeconds);
   const waits = policy.mode === 'WAIT';
   const deadline = waits && policy.deadlineEnabled;
   const countdown = userNotifications && (
@@ -278,7 +304,7 @@ export function SoftwareUpdateSettingsFields({
             checked={value.autoUpdate}
             onCheckedChange={autoUpdate => onChange({ ...value, autoUpdate })}
             label="Keep it auto-updated"
-            description="After this update, OpenFrame installs each new version from Winget or Brew on the selected devices. When off, only this update runs."
+            description={AUTO_UPDATE_DESCRIPTION}
           />
           {value.autoUpdate && (
             <>
@@ -305,25 +331,10 @@ export function SoftwareUpdateSettingsFields({
         </div>
       </div>
 
-      {/* Core Alert on the card surface, as a note: it comes with "Keep it auto-updated" and goes with it, since the
-          reinstall is what lets OpenFrame keep a hand-installed app updated, and a one-off update promises no more. The
-          icon sits in a span so Alert's `[&>svg]` positioning does not apply. */}
-      {value.autoUpdate && (
-        <Alert
-          role="note"
-          className="flex items-center gap-[var(--spacing-system-m)] rounded-[6px] border-ods-border bg-ods-card p-[var(--spacing-system-m)]"
-        >
-          <span className="shrink-0 text-ods-text-secondary">
-            <InfoCircleIcon size={24} color="currentColor" />
-          </span>
-          <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
-            <p className="text-ods-text-primary text-h3">Apps installed by hand get reinstalled</p>
-            <p className="text-ods-text-secondary text-h6">
-              On the first update, OpenFrame reinstalls them with Winget or Brew so it can keep them updated.
-            </p>
-          </div>
-        </Alert>
-      )}
+      {/* No note that apps installed by hand get reinstalled on the first update: the agent does not do that. A copy no
+          package manager installed is left alone (brew probes it as not installed, winget as "not installed from a
+          winget source"), so it is neither updated nor reinstalled. Reinstalling it with a package manager is Adopt
+          (`adoptSoftware`), which the backend does not implement yet. */}
     </section>
   );
 }

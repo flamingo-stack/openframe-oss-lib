@@ -73,7 +73,8 @@ describe('SoftwareUpdateSettingsFields without user notifications', () => {
     render(<SilentHarness />);
     expect(screen.getByRole('radio', { name: /Force Update/ }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('radio', { name: /^Wait/ })).toBeTruthy();
-    expect(screen.getByText('The app closes and updates.')).toBeTruthy();
+    // Force is not instant: the agent waits the (silent) countdown before it closes the app.
+    expect(screen.getByText('The app is closed without warning 5 minutes later, then updated.')).toBeTruthy();
     expect(screen.queryByText(/notify|Ask Later|countdown/i)).toBeNull();
     expect(screen.queryByLabelText('Countdown')).toBeNull();
   });
@@ -87,7 +88,9 @@ describe('SoftwareUpdateSettingsFields without user notifications', () => {
 
     fireEvent.click(screen.getByRole('checkbox', { name: /Close the app after a deadline/ }));
     expect(
-      screen.getByText('If the app is still open by the deadline, it is closed without warning and updated.'),
+      screen.getByText(
+        'If the app is still open by the deadline, it is closed without warning 5 minutes later, then updated.',
+      ),
     ).toBeTruthy();
     expect(screen.getByLabelText('Deadline').textContent).toContain('7 days after the first try');
     expect(screen.queryByLabelText('Countdown')).toBeNull();
@@ -96,6 +99,17 @@ describe('SoftwareUpdateSettingsFields without user notifications', () => {
       deadlineEnabled: true,
       deadlineSeconds: 7 * 86_400,
     });
+  });
+
+  it('says how long the silent wait before a forced close is, from the policy it draws', () => {
+    render(<Harness initial={{ ...FORCE_SETTINGS, policy: { ...FORCE_SETTINGS.policy, countdownSeconds: 900 } }} />);
+    expect(screen.getByText('The app is closed without warning 15 minutes later, then updated.')).toBeTruthy();
+  });
+
+  it('auto-update says that leaving it off does not stop an auto-update already on', () => {
+    render(<SilentHarness />);
+    expect(screen.getByText(/Leaving it off does not turn off auto-update that is already on there\./)).toBeTruthy();
+    expect(screen.queryByText(/only this update runs/)).toBeNull();
   });
 
   it('separate auto-update settings get the same two choices', () => {
@@ -152,13 +166,10 @@ describe('SoftwareUpdateSettingsFields with user notifications', () => {
     expect(screen.queryByText('For auto-updates')).toBeNull();
   });
 
-  it('the reinstall note comes and goes with auto-update', () => {
+  it('promises no reinstall of apps installed by hand: the agent leaves them alone', () => {
     render(<Harness userNotifications />);
-    expect(screen.getByRole('note').textContent).toContain('Apps installed by hand get reinstalled');
-    fireEvent.click(screen.getByRole('checkbox', { name: /Keep it auto-updated/ }));
     expect(screen.queryByRole('note')).toBeNull();
-    fireEvent.click(screen.getByRole('checkbox', { name: /Keep it auto-updated/ }));
-    expect(screen.getByRole('note')).toBeTruthy();
+    expect(screen.queryByText(/reinstall/i)).toBeNull();
   });
 });
 
