@@ -4,8 +4,8 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
-import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.device.DeviceService;
@@ -22,6 +22,7 @@ import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
+import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,7 @@ import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -59,6 +61,7 @@ class DeviceServiceTest {
 
     @Mock private MachineRepository machineRepository;
     @Mock private DeletedMachineCleanup deletedMachineCleanup;
+    @Mock private DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
     @Mock private MachineWriter machineWriter;
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
@@ -70,8 +73,8 @@ class DeviceServiceTest {
     private ApplicationEventPublisher eventPublisher;
 
     private DeviceService service() {
-        DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, machineWriter,
-                tagRepository, tagAssignmentRepository,
+        DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, deviceSoftwareConnectivitySync,
+                machineWriter, tagRepository, tagAssignmentRepository,
                 deviceStatusProcessor, deviceFilterOptionMapper, tenantIdProvider,
                 eventPublisher);
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
@@ -291,7 +294,7 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
-        verify(deletedMachineCleanup).removeFromSchedules("t-1", "m-del");
+        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
     }
 
     @Test
@@ -303,13 +306,13 @@ class DeviceServiceTest {
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
         doThrow(new RuntimeException("mongo hiccup"))
-                .when(deletedMachineCleanup).removeFromSchedules("t-1", "m-del");
+                .when(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
 
         assertThatThrownBy(() -> service().updateStatusByMachineId("m-del", DeviceStatus.DELETED))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("mongo hiccup");
 
-        verify(deletedMachineCleanup).removeFromSchedules("t-1", "m-del");
+        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
         verify(machineRepository, never()).save(any());
         assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
         verifyNoInteractions(deviceStatusProcessor);
@@ -326,7 +329,65 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
-        verify(deletedMachineCleanup, never()).removeFromSchedules(any(), any());
+        verify(deletedMachineCleanup, never()).cleanUpDeletedMachine(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: archiving leaves CONNECTED, so the device is re-filtered out of the counters")
+    void archiving_syncsConnectivityOff() {
+        Machine m = new Machine();
+        m.setMachineId("m-arc");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+
+        service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
+
+        verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-arc", false);
+        verify(deletedMachineCleanup, never()).cleanUpDeletedMachine(any(), any());
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: restoring an archived device re-enters CONNECTED, so it counts again")
+    void restoringArchived_syncsConnectivityOn() {
+        Machine m = new Machine();
+        m.setMachineId("m-arc");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ARCHIVED);
+        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+
+        service().updateStatusByMachineId("m-arc", DeviceStatus.ONLINE);
+
+        verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-arc", true);
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: ONLINE<->OFFLINE stays within CONNECTED, so the counters are not touched")
+    void onlineToOffline_noConnectivitySync() {
+        Machine m = new Machine();
+        m.setMachineId("m-off");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
+
+        service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
+
+        verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: DELETED hard-removes rows and never goes through the connectivity sync")
+    void deleting_usesCleanupNotConnectivitySync() {
+        Machine m = new Machine();
+        m.setMachineId("m-del");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+
+        service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
+
+        verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
+        verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
     }
 
 

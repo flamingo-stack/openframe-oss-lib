@@ -21,14 +21,15 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
-import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.device.MachineNameMatches;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
-import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +59,7 @@ public class DeviceService {
 
     private final MachineRepository machineRepository;
     private final DeletedMachineCleanup deletedMachineCleanup;
+    private final DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
     private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
@@ -349,8 +351,12 @@ public class DeviceService {
             log.info("Device {} already has status {}", machineId, status);
             return;
         }
+        DeviceStatus previousStatus = machine.getStatus();
+        boolean connected = status.isConnected();
         if (status == DeviceStatus.DELETED) {
-            deletedMachineCleanup.removeFromSchedules(machine.getTenantId(), machineId);
+            deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
+        } else if (previousStatus.isConnected() != connected) {
+            deviceSoftwareConnectivitySync.onConnectivityChanged(machine.getTenantId(), machineId, connected);
         }
 
         machine.setStatus(status);

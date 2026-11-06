@@ -1,16 +1,20 @@
 package com.openframe.api.util;
 
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
+import com.openframe.core.util.SoftwareVersions;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitle;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import lombok.experimental.UtilityClass;
+import org.springframework.util.StringUtils;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 @UtilityClass
 public class FleetSoftwareMapper {
@@ -31,7 +35,27 @@ public class FleetSoftwareMapper {
                 .olderVersionsCount(olderVersionsCount(versions))
                 .devicesCount(title.getHostsCount())
                 .vulnerabilitySummary(rollUpVulnerabilities(versions))
+                .fleetSource(FleetSource.of(title.getSource()))
+                .publisher(firstText(versions, SoftwareTitleVersion::getVendor))
+                .upgradeCode(title.getUpgradeCode())
                 .build();
+    }
+
+    public static <T> String firstText(List<T> versions, Function<T, String> value) {
+        return versions == null ? null : versions.stream().map(value).filter(StringUtils::hasText).findFirst().orElse(null);
+    }
+
+    public static <T> List<String> distinctText(List<T> versions, Function<T, String> value) {
+        return versions == null ? List.of() : versions.stream().map(value).filter(StringUtils::hasText).distinct().toList();
+    }
+
+    // null until a version reports the flag; true only when every reporting version has it set
+    public static <T> Boolean allFlagged(List<T> versions, Function<T, Boolean> flag) {
+        if (versions == null) {
+            return null;
+        }
+        List<Boolean> flags = versions.stream().map(flag).filter(Objects::nonNull).toList();
+        return flags.isEmpty() ? null : flags.stream().allMatch(Boolean::booleanValue);
     }
 
     // the highest version installed on the tenant's devices: Fleet does not say what the newest release is

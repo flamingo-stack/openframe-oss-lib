@@ -5,15 +5,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 
 /**
  * Decides whether an email domain may be used to register, be invited, or be configured for SSO
  * auto-provisioning.
  * <p>
- * Two layers: the configured {@code blocked-domains} list, and — only for domains that pass it — a
- * {@link DisposableDomainChecker} lookup. The second layer fails open, so an unreachable third party
- * never blocks a flow.
+ * Three layers: the configured {@code blocked-domains} list, every {@link BlockedEmailDomainSource} bean
+ * (a list kept outside the configuration, such as one a backoffice edits), and — only for domains that
+ * pass both — a {@link DisposableDomainChecker} lookup. The last two fail open, so an unreachable
+ * datastore or third party never blocks a flow. The configured {@code allowed-domains} carve-out wins
+ * over every layer.
  */
 @Slf4j
 @Service
@@ -22,6 +25,8 @@ public class EmailDomainPolicy {
 
     private final EmailDomainPolicyProperties properties;
     private final DisposableDomainChecker disposableDomainChecker;
+    /** Every source bean in {@code @Order}; empty when a deployment has none. */
+    private final List<BlockedEmailDomainSource> blockedDomainSources;
 
     /** @throws IllegalArgumentException if the address uses a blocked domain */
     public void ensureEmailAllowed(String email) {
@@ -64,14 +69,10 @@ public class EmailDomainPolicy {
         if (normalized == null) {
             return false;
         }
-        if (contains(properties.getAllowedDomains(), normalized)) {
-            return false;
-        }
-        if (contains(properties.getBlockedDomains(), normalized)) {
-            log.debug("Domain '{}' blocked by list", normalized);
+        if (isDomainListed(normalized)) {
             return true;
         }
-        if (!properties.getDisposableCheck().isEnabled()) {
+        if (contains(properties.getAllowedDomains(), normalized) || !properties.getDisposableCheck().isEnabled()) {
             return false;
         }
         boolean disposable = disposableDomainChecker.isDisposable(normalized);
@@ -79,6 +80,36 @@ public class EmailDomainPolicy {
             log.info("Domain '{}' blocked as disposable by external check", normalized);
         }
         return disposable;
+    }
+
+    /**
+     * The list layers only: the configured {@code blocked-domains} and every {@link BlockedEmailDomainSource},
+     * minus the {@code allowed-domains} carve-out. No external call, so it is safe to ask for many domains
+     * at once, as the tenant trust scoring does for every owner domain.
+     */
+    public boolean isDomainListed(String domain) {
+        String normalized = normalize(domain);
+        if (normalized == null || contains(properties.getAllowedDomains(), normalized)) {
+            return false;
+        }
+        if (contains(properties.getBlockedDomains(), normalized)) {
+            log.debug("Domain '{}' blocked by the configured list", normalized);
+            return true;
+        }
+        return blockedDomainSources.stream().anyMatch(source -> blockedBy(source, normalized));
+    }
+
+    private static boolean blockedBy(BlockedEmailDomainSource source, String normalized) {
+        boolean blocked = source.isBlocked(normalized);
+        if (blocked) {
+            log.debug("Domain '{}' blocked by {}", normalized, source.getClass().getSimpleName());
+        }
+        return blocked;
+    }
+
+    /** The domain as every layer compares it: trimmed and lowercase; {@code null} for blank input. */
+    public static String normalizeDomain(String domain) {
+        return normalize(domain);
     }
 
     private static boolean contains(Collection<String> domains, String normalized) {

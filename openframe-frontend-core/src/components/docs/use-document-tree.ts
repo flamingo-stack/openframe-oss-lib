@@ -9,6 +9,8 @@ import {
   findDocNodeByPath,
   getDocAncestorNodeIds,
   DEFAULT_FOLDER_INDEX_FILE,
+  findFirstDocPath,
+  rootDocumentPath,
 } from '../../utils/doc-tree-nav';
 import { contentFetch } from '../../utils/embed-content-fetch';
 import { navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
@@ -34,21 +36,6 @@ function scrollToContent() {
  * its README) instead of a blank panel or a redundant in-page listing — the
  * sidebar tree is the directory browser. Returns null for a folder with no docs.
  */
-function findFirstDocPath(folder: DocNode): string | null {
-  const children = folder.children ?? [];
-  for (const child of children) {
-    if (child.type === 'file' && !child.path.toLowerCase().endsWith('.mmd')) {
-      return child.path;
-    }
-  }
-  for (const child of children) {
-    if (child.type === 'folder') {
-      const nested = findFirstDocPath(child);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Wire decoding for the two doc-source endpoints
@@ -220,6 +207,11 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
   const cleanInitialPath = stripFolderIndexFromPath(initialPath?.replace(/\/$/, '') || '', folderIndexFile);
 
   const [structure, setStructure] = useState<DocNode[]>([]);
+  // The latest committed tree, for a request that settles after the tree arrived (its closure holds the old one).
+  const structureRef = useRef(structure);
+  useEffect(() => {
+    structureRef.current = structure;
+  }, [structure]);
   const [selectedPath, setSelectedPath] = useState<string>(cleanInitialPath);
   const [content, setContent] = useState<DocContent | null>(null);
   const [isLoadingStructure, setIsLoadingStructure] = useState(true);
@@ -409,12 +401,16 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
           // No-README FOLDER → stay silent: the content effect resolves it to
           // the folder's first child, so the folder-path 404 from the direct-
           // load speculative fetch is expected, not an error to flash.
-          const probe = findDocNodeByPath(stripFolderIndexFromPath(path, folderIndexFile), structure);
+          // Classified against the LATEST tree (`structureRef`), never the one captured when this request went out: the tree
+          // often arrives while the request is in flight, and judged against the empty tree of the call a missing
+          // document read as "not classified yet, wait", so nothing settled it and the page stayed a skeleton.
+          const latestStructure = structureRef.current;
+          const probe = findDocNodeByPath(stripFolderIndexFromPath(path, folderIndexFile), latestStructure);
           const probeIsNoReadmeFolder = !!probe && probe.type === 'folder' && !probe.hasReadme;
           // Before the structure has loaded to classify the path (`structure`
           // is [] in the speculative call's closure), only silence FOLDER-LIKE
           // paths (no `.md`) — a genuinely missing `*.md` leaf must still error.
-          const preStructureFolderLike = structure.length === 0 && !path.endsWith('.md');
+          const preStructureFolderLike = latestStructure.length === 0 && !path.endsWith('.md');
           if (probeIsNoReadmeFolder || preStructureFolderLike) {
             // Superseded by the targeted fetch (first-child / reclassified path)
             // the structure effect fires. Null the request id so the `finally`
@@ -507,7 +503,15 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
     let pathToFetch: string | null = null;
 
     if (selectedPath === '') {
-      pathToFetch = folderIndexFile;
+      // The root shows its landing document (the folder index); a source with none shows its FIRST document, the
+      // rule a no-README folder follows. Asking for the missing index again would 404 for ever.
+      const rootPath = rootDocumentPath(structure, folderIndexFile);
+      if (!rootPath) {
+        // A tree with folders and no document at all: nothing to fetch; the empty state is derived below.
+        lastFetchedPath.current = null;
+        return;
+      }
+      pathToFetch = rootPath;
     } else {
       const node = findDocNodeByPath(selectedPath, structure);
 
@@ -731,19 +735,25 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
   // the content effect, which reached the same conclusion one commit later and
   // meanwhile left the PREVIOUS document's body on screen.
   const isEmptyFolder = useMemo(() => {
-    if (!selectedPath || structure.length === 0) return false;
+    if (structure.length === 0) return false;
+    // The root of a source whose tree holds no document at all is an empty folder too.
+    if (!selectedPath) return !rootDocumentPath(structure, folderIndexFile);
     const node = findDocNodeByPath(selectedPath, structure);
     return !!node && node.type === 'folder' && !node.hasReadme && !findFirstDocPath(node);
-  }, [selectedPath, structure]);
+  }, [selectedPath, structure, folderIndexFile]);
+  // A source with no documents at all (its tree is read and empty): there is nothing to load, so the viewer shows the
+  // source's empty state instead of waiting for a landing document that does not exist.
+  const isEmptySource = !isLoadingStructure && structure.length === 0;
+  const settled = isEmptyFolder || isEmptySource;
 
   return {
     structure,
     selectedPath,
     setSelectedPath,
-    content: isEmptyFolder ? null : content,
+    content: settled ? null : content,
     isLoadingStructure,
-    isLoadingContent: isEmptyFolder ? false : isLoadingContent,
-    error: isEmptyFolder ? null : error,
+    isLoadingContent: settled ? false : isLoadingContent,
+    error: settled ? null : error,
     expandedNodes,
     toggleNode,
     selectNode,

@@ -2,6 +2,7 @@ package com.openframe.gateway.filter;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.openframe.core.clientversion.AppOrigins;
 import com.openframe.core.clientversion.ClientIdentity;
 import com.openframe.core.clientversion.ClientIdentityParser;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
@@ -19,7 +20,6 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.Map;
 
 import static com.openframe.core.constants.HttpHeaders.X_OPENFRAME_CLIENT;
 import static com.openframe.core.clientversion.ClientIdentity.UNKNOWN_VERSION;
@@ -45,10 +45,7 @@ public class ClientVersionMetricsFilter implements GlobalFilter, Ordered {
     private static final long SEEN_MAX_SIZE = 100_000;
     private static final String NO_TENANT = "-";
     private static final String NO_HEADER_KIND = "none";
-    private static final Map<String, String> LEGACY_SHELL_KINDS_BY_ORIGIN = Map.of(
-            "capacitor://localhost", "legacy-ios",
-            "https://localhost", "legacy-android",
-            "tauri://localhost", "legacy-desktop");
+    private static final String LEGACY_KIND_PREFIX = "legacy-";
 
     private final GatewayTrafficMetrics metrics;
     private final Cache<String, Boolean> seenClients;
@@ -90,13 +87,9 @@ public class ClientVersionMetricsFilter implements GlobalFilter, Ordered {
             record(request, sub, identity.getKind().getLabel(), identity.getShellVersion(), identity.getBundleVersion());
             return;
         }
-        String origin = request.getHeaders().getFirst(ORIGIN);
-        String legacyShellKind = origin == null ? null : LEGACY_SHELL_KINDS_BY_ORIGIN.get(origin);
-        if (legacyShellKind != null) {
-            record(request, sub, legacyShellKind, UNKNOWN_VERSION, UNKNOWN_VERSION);
-            return;
-        }
-        metrics.recordClientRequest(NO_HEADER_KIND, UNKNOWN_VERSION, UNKNOWN_VERSION);
+        AppOrigins.kindOf(request.getHeaders().getFirst(ORIGIN)).ifPresentOrElse(
+                shell -> record(request, sub, LEGACY_KIND_PREFIX + shell.getLabel(), UNKNOWN_VERSION, UNKNOWN_VERSION),
+                () -> metrics.recordClientRequest(NO_HEADER_KIND, UNKNOWN_VERSION, UNKNOWN_VERSION));
     }
 
     private void record(ServerHttpRequest request, String sub, String kind, String shellVersion, String bundleVersion) {

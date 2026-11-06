@@ -19,6 +19,21 @@ export interface SoftwareActionCopy {
   logsHeading: string;
 }
 
+/**
+ * The run modes say when a device actually gets the run, not only when it is sent. Both forms submit a software bundle
+ * (`submitSoftwareBundle`), and the backend delivers it per device:
+ * - Now: each device gets an online-dispatch sentinel (`SoftwareBundleService.armOnlineDispatch`), so an online device
+ *   starts at once and an offline one when it comes online.
+ * - Scheduled: the schedule is created with `offlineBehavior` RETRY_ON_RECONNECT and the reconnect window
+ *   `openframe.rmm.software.bundle.schedule.reconnect-window-seconds` (604800 s, 7 days, in saas-tenant
+ *   `configs/base/openframe-saas-api.yml`): a device offline at the start time gets the run when it reconnects within
+ *   that window. Keep "within 7 days" in step with that key.
+ */
+const nowDescription = (noun: string) =>
+  `The ${noun} starts now on online devices, and on the others when they come online.`;
+const scheduleDescription = (noun: string) =>
+  `The ${noun} runs at the scheduled time. Devices offline then get it when they come back online, within 7 days.`;
+
 /** Everything the install and update flows word differently, on every page that shows one. */
 export const SOFTWARE_ACTION_COPY: Record<SoftwareActionKind, SoftwareActionCopy> = {
   INSTALL: {
@@ -27,12 +42,8 @@ export const SOFTWARE_ACTION_COPY: Record<SoftwareActionKind, SoftwareActionCopy
     runLabel: 'Run Installation',
     scheduleLabel: 'Schedule Install',
     modes: [
-      { value: 'now', label: 'Install Now', description: 'The install starts immediately.' },
-      {
-        value: 'schedule',
-        label: 'Schedule Install',
-        description: 'The install runs automatically at the scheduled time.',
-      },
+      { value: 'now', label: 'Install Now', description: nowDescription('install') },
+      { value: 'schedule', label: 'Schedule Install', description: scheduleDescription('install') },
     ],
     started: 'Installation started',
     scheduled: 'Installation scheduled',
@@ -46,12 +57,8 @@ export const SOFTWARE_ACTION_COPY: Record<SoftwareActionKind, SoftwareActionCopy
     runLabel: 'Run Update',
     scheduleLabel: 'Schedule Update',
     modes: [
-      { value: 'now', label: 'Update Now', description: 'The update starts immediately.' },
-      {
-        value: 'schedule',
-        label: 'Schedule Update',
-        description: 'The update runs automatically at the scheduled time.',
-      },
+      { value: 'now', label: 'Update Now', description: nowDescription('update') },
+      { value: 'schedule', label: 'Schedule Update', description: scheduleDescription('update') },
     ],
     started: 'Update started',
     scheduled: 'Update scheduled',

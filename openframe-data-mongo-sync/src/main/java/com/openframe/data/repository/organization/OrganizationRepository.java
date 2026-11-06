@@ -4,6 +4,7 @@ import com.openframe.data.document.organization.Organization;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -21,6 +22,8 @@ public interface OrganizationRepository extends MongoRepository<Organization, St
      * @return Optional containing the organization if found
      */
     Optional<Organization> findByOrganizationId(String organizationId);
+
+    List<Organization> findByTenantIdInAndOrganizationIdIn(Collection<String> tenantIds, Collection<String> organizationIds);
 
     /**
      * Find organization by name

@@ -43,6 +43,12 @@ export interface StatusFilterComponentProps {
   showAll?: boolean;
   /** The options are read on the client and have not arrived: the row draws its skeleton, as in a loading scope. */
   loading?: boolean;
+  /**
+   * The options' labels are known but their counts are not ("Active" now, "Active (33)" once read): while loading,
+   * each option is drawn as its real button with a bar where the count goes, so the row keeps its width and, on a
+   * narrow screen, wraps onto the same lines as the loaded row.
+   */
+  countsPending?: boolean;
 }
 
 /** The row's frame, label and controls, read by the row and by its skeleton, so the skeleton is the row's size. */
@@ -74,6 +80,7 @@ export function StatusFilterComponent({
   label = 'Status',
   showAll = true,
   loading = false,
+  countsPending = false,
 }: StatusFilterComponentProps) {
   // Filter out 'all' from options since we render it separately
   const filteredOptions = statusOptions.filter(option => option.value !== 'all');
@@ -84,6 +91,7 @@ export function StatusFilterComponent({
         label={label}
         // Options the page states itself are its own words: drawn for real. Read ones arrive empty: boxes.
         options={filteredOptions.length > 0 ? filteredOptions.map(option => option.label) : undefined}
+        countsPending={countsPending}
         showAll={showAll}
         showCount={showCount}
         className={className}
@@ -142,6 +150,7 @@ function StatusFilterComponentSkeleton({
   label = 'Status',
   options,
   pills = STATUS_FILTER_SKELETON_PILLS,
+  countsPending = false,
   showAll = true,
   showCount = false,
   className,
@@ -150,6 +159,8 @@ function StatusFilterComponentSkeleton({
   /** Option labels the page states itself: drawn as real buttons (in place of `pills` boxes). */
   options?: string[];
   pills?: number;
+  /** Each option's count is still being read: a bar the width of " (00)" follows its label. */
+  countsPending?: boolean;
   showAll?: boolean;
   showCount?: boolean;
   className?: string;
@@ -182,6 +193,10 @@ function StatusFilterComponentSkeleton({
               tabIndex={-1}
             >
               {option}
+              {/* With the button's gap before it, a 2ch bar is the width of the " (00)" the count adds. */}
+              {countsPending && (
+                <TextLineSkeleton type="inherit" as="span" className="inline-block w-[2ch] align-top" />
+              )}
             </Button>
           ))
         : Array.from({ length: pills }, (_, index) => (
