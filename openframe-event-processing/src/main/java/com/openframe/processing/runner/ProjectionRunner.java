@@ -113,9 +113,10 @@ public class ProjectionRunner {
             return Outcome.SKIPPED;
         }
         versions.saveVersionIfHigher(name, tenantId, aggregateId, version);
-        // No projection handles deletes yet; the version is kept, so a late older event after the delete is skipped.
+        // The version is kept after a delete, so a late older event is skipped.
         if (record.isDeleted()) {
-            return Outcome.DELETE_STORED;
+            projection.applyDelete(tenantId, aggregateId);
+            return Outcome.DELETED;
         }
         return applyOrDecideHandOver(projection, aggregateId, record);
     }
@@ -123,9 +124,10 @@ public class ProjectionRunner {
     private void recordOutcome(Timer.Sample sample, String name, Outcome outcome, String aggregateId, PublishedRecord<?> record) {
         switch (outcome) {
             case APPLIED -> metrics.recordApplied(sample, name);
+            case UNCHANGED -> metrics.recordUnchanged(sample, name);
             case HANDED_OVER -> metrics.recordHandedOver(sample, name);
             case SKIPPED -> metrics.recordSkipped(sample, name);
-            case DELETE_STORED -> metrics.recordDeleteStored(sample, name);
+            case DELETED -> metrics.recordDeleted(sample, name);
         }
         log.debug("Projection {}: {} for {} version {} of tenant {}", name, outcome, aggregateId, record.getVersion(),
             record.getTenantId());
@@ -140,6 +142,10 @@ public class ProjectionRunner {
             return Outcome.HANDED_OVER;
         }
         long changes = projection.countChanges(record, inlineLimit);
+        // Most events change no copy, such as a save that kept the name; their version is still stored.
+        if (changes == 0) {
+            return Outcome.UNCHANGED;
+        }
         if (changes < inlineLimit) {
             projection.apply(record);
             return Outcome.APPLIED;
@@ -168,8 +174,9 @@ public class ProjectionRunner {
 
     private enum Outcome {
         APPLIED,
+        UNCHANGED,
         HANDED_OVER,
         SKIPPED,
-        DELETE_STORED
+        DELETED
     }
 }

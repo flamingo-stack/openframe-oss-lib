@@ -11,7 +11,8 @@ import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult;
 import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
-import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
+import com.openframe.publishing.config.EventsAutoConfiguration;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -35,7 +36,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -65,7 +65,8 @@ import static org.mockito.Mockito.when;
 
 // A real broker: the module creates its topics, then record -> listener -> runner -> projection, and the error handler's retry and DLT.
 @SpringBootTest(classes = EventProcessingKafkaIT.TestApplication.class,
-        properties = {"openframe.events.enabled=true",
+        properties = {"openframe.events.enabled=true", "spring.data.mongodb.enabled=true",
+                "openframe.events.topics.organizations.enabled=true",
                 "openframe.events.processing.kafka.topic-prefix=events.",
                 "openframe.events.processing.kafka.group-prefix=processing-it.",
                 "openframe.events.processing.kafka.topics.events.replication-factor=1",
@@ -246,8 +247,8 @@ class EventProcessingKafkaIT {
 
     @SpringBootConfiguration
     @ImportAutoConfiguration({PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
-            EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class, EventTopicsAutoConfiguration.class})
-    @Import(AggregateSpecRegistry.class)
+            EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class, EventTopicsAutoConfiguration.class,
+            AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class})
     static class TestApplication {
 
         @Bean
@@ -338,7 +339,7 @@ class EventProcessingKafkaIT {
 
         @Override
         public long countChanges(PublishedRecord<OrganizationEvent> record, int limit) {
-            return 0;
+            return 1;
         }
 
         @Override

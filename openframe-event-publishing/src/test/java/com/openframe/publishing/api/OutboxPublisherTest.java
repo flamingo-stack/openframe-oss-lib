@@ -12,6 +12,7 @@ import com.openframe.publishing.persistence.OutboxEvent;
 import com.openframe.publishing.transaction.MongoTransactionRunner;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,7 @@ import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
 import org.springframework.data.mongodb.core.convert.NoOpDbRefResolver;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -193,6 +195,26 @@ class OutboxPublisherTest {
         assertThat(modified).isEqualTo(1L);
         verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
         assertThat(versionOf(onlyRow().getPayload())).isEqualTo(1L);
+    }
+
+    // A link beside a directory config changes what its projection reads; the raised version keeps that event newest.
+    @Test
+    void aRepublish_raisesTheVersionAfterTheWrite_thenPublishesTheNewState() {
+        when(mongoOperations.find(any(Query.class), eq(Widget.class))).thenReturn(List.of(widget("w-1", 5L)));
+        Runnable write = mock(Runnable.class);
+        ArgumentCaptor<Update> increment = ArgumentCaptor.forClass(Update.class);
+
+        publisher.republishByIds(spec, List.of("w-1"), () -> {
+            write.run();
+            return null;
+        });
+
+        InOrder order = inOrder(mongoOperations, write);
+        order.verify(write).run();
+        order.verify(mongoOperations).updateMulti(any(Query.class), increment.capture(), eq(Widget.class));
+        order.verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
+        assertThat(increment.getValue().getUpdateObject().get("$inc")).isEqualTo(new Document("version", 1));
+        assertThat(versionOf(onlyRow().getPayload())).isEqualTo(5L);
     }
 
     @Test
