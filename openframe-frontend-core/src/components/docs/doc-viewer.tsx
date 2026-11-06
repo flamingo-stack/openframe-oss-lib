@@ -4,7 +4,7 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
 import type { DocContent, DocNode, DocRenderHandlers, DocSourceId } from '../../types/doc-source';
-import { findDocNodeByPath } from '../../utils/doc-tree-nav';
+import { findDocNodeByPath, rootDocumentPath } from '../../utils/doc-tree-nav';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { MultiLevelNavigation, MobileNavigationDropdown } from '../navigation/multi-level-navigation';
@@ -248,11 +248,15 @@ function DocViewerContent({
   //   - the article max-width + sticky-nav visibility (markdown only)
   // `undefined` documentType is treated as `'markdown'` (per the DocNode
   // discriminator's documented default).
-  // Before the tree is read, the host's `initialDocumentType` (the page's own document) stands in.
+  // Before the tree is read, the host's `initialDocumentType` (the page's own document) stands in. Once it is read, the
+  // root takes the type of the document it shows (`rootDocumentPath`), so a root Figma or PDF never flips to the text
+  // layout between the tree arriving and the document arriving.
+  const selectedNodePath =
+    structure.length > 0 && !selectedPath ? rootDocumentPath(structure, folderIndexFile) : selectedPath;
   const selectedNodeDocType =
     structure.length > 0
-      ? selectedPath
-        ? findDocNodeByPath(selectedPath, structure)?.documentType
+      ? selectedNodePath
+        ? findDocNodeByPath(selectedNodePath, structure)?.documentType
         : undefined
       : initialDocumentType;
   // While a document loads, `content` is still the PREVIOUS document's: the layout (the "On this page" column, the

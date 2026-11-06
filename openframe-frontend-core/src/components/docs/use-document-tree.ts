@@ -9,6 +9,8 @@ import {
   findDocNodeByPath,
   getDocAncestorNodeIds,
   DEFAULT_FOLDER_INDEX_FILE,
+  findFirstDocPath,
+  rootDocumentPath,
 } from '../../utils/doc-tree-nav';
 import { contentFetch } from '../../utils/embed-content-fetch';
 import { navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
@@ -34,24 +36,6 @@ function scrollToContent() {
  * its README) instead of a blank panel or a redundant in-page listing — the
  * sidebar tree is the directory browser. Returns null for a folder with no docs.
  */
-/** The tree's root as a folder node, so the folder rules (first document) apply to it. */
-const ROOT_NODE: DocNode = { id: '', name: '', slug: '', path: '', type: 'folder', children: [] };
-
-function findFirstDocPath(folder: DocNode): string | null {
-  const children = folder.children ?? [];
-  for (const child of children) {
-    if (child.type === 'file' && !child.path.toLowerCase().endsWith('.mmd')) {
-      return child.path;
-    }
-  }
-  for (const child of children) {
-    if (child.type === 'folder') {
-      const nested = findFirstDocPath(child);
-      if (nested) return nested;
-    }
-  }
-  return null;
-}
 
 // ---------------------------------------------------------------------------
 // Wire decoding for the two doc-source endpoints
@@ -521,14 +505,13 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
     if (selectedPath === '') {
       // The root shows its landing document (the folder index); a source with none shows its FIRST document, the
       // rule a no-README folder follows. Asking for the missing index again would 404 for ever.
-      const hasRootIndex = structure.some(node => node.type === 'file' && node.path === folderIndexFile);
-      const firstDocPath = hasRootIndex ? null : findFirstDocPath({ ...ROOT_NODE, children: structure });
-      if (!hasRootIndex && !firstDocPath) {
+      const rootPath = rootDocumentPath(structure, folderIndexFile);
+      if (!rootPath) {
         // A tree with folders and no document at all: nothing to fetch; the empty state is derived below.
         lastFetchedPath.current = null;
         return;
       }
-      pathToFetch = firstDocPath ?? folderIndexFile;
+      pathToFetch = rootPath;
     } else {
       const node = findDocNodeByPath(selectedPath, structure);
 
@@ -754,12 +737,7 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
   const isEmptyFolder = useMemo(() => {
     if (structure.length === 0) return false;
     // The root of a source whose tree holds no document at all is an empty folder too.
-    if (!selectedPath) {
-      return (
-        !structure.some(node => node.type === 'file' && node.path === folderIndexFile) &&
-        !findFirstDocPath({ ...ROOT_NODE, children: structure })
-      );
-    }
+    if (!selectedPath) return !rootDocumentPath(structure, folderIndexFile);
     const node = findDocNodeByPath(selectedPath, structure);
     return !!node && node.type === 'folder' && !node.hasReadme && !findFirstDocPath(node);
   }, [selectedPath, structure, folderIndexFile]);
