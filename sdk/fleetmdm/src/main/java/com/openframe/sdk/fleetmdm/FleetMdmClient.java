@@ -9,6 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmArgumentException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmNotFoundException;
 import com.openframe.sdk.fleetmdm.model.AffectedSoftware;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
@@ -54,6 +55,7 @@ public class FleetMdmClient {
 
     private static final String HOSTS_URL = "/api/v1/fleet/hosts";
     private static final String HOSTS_COUNT_URL = "/api/v1/fleet/hosts/count";
+    private static final String HOST_BY_IDENTIFIER_URL = "/api/v1/fleet/hosts/identifier/";
     private static final String QUERIES_URL = "/api/v1/fleet/queries";
     private static final String POLICIES_URL = "/api/v1/fleet/global/policies";
     private static final String GET_ENROLL_SECRET_URL = "/api/latest/fleet/spec/enroll_secret";
@@ -155,12 +157,26 @@ public class FleetMdmClient {
      */
     public Host getHostById(long id) {
         String url = baseUrl + HOSTS_URL + "/" + id + "?exclude_software=true";
-        return getHost(id, url, Host.class);
+        String hostLabel = String.valueOf(id);
+        return getHost(hostLabel, url, Host.class);
+    }
+
+    // Fleet matches hostname, osquery_host_id, node key, uuid or serial and answers the first hit: callers check the field they meant.
+    public Host getHostByIdentifier(String identifier) {
+        validateIdentifier(identifier);
+        String encodedIdentifier = URLEncoder.encode(identifier, StandardCharsets.UTF_8).replace("+", "%20");
+        String url = baseUrl + HOST_BY_IDENTIFIER_URL + encodedIdentifier + "?exclude_software=true";
+        Host host = getHost(identifier, url, Host.class);
+        if (host == null) {
+            throw new FleetMdmNotFoundException("Fleet host not found for identifier " + identifier, "");
+        }
+        return host;
     }
 
     public HostVulnerabilityInventory getHostVulnerabilityInventoryById(long id) {
         String url = baseUrl + HOSTS_URL + "/" + id;
-        return getHost(id, url, HostVulnerabilityInventory.class);
+        String hostLabel = String.valueOf(id);
+        return getHost(hostLabel, url, HostVulnerabilityInventory.class);
     }
 
     public HostSoftwareResponse listHostSoftware(long hostId, int page, int perPage) {
@@ -186,8 +202,8 @@ public class FleetMdmClient {
         });
     }
 
-    private <T> T getHost(long id, String url, Class<T> responseType) {
-        return call("fetch Fleet host " + id, () -> {
+    private <T> T getHost(String hostLabel, String url, Class<T> responseType) {
+        return call("fetch Fleet host " + hostLabel, () -> {
             HttpRequest request = addHeaders(HttpRequest.newBuilder()
                     .uri(URI.create(url)))
                     .GET()
@@ -380,6 +396,12 @@ public class FleetMdmClient {
     private static void validateQuery(String query) {
         if (query == null || query.trim().isEmpty()) {
             throw new FleetMdmArgumentException("Query cannot be null or empty");
+        }
+    }
+
+    private static void validateIdentifier(String identifier) {
+        if (identifier == null || identifier.trim().isEmpty()) {
+            throw new FleetMdmArgumentException("Host identifier cannot be null or empty");
         }
     }
 
