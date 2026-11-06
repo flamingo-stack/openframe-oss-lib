@@ -102,3 +102,30 @@ export function getDocSourceDefaultPath(
   const firstFolderWithReadme = structure.find(node => node.type === 'folder' && node.hasReadme && !!node.path);
   return firstFolderWithReadme?.path ?? null;
 }
+
+/** The first document under a folder (its own files first, then each subfolder's, in order), never a diagram source. */
+export function findFirstDocPath(folder: DocNode): string | null {
+  const children = folder.children ?? [];
+  for (const child of children) {
+    if (child.type === 'file' && !child.path.toLowerCase().endsWith('.mmd')) return child.path;
+  }
+  for (const child of children) {
+    if (child.type === 'folder') {
+      const nested = findFirstDocPath(child);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+/**
+ * The document a source's root shows: its folder index when the tree has one, else its first document (the rule a
+ * folder with no README follows), else null (a tree with no document at all).
+ */
+export function rootDocumentPath(
+  structure: DocNode[],
+  folderIndexFile: string = DEFAULT_FOLDER_INDEX_FILE,
+): string | null {
+  if (structure.some(node => node.type === 'file' && node.path === folderIndexFile)) return folderIndexFile;
+  return findFirstDocPath({ id: '', name: '', slug: '', path: '', type: 'folder', children: structure });
+}
