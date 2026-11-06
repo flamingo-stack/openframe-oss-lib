@@ -65,6 +65,18 @@ class CustomMachineRepositoryHostFactsCheckedIT extends BaseMongoIntegrationTest
     }
 
     @Test
+    void markHostFactsChecked_knownMachine_leavesTheVersion() {
+        // setup
+        Long savedVersion = repository.findByMachineId(MACHINE_ID).orElseThrow().getVersion();
+
+        // execution
+        repository.markHostFactsChecked(MACHINE_ID, Instant.now());
+
+        // verifications
+        assertThat(repository.findByMachineId(MACHINE_ID).orElseThrow().getVersion()).isEqualTo(savedVersion);
+    }
+
+    @Test
     void markHostFactsChecked_unknownMachine_createsNothing() {
         // setup
 

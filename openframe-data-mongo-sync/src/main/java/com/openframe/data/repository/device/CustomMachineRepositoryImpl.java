@@ -746,7 +746,9 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     @Override
     public void markHostFactsChecked(String machineId, Instant checkedAt) {
         Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
-        mongoTemplate.updateFirst(query, new Update().set(HOST_FACTS_CHECKED_AT_FIELD, checkedAt), Machine.class);
+        // $inc by 0 as in updateLastSeen: a background stamp never conflicts with a user edit.
+        Update update = new Update().set(HOST_FACTS_CHECKED_AT_FIELD, checkedAt).inc(VERSION_FIELD, 0);
+        mongoTemplate.updateFirst(query, update, Machine.class);
     }
 
     // No index serves "any fact blank": the filter runs server side over the tenant's machines, once per backfill run
