@@ -1605,6 +1605,7 @@ export const ICON_LOADERS: Readonly<Record<string, () => Promise<IconModule>>> =
   StrawberryIcon: () => import('./food-and-drinks/strawberry-icon').then(module => ({ default: module.StrawberryIcon })),
   StreetViewIcon: () => import('./map-and-travel/street-view-icon').then(module => ({ default: module.StreetViewIcon })),
   StrikeThroughIcon: () => import('./text-editor/strike-through-icon').then(module => ({ default: module.StrikeThroughIcon })),
+  StripeIcon: () => import('./brand-logos/stripe-icon').then(module => ({ default: module.StripeIcon })),
   SubtitleIcon: () => import('./media-playback/subtitle-icon').then(module => ({ default: module.SubtitleIcon })),
   SuitcaseIcon: () => import('./map-and-travel/suitcase-icon').then(module => ({ default: module.SuitcaseIcon })),
   Sun01Icon: () => import('./weather-and-nature/sun-01-icon').then(module => ({ default: module.Sun01Icon })),

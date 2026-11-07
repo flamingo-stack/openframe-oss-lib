@@ -53,6 +53,9 @@
   "brand-logos/shell": {
     "color": "var(--color-text-primary)"
   },
+  "brand-logos/stripe": {
+    "color": "var(--social-stripe)"
+  },
   "brand-logos/telegram": {
     "color": "var(--color-text-primary)"
   },
