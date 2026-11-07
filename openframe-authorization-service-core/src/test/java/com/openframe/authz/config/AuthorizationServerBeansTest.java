@@ -1,7 +1,10 @@
 package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.core.exception.AuthErrorCode;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
 import org.junit.jupiter.api.AfterEach;
@@ -12,6 +15,9 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -28,6 +34,7 @@ import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +45,7 @@ class AuthorizationServerBeansTest {
 
     private final AuthorizationServerConfig config = new AuthorizationServerConfig();
     private final UserService userService = mock(UserService.class);
+    private final TenantService tenantService = mock(TenantService.class);
     private AuthUser owner;
 
     @BeforeEach
@@ -46,6 +54,7 @@ class AuthorizationServerBeansTest {
         owner = activeUser("user-1", TENANT, "owner@acme.com");
         owner.setRoles(List.of(UserRole.OWNER));
         owner.setPasswordHash(new BCryptPasswordEncoder(4).encode("Str0ng-password!"));
+        when(tenantService.isActive(TENANT)).thenReturn(true);
     }
 
     @AfterEach
@@ -63,7 +72,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldAddTenantUserAndEffectiveRolesToAccessToken() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        OAuth2TokenCustomizer<JwtEncodingContext> customizer = config.tokenCustomizer(userService);
+        OAuth2TokenCustomizer<JwtEncodingContext> customizer = config.tokenCustomizer(userService, tenantService);
         JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.AUTHORIZATION_CODE, "Owner@Acme.com").build();
 
         customizer.customize(ctx);
@@ -79,7 +88,7 @@ class AuthorizationServerBeansTest {
     void shouldTouchLastLoginOnRefreshGrant() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
 
-        config.tokenCustomizer(userService).customize(
+        config.tokenCustomizer(userService, tenantService).customize(
                 context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.REFRESH_TOKEN, "owner@acme.com").build());
 
         verify(userService).touchLastLogin("owner@acme.com", TENANT);
@@ -89,7 +98,7 @@ class AuthorizationServerBeansTest {
     void shouldRefuseToMintForPrincipalWithoutActiveUserInRequestTenant() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> config.tokenCustomizer(userService).customize(
+        assertThatThrownBy(() -> config.tokenCustomizer(userService, tenantService).customize(
                 context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.AUTHORIZATION_CODE, "owner@acme.com").build()))
                 .isInstanceOf(UsernameNotFoundException.class);
     }
@@ -100,7 +109,7 @@ class AuthorizationServerBeansTest {
         JwtEncodingContext ctx = context(new OAuth2TokenType("id_token"), AuthorizationGrantType.AUTHORIZATION_CODE,
                 "owner@acme.com").build();
 
-        config.tokenCustomizer(userService).customize(ctx);
+        config.tokenCustomizer(userService, tenantService).customize(ctx);
 
         assertThat(ctx.getClaims().build().getClaims()).doesNotContainKeys("tenant_id", "roles");
     }
@@ -108,7 +117,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldLoadPasswordUserScopedToRequestTenant() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        UserDetailsService details = config.userDetailsService(userService);
+        UserDetailsService details = config.userDetailsService(userService, tenantService);
 
         UserDetails loaded = details.loadUserByUsername("OWNER@acme.com");
 
@@ -118,7 +127,7 @@ class AuthorizationServerBeansTest {
 
     @Test
     void shouldRefusePasswordLoginWithoutUserInTenantOrWithoutHash() {
-        UserDetailsService details = config.userDetailsService(userService);
+        UserDetailsService details = config.userDetailsService(userService, tenantService);
         AuthUser ssoOnly = activeUser("u2", TENANT, "sso@acme.com");
         ssoOnly.setPasswordHash(" ");
         when(userService.findActiveByEmailAndTenant("ghost@acme.com", TENANT)).thenReturn(Optional.empty());
@@ -133,7 +142,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldAuthenticatePasswordsWithBcryptOnly() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        var manager = config.authenticationManager(config.userDetailsService(userService), config.passwordEncoder());
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
 
         assertThat(config.passwordEncoder()).isInstanceOf(BCryptPasswordEncoder.class);
         assertThat(manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!"))
@@ -146,9 +155,67 @@ class AuthorizationServerBeansTest {
     void shouldGiveSameErrorForUnknownUserAndWrongPassword() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
         when(userService.findActiveByEmailAndTenant("ghost@acme.com", TENANT)).thenReturn(Optional.empty());
-        var manager = config.authenticationManager(config.userDetailsService(userService), config.passwordEncoder());
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
 
         assertThatThrownBy(() -> manager.authenticate(new UsernamePasswordAuthenticationToken("ghost@acme.com", "x")))
                 .isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
+    }
+
+    @Test
+    void shouldRefusePasswordLoginIntoInactiveTenantBeforeLookingUpTheUser() {
+        when(tenantService.isActive(TENANT)).thenReturn(false);
+        UserDetailsService details = config.userDetailsService(userService, tenantService);
+
+        assertThatThrownBy(() -> details.loadUserByUsername("owner@acme.com"))
+                .isInstanceOf(AuthFlowException.class)
+                .hasMessage(TenantService.ACCOUNT_INACTIVE_MESSAGE)
+                .extracting(e -> ((AuthFlowException) e).getCode())
+                .isEqualTo(AuthErrorCode.ACCOUNT_INACTIVE);
+        verify(userService, never()).findActiveByEmailAndTenant(anyString(), anyString());
+    }
+
+    @Test
+    void shouldFailPasswordAuthenticationForInactiveTenantEvenWithTheRightPassword() {
+        when(tenantService.isActive(TENANT)).thenReturn(false);
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
+
+        assertThatThrownBy(() -> manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!")))
+                .isInstanceOf(InternalAuthenticationServiceException.class)
+                .hasCauseInstanceOf(AuthFlowException.class);
+    }
+
+    @Test
+    void shouldAuthenticatePasswordLoginIntoActiveTenant() {
+        when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
+
+        assertThat(manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!"))
+                .isAuthenticated()).isTrue();
+        verify(tenantService).isActive(TENANT);
+    }
+
+    @Test
+    void shouldRefuseToRefreshTokensOfInactiveTenantWithInvalidGrant() {
+        when(tenantService.isActive(TENANT)).thenReturn(false);
+        OAuth2TokenCustomizer<JwtEncodingContext> customizer = config.tokenCustomizer(userService, tenantService);
+        JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.REFRESH_TOKEN, "owner@acme.com").build();
+
+        assertThatThrownBy(() -> customizer.customize(ctx))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .extracting(e -> ((OAuth2AuthenticationException) e).getError())
+                .satisfies(error -> {
+                    assertThat(error.getErrorCode()).isEqualTo(OAuth2ErrorCodes.INVALID_GRANT);
+                    assertThat(error.getDescription()).isEqualTo(TenantService.ACCOUNT_INACTIVE_MESSAGE);
+                });
+        verify(userService, never()).touchLastLogin("owner@acme.com", TENANT);
+    }
+
+    @Test
+    void shouldRefuseToMintAccessTokenForInactiveTenantOnCodeExchange() {
+        when(tenantService.isActive(TENANT)).thenReturn(false);
+        OAuth2TokenCustomizer<JwtEncodingContext> customizer = config.tokenCustomizer(userService, tenantService);
+        JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.AUTHORIZATION_CODE, "owner@acme.com").build();
+
+        assertThatThrownBy(() -> customizer.customize(ctx)).isInstanceOf(OAuth2AuthenticationException.class);
     }
 }

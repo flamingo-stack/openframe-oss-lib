@@ -12,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+import static org.springframework.util.StringUtils.hasText;
+
 /**
  * Service for managing tenants in multi-tenant architecture
  */
@@ -20,6 +22,8 @@ import java.util.Optional;
 @Transactional
 @RequiredArgsConstructor
 public class TenantService {
+
+    public static final String ACCOUNT_INACTIVE_MESSAGE = "Your account is not active. Please contact your administrator.";
 
     private final TenantRepository tenantRepository;
     private final RegistrationValidationService registrationValidationService;
@@ -63,6 +67,11 @@ public class TenantService {
      */
     public Optional<Tenant> findById(String tenantId) {
         return tenantRepository.findById(tenantId);
+    }
+
+    // A blocked tenant is INACTIVE, so it is refused here like an unknown or blank id.
+    public boolean isActive(String tenantId) {
+        return hasText(tenantId) && tenantRepository.findById(tenantId).filter(Tenant::isActive).isPresent();
     }
 
     /**

@@ -5,6 +5,8 @@ import com.openframe.authz.security.SsoAuthorizationRequestResolver;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.web.AuthErrorResponder;
+import com.openframe.core.exception.AuthErrorCode;
+import com.openframe.core.exception.AuthFlowException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,6 +33,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -63,6 +66,7 @@ public class SecurityConfig {
                                                           ClientRegistrationRepository clientRegistrationRepository,
                                                           SsoCookieCodec ssoCookieCodec,
                                                           AuthenticationFailureHandler oauth2LoginFailureHandler,
+                                                          AuthErrorResponder authErrorResponder,
                                                           JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory,
                                                           SsoProviderRegistry ssoProviderRegistry) throws Exception {
         return http
@@ -96,6 +100,7 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .successHandler(authSuccessHandler)
+                        .failureHandler(passwordLoginFailureHandler(authErrorResponder))
                         .permitAll())
                 .oauth2Login(o -> o
                         .loginPage("/login")
@@ -120,6 +125,19 @@ public class SecurityConfig {
     public AuthenticationFailureHandler oauth2LoginFailureHandler(AuthErrorResponder authErrorResponder) {
         return (HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) ->
                 authErrorResponder.send(response, request, "oauth2-login", exception, SSO_LOGIN_FAILED);
+    }
+
+    // DaoAuthenticationProvider wraps the user loader's AuthFlowException, so the refusal is the cause.
+    static AuthenticationFailureHandler passwordLoginFailureHandler(AuthErrorResponder authErrorResponder) {
+        AuthenticationFailureHandler invalidCredentials = new SimpleUrlAuthenticationFailureHandler("/login?error");
+        return (request, response, exception) -> {
+            if (exception.getCause() instanceof AuthFlowException refusal) {
+                AuthErrorCode code = refusal.getCode();
+                authErrorResponder.send(response, request, "password-login", refusal, code);
+                return;
+            }
+            invalidCredentials.onAuthenticationFailure(request, response, exception);
+        };
     }
 
     /** One entry per distinct SSO config (its cache key), NOT per login — bounded by active configs. */

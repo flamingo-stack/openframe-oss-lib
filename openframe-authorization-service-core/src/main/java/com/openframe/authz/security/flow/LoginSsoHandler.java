@@ -31,6 +31,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.Optional;
 
+import static com.openframe.authz.service.tenant.TenantService.ACCOUNT_INACTIVE_MESSAGE;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
@@ -138,7 +139,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
         tenantService.findById(tenantId)
                 .filter(Tenant::isActive)
-                .orElseThrow(() -> new AuthFlowException(ACCOUNT_INACTIVE, "Your account is not active. Please contact your administrator."));
+                .orElseThrow(() -> new AuthFlowException(ACCOUNT_INACTIVE, ACCOUNT_INACTIVE_MESSAGE));
 
         // Only now — the login is fully allowed (trusted routing, provider permitted, tenant
         // active). A link written before these checks would outlive a REJECTED login and later
