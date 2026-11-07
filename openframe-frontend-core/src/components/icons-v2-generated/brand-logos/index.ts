@@ -113,6 +113,7 @@ export { SlackLogoIcon } from './slack-logo-icon';
 export { SlackMonoIcon } from './slack-mono-icon';
 export { SoundcloudIcon } from './soundcloud-icon';
 export { SpotifyIcon } from './spotify-icon';
+export { StripeIcon } from './stripe-icon';
 export { TelegramIcon } from './telegram-icon';
 export { TiktokIcon } from './tiktok-icon';
 export { TiktokSquareIcon } from './tiktok-square-icon';
