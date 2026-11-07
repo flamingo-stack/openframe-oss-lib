@@ -120,6 +120,25 @@
   --ods-system-greys-white-hover: #f5f5f5;
   --ods-system-greys-white-action: #f0f0f0;
 
+  /* ODS v2 — groups the lib had not synced yet (Figma open-design-system,
+   * collection "colors", 2026-11): backgrounds and borders. The three-column
+   * shell uses them; nothing else does until the palette sync. */
+  --ods-backgrounds-openframe-background: #141414;
+  --ods-backgrounds-openframe-background-hover: #202020;
+  --ods-backgrounds-openframe-background-action: #272727;
+  --ods-backgrounds-panel: #191919;
+  --ods-backgrounds-overlay: #272727;
+  --ods-borders-subtle: #2e2e2e;
+  --ods-borders-default: #393939;
+  --ods-borders-strong: #4a4a4a;
+  /* ODS v2 values of tokens the lib still carries at their older values
+   * (system greys/grey, open colors/yellow sec), under the shell's own names so
+   * nothing else moves before the palette sync. */
+  --ods-shell-system-greys-grey: #a0a0a0;
+  --ods-shell-open-yellow-sec: #291f09;
+  --ods-shell-open-yellow-sec-hover: #322507;
+  --ods-shell-open-yellow-sec-action: #3c2b01;
+
   /* Shadcn/ui HSL bridge — DARK (mirrors app-globals.css :root).
    * Re-declared here so toggling data-theme also flips shadcn-mapped
    * Tailwind utilities (bg-background, bg-card, text-foreground, …). */
@@ -211,6 +230,20 @@
   --ods-system-greys-white: #1a1a1a;
   --ods-system-greys-white-hover: #424242;
   --ods-system-greys-white-action: #6a6a6a;
+
+  /* ODS v2 groups — no light mode in Figma yet: the nearest light primitives. */
+  --ods-backgrounds-openframe-background: #fafafa;
+  --ods-backgrounds-openframe-background-hover: #f5f5f5;
+  --ods-backgrounds-openframe-background-action: #f0f0f0;
+  --ods-backgrounds-panel: #ffffff;
+  --ods-backgrounds-overlay: #f5f5f5;
+  --ods-borders-subtle: #f0f0f0;
+  --ods-borders-default: #e7e7e7;
+  --ods-borders-strong: #d3d3d3;
+  --ods-shell-system-greys-grey: #767676;
+  --ods-shell-open-yellow-sec: #fafafa;
+  --ods-shell-open-yellow-sec-hover: #f5f5f5;
+  --ods-shell-open-yellow-sec-action: #f0f0f0;
 
   /* Shadcn/ui HSL bridge — LIGHT */
   --background: 0 0% 98%; /* #fafafa */
@@ -328,6 +361,15 @@
   --color-accent-secondary-active: var(--ods-open-yellow-secondary-action);
   --color-accent-focus: var(--ods-open-yellow-base);
   --color-accent-disabled: var(--ods-system-greys-soft-grey);
+
+  /* Three-column shell (ODS v2): its sidebars' ground and divider, their
+   * secondary grey (icons, category labels) and the active entry's tint. */
+  --color-bg-panel: var(--ods-backgrounds-panel);
+  --color-border-panel: var(--ods-borders-subtle);
+  --color-text-panel-secondary: var(--ods-shell-system-greys-grey);
+  --color-accent-tint: var(--ods-shell-open-yellow-sec);
+  --color-accent-tint-hover: var(--ods-shell-open-yellow-sec-hover);
+  --color-accent-tint-active: var(--ods-shell-open-yellow-sec-action);
 
   /* Status Colors */
   --color-success: var(--ods-attention-green-success);

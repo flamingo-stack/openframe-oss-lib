@@ -40,7 +40,11 @@ export type { PageSectionBarProps } from './page-section-bar';
 export { useScrollSpy } from '../docs/use-scroll-spy';
 export type { UseScrollSpyOptions } from '../docs/use-scroll-spy';
 
-export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar';
+export {
+  NAVIGATION_SIDEBAR_END_WIDTH_VAR,
+  NAVIGATION_SIDEBAR_WIDTH_VAR,
+  NavigationSidebar,
+} from './navigation-sidebar';
 export type { NavigationSidebarProps } from './navigation-sidebar';
 export { NavigationSidebarActionRow } from './navigation-sidebar-grouped';
 export type { NavigationSidebarActionRowProps } from './navigation-sidebar-grouped';
@@ -69,6 +73,10 @@ export type {
   AppLayoutSidePanelRenderState,
 } from './app-layout-side-panel';
 export { SIDE_PANEL_FRAME_WIDTH } from './app-layout-side-panel';
+export { AppLayoutWorkArea, WORK_AREA_MIN_COLUMN_WIDTH } from './app-layout-work-area';
+export type { AppLayoutWorkAreaMode, AppLayoutWorkAreaProps } from './app-layout-work-area';
+export { AppColumnHeader } from './app-column-header';
+export type { AppColumnHeaderLayoutAction, AppColumnHeaderProps } from './app-column-header';
 
 export {
   AppLayoutDrawer,

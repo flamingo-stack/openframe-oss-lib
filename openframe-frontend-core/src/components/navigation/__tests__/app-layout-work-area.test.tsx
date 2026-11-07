@@ -1,0 +1,198 @@
+/**
+ * The chat column and the page column (`AppLayoutWorkArea`), the column header
+ * (`AppColumnHeader`), and both wired into `AppLayout` (`chatColumn`,
+ * `workAreaMode`, `endSidebarConfig`).
+ */
+
+import { fireEvent, render, screen } from '@testing-library/react';
+import { useEffect } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppColumnHeader } from '../app-column-header';
+import { AppLayout } from '../app-layout';
+import { AppLayoutWorkArea, type AppLayoutWorkAreaMode } from '../app-layout-work-area';
+
+/** jsdom has no layout: every element reports this width. */
+function rowWidth(px: number) {
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(px);
+}
+
+function area(mode: AppLayoutWorkAreaMode, storageKey?: string) {
+  return <AppLayoutWorkArea mode={mode} chat={<h2>Thread</h2>} page={<h2>Page body</h2>} storageKey={storageKey} />;
+}
+
+/** A column's heading, found only while its column is not hidden from assistive tech. */
+const shownHeading = (name: string) => screen.queryByRole('heading', { name });
+const mountedHeading = (name: string) => screen.getByRole('heading', { name, hidden: true });
+const chatColumn = () => screen.getByRole('region', { hidden: true });
+const divider = () => screen.getByRole('separator', { name: 'Resize chat column' });
+
+beforeEach(() => window.localStorage.clear());
+afterEach(() => vi.restoreAllMocks());
+
+describe('AppLayoutWorkArea', () => {
+  it('chat: the chat column alone; the page stays mounted but hidden', () => {
+    rowWidth(1000);
+    render(area('chat'));
+    expect(shownHeading('Thread')).toBeInTheDocument();
+    expect(shownHeading('Page body')).not.toBeInTheDocument();
+    expect(mountedHeading('Page body')).toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+
+  it('page: the page column alone; the chat stays mounted, hidden and inert', () => {
+    rowWidth(1000);
+    render(area('page'));
+    expect(shownHeading('Thread')).not.toBeInTheDocument();
+    expect(mountedHeading('Thread')).toBeInTheDocument();
+    expect(chatColumn()).toHaveAttribute('inert');
+  });
+
+  it('split: both columns, the chat column at half the room, a divider between', () => {
+    rowWidth(1000);
+    render(area('split'));
+    expect(shownHeading('Thread')).toBeInTheDocument();
+    expect(shownHeading('Page body')).toBeInTheDocument();
+    expect(chatColumn()).toHaveStyle({ width: '500px' });
+    expect(divider()).toHaveAttribute('aria-valuemin', '360');
+    expect(divider()).toHaveAttribute('aria-valuemax', '640');
+  });
+
+  it('keeps both columns at least 360px wide', () => {
+    rowWidth(1000);
+    render(area('split'));
+    fireEvent.keyDown(divider(), { key: 'End' });
+    expect(chatColumn()).toHaveStyle({ width: '640px' });
+    fireEvent.keyDown(divider(), { key: 'Home' });
+    expect(chatColumn()).toHaveStyle({ width: '360px' });
+  });
+
+  it('steps with the arrow keys, resets on double click and keeps the share', () => {
+    rowWidth(1000);
+    const { unmount } = render(area('split', 'test.split'));
+    fireEvent.keyDown(divider(), { key: 'ArrowRight' });
+    expect(chatColumn()).toHaveStyle({ width: '516px' });
+    expect(JSON.parse(window.localStorage.getItem('test.split') ?? 'null')).toEqual({ share: 0.516 });
+    unmount();
+    render(area('split', 'test.split'));
+    expect(chatColumn()).toHaveStyle({ width: '516px' });
+    fireEvent.doubleClick(divider());
+    expect(chatColumn()).toHaveStyle({ width: '500px' });
+    expect(window.localStorage.getItem('test.split')).toBeNull();
+  });
+
+  it('shows the page alone when there is no room for two columns', () => {
+    rowWidth(700);
+    render(area('split'));
+    expect(shownHeading('Thread')).not.toBeInTheDocument();
+    expect(shownHeading('Page body')).toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+});
+
+describe('AppColumnHeader', () => {
+  it('draws the title alone without actions, in the shell body style', () => {
+    render(<AppColumnHeader title="Start Work" />);
+    expect(screen.getByText('Start Work')).toBeInTheDocument();
+    // Panel ground and the ODS v2 body text (16/20), on the window's tokens in a narrow column.
+    expect(screen.getByText('Start Work')).toHaveClass('text-shell-body');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('names the layout and close buttons and calls them', () => {
+    const onLayout = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <AppColumnHeader
+        title="Devices"
+        layoutAction="fullscreen"
+        onLayoutAction={onLayout}
+        onClose={onClose}
+        closeLabel="Close page"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close page' }));
+    expect(onLayout).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    rerender(<AppColumnHeader title="Devices" layoutAction="restore-split" onLayoutAction={onLayout} />);
+    expect(screen.getByRole('button', { name: 'Show side by side' })).toBeInTheDocument();
+  });
+});
+
+describe('AppLayout chatColumn and endSidebarConfig', () => {
+  const mounts = { count: 0 };
+  function Page() {
+    useEffect(() => {
+      mounts.count += 1;
+    }, []);
+    return <h1>Page</h1>;
+  }
+
+  function layout(mode: AppLayoutWorkAreaMode) {
+    return (
+      <AppLayout
+        sidebarConfig={{ items: [], onNavigate: () => undefined }}
+        endSidebarConfig={{
+          variant: 'grouped',
+          items: [{ id: 'devices', label: 'Devices', icon: <svg />, path: '/devices' }],
+        }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        chatColumn={<p>thread</p>}
+        workAreaMode={mode}
+      >
+        <Page />
+      </AppLayout>
+    );
+  }
+
+  it('draws a second sidebar on the right edge', () => {
+    rowWidth(1200);
+    render(layout('split'));
+    const sidebars = screen.getAllByRole('complementary', { name: 'Main navigation sidebar' });
+    expect(sidebars).toHaveLength(2);
+    expect(sidebars[1]).toHaveClass('border-l');
+  });
+
+  it('switches modes without remounting the page', () => {
+    rowWidth(1200);
+    mounts.count = 0;
+    const { rerender } = render(layout('split'));
+    expect(screen.getByText('thread')).toBeInTheDocument();
+    rerender(layout('page'));
+    rerender(layout('chat'));
+    rerender(layout('split'));
+    expect(mounts.count).toBe(1);
+  });
+});
+
+describe('AppLayout animateSidebars', () => {
+  function layout(animateSidebars?: boolean) {
+    return (
+      <AppLayout
+        sidebarConfig={{ items: [] }}
+        endSidebarConfig={{ variant: 'sectioned', items: [] }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        chatColumn={<p>thread</p>}
+        animateSidebars={animateSidebars}
+      >
+        <p>page</p>
+      </AppLayout>
+    );
+  }
+
+  it('snaps the sidebars beside a content area by default', () => {
+    render(layout());
+    for (const aside of screen.getAllByRole('complementary', { name: 'Main navigation sidebar' })) {
+      expect(aside).toHaveClass('lg:transition-none');
+    }
+  });
+
+  it('animates them with animateSidebars', () => {
+    render(layout(true));
+    for (const aside of screen.getAllByRole('complementary', { name: 'Main navigation sidebar' })) {
+      expect(aside).not.toHaveClass('lg:transition-none');
+    }
+  });
+});

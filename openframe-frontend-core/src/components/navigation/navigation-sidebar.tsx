@@ -15,12 +15,18 @@ import {
   NavigationSidebarGroupedEntries,
   NavigationSidebarGroupedSkeleton,
   useOpenNavigationGroup,
+  useOpenNavigationGroups,
 } from './navigation-sidebar-grouped';
 import { NavigationSidebarHeader } from './navigation-sidebar-header';
 import { NavigationSidebarItemButton } from './navigation-sidebar-item';
 import { resolveNavigationActive } from './navigation-sidebar-match';
+import {
+  NavigationSidebarSectionedEntries,
+  SECTIONED_PRIMARY_NAV_CLASSES,
+  useFoldedNavigationSections,
+} from './navigation-sidebar-sectioned';
 import { hasNavigationSidebarSlot, renderNavigationSidebarSlot } from './navigation-sidebar-slot';
-import { NavigationSidebarToggle } from './navigation-sidebar-toggle';
+import { NavigationSidebarIconToggle, NavigationSidebarToggle } from './navigation-sidebar-toggle';
 
 const MINIMIZED_WIDTH = 56; // 3.5rem = 56px
 const EXPANDED_WIDTH = 224; // 14rem = 224px — the default; a grouped config may set its own
@@ -52,6 +58,13 @@ const STORAGE_KEY = 'of.navigationSidebar.minimized';
  * catches up, which is the flash the seed exists to remove.
  */
 export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width';
+
+/**
+ * The desktop width of a `side: 'right'` sidebar — {@link NAVIGATION_SIDEBAR_WIDTH_VAR}
+ * for the other edge. Its own property, so a layout with a sidebar on each side
+ * seeds and publishes two widths instead of one overwriting the other.
+ */
+export const NAVIGATION_SIDEBAR_END_WIDTH_VAR = '--of-navigation-sidebar-end-width';
 
 /**
  * A grouped config's own `expandedWidth`, as an inline custom property on the
@@ -118,20 +131,35 @@ const SIDEBAR_POSITION_CLASSES = [
   // within AppLayout's `relative` row) — NOT the viewport — so an optional
   // `topBar` above the row is not overlapped. With no topBar the row spans the
   // full viewport, so this is visually identical to a viewport-fixed sidebar.
-  'md:absolute md:inset-y-0 md:left-0 md:z-[45]',
+  'md:absolute md:inset-y-0 md:z-[45]',
   // Desktop: back in the flex flow, width from the persisted preference.
   'lg:relative lg:inset-auto lg:z-auto lg:h-full',
 ];
 const SIDEBAR_GEOMETRY_CLASSES = {
-  // The fallback IS the default, so the property needs no global declaration
-  // and an unseeded consumer gets the full sidebar rather than a rail with no
-  // labels.
-  default: [...SIDEBAR_POSITION_CLASSES, 'lg:w-[var(--of-navigation-sidebar-width,14rem)]'].join(' '),
-  // With a config width the fallback is that width (`EXPANDED_WIDTH_VAR`).
-  custom: [
-    ...SIDEBAR_POSITION_CLASSES,
-    'lg:w-[var(--of-navigation-sidebar-width,var(--of-navigation-sidebar-expanded-width))]',
-  ].join(' '),
+  left: {
+    // The fallback IS the default, so the property needs no global declaration
+    // and an unseeded consumer gets the full sidebar rather than a rail with no
+    // labels.
+    default: [...SIDEBAR_POSITION_CLASSES, 'md:left-0', 'lg:w-[var(--of-navigation-sidebar-width,14rem)]'].join(' '),
+    // With a config width the fallback is that width (`EXPANDED_WIDTH_VAR`).
+    custom: [
+      ...SIDEBAR_POSITION_CLASSES,
+      'md:left-0',
+      'lg:w-[var(--of-navigation-sidebar-width,var(--of-navigation-sidebar-expanded-width))]',
+    ].join(' '),
+  },
+  // `side: 'right'`: the other edge, and its own width property
+  // (`NAVIGATION_SIDEBAR_END_WIDTH_VAR`), spelled out for Tailwind's scan.
+  right: {
+    default: [...SIDEBAR_POSITION_CLASSES, 'md:right-0', 'lg:w-[var(--of-navigation-sidebar-end-width,14rem)]'].join(
+      ' ',
+    ),
+    custom: [
+      ...SIDEBAR_POSITION_CLASSES,
+      'md:right-0',
+      'lg:w-[var(--of-navigation-sidebar-end-width,var(--of-navigation-sidebar-expanded-width))]',
+    ].join(' '),
+  },
 } as const;
 
 /**
@@ -217,6 +245,13 @@ export function NavigationSidebar({
   // content area (overlay) instead of pushing it like on desktop.
   const isTablet = isMdUp && !isLgUp;
 
+  // The edge it stands on (`config.side`), and the width property that goes with it.
+  const side = config.side ?? 'left';
+  // `surface: 'panel'`: the shell's panel ground; a left panel's borders are the subtle ones.
+  const panel = config.surface === 'panel';
+  const dividerClass = panel && side === 'left' ? 'border-ods-border-panel' : 'border-ods-border';
+  const widthVar = side === 'right' ? NAVIGATION_SIDEBAR_END_WIDTH_VAR : NAVIGATION_SIDEBAR_WIDTH_VAR;
+
   // Desktop preference persists across sessions. Tablet state is in-memory
   // only so entering tablet always starts minimized without clobbering the
   // user's desktop choice.
@@ -285,7 +320,7 @@ export function NavigationSidebar({
   // A grouped config's own expanded width (`expandedWidth`); `null` = the
   // default 224px through the literal classes, exactly as before.
   const configExpandedWidth =
-    config.variant === 'grouped' && config.expandedWidth !== undefined
+    (config.variant === 'grouped' || config.variant === 'sectioned') && config.expandedWidth !== undefined
       ? Math.max(config.expandedWidth, MIN_CUSTOM_EXPANDED_WIDTH)
       : null;
 
@@ -333,12 +368,15 @@ export function NavigationSidebar({
   // does not trail the pointer; the choice is committed once, on release, which
   // also lifts the mark. Neither write concerns hydration: both run on the
   // client only, once the user has the handle.
-  const dragExpandedWidth = useCallback((next: number) => {
-    const aside = asideRef.current;
-    if (!aside) return;
-    aside.setAttribute('data-resizing', '');
-    aside.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, `${Math.round(next)}px`);
-  }, []);
+  const dragExpandedWidth = useCallback(
+    (next: number) => {
+      const aside = asideRef.current;
+      if (!aside) return;
+      aside.setAttribute('data-resizing', '');
+      aside.style.setProperty(widthVar, `${Math.round(next)}px`);
+    },
+    [widthVar],
+  );
   const commitExpandedWidth = useCallback(
     (next: number) => {
       asideRef.current?.removeAttribute('data-resizing');
@@ -411,15 +449,22 @@ export function NavigationSidebar({
   // reader — a statement that is simply false until the router says otherwise.
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
   const grouped = config.variant === 'grouped';
+  const sectioned = config.variant === 'sectioned';
   // ONE active entry for the whole tree. Flat: `items.find(isActive)`, exactly
   // as before, unless the host also hands over `currentPath` for entries that
   // leave `isActive` out. Grouped: resolved through the children too, so the
   // committed id — and the pending hint cleared by it — can be a child's.
   const { activeId: committedActiveId, groupId: activeGroupId } = useMemo(
-    () => resolveNavigationActive(config.items, { currentPath: config.currentPath, includeChildren: grouped }),
-    [config.items, config.currentPath, grouped],
+    () =>
+      resolveNavigationActive(config.items, { currentPath: config.currentPath, includeChildren: grouped || sectioned }),
+    [config.items, config.currentPath, grouped, sectioned],
   );
   const [openGroupId, setOpenGroupId] = useOpenNavigationGroup(activeGroupId);
+  // `groupMode: 'multi'`: every group opens and folds on its own (both hooks run; one is read).
+  const multiGroups = config.groupMode === 'multi';
+  const [openGroupIds, toggleOpenGroup] = useOpenNavigationGroups(activeGroupId, config.groupsStorageKey);
+  // `variant: 'sectioned'`: every section open until folded.
+  const [foldedSectionIds, toggleSection] = useFoldedNavigationSections(activeGroupId, config.groupsStorageKey);
 
   // Any committed change clears it — including one that landed somewhere else
   // entirely (a redirect, a link elsewhere on the page). A navigation that never
@@ -479,8 +524,12 @@ export function NavigationSidebar({
   // A group parent (grouped variant) only opens and folds; it goes nowhere. The
   // one-open rule closes whichever group was open.
   const handleGroupClick = useCallback(
-    (item: NavigationSidebarItem) => setOpenGroupId(current => (current === item.id ? null : item.id)),
-    [setOpenGroupId],
+    (item: NavigationSidebarItem) => {
+      if (sectioned) toggleSection(item.id);
+      else if (multiGroups) toggleOpenGroup(item.id);
+      else setOpenGroupId(current => (current === item.id ? null : item.id));
+    },
+    [sectioned, toggleSection, multiGroups, toggleOpenGroup, setOpenGroupId],
   );
 
   const { primaryItems, secondaryItems } = useMemo(
@@ -509,7 +558,7 @@ export function NavigationSidebar({
   // The grouped rows glide and fade with the width, on the same curve.
   const widthTransition = cn(
     'transition-[width] duration-300',
-    grouped && '[transition-timing-function:cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
+    (grouped || sectioned) && '[transition-timing-function:cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
   );
 
   const sidebarWidth = useMemo(
@@ -533,8 +582,8 @@ export function NavigationSidebar({
   // and an inherited custom property on the root made WebKit restyle the whole
   // document on every toggle. Its own value overrides the inherited seed.
   useIsomorphicLayoutEffect(() => {
-    asideRef.current?.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth);
-  }, [sidebarWidth]);
+    asideRef.current?.style.setProperty(widthVar, sidebarWidth);
+  }, [sidebarWidth, widthVar]);
 
   // There used to be an `isHydrated` gate here — `isMdUp !== undefined && ...`
   // — meant to hold the sidebar's contents back until the media queries
@@ -556,11 +605,25 @@ export function NavigationSidebar({
   const renderEntries = (placeholders: string[] | null, items: NavigationSidebarItem[]): ReactNode => {
     if (placeholders) {
       return placeholders.map(key =>
-        grouped ? (
+        grouped || sectioned ? (
           <NavigationSidebarGroupedSkeleton key={key} />
         ) : (
           <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
         ),
+      );
+    }
+    if (sectioned) {
+      return (
+        <NavigationSidebarSectionedEntries
+          items={items}
+          activeId={committedActiveId}
+          pendingId={pendingItemId}
+          foldedIds={foldedSectionIds}
+          showLabel={showLabel}
+          disabled={disabled}
+          onItemClick={handleItemClick}
+          onSectionClick={handleGroupClick}
+        />
       );
     }
     if (grouped) {
@@ -570,6 +633,7 @@ export function NavigationSidebar({
           activeId={committedActiveId}
           pendingId={pendingItemId}
           openGroupId={openGroupId}
+          openGroupIds={multiGroups ? openGroupIds : undefined}
           showLabel={showLabel}
           disabled={disabled}
           onItemClick={handleItemClick}
@@ -628,8 +692,10 @@ export function NavigationSidebar({
         className={cn(
           SIDEBAR_CONTAINER,
           'hidden flex-shrink-0 flex-col md:flex',
-          'border-r border-ods-border bg-ods-card',
-          customExpandedWidth === null ? SIDEBAR_GEOMETRY_CLASSES.default : SIDEBAR_GEOMETRY_CLASSES.custom,
+          side === 'right' ? 'border-l' : 'border-r',
+          dividerClass,
+          panel ? 'bg-ods-panel' : 'bg-ods-card',
+          customExpandedWidth === null ? SIDEBAR_GEOMETRY_CLASSES[side].default : SIDEBAR_GEOMETRY_CLASSES[side].custom,
           // The one width a viewport cannot imply: an overlay the user opened on
           // tablet. Only ever true after a click, so the first paint always gets
           // the rail.
@@ -652,14 +718,14 @@ export function NavigationSidebar({
         aria-label="Main navigation sidebar"
         {...{ [NAVIGATION_SIDEBAR_ATTRIBUTE]: '' }}
       >
-        <NavigationSidebarHeader minimized={minimized} />
+        {config.header !== false && <NavigationSidebarHeader minimized={minimized} borderClassName={dividerClass} />}
 
         <div
           className={cn(
             'flex flex-1 flex-col justify-between overflow-y-auto',
             // Grouped: one inset all round the rows (8px), so the first row sits as far under the
             // header's border as the rows sit from the sidebar's sides.
-            grouped ? 'p-[var(--spacing-system-xsf)]' : 'py-4',
+            sectioned ? 'p-0' : grouped ? 'p-[var(--spacing-system-xsf)]' : 'py-4',
           )}
         >
           {/* The top slot, the primary nav and the section are ONE
@@ -671,7 +737,11 @@ export function NavigationSidebar({
             {/* `aria-busy` on the nav, not the rows: the region is what is loading,
                 and each placeholder row is already `aria-hidden`. */}
             <nav
-              className={cn('flex flex-col', grouped && 'gap-[var(--spacing-system-xxs)]')}
+              className={cn(
+                'flex flex-col',
+                grouped && 'gap-[var(--spacing-system-xxs)]',
+                sectioned && SECTIONED_PRIMARY_NAV_CLASSES,
+              )}
               aria-label="Primary navigation"
               aria-busy={!!loadingRows}
             >
@@ -688,7 +758,10 @@ export function NavigationSidebar({
               // A divider between the tree and the section, as under the top slot's rows.
               <div
                 className={cn(
-                  'mt-[var(--spacing-system-xsf)] flex flex-col border-t border-ods-border pt-[var(--spacing-system-sf)]',
+                  'flex flex-col',
+                  config.sectionDivider === false
+                    ? 'pt-[var(--spacing-system-sf)]'
+                    : cn('mt-[var(--spacing-system-xsf)] border-t pt-[var(--spacing-system-sf)]', dividerClass),
                   sectionRailHidden,
                 )}
               >
@@ -708,17 +781,35 @@ export function NavigationSidebar({
             like the rows. Rendered in both widths: a function adapts to
             `minimized`, a node is clipped to the rail. */}
         {hasNavigationSidebarSlot(config.footerSlot) && (
-          <div className="shrink-0 overflow-hidden border-t border-ods-border px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)]">
+          <div
+            className={cn(
+              'shrink-0 overflow-hidden border-t',
+              dividerClass,
+              config.footerInset !== false && 'px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)]',
+            )}
+          >
             {renderNavigationSidebarSlot(config.footerSlot, { minimized, inDrawer: false })}
           </div>
         )}
 
-        <NavigationSidebarToggle
-          minimized={minimized}
-          showLabel={showLabel}
-          onToggle={handleToggle}
-          compact={grouped}
-        />
+        {config.toggle === 'icon' && (
+          <NavigationSidebarIconToggle
+            minimized={minimized}
+            onToggle={handleToggle}
+            side={side}
+            borderClassName={dividerClass}
+          />
+        )}
+        {(config.toggle ?? 'row') === 'row' && (
+          <NavigationSidebarToggle
+            minimized={minimized}
+            showLabel={showLabel}
+            onToggle={handleToggle}
+            compact={grouped}
+            side={side}
+            borderClassName={dividerClass}
+          />
+        )}
 
         {/* The resize handle (`config.resizable`), astride the rail's right edge —
             the grip the Mingo chat drawer had — on desktop while expanded: the
@@ -727,7 +818,9 @@ export function NavigationSidebar({
             content's edge; the grip marks the border as draggable. */}
         {resize !== undefined && !minimized && (
           <PanelResizeHandle
-            side="left"
+            // The handle's `side` is the panel's: astride the right edge of a left
+            // sidebar, the left edge of a right one.
+            side={side}
             variant="inLayout"
             size={markupExpandedWidth}
             minSize={resizeMinWidth}
@@ -737,7 +830,11 @@ export function NavigationSidebar({
             onDrag={dragExpandedWidth}
             onReset={resetChosenExpandedWidth}
             ariaLabel="Resize navigation sidebar"
-            className="inset-y-0 hidden w-6 -translate-x-1/2 justify-center pl-0 lg:flex"
+            className={
+              side === 'right'
+                ? 'inset-y-0 hidden w-6 translate-x-1/2 justify-center pr-0 lg:flex'
+                : 'inset-y-0 hidden w-6 -translate-x-1/2 justify-center pl-0 lg:flex'
+            }
             grip={<PanelResizeGrip />}
           />
         )}

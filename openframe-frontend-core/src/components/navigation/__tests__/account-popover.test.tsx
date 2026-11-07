@@ -84,6 +84,26 @@ describe('AccountPopover', () => {
     expect(menu).toHaveAttribute('data-side', 'right');
   });
 
+  it('keeps the avatar 8px in by default, and centres it alone with collapsedAlign="center"', () => {
+    const { rerender } = render(<AccountPopover collapsed name="Ada Lovelace" items={entries()} />);
+    const trigger = () => screen.getByRole('button', { name: 'Account: Ada Lovelace' });
+    // The name's column (the `flex-1` one) taken out of the row.
+    const nameHidden = () => /class="[^"]*\bflex-1\b[^"]*\bhidden\b/.test(document.body.innerHTML);
+    // Default: the name holds its place in the row (it fades with the width).
+    expect(trigger()).toHaveClass('pl-[var(--spacing-system-xsf)]');
+    expect(trigger()).not.toHaveClass('justify-center');
+    expect(nameHidden()).toBe(false);
+
+    rerender(<AccountPopover collapsed collapsedAlign="center" name="Ada Lovelace" items={entries()} />);
+    expect(trigger()).toHaveClass('justify-center', 'gap-0', 'px-0');
+    expect(nameHidden()).toBe(true);
+
+    // Expanded, `collapsedAlign` changes nothing.
+    rerender(<AccountPopover collapsedAlign="center" name="Ada Lovelace" items={entries()} />);
+    expect(screen.getByRole('button', { name: /Ada Lovelace/ })).not.toHaveClass('justify-center');
+    expect(nameHidden()).toBe(false);
+  });
+
   it("puts an item's unread count on its icon, and the unread dot on the avatar", async () => {
     const hasDot = () =>
       /class="[^"]*\bbg-ods-warning\b/.test(screen.getByRole('button', { name: /Ada Lovelace/ }).innerHTML);

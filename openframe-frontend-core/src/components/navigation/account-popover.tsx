@@ -56,6 +56,13 @@ export interface AccountPopoverProps {
    * in the rail), so outside a sidebar it is the avatar alone.
    */
   collapsed?: boolean;
+  /**
+   * Where the avatar sits while `collapsed`:
+   * - `start` (default): 8px in, on the rail rows' icon line;
+   * - `center`: centred in the trigger, for a rail whose buttons are centred
+   *   (the name is taken out of the row, so it no longer holds the avatar left).
+   */
+  collapsedAlign?: 'start' | 'center';
   /** Controlled open state; pair with `onOpenChange`. Uncontrolled by default. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -120,12 +127,14 @@ export function AccountPopover({
   avatarUrl,
   items,
   collapsed = false,
+  collapsedAlign = 'start',
   open: openProp,
   onOpenChange,
   disabled = false,
   className,
 }: AccountPopoverProps) {
   const unread = items.some(entry => entry.type !== 'divider' && (entry.count ?? 0) > 0);
+  const centred = collapsed && collapsedAlign === 'center';
   // The name and subtitle a narrow sidebar clips: their full text in a tooltip
   // over them, only while clipped and where a pointer can hover. The rail's
   // tooltip is the trigger's `title`.
@@ -165,7 +174,9 @@ export function AccountPopover({
           // crosses 140px. `collapsed` flips on the click, mid-way through that.
           className={cn(
             'group/account flex h-11 w-full min-w-0 items-center gap-[var(--spacing-system-xsf)] overflow-hidden rounded-md text-left',
-            'pl-[var(--spacing-system-xsf)] pr-0 @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]',
+            centred
+              ? 'justify-center gap-0 px-0'
+              : 'pl-[var(--spacing-system-xsf)] pr-0 @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]',
             'transition-[padding,background-color] duration-200 hover:bg-ods-bg-hover data-[state=open]:bg-ods-bg-hover motion-reduce:transition-none',
             disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',
             className,
@@ -183,7 +194,10 @@ export function AccountPopover({
             {unread && <UnreadDot size="fixed" />}
           </span>
           <span
-            className="flex min-w-0 flex-1 flex-col opacity-0 transition-opacity duration-150 @[140px]/of-nav-sidebar:opacity-100 motion-reduce:transition-none"
+            className={cn(
+              'min-w-0 flex-1 flex-col opacity-0 transition-opacity duration-150 @[140px]/of-nav-sidebar:opacity-100 motion-reduce:transition-none',
+              centred ? 'hidden' : 'flex',
+            )}
             aria-hidden={collapsed || undefined}
           >
             {/* The chevron follows the name, so it reads as this row's menu and not

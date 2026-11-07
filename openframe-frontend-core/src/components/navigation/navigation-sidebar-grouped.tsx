@@ -1,10 +1,21 @@
 'use client';
 
-import { cloneElement, isValidElement, type MouseEvent, type ReactNode, useId, useState } from 'react';
+import {
+  cloneElement,
+  isValidElement,
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useId,
+  useMemo,
+  useState,
+} from 'react';
 import Link from '../../embed-shims/next-link';
 import { useClippedLabelTooltip } from '../../hooks/ui/use-clipped-label-tooltip';
+import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
+import { createLocalStorageAdapter } from '../../utils/local-storage-adapter';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FloatingTooltip } from '../ui/floating-tooltip';
 import { CountPill } from './count-pill';
@@ -35,11 +46,11 @@ interface IconProps {
 }
 
 /** The host's icon at the row's size, coloured by the row (`currentColor`). */
-function sizedIcon(icon: ReactNode, size: number): ReactNode {
+export function sizedIcon(icon: ReactNode, size: number): ReactNode {
   return isValidElement<IconProps>(icon) ? cloneElement(icon, { size, color: 'currentColor' }) : icon;
 }
 
-function accessibleName(item: NavigationSidebarItem): string {
+export function accessibleName(item: NavigationSidebarItem): string {
   return item.badge ? `${item.label} (${item.badge})` : item.label;
 }
 
@@ -63,11 +74,73 @@ export function useOpenNavigationGroup(activeGroupId: string | null) {
   return [openGroupId, setOpenGroupId] as const;
 }
 
+function isStoredGroupIds(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(id => typeof id === 'string');
+}
+
+/**
+ * Which groups are open when several may be (`groupMode: 'multi'`). Each group
+ * opens and folds on its own; the group holding the current page opens when the
+ * page changes (adjusted while rendering, as in `useOpenNavigationGroup`) and
+ * nothing else is closed for it. With a `storageKey` the user's own opens and
+ * folds outlive the session.
+ *
+ * The stored set is read only once hydrated, never in the first render: the
+ * server cannot read it, and an `isOpen` that differs on the hydrating client is
+ * a hydration mismatch. Until then the active entry's group alone is open, which
+ * is also what the server drew. Until the user opens or folds one, the set is
+ * the stored one plus the active entry's group.
+ */
+export function useOpenNavigationGroups(activeGroupId: string | null, storageKey?: string) {
+  const hydrated = useIsHydrated();
+  const storage = useMemo(
+    () =>
+      storageKey
+        ? createLocalStorageAdapter<string[]>({
+            key: storageKey,
+            validate: isStoredGroupIds,
+            logTag: `[nav-groups:${storageKey}]`,
+          })
+        : null,
+    [storageKey],
+  );
+  const stored = useMemo(() => (hydrated ? (storage?.load() ?? null) : null), [hydrated, storage]);
+  // The user's own set, once they opened or folded a group.
+  const [chosen, setChosen] = useState<ReadonlySet<string> | null>(null);
+  const openIds = useMemo<ReadonlySet<string>>(
+    () => chosen ?? new Set([...(stored ?? []), ...(activeGroupId === null ? [] : [activeGroupId])]),
+    [chosen, stored, activeGroupId],
+  );
+
+  // A page in another group opens that group too; the one it came from stays open.
+  const [openFor, setOpenFor] = useState(activeGroupId);
+  if (openFor !== activeGroupId) {
+    setOpenFor(activeGroupId);
+    if (activeGroupId !== null) {
+      const before = chosen ?? new Set([...(stored ?? []), ...(openFor === null ? [] : [openFor])]);
+      if (!before.has(activeGroupId)) setChosen(new Set([...before, activeGroupId]));
+    }
+  }
+
+  const toggleGroup = useCallback(
+    (id: string) => {
+      const next = new Set(openIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      setChosen(next);
+      storage?.save([...next]);
+    },
+    [openIds, storage],
+  );
+
+  return [openIds, toggleGroup] as const;
+}
+
 /**
  * The active pill. Figma paints it `yellow sec` #614c12, which has no ODS token;
  * the palette's `accent-secondary` stands in (design: no new colours, palette only).
  */
-const ACTIVE_PILL = 'bg-ods-accent-secondary text-ods-accent';
+export const ACTIVE_PILL = 'bg-ods-accent-secondary text-ods-accent';
 
 /**
  * An open group's parent row, flush inside its card: the card's 6px less its 1px border,
@@ -76,7 +149,7 @@ const ACTIVE_PILL = 'bg-ods-accent-secondary text-ods-accent';
 const CARD_INNER_RADIUS = 'rounded-[calc(var(--radius)-3px)] after:rounded-[calc(var(--radius)-3px)]';
 
 /** The motion curve of the grouped sidebar: quick off the mark, a long soft landing. */
-const EASE = '[transition-timing-function:cubic-bezier(0.2,0,0,1)]';
+export const EASE = '[transition-timing-function:cubic-bezier(0.2,0,0,1)]';
 
 /**
  * The hover wash — the design system's `bg-hover`, a press its `bg-active` — on
@@ -84,7 +157,7 @@ const EASE = '[transition-timing-function:cubic-bezier(0.2,0,0,1)]';
  * note in `navigation-sidebar-item.tsx`). Quick to answer the cursor, slower to
  * let it go.
  */
-const HOVER_LAYER = cn(
+export const HOVER_LAYER = cn(
   "after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:rounded-md after:content-['']",
   'after:bg-ods-bg-hover after:opacity-0 after:transition-opacity after:duration-200 after:ease-out',
   'hover:after:duration-75 active:after:bg-ods-bg-active',
@@ -92,7 +165,7 @@ const HOVER_LAYER = cn(
 );
 
 /** Keyboard focus, drawn inside the row so the card and the scroller do not clip it. */
-const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus';
+export const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus';
 
 /**
  * The 44px row geometry shared by a top-level entry, a group's parent and an
@@ -126,7 +199,7 @@ const idleIcon = (group: 'row' | 'child') =>
  * is still there, zero-wide and transparent, so crossing 140px fades it rather
  * than popping it in or out.
  */
-const EXPANDED_ONLY =
+export const EXPANDED_ONLY =
   'opacity-0 transition-opacity duration-150 @[140px]/of-nav-sidebar:opacity-100 motion-reduce:transition-none';
 
 interface RowStateProps {
@@ -145,7 +218,16 @@ function RowEnd({ count }: { count: number }) {
  * offers it — only while it IS clipped, and only where a pointer can hover.
  * The rail (`showLabel` false) has its own: the row's `title`.
  */
-function RowLabel({ item, showLabel = true }: { item: NavigationSidebarItem; showLabel?: boolean }) {
+function RowLabel({
+  item,
+  showLabel = true,
+  textClassName = 'text-h4',
+}: {
+  item: NavigationSidebarItem;
+  showLabel?: boolean;
+  /** The label's type style: the grouped rows' 18px (`text-h4`), or 14px (`text-h6`) beside sectioned rows. */
+  textClassName?: string;
+}) {
   const unreadCount = item.unreadCount ?? 0;
   const { ref: labelRef, enabled: labelTooltip } = useClippedLabelTooltip<HTMLSpanElement>(item.label);
   return (
@@ -162,7 +244,7 @@ function RowLabel({ item, showLabel = true }: { item: NavigationSidebarItem; sho
         disabled={!showLabel || !labelTooltip}
         triggerClassName="min-w-0"
       >
-        <span ref={labelRef} className="block min-w-0 truncate text-h4">
+        <span ref={labelRef} className={cn('block min-w-0 truncate', textClassName)}>
           {item.label}
         </span>
       </FloatingTooltip>
@@ -427,7 +509,10 @@ export interface NavigationSidebarGroupedEntriesProps {
   items: readonly NavigationSidebarItem[];
   activeId: string | null;
   pendingId: string | null;
+  /** The open group (`groupMode: 'single'`). Ignored when `openGroupIds` is given. */
   openGroupId: string | null;
+  /** The open groups (`groupMode: 'multi'`). */
+  openGroupIds?: ReadonlySet<string>;
   showLabel: boolean;
   disabled: boolean;
   onItemClick: (item: NavigationSidebarItem, event?: MouseEvent) => void;
@@ -441,6 +526,7 @@ export function NavigationSidebarGroupedEntries({
   activeId,
   pendingId,
   openGroupId,
+  openGroupIds,
   showLabel,
   disabled,
   onItemClick,
@@ -453,7 +539,7 @@ export function NavigationSidebarGroupedEntries({
           <GroupedGroup
             key={item.id}
             item={item}
-            isOpen={item.id === openGroupId}
+            isOpen={openGroupIds ? openGroupIds.has(item.id) : item.id === openGroupId}
             activeId={activeId}
             pendingId={pendingId}
             showLabel={showLabel}
@@ -490,6 +576,11 @@ export interface NavigationSidebarActionRowProps {
   count?: number;
   /** `'outline'`: a bordered row with an accent icon — an action rather than a place ("New chat"). */
   variant?: 'default' | 'outline';
+  /**
+   * `'sectioned'`: the 40px row and 14px label of the sectioned variant's rows
+   * (the three-column shell's "Start Work"). Default: the grouped 44px row.
+   */
+  size?: 'default' | 'sectioned';
   disabled?: boolean;
   /** The sidebar's `minimized` (from the slot's render function): the rail's tooltip. The geometry follows the rail's width on its own. */
   minimized?: boolean;
@@ -513,6 +604,7 @@ export function NavigationSidebarActionRow({
   active = false,
   count = 0,
   variant = 'default',
+  size = 'default',
   disabled = false,
   minimized = false,
   'aria-label': ariaLabel,
@@ -526,16 +618,28 @@ export function NavigationSidebarActionRow({
   const classes = cn(
     'group/nav-row',
     ROW_CLASSES,
+    size === 'sectioned' && 'h-10',
     outline && 'border border-ods-border',
     !disabled && !lit && 'text-ods-text-primary hover:after:opacity-100',
-    lit && ACTIVE_PILL,
+    // The sectioned size is the three-column shell's: its tint, not the grouped pill.
+    lit && (size === 'sectioned' ? 'bg-ods-accent-tint text-ods-accent' : ACTIVE_PILL),
     disabled && 'cursor-not-allowed text-ods-text-secondary opacity-50',
     className,
   );
   const content = (
     <>
-      <RowIcon item={entry} size={20} className={lit || (outline && !disabled) ? 'text-ods-accent' : idleIcon('row')} />
-      <RowLabel item={entry} showLabel={!minimized} />
+      <RowIcon
+        item={entry}
+        size={20}
+        className={
+          lit || (outline && !disabled)
+            ? 'text-ods-accent'
+            : size === 'sectioned'
+              ? 'text-ods-text-panel-secondary'
+              : idleIcon('row')
+        }
+      />
+      <RowLabel item={entry} showLabel={!minimized} textClassName={size === 'sectioned' ? 'text-h6' : undefined} />
     </>
   );
   const shared = { className: classes, title: minimized ? name : undefined, 'aria-label': name };
