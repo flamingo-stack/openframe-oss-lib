@@ -34,6 +34,7 @@ type Notification implements Node {
     title: String!
     description: String
     createdAt: Instant!
+    read: Boolean! @deprecated(reason: "Use status.")
     "The recipient's read state of this notification. DELETED rows are never listed."
     status: NotificationReadStatus!
     category: NotificationCategory!
