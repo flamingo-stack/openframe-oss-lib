@@ -12,7 +12,7 @@
 export const BLOCKED_SENDERS_API_PATH = '/api/admin/spam';
 
 /** Rows per page on every tab. The host's routes page with it and the tables draw this many loading rows. */
-export const BLOCKED_SENDERS_PAGE_SIZE = 25;
+export const BLOCKED_SENDERS_PAGE_SIZE = 20;
 
 export type BlockedSenderKind = 'domain' | 'address';
 

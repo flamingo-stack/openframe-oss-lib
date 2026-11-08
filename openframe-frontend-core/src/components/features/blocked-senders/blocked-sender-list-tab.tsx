@@ -195,7 +195,7 @@ function BlockedSendersTable({ kind, rows, totalCount, search, onRelease }: Bloc
           return <StatusBadge text={badge.label} colorScheme={badge.color} />;
         },
         enableSorting: false,
-        meta: { width: 'w-28' },
+        meta: { width: 'w-28', hideAt: 'lg' },
       },
       {
         id: 'reason',
@@ -215,7 +215,7 @@ function BlockedSendersTable({ kind, rows, totalCount, search, onRelease }: Bloc
           <CellText>{row.original.addedBy ?? BLOCKED_SENDERS_UNKNOWN}</CellText>
         ),
         enableSorting: false,
-        meta: { width: 'flex-[2] min-w-0', hideAt: 'md' },
+        meta: { width: 'flex-[2] min-w-0', hideAt: 'lg' },
       },
       {
         id: 'createdAt',
@@ -224,7 +224,7 @@ function BlockedSendersTable({ kind, rows, totalCount, search, onRelease }: Bloc
           <CellText tone="secondary">{formatBlockedDate(row.original.createdAt)}</CellText>
         ),
         enableSorting: false,
-        meta: { width: 'w-32', hideAt: 'md' },
+        meta: { width: 'w-32', hideAt: 'lg' },
       },
       {
         id: 'release',

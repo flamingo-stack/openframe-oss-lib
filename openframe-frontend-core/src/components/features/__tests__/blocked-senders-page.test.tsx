@@ -37,7 +37,7 @@ const domain = (value: string, source: BlockedSenderRow['source']): BlockedSende
 const page = <T,>(items: T[]): WirePage<T> => ({
   items,
   page: 1,
-  pageSize: 25,
+  pageSize: 20,
   totalCount: items.length,
   totalPages: 1,
 });
@@ -125,7 +125,7 @@ describe('BlockedSendersPage', () => {
 
     const urls = requested().map(r => r.url);
     expect(urls).toContain('/api/admin/spam/overview?env=qa');
-    expect(urls).toContain('/api/admin/spam/domains?env=qa&pageSize=25');
+    expect(urls).toContain('/api/admin/spam/domains?env=qa&pageSize=20');
   });
 
   it('draws its own loading form in a loading scope and reads nothing', () => {
@@ -221,7 +221,7 @@ describe('BlockedSendersPage', () => {
     serve();
     render(<BlockedSendersPage endpoint={ENDPOINT} />);
     await screen.findByText('mailinator.com');
-    expect(requested().map(r => r.url)).toContain('/api/admin/spam/domains?env=qa&q=seo&page=2&pageSize=25');
+    expect(requested().map(r => r.url)).toContain('/api/admin/spam/domains?env=qa&q=seo&page=2&pageSize=20');
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggestions (1)' }));
     await waitFor(() => expect(mockReplace).toHaveBeenCalled());

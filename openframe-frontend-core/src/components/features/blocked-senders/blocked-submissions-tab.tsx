@@ -134,7 +134,7 @@ function BlockedSubmissionsTable({
         header: 'HubSpot',
         cell: () => <HubspotCell />,
         enableSorting: false,
-        meta: { width: 'w-28' },
+        meta: { width: 'w-28', hideAt: 'lg' },
       },
     ],
     [],
