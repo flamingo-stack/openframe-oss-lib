@@ -6,7 +6,6 @@ import com.openframe.data.integration.support.BlockedEmailAddressIntegrationTest
 import com.openframe.data.repository.email.BlockedEmailAddressRepository;
 import com.openframe.data.repository.email.StoredBlockedEmailAddressSource;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -14,12 +13,23 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Sort;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = BlockedEmailAddressIntegrationTestApplication.class)
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
 class BlockedEmailAddressRepositoryIT extends BaseMongoIntegrationTest {
+
+    private static final String BLOCKED_ADDRESS = "spammer@gmail.com";
+    private static final String OTHER_ADDRESS = "someone@gmail.com";
+    private static final String TAGGED_BLOCKED_ADDRESS = "spammer+promo@gmail.com";
+    private static final String FIRST_ADDRESS = "amy@example.com";
+    private static final String LAST_ADDRESS = "zed@example.com";
+    private static final String EMAIL_FIELD = "email";
+    private static final String REASON = "spam submission";
+    private static final String ADDED_BY = "it";
 
     @Autowired
     private BlockedEmailAddressRepository repository;
@@ -33,37 +43,82 @@ class BlockedEmailAddressRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("Given a stored address, when the source is asked, then only that exact normalized address is blocked")
-    void isBlocked_matchesTheStoredAddressOnly() {
-        repository.save(address("spammer@gmail.com"));
+    void isBlocked_storedAddress_true() {
+        // setup
+        BlockedEmailAddress blocked = address(BLOCKED_ADDRESS);
+        repository.save(blocked);
 
-        assertThat(source.isBlocked("spammer@gmail.com")).isTrue();
-        assertThat(source.isBlocked("someone@gmail.com")).isFalse();
-        // the source is an exact lookup: EmailDomainPolicy folds a +tag (and Gmail dots) before it asks
-        assertThat(source.isBlocked("spammer+promo@gmail.com")).isFalse();
+        // execution
+        boolean result = source.isBlocked(BLOCKED_ADDRESS);
+
+        // verifications
+        assertThat(result).isTrue();
     }
 
     @Test
-    @DisplayName("Given an address saved twice, when the collection is read, then it holds one entry, because the address is the id")
-    void save_sameAddressTwiceKeepsOneEntry() {
-        repository.save(address("spammer@gmail.com"));
-        repository.save(address("spammer@gmail.com"));
+    void isBlocked_otherAddressOnTheSameDomain_false() {
+        // setup
+        BlockedEmailAddress blocked = address(BLOCKED_ADDRESS);
+        repository.save(blocked);
 
-        assertThat(repository.count()).isEqualTo(1);
+        // execution
+        boolean result = source.isBlocked(OTHER_ADDRESS);
+
+        // verifications
+        assertThat(result).isFalse();
     }
 
     @Test
-    @DisplayName("Given several addresses, when they are listed by address, then they come back alphabetically")
-    void findAll_sortedByEmail() {
-        repository.save(address("zed@example.com"));
-        repository.save(address("amy@example.com"));
+    void isBlocked_nonCanonicalSpellingOfAStoredAddress_false() {
+        // setup
+        BlockedEmailAddress blocked = address(BLOCKED_ADDRESS);
+        repository.save(blocked);
 
-        assertThat(repository.findAll(Sort.by("email")))
+        // execution
+        boolean result = source.isBlocked(TAGGED_BLOCKED_ADDRESS);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void save_sameAddressTwice_oneEntryKept() {
+        // setup
+        BlockedEmailAddress first = address(BLOCKED_ADDRESS);
+        BlockedEmailAddress second = address(BLOCKED_ADDRESS);
+        repository.save(first);
+
+        // execution
+        repository.save(second);
+
+        // verifications
+        long stored = repository.count();
+        assertThat(stored).isEqualTo(1);
+    }
+
+    @Test
+    void findAll_sortedByEmail_alphabeticalOrder() {
+        // setup
+        BlockedEmailAddress last = address(LAST_ADDRESS);
+        BlockedEmailAddress first = address(FIRST_ADDRESS);
+        repository.save(last);
+        repository.save(first);
+        Sort byEmail = Sort.by(EMAIL_FIELD);
+
+        // execution
+        List<BlockedEmailAddress> result = repository.findAll(byEmail);
+
+        // verifications
+        assertThat(result)
                 .extracting(BlockedEmailAddress::getEmail)
-                .containsExactly("amy@example.com", "zed@example.com");
+                .containsExactly(FIRST_ADDRESS, LAST_ADDRESS);
     }
 
     private static BlockedEmailAddress address(String email) {
-        return BlockedEmailAddress.builder().email(email).reason("spam submission").addedBy("it").build();
+        return BlockedEmailAddress.builder()
+                .email(email)
+                .reason(REASON)
+                .addedBy(ADDED_BY)
+                .build();
     }
 }

@@ -3,6 +3,9 @@ package com.openframe.core.email;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -11,7 +14,9 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +24,18 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EmailDomainPolicyTest {
+
+    private static final String BLOCKED_MAILBOX = "spammer@gmail.com";
+    private static final String GMAIL_DOMAIN = "gmail.com";
+    private static final String ALLOWED_DOMAIN_ADDRESS = "someone@allowed.example";
+    private static final String CONFIGURED_BLOCKED_ADDRESS = "someone@proton.me";
+    private static final String ROGUE_DOMAIN = "rogue.example";
+    private static final String ROGUE_ADDRESS = "someone@rogue.example";
+    private static final String FRESH_DOMAIN = "fresh.example";
+    private static final String FRESH_ADDRESS = "someone@fresh.example";
+    private static final String WORK_DOMAIN = "work.example";
+    private static final String WORK_ADDRESS = "someone@work.example";
+    private static final String BLOCKED_ADDRESS_MESSAGE = "This email address cannot be used";
 
     @Mock
     private DisposableDomainChecker disposableDomainChecker;
@@ -108,118 +125,179 @@ class EmailDomainPolicyTest {
         verify(databaseList, never()).isBlocked(any());
     }
 
-    @Test
-    void normalizeDomain_trimsAndLowercases() {
-        assertThat(EmailDomainPolicy.normalizeDomain("  Example.COM ")).isEqualTo("example.com");
-        assertThat(EmailDomainPolicy.normalizeDomain("   ")).isNull();
-        assertThat(EmailDomainPolicy.normalizeDomain(null)).isNull();
-    }
-
-    @Test
-    void verdict_addressBlockIsCheckedFirstAndNamesTheAddress() {
+    @ParameterizedTest
+    @ValueSource(strings = {"  Spammer+Promo@Gmail.com ", "spammer+1@gmail.com", "s.pammer@googlemail.com"})
+    void verdict_anySpellingOfABlockedMailbox_blockedAddress(String email) {
         // setup
-        when(addressList.isBlocked("spammer@gmail.com")).thenReturn(true);
+        when(addressList.isBlocked(BLOCKED_MAILBOX)).thenReturn(true);
+
         // execution
-        EmailVerdict verdict = policy.verdict("  Spammer+Promo@Gmail.com ");
+        EmailVerdict verdict = policy.verdict(email);
+
         // verifications
         assertThat(verdict).isEqualTo(EmailVerdict.BLOCKED_ADDRESS);
-        verify(databaseList, never()).isBlocked(any());
-        verify(disposableDomainChecker, never()).isDisposable(any());
     }
 
     @Test
-    void verdict_addressBlockIsNotLiftedByTheAllowedCarveOut() {
+    void verdict_blockedAddress_domainLayersNotAsked() {
         // setup
-        when(addressList.isBlocked("someone@allowed.example")).thenReturn(true);
-        // execution + verifications
-        assertThat(policy.verdict("someone@allowed.example")).isEqualTo(EmailVerdict.BLOCKED_ADDRESS);
-        assertThat(policy.isEmailAllowed("someone@allowed.example")).isFalse();
+        when(addressList.isBlocked(BLOCKED_MAILBOX)).thenReturn(true);
+
+        // execution
+        policy.verdict(BLOCKED_MAILBOX);
+
+        // verifications
+        verify(databaseList, never()).isBlocked(anyString());
+        verify(disposableDomainChecker, never()).isDisposable(anyString());
     }
 
     @Test
-    void verdict_namesTheDomainLayerThatDecided() {
+    void verdict_blockedAddressOnAnAllowedDomain_blockedAddress() {
         // setup
-        when(databaseList.isBlocked("rogue.example")).thenReturn(true);
-        when(databaseList.isBlocked("fresh.example")).thenReturn(false);
-        when(databaseList.isBlocked("work.example")).thenReturn(false);
-        when(disposableDomainChecker.isDisposable("fresh.example")).thenReturn(true);
-        when(disposableDomainChecker.isDisposable("work.example")).thenReturn(false);
-        // execution + verifications
-        assertThat(policy.verdict("a@proton.me")).isEqualTo(EmailVerdict.BLOCKED_DOMAIN);
-        assertThat(policy.verdict("a@rogue.example")).isEqualTo(EmailVerdict.BLOCKED_DOMAIN);
-        assertThat(policy.verdict("a@fresh.example")).isEqualTo(EmailVerdict.DISPOSABLE);
-        assertThat(policy.verdict("a@work.example")).isEqualTo(EmailVerdict.ALLOWED);
+        when(addressList.isBlocked(ALLOWED_DOMAIN_ADDRESS)).thenReturn(true);
+
+        // execution
+        EmailVerdict verdict = policy.verdict(ALLOWED_DOMAIN_ADDRESS);
+
+        // verifications
+        assertThat(verdict).isEqualTo(EmailVerdict.BLOCKED_ADDRESS);
     }
 
     @Test
-    void verdict_inputWithoutAnAddressIsAllowedWithoutAskingAnySource() {
-        // execution + verifications
-        assertThat(policy.verdict("not-an-address")).isEqualTo(EmailVerdict.ALLOWED);
-        assertThat(policy.verdict(null)).isEqualTo(EmailVerdict.ALLOWED);
-        verify(addressList, never()).isBlocked(any());
-        verify(databaseList, never()).isBlocked(any());
+    void isEmailAllowed_blockedAddressOnAnAllowedDomain_false() {
+        // setup
+        when(addressList.isBlocked(ALLOWED_DOMAIN_ADDRESS)).thenReturn(true);
+
+        // execution
+        boolean allowed = policy.isEmailAllowed(ALLOWED_DOMAIN_ADDRESS);
+
+        // verifications
+        assertThat(allowed).isFalse();
     }
 
     @Test
-    void verdict_disabledPolicyIgnoresTheAddressList() {
+    void verdict_configuredBlockedDomain_blockedDomain() {
+        // execution
+        EmailVerdict verdict = policy.verdict(CONFIGURED_BLOCKED_ADDRESS);
+
+        // verifications
+        assertThat(verdict).isEqualTo(EmailVerdict.BLOCKED_DOMAIN);
+    }
+
+    @Test
+    void verdict_domainOnASource_blockedDomain() {
+        // setup
+        when(databaseList.isBlocked(ROGUE_DOMAIN)).thenReturn(true);
+
+        // execution
+        EmailVerdict verdict = policy.verdict(ROGUE_ADDRESS);
+
+        // verifications
+        assertThat(verdict).isEqualTo(EmailVerdict.BLOCKED_DOMAIN);
+    }
+
+    @Test
+    void verdict_disposableDomain_disposable() {
+        // setup
+        when(databaseList.isBlocked(FRESH_DOMAIN)).thenReturn(false);
+        when(disposableDomainChecker.isDisposable(FRESH_DOMAIN)).thenReturn(true);
+
+        // execution
+        EmailVerdict verdict = policy.verdict(FRESH_ADDRESS);
+
+        // verifications
+        assertThat(verdict).isEqualTo(EmailVerdict.DISPOSABLE);
+    }
+
+    @Test
+    void verdict_noLayerBlocks_allowed() {
+        // setup
+        stubWorkAddressAllowedByEveryLayer();
+
+        // execution
+        EmailVerdict verdict = policy.verdict(WORK_ADDRESS);
+
+        // verifications
+        assertThat(verdict).isEqualTo(EmailVerdict.ALLOWED);
+    }
+
+    @Test
+    void isEmailAllowed_noLayerBlocks_true() {
+        // setup
+        stubWorkAddressAllowedByEveryLayer();
+
+        // execution
+        boolean allowed = policy.isEmailAllowed(WORK_ADDRESS);
+
+        // verifications
+        assertThat(allowed).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"not-an-address", "trailing@"})
+    void verdict_inputWithoutADomain_allowed(String email) {
+        // execution
+        EmailVerdict verdict = policy.verdict(email);
+
+        // verifications
+        assertThat(verdict).isEqualTo(EmailVerdict.ALLOWED);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"not-an-address", "trailing@"})
+    void verdict_inputWithoutADomain_noListAsked(String email) {
+        // execution
+        policy.verdict(email);
+
+        // verifications
+        verify(addressList, never()).isBlocked(anyString());
+        verify(databaseList, never()).isBlocked(anyString());
+    }
+
+    @Test
+    void verdict_disabledPolicy_allowed() {
         // setup
         properties.setEnabled(false);
-        // execution + verifications
-        assertThat(policy.verdict("spammer@gmail.com")).isEqualTo(EmailVerdict.ALLOWED);
-        verify(addressList, never()).isBlocked(any());
+
+        // execution
+        EmailVerdict verdict = policy.verdict(BLOCKED_MAILBOX);
+
+        // verifications
+        assertThat(verdict).isEqualTo(EmailVerdict.ALLOWED);
     }
 
     @Test
-    void ensureEmailAllowed_blockedAddressDoesNotBlameTheDomain() {
+    void verdict_disabledPolicy_addressListNotAsked() {
         // setup
-        when(addressList.isBlocked("spammer@gmail.com")).thenReturn(true);
-        // execution + verifications
-        assertThatThrownBy(() -> policy.ensureEmailAllowed("spammer@gmail.com"))
+        properties.setEnabled(false);
+
+        // execution
+        policy.verdict(BLOCKED_MAILBOX);
+
+        // verifications
+        verify(addressList, never()).isBlocked(anyString());
+    }
+
+    @Test
+    void ensureEmailAllowed_blockedAddress_messageDoesNotNameTheDomain() {
+        // setup
+        when(addressList.isBlocked(BLOCKED_MAILBOX)).thenReturn(true);
+
+        // execution
+        Throwable thrown = catchThrowable(() -> policy.ensureEmailAllowed(BLOCKED_MAILBOX));
+
+        // verifications
+        assertThat(thrown)
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("This email address cannot be used")
-                .hasMessageNotContaining("gmail.com");
+                .hasMessageContaining(BLOCKED_ADDRESS_MESSAGE)
+                .hasMessageNotContaining(GMAIL_DOMAIN);
     }
 
-    @Test
-    void isEmailAllowed_addressNoLayerBlocksIsAllowed() {
-        // setup
-        when(addressList.isBlocked("someone@work.example")).thenReturn(false);
-        when(databaseList.isBlocked("work.example")).thenReturn(false);
-        when(disposableDomainChecker.isDisposable("work.example")).thenReturn(false);
-        // execution + verifications: SSO auto-provisioning reads this method, so an allowed address must stay allowed
-        assertThat(policy.isEmailAllowed("someone@work.example")).isTrue();
-    }
-
-    @Test
-    void domainOf_namesTheDomainOnly() {
-        assertThat(EmailDomainPolicy.domainOf(" Someone+Tag@Example.COM ")).isEqualTo("example.com");
-        assertThat(EmailDomainPolicy.domainOf("no-at-sign")).isNull();
-        assertThat(EmailDomainPolicy.domainOf("trailing@")).isNull();
-        assertThat(EmailDomainPolicy.domainOf(null)).isNull();
-    }
-
-    @Test
-    void normalizeEmail_isOneFormPerMailbox() {
-        // a +tag is dropped everywhere; dots only matter outside Gmail
-        assertThat(EmailDomainPolicy.normalizeEmail("  Someone+Tag@Example.COM ")).isEqualTo("someone@example.com");
-        assertThat(EmailDomainPolicy.normalizeEmail("first.last@example.com")).isEqualTo("first.last@example.com");
-        assertThat(EmailDomainPolicy.normalizeEmail("S.Pam.Mer+promo@Gmail.com")).isEqualTo("spammer@gmail.com");
-        assertThat(EmailDomainPolicy.normalizeEmail("spammer@googlemail.com")).isEqualTo("spammer@gmail.com");
-        // nothing to canonicalize: only trimmed and lowercased
-        assertThat(EmailDomainPolicy.normalizeEmail("+tag@example.com")).isEqualTo("+tag@example.com");
-        assertThat(EmailDomainPolicy.normalizeEmail("...@gmail.com")).isEqualTo("...@gmail.com");
-        assertThat(EmailDomainPolicy.normalizeEmail(" No-At-Sign ")).isEqualTo("no-at-sign");
-        assertThat(EmailDomainPolicy.normalizeEmail("trailing@")).isEqualTo("trailing@");
-        assertThat(EmailDomainPolicy.normalizeEmail("   ")).isNull();
-        assertThat(EmailDomainPolicy.normalizeEmail(null)).isNull();
-    }
-
-    @Test
-    void verdict_aBlockedMailboxIsBlockedInEverySpelling() {
-        // setup
-        when(addressList.isBlocked("spammer@gmail.com")).thenReturn(true);
-        // execution + verifications
-        assertThat(policy.verdict("spammer+1@gmail.com")).isEqualTo(EmailVerdict.BLOCKED_ADDRESS);
-        assertThat(policy.verdict("s.pammer@googlemail.com")).isEqualTo(EmailVerdict.BLOCKED_ADDRESS);
+    private void stubWorkAddressAllowedByEveryLayer() {
+        when(addressList.isBlocked(WORK_ADDRESS)).thenReturn(false);
+        when(databaseList.isBlocked(WORK_DOMAIN)).thenReturn(false);
+        when(disposableDomainChecker.isDisposable(WORK_DOMAIN)).thenReturn(false);
     }
 }

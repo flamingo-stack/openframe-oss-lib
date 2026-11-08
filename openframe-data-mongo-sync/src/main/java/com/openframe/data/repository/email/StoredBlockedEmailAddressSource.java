@@ -1,18 +1,13 @@
 package com.openframe.data.repository.email;
 
 import com.openframe.core.email.BlockedEmailAddressSource;
-import com.openframe.core.email.EmailDomainPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
-/**
- * Answers the email domain policy's address layer from {@link BlockedEmailAddressRepository}: one point read
- * per asked address, so an added entry blocks the next signup at once. Fails open on a datastore error, as
- * the policy requires of every source: a database problem never stops a registration by itself. The address
- * is never logged, only its domain.
- */
+import static com.openframe.core.email.EmailAddressCanonicalizer.domainOf;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -20,13 +15,13 @@ public class StoredBlockedEmailAddressSource implements BlockedEmailAddressSourc
 
     private final BlockedEmailAddressRepository repository;
 
+    // Fails open: a database problem never stops a registration by itself. Only the domain is logged.
     @Override
-    public boolean isBlocked(String email) {
+    public boolean isBlocked(String canonicalAddress) {
         try {
-            return repository.existsById(email);
+            return repository.existsById(canonicalAddress);
         } catch (DataAccessException e) {
-            log.warn("Blocked email address lookup failed for an address on '{}', allowing: {}",
-                    EmailDomainPolicy.domainOf(email), e.getMessage());
+            log.warn("Blocked email address lookup failed for an address on '{}', allowing", domainOf(canonicalAddress), e);
             return false;
         }
     }

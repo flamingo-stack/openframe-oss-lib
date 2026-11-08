@@ -25,7 +25,7 @@ public class BlockedEmailDomain extends BlockedEmailEntry {
     public static final String COLLECTION = "blocked_email_domains";
 
     /**
-     * The domain itself, in the {@code EmailDomainPolicy.normalizeDomain} form: trimmed and lowercase, no local
+     * The domain itself, in the {@code EmailAddressCanonicalizer.canonicalDomain} form: trimmed and lowercase, no local
      * part. The lookup is an exact match on this id, so an entry inserted by hand as {@code Rogue.Example} or with
      * spaces never matches. Keeping it the id also means the collection cannot hold a domain twice.
      */

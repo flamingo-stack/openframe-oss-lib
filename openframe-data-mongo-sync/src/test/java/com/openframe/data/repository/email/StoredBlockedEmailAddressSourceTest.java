@@ -13,6 +13,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class StoredBlockedEmailAddressSourceTest {
 
+    private static final String ADDRESS = "spammer@gmail.com";
+    private static final String DATASTORE_ERROR = "mongo down";
+
     @Mock
     private BlockedEmailAddressRepository repository;
 
@@ -20,18 +23,39 @@ class StoredBlockedEmailAddressSourceTest {
     private StoredBlockedEmailAddressSource source;
 
     @Test
-    void isBlocked_answersFromTheCollection() {
-        when(repository.existsById("spammer@gmail.com")).thenReturn(true);
-        when(repository.existsById("someone@gmail.com")).thenReturn(false);
+    void isBlocked_addressInTheCollection_true() {
+        // setup
+        when(repository.existsById(ADDRESS)).thenReturn(true);
 
-        assertThat(source.isBlocked("spammer@gmail.com")).isTrue();
-        assertThat(source.isBlocked("someone@gmail.com")).isFalse();
+        // execution
+        boolean result = source.isBlocked(ADDRESS);
+
+        // verifications
+        assertThat(result).isTrue();
     }
 
     @Test
-    void isBlocked_failsOpenWhenTheDatastoreCannotAnswer() {
-        when(repository.existsById("spammer@gmail.com")).thenThrow(new DataAccessResourceFailureException("mongo down"));
+    void isBlocked_addressNotInTheCollection_false() {
+        // setup
+        when(repository.existsById(ADDRESS)).thenReturn(false);
 
-        assertThat(source.isBlocked("spammer@gmail.com")).isFalse();
+        // execution
+        boolean result = source.isBlocked(ADDRESS);
+
+        // verifications
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void isBlocked_datastoreCannotAnswer_failsOpen() {
+        // setup
+        DataAccessResourceFailureException failure = new DataAccessResourceFailureException(DATASTORE_ERROR);
+        when(repository.existsById(ADDRESS)).thenThrow(failure);
+
+        // execution
+        boolean result = source.isBlocked(ADDRESS);
+
+        // verifications
+        assertThat(result).isFalse();
     }
 }

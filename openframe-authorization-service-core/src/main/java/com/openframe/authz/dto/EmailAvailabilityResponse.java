@@ -20,14 +20,5 @@ public class EmailAvailabilityResponse {
 
     /** Why it is unavailable. Omitted when {@code available} is true. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    private Reason reason;
-
-    public enum Reason {
-        /** An active user already owns this address. */
-        TAKEN,
-        /** The address itself is on the blocked address list. */
-        BLOCKED_ADDRESS,
-        /** The domain is not accepted — disposable or privacy-focused provider. */
-        BLOCKED_DOMAIN
-    }
+    private EmailRefusalReason reason;
 }

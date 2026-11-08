@@ -6,21 +6,14 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 
-/**
- * Decides whether an email address may be used to register, be invited, or be configured for SSO
- * auto-provisioning.
- * <p>
- * For an address, first every {@link BlockedEmailAddressSource} bean (single addresses kept outside the
- * configuration, such as a list a backoffice edits). Then three domain layers: the configured
- * {@code blocked-domains} list, every {@link BlockedEmailDomainSource} bean, and — only for domains that
- * pass both — a {@link DisposableDomainChecker} lookup. Every source and the external check fail open, so an
- * unreachable datastore or third party never blocks a flow. The configured {@code allowed-domains} carve-out
- * wins over every domain layer, but not over an address block: blocking one address is the more specific
- * decision. {@link #verdict} says which layer decided.
- */
+import static com.openframe.core.email.EmailAddressCanonicalizer.canonicalAddress;
+import static com.openframe.core.email.EmailAddressCanonicalizer.canonicalDomain;
+import static com.openframe.core.email.EmailAddressCanonicalizer.domainOf;
+import static com.openframe.core.email.EmailAddressCanonicalizer.hasDomain;
+import static com.openframe.core.email.EmailAddressCanonicalizer.hasLocalPartAndDomain;
+
+// An address block beats the allowed-domains carve-out: blocking one address is the more specific decision.
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,10 +23,8 @@ public class EmailDomainPolicy {
     private final DisposableDomainChecker disposableDomainChecker;
     /** Every source bean in {@code @Order}; empty when a deployment has none. */
     private final List<BlockedEmailDomainSource> blockedDomainSources;
-    /** Every address source bean in {@code @Order}; empty when a deployment has none. */
     private final List<BlockedEmailAddressSource> blockedAddressSources;
 
-    /** @throws IllegalArgumentException if the address is blocked or uses a blocked domain */
     public void ensureEmailAllowed(String email) {
         EmailVerdict verdict = verdict(email);
         if (verdict == EmailVerdict.BLOCKED_ADDRESS) {
@@ -41,28 +32,20 @@ public class EmailDomainPolicy {
                     "This email address cannot be used. Please use your work email address.");
         }
         if (!verdict.isAllowed()) {
-            String domain = extractDomain(email);
+            String domain = domainOf(email);
             throw new IllegalArgumentException(
                     "Email addresses from " + domain + " cannot be used. Please use your work email address.");
         }
     }
 
-    /**
-     * Which layer, if any, blocks the address: the address sources first, then the domain layers in the order
-     * {@link #isDomainBlocked} applies them. A disabled policy, or input with no address in it, is
-     * {@link EmailVerdict#ALLOWED}.
-     */
     public EmailVerdict verdict(String email) {
-        if (!properties.isEnabled()) {
+        if (isOutOfScope(email)) {
             return EmailVerdict.ALLOWED;
         }
-        String domain = extractDomain(email);
-        if (domain == null) {
-            return EmailVerdict.ALLOWED;
-        }
-        if (isAddressListed(normalizeEmail(email))) {
+        if (isAddressListed(email)) {
             return EmailVerdict.BLOCKED_ADDRESS;
         }
+        String domain = domainOf(email);
         return domainVerdict(domain);
     }
 
@@ -76,7 +59,7 @@ public class EmailDomainPolicy {
             return;
         }
         for (String domain : domains) {
-            String normalized = normalize(domain);
+            String normalized = canonicalDomain(domain);
             if (normalized != null && isDomainBlocked(normalized)) {
                 throw new IllegalArgumentException(
                         normalized + " cannot be used for auto-provisioning. Please use a domain your organization owns.");
@@ -93,16 +76,23 @@ public class EmailDomainPolicy {
         if (!properties.isEnabled()) {
             return false;
         }
-        String normalized = normalize(domain);
-        return normalized != null && !domainVerdict(normalized).isAllowed();
+        String normalized = canonicalDomain(domain);
+        if (normalized == null) {
+            return false;
+        }
+        EmailVerdict verdict = domainVerdict(normalized);
+        return !verdict.isAllowed();
     }
 
-    /** The domain layers for an already normalized domain; the policy is known to be enabled. */
+    private boolean isOutOfScope(String email) {
+        return !properties.isEnabled() || !hasDomain(email);
+    }
+
     private EmailVerdict domainVerdict(String normalized) {
         if (isDomainListed(normalized)) {
             return EmailVerdict.BLOCKED_DOMAIN;
         }
-        if (contains(properties.getAllowedDomains(), normalized) || !properties.getDisposableCheck().isEnabled()) {
+        if (shouldSkipDisposableCheck(normalized)) {
             return EmailVerdict.ALLOWED;
         }
         boolean disposable = disposableDomainChecker.isDisposable(normalized);
@@ -113,14 +103,23 @@ public class EmailDomainPolicy {
         return EmailVerdict.ALLOWED;
     }
 
-    private boolean isAddressListed(String address) {
-        return blockedAddressSources.stream().anyMatch(source -> addressBlockedBy(source, address));
+    private boolean shouldSkipDisposableCheck(String normalized) {
+        Collection<String> allowedDomains = properties.getAllowedDomains();
+        return contains(allowedDomains, normalized) || !properties.getDisposableCheck().isEnabled();
     }
 
-    private static boolean addressBlockedBy(BlockedEmailAddressSource source, String address) {
+    private boolean isAddressListed(String email) {
+        if (!hasLocalPartAndDomain(email)) {
+            return false;
+        }
+        String address = canonicalAddress(email);
+        return blockedAddressSources.stream().anyMatch(source -> isAddressBlockedBy(source, address));
+    }
+
+    private static boolean isAddressBlockedBy(BlockedEmailAddressSource source, String address) {
         boolean blocked = source.isBlocked(address);
         if (blocked) {
-            log.debug("Address on domain '{}' blocked by {}", extractDomain(address), source.getClass().getSimpleName());
+            log.debug("Address on domain '{}' blocked by {}", domainOf(address), source.getClass().getSimpleName());
         }
         return blocked;
     }
@@ -131,7 +130,7 @@ public class EmailDomainPolicy {
      * at once, as the tenant trust scoring does for every owner domain.
      */
     public boolean isDomainListed(String domain) {
-        String normalized = normalize(domain);
+        String normalized = canonicalDomain(domain);
         if (normalized == null || contains(properties.getAllowedDomains(), normalized)) {
             return false;
         }
@@ -150,74 +149,12 @@ public class EmailDomainPolicy {
         return blocked;
     }
 
-    /** The domain as every layer compares it: trimmed and lowercase; {@code null} for blank input. */
-    public static String normalizeDomain(String domain) {
-        return normalize(domain);
-    }
-
-    /** Domains whose mailboxes ignore dots in the local part, all delivering to {@code gmail.com}. */
-    private static final Set<String> DOTLESS_MAILBOX_DOMAINS = Set.of("gmail.com", "googlemail.com");
-    private static final String DOTLESS_MAILBOX_DOMAIN = "gmail.com";
-
-    /**
-     * The whole address as every address source stores and compares it, so one block catches every spelling of the
-     * same mailbox: trimmed and lowercase, a {@code +tag} dropped, and on Gmail ({@code gmail.com},
-     * {@code googlemail.com}) the dots of the local part dropped and the domain written {@code gmail.com}.
-     * {@code null} for blank input; input with no local part or no domain is only trimmed and lowercased.
-     */
-    public static String normalizeEmail(String email) {
-        String normalized = normalize(email);
-        int at = normalized == null ? -1 : normalized.lastIndexOf('@');
-        if (at <= 0 || at == normalized.length() - 1) {
-            return normalized;
-        }
-        String local = normalized.substring(0, at);
-        String domain = normalized.substring(at + 1);
-        int tag = local.indexOf('+');
-        if (tag > 0) {
-            local = local.substring(0, tag);
-        }
-        if (DOTLESS_MAILBOX_DOMAINS.contains(domain)) {
-            String dotless = local.replace(".", "");
-            local = dotless.isEmpty() ? local : dotless;
-            domain = DOTLESS_MAILBOX_DOMAIN;
-        }
-        return local + "@" + domain;
-    }
-
-    /**
-     * The domain of an address, trimmed and lowercase: what a log line may name in place of the address;
-     * {@code null} when the input has no {@code @} or nothing after it.
-     */
-    public static String domainOf(String email) {
-        return extractDomain(email);
-    }
-
     private static boolean contains(Collection<String> domains, String normalized) {
         if (domains == null || domains.isEmpty()) {
             return false;
         }
         return domains.stream()
-                .map(EmailDomainPolicy::normalize)
+                .map(EmailAddressCanonicalizer::canonicalDomain)
                 .anyMatch(normalized::equals);
-    }
-
-    private static String extractDomain(String email) {
-        if (email == null) {
-            return null;
-        }
-        int at = email.lastIndexOf('@');
-        if (at < 0 || at == email.length() - 1) {
-            return null;
-        }
-        return normalize(email.substring(at + 1));
-    }
-
-    private static String normalize(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim().toLowerCase(Locale.ROOT);
-        return trimmed.isEmpty() ? null : trimmed;
     }
 }

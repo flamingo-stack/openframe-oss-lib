@@ -2,6 +2,7 @@ package com.openframe.authz.controller;
 
 import com.openframe.authz.dto.EmailAvailabilityResponse;
 import com.openframe.authz.dto.EmailDomainAllowedResponse;
+import com.openframe.authz.dto.EmailRefusalReason;
 import com.openframe.authz.dto.TenantDiscoveryResponse;
 import com.openframe.authz.service.tenant.TenantDiscoveryService;
 import com.openframe.authz.service.user.UserService;
@@ -64,49 +65,56 @@ public class TenantDiscoveryController {
         if (taken) {
             return EmailAvailabilityResponse.builder()
                     .available(false)
-                    .reason(EmailAvailabilityResponse.Reason.TAKEN)
+                    .reason(EmailRefusalReason.TAKEN)
                     .build();
         }
 
-        EmailVerdict verdict = emailDomainPolicy.verdict(normalizedEmail);
-        if (!verdict.isAllowed()) {
+        EmailVerdict verdict = emailDomainPolicy.verdict(email);
+        if (verdict.isAllowed()) {
             return EmailAvailabilityResponse.builder()
-                    .available(false)
-                    .reason(verdict == EmailVerdict.BLOCKED_ADDRESS
-                            ? EmailAvailabilityResponse.Reason.BLOCKED_ADDRESS
-                            : EmailAvailabilityResponse.Reason.BLOCKED_DOMAIN)
+                    .available(true)
                     .build();
         }
-
+        EmailRefusalReason reason = refusalReasonOf(verdict);
+        EmailRefusalReason availabilityReason = asAvailabilityReason(reason);
         return EmailAvailabilityResponse.builder()
-                .available(true)
+                .available(false)
+                .reason(availabilityReason)
                 .build();
     }
 
-    /**
-     * Check an address against the email policy alone — ignoring whether it is already
-     * registered. Lets the UI flag a disposable or privacy-focused provider as the user types,
-     * without conflating it with the availability check, and says which layer blocked it
-     * ({@code reason}: a blocked address, a blocked domain or a disposable one; null when allowed).
-     */
     @GetMapping(value = "/email-domain-allowed", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
     public EmailDomainAllowedResponse emailDomainAllowed(
             @RequestParam @Email @NotBlank String email) {
 
-        EmailVerdict verdict = emailDomainPolicy.verdict(email.toLowerCase(Locale.ROOT));
+        EmailVerdict verdict = emailDomainPolicy.verdict(email);
+        if (verdict.isAllowed()) {
+            return EmailDomainAllowedResponse.builder()
+                    .allowed(true)
+                    .build();
+        }
+        EmailRefusalReason reason = refusalReasonOf(verdict);
         return EmailDomainAllowedResponse.builder()
-                .allowed(verdict.isAllowed())
-                .reason(toReason(verdict))
+                .allowed(false)
+                .reason(reason)
                 .build();
     }
 
-    private static EmailDomainAllowedResponse.Reason toReason(EmailVerdict verdict) {
+    private static EmailRefusalReason refusalReasonOf(EmailVerdict verdict) {
         return switch (verdict) {
-            case ALLOWED -> null;
-            case BLOCKED_ADDRESS -> EmailDomainAllowedResponse.Reason.BLOCKED_ADDRESS;
-            case BLOCKED_DOMAIN -> EmailDomainAllowedResponse.Reason.BLOCKED_DOMAIN;
-            case DISPOSABLE -> EmailDomainAllowedResponse.Reason.DISPOSABLE;
+            case BLOCKED_ADDRESS -> EmailRefusalReason.BLOCKED_ADDRESS;
+            case BLOCKED_DOMAIN -> EmailRefusalReason.BLOCKED_DOMAIN;
+            case DISPOSABLE -> EmailRefusalReason.DISPOSABLE;
+            case ALLOWED -> throw new IllegalArgumentException("An allowed address has no refusal reason");
         };
+    }
+
+    // The registration form reads only BLOCKED_DOMAIN as a policy refusal, so a disposable domain is reported as one.
+    private static EmailRefusalReason asAvailabilityReason(EmailRefusalReason reason) {
+        if (reason == EmailRefusalReason.DISPOSABLE) {
+            return EmailRefusalReason.BLOCKED_DOMAIN;
+        }
+        return reason;
     }
 }

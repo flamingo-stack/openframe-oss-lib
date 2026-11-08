@@ -7,10 +7,6 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
-/**
- * Minimal Spring Boot configuration for the blocked email address integration tests: the email repository
- * package and the source that reads it, nothing else.
- */
 @SpringBootConfiguration
 @EnableAutoConfiguration
 @EnableMongoRepositories(basePackageClasses = BlockedEmailAddressRepository.class)
