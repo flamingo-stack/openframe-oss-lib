@@ -165,6 +165,13 @@ export interface AppLayoutProps {
   /** `localStorage` key for the divider position (`chatColumn` only). */
   workAreaStorageKey?: string;
   /**
+   * A bar at the top of the page column, over `<main>` and outside its scroll (e.g. an
+   * `AppColumnHeader` with the page's title and the work area's layout buttons). Keep it
+   * present for the whole session, like `chatColumn`; `null` draws nothing. Optional;
+   * without it the layout is unchanged.
+   */
+  pageHeader?: ReactNode;
+  /**
    * A second navigation sidebar on the window's right edge (`side: 'right'` is
    * forced), e.g. the navigation while `sidebarConfig` holds the chat list. Not in
    * the phone burger menu, which draws `sidebarConfig`. Optional.
@@ -211,6 +218,7 @@ export function AppLayout({
   chatColumn,
   workAreaMode = 'page',
   workAreaStorageKey,
+  pageHeader,
   endSidebarConfig,
   animateSidebars = false,
   mobileMenuConfig,
@@ -239,7 +247,8 @@ export function AppLayout({
   // The column needs a box of its own only to stack the dock under <main> and
   // to anchor the corner; otherwise it is `contents` and <main> stays the row's
   // flex item exactly as before.
-  const columnIsBox = hasDock || hasCorner;
+  const hasPageHeader = pageHeader !== undefined;
+  const columnIsBox = hasDock || hasCorner || hasPageHeader;
   const sidePanelState = useAppLayoutSidePanel(sidePanel, drawerContainer);
 
   useIsomorphicLayoutEffect(() => {
@@ -393,6 +402,8 @@ export function AppLayout({
             {contentCorner}
           </div>
         )}
+        {/* Over <main>, outside its scroll; its own token scope (it is chrome). */}
+        {hasPageHeader && pageHeader}
         {/* `hidden` while the panel covers the area: the page stays
         mounted, it just takes no room. */}
         <main

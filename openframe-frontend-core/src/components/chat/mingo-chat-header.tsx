@@ -26,13 +26,19 @@ export interface MingoChatHeaderProps {
    * ⋯; the list toggle, collapse and close are never drawn, whatever is passed.
    */
   variant?: 'panel' | 'page';
+  /**
+   * Page variant only. `'column'`: the header of a work-area chat column (Figma
+   * `chat/header`): the shell's panel surface and borders, the title in the shell's body
+   * type, no `meta`, the owner's `avatar` in its own cell, 20px glyphs. Default `'default'`.
+   */
+  look?: 'default' | 'column';
   title: string;
   /** Second line: the chat's owner. Panel variant. */
   subtitle?: string | null;
   /** Page variant: small parts after the title, each led by "·" (e.g. the
    *  owner and the day). Empty parts are skipped. */
   meta?: ReadonlyArray<string | null | undefined>;
-  /** The owner's avatar at the title cell's end. Panel variant. */
+  /** The owner's avatar at the title cell's end (panel variant), or in its own cell (`look="column"`). */
   avatar?: { name?: string | null; avatarUrl?: string | null } | null;
   /** Shows the chat list toggle at the start. Panel variant. */
   onToggleList?: () => void;
@@ -66,6 +72,7 @@ export interface MingoChatHeaderProps {
  */
 export function MingoChatHeader({
   variant = 'panel',
+  look = 'default',
   title,
   subtitle,
   meta,
@@ -83,6 +90,11 @@ export function MingoChatHeader({
   actions = [],
 }: MingoChatHeaderProps) {
   const isPage = variant === 'page';
+  const isColumn = isPage && look === 'column';
+  const glyph = isColumn ? 20 : 24;
+  // The column look: the panel's border between the title and the avatar, the default one between the buttons.
+  const cellClass = cn('w-14', isColumn && 'border-l border-ods-border text-ods-text-primary [&_svg]:h-5 [&_svg]:w-5');
+  const showAvatar = !!avatar && !!(avatar.name || avatar.avatarUrl);
   const menuGroups: ActionsMenuGroup[] = [
     ...(menuItems.length > 0 ? [{ items: menuItems, separator: true }] : []),
     ...(extraMenuItems.length > 0 ? [{ items: extraMenuItems }] : []),
@@ -98,11 +110,28 @@ export function MingoChatHeader({
       onCancel={() => onRenameCancel?.()}
     />
   ) : (
-    <p className={cn('truncate text-ods-text-primary text-h3', isPage && 'min-w-0')}>{title}</p>
+    <p
+      className={cn(
+        'truncate text-ods-text-primary',
+        isColumn ? 'min-w-0 flex-1 text-shell-body' : 'text-h3',
+        isPage && 'min-w-0',
+      )}
+    >
+      {title}
+    </p>
   );
 
   return (
-    <div className="flex h-14 w-full shrink-0 divide-x divide-ods-border overflow-hidden border-b border-ods-border">
+    <div
+      className={cn(
+        'flex h-14 w-full shrink-0 overflow-hidden border-b',
+        isColumn
+          ? // Chrome, not content: the window's tokens even in a column narrower than 720px.
+            'ods-viewport-layer border-ods-border-panel bg-ods-panel'
+          : 'divide-x divide-ods-border border-ods-border',
+      )}
+      data-look={isColumn ? 'column' : undefined}
+    >
       {!isPage && onToggleList && (
         <Button
           variant="cell"
@@ -115,7 +144,12 @@ export function MingoChatHeader({
         </Button>
       )}
 
-      {isPage ? (
+      {isColumn ? (
+        // The column look: the title alone, in from the column's edge.
+        <div className="flex min-w-0 flex-1 items-center pl-[var(--spacing-system-l)] pr-[var(--spacing-system-sf)]">
+          {titleNode}
+        </div>
+      ) : isPage ? (
         // The page variant: one line, the title then its meta.
         <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)]">
           {titleNode}
@@ -144,9 +178,21 @@ export function MingoChatHeader({
         </div>
       )}
 
+      {isColumn && showAvatar && (
+        <div className="flex w-14 shrink-0 items-center justify-center border-l border-ods-border-panel">
+          <SquareAvatar
+            variant="round"
+            sizePx={20}
+            src={avatar.avatarUrl || undefined}
+            alt={avatar.name || undefined}
+            fallback={avatar.name || undefined}
+            title={avatar.name || undefined}
+          />
+        </div>
+      )}
       {onRestore && (
-        <Button variant="cell" className="w-14" onClick={onRestore} aria-label="Unarchive chat">
-          <Refresh01LeftIcon size={24} />
+        <Button variant="cell" className={cellClass} onClick={onRestore} aria-label="Unarchive chat">
+          <Refresh01LeftIcon size={glyph} />
         </Button>
       )}
       {menuGroups.length > 0 && (
@@ -155,8 +201,8 @@ export function MingoChatHeader({
           onCloseAutoFocus={e => e.preventDefault()}
           groups={menuGroups}
           customTrigger={
-            <Button variant="cell" className="w-14" aria-label="Chat actions">
-              <Ellipsis01Icon size={24} />
+            <Button variant="cell" className={cellClass} aria-label="Chat actions">
+              <Ellipsis01Icon size={glyph} />
             </Button>
           }
         />
@@ -165,7 +211,7 @@ export function MingoChatHeader({
         <Button
           key={action.id}
           variant="cell"
-          className="w-14"
+          className={cellClass}
           onClick={action.onClick}
           aria-label={action.label}
           title={action.label}

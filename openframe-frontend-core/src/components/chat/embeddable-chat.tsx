@@ -560,6 +560,13 @@ export interface EmbeddableChatProps {
    */
   threadHeaderActions?: ReadonlyArray<MingoChatHeaderAction>;
   /**
+   * How the header portalled into `threadContainer` looks: `'page'` (default) the page
+   * bar (title · owner · day); `'column'` a work-area chat column's header (Figma
+   * `chat/header`: the panel surface, the owner's avatar in a cell, 20px glyphs).
+   * Split layout only.
+   */
+  threadHeaderLook?: 'page' | 'column';
+  /**
    * The thread's column inside `threadContainer` — e.g. `mx-auto max-w-[760px]` to
    * centre it at the composer's width on a wide chat page; the header stays full
    * width. Omitted: the column fills the container (a narrow panel, a sheet).
@@ -1155,6 +1162,7 @@ function EmbeddableChatInner({
   rail = 'auto',
   threadContainer,
   threadHeaderActions,
+  threadHeaderLook = 'page',
   threadContentClassName,
   showModel = true,
   onModelClick,
@@ -3408,6 +3416,8 @@ function EmbeddableChatInner({
   const pageHeader = (
     <MingoChatHeader
       variant="page"
+      look={threadHeaderLook === 'column' ? 'column' : 'default'}
+      avatar={threadHeaderLook === 'column' && !archiveOpen && hasConversation ? headerAvatar : undefined}
       // Over the archive the header is the archive's (see the v2 header).
       title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
       meta={archiveOpen || !hasConversation ? undefined : [headerPersonName, chatDayLabel(activeDialog?.timestamp)]}

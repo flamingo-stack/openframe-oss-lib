@@ -5,7 +5,7 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import { useEffect } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppColumnHeader } from '../app-column-header';
 import { AppLayout } from '../app-layout';
@@ -194,5 +194,39 @@ describe('AppLayout animateSidebars', () => {
     for (const aside of screen.getAllByRole('complementary', { name: 'Main navigation sidebar' })) {
       expect(aside).not.toHaveClass('lg:transition-none');
     }
+  });
+});
+
+describe('AppLayout pageHeader', () => {
+  it('draws the bar over <main>, outside its scroll, and keeps the page mounted when it goes', () => {
+    const mounts = { count: 0 };
+    function Page() {
+      useEffect(() => {
+        mounts.count += 1;
+      }, []);
+      return <h1>Page</h1>;
+    }
+    const layout = (header: ReactNode) => (
+      <AppLayout
+        sidebarConfig={{ items: [] }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        chatColumn={<p>thread</p>}
+        pageHeader={header}
+      >
+        <Page />
+      </AppLayout>
+    );
+    const { rerender } = render(layout(<AppColumnHeader title="Devices" onClose={() => undefined} />));
+
+    const main = screen.getByRole('main');
+    const bar = screen.getByText('Devices');
+    expect(main).not.toContainElement(bar);
+    // Before <main> in the page column.
+    expect(bar.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    rerender(layout(null));
+    expect(screen.queryByText('Devices')).not.toBeInTheDocument();
+    expect(mounts.count).toBe(1);
   });
 });
