@@ -6,6 +6,7 @@ import com.openframe.authz.dto.TenantDiscoveryResponse;
 import com.openframe.authz.service.tenant.TenantDiscoveryService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.core.email.EmailDomainPolicy;
+import com.openframe.core.email.EmailVerdict;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -67,10 +68,13 @@ public class TenantDiscoveryController {
                     .build();
         }
 
-        if (!emailDomainPolicy.isEmailAllowed(normalizedEmail)) {
+        EmailVerdict verdict = emailDomainPolicy.verdict(normalizedEmail);
+        if (!verdict.isAllowed()) {
             return EmailAvailabilityResponse.builder()
                     .available(false)
-                    .reason(EmailAvailabilityResponse.Reason.BLOCKED_DOMAIN)
+                    .reason(verdict == EmailVerdict.BLOCKED_ADDRESS
+                            ? EmailAvailabilityResponse.Reason.BLOCKED_ADDRESS
+                            : EmailAvailabilityResponse.Reason.BLOCKED_DOMAIN)
                     .build();
         }
 
@@ -80,17 +84,29 @@ public class TenantDiscoveryController {
     }
 
     /**
-     * Check an address against the email domain policy alone — ignoring whether it is already
+     * Check an address against the email policy alone — ignoring whether it is already
      * registered. Lets the UI flag a disposable or privacy-focused provider as the user types,
-     * without conflating it with the availability check.
+     * without conflating it with the availability check, and says which layer blocked it
+     * ({@code reason}: a blocked address, a blocked domain or a disposable one; null when allowed).
      */
     @GetMapping(value = "/email-domain-allowed", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
     public EmailDomainAllowedResponse emailDomainAllowed(
             @RequestParam @Email @NotBlank String email) {
 
+        EmailVerdict verdict = emailDomainPolicy.verdict(email.toLowerCase(Locale.ROOT));
         return EmailDomainAllowedResponse.builder()
-                .allowed(emailDomainPolicy.isEmailAllowed(email.toLowerCase(Locale.ROOT)))
+                .allowed(verdict.isAllowed())
+                .reason(toReason(verdict))
                 .build();
+    }
+
+    private static EmailDomainAllowedResponse.Reason toReason(EmailVerdict verdict) {
+        return switch (verdict) {
+            case ALLOWED -> null;
+            case BLOCKED_ADDRESS -> EmailDomainAllowedResponse.Reason.BLOCKED_ADDRESS;
+            case BLOCKED_DOMAIN -> EmailDomainAllowedResponse.Reason.BLOCKED_DOMAIN;
+            case DISPOSABLE -> EmailDomainAllowedResponse.Reason.DISPOSABLE;
+        };
     }
 }

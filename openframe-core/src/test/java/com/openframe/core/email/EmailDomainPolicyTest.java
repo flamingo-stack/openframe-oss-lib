@@ -24,6 +24,8 @@ class EmailDomainPolicyTest {
     private DisposableDomainChecker disposableDomainChecker;
     @Mock
     private BlockedEmailDomainSource databaseList;
+    @Mock
+    private BlockedEmailAddressSource addressList;
 
     private EmailDomainPolicyProperties properties;
     private EmailDomainPolicy policy;
@@ -33,7 +35,7 @@ class EmailDomainPolicyTest {
         properties = new EmailDomainPolicyProperties();
         properties.setBlockedDomains(Set.of("Proton.me"));
         properties.setAllowedDomains(Set.of("allowed.example"));
-        policy = new EmailDomainPolicy(properties, disposableDomainChecker, List.of(databaseList));
+        policy = new EmailDomainPolicy(properties, disposableDomainChecker, List.of(databaseList), List.of(addressList));
     }
 
     @Test
@@ -111,5 +113,77 @@ class EmailDomainPolicyTest {
         assertThat(EmailDomainPolicy.normalizeDomain("  Example.COM ")).isEqualTo("example.com");
         assertThat(EmailDomainPolicy.normalizeDomain("   ")).isNull();
         assertThat(EmailDomainPolicy.normalizeDomain(null)).isNull();
+    }
+
+    @Test
+    void verdict_addressBlockIsCheckedFirstAndNamesTheAddress() {
+        // setup
+        when(addressList.isBlocked("spammer+promo@gmail.com")).thenReturn(true);
+        // execution
+        EmailVerdict verdict = policy.verdict("  Spammer+Promo@Gmail.com ");
+        // verifications
+        assertThat(verdict).isEqualTo(EmailVerdict.BLOCKED_ADDRESS);
+        verify(databaseList, never()).isBlocked(any());
+        verify(disposableDomainChecker, never()).isDisposable(any());
+    }
+
+    @Test
+    void verdict_addressBlockIsNotLiftedByTheAllowedCarveOut() {
+        // setup
+        when(addressList.isBlocked("someone@allowed.example")).thenReturn(true);
+        // execution + verifications
+        assertThat(policy.verdict("someone@allowed.example")).isEqualTo(EmailVerdict.BLOCKED_ADDRESS);
+        assertThat(policy.isEmailAllowed("someone@allowed.example")).isFalse();
+    }
+
+    @Test
+    void verdict_namesTheDomainLayerThatDecided() {
+        // setup
+        when(databaseList.isBlocked("rogue.example")).thenReturn(true);
+        when(databaseList.isBlocked("fresh.example")).thenReturn(false);
+        when(databaseList.isBlocked("work.example")).thenReturn(false);
+        when(disposableDomainChecker.isDisposable("fresh.example")).thenReturn(true);
+        when(disposableDomainChecker.isDisposable("work.example")).thenReturn(false);
+        // execution + verifications
+        assertThat(policy.verdict("a@proton.me")).isEqualTo(EmailVerdict.BLOCKED_DOMAIN);
+        assertThat(policy.verdict("a@rogue.example")).isEqualTo(EmailVerdict.BLOCKED_DOMAIN);
+        assertThat(policy.verdict("a@fresh.example")).isEqualTo(EmailVerdict.DISPOSABLE);
+        assertThat(policy.verdict("a@work.example")).isEqualTo(EmailVerdict.ALLOWED);
+    }
+
+    @Test
+    void verdict_inputWithoutAnAddressIsAllowedWithoutAskingAnySource() {
+        // execution + verifications
+        assertThat(policy.verdict("not-an-address")).isEqualTo(EmailVerdict.ALLOWED);
+        assertThat(policy.verdict(null)).isEqualTo(EmailVerdict.ALLOWED);
+        verify(addressList, never()).isBlocked(any());
+        verify(databaseList, never()).isBlocked(any());
+    }
+
+    @Test
+    void verdict_disabledPolicyIgnoresTheAddressList() {
+        // setup
+        properties.setEnabled(false);
+        // execution + verifications
+        assertThat(policy.verdict("spammer@gmail.com")).isEqualTo(EmailVerdict.ALLOWED);
+        verify(addressList, never()).isBlocked(any());
+    }
+
+    @Test
+    void ensureEmailAllowed_blockedAddressDoesNotBlameTheDomain() {
+        // setup
+        when(addressList.isBlocked("spammer@gmail.com")).thenReturn(true);
+        // execution + verifications
+        assertThatThrownBy(() -> policy.ensureEmailAllowed("spammer@gmail.com"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("This email address cannot be used")
+                .hasMessageNotContaining("gmail.com");
+    }
+
+    @Test
+    void normalizeEmail_trimsAndLowercasesAndKeepsThePlusTag() {
+        assertThat(EmailDomainPolicy.normalizeEmail("  Someone+Tag@Example.COM ")).isEqualTo("someone+tag@example.com");
+        assertThat(EmailDomainPolicy.normalizeEmail("   ")).isNull();
+        assertThat(EmailDomainPolicy.normalizeEmail(null)).isNull();
     }
 }
