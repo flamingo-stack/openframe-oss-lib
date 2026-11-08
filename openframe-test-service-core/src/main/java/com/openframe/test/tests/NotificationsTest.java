@@ -89,7 +89,7 @@ public class NotificationsTest extends BaseTest {
             assertThat(n.getTitle()).as("Every notification has a title (" + n.getId() + ")").isNotBlank();
             assertThat(n.getSeverity()).as("Severity is a schema value (" + n.getId() + ")").isIn(SEVERITIES);
             assertThat(n.getCategory()).as("Category is a schema value (" + n.getId() + ")").isIn(CATEGORIES);
-            assertThat(n.getStatus()).as("status is always present (" + n.getId() + ")").isNotBlank();
+            assertThat(n.getRead()).as("read is always present (" + n.getId() + ")").isNotNull();
             assertThat(n.getCreatedAt()).as("createdAt is always present (" + n.getId() + ")").isNotBlank();
         });
 
@@ -102,10 +102,10 @@ public class NotificationsTest extends BaseTest {
         assertThat(NotificationApi.hasUnread()).as("hasUnreadNotifications agrees with the counts").isEqualTo(unread > 0);
 
         NotificationConnection unreadPage = NotificationApi.listUnread(PAGE);
-        assertThat(unreadPage.nodes()).allSatisfy(n -> assertThat(n.isRead()).as("read:false lists only unread").isFalse());
+        assertThat(unreadPage.nodes()).allSatisfy(n -> assertThat(n.getRead()).as("read:false lists only unread").isFalse());
         assertThat(unreadPage.nodes()).as("The unread page matches the counts").hasSize(Math.min(unread, PAGE));
         assertThat(NotificationApi.listRead(PAGE).nodes())
-                .allSatisfy(n -> assertThat(n.isRead()).as("read:true lists only read").isTrue());
+                .allSatisfy(n -> assertThat(n.getRead()).as("read:true lists only read").isTrue());
     }
 
     @Tag("feature")
@@ -123,18 +123,18 @@ public class NotificationsTest extends BaseTest {
                 .orElseGet(() -> NotificationApi.listNotifications(null, 1).nodes().stream().findFirst().orElse(null));
         assumeTrue(target != null, "The inbox is empty and the product never notifies a user about their own actions;"
                 + " nothing to mark or delete" + orgSuffix());
-        boolean wasUnread = !target.isRead();
+        boolean wasUnread = Boolean.FALSE.equals(target.getRead());
         int categoryBefore = countFor(target.getCategory());
 
         assertThat(NotificationApi.markRead(target.getId())).as("Marking an existing notification read returns true").isTrue();
         Notification after = NotificationApi.find(target.getId(), target.getTitle());
         assertThat(after).as("The notification still exists after being read").isNotNull();
-        assertThat(after.isRead()).as("The notification is read").isTrue();
+        assertThat(after.getRead()).as("The notification is read").isTrue();
         assertThat(countFor(target.getCategory()))
                 .as("The category's unread count drops by one when the notification was unread")
                 .isEqualTo(wasUnread ? categoryBefore - 1 : categoryBefore);
         NotificationApi.markRead(target.getId());
-        assertThat(NotificationApi.find(target.getId(), target.getTitle()).isRead()).as("Marking read again keeps it read").isTrue();
+        assertThat(NotificationApi.find(target.getId(), target.getTitle()).getRead()).as("Marking read again keeps it read").isTrue();
 
         assertThat(NotificationApi.delete(target.getId())).as("Deleting an existing notification returns true").isTrue();
         assertThat(NotificationApi.find(target.getId(), target.getTitle())).as("A deleted notification is gone").isNull();
