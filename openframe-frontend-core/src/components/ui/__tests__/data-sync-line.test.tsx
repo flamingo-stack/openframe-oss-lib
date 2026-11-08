@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { DATA_SYNC_SOURCES, type DataSyncSource } from '../../../types/data-sync';
+import { StripeIcon } from '../../icons-v2-generated/brand-logos/stripe-icon';
 import { PageDataSyncProvider, PageDataSyncRow } from '../../layout/page-data-sync';
-import { DataSyncLine } from '../data-attribution';
+import { DataSyncIcon, DataSyncLine } from '../data-attribution';
 
 describe('DataSyncLine', () => {
   it('names the system the records are mirrored from and when it last read them', () => {
@@ -14,6 +16,16 @@ describe('DataSyncLine', () => {
     render(<DataSyncLine sync={{ source: 'github', syncedAt: null }} />);
     expect(screen.getByText('Data synced from GitHub')).toBeInTheDocument();
     expect(screen.getByText('Last updated: Never')).toBeInTheDocument();
+  });
+
+  it.each(Object.keys(DATA_SYNC_SOURCES) as DataSyncSource[])('names and marks %s', source => {
+    render(<DataSyncLine sync={{ source, syncedAt: null }} />);
+    expect(screen.getByText(`Data synced from ${DATA_SYNC_SOURCES[source]}`)).toBeInTheDocument();
+  });
+
+  it("draws a source's mark at the size asked for", () => {
+    const drawn = render(<DataSyncIcon source="stripe" size={20} />).asFragment();
+    expect(drawn).toEqual(render(<StripeIcon size={20} />).asFragment());
   });
 
   it('draws nothing when the host states no sync, and its skeleton while loading', () => {
