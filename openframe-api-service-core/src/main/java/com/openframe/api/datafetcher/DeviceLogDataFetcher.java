@@ -7,7 +7,9 @@ import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
+import com.openframe.api.dto.device.DeviceLogFilterCriteria;
 import com.openframe.api.dto.device.DeviceLogFilterInput;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.mapper.GraphQLDeviceLogMapper;
 import com.openframe.api.service.device.DeviceLogService;
 import jakarta.validation.Valid;
@@ -39,8 +41,10 @@ public class DeviceLogDataFetcher {
         log.debug("Fetching device logs for machineIds: {}, organizationIds: {}, filter: {}, first: {}, after: {}",
                 machineIds, organizationIds, filter, first, after);
 
-        GenericQueryResult<DeviceLogEntry> result = deviceLogService.queryLogs(machineIds, organizationIds,
-                mapper.toFilterCriteria(filter), mapper.toCursorPaginationCriteria(first, after));
+        DeviceLogFilterCriteria criteria = mapper.toFilterCriteria(filter);
+        CursorPaginationCriteria pagination = mapper.toCursorPaginationCriteria(first, after);
+        GenericQueryResult<DeviceLogEntry> result = deviceLogService.queryLogs(machineIds, organizationIds, criteria,
+                pagination);
         return mapper.toConnection(result);
     }
 }
