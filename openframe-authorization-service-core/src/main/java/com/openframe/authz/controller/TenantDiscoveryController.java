@@ -2,7 +2,6 @@ package com.openframe.authz.controller;
 
 import com.openframe.authz.dto.EmailAvailabilityResponse;
 import com.openframe.authz.dto.EmailDomainAllowedResponse;
-import com.openframe.authz.dto.EmailRefusalReason;
 import com.openframe.authz.dto.TenantDiscoveryResponse;
 import com.openframe.authz.service.tenant.TenantDiscoveryService;
 import com.openframe.authz.service.user.UserService;
@@ -63,48 +62,22 @@ public class TenantDiscoveryController {
         // domain policy's external disposable-domain call.
         boolean taken = userService.existsActiveByEmail(normalizedEmail);
         if (taken) {
-            return EmailAvailabilityResponse.builder()
-                    .available(false)
-                    .reason(EmailRefusalReason.TAKEN)
-                    .build();
+            return EmailAvailabilityResponse.taken();
         }
-
         EmailVerdict verdict = emailDomainPolicy.verdict(email);
-        if (verdict.isAllowed()) {
-            return EmailAvailabilityResponse.builder()
-                    .available(true)
-                    .build();
-        }
-        EmailRefusalReason reason = refusalReasonOf(verdict);
-        return EmailAvailabilityResponse.builder()
-                .available(false)
-                .reason(reason)
-                .build();
+        return EmailAvailabilityResponse.of(verdict);
     }
 
+    /**
+     * The email policy alone, ignoring whether the address is registered: lets the UI flag a blocked address or
+     * domain as the user types.
+     */
     @GetMapping(value = "/email-domain-allowed", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
     public EmailDomainAllowedResponse emailDomainAllowed(
             @RequestParam @Email @NotBlank String email) {
 
         EmailVerdict verdict = emailDomainPolicy.verdict(email);
-        if (verdict.isAllowed()) {
-            return EmailDomainAllowedResponse.builder()
-                    .allowed(true)
-                    .build();
-        }
-        EmailRefusalReason reason = refusalReasonOf(verdict);
-        return EmailDomainAllowedResponse.builder()
-                .allowed(false)
-                .reason(reason)
-                .build();
-    }
-
-    private static EmailRefusalReason refusalReasonOf(EmailVerdict verdict) {
-        return switch (verdict) {
-            case BLOCKED_ADDRESS -> EmailRefusalReason.BLOCKED_ADDRESS;
-            case BLOCKED_DOMAIN -> EmailRefusalReason.BLOCKED_DOMAIN;
-            case ALLOWED -> throw new IllegalArgumentException("An allowed address has no refusal reason");
-        };
+        return EmailDomainAllowedResponse.of(verdict);
     }
 }

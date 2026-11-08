@@ -1,24 +1,31 @@
 package com.openframe.data.document.email;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.Instant;
+
 @Data
-@EqualsAndHashCode(callSuper = true)
-@ToString(callSuper = true)
-@SuperBuilder
+@Builder(toBuilder = true)
 @NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = BlockedEmailAddress.COLLECTION)
-public class BlockedEmailAddress extends BlockedEmailEntry {
+public class BlockedEmailAddress {
 
     public static final String COLLECTION = "blocked_email_addresses";
 
-    // Stored in the EmailAddressCanonicalizer.canonicalAddress form: the lookup is an exact match on this id.
+    // EmailAddressCanonicalizer.canonicalAddress form: the lookup is an exact match on this id.
     @Id
     private String email;
+
+    private String reason;
+
+    private String addedBy;
+
+    // Set by the caller: the id is assigned, so Spring Data sees every save as an update and @CreatedDate never fires.
+    private Instant createdAt;
 }

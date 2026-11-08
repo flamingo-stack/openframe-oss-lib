@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
@@ -112,6 +115,26 @@ class BlockedEmailAddressRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(result)
                 .extracting(BlockedEmailAddress::getEmail)
                 .containsExactly(FIRST_ADDRESS, LAST_ADDRESS);
+    }
+
+    @Test
+    void search_partOfTheAddressOrReasonInAnyCase_matchingPageOnly() {
+        // setup
+        repository.save(address(FIRST_ADDRESS));
+        repository.save(address(LAST_ADDRESS));
+        repository.save(address(BLOCKED_ADDRESS).toBuilder().reason("Link spam (contact form)").build());
+        Pageable firstPage = PageRequest.of(0, 1, Sort.by(EMAIL_FIELD));
+
+        // execution
+        Page<BlockedEmailAddress> byAddress = repository
+                .findByEmailContainingIgnoreCaseOrReasonContainingIgnoreCase("EXAMPLE", "EXAMPLE", firstPage);
+        Page<BlockedEmailAddress> byReason = repository
+                .findByEmailContainingIgnoreCaseOrReasonContainingIgnoreCase("(contact", "(contact", firstPage);
+
+        // verifications
+        assertThat(byAddress.getTotalElements()).isEqualTo(2);
+        assertThat(byAddress.getContent()).extracting(BlockedEmailAddress::getEmail).containsExactly(FIRST_ADDRESS);
+        assertThat(byReason.getContent()).extracting(BlockedEmailAddress::getEmail).containsExactly(BLOCKED_ADDRESS);
     }
 
     private static BlockedEmailAddress address(String email) {

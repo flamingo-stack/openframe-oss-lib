@@ -21,7 +21,7 @@ public class StoredBlockedEmailAddressSource implements BlockedEmailAddressSourc
         try {
             return repository.existsById(canonicalAddress);
         } catch (DataAccessException e) {
-            log.warn("Blocked email address lookup failed for an address on '{}', allowing", domainOf(canonicalAddress), e);
+            log.warn("Blocked email address lookup failed for an address on '{}', allowing: {}", domainOf(canonicalAddress), e.getMessage());
             return false;
         }
     }

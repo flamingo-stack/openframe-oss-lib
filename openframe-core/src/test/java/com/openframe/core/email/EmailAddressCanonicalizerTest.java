@@ -18,7 +18,6 @@ class EmailAddressCanonicalizerTest {
     private static final String PADDED_MIXED_CASE_DOMAIN = "  Example.COM ";
     private static final String PADDED_TAGGED_ADDRESS = " Someone+Tag@Example.COM ";
     private static final String NO_LOCAL_PART_OR_DOMAIN = "needs a local part and a domain";
-    private static final String NO_DOMAIN = "has no domain";
 
     @ParameterizedTest
     @MethodSource("canonicalForms")
@@ -56,14 +55,25 @@ class EmailAddressCanonicalizerTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"no-at-sign", "trailing@", "someone@   "})
-    void domainOf_noDomain_throwsIllegalArgument(String email) {
+    void domainOf_noDomain_null(String email) {
         // execution
-        Throwable thrown = catchThrowable(() -> EmailAddressCanonicalizer.domainOf(email));
+        String domain = EmailAddressCanonicalizer.domainOf(email);
 
         // verifications
-        assertThat(thrown)
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(NO_DOMAIN);
+        assertThat(domain).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"someone@example.com", " Someone+Tag@Example.COM "})
+    void isAddress_localPartAndDomain_true(String email) {
+        assertThat(EmailAddressCanonicalizer.isAddress(email)).isTrue();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"   ", "no-at-sign", "trailing@", "@example.com"})
+    void isAddress_noLocalPartOrNoDomain_false(String email) {
+        assertThat(EmailAddressCanonicalizer.isAddress(email)).isFalse();
     }
 
     @Test
