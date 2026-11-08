@@ -345,7 +345,7 @@ function BlockedSendersTable({ kind, rows, totalCount, search, onRelease }: Bloc
             ? { title: 'Nothing matches', description: `No blocked ${copy.noun} matches "${search}".` }
             : {
                 title: `No blocked ${copy.nounPlural}`,
-                description: `Block a ${copy.noun} above and it is listed here.`,
+                description: copy.emptyHint,
               }
         }
         rowClassName="mb-[var(--spacing-system-xxs)]"

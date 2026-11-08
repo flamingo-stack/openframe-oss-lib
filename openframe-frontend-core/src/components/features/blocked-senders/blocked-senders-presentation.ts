@@ -25,6 +25,8 @@ export const BLOCKED_SENDER_KIND_COPY: Record<
     searchPlaceholder: string;
     blockLabel: string;
     hint: string;
+    /** The empty list's line, worded per kind ("a domain", "an address"). */
+    emptyHint: string;
   }
 > = {
   domain: {
@@ -35,6 +37,7 @@ export const BLOCKED_SENDER_KIND_COPY: Record<
     placeholder: 'rogue-msp.example',
     searchPlaceholder: 'Domain or reason',
     blockLabel: 'Block domain',
+    emptyHint: 'Block a domain above and it is listed here.',
     hint: "Blocks sign-up, invitations, SSO sign-up and every hub form from the next request. Only for throwaway or abusive domains, never a real company's.",
   },
   address: {
@@ -45,6 +48,7 @@ export const BLOCKED_SENDER_KIND_COPY: Record<
     placeholder: 'spammer@gmail.com',
     searchPlaceholder: 'Email or reason',
     blockLabel: 'Block address',
+    emptyHint: 'Block an address above and it is listed here.',
     hint: 'Blocks one address on sign-up and every hub form from the next request. For a sender on a public mail provider (gmail.com, outlook.com), whose domain is never blocked.',
   },
 };
