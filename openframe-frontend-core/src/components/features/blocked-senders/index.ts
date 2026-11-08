@@ -1,6 +1,8 @@
 'use client';
 
 export { BlockedSendersPage } from './blocked-senders-page';
+export { BlockSenderModal } from './block-sender-modal';
+export type { BlockSenderModalProps } from './block-sender-modal';
 export type { BlockedSendersPageProps } from './blocked-senders-page';
 export { BlockedSenderListTab } from './blocked-sender-list-tab';
 export type { BlockedSenderListTabProps } from './blocked-sender-list-tab';
