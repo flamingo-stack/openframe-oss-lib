@@ -17,7 +17,11 @@ import { NavigationItemBadge } from './navigation-item-badge';
 import { isModifiedClick } from './navigation-sidebar';
 import { NavigationSidebarGroupedEntries, useOpenNavigationGroup } from './navigation-sidebar-grouped';
 import { resolveNavigationActive } from './navigation-sidebar-match';
-import { NavigationSidebarSectionedEntries, useFoldedNavigationSections } from './navigation-sidebar-sectioned';
+import {
+  NavigationSidebarSectionedEntries,
+  SECTIONED_PRIMARY_NAV_CLASSES,
+  useFoldedNavigationSections,
+} from './navigation-sidebar-sectioned';
 import { hasNavigationSidebarSlot, renderNavigationSidebarSlot } from './navigation-sidebar-slot';
 
 // Header height constant — the unified top-navigation `small` bar (56px on all screens)
@@ -332,7 +336,9 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
 
                   <nav
                     aria-label="Primary navigation"
-                    className={cn('flex flex-col', !sectioned && 'gap-[var(--spacing-system-xxs)]')}
+                    className={
+                      sectioned ? SECTIONED_PRIMARY_NAV_CLASSES : 'flex flex-col gap-[var(--spacing-system-xxs)]'
+                    }
                   >
                     {entries(primaryItems)}
                   </nav>

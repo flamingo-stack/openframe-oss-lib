@@ -60,10 +60,14 @@ const SECTION_CLASSES =
 
 /**
  * The primary `<nav>` of the sectioned variant: its first section has no border
- * above it (the top of the sidebar) and 12px of room instead of 8.
+ * above it (the top of the sidebar) and 12px of room instead of 8 — its category row
+ * then sits in the middle of the 56px band of the column headers beside it (Figma
+ * 1408:293075). Folded, it keeps 11px under the row: 55px, so the next section's top
+ * border lies on the column headers' own bottom border (55–56px) and the close cell
+ * beside it (55px) matches it exactly.
  */
 export const SECTIONED_PRIMARY_NAV_CLASSES =
-  'flex flex-col [&>:first-child]:border-t-0 [&>:first-child]:pt-[var(--spacing-system-sf)]';
+  'flex flex-col [&>:first-child]:border-t-0 [&>:first-child]:pt-[var(--spacing-system-sf)] [&>:first-child[data-folded]]:pb-[calc(var(--spacing-system-sf)-1px)]';
 
 function isStoredSectionIds(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(id => typeof id === 'string');
@@ -249,7 +253,7 @@ function Section({
   return (
     // Folded, no gap under the category: the rows' box is 0px tall, and the gap would
     // still stand below it as empty room.
-    <div className={cn(SECTION_CLASSES, folded && 'gap-0')}>
+    <div className={cn(SECTION_CLASSES, folded && 'gap-0')} data-folded={folded || undefined}>
       <button
         type="button"
         onClick={() => onSectionClick(item)}

@@ -81,10 +81,22 @@ describe('NavigationSidebar sectioned', () => {
     renderSidebar();
     // The section box that holds the category button, read from the markup (no node access).
     const sectionBox = (name: string) =>
-      new RegExp(`class="([^"]*)"><button[^>]*aria-label="${name}"`).exec(document.body.innerHTML)?.[1] ?? '';
+      new RegExp(`class="([^"]*)"(?: data-folded="true")?><button[^>]*aria-label="${name}"`).exec(
+        document.body.innerHTML,
+      )?.[1] ?? '';
     expect(sectionBox('Fleet')).not.toMatch(/\bgap-0\b/);
     fireEvent.click(section('Fleet'));
     expect(sectionBox('Fleet')).toMatch(/\bgap-0\b/);
+  });
+
+  it('marks a folded section, so the first one ends on the bottom border of the column headers', () => {
+    renderSidebar();
+    expect(document.body.innerHTML).toContain(
+      '[&amp;&gt;:first-child[data-folded]]:pb-[calc(var(--spacing-system-sf)-1px)]',
+    );
+    expect(document.body.innerHTML).not.toMatch(/data-folded="true"><button[^>]*aria-label="Service Desk"/);
+    fireEvent.click(section('Service Desk'));
+    expect(document.body.innerHTML).toMatch(/data-folded="true"><button[^>]*aria-label="Service Desk"/);
   });
 
   it('marks the current page and unfolds its section', () => {
