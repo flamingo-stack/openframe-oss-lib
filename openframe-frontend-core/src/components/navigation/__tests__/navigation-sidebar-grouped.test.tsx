@@ -192,7 +192,7 @@ describe('NavigationSidebar — slots', () => {
     expect(screen.getByRole('complementary', { name: 'Main navigation sidebar' })).toHaveAttribute(
       'data-navigation-sidebar',
     );
-    expect(footer).toHaveBeenLastCalledWith({ minimized: false, inDrawer: false });
+    expect(footer).toHaveBeenLastCalledWith({ minimized: false, inDrawer: false, toggle: expect.any(Function) });
   });
 
   it('hands a section render function the collapsed state', () => {

@@ -283,6 +283,24 @@ export interface NavigationSidebarConfig {
    */
   revealSignal?: number;
   /**
+   * The tablet form at desktop widths too: the rail in the flow, and the toggle (or a
+   * reveal) opens the expanded sidebar OVER the content, with the scrim, closing on
+   * Escape, a click outside or a pick — as between md and lg. For a host that keeps
+   * the content beside the sidebars at a minimum width (a narrow window, a wide
+   * sidebar beside it). The desktop preference (`collapsed`, the stored one) is kept,
+   * untouched, and back in force once this turns off. While it is on, a change of
+   * `currentPath` closes the overlay too. `'drawer'`: the same from md up, and no rail
+   * either — closed, the sidebar takes no room and shows nothing; `revealSignal` opens
+   * it (a host's own top bar button). Default `false`.
+   */
+  overlay?: boolean | 'drawer';
+  /**
+   * A dismiss command: every CHANGE of this number (not its first value) closes the
+   * overlay (tablet, `overlay`), e.g. when a pick inside a slot (a chat in the history)
+   * has done what the user opened the sidebar for. The desktop preference is untouched.
+   */
+  dismissSignal?: number;
+  /**
    * Let the user resize the expanded sidebar on desktop: a drag handle astride
    * its right edge (the grip the Mingo chat drawer had), arrow keys, Home and
    * End on it, a double click back to the default. The default stays
@@ -340,6 +358,13 @@ export interface NavigationSidebarSlotState {
    * its sidebar copy shares — renders only where this is `false`.
    */
   inDrawer: boolean;
+  /**
+   * The sidebar's own collapse toggle, for a host that draws its own collapse
+   * control in the slot (`toggle: 'none'`): on desktop it flips the preference
+   * (`onCollapsedChange`), on tablet and with `overlay` it opens or closes the
+   * overlay instead. Absent in the burger menu, which has nothing to collapse.
+   */
+  toggle?: () => void;
 }
 
 /**

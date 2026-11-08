@@ -163,6 +163,16 @@ const SIDEBAR_GEOMETRY_CLASSES = {
 } as const;
 
 /**
+ * `config.overlay`: the tablet geometry at every width from md up — no `lg:` rule puts
+ * the sidebar back in the flow or gives it the desktop width, so the tablet width
+ * classes below decide (the rail, or the overlay the user opened).
+ */
+const SIDEBAR_OVERLAY_GEOMETRY_CLASSES = {
+  left: 'md:absolute md:inset-y-0 md:z-[45] md:left-0',
+  right: 'md:absolute md:inset-y-0 md:z-[45] md:right-0',
+} as const;
+
+/**
  * The tablet width, as ONE `md:` class rather than a rail plus an override.
  *
  * Tablet is a 56px rail by design and only widens for an overlay the user has
@@ -242,8 +252,12 @@ export function NavigationSidebar({
   const isLgUp = useLgUp() ?? false;
 
   // Tablet = md viewport but not lg. On tablet the sidebar floats over the
-  // content area (overlay) instead of pushing it like on desktop.
-  const isTablet = isMdUp && !isLgUp;
+  // content area (overlay) instead of pushing it like on desktop. `config.overlay`
+  // asks for that form on desktop too (the host keeps its content wide enough).
+  // `'drawer'`: no rail either, from md up — closed it takes no room.
+  const drawer = config.overlay === 'drawer' && isMdUp;
+  const forcedOverlay = (config.overlay === true && isLgUp) || drawer;
+  const isTablet = (isMdUp && !isLgUp) || forcedOverlay;
 
   // The edge it stands on (`config.side`), and the width property that goes with it.
   const side = config.side ?? 'left';
@@ -283,6 +297,19 @@ export function NavigationSidebar({
   if (revealSeen !== config.revealSignal) {
     setRevealSeen(config.revealSignal);
     if (isTablet && config.revealSignal !== undefined) setTabletMinimized(false);
+  }
+
+  // `dismissSignal`: each change closes the overlay; and while the form is forced, so
+  // does a new page (the host navigated from inside it).
+  const [dismissSeen, setDismissSeen] = useState(config.dismissSignal);
+  if (dismissSeen !== config.dismissSignal) {
+    setDismissSeen(config.dismissSignal);
+    if (isTablet && config.dismissSignal !== undefined) setTabletMinimized(true);
+  }
+  const [pathSeen, setPathSeen] = useState(config.currentPath);
+  if (pathSeen !== config.currentPath) {
+    setPathSeen(config.currentPath);
+    if (forcedOverlay) setTabletMinimized(true);
   }
 
   // Entering tablet always starts minimized. Adjusted while rendering — React's
@@ -422,10 +449,10 @@ export function NavigationSidebar({
   useEffect(() => {
     if (revealHandledRef.current === revealSignal) return;
     revealHandledRef.current = revealSignal;
-    if (revealSignal === undefined || !isLgUp || !desktopMinimized) return;
+    if (revealSignal === undefined || isTablet || !isLgUp || !desktopMinimized) return;
     if (!isControlled) setStoredMinimized(false);
     onCollapsedChange?.(false);
-  }, [revealSignal, isLgUp, desktopMinimized, isControlled, setStoredMinimized, onCollapsedChange]);
+  }, [revealSignal, isTablet, isLgUp, desktopMinimized, isControlled, setStoredMinimized, onCollapsedChange]);
 
   // Dismiss the tablet overlay with Escape so it behaves like a transient panel
   useEffect(() => {
@@ -660,7 +687,7 @@ export function NavigationSidebar({
       <div
         className={cn(
           'fixed inset-0 z-[40] bg-ods-overlay',
-          'hidden md:block lg:hidden',
+          forcedOverlay ? 'hidden md:block' : 'hidden md:block lg:hidden',
           'transition-opacity duration-300',
           isOverlayOpen && !pushOnTablet ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
@@ -676,7 +703,11 @@ export function NavigationSidebar({
           compensates for has already gone `absolute`. */}
       <div
         className={cn(
-          'hidden h-full flex-shrink-0 md:block lg:hidden',
+          drawer
+            ? 'hidden'
+            : forcedOverlay
+              ? 'hidden h-full flex-shrink-0 md:block'
+              : 'hidden h-full flex-shrink-0 md:block lg:hidden',
           isOverlayOpen && pushOnTablet
             ? customExpandedWidth === null
               ? 'w-56'
@@ -695,7 +726,11 @@ export function NavigationSidebar({
           side === 'right' ? 'border-l' : 'border-r',
           dividerClass,
           panel ? 'bg-ods-panel' : 'bg-ods-card',
-          customExpandedWidth === null ? SIDEBAR_GEOMETRY_CLASSES[side].default : SIDEBAR_GEOMETRY_CLASSES[side].custom,
+          forcedOverlay
+            ? SIDEBAR_OVERLAY_GEOMETRY_CLASSES[side]
+            : customExpandedWidth === null
+              ? SIDEBAR_GEOMETRY_CLASSES[side].default
+              : SIDEBAR_GEOMETRY_CLASSES[side].custom,
           // The one width a viewport cannot imply: an overlay the user opened on
           // tablet. Only ever true after a click, so the first paint always gets
           // the rail.
@@ -708,9 +743,11 @@ export function NavigationSidebar({
           // A drag on the resize handle in progress: the width follows the
           // pointer, with no transition trailing it (`dragExpandedWidth`).
           'data-[resizing]:transition-none',
+          // A closed drawer is nothing at all.
+          drawer && minimized && 'md:hidden',
           // Snaps where its width moves the content: the desktop rail, and the
           // tablet overlay too when it pushes (its slot above snaps with it).
-          !animateWidth && (pushOnTablet ? 'transition-none' : 'lg:transition-none'),
+          !animateWidth && (pushOnTablet ? 'transition-none' : !forcedOverlay && 'lg:transition-none'),
           config.className,
         )}
         ref={asideRef}
@@ -765,7 +802,7 @@ export function NavigationSidebar({
                   sectionRailHidden,
                 )}
               >
-                {renderNavigationSidebarSlot(config.sectionSlot, { minimized, inDrawer: false })}
+                {renderNavigationSidebarSlot(config.sectionSlot, { minimized, inDrawer: false, toggle: handleToggle })}
               </div>
             )}
           </div>
@@ -788,7 +825,7 @@ export function NavigationSidebar({
               config.footerInset !== false && 'px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)]',
             )}
           >
-            {renderNavigationSidebarSlot(config.footerSlot, { minimized, inDrawer: false })}
+            {renderNavigationSidebarSlot(config.footerSlot, { minimized, inDrawer: false, toggle: handleToggle })}
           </div>
         )}
 
@@ -816,7 +853,8 @@ export function NavigationSidebar({
             56px rail has nothing to resize, and below `lg` the width is the
             tablet's. The 24px track straddles the border, half of it over the
             content's edge; the grip marks the border as draggable. */}
-        {resize !== undefined && !minimized && (
+        {/* Not over the content (`config.overlay`): the overlay's width is the tablet's. */}
+        {resize !== undefined && !minimized && !forcedOverlay && (
           <PanelResizeHandle
             // The handle's `side` is the panel's: astride the right edge of a left
             // sidebar, the left edge of a right one.
