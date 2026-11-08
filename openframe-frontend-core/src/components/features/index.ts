@@ -20,6 +20,7 @@ export {
 export * from './array-entry-manager';
 export * from './auth';
 export * from './auth-providers-list';
+export * from './blocked-senders';
 export * from './changelog-manager';
 export * from './changelog-sections-manager';
 export * from './clickup-tasks-manager';

@@ -50,6 +50,11 @@ export interface EndpointsRuntime {
    *  block from it, for the page's topic (`usePageTopic`). OPTIONAL: a host whose layout draws every page's FAQ itself
    *  (the hub) leaves it unset, and `FaqSection` then asks the same-origin `/api/faqs`. */
   faqsUrl?: string;
+  /** Base of the host's staff blocked-senders routes (the hub's `/api/admin/spam`): `<base>/overview`,
+   *  `<base>/domains`, `<base>/emails`, `<base>/suggestions`, `<base>/submissions` (`blockedSendersUrl`). The base may
+   *  carry its own query (`?env=prod`), kept on every address. OPTIONAL: `<BlockedSendersPage>` takes an `endpoint`
+   *  prop first, and without either asks the same-origin `BLOCKED_SENDERS_API_PATH`. */
+  blockedSendersUrl?: string;
 }
 
 export const EndpointsRuntimeContext = createContext<EndpointsRuntime | null>(null);

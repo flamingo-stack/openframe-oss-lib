@@ -57,6 +57,7 @@ export * from './waitlist';
 export * from './faq';
 export * from './trust-center';
 export * from './downloads';
+export * from './blocked-senders';
 export * from './content-ref';
 export * from './report';
 export * from './stack';
