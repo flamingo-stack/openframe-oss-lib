@@ -181,6 +181,24 @@ class EmailDomainPolicyTest {
     }
 
     @Test
+    void isEmailAllowed_addressNoLayerBlocksIsAllowed() {
+        // setup
+        when(addressList.isBlocked("someone@work.example")).thenReturn(false);
+        when(databaseList.isBlocked("work.example")).thenReturn(false);
+        when(disposableDomainChecker.isDisposable("work.example")).thenReturn(false);
+        // execution + verifications: SSO auto-provisioning reads this method, so an allowed address must stay allowed
+        assertThat(policy.isEmailAllowed("someone@work.example")).isTrue();
+    }
+
+    @Test
+    void domainOf_namesTheDomainOnly() {
+        assertThat(EmailDomainPolicy.domainOf(" Someone+Tag@Example.COM ")).isEqualTo("example.com");
+        assertThat(EmailDomainPolicy.domainOf("no-at-sign")).isNull();
+        assertThat(EmailDomainPolicy.domainOf("trailing@")).isNull();
+        assertThat(EmailDomainPolicy.domainOf(null)).isNull();
+    }
+
+    @Test
     void normalizeEmail_trimsAndLowercasesAndKeepsThePlusTag() {
         assertThat(EmailDomainPolicy.normalizeEmail("  Someone+Tag@Example.COM ")).isEqualTo("someone+tag@example.com");
         assertThat(EmailDomainPolicy.normalizeEmail("   ")).isNull();

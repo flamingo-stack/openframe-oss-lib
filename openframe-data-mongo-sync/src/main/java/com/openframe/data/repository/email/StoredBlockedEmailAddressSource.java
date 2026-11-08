@@ -1,6 +1,7 @@
 package com.openframe.data.repository.email;
 
 import com.openframe.core.email.BlockedEmailAddressSource;
+import com.openframe.core.email.EmailDomainPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -25,13 +26,8 @@ public class StoredBlockedEmailAddressSource implements BlockedEmailAddressSourc
             return repository.existsById(email);
         } catch (DataAccessException e) {
             log.warn("Blocked email address lookup failed for an address on '{}', allowing: {}",
-                    domainOf(email), e.getMessage());
+                    EmailDomainPolicy.domainOf(email), e.getMessage());
             return false;
         }
-    }
-
-    private static String domainOf(String email) {
-        int at = email == null ? -1 : email.lastIndexOf('@');
-        return at < 0 ? "" : email.substring(at + 1);
     }
 }

@@ -162,6 +162,14 @@ public class EmailDomainPolicy {
         return normalize(email);
     }
 
+    /**
+     * The domain of an address, trimmed and lowercase: what a log line may name in place of the address;
+     * {@code null} when the input has no {@code @} or nothing after it.
+     */
+    public static String domainOf(String email) {
+        return extractDomain(email);
+    }
+
     private static boolean contains(Collection<String> domains, String normalized) {
         if (domains == null || domains.isEmpty()) {
             return false;
