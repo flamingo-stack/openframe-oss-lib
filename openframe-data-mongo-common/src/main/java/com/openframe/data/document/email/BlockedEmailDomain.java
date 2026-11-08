@@ -1,14 +1,12 @@
 package com.openframe.data.document.email;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-
-import java.time.Instant;
 
 /**
  * An email domain that may not register, be invited, or be configured for SSO auto-provisioning, kept in the
@@ -17,11 +15,12 @@ import java.time.Instant;
  * adds entries, so a deployment that never uses it behaves exactly as before.
  */
 @Data
-@Builder
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
 @Document(collection = BlockedEmailDomain.COLLECTION)
-public class BlockedEmailDomain {
+public class BlockedEmailDomain extends BlockedEmailEntry {
 
     public static final String COLLECTION = "blocked_email_domains";
 
@@ -32,13 +31,4 @@ public class BlockedEmailDomain {
      */
     @Id
     private String domain;
-
-    /** Why it is blocked: the signup or incident it came from. */
-    private String reason;
-
-    /** Who added it. */
-    private String addedBy;
-
-    @CreatedDate
-    private Instant createdAt;
 }

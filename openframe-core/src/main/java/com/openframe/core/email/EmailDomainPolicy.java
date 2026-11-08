@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Decides whether an email address may be used to register, be invited, or be configured for SSO
@@ -154,12 +155,34 @@ public class EmailDomainPolicy {
         return normalize(domain);
     }
 
+    /** Domains whose mailboxes ignore dots in the local part, all delivering to {@code gmail.com}. */
+    private static final Set<String> DOTLESS_MAILBOX_DOMAINS = Set.of("gmail.com", "googlemail.com");
+    private static final String DOTLESS_MAILBOX_DOMAIN = "gmail.com";
+
     /**
-     * The whole address as every address source compares it: trimmed and lowercase, a {@code +tag} kept as
-     * written; {@code null} for blank input.
+     * The whole address as every address source stores and compares it, so one block catches every spelling of the
+     * same mailbox: trimmed and lowercase, a {@code +tag} dropped, and on Gmail ({@code gmail.com},
+     * {@code googlemail.com}) the dots of the local part dropped and the domain written {@code gmail.com}.
+     * {@code null} for blank input; input with no local part or no domain is only trimmed and lowercased.
      */
     public static String normalizeEmail(String email) {
-        return normalize(email);
+        String normalized = normalize(email);
+        int at = normalized == null ? -1 : normalized.lastIndexOf('@');
+        if (at <= 0 || at == normalized.length() - 1) {
+            return normalized;
+        }
+        String local = normalized.substring(0, at);
+        String domain = normalized.substring(at + 1);
+        int tag = local.indexOf('+');
+        if (tag > 0) {
+            local = local.substring(0, tag);
+        }
+        if (DOTLESS_MAILBOX_DOMAINS.contains(domain)) {
+            String dotless = local.replace(".", "");
+            local = dotless.isEmpty() ? local : dotless;
+            domain = DOTLESS_MAILBOX_DOMAIN;
+        }
+        return local + "@" + domain;
     }
 
     /**

@@ -13,7 +13,7 @@ public interface BlockedEmailAddressSource {
 
     /**
      * @param email the whole address in the {@link EmailDomainPolicy#normalizeEmail} form: trimmed and lowercase,
-     *              a {@code +tag} kept as written
+     *              no {@code +tag}, and on Gmail no dots in the local part
      * @return {@code true} only when the address is positively known to be blocked
      */
     boolean isBlocked(String email);

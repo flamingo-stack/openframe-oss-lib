@@ -39,6 +39,7 @@ class BlockedEmailAddressRepositoryIT extends BaseMongoIntegrationTest {
 
         assertThat(source.isBlocked("spammer@gmail.com")).isTrue();
         assertThat(source.isBlocked("someone@gmail.com")).isFalse();
+        // the source is an exact lookup: EmailDomainPolicy folds a +tag (and Gmail dots) before it asks
         assertThat(source.isBlocked("spammer+promo@gmail.com")).isFalse();
     }
 

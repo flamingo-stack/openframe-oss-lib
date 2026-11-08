@@ -118,7 +118,7 @@ class EmailDomainPolicyTest {
     @Test
     void verdict_addressBlockIsCheckedFirstAndNamesTheAddress() {
         // setup
-        when(addressList.isBlocked("spammer+promo@gmail.com")).thenReturn(true);
+        when(addressList.isBlocked("spammer@gmail.com")).thenReturn(true);
         // execution
         EmailVerdict verdict = policy.verdict("  Spammer+Promo@Gmail.com ");
         // verifications
@@ -199,9 +199,27 @@ class EmailDomainPolicyTest {
     }
 
     @Test
-    void normalizeEmail_trimsAndLowercasesAndKeepsThePlusTag() {
-        assertThat(EmailDomainPolicy.normalizeEmail("  Someone+Tag@Example.COM ")).isEqualTo("someone+tag@example.com");
+    void normalizeEmail_isOneFormPerMailbox() {
+        // a +tag is dropped everywhere; dots only matter outside Gmail
+        assertThat(EmailDomainPolicy.normalizeEmail("  Someone+Tag@Example.COM ")).isEqualTo("someone@example.com");
+        assertThat(EmailDomainPolicy.normalizeEmail("first.last@example.com")).isEqualTo("first.last@example.com");
+        assertThat(EmailDomainPolicy.normalizeEmail("S.Pam.Mer+promo@Gmail.com")).isEqualTo("spammer@gmail.com");
+        assertThat(EmailDomainPolicy.normalizeEmail("spammer@googlemail.com")).isEqualTo("spammer@gmail.com");
+        // nothing to canonicalize: only trimmed and lowercased
+        assertThat(EmailDomainPolicy.normalizeEmail("+tag@example.com")).isEqualTo("+tag@example.com");
+        assertThat(EmailDomainPolicy.normalizeEmail("...@gmail.com")).isEqualTo("...@gmail.com");
+        assertThat(EmailDomainPolicy.normalizeEmail(" No-At-Sign ")).isEqualTo("no-at-sign");
+        assertThat(EmailDomainPolicy.normalizeEmail("trailing@")).isEqualTo("trailing@");
         assertThat(EmailDomainPolicy.normalizeEmail("   ")).isNull();
         assertThat(EmailDomainPolicy.normalizeEmail(null)).isNull();
+    }
+
+    @Test
+    void verdict_aBlockedMailboxIsBlockedInEverySpelling() {
+        // setup
+        when(addressList.isBlocked("spammer@gmail.com")).thenReturn(true);
+        // execution + verifications
+        assertThat(policy.verdict("spammer+1@gmail.com")).isEqualTo(EmailVerdict.BLOCKED_ADDRESS);
+        assertThat(policy.verdict("s.pammer@googlemail.com")).isEqualTo(EmailVerdict.BLOCKED_ADDRESS);
     }
 }
