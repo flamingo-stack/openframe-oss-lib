@@ -22,15 +22,21 @@ export function BlockedSendersSearch({ value, onSearch, placeholder }: BlockedSe
     onSearchRef.current = onSearch;
   }, [onSearch]);
   const appliedRef = useRef(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPending = () => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  };
 
   useEffect(() => {
     const next = text.trim();
     if (next === appliedRef.current) return undefined;
-    const timer = setTimeout(() => {
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
       appliedRef.current = next;
       onSearchRef.current(next);
     }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return cancelPending;
   }, [text]);
 
   return (
@@ -40,6 +46,8 @@ export function BlockedSendersSearch({ value, onSearch, placeholder }: BlockedSe
       value={text}
       onChange={setText}
       onSubmit={submitted => {
+        // Enter searches now: the debounce still waiting on the last keystroke would ask again.
+        cancelPending();
         const next = submitted.trim();
         appliedRef.current = next;
         setText(submitted);

@@ -265,4 +265,20 @@ describe('BlockedSendersPage', () => {
       expect(requested().some(r => r.url === '/api/admin/spam/suggestions/7/not-spam?env=qa')).toBe(true),
     );
   });
+
+  it('keeps the block dialog and the typed reason when the block fails, so it can be sent again', async () => {
+    setMockSearchParams(new URLSearchParams('tab=suggestions'));
+    serve({ write: () => json({ error: 'OpenFrame unreachable', code: 'UPSTREAM' }, 502) });
+    render(<BlockedSendersPage endpoint={ENDPOINT} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Block domain' }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.change(within(dialog).getByLabelText('Reason (required)'), { target: { value: 'Link spam' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Block domain' }));
+
+    await waitFor(() => expect(requested().some(r => r.url.includes('/suggestions/7/block'))).toBe(true));
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Block domain' })).not.toBeDisabled());
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(within(screen.getByRole('alertdialog')).getByLabelText('Reason (required)')).toHaveValue('Link spam');
+  });
 });

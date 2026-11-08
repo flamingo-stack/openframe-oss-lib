@@ -98,8 +98,10 @@ export function SenderSuggestionsTab({
       failure: `Could not block ${row.sender}`,
     });
     setBusy(null);
+    // A failed block keeps the dialog and the typed reason, so it can be sent again.
+    if (!ok) return;
     setBlocking(null);
-    if (ok) changed();
+    changed();
   };
 
   const notSpam = async (row: SenderSuggestionRow) => {
@@ -122,7 +124,7 @@ export function SenderSuggestionsTab({
   const rows = data?.items ?? [];
 
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-m)]">
+    <div className="grid grid-cols-1 gap-[var(--spacing-system-m)]">
       {error && !inScope && dataUrl === url && (
         <ReloadFailedNotice message="Could not read the suggestions." onRetry={reload} />
       )}
@@ -218,7 +220,7 @@ function SuggestionList({ rows, search, busy, onBlock, onNotSpam }: SuggestionLi
   const loading = useLoadingScope();
   if (loading) {
     return (
-      <div className="flex flex-col gap-[var(--spacing-system-sf)]">
+      <div className="grid grid-cols-1 gap-[var(--spacing-system-sf)]">
         <LoadingItems count={BLOCKED_SENDERS_PAGE_SIZE}>
           {() => <SuggestionCard data-loading-item busy={false} onBlock={onBlock} onNotSpam={onNotSpam} />}
         </LoadingItems>
@@ -233,7 +235,7 @@ function SuggestionList({ rows, search, busy, onBlock, onNotSpam }: SuggestionLi
     );
   }
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-sf)]">
+    <div className="grid grid-cols-1 gap-[var(--spacing-system-sf)]">
       {rows.map(row => (
         <SuggestionCard
           key={row.id}
@@ -268,7 +270,7 @@ function SuggestionCard({ row, busy, onBlock, onNotSpam, ...rest }: SuggestionCa
   return (
     <article
       {...loadingItemProps(rest)}
-      className="flex flex-col gap-[var(--spacing-system-sf)] rounded-2xl border border-ods-border bg-ods-card p-[var(--spacing-system-m)]"
+      className="grid grid-cols-1 gap-[var(--spacing-system-sf)] rounded-2xl border border-ods-border bg-ods-card p-[var(--spacing-system-m)]"
     >
       <div className="flex flex-wrap items-center gap-[var(--spacing-system-xs)] content-md:gap-[var(--spacing-system-m)]">
         <div className="min-w-0 flex-1 basis-48">
@@ -292,7 +294,7 @@ function SuggestionCard({ row, busy, onBlock, onNotSpam, ...rest }: SuggestionCa
         )}
       </div>
       {shown ? (
-        <ul className="flex flex-col gap-[var(--spacing-system-xxs)]">
+        <ul className="grid grid-cols-1 gap-[var(--spacing-system-xxs)]">
           {shown.signals.map(signal => {
             const badge = SIGNAL_STRENGTH_BADGE[signal.strength];
             return (

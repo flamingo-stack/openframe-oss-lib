@@ -116,14 +116,20 @@ export function formLabel(form: string): string {
   return BLOCKED_SUBMISSION_FORM_LABELS[form] ?? form;
 }
 
-/** "Nov 6, 2026" (UTC, the lib's date rule). */
-export function formatBlockedDate(value: string | null): string {
+const DATE_PARTS = { year: 'numeric', month: 'short', day: 'numeric' } as const;
+
+/** A stored instant in the lib's date rule (UTC); an absent or unreadable one reads as unknown. */
+function formatBlockedInstant(value: string | null, options: Intl.DateTimeFormatOptions): string {
   if (!value || Number.isNaN(new Date(value).getTime())) return BLOCKED_SENDERS_UNKNOWN;
-  return formatDate(value, { year: 'numeric', month: 'short', day: 'numeric' });
+  return formatDate(value, options);
 }
 
-/** "Nov 6, 2026, 14:20" (UTC). */
+/** "Nov 6, 2026". */
+export function formatBlockedDate(value: string | null): string {
+  return formatBlockedInstant(value, DATE_PARTS);
+}
+
+/** "Nov 6, 2026, 14:20". */
 export function formatBlockedDateTime(value: string | null): string {
-  if (!value || Number.isNaN(new Date(value).getTime())) return BLOCKED_SENDERS_UNKNOWN;
-  return formatDate(value, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return formatBlockedInstant(value, { ...DATE_PARTS, hour: '2-digit', minute: '2-digit' });
 }

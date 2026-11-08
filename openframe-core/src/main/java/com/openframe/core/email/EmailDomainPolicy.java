@@ -40,9 +40,9 @@ public class EmailDomainPolicy {
                     "This email address cannot be used. Please use your work email address.");
         }
         if (!verdict.isAllowed()) {
+            String domain = extractDomain(email);
             throw new IllegalArgumentException(
-                    "Email addresses from " + extractDomain(email)
-                            + " cannot be used. Please use your work email address.");
+                    "Email addresses from " + domain + " cannot be used. Please use your work email address.");
         }
     }
 

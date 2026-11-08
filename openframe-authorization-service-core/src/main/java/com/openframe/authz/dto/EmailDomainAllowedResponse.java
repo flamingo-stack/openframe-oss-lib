@@ -1,5 +1,6 @@
 package com.openframe.authz.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,8 +20,10 @@ public class EmailDomainAllowedResponse {
 
     /**
      * Which layer blocked the address: {@code BLOCKED_ADDRESS}, {@code BLOCKED_DOMAIN} or {@code DISPOSABLE};
-     * {@code null} when {@code allowed} is true. Callers that read only {@code allowed} are unaffected.
+     * omitted when {@code allowed} is true, like {@code EmailAvailabilityResponse.reason}. Callers that read only
+     * {@code allowed} are unaffected.
      */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Reason reason;
 
     public enum Reason {
