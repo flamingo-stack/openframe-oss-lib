@@ -567,6 +567,13 @@ export interface EmbeddableChatProps {
    */
   threadHeaderLook?: 'page' | 'column';
   /**
+   * The portalled thread fades out at its end, into the composer under it, as a page
+   * fades under a floating dock (`ChatMessageList` `fadeEnd`). Split layout only.
+   */
+  threadFadeEnd?: boolean;
+  /** The composer's side inset (`ChatComposer` `inset`). Default `'always'`. */
+  composerInset?: 'always' | 'wide';
+  /**
    * The thread's column inside `threadContainer` — e.g. `mx-auto max-w-[760px]` to
    * centre it at the composer's width on a wide chat page; the header stays full
    * width. Omitted: the column fills the container (a narrow panel, a sheet).
@@ -1163,6 +1170,8 @@ function EmbeddableChatInner({
   threadContainer,
   threadHeaderActions,
   threadHeaderLook = 'page',
+  threadFadeEnd = false,
+  composerInset = 'always',
   threadContentClassName,
   showModel = true,
   onModelClick,
@@ -2791,6 +2800,8 @@ function EmbeddableChatInner({
               messages={messages}
               isLoading={messagesInitialLoading}
               fill={previewMode}
+              // The split layout's column: the thread fades out into the composer under it.
+              fadeEnd={splitMode && threadFadeEnd}
               // v2 thread: names without the colon, 24px
               // faces, 16px between messages (shared with fae v2).
               appearance={appearance}
@@ -2993,6 +3004,7 @@ function EmbeddableChatInner({
       previewText={composerPreviewText ?? undefined}
       safeAreaBottom={safeAreaBottom}
       edgeLight={composerEdgeLight}
+      inset={composerInset}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
       attachmentsCount={stagedAttachments.length}
       onAddFiles={addAttachmentFiles}

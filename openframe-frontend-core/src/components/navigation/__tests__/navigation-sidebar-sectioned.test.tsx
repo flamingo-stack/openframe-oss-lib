@@ -77,6 +77,16 @@ describe('NavigationSidebar sectioned', () => {
     expect(section('Fleet')).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('leaves no gap under a folded section', () => {
+    renderSidebar();
+    // The section box that holds the category button, read from the markup (no node access).
+    const sectionBox = (name: string) =>
+      new RegExp(`class="([^"]*)"><button[^>]*aria-label="${name}"`).exec(document.body.innerHTML)?.[1] ?? '';
+    expect(sectionBox('Fleet')).not.toMatch(/\bgap-0\b/);
+    fireEvent.click(section('Fleet'));
+    expect(sectionBox('Fleet')).toMatch(/\bgap-0\b/);
+  });
+
   it('marks the current page and unfolds its section', () => {
     window.localStorage.setItem('test.sections', JSON.stringify(['fleet']));
     const { rerender } = renderSidebar({ groupsStorageKey: 'test.sections', currentPath: '/tickets' });

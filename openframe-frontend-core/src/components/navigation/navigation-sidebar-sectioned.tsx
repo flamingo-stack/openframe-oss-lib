@@ -247,7 +247,9 @@ function Section({
   const rowsId = `${useId()}-rows`;
   const name = accessibleName(item);
   return (
-    <div className={SECTION_CLASSES}>
+    // Folded, no gap under the category: the rows' box is 0px tall, and the gap would
+    // still stand below it as empty room.
+    <div className={cn(SECTION_CLASSES, folded && 'gap-0')}>
       <button
         type="button"
         onClick={() => onSectionClick(item)}
