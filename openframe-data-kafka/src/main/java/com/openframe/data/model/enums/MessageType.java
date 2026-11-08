@@ -30,9 +30,6 @@ public enum MessageType {
     REMOTE_SESSION_AUDIT_EVENT(IntegratedToolType.MESHCENTRAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
 
-    FLEET_MDM_CVE_META_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.MONGO_CVE_METADATA), EventHandlerType.COMMON_TYPE),
-
     FLEET_MDM_HOST_SOFTWARE_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.MONGO_DEVICE_SOFTWARE), EventHandlerType.COMMON_TYPE);
 
