@@ -19,7 +19,6 @@ import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
-import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
 import lombok.extern.slf4j.Slf4j;
@@ -44,12 +43,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.OAuth2Error;
-import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.oauth2.core.OAuth2Token;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
-import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
@@ -66,8 +61,6 @@ import java.util.Locale;
 import com.openframe.authz.util.AuthUserPrincipals;
 
 import static com.openframe.authz.config.tenant.TenantContext.getTenantId;
-import static com.openframe.authz.service.tenant.TenantService.ACCOUNT_INACTIVE_MESSAGE;
-import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
 
 /**
  * OAuth2 Authorization Server Configuration
@@ -173,22 +166,14 @@ public class AuthorizationServerConfig {
         return new NimbusJwtEncoder(jwkSource);
     }
 
-    private static boolean isAccessTokenForInactiveTenant(JwtEncodingContext context, TenantService tenantService, String tenantId) {
-        return OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType()) && !tenantService.isActive(tenantId);
-    }
-
-    // Every grant (code, refresh, the native grants) mints its access token here, so an inactive tenant gets invalid_grant.
+    /**
+     * JWT token customizer to add custom claims
+     */
     @Bean
-    public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService userService,
-                                                                     TenantService tenantService) {
+    public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService userService) {
         return context -> {
             Authentication authentication = context.getPrincipal();
             String tenantId = getTenantId();
-
-            if (isAccessTokenForInactiveTenant(context, tenantService, tenantId)) {
-                OAuth2Error inactive = new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT, ACCOUNT_INACTIVE_MESSAGE, null);
-                throw new OAuth2AuthenticationException(inactive);
-            }
 
             String username = authentication != null ? authentication.getName().toLowerCase(Locale.ROOT) : null;
 
@@ -226,9 +211,7 @@ public class AuthorizationServerConfig {
         return username -> {
             String tenantId = getTenantId();
             // Before the user lookup, so the refusal is the same for every email and reveals no account.
-            if (!tenantService.isActive(tenantId)) {
-                throw new AuthFlowException(ACCOUNT_INACTIVE, ACCOUNT_INACTIVE_MESSAGE);
-            }
+            tenantService.refuseLoginUnlessActive(tenantId);
             AuthUser user = userService.findActiveByEmailAndTenant(username.toLowerCase(Locale.ROOT), tenantId)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 

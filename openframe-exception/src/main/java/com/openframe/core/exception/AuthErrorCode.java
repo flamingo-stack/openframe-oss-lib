@@ -20,6 +20,7 @@ public enum AuthErrorCode {
     EMAIL_NOT_VERIFIED("This account's email is not verified by the provider. Please try a different sign-in method, or contact your administrator."),
     ACCOUNT_NOT_FOUND("No account found. Please sign up first."),
     ACCOUNT_INACTIVE("Your account is not active. Please contact your administrator."),
+    ACCOUNT_BLOCKED("This OpenFrame account is blocked. Contact support."),
     ACCOUNT_ALREADY_LINKED("This account is already connected to an organization. Please sign in instead."),
     ORGANIZATION_SSO_REQUIRED("Your organization uses its own sign-in for this provider. Enter your email on the login page to be redirected to it."),
     INVITATION_FAILED("Invitation acceptance failed. Please try again."),

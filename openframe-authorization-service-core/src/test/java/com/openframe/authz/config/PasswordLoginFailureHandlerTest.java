@@ -9,8 +9,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 
-import static com.openframe.authz.service.tenant.TenantService.ACCOUNT_INACTIVE_MESSAGE;
-import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_BLOCKED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -23,15 +22,15 @@ class PasswordLoginFailureHandlerTest {
     private final AuthenticationFailureHandler handler = SecurityConfig.passwordLoginFailureHandler(authErrorResponder);
 
     @Test
-    void shouldSendInactiveTenantToTheErrorPageWithItsCode() throws Exception {
+    void shouldSendBlockedTenantToTheErrorPageWithItsCode() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/login");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        AuthFlowException refusal = new AuthFlowException(ACCOUNT_INACTIVE, ACCOUNT_INACTIVE_MESSAGE);
+        AuthFlowException refusal = new AuthFlowException(ACCOUNT_BLOCKED, ACCOUNT_BLOCKED.getMessage());
 
         handler.onAuthenticationFailure(request, response,
-                new InternalAuthenticationServiceException(ACCOUNT_INACTIVE_MESSAGE, refusal));
+                new InternalAuthenticationServiceException(ACCOUNT_BLOCKED.getMessage(), refusal));
 
-        verify(authErrorResponder).send(response, request, "password-login", refusal, ACCOUNT_INACTIVE);
+        verify(authErrorResponder).send(response, request, "password-login", refusal, ACCOUNT_BLOCKED);
     }
 
     @Test

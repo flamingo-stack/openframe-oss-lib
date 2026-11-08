@@ -1,6 +1,7 @@
 package com.openframe.authz.service.tenant;
 
 import com.openframe.authz.service.validation.RegistrationValidationService;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.document.tenant.TenantStatus;
 import com.openframe.data.repository.tenant.TenantRepository;
@@ -15,7 +16,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_BLOCKED;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -32,54 +36,55 @@ class TenantServiceTest {
     @InjectMocks private TenantService service;
 
     @Test
-    void isActive_activeTenant_true() {
-        // setup
-        Tenant tenant = tenant(TenantStatus.ACTIVE);
-        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(tenant));
+    void refuseLoginUnlessActive_activeTenant_passes() {
+        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(tenant(TenantStatus.ACTIVE)));
 
-        // execution
-        boolean active = service.isActive(TENANT_ID);
-
-        // verifications
-        assertThat(active).isTrue();
+        assertThatCode(() -> service.refuseLoginUnlessActive(TENANT_ID)).doesNotThrowAnyException();
     }
 
     @Test
-    void isActive_inactiveTenant_false() {
-        // setup
-        Tenant tenant = tenant(TenantStatus.INACTIVE);
-        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(tenant));
+    void refuseLoginUnlessActive_tenantWithoutStatus_passesAsTheDocumentDefault() {
+        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(tenant(null)));
 
-        // execution
-        boolean active = service.isActive(TENANT_ID);
-
-        // verifications
-        assertThat(active).isFalse();
+        assertThatCode(() -> service.refuseLoginUnlessActive(TENANT_ID)).doesNotThrowAnyException();
     }
 
     @Test
-    void isActive_unknownTenant_false() {
-        // setup
+    void refuseLoginUnlessActive_blockedTenant_saysItIsBlocked() {
+        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(tenant(TenantStatus.BLOCKED)));
+
+        assertThatThrownBy(() -> service.refuseLoginUnlessActive(TENANT_ID))
+                .isInstanceOf(AuthFlowException.class)
+                .hasMessage(ACCOUNT_BLOCKED.getMessage())
+                .extracting(e -> ((AuthFlowException) e).getCode())
+                .isEqualTo(ACCOUNT_BLOCKED);
+    }
+
+    @Test
+    void refuseLoginUnlessActive_deletedTenant_isInactive() {
+        when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.of(tenant(TenantStatus.DELETED)));
+
+        assertThatThrownBy(() -> service.refuseLoginUnlessActive(TENANT_ID))
+                .isInstanceOf(AuthFlowException.class)
+                .extracting(e -> ((AuthFlowException) e).getCode())
+                .isEqualTo(ACCOUNT_INACTIVE);
+    }
+
+    @Test
+    void refuseLoginUnlessActive_unknownTenant_isInactive() {
         when(tenantRepository.findById(TENANT_ID)).thenReturn(Optional.empty());
 
-        // execution
-        boolean active = service.isActive(TENANT_ID);
-
-        // verifications
-        assertThat(active).isFalse();
+        assertThatThrownBy(() -> service.refuseLoginUnlessActive(TENANT_ID))
+                .isInstanceOf(AuthFlowException.class)
+                .extracting(e -> ((AuthFlowException) e).getCode())
+                .isEqualTo(ACCOUNT_INACTIVE);
     }
 
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", " "})
-    void isActive_blankTenantId_falseWithoutLookup(String tenantId) {
-        // setup
-
-        // execution
-        boolean active = service.isActive(tenantId);
-
-        // verifications
-        assertThat(active).isFalse();
+    void refuseLoginUnlessActive_blankTenantId_isInactiveWithoutLookup(String tenantId) {
+        assertThatThrownBy(() -> service.refuseLoginUnlessActive(tenantId)).isInstanceOf(AuthFlowException.class);
         verify(tenantRepository, never()).findById(anyString());
     }
 

@@ -7,6 +7,7 @@ import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.web.AuthErrorResponder;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,8 +34,10 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import java.util.Optional;
 
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_BLOCKED;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
@@ -46,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * The production {@link SecurityConfig#defaultSecurityFilterChain} with the production password-login
  * {@link AuthenticationManager}: guards that the form login is wired to the failure handler that turns
- * an inactive (blocked) tenant into the error page, not Spring's default "bad credentials" redirect.
+ * a blocked tenant into the error page, not Spring's default "bad credentials" redirect.
  */
 @SpringJUnitWebConfig(PasswordLoginFilterChainTest.Wiring.class)
 @TestPropertySource(properties = "openframe.auth.error-url=https://app.example/auth/error")
@@ -70,18 +73,17 @@ class PasswordLoginFilterChainTest {
     }
 
     @Test
-    @DisplayName("Given an inactive tenant, when its user posts the login form, then the error page shows ACCOUNT_INACTIVE")
-    void inactiveTenant_redirectsToTheErrorPage() throws Exception {
-        when(tenantService.isActive(any())).thenReturn(false);
+    @DisplayName("Given a blocked tenant, when its user posts the login form, then the error page shows ACCOUNT_BLOCKED")
+    void blockedTenant_redirectsToTheErrorPage() throws Exception {
+        doThrow(new AuthFlowException(ACCOUNT_BLOCKED, ACCOUNT_BLOCKED.getMessage())).when(tenantService).refuseLoginUnlessActive(any());
 
         mvc.perform(post("/login").with(csrf()).param("username", EMAIL).param("password", "right"))
-                .andExpect(redirectedUrl("https://app.example/auth/error?ref=ACCOUNT_INACTIVE"));
+                .andExpect(redirectedUrl("https://app.example/auth/error?ref=ACCOUNT_BLOCKED"));
     }
 
     @Test
     @DisplayName("Given an active tenant, when the password is wrong, then the login page shows its error")
     void wrongPassword_staysOnTheLoginPage() throws Exception {
-        when(tenantService.isActive(any())).thenReturn(true);
         AuthUser user = activeUser("u1", "tenant-a", EMAIL);
         user.setPasswordHash(new BCryptPasswordEncoder().encode("right"));
         when(userService.findActiveByEmailAndTenant(anyString(), any())).thenReturn(Optional.of(user));

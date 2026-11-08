@@ -17,7 +17,6 @@ import com.openframe.authz.util.SsoAuthentication;
 import com.openframe.authz.web.DownloadCookieReader;
 import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
-import com.openframe.data.document.tenant.Tenant;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,9 +30,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.Optional;
 
-import static com.openframe.authz.service.tenant.TenantService.ACCOUNT_INACTIVE_MESSAGE;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
-import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
 import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
 import static com.openframe.core.exception.AuthErrorCode.ORGANIZATION_SSO_REQUIRED;
@@ -137,9 +134,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
         String tenantId = authUser.getTenantId();
         ensureGenericProviderAllowed(tenantId, provider);
 
-        tenantService.findById(tenantId)
-                .filter(Tenant::isActive)
-                .orElseThrow(() -> new AuthFlowException(ACCOUNT_INACTIVE, ACCOUNT_INACTIVE_MESSAGE));
+        tenantService.refuseLoginUnlessActive(tenantId);
 
         // Only now — the login is fully allowed (trusted routing, provider permitted, tenant
         // active). A link written before these checks would outlive a REJECTED login and later
