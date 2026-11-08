@@ -28,7 +28,11 @@ const DEFAULT_CHAT_SHARE = 0.5;
 
 export interface AppLayoutWorkAreaProps {
   mode: AppLayoutWorkAreaMode;
-  /** The chat column's content (its header, thread and composer). */
+  /**
+   * The chat column's content (its header, thread and composer). `null`: no chat
+   * column at all — the page column alone, in the same element tree a chat column
+   * joins later, so the page does not remount when it arrives.
+   */
   chat: ReactNode;
   /** The page column's content. */
   page: ReactNode;
@@ -131,7 +135,8 @@ export function AppLayoutWorkArea({
 
   const measured = rowWidth > 0;
   const canSplit = !measured || rowWidth >= 2 * minColumnWidth;
-  const shown: AppLayoutWorkAreaMode = mode === 'split' && !canSplit ? 'page' : mode;
+  const hasChat = chat !== null;
+  const shown: AppLayoutWorkAreaMode = !hasChat ? 'page' : mode === 'split' && !canSplit ? 'page' : mode;
   const maxChatWidth = Math.max(minColumnWidth, rowWidth - minColumnWidth);
   const clampChatWidth = useCallback(
     (next: number) => clamp(next, minColumnWidth, maxChatWidth),
@@ -164,25 +169,29 @@ export function AppLayoutWorkArea({
 
   return (
     <div ref={setRow} className={cn('relative flex min-h-0 min-w-0 flex-1', className)} data-work-area={shown}>
-      <div
-        ref={setChatNode}
-        role="region"
-        aria-label={chatLabel}
-        aria-hidden={chatHidden || undefined}
-        inert={chatHidden}
-        data-work-area-column="chat"
-        className={cn(
-          'ods-content-area relative flex min-h-0 min-w-0 flex-col overflow-hidden',
-          shown === 'chat' && 'flex-1',
-          shown === 'split' && 'shrink-0',
-          chatHidden && 'hidden',
-        )}
-        style={shown === 'split' ? { width: chatWidth ?? `${DEFAULT_CHAT_SHARE * 100}%` } : undefined}
-      >
-        <ContentAreaWidthContext.Provider value={chatContentWidth}>
-          <div className="ods-content-scope">{chat}</div>
-        </ContentAreaWidthContext.Provider>
-      </div>
+      {/* Conditional in place: the page column keeps its position among the children
+          whether or not there is a chat column. */}
+      {hasChat && (
+        <div
+          ref={setChatNode}
+          role="region"
+          aria-label={chatLabel}
+          aria-hidden={chatHidden || undefined}
+          inert={chatHidden}
+          data-work-area-column="chat"
+          className={cn(
+            'ods-content-area relative flex min-h-0 min-w-0 flex-col overflow-hidden',
+            shown === 'chat' && 'flex-1',
+            shown === 'split' && 'shrink-0',
+            chatHidden && 'hidden',
+          )}
+          style={shown === 'split' ? { width: chatWidth ?? `${DEFAULT_CHAT_SHARE * 100}%` } : undefined}
+        >
+          <ContentAreaWidthContext.Provider value={chatContentWidth}>
+            <div className="ods-content-scope">{chat}</div>
+          </ContentAreaWidthContext.Provider>
+        </div>
+      )}
       {shown === 'split' && (
         // A zero-wide slot on the columns' border: the handle straddles it.
         <div className="relative w-0 shrink-0">

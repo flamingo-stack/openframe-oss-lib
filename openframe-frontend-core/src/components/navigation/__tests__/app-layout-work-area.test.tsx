@@ -230,3 +230,34 @@ describe('AppLayout pageHeader', () => {
     expect(mounts.count).toBe(1);
   });
 });
+
+describe('AppLayout chatColumn null', () => {
+  it('keeps the page mounted when the chat column arrives later', () => {
+    rowWidth(1200);
+    const mounts = { count: 0 };
+    function Page() {
+      useEffect(() => {
+        mounts.count += 1;
+      }, []);
+      return <h1>Page</h1>;
+    }
+    const layout = (chat: ReactNode, mode: AppLayoutWorkAreaMode) => (
+      <AppLayout
+        sidebarConfig={{ items: [] }}
+        headerProps={{}}
+        mobileBurgerMenuProps={{}}
+        chatColumn={chat}
+        workAreaMode={mode}
+      >
+        <Page />
+      </AppLayout>
+    );
+    const { rerender } = render(layout(null, 'split'));
+    // No chat column at all: no region, the page alone.
+    expect(screen.queryByRole('region', { hidden: true })).not.toBeInTheDocument();
+
+    rerender(layout(<h2>Thread</h2>, 'split'));
+    expect(screen.getByRole('heading', { name: 'Thread' })).toBeInTheDocument();
+    expect(mounts.count).toBe(1);
+  });
+});

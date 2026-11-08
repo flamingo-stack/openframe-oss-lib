@@ -157,7 +157,9 @@ export interface AppLayoutProps {
    * between them. With it `<main>` is a content area, as with `sidePanel`. Keep
    * it present for the whole session (pass the same element tree): a slot that
    * comes and goes changes the elements above the page, and React remounts it.
-   * Optional; without it the layout is unchanged.
+   * `null` keeps the work area with no chat column (the page alone), for a host
+   * that may add one once it knows (a flag still loading): the page does not
+   * remount when the column arrives. Optional; without it the layout is unchanged.
    */
   chatColumn?: ReactNode;
   /** Which work-area columns show (`chatColumn` only). Default `'page'`. */
