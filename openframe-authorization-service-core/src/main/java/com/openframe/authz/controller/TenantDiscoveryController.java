@@ -76,10 +76,9 @@ public class TenantDiscoveryController {
                     .build();
         }
         EmailRefusalReason reason = refusalReasonOf(verdict);
-        EmailRefusalReason availabilityReason = asAvailabilityReason(reason);
         return EmailAvailabilityResponse.builder()
                 .available(false)
-                .reason(availabilityReason)
+                .reason(reason)
                 .build();
     }
 
@@ -105,16 +104,7 @@ public class TenantDiscoveryController {
         return switch (verdict) {
             case BLOCKED_ADDRESS -> EmailRefusalReason.BLOCKED_ADDRESS;
             case BLOCKED_DOMAIN -> EmailRefusalReason.BLOCKED_DOMAIN;
-            case DISPOSABLE -> EmailRefusalReason.DISPOSABLE;
             case ALLOWED -> throw new IllegalArgumentException("An allowed address has no refusal reason");
         };
-    }
-
-    // The registration form reads only BLOCKED_DOMAIN as a policy refusal, so a disposable domain is reported as one.
-    private static EmailRefusalReason asAvailabilityReason(EmailRefusalReason reason) {
-        if (reason == EmailRefusalReason.DISPOSABLE) {
-            return EmailRefusalReason.BLOCKED_DOMAIN;
-        }
-        return reason;
     }
 }

@@ -40,7 +40,7 @@ class TenantDiscoveryControllerEmailPolicyTest {
     private TenantDiscoveryController controller;
 
     @ParameterizedTest
-    @MethodSource("domainAllowedRefusals")
+    @MethodSource("refusals")
     void emailDomainAllowed_blockedVerdict_refusedWithTheLayerThatBlocked(EmailVerdict verdict,
                                                                           EmailRefusalReason reason) {
         // setup
@@ -70,7 +70,7 @@ class TenantDiscoveryControllerEmailPolicyTest {
     }
 
     @ParameterizedTest
-    @MethodSource("availabilityRefusals")
+    @MethodSource("refusals")
     void emailAvailable_blockedVerdict_unavailableWithItsReason(EmailVerdict verdict, EmailRefusalReason reason) {
         // setup
         when(userService.existsActiveByEmail(EMAIL)).thenReturn(false);
@@ -126,19 +126,11 @@ class TenantDiscoveryControllerEmailPolicyTest {
         verify(emailDomainPolicy, never()).verdict(anyString());
     }
 
-    private static Stream<Arguments> domainAllowedRefusals() {
+    private static Stream<Arguments> refusals() {
         return Stream.of(
                 Arguments.of(EmailVerdict.BLOCKED_ADDRESS, EmailRefusalReason.BLOCKED_ADDRESS),
-                Arguments.of(EmailVerdict.BLOCKED_DOMAIN, EmailRefusalReason.BLOCKED_DOMAIN),
-                Arguments.of(EmailVerdict.DISPOSABLE, EmailRefusalReason.DISPOSABLE)
+                Arguments.of(EmailVerdict.BLOCKED_DOMAIN, EmailRefusalReason.BLOCKED_DOMAIN)
         );
     }
 
-    private static Stream<Arguments> availabilityRefusals() {
-        return Stream.of(
-                Arguments.of(EmailVerdict.BLOCKED_ADDRESS, EmailRefusalReason.BLOCKED_ADDRESS),
-                Arguments.of(EmailVerdict.BLOCKED_DOMAIN, EmailRefusalReason.BLOCKED_DOMAIN),
-                Arguments.of(EmailVerdict.DISPOSABLE, EmailRefusalReason.BLOCKED_DOMAIN)
-        );
-    }
 }

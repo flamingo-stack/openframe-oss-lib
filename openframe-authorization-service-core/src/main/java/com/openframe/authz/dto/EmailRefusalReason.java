@@ -4,6 +4,5 @@ public enum EmailRefusalReason {
 
     TAKEN,
     BLOCKED_ADDRESS,
-    BLOCKED_DOMAIN,
-    DISPOSABLE
+    BLOCKED_DOMAIN
 }

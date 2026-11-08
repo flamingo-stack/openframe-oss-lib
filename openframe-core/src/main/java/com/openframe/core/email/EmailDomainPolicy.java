@@ -95,10 +95,11 @@ public class EmailDomainPolicy {
         if (shouldSkipDisposableCheck(normalized)) {
             return EmailVerdict.ALLOWED;
         }
+        // A disposable domain is one more blocked domain; the check stays apart from the lists only because it calls out.
         boolean disposable = disposableDomainChecker.isDisposable(normalized);
         if (disposable) {
             log.info("Domain '{}' blocked as disposable by external check", normalized);
-            return EmailVerdict.DISPOSABLE;
+            return EmailVerdict.BLOCKED_DOMAIN;
         }
         return EmailVerdict.ALLOWED;
     }

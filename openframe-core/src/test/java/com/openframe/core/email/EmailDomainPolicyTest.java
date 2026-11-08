@@ -197,7 +197,7 @@ class EmailDomainPolicyTest {
     }
 
     @Test
-    void verdict_disposableDomain_disposable() {
+    void verdict_disposableDomain_blockedDomain() {
         // setup
         when(databaseList.isBlocked(FRESH_DOMAIN)).thenReturn(false);
         when(disposableDomainChecker.isDisposable(FRESH_DOMAIN)).thenReturn(true);
@@ -206,7 +206,7 @@ class EmailDomainPolicyTest {
         EmailVerdict verdict = policy.verdict(FRESH_ADDRESS);
 
         // verifications
-        assertThat(verdict).isEqualTo(EmailVerdict.DISPOSABLE);
+        assertThat(verdict).isEqualTo(EmailVerdict.BLOCKED_DOMAIN);
     }
 
     @Test
