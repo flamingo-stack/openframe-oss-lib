@@ -36,6 +36,8 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
+import java.io.IOException;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -130,14 +132,20 @@ public class SecurityConfig {
     // DaoAuthenticationProvider wraps the user loader's AuthFlowException, so the refusal is the cause.
     static AuthenticationFailureHandler passwordLoginFailureHandler(AuthErrorResponder authErrorResponder) {
         AuthenticationFailureHandler invalidCredentials = new SimpleUrlAuthenticationFailureHandler("/login?error");
-        return (request, response, exception) -> {
-            if (exception.getCause() instanceof AuthFlowException refusal) {
-                AuthErrorCode code = refusal.getCode();
-                authErrorResponder.send(response, request, "password-login", refusal, code);
-                return;
-            }
-            invalidCredentials.onAuthenticationFailure(request, response, exception);
-        };
+        return (request, response, exception) ->
+                handlePasswordLoginFailure(request, response, exception, authErrorResponder, invalidCredentials);
+    }
+
+    private static void handlePasswordLoginFailure(HttpServletRequest request, HttpServletResponse response,
+                                                   AuthenticationException exception, AuthErrorResponder authErrorResponder,
+                                                   AuthenticationFailureHandler invalidCredentials)
+            throws IOException, ServletException {
+        if (exception.getCause() instanceof AuthFlowException refusal) {
+            AuthErrorCode code = refusal.getCode();
+            authErrorResponder.send(response, request, "password-login", refusal, code);
+            return;
+        }
+        invalidCredentials.onAuthenticationFailure(request, response, exception);
     }
 
     /** One entry per distinct SSO config (its cache key), NOT per login — bounded by active configs. */

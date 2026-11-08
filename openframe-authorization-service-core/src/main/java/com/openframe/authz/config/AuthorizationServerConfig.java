@@ -173,6 +173,10 @@ public class AuthorizationServerConfig {
         return new NimbusJwtEncoder(jwkSource);
     }
 
+    private static boolean isAccessTokenForInactiveTenant(JwtEncodingContext context, TenantService tenantService, String tenantId) {
+        return OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType()) && !tenantService.isActive(tenantId);
+    }
+
     // Every grant (code, refresh, the native grants) mints its access token here, so an inactive tenant gets invalid_grant.
     @Bean
     public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(UserService userService,
@@ -181,7 +185,7 @@ public class AuthorizationServerConfig {
             Authentication authentication = context.getPrincipal();
             String tenantId = getTenantId();
 
-            if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType()) && !tenantService.isActive(tenantId)) {
+            if (isAccessTokenForInactiveTenant(context, tenantService, tenantId)) {
                 OAuth2Error inactive = new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT, ACCOUNT_INACTIVE_MESSAGE, null);
                 throw new OAuth2AuthenticationException(inactive);
             }
