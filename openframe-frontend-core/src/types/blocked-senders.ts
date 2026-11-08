@@ -48,10 +48,8 @@ export interface BlockedSendersPageResult<T> {
   totalPages: number;
 }
 
-/** A blocklist page. `available: false`: the backend has no such list yet (the Emails tab says so and blocks nothing). */
-export interface BlockedSendersListResponse extends BlockedSendersPageResult<BlockedSenderRow> {
-  available: boolean;
-}
+/** A blocklist page. */
+export type BlockedSendersListResponse = BlockedSendersPageResult<BlockedSenderRow>;
 
 export type SenderSignalStrength = 'strong' | 'medium' | 'weak' | 'negative';
 
@@ -101,10 +99,9 @@ export const BLOCKED_SUBMISSION_FORM_LABELS: Record<string, string> = {
   form_rescue: 'Unfinished form',
 };
 
-/** The counts on the tabs, whether addresses can be blocked yet, and the auto-block state the banner reads. */
+/** The counts on the tabs, the auto-block state, and the bars the Suggestions tab's hint states. */
 export interface BlockedSendersOverview {
   counts: Record<BlockedSendersTab, number>;
-  emailsAvailable: boolean;
   autoBlock: { enabled: boolean; dryRun: boolean };
   suggestBar: number;
   blockBar: number;

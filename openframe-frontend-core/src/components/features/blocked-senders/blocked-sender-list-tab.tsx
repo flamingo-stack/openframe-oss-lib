@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelfFetch } from '../../../hooks/use-self-fetch';
 import {
   BLOCKED_SENDERS_PAGE_SIZE,
@@ -21,20 +21,13 @@ import {
 import { Button } from '../../ui/button';
 import { type ColumnDef, DataTable, dataTableLoadingRows, type Row, useDataTable } from '../../ui/data-table';
 import { LoadError } from '../../ui/error-state';
-import { FieldWrapper } from '../../ui/field-wrapper';
-import { Input } from '../../ui/input';
 import { LoadingWhen, useLoadingScope } from '../../ui/loading-scope';
-import { NoData } from '../../ui/no-data';
 import { StatusBadge } from '../../ui/status-badge';
 import { UnifiedPagination } from '../../unified-pagination';
 import {
   BLOCKED_SENDER_KIND_COPY,
   BLOCKED_SENDERS_UNKNOWN,
-  EMAILS_NOT_AVAILABLE_DESCRIPTION,
-  EMAILS_NOT_AVAILABLE_TITLE,
   formatBlockedDate,
-  REASON_LABEL,
-  REASON_PLACEHOLDER,
   SOURCE_BADGE,
 } from './blocked-senders-presentation';
 import { BlockedSendersSearch } from './blocked-senders-search';
@@ -63,9 +56,11 @@ export interface BlockedSenderListTabProps {
   onPageChange: (page: number) => void;
   /** Something was blocked or released: the host reloads what counts it (the tab badges). */
   onChanged: () => void;
+  /** The host changed the list itself (its Block modal): every change of this key reads the list again. */
+  refreshKey?: number;
 }
 
-/** The Domains or Emails tab: block one (with a reason), search the list on the server, and release a row. */
+/** The Domains or Emails tab: search the list on the server and release a row. Blocking is the host's (its Block modal). */
 export function BlockedSenderListTab({
   endpoint,
   kind,
@@ -74,6 +69,7 @@ export function BlockedSenderListTab({
   onSearch,
   onPageChange,
   onChanged,
+  refreshKey = 0,
 }: BlockedSenderListTabProps) {
   const segment = segmentOf(kind);
   const url = blockedSendersUrl(endpoint, segment, {
@@ -86,6 +82,14 @@ export function BlockedSenderListTab({
   const copy = BLOCKED_SENDER_KIND_COPY[kind];
   const [releasing, setReleasing] = useState<BlockedSenderRow | null>(null);
   const [busy, setBusy] = useState(false);
+  // The host's key re-reads the list; a ref keeps the effect keyed on the key alone.
+  const reloadRef = useRef(reload);
+  useEffect(() => {
+    reloadRef.current = reload;
+  });
+  useEffect(() => {
+    if (refreshKey > 0) reloadRef.current();
+  }, [refreshKey]);
 
   const changed = () => {
     reload();
@@ -110,36 +114,29 @@ export function BlockedSenderListTab({
   }
 
   const loading = inScope || dataUrl !== url || !data;
-  const available = loading ? true : data.available;
 
   return (
     <div className="flex flex-col gap-[var(--spacing-system-m)]">
       {error && !inScope && dataUrl === url && (
         <ReloadFailedNotice message={`Could not read the blocked ${copy.nounPlural}.`} onRetry={reload} />
       )}
-      {!available && <NoData title={EMAILS_NOT_AVAILABLE_TITLE} description={EMAILS_NOT_AVAILABLE_DESCRIPTION} />}
-      <BlockSenderForm endpoint={endpoint} kind={kind} disabled={!available} onBlocked={changed} />
-      {available && (
-        <>
-          <BlockedSendersSearch value={search} onSearch={onSearch} placeholder={copy.searchPlaceholder} />
-          <LoadingWhen loading={loading} label={`Loading the blocked ${copy.nounPlural}`}>
-            <BlockedSendersTable
-              kind={kind}
-              rows={data?.items ?? []}
-              totalCount={data?.totalCount ?? 0}
-              search={search}
-              onRelease={setReleasing}
-            />
-            <UnifiedPagination
-              currentPage={data?.page ?? page}
-              totalPages={data?.totalPages ?? 0}
-              onPageChange={onPageChange}
-              syncUrl={false}
-              reserveSpace
-            />
-          </LoadingWhen>
-        </>
-      )}
+      <BlockedSendersSearch value={search} onSearch={onSearch} placeholder={copy.searchPlaceholder} />
+      <LoadingWhen loading={loading} label={`Loading the blocked ${copy.nounPlural}`}>
+        <BlockedSendersTable
+          kind={kind}
+          rows={data?.items ?? []}
+          totalCount={data?.totalCount ?? 0}
+          search={search}
+          onRelease={setReleasing}
+        />
+        <UnifiedPagination
+          currentPage={data?.page ?? page}
+          totalPages={data?.totalPages ?? 0}
+          onPageChange={onPageChange}
+          syncUrl={false}
+          reserveSpace
+        />
+      </LoadingWhen>
       <AlertDialog open={releasing !== null} onOpenChange={open => !open && !busy && setReleasing(null)}>
         <AlertDialogContent className="border-ods-border bg-ods-card">
           <AlertDialogHeader>
@@ -166,82 +163,6 @@ export function BlockedSenderListTab({
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-interface BlockSenderFormProps {
-  endpoint: string;
-  kind: BlockedSenderKind;
-  disabled: boolean;
-  onBlocked: () => void;
-}
-
-/** Block one domain or address. Both the value and the reason are required. */
-function BlockSenderForm({ endpoint, kind, disabled, onBlocked }: BlockSenderFormProps) {
-  const copy = BLOCKED_SENDER_KIND_COPY[kind];
-  const [value, setValue] = useState('');
-  const [reason, setReason] = useState('');
-  const [saving, setSaving] = useState(false);
-  const canSave = !disabled && !saving && value.trim() !== '' && reason.trim() !== '';
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!canSave) return;
-    const target = value.trim();
-    setSaving(true);
-    const ok = await sendBlockedSendersWrite({
-      url: blockedSendersUrl(endpoint, segmentOf(kind)),
-      method: 'POST',
-      body: { value: target, reason: reason.trim() },
-      success: `Blocked ${target}.`,
-      failure: `Could not block ${target}`,
-    });
-    setSaving(false);
-    if (!ok) return;
-    setValue('');
-    setReason('');
-    onBlocked();
-  };
-
-  return (
-    <form
-      onSubmit={event => void submit(event)}
-      className="flex flex-col gap-[var(--spacing-system-sf)] rounded-2xl border border-ods-border bg-ods-card p-[var(--spacing-system-m)]"
-    >
-      <div className="flex flex-col gap-[var(--spacing-system-sf)] content-md:flex-row content-md:items-end">
-        <div className="min-w-0 content-md:flex-1">
-          <FieldWrapper label={copy.fieldLabel} htmlFor={`blocked-senders-${kind}-value`}>
-            <Input
-              id={`blocked-senders-${kind}-value`}
-              placeholder={copy.placeholder}
-              value={value}
-              onChange={event => setValue(event.target.value)}
-              disabled={disabled || saving}
-              required
-              userValue
-            />
-          </FieldWrapper>
-        </div>
-        <div className="min-w-0 content-md:flex-[3]">
-          <FieldWrapper label={REASON_LABEL} htmlFor={`blocked-senders-${kind}-reason`}>
-            <Input
-              id={`blocked-senders-${kind}-reason`}
-              placeholder={REASON_PLACEHOLDER}
-              value={reason}
-              onChange={event => setReason(event.target.value)}
-              disabled={disabled || saving}
-              maxLength={500}
-              required
-              userValue
-            />
-          </FieldWrapper>
-        </div>
-        <Button type="submit" variant="accent" disabled={!canSave} loading={saving}>
-          {copy.blockLabel}
-        </Button>
-      </div>
-      <p className="text-ods-text-secondary text-h6">{copy.hint}</p>
-    </form>
   );
 }
 
@@ -340,6 +261,7 @@ function BlockedSendersTable({ kind, rows, totalCount, search, onRelease }: Bloc
       <DataTable.Body
         loadingCells
         skeletonRows={BLOCKED_SENDERS_PAGE_SIZE}
+        minRows={BLOCKED_SENDERS_PAGE_SIZE}
         emptyState={
           search
             ? { title: 'Nothing matches', description: `No blocked ${copy.noun} matches "${search}".` }
@@ -348,7 +270,6 @@ function BlockedSendersTable({ kind, rows, totalCount, search, onRelease }: Bloc
                 description: copy.emptyHint,
               }
         }
-        rowClassName="mb-[var(--spacing-system-xxs)]"
       />
     </DataTable>
   );

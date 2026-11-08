@@ -128,21 +128,13 @@ export function SenderSuggestionsTab({
       {error && !inScope && dataUrl === url && (
         <ReloadFailedNotice message="Could not read the suggestions." onRetry={reload} />
       )}
-      <p className="text-ods-text-secondary text-h5">
-        Senders that got through the gate, scored on every submission and every few minutes. Suggested at{' '}
-        <BarValue value={bars?.suggest} /> points; auto-blocked at <BarValue value={bars?.block} /> points
-        {bars ? (
-          strongSignalsClause(bars.minStrong)
-        ) : (
-          <>
-            {' '}
-            with at least <BarValue value={undefined} /> strong signal
-          </>
-        )}
-        . A real customer, an open deal, a paying tenant or a held meeting counts against a sender. Block one, or mark
-        it not spam so it is never suggested again.
-      </p>
-      <BlockedSendersSearch value={search} onSearch={onSearch} placeholder="Domain or address" />
+      <BlockedSendersSearch
+        value={search}
+        onSearch={onSearch}
+        placeholder="Domain or address"
+        hintLabel="How suggestions are scored"
+        hint={suggestionsHint(bars)}
+      />
       <LoadingWhen loading={loading} label="Loading the suggestions">
         <SuggestionList
           rows={rows}
@@ -201,10 +193,12 @@ export function SenderSuggestionsTab({
   );
 }
 
-/** A number of the intro sentence; while the overview is read, an inline bar of the same line. */
-function BarValue({ value }: { value: number | undefined }) {
-  if (value === undefined) return <TextLineSkeleton as="span" type="h5" className="inline-flex w-6 align-bottom" />;
-  return <span className="tabular-nums">{value}</span>;
+/** How suggestions are scored, for the tab's info hint: the bars once the overview has them, in words before. */
+function suggestionsHint(bars: SenderSuggestionsTabProps['bars']): string {
+  const scoring = bars
+    ? `Suggested at ${bars.suggest} points; auto-blocked at ${bars.block} points${strongSignalsClause(bars.minStrong)}.`
+    : 'Suggested and auto-blocked above the bars set in Auto-block settings.';
+  return `Senders that got through the gate, scored on every submission and every few minutes. ${scoring} A real customer, an open deal, a paying tenant or a held meeting counts against a sender. Block one, or mark it not spam so it is never suggested again.`;
 }
 
 interface SuggestionListProps {

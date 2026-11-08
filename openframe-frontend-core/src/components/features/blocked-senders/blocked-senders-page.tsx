@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useEndpointsRuntime } from '../../../contexts/endpoints-runtime-context';
 import { useApiParams } from '../../../hooks/state/use-api-params';
 import { useSelfFetch } from '../../../hooks/use-self-fetch';
@@ -12,18 +13,8 @@ import {
   blockedSendersUrl,
 } from '../../../types/blocked-senders';
 import { cn } from '../../../utils/cn';
-import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { Alert } from '../../ui/alert';
 import { type TabItem, TabNavigation } from '../../ui/tab-navigation';
 import { BlockedSenderListTab } from './blocked-sender-list-tab';
-import {
-  AUTO_BLOCK_OFF_TEXT,
-  AUTO_BLOCK_OFF_TITLE,
-  AUTO_BLOCK_ON_TITLE,
-  autoBlockOnText,
-  DRY_RUN_BANNER_TEXT,
-  DRY_RUN_BANNER_TITLE,
-} from './blocked-senders-presentation';
 import { BlockedSubmissionsTab } from './blocked-submissions-tab';
 import { SenderSuggestionsTab } from './sender-suggestions-tab';
 
@@ -45,6 +36,11 @@ export interface BlockedSendersPageProps {
    * `BLOCKED_SENDERS_API_PATH`. A query on it (`?env=qa`) is kept on every request.
    */
   endpoint?: string;
+  /**
+   * The host changed a list itself (its Block modal): every change of this key reads the open list and the tab
+   * counts again. The page has no block form of its own; the host's header action opens one.
+   */
+  refreshKey?: number;
 }
 
 /**
@@ -52,13 +48,21 @@ export interface BlockedSendersPageProps {
  * reason), act on the spam recommender's suggestions, and see the submissions the gate stopped. Draws no page header:
  * the host draws its own above it. Every list is read live from the host on each load and after each change.
  */
-export function BlockedSendersPage({ endpoint: endpointProp }: BlockedSendersPageProps) {
+export function BlockedSendersPage({ endpoint: endpointProp, refreshKey = 0 }: BlockedSendersPageProps) {
   const runtimeUrl = useEndpointsRuntime()?.blockedSendersUrl;
   const endpoint = endpointProp ?? runtimeUrl ?? BLOCKED_SENDERS_API_PATH;
   const { params, setParams } = useApiParams(PARAM_SCHEMA);
   const overviewUrl = blockedSendersUrl(endpoint, 'overview');
   const overview = useSelfFetch<BlockedSendersOverview>(overviewUrl);
   const summary = overview.dataUrl === overviewUrl ? overview.data : null;
+  // The host's key re-reads the list; a ref keeps the effect keyed on the key alone.
+  const reloadRef = useRef(overview.reload);
+  useEffect(() => {
+    reloadRef.current = overview.reload;
+  });
+  useEffect(() => {
+    if (refreshKey > 0) reloadRef.current();
+  }, [refreshKey]);
 
   const activeTab: BlockedSendersTab = isTab(params.tab) ? params.tab : DEFAULT_TAB;
   const search = params.q;
@@ -66,7 +70,7 @@ export function BlockedSendersPage({ endpoint: endpointProp }: BlockedSendersPag
 
   const tabs: TabItem[] = BLOCKED_SENDERS_TABS.map(id => {
     const count = summary?.counts[id];
-    const showCount = count !== undefined && count > 0 && !(id === 'emails' && !summary?.emailsAvailable);
+    const showCount = count !== undefined && count > 0;
     return { id, label: BLOCKED_SENDERS_TAB_LABELS[id], ...(showCount ? { badge: String(count) } : {}) };
   });
 
@@ -80,7 +84,6 @@ export function BlockedSendersPage({ endpoint: endpointProp }: BlockedSendersPag
 
   return (
     <div className="flex flex-col gap-[var(--spacing-system-l)]">
-      <AutoBlockStatus summary={summary} />
       <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={selectTab} staticLabels>
         {(tab, { isStale }) => (
           <div key={tab} className={cn('pt-[var(--spacing-system-m)]', isStale && 'opacity-60 transition-opacity')}>
@@ -93,6 +96,7 @@ export function BlockedSendersPage({ endpoint: endpointProp }: BlockedSendersPag
                 onSearch={onSearch}
                 onPageChange={onPageChange}
                 onChanged={onChanged}
+                refreshKey={refreshKey}
               />
             ) : tab === 'suggestions' ? (
               <SenderSuggestionsTab
@@ -121,38 +125,5 @@ export function BlockedSendersPage({ endpoint: endpointProp }: BlockedSendersPag
         )}
       </TabNavigation>
     </div>
-  );
-}
-
-/**
- * What auto-block is doing, always one line in the same place (so the page below never moves when the overview
- * lands): in dry run the warning, on or off a quiet note, and while the overview is read its loading form.
- */
-function AutoBlockStatus({ summary }: { summary: BlockedSendersOverview | null }) {
-  const lineClass = 'flex flex-wrap gap-x-[var(--spacing-system-sf)] gap-y-1';
-  const quietClass = 'border-ods-border bg-ods-card text-ods-text-secondary';
-  if (!summary) {
-    return (
-      <Alert role="note" aria-busy="true" className={cn(lineClass, quietClass)}>
-        <TextLineSkeleton type="h5" className="w-2/3" />
-      </Alert>
-    );
-  }
-  const { enabled, dryRun } = summary.autoBlock;
-  if (enabled && dryRun) {
-    return (
-      <Alert variant="warning" role="note" className={lineClass}>
-        <strong className="text-h5">{DRY_RUN_BANNER_TITLE}</strong>
-        <span className="text-h5">{DRY_RUN_BANNER_TEXT}</span>
-      </Alert>
-    );
-  }
-  return (
-    <Alert role="note" className={cn(lineClass, quietClass)}>
-      <strong className="text-ods-text-primary text-h5">{enabled ? AUTO_BLOCK_ON_TITLE : AUTO_BLOCK_OFF_TITLE}</strong>
-      <span className="text-h5">
-        {enabled ? autoBlockOnText(summary.blockBar, summary.blockMinStrong) : AUTO_BLOCK_OFF_TEXT}
-      </span>
-    </Alert>
   );
 }

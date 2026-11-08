@@ -57,12 +57,13 @@ export function BlockedSubmissionsTab({ endpoint, search, page, onSearch, onPage
       {error && !inScope && dataUrl === url && (
         <ReloadFailedNotice message="Could not read the blocked submissions." onRetry={reload} />
       )}
-      <p className="text-ods-text-secondary text-h5">
-        Form submissions the gate stopped. Every submission is checked live against the OpenFrame blocklist, with no
-        cache, so a block applies to the very next one. Stopped submissions are kept here, never posted to Slack or sent
-        to HubSpot; the visitor saw the normal thank-you.
-      </p>
-      <BlockedSendersSearch value={search} onSearch={onSearch} placeholder="Sender or form" />
+      <BlockedSendersSearch
+        value={search}
+        onSearch={onSearch}
+        placeholder="Sender or form"
+        hintLabel="About blocked submissions"
+        hint="Form submissions the gate stopped. Every submission is checked live against the OpenFrame blocklist, with no cache, so a block applies to the very next one. Stopped submissions are kept here, never posted to Slack or sent to HubSpot; the visitor saw the normal thank-you."
+      />
       <LoadingWhen loading={loading} label="Loading the blocked submissions">
         <BlockedSubmissionsTable rows={data?.items ?? []} totalCount={data?.totalCount ?? 0} search={search} />
         <UnifiedPagination
@@ -157,12 +158,12 @@ function BlockedSubmissionsTable({
       <DataTable.Body
         loadingCells
         skeletonRows={BLOCKED_SENDERS_PAGE_SIZE}
+        minRows={BLOCKED_SENDERS_PAGE_SIZE}
         emptyState={
           search
             ? { title: 'Nothing matches', description: `No blocked submission matches "${search}".` }
             : { title: 'No blocked submissions', description: 'Nothing from a blocked sender reached a form.' }
         }
-        rowClassName="mb-[var(--spacing-system-xxs)]"
       />
     </DataTable>
   );

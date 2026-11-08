@@ -19,7 +19,6 @@ const ENDPOINT = '/api/admin/spam?env=qa';
 
 const OVERVIEW: BlockedSendersOverview = {
   counts: { domains: 2, emails: 0, suggestions: 1, submissions: 3 },
-  emailsAvailable: false,
   autoBlock: { enabled: true, dryRun: true },
   suggestBar: 4,
   blockBar: 8,
@@ -43,12 +42,12 @@ const page = <T,>(items: T[]): WirePage<T> => ({
   totalPages: 1,
 });
 
-const DOMAINS: BlockedSendersListResponse = {
-  ...page([domain('mailinator.com', 'manual'), domain('seo-boost.example', 'auto')]),
-  available: true,
-};
+const DOMAINS: BlockedSendersListResponse = page([
+  domain('mailinator.com', 'manual'),
+  domain('seo-boost.example', 'auto'),
+]);
 
-const EMAILS_UNAVAILABLE: BlockedSendersListResponse = { ...page<BlockedSenderRow>([]), available: false };
+const EMAILS: BlockedSendersListResponse = page<BlockedSenderRow>([]);
 
 const SUGGESTION: SenderSuggestionRow = {
   id: 7,
@@ -80,7 +79,7 @@ function serve(overrides: { emails?: BlockedSendersListResponse; write?: () => R
     const path = url.split('?')[0];
     if (path.endsWith('/overview')) return json(OVERVIEW);
     if (path.endsWith('/domains')) return json(DOMAINS);
-    if (path.endsWith('/emails')) return json(overrides.emails ?? EMAILS_UNAVAILABLE);
+    if (path.endsWith('/emails')) return json(overrides.emails ?? EMAILS);
     if (path.endsWith('/suggestions')) return json(page([SUGGESTION]));
     if (path.endsWith('/submissions')) return json(page([]));
     return json({ error: 'not found' }, 404);
@@ -111,16 +110,14 @@ describe('blockedSendersUrl', () => {
 });
 
 describe('BlockedSendersPage', () => {
-  it('lists the blocked domains with the dry-run banner and the tab counts, every row releasable', async () => {
+  it('lists the blocked domains with the tab counts, every row releasable, and no banner or block form', async () => {
     serve();
     render(<BlockedSendersPage endpoint={ENDPOINT} />);
 
     expect(await screen.findByText('seo-boost.example')).toBeInTheDocument();
     expect(screen.getByText('mailinator.com')).toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent('Auto-block is in dry run.');
-    expect(screen.getByRole('note')).toHaveTextContent(
-      'Suggestions above the bar are logged as "would block". Turn it on in Auto-block settings.',
-    );
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Block domain' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /^Release / })).toHaveLength(2);
     expect(screen.queryByText(/Blocked by configuration/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Domains (2)' })).toBeInTheDocument();
@@ -155,27 +152,22 @@ describe('BlockedSendersPage', () => {
     expect(requested().map(r => r.url)).toContain('/proxy/spam/overview');
   });
 
-  it('blocks a domain with its required reason, then reads the list again', async () => {
+  it("reads the open list and the tab counts again when the host's refresh key changes", async () => {
     serve();
-    render(<BlockedSendersPage endpoint={ENDPOINT} />);
+    const { rerender } = render(<BlockedSendersPage endpoint={ENDPOINT} />);
     await screen.findByText('mailinator.com');
+    const reads = () =>
+      requested()
+        .filter(r => !r.init?.method || r.init.method === 'GET')
+        .map(r => r.url.split('?')[0]);
+    const before = reads().length;
 
-    const block = screen.getByRole('button', { name: 'Block domain' });
-    fireEvent.change(screen.getByLabelText('Domain'), { target: { value: 'rogue-msp.example' } });
-    expect(block).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Reason (required)'), { target: { value: 'Silent remote installs' } });
-    expect(block).toBeEnabled();
-    const before = requested().length;
-    fireEvent.click(block);
+    rerender(<BlockedSendersPage endpoint={ENDPOINT} refreshKey={1} />);
 
-    await waitFor(() => expect(requested().some(r => r.init?.method === 'POST')).toBe(true));
-    const post = requested().find(r => r.init?.method === 'POST');
-    expect(post?.url).toBe('/api/admin/spam/domains?env=qa');
-    expect(JSON.parse(String(post?.init?.body))).toEqual({
-      value: 'rogue-msp.example',
-      reason: 'Silent remote installs',
-    });
-    await waitFor(() => expect(requested().length).toBeGreaterThan(before + 2));
+    await waitFor(() => expect(reads().length).toBeGreaterThanOrEqual(before + 2));
+    const after = reads().slice(before);
+    expect(after).toContain('/api/admin/spam/overview');
+    expect(after).toContain('/api/admin/spam/domains');
   });
 
   it('keeps the list and says so when a reload after a change fails', async () => {
@@ -214,14 +206,14 @@ describe('BlockedSendersPage', () => {
     );
   });
 
-  it('says address blocking is not available yet while the backend has no list, and blocks nothing', async () => {
+  it('lists the blocked addresses on the Emails tab, with no availability notice', async () => {
     setMockSearchParams(new URLSearchParams('tab=emails'));
     serve();
     render(<BlockedSendersPage endpoint={ENDPOINT} />);
 
-    expect(await screen.findByText('Blocking single addresses is not available yet')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Block address' })).toBeDisabled();
-    expect(screen.getByLabelText('Email address')).toBeDisabled();
+    expect(await screen.findByText('No blocked addresses')).toBeInTheDocument();
+    expect(screen.getByText('Every address you block is listed here.')).toBeInTheDocument();
+    expect(screen.queryByText(/not available/i)).not.toBeInTheDocument();
   });
 
   it('switching tabs puts the tab in the address and starts its list from the top', async () => {

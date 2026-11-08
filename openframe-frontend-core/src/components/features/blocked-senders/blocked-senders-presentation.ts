@@ -37,7 +37,7 @@ export const BLOCKED_SENDER_KIND_COPY: Record<
     placeholder: 'rogue-msp.example',
     searchPlaceholder: 'Domain or reason',
     blockLabel: 'Block domain',
-    emptyHint: 'Block a domain above and it is listed here.',
+    emptyHint: 'Every domain you block is listed here.',
     hint: "Blocks sign-up, invitations, SSO sign-up and every hub form from the next request. Only for throwaway or abusive domains, never a real company's.",
   },
   address: {
@@ -48,7 +48,7 @@ export const BLOCKED_SENDER_KIND_COPY: Record<
     placeholder: 'spammer@gmail.com',
     searchPlaceholder: 'Email or reason',
     blockLabel: 'Block address',
-    emptyHint: 'Block an address above and it is listed here.',
+    emptyHint: 'Every address you block is listed here.',
     hint: 'Blocks one address on sign-up and every hub form from the next request. For a sender on a public mail provider (gmail.com, outlook.com), whose domain is never blocked.',
   },
 };
@@ -56,26 +56,10 @@ export const BLOCKED_SENDER_KIND_COPY: Record<
 export const REASON_LABEL = 'Reason (required)';
 export const REASON_PLACEHOLDER = 'The signup or submissions it came from';
 
-export const EMAILS_NOT_AVAILABLE_TITLE = 'Blocking single addresses is not available yet';
-export const EMAILS_NOT_AVAILABLE_DESCRIPTION =
-  'The OpenFrame Backoffice API blocks whole domains today. Use this for one address on a public mail provider (gmail.com, outlook.com) once the address endpoint ships.';
-
-export const DRY_RUN_BANNER_TITLE = 'Auto-block is in dry run.';
-export const DRY_RUN_BANNER_TEXT =
-  'Suggestions above the bar are logged as "would block". Turn it on in Auto-block settings.';
-export const AUTO_BLOCK_ON_TITLE = 'Auto-block is on.';
-export const AUTO_BLOCK_OFF_TITLE = 'Auto-block is off.';
-export const AUTO_BLOCK_OFF_TEXT = 'Suggestions wait for a person to block them or mark them not spam.';
-
 /** "with at least 2 strong signals", or nothing when no strong signal is required. */
 export function strongSignalsClause(minStrong: number): string {
   if (minStrong <= 0) return '';
   return ` with at least ${minStrong} strong ${minStrong === 1 ? 'signal' : 'signals'}`;
-}
-
-/** What auto-block does while it is on, from the overview's bars. */
-export function autoBlockOnText(blockBar: number, minStrong: number): string {
-  return `Senders at ${blockBar} points${strongSignalsClause(minStrong)} are blocked on their own, at most a few each run.`;
 }
 
 export const SOURCE_BADGE: Record<BlockedSenderRow['source'], { label: string; color: BadgeColor }> = {
