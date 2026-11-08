@@ -109,3 +109,8 @@ type OrganizationEdge {
     node: Organization!
     cursor: String!
 }
+
+# Deprecated: Use OrganizationConnection instead
+type OrganizationList {
+    organizations: [Organization!]!
+}
