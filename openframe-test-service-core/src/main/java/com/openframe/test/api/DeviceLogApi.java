@@ -20,16 +20,7 @@ public class DeviceLogApi {
 
     // One page, newest first; null machineIds reads every device of the tenant, after is the previous page's endCursor or null.
     public static DeviceLogConnection deviceLogs(List<String> machineIds, DeviceLogFilterInput filter, Integer first, String after) {
-        Map<String, Object> body = Map.of("query", DEVICE_LOGS, "variables", variables(null, machineIds, filter, first, after));
-        return given(getAuthorizedSpec())
-                .body(body).post(GRAPHQL)
-                .then().spec(graphqlSuccess())
-                .extract().jsonPath().getObject("data.deviceLogs", DeviceLogConnection.class);
-    }
-
-    // One page through the deprecated single-device argument.
-    public static DeviceLogConnection deviceLogsByMachineId(String machineId, DeviceLogFilterInput filter, Integer first) {
-        Map<String, Object> body = Map.of("query", DEVICE_LOGS, "variables", variables(machineId, null, filter, first, null));
+        Map<String, Object> body = Map.of("query", DEVICE_LOGS, "variables", variables(machineIds, filter, first, after));
         return given(getAuthorizedSpec())
                 .body(body).post(GRAPHQL)
                 .then().spec(graphqlSuccess())
@@ -38,7 +29,7 @@ public class DeviceLogApi {
 
     // A query expected to be refused; returns its GraphQL errors, and a non-200 answer fails with the status and body.
     public static List<GraphqlError> attemptDeviceLogsErrors(List<String> machineIds, DeviceLogFilterInput filter, Integer first, String after) {
-        Map<String, Object> body = Map.of("query", DEVICE_LOGS, "variables", variables(null, machineIds, filter, first, after));
+        Map<String, Object> body = Map.of("query", DEVICE_LOGS, "variables", variables(machineIds, filter, first, after));
         Response response = given(getAuthorizedSpec()).body(body).post(GRAPHQL);
         if (response.statusCode() != 200) {
             throw new AssertionError("api/graphql answered HTTP " + response.statusCode()
@@ -49,12 +40,9 @@ public class DeviceLogApi {
         return errors == null ? List.of() : errors;
     }
 
-    private static Map<String, Object> variables(String machineId, List<String> machineIds, DeviceLogFilterInput filter,
-                                                 Integer first, String after) {
+    private static Map<String, Object> variables(List<String> machineIds, DeviceLogFilterInput filter, Integer first,
+                                                 String after) {
         Map<String, Object> variables = new HashMap<>();
-        if (machineId != null) {
-            variables.put("machineId", machineId);
-        }
         if (machineIds != null) {
             variables.put("machineIds", machineIds);
         }

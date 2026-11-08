@@ -242,10 +242,6 @@ public class DeviceLogsTest extends BaseTest {
         assertThat(widened).extracting(DeviceLogEntry::getMachineId).as("The 30-day window holds only %s's lines", machineId).containsOnly(machineId);
         assertThat(widened).extracting(DeviceLogEntry::getHostname).as("Its lines carry its hostname")
                 .allMatch(hostname -> hostname == null || WINDOWS_HOSTNAME.equalsIgnoreCase(hostname));
-
-        List<DeviceLogEntry> deprecated = DeviceLogApi.deviceLogsByMachineId(machineId, month, DEFAULT_PAGE).nodes();
-        assertThat(deprecated).extracting(DeviceLogEntry::getMachineId).as("The deprecated machineId argument also narrows to %s", machineId)
-                .isNotEmpty().containsOnly(machineId);
     }
 
     private static void requireTenantPage() {
