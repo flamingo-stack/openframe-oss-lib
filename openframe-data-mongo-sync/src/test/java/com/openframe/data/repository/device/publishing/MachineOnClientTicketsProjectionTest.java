@@ -94,6 +94,8 @@ class MachineOnClientTicketsProjectionTest {
     @Test
     void anOpenTicketOfAPreviousCustomer_isAMismatch_butArchivedAdminAndGoneMachineTicketsAreNot() {
         // setup
+        when(ticketProjectionRepository.findStatusId("tenant-a", TicketStatusKind.ARCHIVED))
+                .thenReturn(Optional.of(ARCHIVED_STATUS_ID));
         when(machineRepository.findByTenantIdInAndMachineIdIn(Set.of("tenant-a"), Set.of("machine-1", "machine-gone")))
                 .thenReturn(List.of(buildMachine("tenant-a", "machine-1", "org-b")));
 
@@ -109,6 +111,21 @@ class MachineOnClientTicketsProjectionTest {
         // verifications
         assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t1");
         assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("doc-tenant-a");
+    }
+
+    // apply could never archive them, so reporting them would republish the machine every run.
+    @Test
+    void ticketsOfATenantWithoutAnArchivedStatus_areNoMismatch() {
+        // setup
+        when(ticketProjectionRepository.findStatusId("tenant-a", TicketStatusKind.ARCHIVED)).thenReturn(Optional.empty());
+
+        // execution
+        ReconciliationResult result = projection.reconcile(List.of(
+                view("t1", TicketStatusKind.TECH_REQUIRED, new ClientTicketOwner("machine-1", "org-a"))));
+
+        // verifications
+        assertThat(result.getMismatches()).isEmpty();
+        verify(machineRepository, never()).findByTenantIdInAndMachineIdIn(any(), any());
     }
 
     @Test

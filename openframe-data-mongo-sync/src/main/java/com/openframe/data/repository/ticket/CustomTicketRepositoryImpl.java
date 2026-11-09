@@ -136,10 +136,10 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         if (ownerScope == null) {
             return;
         }
-        query.addCriteria(Criteria.where(FIELD_OWNER_MACHINE_ID).is(ownerScope.machineId()));
-        if (ownerScope.organizationId() != null) {
+        query.addCriteria(Criteria.where(FIELD_OWNER_MACHINE_ID).is(ownerScope.getMachineId()));
+        if (ownerScope.getOrganizationId() != null) {
             query.addCriteria(Criteria.where(FIELD_OWNER_ORGANIZATION_ID)
-                    .in(Arrays.asList(ownerScope.organizationId(), null)));
+                    .in(Arrays.asList(ownerScope.getOrganizationId(), null)));
         }
     }
 

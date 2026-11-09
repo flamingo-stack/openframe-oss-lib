@@ -56,7 +56,8 @@ class TicketServiceClientOwnerScopeTest {
     @Test
     void getTicket_agentAndTicketCreatedUnderCurrentOrganization_found() {
         // setup
-        when(clientOwnerScopeResolver.resolve(AGENT)).thenReturn(Optional.of(UNDER_ORG_B));
+        when(clientOwnerScopeResolver.isOwnerScoped(AGENT)).thenReturn(true);
+        when(clientOwnerScopeResolver.scopeOf(AGENT)).thenReturn(UNDER_ORG_B);
         Ticket ticket = ownedBy("machine-1", "org-b");
         when(ticketRepository.findByIdAndOwnerMachineId("t-1", "machine-1")).thenReturn(Optional.of(ticket));
 
@@ -70,7 +71,8 @@ class TicketServiceClientOwnerScopeTest {
     @Test
     void getTicket_agentAndTicketCreatedUnderPreviousOrganization_notFound() {
         // setup
-        when(clientOwnerScopeResolver.resolve(AGENT)).thenReturn(Optional.of(UNDER_ORG_B));
+        when(clientOwnerScopeResolver.isOwnerScoped(AGENT)).thenReturn(true);
+        when(clientOwnerScopeResolver.scopeOf(AGENT)).thenReturn(UNDER_ORG_B);
         when(ticketRepository.findByIdAndOwnerMachineId("t-1", "machine-1"))
                 .thenReturn(Optional.of(ownedBy("machine-1", "org-a")));
 
@@ -84,7 +86,8 @@ class TicketServiceClientOwnerScopeTest {
     @Test
     void getTicket_agentAndTicketWithoutSnapshot_stillFound() {
         // setup
-        when(clientOwnerScopeResolver.resolve(AGENT)).thenReturn(Optional.of(UNDER_ORG_B));
+        when(clientOwnerScopeResolver.isOwnerScoped(AGENT)).thenReturn(true);
+        when(clientOwnerScopeResolver.scopeOf(AGENT)).thenReturn(UNDER_ORG_B);
         Ticket legacy = ownedBy("machine-1", null);
         when(ticketRepository.findByIdAndOwnerMachineId("t-1", "machine-1")).thenReturn(Optional.of(legacy));
 
@@ -98,7 +101,8 @@ class TicketServiceClientOwnerScopeTest {
     @Test
     void getTicketByNumber_agentAndTicketCreatedUnderPreviousOrganization_notFound() {
         // setup
-        when(clientOwnerScopeResolver.resolve(AGENT)).thenReturn(Optional.of(UNDER_ORG_B));
+        when(clientOwnerScopeResolver.isOwnerScoped(AGENT)).thenReturn(true);
+        when(clientOwnerScopeResolver.scopeOf(AGENT)).thenReturn(UNDER_ORG_B);
         when(ticketRepository.findByTicketNumberAndOwnerMachineId(42, "machine-1"))
                 .thenReturn(Optional.of(ownedBy("machine-1", "org-a")));
 
@@ -112,7 +116,7 @@ class TicketServiceClientOwnerScopeTest {
     @Test
     void getTicket_admin_unscopedLookup() {
         // setup
-        when(clientOwnerScopeResolver.resolve(ADMIN)).thenReturn(Optional.empty());
+        when(clientOwnerScopeResolver.isOwnerScoped(ADMIN)).thenReturn(false);
         Ticket ticket = ownedBy("machine-1", "org-a");
         when(ticketRepository.findById("t-1")).thenReturn(Optional.of(ticket));
 

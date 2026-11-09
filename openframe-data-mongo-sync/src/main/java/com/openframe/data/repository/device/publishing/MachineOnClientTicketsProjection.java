@@ -24,13 +24,8 @@ import java.util.Set;
 
 import static java.util.stream.Collectors.toSet;
 
-/**
- * Archives the client tickets a device opened under a previous customer once the device belongs to another one.
- * A client ticket keeps the customer it was opened under in its owner ({@code owner.organizationId}); when the
- * machine's current organization differs, the ticket is moved to the tenant's ARCHIVED status. Tickets without a
- * snapshot, admin tickets and tickets already archived are left alone, and so is everything when the machine has
- * no organization or the tenant has no ARCHIVED status.
- */
+// Archives the client tickets a device opened under a previous customer (owner.organizationId differs from the
+// machine's current one) into the tenant's ARCHIVED status; no snapshot, admin or archived tickets stay as they are.
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -101,10 +96,19 @@ public class MachineOnClientTicketsProjection implements Projection<MachineEvent
         if (candidates.isEmpty()) {
             return ReconciliationResult.allMatch();
         }
-        Set<String> tenantIds = candidates.stream().map(TicketClientOwnerView::getTenantId).collect(toSet());
-        Set<String> machineIds = candidates.stream().map(ticket -> clientOwner(ticket).getMachineId()).collect(toSet());
+        // A tenant without an ARCHIVED status cannot be repaired, so its tickets are no mismatch (apply would skip them too).
+        Set<String> tenantIds = candidates.stream().map(TicketClientOwnerView::getTenantId)
+                .filter(tenantId -> ticketProjectionRepository.findStatusId(tenantId, TicketStatusKind.ARCHIVED).isPresent())
+                .collect(toSet());
+        List<TicketClientOwnerView> repairable = candidates.stream()
+                .filter(ticket -> tenantIds.contains(ticket.getTenantId()))
+                .toList();
+        if (repairable.isEmpty()) {
+            return ReconciliationResult.allMatch();
+        }
+        Set<String> machineIds = repairable.stream().map(ticket -> clientOwner(ticket).getMachineId()).collect(toSet());
         Map<TenantScopedId, Machine> machines = findMachines(tenantIds, machineIds);
-        List<Mismatch> mismatches = candidates.stream()
+        List<Mismatch> mismatches = repairable.stream()
                 .map(ticket -> toMismatch(ticket, machines))
                 .filter(Objects::nonNull)
                 .toList();

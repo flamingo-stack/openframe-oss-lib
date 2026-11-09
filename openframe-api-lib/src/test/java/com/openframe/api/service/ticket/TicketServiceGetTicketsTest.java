@@ -24,7 +24,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -146,7 +145,10 @@ class TicketServiceGetTicketsTest {
     }
 
     private void stubQuery(ClientOwnerScope ownerScope) {
-        when(clientOwnerScopeResolver.resolve(any())).thenReturn(Optional.ofNullable(ownerScope));
+        when(clientOwnerScopeResolver.isOwnerScoped(any())).thenReturn(ownerScope != null);
+        if (ownerScope != null) {
+            when(clientOwnerScopeResolver.scopeOf(any())).thenReturn(ownerScope);
+        }
         when(ticketRepository.buildTicketQuery(any(TicketQueryFilter.class), isNull(), eq(List.of()), eq(ownerScope)))
                 .thenReturn(query);
     }

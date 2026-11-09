@@ -25,7 +25,6 @@ import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -102,7 +101,8 @@ class TicketServiceStatusFilterTest {
                 .machineId("machine-7")
                 .build();
         ClientOwnerScope scope = new ClientOwnerScope("machine-7", "org-7");
-        when(clientOwnerScopeResolver.resolve(agent)).thenReturn(Optional.of(scope));
+        when(clientOwnerScopeResolver.isOwnerScoped(agent)).thenReturn(true);
+        when(clientOwnerScopeResolver.scopeOf(agent)).thenReturn(scope);
         givenRepositoryReturns(List.of());
 
         service.getTickets(agent, TicketFilterInput.builder().build(), null, null, null);

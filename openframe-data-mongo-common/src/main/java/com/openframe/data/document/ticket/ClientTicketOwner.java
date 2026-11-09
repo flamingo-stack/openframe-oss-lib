@@ -11,11 +11,7 @@ public class ClientTicketOwner extends TicketOwner {
 
     private String machineId;
 
-    /**
-     * Organization the machine belonged to when the ticket was created. Never updated afterwards, so it
-     * tells which customer's device opened the ticket even after the machine moves; null on documents
-     * written before the field existed.
-     */
+    // The customer the machine belonged to when the ticket was created; never updated, null before the backfill.
     private String organizationId;
 
     public ClientTicketOwner(String machineId, String organizationId) {

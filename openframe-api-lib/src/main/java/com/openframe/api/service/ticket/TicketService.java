@@ -91,7 +91,9 @@ public class TicketService {
                                                         CursorPaginationCriteria pagination,
                                                         String search,
                                                         SortInput sort) {
-        ClientOwnerScope ownerScope = clientOwnerScopeResolver.resolve(principal).orElse(null);
+        ClientOwnerScope ownerScope = clientOwnerScopeResolver.isOwnerScoped(principal)
+                ? clientOwnerScopeResolver.scopeOf(principal)
+                : null;
 
         log.debug("Querying tickets for {} with filter: {}, pagination: {}, search: '{}', sort: {}",
                 principal.getActorType(), filter, pagination, search, sort);
@@ -120,19 +122,23 @@ public class TicketService {
     public Optional<Ticket> getTicket(AuthPrincipal principal, @NotBlank String ticketId) {
         log.debug("Getting ticket: {} for {}", ticketId, principal.getActorType());
 
-        return clientOwnerScopeResolver.resolve(principal)
-                .map(scope -> ticketRepository.findByIdAndOwnerMachineId(ticketId, scope.machineId())
-                        .filter(ticket -> scope.allows(ticket.getOwner())))
-                .orElseGet(() -> ticketRepository.findById(ticketId));
+        if (!clientOwnerScopeResolver.isOwnerScoped(principal)) {
+            return ticketRepository.findById(ticketId);
+        }
+        ClientOwnerScope scope = clientOwnerScopeResolver.scopeOf(principal);
+        return ticketRepository.findByIdAndOwnerMachineId(ticketId, scope.getMachineId())
+                .filter(ticket -> scope.allows(ticket.getOwner()));
     }
 
     public Optional<Ticket> getTicketByNumber(AuthPrincipal principal, Integer ticketNumber) {
         log.debug("Getting ticket #{} for {}", ticketNumber, principal.getActorType());
 
-        return clientOwnerScopeResolver.resolve(principal)
-                .map(scope -> ticketRepository.findByTicketNumberAndOwnerMachineId(ticketNumber, scope.machineId())
-                        .filter(ticket -> scope.allows(ticket.getOwner())))
-                .orElseGet(() -> ticketRepository.findByTicketNumber(ticketNumber));
+        if (!clientOwnerScopeResolver.isOwnerScoped(principal)) {
+            return ticketRepository.findByTicketNumber(ticketNumber);
+        }
+        ClientOwnerScope scope = clientOwnerScopeResolver.scopeOf(principal);
+        return ticketRepository.findByTicketNumberAndOwnerMachineId(ticketNumber, scope.getMachineId())
+                .filter(ticket -> scope.allows(ticket.getOwner()));
     }
 
     public Optional<Ticket> findByIdOrNumber(AuthPrincipal principal, String ticketId, Integer ticketNumber) {
@@ -451,10 +457,7 @@ public class TicketService {
         return trimmedField;
     }
 
-    /**
-     * Stamps a client-created ticket with its device: the owner (machine plus the organization the machine
-     * belongs to right now, kept as the visibility snapshot), the device fields and the organization.
-     */
+    // The owner keeps the machine and the customer it belongs to right now: the snapshot the visibility rule compares.
     private void populateClientOrigin(Ticket ticket, AuthPrincipal principal) {
         String machineId = principal.getMachineId();
         if (machineId == null || machineId.isBlank()) {
