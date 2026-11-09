@@ -18,6 +18,7 @@ import static com.openframe.data.document.device.DeviceStatus.ONLINE;
 public class PinotClientDeviceRepository extends AbstractPinotRepository implements PinotDeviceRepository {
 
     private static final String STATUS = "status";
+    private static final String CONNECTIVITY = "connectivity";
     private static final String DEVICE_TYPE = "deviceType";
     private static final String OS_TYPE = "osType";
     private static final String ORGANIZATION_ID = "organizationId";
@@ -51,67 +52,86 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     public Map<String, Integer> getStatusFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        return executeFacetQuery(STATUS, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, STATUS);
+        return executeFacetQuery(STATUS, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, STATUS);
+    }
+
+    @Override
+    public Map<String, Integer> getConnectivityFilterOptions(
+            String tenantId,
+            List<String> statuses,
+            List<String> connectivity,
+            List<String> deviceTypes,
+            List<String> osTypes,
+            List<String> organizationIds,
+            List<String> tagKeys,
+            List<String> tagKeyValues) {
+        return executeFacetQuery(CONNECTIVITY, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, CONNECTIVITY);
     }
 
     @Override
     public Map<String, Integer> getDeviceTypeFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        return executeFacetQuery(DEVICE_TYPE, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, DEVICE_TYPE);
+        return executeFacetQuery(DEVICE_TYPE, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, DEVICE_TYPE);
     }
 
     @Override
     public Map<String, Integer> getOsTypeFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        return executeFacetQuery(OS_TYPE, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, OS_TYPE);
+        return executeFacetQuery(OS_TYPE, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, OS_TYPE);
     }
 
     @Override
     public Map<String, Integer> getOrganizationFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
         // Organization device counts only include active devices (ONLINE / OFFLINE).
-        return executeActiveFacetQuery(ORGANIZATION_ID, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, ORGANIZATION_ID);
+        return executeActiveFacetQuery(ORGANIZATION_ID, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, ORGANIZATION_ID);
     }
 
     @Override
     public Map<String, Integer> getTagKeyFilterOptions(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
             List<String> tagKeyValues) {
-        return executeFacetQuery(TAG_KEY_VALUES, tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, TAG_KEY_VALUES);
+        return executeFacetQuery(TAG_KEY_VALUES, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, TAG_KEY_VALUES);
     }
 
     @Override
     public int getFilteredDeviceCount(
             String tenantId,
             List<String> statuses,
+            List<String> connectivity,
             List<String> deviceTypes,
             List<String> osTypes,
             List<String> organizationIds,
@@ -119,7 +139,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> tagKeyValues) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(devicesTable, tenantId)
                 .selectCountAll();
-        applyDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, null);
+        applyDeviceFilters(queryBuilder, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, null);
         return executeCountQuery(queryBuilder.build());
     }
 
@@ -132,6 +152,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     private Map<String, Integer> executeFacetQuery(String facetField,
                                                     String tenantId,
                                                     List<String> statuses,
+                                                    List<String> connectivity,
                                                     List<String> deviceTypes,
                                                     List<String> osTypes,
                                                     List<String> organizationIds,
@@ -139,7 +160,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                                     List<String> tagKeyValues,
                                                     String excludeField) {
         PinotQueryBuilder queryBuilder = newFacetQueryBuilder(facetField, tenantId);
-        applyDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
+        applyDeviceFilters(queryBuilder, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
         return executeKeyCountQuery(queryBuilder.build());
     }
 
@@ -150,6 +171,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     private Map<String, Integer> executeActiveFacetQuery(String facetField,
                                                          String tenantId,
                                                          List<String> statuses,
+                                                         List<String> connectivity,
                                                          List<String> deviceTypes,
                                                          List<String> osTypes,
                                                          List<String> organizationIds,
@@ -157,7 +179,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                                          List<String> tagKeyValues,
                                                          String excludeField) {
         PinotQueryBuilder queryBuilder = newFacetQueryBuilder(facetField, tenantId);
-        applyActiveDeviceFilters(queryBuilder, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
+        applyActiveDeviceFilters(queryBuilder, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
         return executeKeyCountQuery(queryBuilder.build());
     }
 
@@ -179,6 +201,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
      */
     private void applyDeviceFilters(PinotQueryBuilder queryBuilder,
                                     List<String> statuses,
+                                    List<String> connectivity,
                                     List<String> deviceTypes,
                                     List<String> osTypes,
                                     List<String> organizationIds,
@@ -190,6 +213,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             queryBuilder.whereNotEquals(STATUS, DELETED.name());
         }
         applyStatusFilter(queryBuilder, requestedStatuses, excludeField);
+        applyConnectivityFilter(queryBuilder, connectivity, excludeField);
         applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
     }
 
@@ -200,6 +224,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
      */
     private void applyActiveDeviceFilters(PinotQueryBuilder queryBuilder,
                                           List<String> statuses,
+                                          List<String> connectivity,
                                           List<String> deviceTypes,
                                           List<String> osTypes,
                                           List<String> organizationIds,
@@ -208,6 +233,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                                           String excludeField) {
         queryBuilder.whereIn(STATUS, ACTIVE_STATUSES);
         applyStatusFilter(queryBuilder, sanitizeStatuses(statuses), excludeField);
+        applyConnectivityFilter(queryBuilder, connectivity, excludeField);
         applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
     }
 
@@ -233,6 +259,16 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             return;
         }
         queryBuilder.whereOr(STATUS, requestedStatuses);
+    }
+
+    // Connectivity is the online/offline facet; skipped when it is the faceted field, like status.
+    private void applyConnectivityFilter(PinotQueryBuilder queryBuilder,
+                                         List<String> connectivity,
+                                         String excludeField) {
+        if (CONNECTIVITY.equals(excludeField) || connectivity == null || connectivity.isEmpty()) {
+            return;
+        }
+        queryBuilder.whereOr(CONNECTIVITY, connectivity);
     }
 
     private void applyNonStatusFilters(PinotQueryBuilder queryBuilder,
