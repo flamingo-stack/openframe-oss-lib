@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm.software;
 
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
@@ -20,6 +21,9 @@ public class SoftwareProjectionTrigger {
     private static final String TAG_KIND = "kind";
     private static final String KIND_TITLE = "title";
     private static final String KIND_CVE = "cve";
+    private static final String TAG_OUTCOME = "outcome";
+    private static final String OUTCOME_SUCCESS = "success";
+    private static final String OUTCOME_ERROR = "error";
 
     private final SoftwareProjector softwareProjector;
     private final VulnerabilityProjector vulnerabilityProjector;
@@ -48,10 +52,18 @@ public class SoftwareProjectionTrigger {
         cveIds.forEach(cveId -> project(KIND_CVE, () -> vulnerabilityProjector.project(tenantId, cveId)));
     }
 
+    // a projection that throws is timed too, tagged as an error, so slow failing rollups show on the dashboard
     private void project(String kind, IntSupplier projection) {
         Timer.Sample sample = Timer.start(meterRegistry);
-        int devices = projection.getAsInt();
-        sample.stop(meterRegistry.timer(TIMER, TAG_KIND, kind));
-        meterRegistry.summary(DEVICES, TAG_KIND, kind).record(devices);
+        String outcome = OUTCOME_ERROR;
+        try {
+            int devices = projection.getAsInt();
+            outcome = OUTCOME_SUCCESS;
+            DistributionSummary summary = meterRegistry.summary(DEVICES, TAG_KIND, kind);
+            summary.record(devices);
+        } finally {
+            Timer timer = meterRegistry.timer(TIMER, TAG_KIND, kind, TAG_OUTCOME, outcome);
+            sample.stop(timer);
+        }
     }
 }

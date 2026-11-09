@@ -37,12 +37,17 @@ public class SoftwareProjector {
             return 0;
         }
         Optional<SoftwareTitleRollup> rolledUp = aggregationRepository.rollUpTitle(tenantId, softwareTitleId);
-        if (rolledUp.isEmpty()) {
-            softwareRepository.deleteByTenantIdAndSoftwareTitleId(tenantId, softwareTitleId);
-            return 0;
-        }
-        SoftwareTitleRollup rollup = rolledUp.get();
+        return rolledUp
+                .map(rollup -> save(tenantId, softwareTitleId, rollup))
+                .orElseGet(() -> remove(tenantId, softwareTitleId));
+    }
 
+    private int remove(String tenantId, Long softwareTitleId) {
+        softwareRepository.deleteByTenantIdAndSoftwareTitleId(tenantId, softwareTitleId);
+        return 0;
+    }
+
+    private int save(String tenantId, Long softwareTitleId, SoftwareTitleRollup rollup) {
         Software software = softwareRepository.findByTenantIdAndSoftwareTitleId(tenantId, softwareTitleId)
                 .orElseGet(Software::new);
         software.setTenantId(tenantId);

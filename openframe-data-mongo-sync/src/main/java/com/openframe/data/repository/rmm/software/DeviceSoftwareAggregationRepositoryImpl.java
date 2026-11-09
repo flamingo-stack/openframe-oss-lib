@@ -64,7 +64,8 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                         .append("arpKeys", union("$arpKeyLists"))
                         .append("packageFamilyNames", union("$packageFamilyNameLists"))
                         .append("installerTypes", union("$installerTypeLists"))));
-        return Optional.ofNullable(aggregateOne(stages)).map(DeviceSoftwareAggregationRepositoryImpl::toTitleRollup);
+        Document rollup = aggregateOne(stages);
+        return Optional.ofNullable(rollup).map(DeviceSoftwareAggregationRepositoryImpl::toTitleRollup);
     }
 
     @Override
@@ -90,47 +91,63 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                 ctx -> new Document("$project", new Document("_id", 0)
                         .append("titles", 1)
                         .append("devicesCount", distinctCount(union("$machineSets")))));
-        return Optional.ofNullable(aggregateOne(stages)).map(DeviceSoftwareAggregationRepositoryImpl::toCveRollup);
+        Document rollup = aggregateOne(stages);
+        return Optional.ofNullable(rollup).map(DeviceSoftwareAggregationRepositoryImpl::toCveRollup);
     }
 
     private Document aggregateOne(List<AggregationOperation> stages) {
-        return mongoTemplate.aggregate(Aggregation.newAggregation(stages), DeviceSoftware.class, Document.class)
+        Aggregation aggregation = Aggregation.newAggregation(stages);
+        return mongoTemplate.aggregate(aggregation, DeviceSoftware.class, Document.class)
                 .getUniqueMappedResult();
     }
 
     private static SoftwareTitleRollup toTitleRollup(Document doc) {
+        int devicesCount = intValue(doc.get("devicesCount"));
+        String name = doc.getString("name");
+        String source = doc.getString("source");
+        String vendor = doc.getString("vendor");
+        String upgradeCode = doc.getString("upgradeCode");
+        List<String> versions = strings(doc, "versions");
+        int cveCount = intValue(doc.get("cveCount"));
+        List<String> arpKeys = strings(doc, "arpKeys");
+        List<String> packageFamilyNames = strings(doc, "packageFamilyNames");
+        List<String> installerTypes = strings(doc, "installerTypes");
+        // a title is a system component only when every device that reports the flag reports it set
         int reported = intValue(doc.get("systemComponentReported"));
-        return new SoftwareTitleRollup(
-                intValue(doc.get("devicesCount")),
-                doc.getString("name"),
-                doc.getString("source"),
-                doc.getString("vendor"),
-                doc.getString("upgradeCode"),
-                strings(doc, "versions"),
-                intValue(doc.get("cveCount")),
-                strings(doc, "arpKeys"),
-                strings(doc, "packageFamilyNames"),
-                strings(doc, "installerTypes"),
-                reported > 0 && reported == intValue(doc.get("systemComponentSet")),
-                doc.getList("installations", Document.class, List.of()).stream()
-                        .map(i -> Software.Installation.builder()
-                                .machineId(i.getString("machineId"))
-                                .versions(i.getList("versions", String.class))
-                                .build())
-                        .toList());
+        int set = intValue(doc.get("systemComponentSet"));
+        boolean systemComponent = reported > 0 && reported == set;
+        List<Software.Installation> installations = doc.getList("installations", Document.class, List.of()).stream()
+                .map(DeviceSoftwareAggregationRepositoryImpl::toInstallation)
+                .toList();
+        return new SoftwareTitleRollup(devicesCount, name, source, vendor, upgradeCode, versions, cveCount,
+                arpKeys, packageFamilyNames, installerTypes, systemComponent, installations);
+    }
+
+    private static Software.Installation toInstallation(Document installation) {
+        String machineId = installation.getString("machineId");
+        List<String> versions = installation.getList("versions", String.class);
+        return Software.Installation.builder()
+                .machineId(machineId)
+                .versions(versions)
+                .build();
     }
 
     private static CveRollup toCveRollup(Document doc) {
         List<CveRollup.Title> titles = doc.getList("titles", Document.class, List.of()).stream()
-                .filter(t -> t.get("softwareTitleId") != null)
-                .map(t -> new CveRollup.Title(
-                        ((Number) t.get("softwareTitleId")).longValue(),
-                        t.getString("name"),
-                        t.getString("source"),
-                        t.getString("installedVersion"),
-                        intValue(t.get("devicesCount"))))
+                .filter(title -> title.get("softwareTitleId") != null)
+                .map(DeviceSoftwareAggregationRepositoryImpl::toCveTitle)
                 .toList();
-        return new CveRollup(intValue(doc.get("devicesCount")), titles);
+        int devicesCount = intValue(doc.get("devicesCount"));
+        return new CveRollup(devicesCount, titles);
+    }
+
+    private static CveRollup.Title toCveTitle(Document title) {
+        Number softwareTitleId = (Number) title.get("softwareTitleId");
+        String name = title.getString("name");
+        String source = title.getString("source");
+        String installedVersion = title.getString("installedVersion");
+        int devicesCount = intValue(title.get("devicesCount"));
+        return new CveRollup.Title(softwareTitleId.longValue(), name, source, installedVersion, devicesCount);
     }
 
     // a set union without blanks, sorted so the stored lists do not reorder between projections

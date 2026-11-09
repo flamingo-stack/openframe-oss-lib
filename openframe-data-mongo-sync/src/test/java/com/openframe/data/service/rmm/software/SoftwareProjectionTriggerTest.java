@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -62,6 +63,30 @@ class SoftwareProjectionTriggerTest {
         assertThat(registry.get(SoftwareProjectionTrigger.TIMER).tag("kind", "cve").timer().count()).isEqualTo(1);
         assertThat(registry.get(SoftwareProjectionTrigger.DEVICES).tag("kind", "cve").summary().totalAmount()).isEqualTo(4);
         verifyNoInteractions(softwareProjector);
+    }
+
+    @Test
+    void failedProjection_isTimedAsErrorAndRecordsNoDevices() {
+        IllegalStateException failure = new IllegalStateException("mongo down");
+        when(softwareProjector.project("t1", 42L)).thenThrow(failure);
+
+        assertThatThrownBy(() -> trigger.titlesChanged("t1", List.of(42L))).isSameAs(failure);
+
+        Timer failed = registry.get(SoftwareProjectionTrigger.TIMER)
+                .tags("kind", "title", "outcome", "error").timer();
+        assertThat(failed.count()).isEqualTo(1);
+        assertThat(registry.find(SoftwareProjectionTrigger.TIMER).tag("outcome", "success").timer()).isNull();
+        assertThat(registry.find(SoftwareProjectionTrigger.DEVICES).summary()).isNull();
+    }
+
+    @Test
+    void successfulProjection_isTimedAsSuccess() {
+        when(vulnerabilityProjector.project("t1", "CVE-1")).thenReturn(1);
+
+        trigger.cvesChanged("t1", List.of("CVE-1"));
+
+        assertThat(registry.get(SoftwareProjectionTrigger.TIMER)
+                .tags("kind", "cve", "outcome", "success").timer().count()).isEqualTo(1);
     }
 
     @Test
