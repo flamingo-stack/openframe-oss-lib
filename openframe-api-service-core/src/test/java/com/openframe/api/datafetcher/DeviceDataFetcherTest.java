@@ -15,6 +15,7 @@ import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.RecipientType;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import org.junit.jupiter.api.DisplayName;
@@ -78,6 +79,37 @@ class DeviceDataFetcherTest {
 
         assertThat(result.getNickname()).isNull();
         verify(deviceService).updateNickname("m1", null);
+    }
+
+    @Test
+    @DisplayName("connectivity: reads the machine's telemetryStatus, not its lifecycle status")
+    void connectivity_readsTelemetryStatus() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        machine.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        when(dfe.getSource()).thenReturn(machine);
+
+        // execution
+        TelemetryStatus result = fetcher.connectivity(dfe);
+
+        // verifications
+        assertThat(result).isEqualTo(TelemetryStatus.OFFLINE);
+    }
+
+    @Test
+    @DisplayName("connectivity: null until the first heartbeat")
+    void connectivity_nullBeforeFirstHeartbeat() {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        when(dfe.getSource()).thenReturn(machine);
+
+        // execution
+        TelemetryStatus result = fetcher.connectivity(dfe);
+
+        // verifications
+        assertThat(result).isNull();
     }
 
     @Test

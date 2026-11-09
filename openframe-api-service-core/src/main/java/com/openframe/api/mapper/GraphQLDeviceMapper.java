@@ -9,8 +9,8 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.PageInfo;
-import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.tool.ConnectionStatus;
@@ -36,6 +36,7 @@ public class GraphQLDeviceMapper {
 
         return DeviceFilterCriteria.builder()
                 .statuses(input.getStatuses())
+                .connectivity(input.getConnectivity())
                 .deviceTypes(input.getDeviceTypes())
                 .osTypes(input.getOsTypes())
                 .organizationIds(input.getOrganizationIds())
@@ -129,7 +130,9 @@ public class GraphQLDeviceMapper {
     }
 
     private static String availableCursor(Machine machine, boolean assigned) {
-        int bucket = (assigned ? 0 : 2) + (machine.getStatus() == DeviceStatus.ONLINE ? 0 : 1);
+        // Must match CustomMachineRepositoryImpl.bucketAddFieldsStage: bucket = (assigned ? 0 : 2) + (online ? 0 : 1).
+        boolean online = machine.getTelemetryStatus() == TelemetryStatus.ONLINE;
+        int bucket = (assigned ? 0 : 2) + (online ? 0 : 1);
         return CursorCodec.encode(bucket + "|" + machine.getId());
     }
 }

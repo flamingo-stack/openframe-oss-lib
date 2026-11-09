@@ -2,6 +2,7 @@ package com.openframe.api.dto.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import lombok.AllArgsConstructor;
@@ -19,6 +20,7 @@ import java.util.List;
 public class DeviceFilterCriteria {
 
     private List<DeviceStatus> statuses;
+    private List<TelemetryStatus> connectivity;
     private List<DeviceType> deviceTypes;
     private List<OsType> osTypes;
     private List<String> organizationIds;

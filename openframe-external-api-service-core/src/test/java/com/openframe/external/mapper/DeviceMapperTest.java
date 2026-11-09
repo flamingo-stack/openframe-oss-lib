@@ -8,6 +8,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.external.dto.device.DeviceFilterItem;
@@ -51,6 +52,7 @@ class DeviceMapperTest {
         assertEquals("os-uuid-1", response.getOsUuid());
         assertEquals("1.2.3", response.getAgentVersion());
         assertEquals(DeviceStatus.ONLINE, response.getStatus());
+        assertEquals(TelemetryStatus.OFFLINE, response.getConnectivity());
         assertEquals(LAST_SEEN, response.getLastSeen());
         assertEquals("SN-1", response.getSerialNumber());
         assertEquals("Apple", response.getManufacturer());
@@ -172,6 +174,7 @@ class DeviceMapperTest {
     void filterResponseRenamesOrganizationsToCustomersAndKeepsCounts() {
         DeviceFilterResponse response = mapper.toDeviceFilterResponse(DeviceFilters.builder()
                 .statuses(List.of(new DeviceFilterOption("ONLINE", "Online", 4), new DeviceFilterOption("OFFLINE", "Offline", 1)))
+                .connectivity(List.of(new DeviceFilterOption("ONLINE", "ONLINE", 3)))
                 .deviceTypes(List.of(new DeviceFilterOption("LAPTOP", "Laptop", 3)))
                 .osTypes(List.of(new DeviceFilterOption("WINDOWS", "Windows", 2)))
                 .organizationIds(List.of(new DeviceFilterOption("cust-1", "Acme", 5)))
@@ -181,6 +184,7 @@ class DeviceMapperTest {
 
         assertEquals(List.of(new DeviceFilterItem("ONLINE", "Online", 4), new DeviceFilterItem("OFFLINE", "Offline", 1)),
                 response.getStatuses());
+        assertEquals(List.of(new DeviceFilterItem("ONLINE", "ONLINE", 3)), response.getConnectivity());
         assertEquals(List.of(new DeviceFilterItem("LAPTOP", "Laptop", 3)), response.getDeviceTypes());
         assertEquals(List.of(new DeviceFilterItem("WINDOWS", "Windows", 2)), response.getOsTypes());
         assertEquals(List.of(new DeviceFilterItem("cust-1", "Acme", 5)), response.getCustomerIds());
@@ -193,6 +197,7 @@ class DeviceMapperTest {
         DeviceFilterResponse response = mapper.toDeviceFilterResponse(new DeviceFilters());
 
         assertTrue(response.getStatuses().isEmpty());
+        assertTrue(response.getConnectivity().isEmpty());
         assertTrue(response.getDeviceTypes().isEmpty());
         assertTrue(response.getOsTypes().isEmpty());
         assertTrue(response.getCustomerIds().isEmpty());
@@ -212,6 +217,16 @@ class DeviceMapperTest {
                 .build();
     }
 
+    @Test
+    void deviceResponseConnectivityIsNullUntilTheFirstHeartbeat() {
+        Machine machine = machine("m-1");
+        machine.setTelemetryStatus(null);
+
+        DeviceResponse response = mapper.toDeviceResponse(machine, List.of());
+
+        assertNull(response.getConnectivity());
+    }
+
     private static Machine machine(String machineId) {
         Machine machine = new Machine();
         machine.setId("mongo-" + machineId);
@@ -224,6 +239,7 @@ class DeviceMapperTest {
         machine.setOsUuid("os-uuid-1");
         machine.setAgentVersion("1.2.3");
         machine.setStatus(DeviceStatus.ONLINE);
+        machine.setTelemetryStatus(TelemetryStatus.OFFLINE);
         machine.setLastSeen(LAST_SEEN);
         machine.setOrganizationId("cust-1");
         machine.setSerialNumber("SN-1");

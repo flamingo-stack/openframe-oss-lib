@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
+import static com.openframe.api.dto.device.DeviceFilterFacet.CONNECTIVITY;
 import static com.openframe.api.dto.device.DeviceFilterFacet.DEVICE_TYPES;
 import static com.openframe.api.dto.device.DeviceFilterFacet.FILTERED_COUNT;
 import static com.openframe.api.dto.device.DeviceFilterFacet.ORGANIZATION_IDS;
@@ -73,6 +74,8 @@ public class DeviceFilterService {
         Set<DeviceFilterFacet> facets = requestedFacets != null ? requestedFacets : DeviceFilterFacet.ALL;
         List<String> statuses = filters != null && filters.getStatuses() != null ?
                 filters.getStatuses().stream().map(Enum::name).toList() : emptyList();
+        List<String> connectivity = filters != null && filters.getConnectivity() != null ?
+                filters.getConnectivity().stream().map(Enum::name).toList() : emptyList();
         List<String> deviceTypes = filters != null && filters.getDeviceTypes() != null ?
                 filters.getDeviceTypes().stream().map(Enum::name).toList() : emptyList();
         List<String> osTypes = filters != null && filters.getOsTypes() != null ?
@@ -84,23 +87,26 @@ public class DeviceFilterService {
         String tenantId = tenantIdProvider.getTenantId();
 
         CompletableFuture<Map<String, Integer>> statusesFuture = facetQuery(facets, STATUSES, () ->
-                pinotDeviceRepository.getStatusFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getStatusFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+        CompletableFuture<Map<String, Integer>> connectivityFuture = facetQuery(facets, CONNECTIVITY, () ->
+                pinotDeviceRepository.getConnectivityFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> deviceTypesFuture = facetQuery(facets, DEVICE_TYPES, () ->
-                pinotDeviceRepository.getDeviceTypeFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getDeviceTypeFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> osTypesFuture = facetQuery(facets, OS_TYPES, () ->
-                pinotDeviceRepository.getOsTypeFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getOsTypeFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> organizationsFuture = facetQuery(facets, ORGANIZATION_IDS, () ->
-                pinotDeviceRepository.getOrganizationFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getOrganizationFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Map<String, Integer>> tagKeysFuture = facetQuery(facets, TAG_KEYS, () ->
-                pinotDeviceRepository.getTagKeyFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getTagKeyFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
         CompletableFuture<Integer> filteredCountFuture = facetQuery(facets, FILTERED_COUNT, () ->
-                pinotDeviceRepository.getFilteredDeviceCount(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
+                pinotDeviceRepository.getFilteredDeviceCount(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues));
 
         return CompletableFuture.allOf(
-                        statusesFuture, deviceTypesFuture, osTypesFuture,
+                        statusesFuture, connectivityFuture, deviceTypesFuture, osTypesFuture,
                         organizationsFuture, tagKeysFuture, filteredCountFuture)
                 .thenApply(v -> DeviceFilters.builder()
                         .statuses(optionMapper.selfLabeled(statusesFuture.join()))
+                        .connectivity(optionMapper.selfLabeled(connectivityFuture.join()))
                         .deviceTypes(optionMapper.selfLabeled(deviceTypesFuture.join()))
                         .osTypes(optionMapper.selfLabeled(osTypesFuture.join()))
                         .organizationIds(optionMapper.organizationLabeled(organizationsFuture.join()))
