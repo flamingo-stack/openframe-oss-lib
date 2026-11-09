@@ -116,6 +116,28 @@ class SoftwareScheduleOnlineDispatchServiceTest {
         assertThat(row.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
     }
 
+    @Test
+    @DisplayName("D1: a PENDING device that is online is left NEW, nothing dispatched")
+    void pendingMachineOnline_leftNew() {
+        // setup
+        Instant now = Instant.now();
+        SoftwareScheduleOnlineDispatch row = sentinel("m-pending", now.plusSeconds(3600));
+        Machine pending = machine("m-pending", DeviceStatus.PENDING);
+        pending.setTelemetryStatus(TelemetryStatus.ONLINE);
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
+                .thenReturn(List.of(row));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(pending));
+        when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of());
+
+        // execution
+        service.processReconnectedDevices();
+
+        // verifications
+        verifyNoInteractions(fireDispatcher);
+        verify(dispatchRepository, never()).saveAll(any());
+        assertThat(row.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
+    }
+
     private static SoftwareScheduleOnlineDispatch byId(List<SoftwareScheduleOnlineDispatch> list, String machineId) {
         return list.stream().filter(s -> s.getMachineId().equals(machineId)).findFirst().orElseThrow();
     }

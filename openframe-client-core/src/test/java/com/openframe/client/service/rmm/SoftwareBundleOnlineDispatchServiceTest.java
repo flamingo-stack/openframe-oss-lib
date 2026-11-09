@@ -110,6 +110,27 @@ class SoftwareBundleOnlineDispatchServiceTest {
         assertThat(row.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
     }
 
+    @Test
+    @DisplayName("D1: a PENDING device that is online is left NEW, nothing dispatched")
+    void pendingMachineOnline_leftNew() {
+        // setup
+        SoftwareBundleOnlineDispatch row = sentinel("m-pending");
+        Machine pending = machine("m-pending", DeviceStatus.PENDING);
+        pending.setTelemetryStatus(TelemetryStatus.ONLINE);
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
+                .thenReturn(List.of(row));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(pending));
+        when(bundleRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of());
+
+        // execution
+        service.processDevicesBecameOnline();
+
+        // verifications
+        verifyNoInteractions(bundleDispatcher);
+        verify(dispatchRepository, never()).saveAll(any());
+        assertThat(row.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
+    }
+
     private static SoftwareBundleOnlineDispatch sentinel(String machineId) {
         return SoftwareBundleOnlineDispatch.builder()
                 .tenantId(TENANT).machineId(machineId).bundleId(BUNDLE_ID)

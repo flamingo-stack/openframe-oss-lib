@@ -232,6 +232,22 @@ class PinotClientDeviceRepositoryTest {
         }
 
         @Test
+        @DisplayName("connectivity facet drops the \"null\" group of rows published before the column existed")
+        void connectivityFacetDropsPinotNullGroup() {
+            when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
+            when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
+            when(resultSet.getRowCount()).thenReturn(2);
+            when(resultSet.getString(0, 0)).thenReturn("null");
+            when(resultSet.getString(1, 0)).thenReturn("OFFLINE");
+            when(resultSet.getLong(1, 1)).thenReturn(2L);
+
+            Map<String, Integer> result = repository.getConnectivityFilterOptions(TENANT_ID, List.of(), List.of(),
+                    List.of(), List.of(), List.of(), List.of(), List.of());
+
+            assertEquals(Map.of("OFFLINE", 2), result);
+        }
+
+        @Test
         @DisplayName("a null connectivity list adds no connectivity condition")
         void nullConnectivityIgnored() {
             whenQueryReturnsEmptyRows();
