@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { NavigationSidebarConfig, NavigationSidebarItem } from '../../../types/navigation';
+import type {
+  NavigationSidebarConfig,
+  NavigationSidebarItem,
+  NavigationSidebarSlotState,
+} from '../../../types/navigation';
 import { NavigationSidebar } from '../navigation-sidebar';
 
 const icon = <svg data-testid="icon" />;
@@ -175,7 +179,7 @@ describe('NavigationSidebar grouped — one open group', () => {
 
 describe('NavigationSidebar — slots', () => {
   it('renders the section and the footer, and hands render functions `minimized`, not in the drawer', () => {
-    const footer = vi.fn(({ minimized }: { minimized: boolean }) => <span>{minimized ? 'rail' : 'account'}</span>);
+    const footer = vi.fn(({ minimized }: NavigationSidebarSlotState) => <span>{minimized ? 'rail' : 'account'}</span>);
     render(
       <NavigationSidebar
         config={{
@@ -192,7 +196,9 @@ describe('NavigationSidebar — slots', () => {
     expect(screen.getByRole('complementary', { name: 'Main navigation sidebar' })).toHaveAttribute(
       'data-navigation-sidebar',
     );
-    expect(footer).toHaveBeenLastCalledWith({ minimized: false, inDrawer: false, toggle: expect.any(Function) });
+    const [slotState] = footer.mock.lastCall ?? [];
+    expect(slotState).toMatchObject({ minimized: false, inDrawer: false });
+    expect(typeof slotState?.toggle).toBe('function');
   });
 
   it('hands a section render function the collapsed state', () => {
