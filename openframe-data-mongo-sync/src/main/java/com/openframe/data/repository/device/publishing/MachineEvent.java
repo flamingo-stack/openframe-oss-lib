@@ -17,4 +17,6 @@ public class MachineEvent implements PublishedEvent {
     private String machineId;
     private String hostname;
     private String nickname;
+    // The customer the device belongs to now; a change hides and archives the previous customer's client chats.
+    private String organizationId;
 }
