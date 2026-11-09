@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { embedAuthedFetch, needsBearerAssetFetch, setEmbedAuthAdapter } from '../embed-authed-fetch';
+import { assetLoadMode, embedAuthedFetch, setEmbedAuthAdapter } from '../embed-authed-fetch';
 
 /**
  * Tests focus on the same-origin guard rather than the proxy-auth
@@ -346,50 +346,55 @@ describe('embedAuthedFetch adapter.allowedOrigins (native-shell cross-origin san
 });
 
 /**
- * `needsBearerAssetFetch` decides whether a `<img>` / `<track>` URL has to be
- * blob-fetched (see `useAuthedAssetSrc`). The signal is the adapter's
- * `Authorization` header — i.e. the host authenticates by HEADER, so nothing
- * the browser fetches on its own carries auth, same-origin included.
+ * `assetLoadMode` decides how a `<img>` / `<track>` URL loads (see `useAuthedAsset`). The signal is the adapter's
+ * credential: where the host authenticates by HEADER, nothing the browser fetches on its own carries auth,
+ * same-origin included.
  */
-describe('needsBearerAssetFetch (native subresources that cannot carry a header)', () => {
+describe('assetLoadMode (native subresources that cannot carry a header)', () => {
   const bearer = { getHeaders: () => ({ Authorization: 'Bearer t' }) };
 
   afterEach(() => {
     setEmbedAuthAdapter(null);
   });
 
-  it('is false with no adapter registered (the hub — cookies or nothing)', () => {
-    expect(needsBearerAssetFetch('/content/api/captions/release/1')).toBe(false);
+  it('is native with no adapter registered (the hub — cookies or nothing)', () => {
+    expect(assetLoadMode('/content/api/captions/release/1')).toBe('native');
   });
 
-  it('is false in cookie mode (adapter supplies no Authorization)', () => {
+  it('is native in cookie mode (adapter supplies no Authorization)', () => {
     setEmbedAuthAdapter({ getHeaders: () => ({}) });
-    expect(needsBearerAssetFetch('/content/api/captions/release/1')).toBe(false);
+    expect(assetLoadMode('/content/api/captions/release/1')).toBe('native');
   });
 
-  it('is TRUE for a relative proxy path in header-auth mode (dev-ticket web)', () => {
+  it('is bearer for a relative proxy path in header-auth mode (dev-ticket web)', () => {
     setEmbedAuthAdapter(bearer);
-    expect(needsBearerAssetFetch('/content/api/captions/release/1')).toBe(true);
+    expect(assetLoadMode('/content/api/captions/release/1')).toBe('bearer');
   });
 
-  it('is TRUE for an absolute same-origin URL in header-auth mode', () => {
+  it('is bearer for an absolute same-origin URL in header-auth mode', () => {
     setEmbedAuthAdapter(bearer);
-    expect(needsBearerAssetFetch('http://localhost:3000/content/api/image-proxy?u=x')).toBe(true);
+    expect(assetLoadMode('http://localhost:3000/content/api/image-proxy?u=x')).toBe('bearer');
   });
 
-  it('is TRUE for a cross-origin gateway the adapter sanctions (native shell)', () => {
+  it('is bearer for a cross-origin gateway the adapter sanctions (native shell)', () => {
     setEmbedAuthAdapter({ ...bearer, allowedOrigins: ['https://gateway.example'] });
-    expect(needsBearerAssetFetch('https://gateway.example/content/api/captions/release/1')).toBe(true);
+    expect(assetLoadMode('https://gateway.example/content/api/captions/release/1')).toBe('bearer');
   });
 
-  it('is false for a third-party origin the bearer does not belong to', () => {
+  it('waits for the credential on a sanctioned gateway when the host declares header auth and has none yet', () => {
+    setEmbedAuthAdapter({ ...bearer, hasCredential: () => false, allowedOrigins: ['https://gateway.example'] });
+    expect(assetLoadMode('https://gateway.example/api/images/user/1')).toBe('awaiting-credential');
+    expect(assetLoadMode('/assets/logo.svg')).toBe('native');
+  });
+
+  it('is native for a third-party origin the bearer does not belong to', () => {
     setEmbedAuthAdapter({ ...bearer, allowedOrigins: ['https://gateway.example'] });
-    expect(needsBearerAssetFetch('https://cdn.example.com/pic.png')).toBe(false);
+    expect(assetLoadMode('https://cdn.example.com/pic.png')).toBe('native');
   });
 
-  it('is false for non-http(s) schemes (data:/blob: assets load natively)', () => {
+  it('is native for non-http(s) schemes (data:/blob: assets load natively)', () => {
     setEmbedAuthAdapter(bearer);
-    expect(needsBearerAssetFetch('data:image/png;base64,AAAA')).toBe(false);
-    expect(needsBearerAssetFetch('blob:http://localhost:3000/abc')).toBe(false);
+    expect(assetLoadMode('data:image/png;base64,AAAA')).toBe('native');
+    expect(assetLoadMode('blob:http://localhost:3000/abc')).toBe('native');
   });
 });

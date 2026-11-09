@@ -20,7 +20,7 @@
  * (e.g. `/api/profile/me`) keep using vanilla `fetch`.
  */
 
-import { resolveAppOriginUrl } from './app-origins';
+import { isPageOriginUrl, readAppOrigins, resolveAppOriginUrl } from './app-origins';
 import { readRegisteredAdapter, writeRegisteredAdapter } from './embed-auth-adapter-registry';
 import { applyProxyAuth } from './embed-proxy-auth-storage';
 
@@ -130,6 +130,27 @@ export interface EmbedAuthAdapter {
    */
   allowedOrigins?: string[];
   /**
+   * Optional: where a picture or other asset URL found in the host's data actually lives. Every asset the lib
+   * loads natively (the boxed `Image`, and everything drawn through `useAuthedAsset`) passes its URL through
+   * this first. A backend path that the page's origin does not serve, such as `/images/user/1` stored on a
+   * record but served at `{gateway}/api/images/user/1`, then loads from the gateway on every host, including a
+   * native shell, whose page origin has no server behind it.
+   *
+   * Must be idempotent. It must return absolute URLs and `data:` / `blob:` URLs unchanged, and leave the host's
+   * own static assets alone. Omit it when every URL in the host's data is already loadable as it stands. A host
+   * that registers `next/image` with its optimizer on must allow the hosts this returns in its image config.
+   */
+  resolveAssetUrl?: (url: string) => string;
+  /**
+   * Optional, side-effect-free: whether `getHeaders()` would carry an `Authorization` header now. Declaring it also
+   * says the host authenticates by header: a picture on an origin in `allowedOrigins` then waits for the credential
+   * (`assetLoadMode`'s `awaiting-credential`) instead of loading natively into a 401. The lib asks it for every
+   * mounted picture and right after every credential change, so a host whose `getHeaders` has per-call side effects
+   * needs it to keep classifying from counting as sending.
+   * Without it the lib reads `getHeaders()` and never waits.
+   */
+  hasCredential?: () => boolean;
+  /**
    * Optional: call `listener` whenever `getHeaders()` starts returning a NEW
    * credential (a rotation the host ran on its own — e.g. a native shell's
    * background refresh). Returns an unsubscribe. Lets a long-lived surface
@@ -189,39 +210,43 @@ export function subscribeEmbedCredentialChange(listener: () => void): () => void
 }
 
 /**
- * Whether `url` is an asset the browser CANNOT load natively because its
- * auth rides in request headers.
+ * How the browser has to load an asset URL on this host. Native asset loads (`<img src>`, `<track src>`, CSS
+ * `background-image`) can't carry custom headers, so where the host authenticates by HEADER (its adapter has a
+ * credential: `hasCredential`, else an `Authorization` from `getHeaders`) nothing the browser fetches on its own is
+ * authenticated:
  *
- * Native asset loads (`<img src>`, `<track src>`, CSS `background-image`)
- * can't carry custom headers, so a URL this returns `true` for must go
- * through `embedAuthedFetch` → blob object-URL instead (see
- * `useAuthedAssetSrc` / `useAuthedImageSrc`).
- *
- * The single signal is the registered adapter: when it supplies an
- * `Authorization` header, the host authenticates by HEADER, so nothing the
- * browser fetches on its own is authenticated. That holds for BOTH shapes a
- * header-auth host takes:
- *
- *   - a cross-origin gateway URL — sanctioned via `allowedOrigins` (native
- *     shells, whose page origin is `capacitor://` / `tauri://`);
- *   - a same-origin / relative reverse-proxy path (`/content/api/...`) —
- *     dev-ticket web, where the token lives in localStorage and there is NO
- *     session cookie to fall back on. This case used to be excluded on the
- *     assumption that same-origin implies "cookies work"; true for a cookie
- *     session, false for every header-auth host, which is exactly when this
- *     predicate is consulted at all.
- *
- * Everything else loads natively, unchanged: cookie-auth web (the adapter
- * supplies no `Authorization`), no adapter at all (the hub), and third-party
- * origins the bearer does NOT belong to (public images) — those stay out of
- * reach of the token by the same origin rules `embedAuthedFetch` enforces.
+ *   - `native`: hand it to the element as it stands. Cookie-auth web (no credential), no adapter at all (the hub), a
+ *     third-party origin the bearer does NOT belong to (public images: out of the token's reach by the same origin
+ *     rules `embedAuthedFetch` enforces), or a non-http(s) URL (`data:`, `blob:`, a native shell's own bundle).
+ *   - `bearer`: fetch it with the adapter's credential (`embedAuthedFetch`) and draw the blob. That covers both shapes
+ *     a header-auth host takes: a cross-origin gateway sanctioned in `allowedOrigins` (native shells, whose page
+ *     origin is `capacitor://` / `tauri://`), and a same-origin or relative reverse-proxy path (`/content/api/...`)
+ *     on dev-ticket web, where the token lives in localStorage and there is NO session cookie to fall back on.
+ *   - `awaiting-credential`: it lives on a gateway the host sanctioned in `allowedOrigins`, which only the bearer
+ *     opens, and the host, which declared header auth (`hasCredential`), has no credential yet. A native shell
+ *     renders before its tokens arrive: a native load at that moment is a guaranteed 401, so the caller waits for
+ *     `subscribeEmbedCredentialChange` instead.
  */
-export function needsBearerAssetFetch(url: string): boolean {
-  if (typeof window === 'undefined') return false;
+export type AssetLoadMode = 'native' | 'bearer' | 'awaiting-credential';
+
+/** `url`'s `AssetLoadMode` on this host now. Pass the URL after `resolveAssetUrl`. */
+export function assetLoadMode(url: string): AssetLoadMode {
+  if (typeof window === 'undefined') return 'native';
   const adapter = getRegisteredAuthAdapter();
-  if (!adapter || adapter.getHeaders?.().Authorization === undefined) return false;
-  const target = resolveAppOriginUrl(url);
-  return target !== null && (target.protocol === 'http:' || target.protocol === 'https:');
+  if (!adapter) return 'native';
+  const origins = readAppOrigins();
+  const target = resolveAppOriginUrl(url, origins);
+  if (!target || (target.protocol !== 'http:' && target.protocol !== 'https:')) return 'native';
+  if (!adapter.hasCredential) return adapter.getHeaders?.().Authorization !== undefined ? 'bearer' : 'native';
+  if (adapter.hasCredential()) return 'bearer';
+  // The page's own origin without a credential: the host authenticates there natively (cookies).
+  return isPageOriginUrl(target, origins) ? 'native' : 'awaiting-credential';
+}
+
+/** `url` where the host says it lives (`EmbedAuthAdapter.resolveAssetUrl`); unchanged when no host says. */
+export function resolveAssetUrl(url: string): string {
+  const resolve = getRegisteredAuthAdapter()?.resolveAssetUrl;
+  return resolve ? resolve(url) : url;
 }
 
 /**
@@ -347,6 +372,16 @@ function dedupedRefresh(): Promise<boolean> {
   return inFlightRefresh;
 }
 
+const answersAfterRefresh = new WeakSet<Response>();
+
+/**
+ * Whether `response` answered the retry `embedAuthedFetch` sent after refreshing the credential: a 401 here is a
+ * refusal of a credential just issued, which another refresh will not lift.
+ */
+export function answeredAfterRefresh(response: Response): boolean {
+  return answersAfterRefresh.has(response);
+}
+
 /**
  * Core fetch path: merge proxy-auth + adapter headers, issue the request,
  * and — on a `401` with a refresh-capable adapter — refresh once and retry
@@ -406,7 +441,9 @@ async function fetchWithRefresh(
   if (response.status === 401 && !isRetry && adapter?.refresh) {
     const refreshed = await dedupedRefresh();
     if (refreshed) {
-      return fetchWithRefresh(url, init, baseHeaders, true);
+      const retried = await fetchWithRefresh(url, init, baseHeaders, true);
+      answersAfterRefresh.add(retried);
+      return retried;
     }
   }
 
