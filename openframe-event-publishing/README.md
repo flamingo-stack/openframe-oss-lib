@@ -103,6 +103,16 @@ Organization is the example; its files are in `openframe-data-mongo-sync`, next 
    publish each one with `OutboxPublisher`, or the change is silently not published.
 5. Add the config key, with `enabled: false`, and switch it on per environment.
 
+## Topics
+
+Each spec has a Kafka topic, `<prefix><type>`, and its DLT, `<prefix><type>-dlt`.
+[`EventTopicCatalog`](src/main/java/com/openframe/publishing/api/topic/EventTopicCatalog.java) (a bean wherever the
+specs are) lists both for every spec, with their settings from
+[`EventTopicDefinition`](src/main/java/com/openframe/publishing/api/topic/EventTopicDefinition.java): compacted events
+topics, DLTs with the delete policy, one partition. Shared management creates them from it; nothing else creates
+event topics, and a new spec needs no topic config (see the
+[processing README](../openframe-event-processing/README.md#topics)).
+
 ## Projections
 
 A projection is data that another collection keeps from a published document, for example `tickets.organizationName`
