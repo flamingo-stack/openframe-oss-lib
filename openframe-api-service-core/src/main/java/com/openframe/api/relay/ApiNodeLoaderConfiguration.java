@@ -68,7 +68,8 @@ public class ApiNodeLoaderConfiguration {
 
     @Bean
     public NodeLoader<MachineTag> machineTagNodeLoader(TagService tagService) {
-        return LookupNodeLoader.byRawId(NodeType.MACHINE_TAG, MachineTag.class, tagService::findMachineTagById);
+        return LookupNodeLoader.byRawId(NodeType.MACHINE_TAG, MachineTag.class,
+                rawId -> findMachineTag(tagService, rawId));
     }
 
     @Bean
@@ -153,6 +154,12 @@ public class ApiNodeLoaderConfiguration {
         TicketService service = ticketService.getIfAvailable();
         return Optional.ofNullable(service)
                 .flatMap(tickets -> tickets.getTicket(principal, rawId));
+    }
+
+    private static Optional<MachineTag> findMachineTag(TagService tagService, String rawId) {
+        List<String> ids = List.of(rawId);
+        List<MachineTag> machineTags = tagService.getMachineTagsByIds(ids);
+        return machineTags.stream().findFirst();
     }
 
     private static Optional<UserResponse> findUser(UserService userService, String rawId) {

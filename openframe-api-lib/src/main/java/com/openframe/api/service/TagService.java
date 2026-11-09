@@ -144,36 +144,32 @@ public class TagService {
 
     /**
      * Get tags for multiple machines (batch loading).
-     * Returns Tag objects enriched with per-device values from TagAssignment: the definition's id with the
-     * device's values and tagged date. Clients that cache by id want {@link #getTagAssignmentsForMachines(List)}.
+     * Returns Tag objects enriched with per-device values from TagAssignment.
      */
     public List<List<Tag>> getTagsForMachines(List<String> machineIds) {
         log.debug("Getting tags for {} machines", machineIds.size());
         return loadPerMachine(machineIds, this::buildTag);
     }
 
-    /**
-     * Get the tag assignments of multiple machines (batch loading), one {@link MachineTag} per assignment with
-     * the assignment's own id, values and tagged date and the stored tag definition under {@code tag}.
-     * One assignment and one tag query per batch, like {@link #getTagsForMachines(List)}.
-     */
+    // One node per assignment: the assignment's own id and values, the stored Tag under it, so clients caching by id
+    // never merge two devices sharing a tag.
     public List<List<MachineTag>> getTagAssignmentsForMachines(List<String> machineIds) {
         log.debug("Getting tag assignments for {} machines", machineIds.size());
         return loadPerMachine(machineIds, this::buildMachineTag);
     }
 
-    /**
-     * Find one device tag assignment by the assignment's id, with its tag definition.
-     * Empty when there is no such assignment, it is not a device's, or its tag definition is gone.
-     */
-    public Optional<MachineTag> findMachineTagById(String assignmentId) {
-        return tagAssignmentRepository.findByIdAndEntityType(assignmentId, TagEntityType.DEVICE)
-                .flatMap(this::toMachineTag);
-    }
-
-    private Optional<MachineTag> toMachineTag(TagAssignment assignment) {
-        return tagRepository.findById(assignment.getTagId())
-                .map(tag -> buildMachineTag(assignment, tag));
+    public List<MachineTag> getMachineTagsByIds(List<String> assignmentIds) {
+        log.debug("Getting {} device tag assignments by id", assignmentIds.size());
+        List<TagAssignment> assignments = tagAssignmentRepository
+                .findByIdInAndEntityType(assignmentIds, TagEntityType.DEVICE);
+        if (assignments.isEmpty()) {
+            return List.of();
+        }
+        Map<String, Tag> tagsById = findTagsOf(assignments);
+        return assignments.stream()
+                .map(assignment -> buildMachineTag(assignment, tagsById.get(assignment.getTagId())))
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private <T> List<List<T>> loadPerMachine(List<String> machineIds, BiFunction<TagAssignment, Tag, T> mapper) {

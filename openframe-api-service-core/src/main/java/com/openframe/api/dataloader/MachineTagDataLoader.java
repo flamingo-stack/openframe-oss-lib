@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
-/** Batches Machine.tagAssignments: one assignment and one tag query per device list. */
+// Machine.tagAssignments: one assignment and one tag query per device list.
 @DgsDataLoader(name = MachineTagDataLoader.NAME)
 @RequiredArgsConstructor
 public class MachineTagDataLoader implements BatchLoader<String, List<MachineTag>> {

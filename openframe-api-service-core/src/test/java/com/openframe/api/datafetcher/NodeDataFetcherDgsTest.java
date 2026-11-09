@@ -149,7 +149,7 @@ class NodeDataFetcherDgsTest {
         // setup
         Tag tag = Tag.builder().id(TAG_ID).key(TAG_KEY).build();
         MachineTag machineTag = MachineTag.builder().id(ASSIGNMENT_ID).tag(tag).values(List.of("prod")).build();
-        when(tagService.findMachineTagById(ASSIGNMENT_ID)).thenReturn(Optional.of(machineTag));
+        when(tagService.getMachineTagsByIds(List.of(ASSIGNMENT_ID))).thenReturn(List.of(machineTag));
         String machineTagGlobalId = codec.encode(NodeType.MACHINE_TAG, ASSIGNMENT_ID);
         String tagGlobalId = codec.encode(NodeType.TAG, TAG_ID);
         Map<String, Object> variables = Map.of("id", machineTagGlobalId);
@@ -167,7 +167,7 @@ class NodeDataFetcherDgsTest {
     @Test
     void node_machineTagGlobalIdOfAnUnknownAssignment_answersNull() {
         // setup
-        when(tagService.findMachineTagById(ASSIGNMENT_ID)).thenReturn(Optional.empty());
+        when(tagService.getMachineTagsByIds(List.of(ASSIGNMENT_ID))).thenReturn(List.of());
         String machineTagGlobalId = codec.encode(NodeType.MACHINE_TAG, ASSIGNMENT_ID);
         Map<String, Object> variables = Map.of("id", machineTagGlobalId);
 

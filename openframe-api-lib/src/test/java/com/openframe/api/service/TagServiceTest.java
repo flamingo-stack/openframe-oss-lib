@@ -294,59 +294,48 @@ class TagServiceTest {
     }
 
     @Test
-    void findMachineTagById_deviceAssignment_theAssignmentWithItsDefinition() {
+    void getMachineTagsByIds_deviceAssignment_theAssignmentWithItsDefinition() {
         // setup
-        when(tagAssignmentRepository.findByIdAndEntityType("as-1", DEVICE)).thenReturn(Optional.of(firstDeviceEnv));
-        when(tagRepository.findById("tag-env")).thenReturn(Optional.of(envTag));
+        when(tagAssignmentRepository.findByIdInAndEntityType(List.of("as-1"), DEVICE))
+                .thenReturn(List.of(firstDeviceEnv));
+        when(tagRepository.findAllById(List.of("tag-env"))).thenReturn(List.of(envTag));
 
         // execution
-        Optional<MachineTag> result = tagService.findMachineTagById("as-1");
+        List<MachineTag> result = tagService.getMachineTagsByIds(List.of("as-1"));
 
         // verifications
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo("as-1");
-        assertThat(result.get().getValues()).containsExactly("prod");
-        assertThat(result.get().getTaggedAt()).isEqualTo(FIRST_TAGGED_AT);
-        assertThat(result.get().getTaggedBy()).isEqualTo("alice");
-        assertThat(result.get().getTag()).isSameAs(envTag);
+        assertThat(result).hasSize(1);
+        MachineTag machineTag = result.get(0);
+        assertThat(machineTag.getId()).isEqualTo("as-1");
+        assertThat(machineTag.getValues()).containsExactly("prod");
+        assertThat(machineTag.getTaggedAt()).isEqualTo(FIRST_TAGGED_AT);
+        assertThat(machineTag.getTaggedBy()).isEqualTo("alice");
+        assertThat(machineTag.getTag()).isSameAs(envTag);
     }
 
     @Test
-    void findMachineTagById_unknownId_empty() {
+    void getMachineTagsByIds_unknownOrNonDeviceAssignment_emptyWithoutATagQuery() {
         // setup
-        when(tagAssignmentRepository.findByIdAndEntityType("missing", DEVICE)).thenReturn(Optional.empty());
+        when(tagAssignmentRepository.findByIdInAndEntityType(List.of("missing"), DEVICE)).thenReturn(List.of());
 
         // execution
-        Optional<MachineTag> result = tagService.findMachineTagById("missing");
-
-        // verifications
-        assertThat(result).isEmpty();
-        verify(tagRepository, never()).findById(any());
-    }
-
-    @Test
-    void findMachineTagById_assignmentOfAnotherEntityType_emptyWithoutATagQuery() {
-        // setup
-        when(tagAssignmentRepository.findByIdAndEntityType("as-s", DEVICE)).thenReturn(Optional.empty());
-
-        // execution
-        Optional<MachineTag> result = tagService.findMachineTagById("as-s");
+        List<MachineTag> result = tagService.getMachineTagsByIds(List.of("missing"));
 
         // verifications
         assertThat(result).isEmpty();
-        verify(tagAssignmentRepository).findByIdAndEntityType("as-s", DEVICE);
-        verify(tagAssignmentRepository, never()).findById(any());
-        verify(tagRepository, never()).findById(any());
+        verify(tagAssignmentRepository).findByIdInAndEntityType(List.of("missing"), DEVICE);
+        verify(tagRepository, never()).findAllById(any());
     }
 
     @Test
-    void findMachineTagById_tagDefinitionGone_empty() {
+    void getMachineTagsByIds_tagDefinitionGone_skipped() {
         // setup
-        when(tagAssignmentRepository.findByIdAndEntityType("as-1", DEVICE)).thenReturn(Optional.of(firstDeviceEnv));
-        when(tagRepository.findById("tag-env")).thenReturn(Optional.empty());
+        when(tagAssignmentRepository.findByIdInAndEntityType(List.of("as-1"), DEVICE))
+                .thenReturn(List.of(firstDeviceEnv));
+        when(tagRepository.findAllById(List.of("tag-env"))).thenReturn(List.of());
 
         // execution
-        Optional<MachineTag> result = tagService.findMachineTagById("as-1");
+        List<MachineTag> result = tagService.getMachineTagsByIds(List.of("as-1"));
 
         // verifications
         assertThat(result).isEmpty();
