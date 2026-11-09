@@ -17,8 +17,6 @@ public interface DeviceSoftwareRepository extends MongoRepository<DeviceSoftware
 
     List<DeviceSoftware> findByTenantIdAndMachineId(String tenantId, String machineId);
 
-    List<DeviceSoftware> findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue(String tenantId, Long softwareTitleId);
-
     List<DeviceSoftware> findByTenantIdAndVulnerabilitiesContainingAndMachineConnectedTrue(String tenantId, String cveId);
 
     long deleteByTenantIdAndMachineId(String tenantId, String machineId);

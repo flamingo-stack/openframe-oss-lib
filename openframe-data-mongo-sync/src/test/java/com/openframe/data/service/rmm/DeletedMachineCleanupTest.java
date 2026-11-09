@@ -4,8 +4,7 @@ import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.service.rmm.software.SoftwareProjector;
-import com.openframe.data.service.rmm.software.VulnerabilityProjector;
+import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -25,8 +25,7 @@ class DeletedMachineCleanupTest {
     @Mock private ScriptScheduleMachineAssignedRepository assignedRepository;
     @Mock private DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
-    @Mock private SoftwareProjector softwareProjector;
-    @Mock private VulnerabilityProjector vulnerabilityProjector;
+    @Mock private SoftwareProjectionTrigger projectionTrigger;
 
     @InjectMocks private DeletedMachineCleanup cleanup;
 
@@ -46,7 +45,7 @@ class DeletedMachineCleanupTest {
         cleanup.cleanUpDeletedMachine("t-1", null);
 
         verifyNoInteractions(assignedRepository, onlineDeviceDispatchRepository,
-                deviceSoftwareRepository, softwareProjector, vulnerabilityProjector);
+                deviceSoftwareRepository, projectionTrigger);
     }
 
     @Test
@@ -61,10 +60,8 @@ class DeletedMachineCleanupTest {
         cleanup.cleanUpDeletedMachine("t-1", "m-1");
 
         verify(deviceSoftwareRepository).deleteByTenantIdAndMachineId("t-1", "m-1");
-        verify(softwareProjector).project("t-1", 42L);
-        verify(softwareProjector).project("t-1", 99L);
-        verify(vulnerabilityProjector).project("t-1", "CVE-1");  // once, de-duplicated across the two titles
-        verify(vulnerabilityProjector).project("t-1", "CVE-2");
+        verify(projectionTrigger).titlesChanged("t-1", Set.of(42L, 99L));
+        verify(projectionTrigger).cvesChanged("t-1", Set.of("CVE-1", "CVE-2"));  // CVE-1 once across the two titles
     }
 
     @Test
@@ -75,6 +72,6 @@ class DeletedMachineCleanupTest {
         cleanup.cleanUpDeletedMachine("t-1", "m-1");
 
         verify(deviceSoftwareRepository).findByTenantIdAndMachineId("t-1", "m-1");
-        verifyNoInteractions(softwareProjector, vulnerabilityProjector);
+        verifyNoInteractions(projectionTrigger);
     }
 }

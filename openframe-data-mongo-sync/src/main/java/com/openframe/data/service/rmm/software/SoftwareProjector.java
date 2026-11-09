@@ -1,28 +1,24 @@
 package com.openframe.data.service.rmm.software;
 
 import com.openframe.core.util.SoftwareVersions;
-import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
-import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareAggregationRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
+import com.openframe.data.repository.rmm.software.SoftwareTitleRollup;
 import com.openframe.data.service.rmm.software.matching.InstalledProgram;
 import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -32,68 +28,58 @@ public class SoftwareProjector {
     static final Duration MATCH_TTL = Duration.ofDays(1);
 
     private final SoftwareRepository softwareRepository;
-    private final DeviceSoftwareRepository deviceSoftwareRepository;
+    private final DeviceSoftwareAggregationRepository aggregationRepository;
     private final SoftwarePackageMatcher packageMatcher;
 
-    public void project(String tenantId, Long softwareTitleId) {
+    // the title's devices count, 0 when the title is gone from the read model
+    public int project(String tenantId, Long softwareTitleId) {
         if (tenantId == null || softwareTitleId == null) {
-            return;
+            return 0;
         }
-        List<DeviceSoftware> installed = deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue(tenantId, softwareTitleId);
-        if (installed.isEmpty()) {
+        Optional<SoftwareTitleRollup> rolledUp = aggregationRepository.rollUpTitle(tenantId, softwareTitleId);
+        if (rolledUp.isEmpty()) {
             softwareRepository.deleteByTenantIdAndSoftwareTitleId(tenantId, softwareTitleId);
-            return;
+            return 0;
         }
-        Set<String> cveIds = installed.stream()
-                .map(DeviceSoftware::getVulnerabilities).filter(Objects::nonNull)
-                .flatMap(List::stream).filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-
-        List<Software.Installation> installations = installed.stream()
-                .map(ds -> Software.Installation.builder()
-                        .machineId(ds.getMachineId())
-                        .versions(ds.getVersions()).build())
-                .toList();
-        int devicesCount = (int) installations.stream()
-                .map(Software.Installation::getMachineId).filter(Objects::nonNull).distinct().count();
+        SoftwareTitleRollup rollup = rolledUp.get();
 
         Software software = softwareRepository.findByTenantIdAndSoftwareTitleId(tenantId, softwareTitleId)
                 .orElseGet(Software::new);
         software.setTenantId(tenantId);
         software.setSoftwareTitleId(softwareTitleId);
-        DeviceSoftware sample = installed.getFirst();
-        InstalledProgram program = programOf(sample, installed);
+        InstalledProgram program = programOf(rollup);
         boolean keysChanged = !hasKeysOf(software, program);
-        applyName(software, sample);
+        applyName(software, rollup);
         applyProgram(software, program);
-        software.setInstallerTypes(union(installed, DeviceSoftware::getInstallerTypes));
+        software.setInstallerTypes(rollup.installerTypes());
         if (keysChanged || isStale(software.getPackageMatch())) {
             software.setPackageMatch(matchOf(program));
         }
-        software.setLatestVersion(latestVersion(installed));
-        software.setInstallations(installations);
-        software.setDevicesCount(devicesCount);
-        software.setCveCount(cveIds.size());
+        software.setLatestVersion(latestVersion(rollup.versions()));
+        software.setInstallations(rollup.installations());
+        software.setDevicesCount(rollup.devicesCount());
+        software.setCveCount(rollup.cveCount());
         software.setUpdatedAt(Instant.now());
         softwareRepository.save(software);
+        return rollup.devicesCount();
     }
 
-    private void applyName(Software software, DeviceSoftware sample) {
-        software.setName(sample.getName());
-        software.setNameLower(sample.getName() == null ? null : sample.getName().toLowerCase());
-        software.setSource(sample.getSource());
+    private void applyName(Software software, SoftwareTitleRollup rollup) {
+        software.setName(rollup.name());
+        software.setNameLower(rollup.name() == null ? null : rollup.name().toLowerCase());
+        software.setSource(rollup.source());
     }
 
     // the title's keys are the union over its devices: one program can sit under different ARP keys
-    private static InstalledProgram programOf(DeviceSoftware sample, List<DeviceSoftware> installed) {
+    private static InstalledProgram programOf(SoftwareTitleRollup rollup) {
         return InstalledProgram.builder()
-                .fleetSource(FleetSource.of(sample.getSource()))
-                .name(sample.getName())
-                .publisher(first(installed, DeviceSoftware::getVendor))
-                .upgradeCode(first(installed, DeviceSoftware::getUpgradeCode))
-                .productCodes(union(installed, DeviceSoftware::getArpKeys))
-                .packageFamilyNames(union(installed, DeviceSoftware::getPackageFamilyNames))
-                .systemComponent(allFlagged(installed, DeviceSoftware::getSystemComponent))
+                .fleetSource(FleetSource.of(rollup.source()))
+                .name(rollup.name())
+                .publisher(rollup.vendor())
+                .upgradeCode(rollup.upgradeCode())
+                .productCodes(rollup.arpKeys())
+                .packageFamilyNames(rollup.packageFamilyNames())
+                .systemComponent(rollup.systemComponent())
                 .build();
     }
 
@@ -131,28 +117,9 @@ public class SoftwareProjector {
         return values == null ? List.of() : values;
     }
 
-    private static String first(List<DeviceSoftware> installed, Function<DeviceSoftware, String> value) {
-        return installed.stream().map(value).filter(StringUtils::isNotBlank).findFirst().orElse(null);
-    }
-
-    private static List<String> union(List<DeviceSoftware> installed, Function<DeviceSoftware, List<String>> values) {
-        return installed.stream()
-                .map(values).filter(Objects::nonNull)
-                .flatMap(List::stream).filter(StringUtils::isNotBlank)
-                .distinct()
-                .toList();
-    }
-
-    // true only when every device that reports the flag reports it set
-    private static boolean allFlagged(List<DeviceSoftware> installed, Function<DeviceSoftware, Boolean> flag) {
-        List<Boolean> flags = installed.stream().map(flag).filter(Objects::nonNull).toList();
-        return !flags.isEmpty() && flags.stream().allMatch(Boolean::booleanValue);
-    }
-
-    private String latestVersion(List<DeviceSoftware> installed) {
-        return installed.stream()
-                .map(DeviceSoftware::getVersions).filter(Objects::nonNull)
-                .flatMap(List::stream).filter(Objects::nonNull)
+    private static String latestVersion(List<String> versions) {
+        return versions.stream()
+                .filter(Objects::nonNull)
                 // numeric per segment: 10.0 is newer than 9.0
                 .max(SoftwareVersions::compare).orElse(null);
     }

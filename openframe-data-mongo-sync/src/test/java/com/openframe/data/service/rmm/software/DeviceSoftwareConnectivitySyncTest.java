@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -22,8 +23,7 @@ import static org.mockito.Mockito.when;
 class DeviceSoftwareConnectivitySyncTest {
 
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
-    @Mock private SoftwareProjector softwareProjector;
-    @Mock private VulnerabilityProjector vulnerabilityProjector;
+    @Mock private SoftwareProjectionTrigger projectionTrigger;
 
     @InjectMocks private DeviceSoftwareConnectivitySync sync;
 
@@ -39,10 +39,8 @@ class DeviceSoftwareConnectivitySyncTest {
         sync.onConnectivityChanged("t1", "m1", false);
 
         verify(deviceSoftwareRepository).setMachineConnectedByTenantIdAndMachineId("t1", "m1", false);
-        verify(softwareProjector).project("t1", 42L);
-        verify(softwareProjector).project("t1", 99L);
-        verify(vulnerabilityProjector).project("t1", "CVE-1");  // once, de-duplicated across the two titles
-        verify(vulnerabilityProjector).project("t1", "CVE-2");
+        verify(projectionTrigger).titlesChanged("t1", Set.of(42L, 99L));
+        verify(projectionTrigger).cvesChanged("t1", Set.of("CVE-1", "CVE-2"));  // CVE-1 once across the two titles
     }
 
     @Test
@@ -54,7 +52,7 @@ class DeviceSoftwareConnectivitySyncTest {
         sync.onConnectivityChanged("t1", "m1", true);
 
         verify(deviceSoftwareRepository).setMachineConnectedByTenantIdAndMachineId("t1", "m1", true);
-        verify(softwareProjector).project("t1", 42L);
+        verify(projectionTrigger).titlesChanged("t1", Set.of(42L));
     }
 
     @Test
@@ -66,7 +64,7 @@ class DeviceSoftwareConnectivitySyncTest {
         sync.onConnectivityChanged("t1", "m1", false);
 
         verify(deviceSoftwareRepository, never()).setMachineConnectedByTenantIdAndMachineId(any(), any(), anyBoolean());
-        verifyNoInteractions(softwareProjector, vulnerabilityProjector);
+        verifyNoInteractions(projectionTrigger);
     }
 
     @Test
@@ -77,7 +75,7 @@ class DeviceSoftwareConnectivitySyncTest {
         sync.onConnectivityChanged("t1", "m1", true);
 
         verify(deviceSoftwareRepository, never()).setMachineConnectedByTenantIdAndMachineId(any(), any(), anyBoolean());
-        verifyNoInteractions(softwareProjector, vulnerabilityProjector);
+        verifyNoInteractions(projectionTrigger);
     }
 
     @Test
@@ -86,6 +84,6 @@ class DeviceSoftwareConnectivitySyncTest {
         sync.onConnectivityChanged(null, "m1", true);
         sync.onConnectivityChanged("t1", null, true);
 
-        verifyNoInteractions(deviceSoftwareRepository, softwareProjector, vulnerabilityProjector);
+        verifyNoInteractions(deviceSoftwareRepository, projectionTrigger);
     }
 }
