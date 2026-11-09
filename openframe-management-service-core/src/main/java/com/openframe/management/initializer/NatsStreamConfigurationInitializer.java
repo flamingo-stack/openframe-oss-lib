@@ -21,40 +21,9 @@ import java.util.List;
 @Slf4j
 public class NatsStreamConfigurationInitializer implements ApplicationRunner {
 
-    private static final long LATEST_MESSAGE_ONLY = 1;
-
     // TODO: use json file
     // TODO: revise stream configuration
     private static final List<StreamConfiguration> CONFIGURATIONS = List.of(
-            // tool installation stream (also carries tool-uninstall on the same stream)
-            StreamConfiguration.builder()
-                    .name("TOOL_INSTALLATION")
-                    .subjects(List.of("machine.*.tool-installation", "machine.*.tool-uninstall"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .build(),
-            // client update stream: only the latest release matters, so an offline agent gets one message, not the backlog
-            StreamConfiguration.builder()
-                    .name("CLIENT_UPDATE")
-                    .subjects(List.of("machine.*.client-update"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .maxMessagesPerSubject(LATEST_MESSAGE_ONLY)
-                    .build(),
-            // client uninstall stream (the message itself is the command, empty payload)
-            StreamConfiguration.builder()
-                    .name("CLIENT_UNINSTALL")
-                    .subjects(List.of("machine.*.client-uninstall"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .build(),
-            // tool agent update stream
-            StreamConfiguration.builder()
-                    .name("TOOL_UPDATE")
-                    .subjects(List.of("machine.*.tool.*.update"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .build(),
             // tool connection stream
             StreamConfiguration.builder()
                     .name("TOOL_CONNECTIONS")
@@ -112,6 +81,9 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .build()
     );
 
+    // the streams of the path before the delivery engine, on every tenant NATS that ran an older release
+    private static final List<String> REMOVED_STREAMS = List.of("TOOL_INSTALLATION", "CLIENT_UPDATE", "CLIENT_UNINSTALL", "TOOL_UPDATE");
+
     private final NatsStreamManagementService natsStreamManagementService;
     private final AdditionalStreamConfigurationProvider additionalStreamConfigurationProvider;
 
@@ -121,6 +93,17 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
 
         additionalStreamConfigurationProvider.provide()
                 .forEach(natsStreamManagementService::save);
+
+        REMOVED_STREAMS.forEach(this::deleteRemovedStream);
+    }
+
+    // a stream left behind harms nothing and the next start tries again: it must not stop management from starting
+    private void deleteRemovedStream(String streamName) {
+        try {
+            natsStreamManagementService.deleteIfExists(streamName);
+        } catch (RuntimeException e) {
+            log.error("Removed stream not deleted, the next start tries again: stream={}", streamName, e);
+        }
     }
 
 }
