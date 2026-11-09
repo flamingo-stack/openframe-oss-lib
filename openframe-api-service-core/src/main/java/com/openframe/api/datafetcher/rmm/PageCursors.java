@@ -11,7 +11,20 @@ import java.util.List;
 
 final class PageCursors {
 
+    static final int DEFAULT_PAGE_SIZE = 20;
+    static final int MAX_PAGE_SIZE = 100;
+
     private PageCursors() {
+    }
+
+    // first wins over last; a missing or non-positive size gets the default, a larger one is cut to the maximum,
+    // so no request makes a list load everything
+    static int pageSize(Integer first, Integer last) {
+        Integer requested = first != null ? first : last;
+        if (requested == null || requested <= 0) {
+            return DEFAULT_PAGE_SIZE;
+        }
+        return Math.min(requested, MAX_PAGE_SIZE);
     }
 
     static int decodePage(String cursor) {

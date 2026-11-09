@@ -41,7 +41,7 @@ public class SoftwareActionDataFetcher {
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
-        Integer perPage = first != null ? first : last;
+        int perPage = PageCursors.pageSize(first, last);
         return PageCursors.toConnection(softwareActionService.list(filter, search, sort, page, perPage));
     }
 

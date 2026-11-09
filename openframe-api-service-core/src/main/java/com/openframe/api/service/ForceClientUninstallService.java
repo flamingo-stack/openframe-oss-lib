@@ -8,6 +8,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.nats.delivery.ClientUninstallDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.service.machine.MachineWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,8 @@ import java.util.Optional;
 
 import static com.openframe.data.document.device.DeviceStatus.DELETED;
 import static com.openframe.data.document.device.DeviceStatus.PENDING_DELETION;
+import static com.openframe.data.service.machine.MachineFields.STATUS;
+import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 
 @Service
@@ -25,6 +28,7 @@ import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 public class ForceClientUninstallService {
 
     private final MachineRepository machineRepository;
+    private final MachineWriter machineWriter;
     private final DeliveryRouter deliveryRouter;
 
     public ForceClientUninstallResponse process(ForceClientUninstallRequest request) {
@@ -70,8 +74,7 @@ public class ForceClientUninstallService {
         if (machine.getStatus() == PENDING_DELETION) {
             return;
         }
-        machine.setStatus(PENDING_DELETION);
-        machineRepository.save(machine);
+        machineWriter.update(machine.getMachineId(), machineUpdate().set(STATUS, PENDING_DELETION));
         log.info("Machine {} marked PENDING_DELETION", machine.getMachineId());
     }
 

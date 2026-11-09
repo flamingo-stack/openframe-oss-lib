@@ -8,6 +8,8 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.nats.delivery.ClientUninstallDeliverySeed;
 import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.service.machine.MachineUpdate;
+import com.openframe.data.service.machine.MachineWriter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +24,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +37,8 @@ class ForceClientUninstallServiceTest {
 
     @Mock private MachineRepository machineRepository;
     @Mock private DeliveryRouter deliveryRouter;
+    @Mock private MachineWriter machineWriter;
+    @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
     @Captor private ArgumentCaptor<ClientUninstallDeliverySeed> seedCaptor;
     @InjectMocks private ForceClientUninstallService service;
 
@@ -60,8 +66,11 @@ class ForceClientUninstallServiceTest {
         // verifications
         verify(deliveryRouter).dispatch(seedCaptor.capture());
         assertThat(seedCaptor.getValue().getMachineId()).isEqualTo(MACHINE_ID);
+        verify(machineWriter).update(eq(MACHINE_ID), updateCaptor.capture());
+        assertThat(updateCaptor.getValue().paths()).containsExactly("status");
+        updateCaptor.getValue().applyTo(machine);
         assertThat(machine.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
-        verify(machineRepository).save(machine);
+        verify(machineRepository, never()).save(any());
         assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.PROCESSED);
     }
 
@@ -74,8 +83,7 @@ class ForceClientUninstallServiceTest {
         ForceClientUninstallResponse response = service.process(request);
 
         // verifications
-        assertThat(machine.getStatus()).isEqualTo(DeviceStatus.ONLINE);
-        verify(machineRepository, never()).save(any());
+        verify(machineWriter, never()).update(anyString(), any(MachineUpdate.class));
         assertThat(response.getItems().get(0).getStatus()).isEqualTo(ForceAgentStatus.FAILED);
     }
 
