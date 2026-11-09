@@ -103,6 +103,47 @@ class SoftwareProjectorTest {
     }
 
     @Test
+    void project_currentVersion_isOnTheMostDevices_olderVersionsAreTheRest() {
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup()
+                .devicesByVersion(Map.of("1.6", 1, "1.7", 2, "1.5", 1)).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
+
+        projector.project("t1", 42L);
+
+        ArgumentCaptor<Software> saved = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(saved.capture());
+        assertThat(saved.getValue().getCurrentVersion()).isEqualTo("1.7");
+        assertThat(saved.getValue().getOlderVersionsCount()).isEqualTo(2);
+    }
+
+    @Test
+    void project_currentVersion_tieGoesToTheNewerVersion() {
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup()
+                .devicesByVersion(Map.of("9.0", 2, "10.0", 2)).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
+
+        projector.project("t1", 42L);
+
+        ArgumentCaptor<Software> saved = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(saved.capture());
+        assertThat(saved.getValue().getCurrentVersion()).isEqualTo("10.0");
+        assertThat(saved.getValue().getOlderVersionsCount()).isEqualTo(1);
+    }
+
+    @Test
+    void project_noVersionCounts_noCurrentVersionAndNoOlderVersions() {
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup().devicesByVersion(Map.of()).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
+
+        projector.project("t1", 42L);
+
+        ArgumentCaptor<Software> saved = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(saved.capture());
+        assertThat(saved.getValue().getCurrentVersion()).isNull();
+        assertThat(saved.getValue().getOlderVersionsCount()).isZero();
+    }
+
+    @Test
     void project_noVersions_noLatestVersion() {
         when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup().versions(List.of()).build()));
         lenient().when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
@@ -266,6 +307,7 @@ class SoftwareProjectorTest {
         private List<String> packageFamilyNames = List.of();
         private List<String> installerTypes = List.of();
         private boolean systemComponent;
+        private Map<String, Integer> devicesByVersion = Map.of("1.0", 1);
         private List<Software.Installation> installations = List.of();
 
         RollupBuilder devicesCount(int value) { devicesCount = value; return this; }
@@ -279,11 +321,12 @@ class SoftwareProjectorTest {
         RollupBuilder packageFamilyNames(List<String> value) { packageFamilyNames = value; return this; }
         RollupBuilder installerTypes(List<String> value) { installerTypes = value; return this; }
         RollupBuilder systemComponent(boolean value) { systemComponent = value; return this; }
+        RollupBuilder devicesByVersion(Map<String, Integer> value) { devicesByVersion = value; return this; }
         RollupBuilder installations(List<Software.Installation> value) { installations = value; return this; }
 
         SoftwareTitleRollup build() {
             return new SoftwareTitleRollup(devicesCount, name, source, vendor, upgradeCode, versions, cveCount,
-                    arpKeys, packageFamilyNames, installerTypes, systemComponent, installations);
+                    arpKeys, packageFamilyNames, installerTypes, systemComponent, devicesByVersion, installations);
         }
     }
 }

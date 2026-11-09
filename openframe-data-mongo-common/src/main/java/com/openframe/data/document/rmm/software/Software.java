@@ -49,6 +49,10 @@ public class Software implements TenantScoped {
 
     private String latestVersion;
 
+    private String currentVersion;
+
+    private Integer olderVersionsCount;
+
     private int devicesCount;
 
     private int cveCount;

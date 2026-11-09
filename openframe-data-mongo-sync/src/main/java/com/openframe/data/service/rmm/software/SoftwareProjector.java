@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -59,7 +61,12 @@ public class SoftwareProjector {
         if (keysChanged || isStale(software.getPackageMatch())) {
             software.setPackageMatch(matchOf(program));
         }
-        software.setLatestVersion(latestVersion(rollup.versions()));
+        String latestVersion = latestVersion(rollup.versions());
+        software.setLatestVersion(latestVersion);
+        Map<String, Integer> devicesByVersion = rollup.devicesByVersion();
+        String currentVersion = currentVersion(devicesByVersion);
+        software.setCurrentVersion(currentVersion);
+        software.setOlderVersionsCount(Math.max(0, devicesByVersion.size() - 1));
         software.setInstallations(rollup.installations());
         software.setDevicesCount(rollup.devicesCount());
         software.setCveCount(rollup.cveCount());
@@ -119,6 +126,16 @@ public class SoftwareProjector {
 
     private static List<String> orEmpty(List<String> values) {
         return values == null ? List.of() : values;
+    }
+
+    private static String currentVersion(Map<String, Integer> devicesByVersion) {
+        Comparator<Map.Entry<String, Integer>> byDevices = Map.Entry.comparingByValue();
+        Comparator<Map.Entry<String, Integer>> thenNewer = byDevices
+                .thenComparing(Map.Entry::getKey, SoftwareVersions::compare);
+        return devicesByVersion.entrySet().stream()
+                .max(thenNewer)
+                .map(Map.Entry::getKey)
+                .orElse(null);
     }
 
     private static String latestVersion(List<String> versions) {

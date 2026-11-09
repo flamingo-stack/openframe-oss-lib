@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -79,6 +80,29 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
         assertThat(rollup.arpKeys()).containsExactly("Google Chrome", "{8A69D345-D564-463C-AFF1-A69D9E530F96}");
         assertThat(rollup.installerTypes()).containsExactly("exe", "msi");
         assertThat(rollup.packageFamilyNames()).containsExactly("google.chrome_x");
+    }
+
+    @Test
+    @DisplayName("title: counts the machines on each version, skipping missing versions")
+    void title_devicesByVersion() {
+        save(row(TENANT, "m1", CHROME).versions(List.of("130.0", "129.0")).build());
+        save(row(TENANT, "m2", CHROME).versions(List.of("129.0")).build());
+        save(row(TENANT, "m3", CHROME).versions(null).build());
+        save(row(TENANT, "m4", CHROME).versions(java.util.Arrays.asList("129.0", null)).build());
+        save(row(TENANT, "m5", CHROME).versions(List.of("131.0")).machineConnected(false).build());
+        save(row(OTHER_TENANT, "m9", CHROME).versions(List.of("131.0")).build());
+
+        SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
+
+        assertThat(rollup.devicesByVersion()).containsExactlyInAnyOrderEntriesOf(Map.of("129.0", 3, "130.0", 1));
+    }
+
+    @Test
+    @DisplayName("title: no versions anywhere -> no version counts")
+    void title_noVersions() {
+        save(row(TENANT, "m1", CHROME).versions(null).build());
+
+        assertThat(repository.rollUpTitle(TENANT, CHROME).orElseThrow().devicesByVersion()).isEmpty();
     }
 
     @Test

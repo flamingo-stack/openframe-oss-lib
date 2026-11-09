@@ -13,7 +13,9 @@ import org.springframework.stereotype.Repository;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -25,12 +27,7 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
 
     @Override
     public Optional<SoftwareTitleRollup> rollUpTitle(String tenantId, Long softwareTitleId) {
-        List<AggregationOperation> stages = List.of(
-                ctx -> new Document("$match", new Document("tenantId", tenantId)
-                        .append("softwareTitleId", softwareTitleId)
-                        .append("machineConnected", true)),
-                ctx -> new Document("$sort", new Document("machineId", 1)),
-                ctx -> new Document("$group", new Document("_id", null)
+        Document summaryGroup = new Document("$group", new Document("_id", null)
                         .append("devicesCount", new Document("$sum", ifString("$machineId", 1, 0)))
                         .append("name", new Document("$first", "$name"))
                         .append("source", new Document("$first", "$source"))
@@ -46,8 +43,8 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                         .append("systemComponentSet", new Document("$sum", new Document("$cond",
                                 List.of(new Document("$eq", List.of("$systemComponent", true)), 1, 0))))
                         .append("installations", new Document("$push", new Document("machineId", "$machineId")
-                                .append("versions", "$versions")))),
-                ctx -> new Document("$project", new Document("_id", 0)
+                                .append("versions", "$versions"))));
+        Document summaryProject = new Document("$project", new Document("_id", 0)
                         .append("devicesCount", 1)
                         .append("name", 1)
                         .append("source", 1)
@@ -61,9 +58,27 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                                 List.of(union("$cveLists"), NULL_ONLY))))
                         .append("arpKeys", union("$arpKeyLists"))
                         .append("packageFamilyNames", union("$packageFamilyNameLists"))
-                        .append("installerTypes", union("$installerTypeLists"))));
-        Document rollup = aggregateOne(stages);
-        return Optional.ofNullable(rollup).map(DeviceSoftwareAggregationRepositoryImpl::toTitleRollup);
+                        .append("installerTypes", union("$installerTypeLists")));
+        List<Document> versionCounts = List.of(
+                new Document("$unwind", "$versions"),
+                new Document("$match", new Document("versions", new Document("$type", "string"))),
+                new Document("$group", new Document("_id", "$versions")
+                        .append("devices", new Document("$sum", 1))));
+        List<AggregationOperation> stages = List.of(
+                ctx -> new Document("$match", new Document("tenantId", tenantId)
+                        .append("softwareTitleId", softwareTitleId)
+                        .append("machineConnected", true)),
+                ctx -> new Document("$sort", new Document("machineId", 1)),
+                ctx -> new Document("$facet", new Document("summary", List.of(summaryGroup, summaryProject))
+                        .append("devicesByVersion", versionCounts)));
+        Document facets = aggregateOne(stages);
+        List<Document> summaries = facets == null ? List.of() : facets.getList("summary", Document.class, List.of());
+        if (summaries.isEmpty()) {
+            return Optional.empty();
+        }
+        List<Document> devicesByVersion = facets.getList("devicesByVersion", Document.class, List.of());
+        SoftwareTitleRollup rollup = toTitleRollup(summaries.getFirst(), devicesByVersion);
+        return Optional.of(rollup);
     }
 
     @Override
@@ -99,7 +114,7 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                 .getUniqueMappedResult();
     }
 
-    private static SoftwareTitleRollup toTitleRollup(Document doc) {
+    private static SoftwareTitleRollup toTitleRollup(Document doc, List<Document> versionCounts) {
         int devicesCount = intValue(doc.get("devicesCount"));
         String name = doc.getString("name");
         String source = doc.getString("source");
@@ -116,8 +131,10 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
         List<Software.Installation> installations = doc.getList("installations", Document.class, List.of()).stream()
                 .map(DeviceSoftwareAggregationRepositoryImpl::toInstallation)
                 .toList();
+        Map<String, Integer> devicesByVersion = versionCounts.stream()
+                .collect(Collectors.toMap(count -> count.getString("_id"), count -> intValue(count.get("devices"))));
         return new SoftwareTitleRollup(devicesCount, name, source, vendor, upgradeCode, versions, cveCount,
-                arpKeys, packageFamilyNames, installerTypes, systemComponent, installations);
+                arpKeys, packageFamilyNames, installerTypes, systemComponent, devicesByVersion, installations);
     }
 
     private static Software.Installation toInstallation(Document installation) {
