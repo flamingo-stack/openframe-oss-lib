@@ -1,6 +1,8 @@
 #[cfg(target_os = "macos")]
 mod brew;
 #[cfg(target_os = "windows")]
+mod choco;
+#[cfg(target_os = "windows")]
 mod winget;
 
 use crate::models::PackageRef;
@@ -62,6 +64,8 @@ pub(super) async fn probe(package: &PackageRef) -> Result<Probe, QueryError> {
     match package {
         #[cfg(target_os = "windows")]
         PackageRef::Winget { .. } => winget::probe(package).await,
+        #[cfg(target_os = "windows")]
+        PackageRef::Choco { .. } => choco::probe(package).await,
         #[cfg(target_os = "macos")]
         PackageRef::Brew { .. } => brew::probe(package).await,
         _ => Err(QueryError::Unavailable(format!(
@@ -76,6 +80,8 @@ pub(super) async fn reread(package: &PackageRef) -> Result<Probe, QueryError> {
     match package {
         #[cfg(target_os = "windows")]
         PackageRef::Winget { .. } => winget::probe(package).await,
+        #[cfg(target_os = "windows")]
+        PackageRef::Choco { .. } => choco::probe(package).await,
         #[cfg(target_os = "macos")]
         PackageRef::Brew { .. } => brew::reread(package).await,
         _ => Err(QueryError::Unavailable(format!(
@@ -89,6 +95,8 @@ pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
     match package {
         #[cfg(target_os = "windows")]
         PackageRef::Winget { .. } => winget::upgrade(package).await,
+        #[cfg(target_os = "windows")]
+        PackageRef::Choco { .. } => choco::upgrade(package).await,
         #[cfg(target_os = "macos")]
         PackageRef::Brew { .. } => brew::upgrade(package).await,
         _ => UpgradeOutcome::Failed {

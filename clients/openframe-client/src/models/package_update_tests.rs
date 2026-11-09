@@ -54,6 +54,33 @@ fn an_auto_wait_order_needs_neither_origin_nor_countdown() {
 }
 
 #[test]
+fn a_choco_order_carries_its_feed() {
+    let order = |package: serde_json::Value| {
+        serde_json::from_value::<PackageUpdateMessage>(json!({
+            "requestId": "req-4",
+            "source": {"kind": "AUTO"},
+            "package": package,
+            "mode": "WAIT"
+        }))
+    };
+
+    let parsed = order(json!({
+        "manager": "CHOCO",
+        "id": "googlechrome",
+        "feed": "https://feed.openframe.build/choco/index.json"
+    }))
+    .unwrap();
+    assert_eq!(
+        parsed.package,
+        PackageRef::Choco {
+            id: "googlechrome".to_string(),
+            feed: "https://feed.openframe.build/choco/index.json".to_string()
+        }
+    );
+    assert!(order(json!({"manager": "CHOCO", "id": "googlechrome"})).is_err());
+}
+
+#[test]
 fn an_unknown_mode_is_rejected() {
     let result = serde_json::from_value::<PackageUpdateMessage>(json!({
         "requestId": "req-3",
