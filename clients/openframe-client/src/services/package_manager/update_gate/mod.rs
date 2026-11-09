@@ -2,6 +2,8 @@
 mod brew;
 mod decide;
 #[cfg(target_os = "windows")]
+mod windows_app;
+#[cfg(target_os = "windows")]
 mod winget;
 
 use crate::models::{BrewKind, PackageRef};

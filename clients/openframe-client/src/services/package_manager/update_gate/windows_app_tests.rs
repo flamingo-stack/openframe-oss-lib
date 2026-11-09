@@ -1,4 +1,5 @@
 use super::*;
+use crate::executor::{execute_script, Privilege, ScriptParams};
 
 /// Identity script output from Windows 10; shortcuts trimmed to these ids, profile path anonymised.
 const CAPTURED: &str = r#"{
@@ -282,7 +283,7 @@ fn shortcut_image_edges() {
 
 #[tokio::test]
 async fn the_identity_output_keeps_non_ascii_paths() {
-    let emit = IDENTITY_SCRIPT.trim_end().lines().last().unwrap();
+    let emit = SCRIPT_OUTPUT.trim_end().lines().last().unwrap();
     let code = format!(
         "$path = 'C:\\Users\\' + [char]0x0414 + [char]0x0435 + [char]0x043D + '\\AppData\\Local\\Programs\\App\\app.exe'\n\
          $json = ConvertTo-Json -InputObject @{{ shortcuts = @(@{{ target = $path }}); packages = @() }} -Depth 4 -Compress\n\
