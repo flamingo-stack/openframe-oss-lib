@@ -183,6 +183,7 @@ fn our_choco_owns_every_package_but_itself() {
     let report = assess(&ours("2.7.5"));
     assert!(report.ours);
     assert_eq!(report.packages, vec!["7zip", "GoogleChrome"]);
+    assert!(report.existing_packages.is_empty());
 }
 
 #[test]
@@ -198,6 +199,7 @@ fn a_customer_choco_owns_only_the_packages_we_recorded_and_still_installed() {
     let report = assess(&facts);
     assert!(!report.ours);
     assert_eq!(report.packages, vec!["GoogleChrome"]);
+    assert_eq!(report.existing_packages, vec!["7zip"]);
 }
 
 #[test]
@@ -214,13 +216,13 @@ fn report_serialises_to_the_agreed_wire_shape() {
     let managed = serde_json::to_string(&assess(&ours("2.7.5"))).unwrap();
     assert_eq!(
         managed,
-        r#"{"version":"2.7.5","edition":"OPEN_SOURCE","ours":true,"status":"MANAGED","options":[],"packages":["7zip","GoogleChrome"]}"#
+        r#"{"version":"2.7.5","edition":"OPEN_SOURCE","ours":true,"status":"MANAGED","options":[],"packages":["7zip","GoogleChrome"],"existingPackages":[]}"#
     );
 
     let action = serde_json::to_string(&assess(&customer("1.4.0"))).unwrap();
     assert_eq!(
         action,
-        r#"{"version":"1.4.0","edition":"OPEN_SOURCE","ours":false,"status":"ACTION_REQUIRED","reason":"VERSION_1","options":["DONT_TOUCH","ADMIN_FIX"],"packages":[]}"#
+        r#"{"version":"1.4.0","edition":"OPEN_SOURCE","ours":false,"status":"ACTION_REQUIRED","reason":"VERSION_1","options":["DONT_TOUCH","ADMIN_FIX"],"packages":[],"existingPackages":["7zip","GoogleChrome"]}"#
     );
 }
 

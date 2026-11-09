@@ -121,6 +121,7 @@ pub(super) struct ChocoReport {
     reason: Option<Reason>,
     options: Vec<AdminOption>,
     packages: Vec<String>,
+    existing_packages: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -245,18 +246,17 @@ fn assess(facts: &Facts) -> ChocoReport {
         ),
     };
 
-    let packages = facts
+    let (packages, existing_packages) = facts
         .installed
         .iter()
         .filter(|id| !id.eq_ignore_ascii_case(CHOCOLATEY))
-        .filter(|id| {
+        .cloned()
+        .partition(|id| {
             ours || facts
                 .recorded
                 .iter()
                 .any(|recorded| recorded.eq_ignore_ascii_case(id))
-        })
-        .cloned()
-        .collect();
+        });
 
     ChocoReport {
         version: version.map(|version| version.to_string()),
@@ -270,6 +270,7 @@ fn assess(facts: &Facts) -> ChocoReport {
         reason,
         options,
         packages,
+        existing_packages,
     }
 }
 
