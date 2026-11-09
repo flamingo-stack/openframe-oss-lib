@@ -72,20 +72,11 @@ openframe:
           max-poll-records: 20          # default
         listener:                       # listener.* keys are applied as Spring Boot applies them
           concurrency: 1
-          missing-topics-fatal: true    # default; a topic that does not exist yet stops the start
+          missing-topics-fatal: true    # default; a topic that does not exist yet stops the start (management creates them, see Topics)
         back-off:                       # the wait between retries while Mongo is down
           initial-interval: 1s
           multiplier: 2
           max-interval: 30s
-        topics:                         # see Topics
-          events:                       # used only when a topic is created
-            partitions: 1
-            replication-factor: 2
-            config: {cleanup.policy: compact, min.compaction.lag.ms: 604800000, delete.retention.ms: 604800000}
-          dead-letter:
-            partitions: 1
-            replication-factor: 2
-            config: {cleanup.policy: delete, retention.ms: 2592000000}
       large-updates:
         inline-limit: 5000              # default; an event that changes this many items or more goes to a projection task
 ```
