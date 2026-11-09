@@ -100,20 +100,27 @@ openframe:
 
 ## Topics
 
-With `openframe.events.enabled: true`,
-[`EventTopicCreator`](src/main/java/com/openframe/processing/topic/EventTopicCreator.java#L32) creates
-`<topic-prefix><type>` and `<topic-prefix><type>-dlt` at startup, before the listeners start, for every spec whose
-`openframe.events.topics.<type>.enabled` is on in this service's own config: a type switched off gets no topic and no
-listener. The rollout switches a type on in the stream before the tenant services, so its topics exist before the
-first outbox row of that type.
+Only management creates topics (CU-86ah6xx4n): `openframe-saas-management` declares `<topic-prefix><type>` and
+`<topic-prefix><type>-dlt` of every published type under `openframe.saas.kafka.managed-topics` in its config, with
+these settings:
 
-- It creates only what is missing and never changes an existing topic, not even its partitions. Another pod creating
-  the same topic at the same moment is fine.
-- An existing events topic that is not compacted (for example one the broker auto-created before) logs a WARN; fix
-  it by hand.
+| Topic | `cleanup.policy` | Other settings |
+|---|---|---|
+| `<topic-prefix><type>` | `compact`, so a new group reads the latest event of every aggregate | `min.compaction.lag.ms` and `delete.retention.ms` 604800000 (7 days, a delete stays readable for a week) |
+| `<topic-prefix><type>-dlt` | `delete` | `retention.ms` 2592000000 (30 days) |
+
+Partitions 1, replication factor -1 (the broker's default), like every managed topic.
+
+With `openframe.events.enabled: true`,
+[`EventTopicCheck`](src/main/java/com/openframe/processing/topic/EventTopicCheck.java#L28) checks at startup, before
+the listeners start, that both topics of every spec whose `openframe.events.topics.<type>.enabled` is on in this
+service's own config exist; a type switched off needs no topic and gets no listener. The rollout adds a type's
+managed topics and restarts management first, then switches the type on in the stream, then in the tenant services.
+
+- A missing topic stops the service, with the missing names and the bootstrap servers in the message. The check
+  creates nothing.
+- An events topic that is not compacted logs a WARN; fix its `managed-topics` entry and the topic by hand.
 - Kafka unreachable stops the service, with the bootstrap servers in the message.
-- A plain `AdminClient`, not `NewTopic` beans: every `KafkaAdmin` in the context would create those too, on its own
-  cluster.
 
 ## Switching a type
 
@@ -204,8 +211,8 @@ The service does not start when:
 |---|---|
 | Two projections have the same `name()` | Rename one (checked by `AggregateSpecRegistry`). |
 | `bootstrap-servers`, `topic-prefix` or `group-prefix` is missing | Set all three. |
-| Kafka cannot be reached to create the topics | Check `bootstrap-servers` and the network. |
-| A listener's topic does not exist | Create the topics first (`missing-topics-fatal`). |
+| Kafka cannot be reached to check the topics | Check `bootstrap-servers` and the network. |
+| A switched-on type's topic or DLT does not exist | Add both to management's `openframe.saas.kafka.managed-topics` and restart management. |
 
 ## Metrics
 
@@ -237,6 +244,6 @@ logging:
 mvn test -pl openframe-event-processing -am -Dintegration.tests=true
 ```
 
-[`EventProcessingKafkaIT`](src/test/java/com/openframe/processing/EventProcessingKafkaIT.java#L78) needs Docker: it starts a Kafka broker with Testcontainers, lets the module create
-its topics, and checks the whole listener path, the retry and the DLT.
-[`EventTopicCreatorIT`](src/test/java/com/openframe/processing/topic/EventTopicCreatorIT.java#L44) checks the created topics' settings and that an existing topic is left alone.
+[`EventProcessingKafkaIT`](src/test/java/com/openframe/processing/EventProcessingKafkaIT.java#L83) needs Docker: it starts a Kafka broker with Testcontainers, creates
+the topics as management does, and checks the whole listener path, the retry and the DLT.
+[`EventTopicCheckIT`](src/test/java/com/openframe/processing/topic/EventTopicCheckIT.java#L42) checks that existing topics let the service start, that a missing one stops it without being created, and the WARN for a topic that is not compacted.

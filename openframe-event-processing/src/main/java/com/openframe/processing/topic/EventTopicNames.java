@@ -2,7 +2,7 @@ package com.openframe.processing.topic;
 
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties;
 
-// The one place that names a published type's topic, its DLT and its projections' listeners; the listeners, the DLT recoverer and the topic creator use it.
+// The one place that names a published type's topic, its DLT and its projections' listeners; the listeners, the DLT recoverer and the topic check use it.
 public final class EventTopicNames {
 
     private static final String DEAD_LETTER_SUFFIX = "-dlt";
@@ -34,7 +34,7 @@ public final class EventTopicNames {
 
     private static String required(String value, String key) {
         if (value == null || value.isBlank()) {
-            throw new IllegalStateException("openframe.events.processing.kafka." + key + " is required when event processing or topic creation is on");
+            throw new IllegalStateException("openframe.events.processing.kafka." + key + " is required when event processing or the topic check is on");
         }
         return value;
     }
