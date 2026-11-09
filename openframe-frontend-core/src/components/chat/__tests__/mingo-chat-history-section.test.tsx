@@ -269,6 +269,14 @@ describe('MingoChatRail variant="section"', () => {
     expect(screen.queryByRole('img', { name: 'Owner: Roman Smith' })).not.toBeInTheDocument();
   });
 
+  it('compact: an empty list says so in sentence case, centred in the room the section takes', () => {
+    render(<MingoChatRail variant="section" density="compact" dialogs={[]} />);
+    expect(screen.getByText('No current chats')).toHaveClass('text-shell-body');
+    expect(screen.getByText('Previous Mingo sessions will show here')).toHaveClass('text-h6');
+    expect(screen.getByRole('region', { name: 'Current chats' })).toHaveClass('flex-1');
+    expect(screen.queryByText('No Current Chats')).toBeNull();
+  });
+
   it('switches the scope from the filter menu, and lights the filter while all chats show', () => {
     const onScopeChange = vi.fn();
     const { rerender } = render(

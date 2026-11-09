@@ -768,7 +768,9 @@ export function NavigationSidebar({
           {/* The top slot, the primary nav and the section are ONE
               `justify-between` child. As siblings the spare space would open
               between them instead of above the secondary nav. */}
-          <div className="flex flex-col">
+          {/* `sectionFill`: it takes the body's spare height and passes it to the
+              section, where an empty chat list centres. */}
+          <div className={cn('flex flex-col', config.sectionFill && 'flex-1')}>
             {config.topSlot?.({ minimized })}
 
             {/* `aria-busy` on the nav, not the rows: the region is what is loading,
@@ -796,6 +798,7 @@ export function NavigationSidebar({
               <div
                 className={cn(
                   'flex flex-col',
+                  config.sectionFill && 'flex-1',
                   config.sectionDivider === false
                     ? 'pt-[var(--spacing-system-sf)]'
                     : cn('mt-[var(--spacing-system-xsf)] border-t pt-[var(--spacing-system-sf)]', dividerClass),

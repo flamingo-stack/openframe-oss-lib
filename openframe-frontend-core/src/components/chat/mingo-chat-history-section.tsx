@@ -8,6 +8,7 @@ import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils/cn';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
 import {
+  ChatBlankIcon,
   ChatsIcon,
   Ellipsis01Icon,
   Filter01Icon,
@@ -148,6 +149,14 @@ function HistoryList({
         icon={<SearchXmarkIcon size={24} />}
         title="No chats found"
         description="Try another search term"
+      />
+    ) : density === 'compact' ? (
+      // The three-column shell (Figma 1409:305752): centred in the room the list leaves.
+      <ChatListEmptyState
+        density="compact"
+        icon={<ChatBlankIcon size={20} />}
+        title="No current chats"
+        description="Previous Mingo sessions will show here"
       />
     ) : (
       <ChatListEmptyState
@@ -348,7 +357,8 @@ export function MingoChatHistorySection({
         aria-labelledby={captionId}
         className={cn(
           'flex w-full min-w-0 flex-col',
-          compact ? 'gap-[var(--spacing-system-xxs)]' : 'gap-[var(--spacing-system-xs)]',
+          // Compact: the section takes the sidebar's spare height, so an empty list centres in it.
+          compact ? 'flex-1 gap-[var(--spacing-system-xxs)]' : 'gap-[var(--spacing-system-xs)]',
           className,
         )}
       >

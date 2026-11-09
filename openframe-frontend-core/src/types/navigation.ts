@@ -240,6 +240,13 @@ export interface NavigationSidebarConfig {
    */
   sectionDivider?: boolean;
   /**
+   * `sectionSlot` takes the body's spare height (the slot's own root should grow into
+   * it, `flex-1`), so what the section centres — an empty chat list — sits in the
+   * middle of the sidebar rather than under its caption. Default false: the section is
+   * as tall as its content. The three-column shell's chats sidebar sets it.
+   */
+  sectionFill?: boolean;
+  /**
    * The expanded sidebar's width in px (grouped and sectioned variants; default 224). Applied
    * to the desktop sidebar, the tablet overlay and its push slot, and written to
    * `NAVIGATION_SIDEBAR_WIDTH_VAR` while expanded — so a host's pre-paint seed
