@@ -2,11 +2,13 @@ package com.openframe.api.datafetcher;
 
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
+import com.openframe.api.dto.device.MachineTag;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.TagService;
+import com.openframe.api.dataloader.MachineTagDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationKey;
 import com.openframe.api.dto.notification.NotificationRecipient;
@@ -146,5 +148,26 @@ class DeviceDataFetcherTest {
 
         assertThat(result).isEqualTo(3);
         verify(loader).load(expectedKey);
+    }
+
+    @Test
+    @DisplayName("tagAssignments: loads the machine's tag assignments through machineTagDataLoader")
+    void tagAssignments_loadsTheMachinesAssignmentsThroughTheLoader() throws Exception {
+        // setup
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        List<MachineTag> assignments = List.of(MachineTag.builder().id("as-1").build());
+        when(dfe.getSource()).thenReturn(machine);
+        @SuppressWarnings("unchecked")
+        DataLoader<String, List<MachineTag>> loader = mock(DataLoader.class);
+        doReturn(loader).when(dfe).getDataLoader(MachineTagDataLoader.NAME);
+        when(loader.load("m1")).thenReturn(CompletableFuture.completedFuture(assignments));
+
+        // execution
+        List<MachineTag> result = fetcher.tagAssignments(dfe).get();
+
+        // verifications
+        assertThat(result).isSameAs(assignments);
+        verify(loader).load("m1");
     }
 }

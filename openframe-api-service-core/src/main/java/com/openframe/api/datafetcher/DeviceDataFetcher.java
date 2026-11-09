@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dataloader.MachineTagDataLoader;
 import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationKey;
@@ -19,6 +20,7 @@ import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.device.MachinePackageManagersResponse;
+import com.openframe.api.dto.device.MachineTag;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -155,6 +157,13 @@ public class DeviceDataFetcher {
     @DgsData(parentType = "Machine")
     public CompletableFuture<List<Tag>> tags(DgsDataFetchingEnvironment dfe) {
         DataLoader<String, List<Tag>> dataLoader = dfe.getDataLoader("tagDataLoader");
+        Machine machine = dfe.getSource();
+        return dataLoader.load(machine.getMachineId());
+    }
+
+    @DgsData(parentType = "Machine")
+    public CompletableFuture<List<MachineTag>> tagAssignments(DgsDataFetchingEnvironment dfe) {
+        DataLoader<String, List<MachineTag>> dataLoader = dfe.getDataLoader(MachineTagDataLoader.NAME);
         Machine machine = dfe.getSource();
         return dataLoader.load(machine.getMachineId());
     }

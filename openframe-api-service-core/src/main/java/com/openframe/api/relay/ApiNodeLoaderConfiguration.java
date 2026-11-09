@@ -1,5 +1,6 @@
 package com.openframe.api.relay;
 
+import com.openframe.api.dto.device.MachineTag;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
@@ -63,6 +64,11 @@ public class ApiNodeLoaderConfiguration {
     @Bean
     public NodeLoader<Tag> tagNodeLoader(TagService tagService) {
         return LookupNodeLoader.byRawId(NodeType.TAG, Tag.class, tagService::findById);
+    }
+
+    @Bean
+    public NodeLoader<MachineTag> machineTagNodeLoader(TagService tagService) {
+        return LookupNodeLoader.byRawId(NodeType.MACHINE_TAG, MachineTag.class, tagService::findMachineTagById);
     }
 
     @Bean

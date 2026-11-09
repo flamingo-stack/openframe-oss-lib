@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
+import com.openframe.api.dto.device.MachineTag;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 @Service
@@ -142,11 +144,39 @@ public class TagService {
 
     /**
      * Get tags for multiple machines (batch loading).
-     * Returns Tag objects enriched with per-device values from TagAssignment.
+     * Returns Tag objects enriched with per-device values from TagAssignment: the definition's id with the
+     * device's values and tagged date. Clients that cache by id want {@link #getTagAssignmentsForMachines(List)}.
      */
     public List<List<Tag>> getTagsForMachines(List<String> machineIds) {
         log.debug("Getting tags for {} machines", machineIds.size());
+        return loadPerMachine(machineIds, this::buildTag);
+    }
 
+    /**
+     * Get the tag assignments of multiple machines (batch loading), one {@link MachineTag} per assignment with
+     * the assignment's own id, values and tagged date and the stored tag definition under {@code tag}.
+     * One assignment and one tag query per batch, like {@link #getTagsForMachines(List)}.
+     */
+    public List<List<MachineTag>> getTagAssignmentsForMachines(List<String> machineIds) {
+        log.debug("Getting tag assignments for {} machines", machineIds.size());
+        return loadPerMachine(machineIds, this::buildMachineTag);
+    }
+
+    /**
+     * Find one device tag assignment by the assignment's id, with its tag definition.
+     * Empty when there is no such assignment, it is not a device's, or its tag definition is gone.
+     */
+    public Optional<MachineTag> findMachineTagById(String assignmentId) {
+        return tagAssignmentRepository.findByIdAndEntityType(assignmentId, TagEntityType.DEVICE)
+                .flatMap(this::toMachineTag);
+    }
+
+    private Optional<MachineTag> toMachineTag(TagAssignment assignment) {
+        return tagRepository.findById(assignment.getTagId())
+                .map(tag -> buildMachineTag(assignment, tag));
+    }
+
+    private <T> List<List<T>> loadPerMachine(List<String> machineIds, BiFunction<TagAssignment, Tag, T> mapper) {
         if (machineIds.isEmpty()) {
             return new ArrayList<>();
         }
@@ -156,30 +186,33 @@ public class TagService {
 
         if (allAssignments.isEmpty()) {
             return machineIds.stream()
-                    .map(id -> new ArrayList<Tag>())
+                    .map(id -> new ArrayList<T>())
                     .collect(Collectors.toList());
         }
 
         Map<String, List<TagAssignment>> assignmentsByEntityId = allAssignments.stream()
                 .collect(Collectors.groupingBy(TagAssignment::getEntityId));
-
-        Set<String> allTagIds = allAssignments.stream()
-                .map(TagAssignment::getTagId)
-                .collect(Collectors.toSet());
-        List<Tag> allTags = tagRepository.findAllById(new ArrayList<>(allTagIds));
-        Map<String, Tag> tagsById = allTags.stream()
-                .collect(Collectors.toMap(Tag::getId, tag -> tag));
+        Map<String, Tag> tagsById = findTagsOf(allAssignments);
 
         return machineIds.stream()
                 .map(machineId -> {
                     List<TagAssignment> assignments = assignmentsByEntityId
                             .getOrDefault(machineId, List.of());
                     return assignments.stream()
-                            .map(assignment -> buildTag(assignment, tagsById.get(assignment.getTagId())))
+                            .map(assignment -> mapper.apply(assignment, tagsById.get(assignment.getTagId())))
                             .filter(Objects::nonNull)
                             .collect(Collectors.toList());
                 })
                 .collect(Collectors.toList());
+    }
+
+    private Map<String, Tag> findTagsOf(List<TagAssignment> assignments) {
+        Set<String> tagIds = assignments.stream()
+                .map(TagAssignment::getTagId)
+                .collect(Collectors.toSet());
+        List<Tag> tags = tagRepository.findAllById(new ArrayList<>(tagIds));
+        return tags.stream()
+                .collect(Collectors.toMap(Tag::getId, tag -> tag));
     }
 
     /**
@@ -267,6 +300,21 @@ public class TagService {
         tagAssignmentRepository.deleteByTagId(tagId);
         tagRepository.deleteById(tagId);
         log.info("Tag deleted with cascade: {}", tagId);
+    }
+
+    private MachineTag buildMachineTag(TagAssignment assignment, Tag tag) {
+        if (tag == null) {
+            log.warn("Tag not found for assignment: {}", assignment.getTagId());
+            return null;
+        }
+
+        return MachineTag.builder()
+                .id(assignment.getId())
+                .tag(tag)
+                .values(assignment.getValues() != null ? assignment.getValues() : List.of())
+                .taggedAt(assignment.getTaggedAt())
+                .taggedBy(assignment.getTaggedBy())
+                .build();
     }
 
     private Tag buildTag(TagAssignment assignment, Tag tag) {

@@ -15,7 +15,9 @@ import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.user.InvitationService;
 import com.openframe.api.service.user.UserService;
+import com.openframe.api.dto.device.MachineTag;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.tag.Tag;
 import com.openframe.data.service.OrganizationService;
 import com.openframe.graphql.node.NodeAutoConfiguration;
 import com.openframe.graphql.relay.NodeType;
@@ -47,7 +49,7 @@ import static org.mockito.Mockito.when;
         classes = NodeDataFetcherDgsTest.NodeApp.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = "dgs.graphql.schema-locations=classpath:test-schema/api-nodes.graphqls")
-@MockitoBean(types = {OrganizationService.class, ToolService.class, TagService.class, ToolConnectionService.class,
+@MockitoBean(types = {OrganizationService.class, ToolService.class, ToolConnectionService.class,
         InstalledAgentService.class, ScriptService.class, ScriptExecutionService.class, ScheduleScriptService.class,
         ScheduleRunService.class, UserService.class, InvitationService.class})
 class NodeDataFetcherDgsTest {
@@ -59,8 +61,14 @@ class NodeDataFetcherDgsTest {
     private static final String TYPENAME = "__typename";
     private static final String NODE_QUERY = "query($id: ID!) { node(id: $id) { __typename id ... on Machine { hostname } } }";
     private static final String NODES_QUERY = "query($ids: [ID!]!) { nodes(ids: $ids) { __typename id } }";
+    private static final String ASSIGNMENT_ID = "as-1";
+    private static final String TAG_ID = "tag-env";
+    private static final String TAG_KEY = "env";
+    private static final String MACHINE_TAG_QUERY =
+            "query($id: ID!) { node(id: $id) { __typename id ... on MachineTag { values tag { id key } } } }";
 
     @MockitoBean private DeviceService deviceService;
+    @MockitoBean private TagService tagService;
 
     @Autowired private DgsQueryExecutor queryExecutor;
 
@@ -134,6 +142,42 @@ class NodeDataFetcherDgsTest {
         // verifications
         assertThat(result.getErrors()).isEmpty();
         assertThat(result.<Map<String, Object>>getData()).containsEntry("nodes", expected);
+    }
+
+    @Test
+    void node_machineTagGlobalId_answersTheAssignmentWithTheTagUnderItsOwnId() {
+        // setup
+        Tag tag = Tag.builder().id(TAG_ID).key(TAG_KEY).build();
+        MachineTag machineTag = MachineTag.builder().id(ASSIGNMENT_ID).tag(tag).values(List.of("prod")).build();
+        when(tagService.findMachineTagById(ASSIGNMENT_ID)).thenReturn(Optional.of(machineTag));
+        String machineTagGlobalId = codec.encode(NodeType.MACHINE_TAG, ASSIGNMENT_ID);
+        String tagGlobalId = codec.encode(NodeType.TAG, TAG_ID);
+        Map<String, Object> variables = Map.of("id", machineTagGlobalId);
+        Map<String, Object> expected = Map.of(TYPENAME, "MachineTag", "id", machineTagGlobalId,
+                "values", List.of("prod"), "tag", Map.of("id", tagGlobalId, "key", TAG_KEY));
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(MACHINE_TAG_QUERY, variables);
+
+        // verifications
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.<Map<String, Object>>getData()).containsEntry("node", expected);
+    }
+
+    @Test
+    void node_machineTagGlobalIdOfAnUnknownAssignment_answersNull() {
+        // setup
+        when(tagService.findMachineTagById(ASSIGNMENT_ID)).thenReturn(Optional.empty());
+        String machineTagGlobalId = codec.encode(NodeType.MACHINE_TAG, ASSIGNMENT_ID);
+        Map<String, Object> variables = Map.of("id", machineTagGlobalId);
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(MACHINE_TAG_QUERY, variables);
+
+        // verifications
+        assertThat(result.getErrors()).isEmpty();
+        Map<String, Object> data = result.getData();
+        assertThat(data).containsEntry("node", null);
     }
 
     @SpringBootConfiguration
