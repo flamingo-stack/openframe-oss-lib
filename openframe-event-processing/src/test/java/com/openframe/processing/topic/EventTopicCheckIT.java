@@ -88,7 +88,7 @@ class EventTopicCheckIT {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(prefix + ORGANIZATIONS)
                 .hasMessageContaining(prefix + ORGANIZATIONS + DEAD_LETTER_SUFFIX)
-                .hasMessageContaining("openframe.saas.kafka.managed-topics");
+                .hasMessageContaining("EventTopicCatalog");
         Set<String> topics = topicNames();
         assertThat(topics).doesNotContain(prefix + ORGANIZATIONS, prefix + ORGANIZATIONS + DEAD_LETTER_SUFFIX);
     }

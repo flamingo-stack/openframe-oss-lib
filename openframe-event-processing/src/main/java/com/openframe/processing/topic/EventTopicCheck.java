@@ -66,7 +66,7 @@ public class EventTopicCheck implements SmartInitializingSingleton {
                 .toList();
         if (!missing.isEmpty()) {
             throw new IllegalStateException("Event topics missing on " + bootstrapServers + ": " + missing
-                    + "; management creates them from openframe.saas.kafka.managed-topics, before the type is switched on here");
+                    + "; management creates them from the specs (EventTopicCatalog) with openframe.saas.kafka.event-topics.enabled on, before the type is switched on here");
         }
         warnIfNotCompacted(admin, eventTopics);
         log.info("Event topics found: {}", requiredTopics);
@@ -103,7 +103,7 @@ public class EventTopicCheck implements SmartInitializingSingleton {
         String policy = cleanupPolicy == null ? null : cleanupPolicy.value();
         if (isNotCompacted(policy)) {
             log.warn("Event topic {} exists with cleanup.policy={}, not compact: a new consumer group would not see "
-                    + "the latest event of every aggregate; fix its managed-topics entry and the topic by hand", resource.name(), policy);
+                    + "the latest event of every aggregate; fix the topic by hand", resource.name(), policy);
         }
     }
 

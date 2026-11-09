@@ -100,26 +100,30 @@ openframe:
 
 ## Topics
 
-Only management creates topics (CU-86ah6xx4n): `openframe-saas-management` declares `<topic-prefix><type>` and
-`<topic-prefix><type>-dlt` of every published type under `openframe.saas.kafka.managed-topics` in its config, with
-these settings:
+Only management creates topics (CU-86ah6xx4n). It derives them from the specs:
+[`EventTopicCatalog`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/topic/EventTopicCatalog.java)
+(in `openframe-event-publishing`) lists `<topic-prefix><type>` and `<topic-prefix><type>-dlt` of every spec, whatever
+its switches, and management hands them to its SaaS `KafkaAdmin` while `openframe.saas.kafka.event-topics.enabled` is
+on. A new spec therefore gets its topics at management's next restart, with no config to write. The settings, from
+[`EventTopicDefinition`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/topic/EventTopicDefinition.java):
 
 | Topic | `cleanup.policy` | Other settings |
 |---|---|---|
 | `<topic-prefix><type>` | `compact`, so a new group reads the latest event of every aggregate | `min.compaction.lag.ms` and `delete.retention.ms` 604800000 (7 days, a delete stays readable for a week) |
 | `<topic-prefix><type>-dlt` | `delete` | `retention.ms` 2592000000 (30 days) |
 
-Partitions 1, replication factor -1 (the broker's default), like every managed topic.
+Partitions 1 (an aggregate's events keep their order), replication factor -1 (the broker's default), like every
+managed topic.
 
 With `openframe.events.enabled: true`,
 [`EventTopicCheck`](src/main/java/com/openframe/processing/topic/EventTopicCheck.java#L28) checks at startup, before
 the listeners start, that both topics of every spec whose `openframe.events.topics.<type>.enabled` is on in this
-service's own config exist; a type switched off needs no topic and gets no listener. The rollout adds a type's
-managed topics and restarts management first, then switches the type on in the stream, then in the tenant services.
+service's own config exist; a type switched off needs no topic and gets no listener. The rollout switches the topics
+on in management and restarts it first, then switches the type on in the stream, then in the tenant services.
 
 - A missing topic stops the service, with the missing names and the bootstrap servers in the message. The check
   creates nothing.
-- An events topic that is not compacted logs a WARN; fix its `managed-topics` entry and the topic by hand.
+- An events topic that is not compacted, for example one created before management did, logs a WARN; fix it by hand.
 - Kafka unreachable stops the service, with the bootstrap servers in the message.
 
 ## Switching a type
@@ -212,7 +216,7 @@ The service does not start when:
 | Two projections have the same `name()` | Rename one (checked by `AggregateSpecRegistry`). |
 | `bootstrap-servers`, `topic-prefix` or `group-prefix` is missing | Set all three. |
 | Kafka cannot be reached to check the topics | Check `bootstrap-servers` and the network. |
-| A switched-on type's topic or DLT does not exist | Add both to management's `openframe.saas.kafka.managed-topics` and restart management. |
+| A switched-on type's topic or DLT does not exist | Switch `openframe.saas.kafka.event-topics.enabled` on in management and restart it. |
 
 ## Metrics
 
