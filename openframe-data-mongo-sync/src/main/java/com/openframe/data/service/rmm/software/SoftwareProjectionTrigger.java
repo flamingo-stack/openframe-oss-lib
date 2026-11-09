@@ -10,8 +10,6 @@ import org.springframework.stereotype.Component;
 import java.util.Collection;
 import java.util.function.IntSupplier;
 
-// The one way into the software read-model projectors: whatever changes device_software reports the titles and CVEs
-// it touched here, so how they are re-projected (now right away) is decided in one place.
 @Component
 public class SoftwareProjectionTrigger {
 
@@ -29,7 +27,6 @@ public class SoftwareProjectionTrigger {
     private final VulnerabilityProjector vulnerabilityProjector;
     private final MeterRegistry meterRegistry;
 
-    // not every deployable that deletes machines has a meter registry; without one the metrics go nowhere
     public SoftwareProjectionTrigger(SoftwareProjector softwareProjector,
                                      VulnerabilityProjector vulnerabilityProjector,
                                      ObjectProvider<MeterRegistry> meterRegistry) {
@@ -52,7 +49,6 @@ public class SoftwareProjectionTrigger {
         cveIds.forEach(cveId -> project(KIND_CVE, () -> vulnerabilityProjector.project(tenantId, cveId)));
     }
 
-    // a projection that throws is timed too, tagged as an error, so slow failing rollups show on the dashboard
     private void project(String kind, IntSupplier projection) {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = OUTCOME_ERROR;

@@ -89,7 +89,6 @@ class SoftwareProjectorTest {
         assertThat(saved.getUpdatedAt()).isNotNull();
     }
 
-    // versions are compared per numeric segment, not as text: "10.0" sorts before "9.0" as a string
     @Test
     void project_latestVersion_isTheNumericMaximum() {
         when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup()
@@ -231,7 +230,6 @@ class SoftwareProjectorTest {
                 .versions(List.of("130.0")).arpKeys(List.of("Google Chrome")).systemComponent(false);
     }
 
-    // what the projector stored for chromeRollup earlier: same keys, matched at the given time
     private static Software chromeProjected(Instant matchedAt) {
         return Software.builder().tenantId("t1").softwareTitleId(7L).name("Google Chrome").source("programs")
                 .vendor("Google LLC").arpKeys(List.of("Google Chrome")).packageFamilyNames(List.of()).systemComponent(false)

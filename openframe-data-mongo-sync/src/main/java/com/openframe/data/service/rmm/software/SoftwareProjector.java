@@ -31,7 +31,6 @@ public class SoftwareProjector {
     private final DeviceSoftwareAggregationRepository aggregationRepository;
     private final SoftwarePackageMatcher packageMatcher;
 
-    // the title's devices count, 0 when the title is gone from the read model
     public int project(String tenantId, Long softwareTitleId) {
         if (tenantId == null || softwareTitleId == null) {
             return 0;

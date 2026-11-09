@@ -15,7 +15,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-// aggregate() is not tenant-scoped by TenantAwareMongoTemplate: every pipeline matches tenantId itself
 @Repository
 @RequiredArgsConstructor
 public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAggregationRepository {
@@ -46,7 +45,6 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                                 List.of(new Document("$eq", List.of(new Document("$type", "$systemComponent"), "bool")), 1, 0))))
                         .append("systemComponentSet", new Document("$sum", new Document("$cond",
                                 List.of(new Document("$eq", List.of("$systemComponent", true)), 1, 0))))
-                        // installations[] is still read by the per-device read paths
                         .append("installations", new Document("$push", new Document("machineId", "$machineId")
                                 .append("versions", "$versions")))),
                 ctx -> new Document("$project", new Document("_id", 0)
@@ -112,7 +110,6 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
         List<String> arpKeys = strings(doc, "arpKeys");
         List<String> packageFamilyNames = strings(doc, "packageFamilyNames");
         List<String> installerTypes = strings(doc, "installerTypes");
-        // a title is a system component only when every device that reports the flag reports it set
         int reported = intValue(doc.get("systemComponentReported"));
         int set = intValue(doc.get("systemComponentSet"));
         boolean systemComponent = reported > 0 && reported == set;
@@ -150,7 +147,6 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
         return new CveRollup.Title(softwareTitleId.longValue(), name, source, installedVersion, devicesCount);
     }
 
-    // a set union without blanks, sorted so the stored lists do not reorder between projections
     private static List<String> strings(Document doc, String field) {
         return doc.getList(field, String.class, List.of()).stream()
                 .filter(StringUtils::isNotBlank)
@@ -192,7 +188,6 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
         return new Document("$cond", Arrays.asList(new Document("$gt", List.of(trimmedLength, 0)), field, "$$REMOVE"));
     }
 
-    // the first non-null version a machine reports for the title, missing when it reports none
     private static Document firstVersionOrRemove() {
         Document versions = new Document("$filter", new Document("input", orEmpty("$versions"))
                 .append("cond", new Document("$ne", Arrays.asList("$$this", null))));

@@ -40,7 +40,7 @@ class DeviceSoftwareConnectivitySyncTest {
 
         verify(deviceSoftwareRepository).setMachineConnectedByTenantIdAndMachineId("t1", "m1", false);
         verify(projectionTrigger).titlesChanged("t1", Set.of(42L, 99L));
-        verify(projectionTrigger).cvesChanged("t1", Set.of("CVE-1", "CVE-2"));  // CVE-1 once across the two titles
+        verify(projectionTrigger).cvesChanged("t1", Set.of("CVE-1", "CVE-2"));
     }
 
     @Test

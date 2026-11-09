@@ -4,8 +4,6 @@ import com.openframe.data.document.rmm.software.Software;
 
 import java.util.List;
 
-// One software title across the tenant's connected machines. Name and source come from the first machine by id,
-// vendor and upgrade code are the first non-blank ones; the key lists are unions without blanks, sorted.
 public record SoftwareTitleRollup(
         int devicesCount,
         String name,
