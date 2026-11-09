@@ -33,6 +33,7 @@ struct OsSpec {
     product_type: ProductType,
     edition_id: Option<String>,
     build: Option<u32>,
+    dotnet_release: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +54,8 @@ const STORELESS_EDITIONS: &[&str] = &[
 
 const MULTI_SESSION_EDITIONS: &[&str] = &["ServerRdsh"];
 
+const DOTNET_4_8_RELEASE: u32 = 528040;
+
 pub fn is_supported(id: ManagerId) -> bool {
     support_of(id, current()) == Support::Supported
 }
@@ -61,8 +64,23 @@ fn support_of(id: ManagerId, spec: &OsSpec) -> Support {
     match id {
         ManagerId::Brew => brew(spec),
         ManagerId::Winget => winget(spec),
-        ManagerId::Choco => Support::Unsupported("Chocolatey is not enabled"),
+        ManagerId::Choco => choco(spec),
     }
+}
+
+fn choco(spec: &OsSpec) -> Support {
+    if spec.os != Os::Windows {
+        return Support::Unsupported("Chocolatey is Windows only");
+    }
+
+    if spec
+        .dotnet_release
+        .is_some_and(|release| release < DOTNET_4_8_RELEASE)
+    {
+        return Support::Unsupported("Chocolatey needs .NET Framework 4.8");
+    }
+
+    Support::Supported
 }
 
 fn brew(spec: &OsSpec) -> Support {
@@ -130,6 +148,7 @@ fn log_spec(spec: &OsSpec) {
         product_type = ?spec.product_type,
         edition_id = ?spec.edition_id,
         build = ?spec.build,
+        dotnet_release = ?spec.dotnet_release,
         verdicts = ?verdicts,
         "Resolved package manager support"
     );
@@ -143,6 +162,7 @@ fn detect() -> OsSpec {
         product_type: ProductType::Unknown,
         edition_id: None,
         build: None,
+        dotnet_release: None,
     }
 }
 
@@ -214,12 +234,18 @@ fn detect() -> OsSpec {
         .and_then(|key| key.get_value::<String, _>("CurrentBuildNumber").ok())
         .and_then(|value| value.trim().parse().ok());
 
+    let dotnet_release = hklm
+        .open_subkey(r"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full")
+        .and_then(|key| key.get_value::<u32, _>("Release"))
+        .ok();
+
     OsSpec {
         os: Os::Windows,
         arch,
         product_type,
         edition_id,
         build,
+        dotnet_release,
     }
 }
 
@@ -231,6 +257,7 @@ fn detect() -> OsSpec {
         product_type: ProductType::Unknown,
         edition_id: None,
         build: None,
+        dotnet_release: None,
     }
 }
 

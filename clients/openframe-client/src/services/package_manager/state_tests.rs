@@ -36,6 +36,20 @@ fn a_supported_absent_manager_is_missing_only_with_a_console_session() {
 }
 
 #[test]
+fn an_absent_choco_is_missing_without_a_console_session() {
+    assert_eq!(
+        resolve(Presence::Absent, true, session_for(ManagerId::Choco, false)),
+        ManagerState::Missing
+    );
+    for id in [ManagerId::Brew, ManagerId::Winget] {
+        assert_eq!(
+            resolve(Presence::Absent, true, session_for(id, false)),
+            ManagerState::Unknown
+        );
+    }
+}
+
+#[test]
 fn an_inconclusive_probe_reports_unknown_either_way() {
     for session in SESSIONS {
         assert_eq!(

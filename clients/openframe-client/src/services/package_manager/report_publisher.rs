@@ -1,3 +1,4 @@
+use super::choco::{self, ChocoReport};
 use super::state::{state_of, ManagerState};
 use super::{Dependency, ManagerId, Presence};
 use crate::services::agent_configuration_service::AgentConfigurationService;
@@ -14,6 +15,8 @@ const PACKAGE_MANAGERS_SUBJECT: &str = "package-managers";
 struct PackageManagerReport {
     package_managers: BTreeMap<ManagerId, ManagerState>,
     dependencies: Vec<DependencyReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chocolatey: Option<ChocoReport>,
 }
 
 #[derive(Debug, Serialize)]
@@ -71,9 +74,17 @@ impl PackageManagerReportPublisher {
             })
             .collect();
 
+        let chocolatey = if package_managers.get(&ManagerId::Choco) == Some(&ManagerState::Present)
+        {
+            choco::report().await
+        } else {
+            None
+        };
+
         info!(
             report = ?package_managers,
             ?dependencies,
+            ?chocolatey,
             console_user_present,
             "Reporting package manager state"
         );
@@ -83,6 +94,7 @@ impl PackageManagerReportPublisher {
                 PackageManagerReport {
                     package_managers,
                     dependencies,
+                    chocolatey,
                 },
             )
             .await

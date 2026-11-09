@@ -1119,11 +1119,16 @@ async fn an_unsupported_package_update_is_refused_on_the_status_stream() {
         return;
     };
     let (orders, mut statuses) = launch_package_update(&mut agent).await;
+    let package = if cfg!(windows) {
+        json!({"manager": "BREW", "kind": "FORMULA", "name": "git"})
+    } else {
+        json!({"manager": "WINGET", "id": "Git.Git"})
+    };
 
     agent
         .send_to(
             format!("machine.{MACHINE}.package-update"),
-            package_order("p2", "req-2", json!({"manager": "CHOCO", "id": "git"})),
+            package_order("p2", "req-2", package),
         )
         .await;
 

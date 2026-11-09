@@ -7,6 +7,7 @@ fn windows(edition: Option<&str>, product_type: ProductType, build: Option<u32>)
         product_type,
         edition_id: edition.map(str::to_string),
         build,
+        dotnet_release: Some(DOTNET_4_8_RELEASE),
     }
 }
 
@@ -17,6 +18,7 @@ fn mac(arch: Arch) -> OsSpec {
         product_type: ProductType::Unknown,
         edition_id: None,
         build: None,
+        dotnet_release: None,
     }
 }
 
@@ -118,15 +120,36 @@ fn every_manager_is_gated_off_its_platform() {
     let desktop = windows(Some("Professional"), ProductType::Workstation, Some(19045));
     assert!(is_gated(ManagerId::Brew, &desktop));
     assert!(is_gated(ManagerId::Winget, &mac(Arch::Arm64)));
+    assert!(is_gated(ManagerId::Choco, &mac(Arch::Arm64)));
 }
 
 #[test]
-fn choco_is_gated_everywhere_while_disabled() {
-    assert!(is_gated(ManagerId::Choco, &mac(Arch::Arm64)));
-    assert!(is_gated(
-        ManagerId::Choco,
-        &windows(Some("Professional"), ProductType::Workstation, Some(19045))
-    ));
+fn choco_is_supported_on_any_windows_with_dotnet_4_8() {
+    for spec in [
+        windows(Some("Professional"), ProductType::Workstation, Some(19045)),
+        windows(Some("EnterpriseS"), ProductType::Workstation, Some(17763)),
+        windows(Some("ServerStandard"), ProductType::Server, Some(17763)),
+    ] {
+        assert_eq!(support_of(ManagerId::Choco, &spec), Support::Supported);
+    }
+}
+
+#[test]
+fn choco_is_gated_below_dotnet_4_8() {
+    let spec = OsSpec {
+        dotnet_release: Some(461814),
+        ..windows(Some("ServerStandard"), ProductType::Server, Some(17763))
+    };
+    assert!(is_gated(ManagerId::Choco, &spec));
+}
+
+#[test]
+fn an_unreadable_dotnet_release_never_gates_choco() {
+    let spec = OsSpec {
+        dotnet_release: None,
+        ..windows(None, ProductType::Unknown, None)
+    };
+    assert_eq!(support_of(ManagerId::Choco, &spec), Support::Supported);
 }
 
 #[test]

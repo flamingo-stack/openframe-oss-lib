@@ -1,4 +1,5 @@
 pub(crate) mod brew;
+mod choco;
 pub mod package_update;
 pub mod report_publisher;
 pub mod report_run_manager;
@@ -38,6 +39,10 @@ impl ManagerId {
 
     pub const ALL: &'static [ManagerId] = &[ManagerId::Brew, ManagerId::Choco, ManagerId::Winget];
 
+    pub fn needs_user_session(self) -> bool {
+        self != ManagerId::Choco
+    }
+
     pub async fn presence(self) -> Presence {
         match self {
             ManagerId::Brew => {
@@ -55,23 +60,11 @@ impl ManagerId {
 
 #[cfg(target_os = "windows")]
 fn choco_presence() -> Presence {
-    use winreg::enums::HKEY_LOCAL_MACHINE;
-    use winreg::RegKey;
-
-    const ENVIRONMENT: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
-
-    let root = RegKey::predef(HKEY_LOCAL_MACHINE)
-        .open_subkey(ENVIRONMENT)
-        .ok()
-        .and_then(|key| key.get_value::<String, _>("ChocolateyInstall").ok())
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| {
-            let program_data =
-                std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".to_string());
-            format!(r"{}\chocolatey", program_data)
-        });
-
-    if Path::new(&root).join("bin").join("choco.exe").exists() {
+    if Path::new(&choco::root())
+        .join("bin")
+        .join("choco.exe")
+        .exists()
+    {
         Presence::Present
     } else {
         Presence::Absent
