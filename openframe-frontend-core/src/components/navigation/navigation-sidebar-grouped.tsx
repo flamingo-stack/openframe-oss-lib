@@ -18,6 +18,7 @@ import { cn } from '../../utils';
 import { createLocalStorageAdapter } from '../../utils/local-storage-adapter';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FloatingTooltip } from '../ui/floating-tooltip';
+import { Tag } from '../ui/tag';
 import { CountPill } from './count-pill';
 import { NavigationItemBadge } from './navigation-item-badge';
 import { UnreadDot } from './unread-dot';
@@ -208,8 +209,20 @@ interface RowStateProps {
 }
 
 /** The row's end, flush right where every row's count sits. */
-function RowEnd({ count }: { count: number }) {
-  return count > 0 ? <CountPill count={count} className="ml-auto" /> : null;
+function RowEnd({ count, tone = 'accent' }: { count: number; tone?: 'accent' | 'warning' }) {
+  if (count <= 0) return null;
+  // Warning: the design's counter tag (Figma `nav/item` "Counter is a tag (warning)"), 28px tall.
+  if (tone === 'warning')
+    return (
+      <Tag
+        as="span"
+        data-testid="nav-row-count"
+        label={count > 99 ? '99+' : String(count)}
+        variant="warning"
+        className="ml-auto h-7 shrink-0"
+      />
+    );
+  return <CountPill count={count} className="ml-auto" />;
 }
 
 /**
@@ -222,9 +235,12 @@ function RowLabel({
   item,
   showLabel = true,
   textClassName = 'text-h4',
+  countTone,
 }: {
   item: NavigationSidebarItem;
   showLabel?: boolean;
+  /** The count's look (`NavigationSidebarActionRowProps.countTone`). Default: the accent pill. */
+  countTone?: 'accent' | 'warning';
   /** The label's type style: the grouped rows' 18px (`text-h4`), or 14px (`text-h6`) beside sectioned rows. */
   textClassName?: string;
 }) {
@@ -249,7 +265,7 @@ function RowLabel({
         </span>
       </FloatingTooltip>
       {item.badge && <NavigationItemBadge label={item.badge} compact />}
-      <RowEnd count={unreadCount} />
+      <RowEnd count={unreadCount} tone={countTone} />
     </span>
   );
 }
@@ -574,6 +590,11 @@ export interface NavigationSidebarActionRowProps {
   active?: boolean;
   /** A count pill after the label (capped at "99+"); a dot on the icon in the rail. 0 = none. */
   count?: number;
+  /**
+   * The count's look: `'accent'` (default) the navigation's accent pill; `'warning'`
+   * the warning tag the three-column shell's "New Chat" carries (what needs the user).
+   */
+  countTone?: 'accent' | 'warning';
   /** `'outline'`: a bordered row with an accent icon — an action rather than a place ("New chat"). */
   variant?: 'default' | 'outline';
   /**
@@ -603,6 +624,7 @@ export function NavigationSidebarActionRow({
   onClick,
   active = false,
   count = 0,
+  countTone = 'accent',
   variant = 'default',
   size = 'default',
   disabled = false,
@@ -639,7 +661,12 @@ export function NavigationSidebarActionRow({
               : idleIcon('row')
         }
       />
-      <RowLabel item={entry} showLabel={!minimized} textClassName={size === 'sectioned' ? 'text-h6' : undefined} />
+      <RowLabel
+        item={entry}
+        showLabel={!minimized}
+        textClassName={size === 'sectioned' ? 'text-h6' : undefined}
+        countTone={countTone}
+      />
     </>
   );
   const shared = { className: classes, title: minimized ? name : undefined, 'aria-label': name };

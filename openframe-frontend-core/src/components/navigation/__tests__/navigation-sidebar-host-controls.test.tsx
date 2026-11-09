@@ -4,7 +4,7 @@
  * (`NavigationSidebarActionRow`).
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NavigationSidebarConfig } from '../../../types/navigation';
@@ -111,6 +111,15 @@ describe('NavigationSidebarActionRow', () => {
     const row = screen.getByRole('link', { name: 'Needs approval (99+)' });
     expect(row).toHaveTextContent('99+');
     expect(row).not.toHaveAttribute('aria-current');
+  });
+
+  it('draws the count as a warning tag when asked (the three-column shell\'s "New Chat")', () => {
+    render(<NavigationSidebarActionRow icon={icon} label="New Chat" size="sectioned" count={3} countTone="warning" />);
+    const row = screen.getByRole('button', { name: 'New Chat (3)' });
+    const tag = within(row).getByTestId('nav-row-count');
+    expect(tag.tagName).toBe('SPAN');
+    expect(tag).toHaveClass('h-7', 'bg-ods-warning-secondary', 'text-ods-warning');
+    expect(tag).toHaveTextContent('3');
   });
 
   it('draws an outlined action button for "New chat"', () => {
