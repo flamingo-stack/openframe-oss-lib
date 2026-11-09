@@ -30,6 +30,12 @@ export interface TabSelectorProps {
   items: TabSelectorItem[];
   /** Visual variant: primary (accent bg) or secondary (soft grey bg) */
   variant?: 'primary' | 'secondary';
+  /**
+   * `compact`: an icon-only strip at its content's width: 44px tall, 36px segments and 20px icons from `content-md`,
+   * 40 / 32 / 16px below it (the guardrails level picker, Figma 4365-22670 / 4365-22462). Default: the full-width
+   * strip, 48px at `content-md`.
+   */
+  size?: 'default' | 'compact';
   /** Optional label displayed above the selector */
   label?: string;
   /** Disable the entire selector (overrides per-item enabled state) */
@@ -51,6 +57,7 @@ export function TabSelector({
   onValueChange,
   items,
   variant = 'primary',
+  size = 'default',
   label,
   disabled,
   scrollable = false,
@@ -63,6 +70,7 @@ export function TabSelector({
   // renders in its title bar adapts by context, with no re-styling at the
   // call site.
   const flush = useIsInActionsMenuHeader();
+  const compact = size === 'compact';
   return (
     <div
       className={cn('flex flex-col gap-[var(--spacing-system-xxs)]', disabled && 'opacity-50', className)}
@@ -79,7 +87,11 @@ export function TabSelector({
           'flex gap-[var(--spacing-system-xxs)] bg-ods-bg p-[var(--spacing-system-xxs)]',
           flush
             ? 'h-10 w-full'
-            : cn('h-11 rounded-md border border-ods-border content-md:h-12', scrollable ? 'overflow-x-auto' : 'w-full'),
+            : cn(
+                'rounded-md border border-ods-border',
+                compact ? 'h-10 content-md:h-11' : 'h-11 content-md:h-12',
+                scrollable ? 'overflow-x-auto' : compact ? 'w-auto' : 'w-full',
+              ),
         )}
       >
         {items.map(item => {
@@ -101,10 +113,21 @@ export function TabSelector({
               data-tone={variant === 'primary' ? 'accent' : undefined}
               // scrollable: intrinsic widths must sum past the container or nothing ever overflows (flex-1's basis-0
               // defeats the scroll).
-              className={cn('h-full', scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1')}
+              className={cn(
+                'h-full',
+                compact ? 'w-8 flex-none content-md:w-9' : scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1',
+              )}
             >
               {item.icon && (
-                <span className="flex size-4 shrink-0 items-center justify-center content-md:size-6">{item.icon}</span>
+                <span
+                  className={cn(
+                    'flex shrink-0 items-center justify-center',
+                    // compact: the box sizes the icon, whatever size the caller drew it at.
+                    compact ? 'size-4 content-md:size-5 [&>svg]:size-full' : 'size-4 content-md:size-6',
+                  )}
+                >
+                  {item.icon}
+                </span>
               )}
               {item.label}
               {item.badge && item.badge}

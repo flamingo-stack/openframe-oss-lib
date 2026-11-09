@@ -5,6 +5,7 @@ package com.openframe.data.document.tenant;
  */
 public enum TenantStatus {
     ACTIVE,
-    INACTIVE,
+    // Blocked by Flamingo staff or the auto-block rule: its users and agents are refused until it is unblocked.
+    BLOCKED,
     DELETED
 }

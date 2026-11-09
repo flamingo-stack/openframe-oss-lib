@@ -29,6 +29,7 @@ import com.openframe.api.service.rmm.vulnerability.FleetGlobalVulnerabilityMappe
 import com.openframe.api.util.FleetSoftwareMapper;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.api.util.FleetVulnerabilityMapper;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -52,6 +53,8 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -442,7 +445,7 @@ public class SoftwareInventoryService {
         SoftwareSource installedBy = source == SoftwareSource.UNMANAGED ? null : source;
         List<SoftwareOnDeviceResponse> rows = tenantSoftwareReadModelQuery
                 .devicesForSoftwareRows(tenantId, softwareId, search, latestVersion);
-        rows.forEach(row -> row.setInstalledBy(installedBy));
+        rows.forEach(row -> row.setInstalledBy(managedByOn(row.getDevice(), installedBy)));
         return rows;
     }
 
@@ -498,11 +501,11 @@ public class SoftwareInventoryService {
                                                               SortInput sort) {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
         List<SoftwareResponse> rows = deviceSoftware(machineId, filter, search);
-        // the filter reads auto-update, so it is set on every row, not only on the page
+        // the filter reads source and auto-update, so they are set on every row, not only on the page
         autoUpdateService.applyToSoftwareOnDevice(machineId, rows);
         catalogStatus.apply(rows);
         List<SoftwareResponse> chosen = rows.stream()
-                .filter(row -> filter == null || selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate()))
+                .filter(row -> matchesCatalogFilter(row, filter))
                 .toList();
         if (!softwareReadModel && !fleetPaging) {
             enrichDevicesCountFromHosts(chosen);
@@ -571,6 +574,12 @@ public class SoftwareInventoryService {
                 .currentVersion(installedVersion(installed))
                 .olderVersionsCount(Math.max(0, installed.size() - 1))
                 .vulnerabilitySummary(summarizeDeviceSoftware(title, inventory))
+                .fleetSource(FleetSource.of(title.getSource()))
+                .publisher(FleetSoftwareMapper.firstText(installed, HostSoftwareInstalledVersion::getVendor))
+                .upgradeCode(title.getUpgradeCode())
+                .productCodes(FleetSoftwareMapper.distinctText(installed, HostSoftwareInstalledVersion::getArpKey))
+                .packageFamilyNames(FleetSoftwareMapper.distinctText(installed, HostSoftwareInstalledVersion::getPackageFamilyName))
+                .systemComponent(FleetSoftwareMapper.allFlagged(installed, HostSoftwareInstalledVersion::getSystemComponent))
                 .build();
     }
 
@@ -603,14 +612,13 @@ public class SoftwareInventoryService {
     }
 
     private static boolean matchesDeviceSoftwareFilter(SoftwareResponse row, SoftwareFilterInput filter) {
-        if (filter == null) {
-            return true;
-        }
-        return matchesSources(row, filter.getSources()) && meetsMinSeverity(row, filter.getMinSeverity());
+        return filter == null || meetsMinSeverity(row, filter.getMinSeverity());
     }
 
-    private static boolean matchesSources(SoftwareResponse row, List<SoftwareSource> sources) {
-        return isEmpty(sources) || sources.contains(row.getSource());
+    private static boolean matchesCatalogFilter(SoftwareResponse row, SoftwareFilterInput filter) {
+        return filter == null
+                || (selected(filter.getSources(), row.getSource())
+                && selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate()));
     }
 
     private static boolean meetsMinSeverity(SoftwareResponse row, SoftwareCveSeverity min) {
@@ -676,7 +684,7 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> titleRows = List.of(titleRow);
         catalogStatus.apply(titleRows);
         String latestVersion = titleRow.getLatestVersion();
-        SoftwareSource installedBy = installedBy(title.getSource());
+        SoftwareSource installedBy = managedBy(titleRow, title.getSource());
 
         List<SoftwareTitleVersion> versions = title.getVersions().stream()
                 .filter(version -> version.getId() != null)
@@ -720,6 +728,22 @@ public class SoftwareInventoryService {
         return source == SoftwareSource.UNMANAGED ? null : source;
     }
 
+    // a program winget matches is managed by winget whoever installed it; brew and choco manage what they installed
+    private static SoftwareSource managedBy(SoftwareResponse titleRow, String fleetSource) {
+        return titleRow.getSource() == SoftwareSource.WINGET ? SoftwareSource.WINGET : installedBy(fleetSource);
+    }
+
+    // winget manages a program only on a device where it runs; a device that never reported its managers counts as
+    // having it, as everywhere else in Software Management
+    private static SoftwareSource managedByOn(Machine device, SoftwareSource managedBy) {
+        if (managedBy != SoftwareSource.WINGET) {
+            return managedBy;
+        }
+        Map<PackageManagerType, PackageManagerState> reported = device.getPackageManagers();
+        boolean hasWinget = reported == null || reported.get(PackageManagerType.WINGET) == PackageManagerState.PRESENT;
+        return hasWinget ? managedBy : null;
+    }
+
     private List<HostVersion> hostVersionsOf(SoftwareTitleVersion version) {
         HostSearchRequest request = new HostSearchRequest();
         request.setSoftwareVersionId(version.getId());
@@ -743,7 +767,7 @@ public class SoftwareInventoryService {
                 .device(device)
                 .softwareVersion(hv.version())
                 .status(status)
-                .installedBy(installedBy)
+                .installedBy(managedByOn(device, installedBy))
                 .build();
     }
 

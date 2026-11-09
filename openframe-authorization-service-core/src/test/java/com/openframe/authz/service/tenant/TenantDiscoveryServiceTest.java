@@ -72,7 +72,7 @@ class TenantDiscoveryServiceTest {
     @Test
     void shouldReportNoAccountForUserOfInactiveTenant() {
         when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.of(activeUser("u", "t-1", "ada@acme.com")));
-        when(tenantService.findById("t-1")).thenReturn(Optional.of(tenant("t-1", TenantStatus.INACTIVE)));
+        when(tenantService.findById("t-1")).thenReturn(Optional.of(tenant("t-1", TenantStatus.BLOCKED)));
 
         TenantDiscoveryResponse response = service.discoverTenantForEmail("ada@acme.com");
 

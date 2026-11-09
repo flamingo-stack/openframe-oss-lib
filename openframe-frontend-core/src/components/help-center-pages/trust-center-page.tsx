@@ -103,7 +103,7 @@ export interface TrustCenterPageProps {
    */
   beforeFaq?: ReactNode;
   /**
-   * The "Data synced from <source>" line and its PDF download in the status row. Default true. Pass false when the
+   * The "Data from <source>" line and its PDF download in the status row. Default true. Pass false when the
    * host's own header states both (the hub's admin preview draws them in its page header), so the page never says
    * them twice; the monitoring status stays.
    */

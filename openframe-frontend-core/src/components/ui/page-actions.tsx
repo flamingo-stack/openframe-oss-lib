@@ -527,9 +527,26 @@ function CompactPrimaryActions({ actions, loading: loadingProp }: { actions: Pag
   );
 }
 
+const subscribeNothing = () => () => {};
+
+/**
+ * False on the server and through hydration, true after: what lets a render use a value only the client measures and
+ * still hydrate into the server's markup.
+ */
+function useHydrated(): boolean {
+  return React.useSyncExternalStore(
+    subscribeNothing,
+    () => true,
+    () => false,
+  );
+}
+
 function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageActionButton[]; loading?: boolean }) {
   const loading = useLoadingScope() || loadingProp;
-  // Over the composer dock where the layout has one.
+  // Over the composer dock where the layout has one. `AppLayout` measures the dock after it mounts, and a page hydrates
+  // after the layout, so the height is often known by the bar's first client render: drawn then, it would not match the
+  // server's markup (no offset). The bar takes it from the render after hydration instead.
+  const hydrated = useHydrated();
   const dockHeight = useComposerDockHeight();
   // Its height, for the chrome that stays clear of it (`useMobileActionBarHeight`).
   const barRef = React.useRef<HTMLDivElement>(null);
@@ -543,7 +560,7 @@ function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageA
     <div
       ref={barRef}
       data-testid="mobile-action-bar"
-      style={dockHeight > 0 ? { bottom: dockHeight } : undefined}
+      style={hydrated && dockHeight > 0 ? { bottom: dockHeight } : undefined}
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50 md:hidden',
         'border-t border-ods-border bg-ods-card',

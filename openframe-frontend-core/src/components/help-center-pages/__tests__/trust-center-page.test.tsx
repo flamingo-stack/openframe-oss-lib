@@ -246,14 +246,14 @@ describe('TrustCenterPage', () => {
 
   it('attribution={false}: the host states the sync line and its download, so the page keeps only the monitoring status', () => {
     render(<TrustCenterPage initialData={makeData()} attribution={false} />);
-    expect(screen.queryByText(/Data synced from/)).toBeNull();
+    expect(screen.queryByText(/Data from/)).toBeNull();
     expect(screen.queryByRole('link', { name: 'Download PDF' })).toBeNull();
   });
 
   it('still offers the PDF when monitoring is not connected (no source line to end)', () => {
     render(<TrustCenterPage initialData={makeData({ connected: false, syncedAt: null })} />);
     expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/api/trust-center/pdf');
-    expect(screen.queryByText(/Data synced from/)).toBeNull();
+    expect(screen.queryByText(/Data from/)).toBeNull();
   });
 
   it('with host content before it, the FAQ is the last thing on the page, after that content', () => {
@@ -310,7 +310,7 @@ describe('TrustCenterPage', () => {
     const { unmount } = render(<TrustCenterPage initialData={makeData()} />);
     expect(screen.getByText('Controls continuously monitored')).toBeInTheDocument();
     // WHEN it was synced is the shared attribution line, not the status.
-    expect(screen.getByText('Data synced from Vanta')).toBeInTheDocument();
+    expect(screen.getByText('Data from Vanta')).toBeInTheDocument();
     // The synced-from logo is the site icon the hub names — the llama, like the subprocessor list.
     expect(screen.getByRole('img', { name: 'Vanta' })).toHaveAttribute('src', 'https://icons.example/vanta.com.png');
     expect(screen.getByText(/^Last updated: /)).toBeInTheDocument();
@@ -328,7 +328,7 @@ describe('TrustCenterPage', () => {
     expect(screen.getByText('Live control monitoring is not enabled yet')).toBeInTheDocument();
     expect(screen.queryByText(/paused/)).toBeNull();
     expect(screen.queryByText(/continuously monitored/)).toBeNull();
-    expect(screen.queryByText('Data synced from Vanta')).toBeNull();
+    expect(screen.queryByText('Data from Vanta')).toBeNull();
   });
   it('defaults to the brand-neutral title + tagline (a host adds its brand via props)', () => {
     render(<TrustCenterPage initialData={makeData()} />);
