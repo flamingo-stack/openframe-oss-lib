@@ -7,6 +7,9 @@ import { formatDate } from '../../utils/format';
 import { ClickupIcon } from '../icons-v2-generated/brand-logos/clickup-icon';
 import { GithubClassicIcon } from '../icons-v2-generated/brand-logos/github-classic-icon';
 import { HubspotIcon } from '../icons-v2-generated/brand-logos/hubspot-icon';
+import { OpenframeLogoGreyIcon } from '../icons-v2-generated/brand-logos/openframe-logo-grey-icon';
+import { QuickbooksIcon } from '../icons-v2-generated/brand-logos/quickbooks-icon';
+import { StripeIcon } from '../icons-v2-generated/brand-logos/stripe-icon';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { TOOL_MARK_CLASS } from '../platform/tool-badge-mark';
 import { useLoadingScope } from './loading-scope';
@@ -39,8 +42,8 @@ function Separator() {
 }
 
 /**
- * THE "Data synced from <source> · Last updated: <date>" line every synced
- * surface shows (the cap table, the financials, the Trust Center). The date is
+ * THE "Data from <source> · Last updated: <date>" line every surface showing another system's data
+ * draws (the cap table, the financials, the Trust Center). The date is
  * UTC (`formatDate`), so a server-rendered page and its hydrated copy print the
  * same text.
  */
@@ -50,7 +53,7 @@ export function DataAttribution({ icon, source, lastUpdated, action }: DataAttri
     <div className={LINE_CLASS}>
       <div className={ITEM_CLASS}>
         {icon}
-        <span>Data synced from {source}</span>
+        <span>Data from {source}</span>
       </div>
       <Separator />
       <span className={UPDATED_CLASS}>Last updated: {lastUpdated ? formatDate(lastUpdated) : 'Never'}</span>
@@ -70,7 +73,7 @@ function DataAttributionSkeleton({ icon, action }: Pick<DataAttributionProps, 'i
       <div className={ITEM_CLASS}>
         {icon ?? <UnifiedSkeleton className={cn(TOOL_MARK_CLASS, 'rounded')} />}
         <span>
-          Data synced from <TextLineSkeleton type="inherit" as="span" className={`${WORD_BAR_CLASS} w-20`} />
+          Data from <TextLineSkeleton type="inherit" as="span" className={`${WORD_BAR_CLASS} w-20`} />
         </span>
       </div>
       <Separator />
@@ -88,11 +91,21 @@ function DataAttributionSkeleton({ icon, action }: Pick<DataAttributionProps, 'i
 }
 
 /** The mark each sync source is drawn with (the app's standard brand marks); its name is `DATA_SYNC_SOURCES`'. */
-const DATA_SYNC_ICONS: Record<DataSyncSource, typeof ClickupIcon> = {
+const DATA_SYNC_ICONS: Record<DataSyncSource, (props: { size?: number }) => ReactNode> = {
   clickup: ClickupIcon,
   hubspot: HubspotIcon,
   github: GithubClassicIcon,
+  // The OpenFrame mark drawn in `currentColor`, so it reads as the text beside it in both themes.
+  openframe: OpenframeLogoGreyIcon,
+  stripe: StripeIcon,
+  quickbooks: QuickbooksIcon,
 };
+
+/** A sync source's mark, the one `DataSyncLine` draws: for a page that names the source in its own words. */
+export function DataSyncIcon({ source, size = 16 }: { source: DataSyncSource; size?: number }) {
+  const Icon = DATA_SYNC_ICONS[source];
+  return <Icon size={size} />;
+}
 
 /**
  * THE sync line of a shared page whose records an API reads from a mirror (the roadmap and the delivery board:
@@ -121,13 +134,12 @@ export function DataSyncLine({
   const inScope = useLoadingScope();
   const loading = (loadingProp || inScope) && stated;
   if (!loading && !(sync && sync.source in DATA_SYNC_ICONS)) return null;
-  const Icon = sync ? DATA_SYNC_ICONS[sync.source] : null;
   const line =
-    loading || !sync || !Icon ? (
+    loading || !sync ? (
       <DataAttributionSkeleton action={action} />
     ) : (
       <DataAttribution
-        icon={<Icon size={16} />}
+        icon={<DataSyncIcon source={sync.source} />}
         source={DATA_SYNC_SOURCES[sync.source]}
         lastUpdated={sync.syncedAt}
         action={action}

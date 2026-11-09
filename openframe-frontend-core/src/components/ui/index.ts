@@ -112,6 +112,8 @@ export * from './device-card';
 export * from './device-card-compact';
 export * from './entity-image';
 export * from './data-attribution';
+// The sources `DataSyncLine` / `DataSyncIcon` take, beside them, so a page draws a source's name and mark from one import.
+export * from '../../types/data-sync';
 export * from './download-button';
 export * from './compliance-badge';
 export * from './feature-card';

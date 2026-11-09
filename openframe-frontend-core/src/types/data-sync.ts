@@ -1,11 +1,14 @@
 /**
  * Every system a shared page's records are mirrored from, with the name a page shows for it. THE list: `DataSync`,
- * `DataSyncLine`'s marks, the docs hook and every host that answers a `sync` read it.
+ * `DataSyncLine`'s and `DataSyncIcon`'s marks, the docs hook and every host that answers a `sync` read it.
  */
 export const DATA_SYNC_SOURCES = {
   clickup: 'ClickUp',
   hubspot: 'HubSpot',
   github: 'GitHub',
+  openframe: 'OpenFrame',
+  stripe: 'Stripe',
+  quickbooks: 'QuickBooks',
 } as const;
 
 export type DataSyncSource = keyof typeof DATA_SYNC_SOURCES;

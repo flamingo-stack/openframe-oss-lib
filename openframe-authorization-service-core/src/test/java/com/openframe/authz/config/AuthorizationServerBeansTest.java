@@ -1,7 +1,9 @@
 package com.openframe.authz.config;
 
 import com.openframe.authz.config.tenant.TenantContext;
+import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
 import org.junit.jupiter.api.AfterEach;
@@ -12,6 +14,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -27,7 +30,10 @@ import java.util.Optional;
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_BLOCKED;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,6 +44,7 @@ class AuthorizationServerBeansTest {
 
     private final AuthorizationServerConfig config = new AuthorizationServerConfig();
     private final UserService userService = mock(UserService.class);
+    private final TenantService tenantService = mock(TenantService.class);
     private AuthUser owner;
 
     @BeforeEach
@@ -108,7 +115,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldLoadPasswordUserScopedToRequestTenant() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        UserDetailsService details = config.userDetailsService(userService);
+        UserDetailsService details = config.userDetailsService(userService, tenantService);
 
         UserDetails loaded = details.loadUserByUsername("OWNER@acme.com");
 
@@ -118,7 +125,7 @@ class AuthorizationServerBeansTest {
 
     @Test
     void shouldRefusePasswordLoginWithoutUserInTenantOrWithoutHash() {
-        UserDetailsService details = config.userDetailsService(userService);
+        UserDetailsService details = config.userDetailsService(userService, tenantService);
         AuthUser ssoOnly = activeUser("u2", TENANT, "sso@acme.com");
         ssoOnly.setPasswordHash(" ");
         when(userService.findActiveByEmailAndTenant("ghost@acme.com", TENANT)).thenReturn(Optional.empty());
@@ -133,7 +140,7 @@ class AuthorizationServerBeansTest {
     @Test
     void shouldAuthenticatePasswordsWithBcryptOnly() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
-        var manager = config.authenticationManager(config.userDetailsService(userService), config.passwordEncoder());
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
 
         assertThat(config.passwordEncoder()).isInstanceOf(BCryptPasswordEncoder.class);
         assertThat(manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!"))
@@ -146,9 +153,43 @@ class AuthorizationServerBeansTest {
     void shouldGiveSameErrorForUnknownUserAndWrongPassword() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
         when(userService.findActiveByEmailAndTenant("ghost@acme.com", TENANT)).thenReturn(Optional.empty());
-        var manager = config.authenticationManager(config.userDetailsService(userService), config.passwordEncoder());
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
 
         assertThatThrownBy(() -> manager.authenticate(new UsernamePasswordAuthenticationToken("ghost@acme.com", "x")))
                 .isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
     }
+
+    @Test
+    void shouldRefusePasswordLoginIntoBlockedTenantBeforeLookingUpTheUser() {
+        doThrow(new AuthFlowException(ACCOUNT_BLOCKED, ACCOUNT_BLOCKED.getMessage())).when(tenantService).refuseLoginUnlessActive(TENANT);
+        UserDetailsService details = config.userDetailsService(userService, tenantService);
+
+        assertThatThrownBy(() -> details.loadUserByUsername("owner@acme.com"))
+                .isInstanceOf(AuthFlowException.class)
+                .hasMessage(ACCOUNT_BLOCKED.getMessage())
+                .extracting(e -> ((AuthFlowException) e).getCode())
+                .isEqualTo(ACCOUNT_BLOCKED);
+        verify(userService, never()).findActiveByEmailAndTenant(anyString(), anyString());
+    }
+
+    @Test
+    void shouldFailPasswordAuthenticationForBlockedTenantEvenWithTheRightPassword() {
+        doThrow(new AuthFlowException(ACCOUNT_BLOCKED, ACCOUNT_BLOCKED.getMessage())).when(tenantService).refuseLoginUnlessActive(TENANT);
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
+
+        assertThatThrownBy(() -> manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!")))
+                .isInstanceOf(InternalAuthenticationServiceException.class)
+                .hasCauseInstanceOf(AuthFlowException.class);
+    }
+
+    @Test
+    void shouldAuthenticatePasswordLoginIntoActiveTenant() {
+        when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
+        var manager = config.authenticationManager(config.userDetailsService(userService, tenantService), config.passwordEncoder());
+
+        assertThat(manager.authenticate(new UsernamePasswordAuthenticationToken("owner@acme.com", "Str0ng-password!"))
+                .isAuthenticated()).isTrue();
+        verify(tenantService).refuseLoginUnlessActive(TENANT);
+    }
+
 }
