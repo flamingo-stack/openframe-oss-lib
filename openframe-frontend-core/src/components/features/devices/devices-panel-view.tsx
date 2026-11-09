@@ -99,6 +99,8 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
   hideColumns?: string[];
   /** Filter keys to drop from the funnels and the grid row; the column itself stays. */
   hideFilters?: string[];
+  /** Adds the USER and SOURCES columns and funnels, for a tenant with directories. Default: neither. */
+  directoryColumns?: boolean;
   /** Message shown when the list is empty. */
   emptyMessage?: string;
   /** Drawn instead of the toolbar and the list: the pristine, genuinely empty panel. */
@@ -151,6 +153,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   actionsColumn,
   hideColumns,
   hideFilters,
+  directoryColumns = false,
   emptyMessage = 'No devices found. Try adjusting your search or filters.',
   emptyState,
   noOrganizations = false,
@@ -164,11 +167,17 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   const scoped = useLoadingScope();
   const loading = scoped || loadingGiven;
   const gridColumns =
-    filterColumns ?? getDeviceFilterColumns(deviceFilters).filter(column => !hideFilters?.includes(column.key));
+    filterColumns ??
+    getDeviceFilterColumns(deviceFilters, { directoryColumns }).filter(column => !hideFilters?.includes(column.key));
 
   const list = (
     <>
-      <DevicesFilterToolbar {...toolbar} isLoading={loading} />
+      <DevicesFilterToolbar
+        {...toolbar}
+        // `devices(search)` also matches the primary user's name once directories are in play (Figma 865:55733).
+        searchPlaceholder={directoryColumns ? 'Search for Devices and Users' : undefined}
+        isLoading={loading}
+      />
       {viewMode === 'table' ? (
         <DevicesTableBody
           devices={devices}
@@ -187,6 +196,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           onColumnFiltersChange={onColumnFiltersChange}
           actionsColumn={actionsColumn}
           hideColumns={hideColumns}
+          directoryColumns={directoryColumns}
           disableColumnFilters={hideFilters}
           totalCount={loading ? undefined : totalCount}
           footerSlot={

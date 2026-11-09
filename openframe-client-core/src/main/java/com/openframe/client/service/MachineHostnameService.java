@@ -3,11 +3,15 @@ package com.openframe.client.service;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.service.machine.MachineWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+
+import static com.openframe.data.service.machine.MachineFields.HOSTNAME;
+import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +19,7 @@ import java.util.Optional;
 public class MachineHostnameService {
 
     private final MachineRepository machineRepository;
+    private final MachineWriter machineWriter;
 
     public void updateHostname(String machineId, String hostname) {
         Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
@@ -35,8 +40,7 @@ public class MachineHostnameService {
             return;
         }
 
-        machine.setHostname(hostname);
-        machineRepository.save(machine);
+        machineWriter.update(machineId, machineUpdate().set(HOSTNAME, hostname));
 
         log.info("Updated hostname for machineId={} to {}", machineId, hostname);
     }
