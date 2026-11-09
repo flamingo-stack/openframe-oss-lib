@@ -1,9 +1,12 @@
 package com.openframe.data.nats.delivery;
 
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.DeliverySpec;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -11,11 +14,15 @@ import static java.lang.String.format;
 
 @Component
 @ConditionalOnProperty("spring.cloud.stream.enabled")
+@RequiredArgsConstructor
 public class ScriptScheduleDeliverySpec implements DeliverySpec<ScriptScheduleDeliverySeed, ScriptScheduleExecutionMessage> {
 
     // the subject every agent since the schedule listener subscribes to over core NATS, no stream behind it: the
     // engine and the path without it send the same message there, the agent answers both on execution.acknowledge
     private static final String SUBJECT_TEMPLATE = "machine.%s.script-schedule-execution";
+
+    // ObjectProvider: a service that never sends this type boots without the encryption config
+    private final ObjectProvider<EncryptionService> encryptionService;
 
     @Override
     public DeliveryType getType() {
@@ -37,6 +44,12 @@ public class ScriptScheduleDeliverySpec implements DeliverySpec<ScriptScheduleDe
                 .offlineBehavior(seed.getOfflineBehavior())
                 .reconnectWindowSeconds(seed.getReconnectWindowSeconds())
                 .build();
+    }
+
+    // the batch is stored with its secrets encrypted, the agent gets them in the clear
+    @Override
+    public ScriptScheduleExecutionMessage wireForm(ScriptScheduleExecutionMessage message) {
+        return message.revealed(value -> encryptionService.getObject().decrypt(value));
     }
 
     @Override

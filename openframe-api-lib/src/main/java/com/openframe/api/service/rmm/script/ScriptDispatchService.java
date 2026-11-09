@@ -7,6 +7,7 @@ import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.mapper.ScriptEnvVarMapper;
+import com.openframe.api.mapper.ScriptSecretSealer;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
@@ -17,6 +18,7 @@ import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptExecution;
 import com.openframe.data.document.rmm.schedule.ScheduledScriptCustomParams;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
@@ -30,8 +32,10 @@ import com.openframe.data.repository.rmm.ScheduleScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -67,6 +71,7 @@ public class ScriptDispatchService {
     private final ScheduleScriptExecutionRepository scheduleScriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptTimeoutValidator timeoutValidator;
+    private final ObjectProvider<ScriptSecretSealer> secretSealer;
 
     public DispatchResponse runScript(RunScriptInput input, String initiatedBy, ExecutionSource source) {
         timeoutValidator.validate(input.getTimeoutSeconds());
@@ -113,8 +118,9 @@ public class ScriptDispatchService {
         // so we never half-dispatch.
         deviceService.verifyDispatchable(machineIds);
 
-        // Resolve the saved script once; every machine shares it.
-        ScriptResponse script = scriptService.get(input.getScriptId());
+        // Resolve the saved script once; every machine shares it. An unsaved draft replaces only
+        // its body and shell, so the run keeps the script's stored env vars.
+        ScriptResponse script = withDraft(scriptService.get(input.getScriptId()), input.getScriptBody(), input.getShell());
         String executionId = UUID.randomUUID().toString();
 
         return dispatchBatch(executionId, script, machineIds, input.getPrivilegeLevel(),
@@ -214,6 +220,7 @@ public class ScriptDispatchService {
                             ? cp.getArgs() : script.getDefaultArgs();
                     List<ScriptEnvVar> effectiveEnv = cp != null && cp.getEnvVars() != null
                             ? cp.getEnvVars() : mergeEnvVars(script.getEnvVars(), null);
+                    List<ScriptEnvVar> sealedEnv = sealed(effectiveEnv);
                     return ScriptScheduleExecutionItem.builder()
                             .scriptId(script.getId())
                             .code(script.getScriptBody())
@@ -221,7 +228,7 @@ public class ScriptDispatchService {
                             .privilegeLevel(script.getPrivilegeLevel())
                             .args(ScriptArgsTokenizer.tokenize(effectiveArgs))
                             .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                            .envVars(effectiveEnv)
+                            .envVars(sealedEnv)
                             .build();
                 })
                 .toList();
@@ -242,6 +249,12 @@ public class ScriptDispatchService {
         log.info("Dispatched schedule run scheduleId={} executionId={} scripts={} machines={}",
                 scheduleId, executionId, runnableScripts.size(), machineIds.size());
         return DispatchResponse.builder().executionId(executionId).build();
+    }
+
+    // the delivery engine stores the batch: its secrets stay encrypted until the wire form
+    private List<ScriptEnvVar> sealed(List<ScriptEnvVar> envVars) {
+        ScriptSecretSealer sealer = secretSealer.getIfAvailable();
+        return sealer == null ? envVars : sealer.seal(envVars);
     }
 
     // the schedule's own rule for a machine that is not online travels with the batch
@@ -282,6 +295,17 @@ public class ScriptDispatchService {
                 executionId, script.getId(), machineIds.size(), script.getShell(), privilegeLevel);
         return DispatchResponse.builder()
                 .executionId(executionId)
+                .build();
+    }
+
+    private static ScriptResponse withDraft(ScriptResponse script, String draftBody, ScriptShell draftShell) {
+        if (!StringUtils.hasText(draftBody)) {
+            return script;
+        }
+        ScriptShell shell = draftShell != null ? draftShell : script.getShell();
+        return script.toBuilder()
+                .scriptBody(draftBody)
+                .shell(shell)
                 .build();
     }
 

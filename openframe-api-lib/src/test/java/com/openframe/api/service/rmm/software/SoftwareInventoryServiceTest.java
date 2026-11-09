@@ -40,6 +40,8 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -62,6 +64,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -84,7 +87,10 @@ class SoftwareInventoryServiceTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private com.openframe.data.repository.tool.IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
+    @Mock private DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
+    @Mock private TenantSoftwareReadModelQuery tenantSoftwareReadModelQuery;
     @Mock private SoftwareAutoUpdateService autoUpdateService;
+    @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private OrganizationRepository organizationRepository;
 
@@ -96,7 +102,8 @@ class SoftwareInventoryServiceTest {
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService, tagAssignmentRepository, organizationRepository);
+                tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }
@@ -515,6 +522,24 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
+    void listSoftwareForDevice_sourcesFilter_readsTheSourceTheCatalogSets() {
+        // setup
+        stubInventory(
+                List.of(title(10L, "Google Chrome", "programs", "141.0"), title(11L, "Contoso Tool", "programs", "1.0")),
+                List.of());
+        catalogMatchesWinget("Google Chrome");
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setSources(List.of(SoftwareSource.WINGET));
+
+        // execution
+        PageResult<SoftwareResponse> result =
+                service.listSoftwareForDevice(MACHINE_ID, filter, null, FIRST_PAGE, PAGE_SIZE, null);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("Google Chrome");
+    }
+
+    @Test
     void listSoftwareForDevice_minSeverityHigh_titlesBelowBandExcluded() {
         // setup
         stubInventory(
@@ -718,6 +743,107 @@ class SoftwareInventoryServiceTest {
     }
 
     @Test
+    @DisplayName("softwareDevices status: with a catalog release out, a device on the highest installed version is OUTDATED too")
+    void listDevices_statusAgainstTheCatalog() {
+        stubDevices("homebrew_packages", device("m-1", "5.8.3"), device("m-2", "5.8.4"));
+        catalogLatestIs("5.8.5");
+
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        assertThat(rows).extracting(SoftwareOnDeviceResponse::getStatus)
+                .containsOnly(SoftwareOnDeviceStatus.OUTDATED);
+    }
+
+    @Test
+    @DisplayName("softwareDevices status: a device past a lagging catalog is UP_TO_DATE")
+    void listDevices_devicePastTheCatalog_upToDate() {
+        stubDevices("homebrew_packages", device("m-1", "5.8.5"));
+        catalogLatestIs("5.8.4");
+
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        assertThat(rows).extracting(SoftwareOnDeviceResponse::getStatus).containsExactly(SoftwareOnDeviceStatus.UP_TO_DATE);
+    }
+
+    @Test
+    @DisplayName("software list: the policies set auto-update first, then the catalog fills the rows they do not cover")
+    void listSoftware_policiesThenCatalog() {
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of());
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+
+        service.listSoftware(null, 0, 20, null, null);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
+        order.verify(autoUpdateService).applyToSoftware(anyList());
+        order.verify(catalogStatus).apply(anyList());
+    }
+
+    @Test
+    @DisplayName("software detail: the policies set auto-update first, then the catalog fills the row")
+    void findById_policiesThenCatalog() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(42L);
+        title.setName("xz");
+        title.setSource("homebrew_packages");
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+
+        assertThat(service.findById("42")).isPresent();
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
+        order.verify(autoUpdateService).applyToSoftware(argThat(rows -> rows.size() == 1));
+        order.verify(catalogStatus).apply(argThat(rows -> rows.size() == 1 && "xz".equals(rows.get(0).getName())));
+    }
+
+    @Test
+    @DisplayName("software filters: the facets count the statuses the policies and the catalog set")
+    void getSoftwareFilters_policiesThenCatalog() {
+        SoftwareTitlesResponse response = mock(SoftwareTitlesResponse.class);
+        when(response.getSoftwareTitles()).thenReturn(List.of());
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+
+        service.getSoftwareFilters(null);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
+        order.verify(autoUpdateService).applyToSoftware(anyList());
+        order.verify(catalogStatus).apply(anyList());
+    }
+
+    @Test
+    @DisplayName("device software list and its filters: the device's policies first, then the catalog")
+    void deviceSoftware_policiesThenCatalog() {
+        when(deviceHostInventoryLoader.load(fleet, MACHINE_ID)).thenReturn(HostInventory.empty());
+
+        service.listSoftwareForDevice(MACHINE_ID, null, null, FIRST_PAGE, PAGE_SIZE, null);
+        service.getDeviceSoftwareFilters(MACHINE_ID, null);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
+        order.verify(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
+        order.verify(catalogStatus).apply(anyList());
+        order.verify(autoUpdateService).applyToSoftwareOnDevice(eq(MACHINE_ID), anyList());
+        order.verify(catalogStatus).apply(anyList());
+    }
+
+    // null matches every row
+    private void catalogMatchesWinget(String name) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.stream().filter(row -> name == null || name.equals(row.getName()))
+                    .forEach(row -> row.setSource(SoftwareSource.WINGET));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+    }
+
+    // what SoftwareCatalogStatus does for a title the catalog carries: its newest release becomes the latest version
+    private void catalogLatestIs(String version) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setLatestVersion(version));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+    }
+
+    @Test
     @DisplayName("softwareDevices sort: by softwareVersion in numeric order, both directions; an unknown field is a client error before Fleet")
     void listDevices_sortBySoftwareVersion() {
         stubDevices("apps", device("m-1", "9.0"), device("m-2", "10.0"), device("m-3", "1.5"));
@@ -744,6 +870,55 @@ class SoftwareInventoryServiceTest {
 
         stubDevices("apps", device("m-1", "1.0"));
         assertThat(service.listDevicesForSoftware("42", null, null, 0, 50, null).items().get(0).getInstalledBy()).isNull();
+    }
+
+    @Test
+    void listDevicesForSoftware_programWingetMatches_wingetOnDevicesWhereWingetRuns() {
+        // setup
+        Machine present = withWinget(device("m-1", "1.0"), PackageManagerState.PRESENT);
+        Machine unsupported = withWinget(device("m-2", "1.0"), PackageManagerState.UNSUPPORTED);
+        Machine missing = withWinget(device("m-3", "1.0"), PackageManagerState.MISSING);
+        Machine unreported = device("m-4", "1.0");
+        stubDevices("programs", present, unsupported, missing, unreported);
+        catalogMatchesWinget(null);
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(rows)
+                .extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getInstalledBy)
+                .containsExactly(tuple("m-1", SoftwareSource.WINGET), tuple("m-2", null), tuple("m-3", null),
+                        tuple("m-4", SoftwareSource.WINGET));
+    }
+
+    @Test
+    void listDevicesForSoftware_installedByWingetFilter_onlyDevicesWingetManages() {
+        // setup
+        Machine present = withWinget(device("m-1", "1.0"), PackageManagerState.PRESENT);
+        Machine unsupported = withWinget(device("m-2", "1.0"), PackageManagerState.UNSUPPORTED);
+        stubDevices("programs", present, unsupported);
+        catalogMatchesWinget(null);
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setInstalledBy(List.of(SoftwareSource.WINGET));
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", filter, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(rows).extracting(row -> row.getDevice().getMachineId()).containsExactly("m-1");
+    }
+
+    @Test
+    void listDevicesForSoftware_programWingetDoesNotMatch_installedByUnknown() {
+        // setup
+        stubDevices("programs", withWinget(device("m-1", "1.0"), PackageManagerState.PRESENT));
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(rows).extracting(SoftwareOnDeviceResponse::getInstalledBy).containsOnlyNulls();
     }
 
     @Test
@@ -922,6 +1097,11 @@ class SoftwareInventoryServiceTest {
                 .thenAnswer(call -> List.of(hostByVersion.get(call.<HostSearchRequest>getArgument(0).getSoftwareVersionId())));
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
         when(hostMachineResolver.resolve(eq("t1"), anyList())).thenReturn(machineByHost);
+    }
+
+    private static Machine withWinget(Machine machine, PackageManagerState state) {
+        machine.setPackageManagers(Map.of(PackageManagerType.WINGET, state));
+        return machine;
     }
 
     private static Machine device(String machineId, String version) {

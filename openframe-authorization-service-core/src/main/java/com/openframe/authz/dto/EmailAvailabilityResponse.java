@@ -1,6 +1,7 @@
 package com.openframe.authz.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.openframe.core.email.EmailVerdict;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,12 +21,14 @@ public class EmailAvailabilityResponse {
 
     /** Why it is unavailable. Omitted when {@code available} is true. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    private Reason reason;
+    private EmailRefusalReason reason;
 
-    public enum Reason {
-        /** An active user already owns this address. */
-        TAKEN,
-        /** The domain is not accepted — disposable or privacy-focused provider. */
-        BLOCKED_DOMAIN
+    public static EmailAvailabilityResponse taken() {
+        return new EmailAvailabilityResponse(false, EmailRefusalReason.TAKEN);
+    }
+
+    public static EmailAvailabilityResponse of(EmailVerdict verdict) {
+        EmailRefusalReason reason = EmailRefusalReason.of(verdict);
+        return new EmailAvailabilityResponse(verdict.isAllowed(), reason);
     }
 }

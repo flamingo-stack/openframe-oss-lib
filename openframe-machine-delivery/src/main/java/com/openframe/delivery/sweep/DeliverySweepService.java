@@ -227,7 +227,8 @@ public class DeliverySweepService {
     private boolean publish(DeliverySpec<DeliverySeed, DeliveryPayload> spec, String machineId, DeliveryPayload payload) {
         try {
             String subject = spec.subject(machineId);
-            publisher.publish(subject, payload);
+            DeliveryPayload wireForm = spec.wireForm(payload);
+            publisher.publish(subject, wireForm);
             return true;
         } catch (RuntimeException e) {
             log.error("Delivery publish failed: machineId={}", machineId, e);

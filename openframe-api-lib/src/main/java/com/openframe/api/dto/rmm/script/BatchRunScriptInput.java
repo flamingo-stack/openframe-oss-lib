@@ -1,6 +1,7 @@
 package com.openframe.api.dto.rmm.script;
 
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptShell;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -36,4 +37,14 @@ public class BatchRunScriptInput {
     /** Run-time env vars merged over the script's stored env vars (same name overrides). */
     @Valid
     private List<ScriptEnvVarInput> envVars;
+
+    /**
+     * Optional unsaved body run in place of the saved one, so an edit can be tested with the
+     * script's stored env vars (secrets included) before it is saved. In-process only: the
+     * GraphQL input does not expose it.
+     */
+    private String scriptBody;
+
+    /** Optional shell of that unsaved body; the saved script's shell when absent. */
+    private ScriptShell shell;
 }

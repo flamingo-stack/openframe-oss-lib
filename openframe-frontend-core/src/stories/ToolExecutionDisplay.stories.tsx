@@ -27,6 +27,20 @@ const executedSuccessMessage: ToolExecutionData = {
   success: true,
 };
 
+/** A command the policy allowed, with its AI review and its result (Figma 1374-105507). */
+const executedReviewedMessage: ToolExecutionData = {
+  ...executedSuccessMessage,
+  policyReview: {
+    source: 'CLASSIFIER',
+    decision: 'POLICY',
+    approvalLevel: 'ALLOW',
+    policyLevel: 'ALLOW',
+    operationCodes: ['CHECK_PERFORMANCE'],
+    matchedRules: [],
+    reason: 'Lists the processes running from the Public folder without changing them.',
+  },
+};
+
 const executedFailureMessage: ToolExecutionData = {
   type: 'EXECUTED_TOOL',
   integratedToolType: 'FLEET_MDM',
@@ -98,6 +112,17 @@ export const CollapsedSuccess: Story = {
 export const CollapsedFailure: Story = {
   args: {
     message: executedFailureMessage,
+  },
+  decorators: [constrainedDecorator()],
+};
+
+/**
+ * A command the policy allowed, with its AI review: open it for the policy's level and the operations, between the
+ * arguments and the result.
+ */
+export const SuccessWithReview: Story = {
+  args: {
+    message: executedReviewedMessage,
   },
   decorators: [constrainedDecorator()],
 };

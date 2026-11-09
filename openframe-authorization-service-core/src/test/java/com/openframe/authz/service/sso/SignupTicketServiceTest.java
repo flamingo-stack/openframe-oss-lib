@@ -1,6 +1,7 @@
 package com.openframe.authz.service.sso;
 
 import com.openframe.authz.dto.Touchpoint;
+import com.openframe.authz.dto.Visit;
 import com.openframe.authz.service.sso.SignupTicketService.PendingSignup;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
@@ -120,7 +121,7 @@ class SignupTicketServiceTest {
     @Test
     void bind_ticketWithAttribution_keepsIt() {
         when(values.get(anyString())).thenReturn("{\"email\":\"a@acme.com\",\"provider\":\"google\",\"emailVerified\":true,"
-                + "\"attribution\":{\"utmSource\":\"newsletter\",\"gclid\":\"gclid-1\"}}");
+                + "\"attribution\":{\"lastVisit\":{\"utmSource\":\"newsletter\",\"gclid\":\"gclid-1\"}}}");
         when(redisTemplate.getExpire(anyString())).thenReturn(120L);
 
         service.bind("t", "user-1", "tenant-1");
@@ -190,7 +191,7 @@ class SignupTicketServiceTest {
     }
 
     private static Touchpoint attribution() {
-        return Touchpoint.builder().utmSource("newsletter").gclid("gclid-1").build();
+        return Touchpoint.builder().lastVisit(Visit.builder().utmSource("newsletter").gclid("gclid-1").build()).build();
     }
 
     private static String keyFor(String ticket) {

@@ -2,6 +2,7 @@ package com.openframe.authz.security.flow;
 
 import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
 import com.openframe.authz.dto.Touchpoint;
+import com.openframe.authz.dto.Visit;
 import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
@@ -44,12 +45,14 @@ import static com.openframe.authz.support.SsoTestFixtures.oidcUser;
 import static com.openframe.authz.support.SsoTestFixtures.tenant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_BLOCKED;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -186,12 +189,12 @@ class LoginSsoHandlerTest {
     }
 
     @Test
-    void shouldRejectInactiveTenantWithoutLinking() {
+    void shouldRejectBlockedTenantWithoutLinking() {
         when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.of(existing));
-        when(tenantService.findById(TENANT)).thenReturn(Optional.of(tenant(TENANT, TenantStatus.INACTIVE)));
+        doThrow(new AuthFlowException(ACCOUNT_BLOCKED, ACCOUNT_BLOCKED.getMessage())).when(tenantService).refuseLoginUnlessActive(TENANT);
 
         assertThatThrownBy(() -> handler.handle(request(), response, authentication("google", trustedGoogle)))
-                .hasMessageContaining("not active");
+                .hasMessageContaining("blocked");
         verify(ssoIdentityService, never()).link(anyString(), any(), any());
     }
 
@@ -257,12 +260,12 @@ class LoginSsoHandlerTest {
     }
 
     @Test
-    void handle_unknownAppUserWithSourceCookie_parksCookieSourceInTicket() throws Exception {
+    void handle_unknownAppUserWithDownloadCookie_parksCookieSourceInTicket() throws Exception {
         when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.empty());
         when(ssoOidcUserService.autoProvisionTenantForDomain("ada@acme.com")).thenReturn(Optional.empty());
         when(ssoIdentityService.subjectOf(eq("google"), anyMap())).thenReturn(Optional.of("g-1"));
         when(signupTicketService.create("ada@acme.com", "Ada", "", "google", true, "g-1",
-                Touchpoint.builder().downloadId("dl-1").utmSource("producthunt").build()))
+                Touchpoint.builder().downloadId("dl-1").lastVisit(Visit.builder().utmSource("producthunt").build()).build()))
                 .thenReturn("ticket/1");
         MockHttpServletRequest request = request("com.openframe.app://auth", true);
         request.setCookies(loginCookie("com.openframe.app://auth", true),

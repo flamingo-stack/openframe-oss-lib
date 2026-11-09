@@ -5,6 +5,7 @@ import com.openframe.data.document.push.PushDevice;
 import com.openframe.data.document.push.PushPlatform;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.bson.BsonObjectId;
+import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +46,23 @@ class CustomPushDeviceRepositoryImplTest {
         ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).upsert(query.capture(), any(Update.class), eq(PushDevice.class));
         assertThat(query.getValue().getQueryObject().toJson()).contains("tok-1");
+    }
+
+    @Test
+    @DisplayName("Given the phone was registered in another tenant, when it registers here, then its token is removed from every other tenant — otherwise the old tenant keeps pushing to a phone signed in elsewhere")
+    void token_is_removed_from_every_other_tenant() {
+        when(mongoTemplate.tenantId()).thenReturn("tenant-b");
+        UpdateResult inserted = upserted();
+        when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(PushDevice.class)))
+                .thenReturn(inserted);
+
+        repository.registerToken("alice", "tok-1", PushPlatform.IOS, "1.4.0");
+
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).remove(query.capture(), eq(PushDevice.class));
+        Document filter = query.getValue().getQueryObject();
+        assertThat(filter.get("token")).isEqualTo("tok-1");
+        assertThat(filter.get("tenantId")).isEqualTo(new Document("$ne", "tenant-b"));
     }
 
     @Test

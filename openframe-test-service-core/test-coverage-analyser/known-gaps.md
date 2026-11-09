@@ -127,8 +127,8 @@ confirmed by the suite owner. Confirm, reclassify, or delete.
   (`GET /oauth/join/pending`, `/oauth/join/complete`), `SsoDiscoveryController`
   (`GET /sso/providers/invite`, `/sso/providers/registration`), `AppleNativeDiscoveryController`
   (`POST /oauth/apple/native/discover`, `/oauth/apple/native/register`),
-  `InvitationRegistrationController` `GET /invitations/accept/sso`, `TenantRegistrationController`
-  `GET /oauth/register/sso`; `openframe-security-oauth` `OAuthBffController`
+  `InvitationRegistrationController` `GET /invitations/accept/sso`; `openframe-security-oauth`
+  `OAuthBffController`
   (`GET /oauth/join-return`, `/oauth/signup-continue`, `POST /oauth/login/sso/complete`,
   `/oauth/apple/native-register`).
 - **Why:** browser redirect flows that need a live session at an external identity provider; an API

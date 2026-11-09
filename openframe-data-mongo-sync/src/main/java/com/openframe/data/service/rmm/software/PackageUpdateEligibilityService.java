@@ -26,6 +26,8 @@ import static java.util.stream.Collectors.toSet;
 public class PackageUpdateEligibilityService {
 
     static final String FLAG = "package-auto-update";
+    // a client built outside a release runs as this version and takes every enabled flag (feature_flags.rs)
+    static final String DEV_AGENT_VERSION = "0.0.0-dev";
 
     private final OpenFrameClientConfigurationService clientConfigurationService;
     private final MachineRepository machineRepository;
@@ -45,14 +47,19 @@ public class PackageUpdateEligibilityService {
         }
         return machineRepository.findByMachineIdIn(machineIds).stream()
                 .filter(admitted)
-                .filter(m -> isAtLeast(m.getAgentVersion(), flag.getMinVersion()))
+                .filter(m -> meetsMinVersion(m, flag))
                 .map(Machine::getMachineId)
                 .collect(toSet());
     }
 
     public boolean isEligible(SoftwareAction action, Machine machine) {
         ClientFeatureFlag flag = enabledFlag(action);
-        return flag != null && isAtLeast(machine.getAgentVersion(), flag.getMinVersion());
+        return flag != null && meetsMinVersion(machine, flag);
+    }
+
+    private static boolean meetsMinVersion(Machine machine, ClientFeatureFlag flag) {
+        String version = machine.getAgentVersion();
+        return DEV_AGENT_VERSION.equals(version) || isAtLeast(version, flag.getMinVersion());
     }
 
     private ClientFeatureFlag enabledFlag(SoftwareAction action) {

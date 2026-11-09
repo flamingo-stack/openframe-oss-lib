@@ -5,14 +5,16 @@ import type { DeviceRow } from './types';
 
 /**
  * What the device views cannot know by themselves, because it belongs to the
- * host: where a device's page lives, where images are served from, and whether
- * the page runs inside the mobile shell. The product provides it once, above
- * every page; without a provider the views render as a picture (no links,
- * image URLs used as given).
+ * host: where a device's page and its notifications live, where images are
+ * served from, and whether the page runs inside the mobile shell. The product
+ * provides it once, above every page; without a provider the views render as a
+ * picture (no links, image URLs used as given).
  */
 export interface DevicesViewConfig {
   /** The device's page. Absent: rows and cards are not links. */
   getDeviceHref?: (device: DeviceRow) => string | undefined;
+  /** The viewer's notifications about the device. Absent: the unread indicator is a counter, not a button. */
+  getDeviceNotificationsHref?: (device: DeviceRow) => string | undefined;
   /** A customer image's full URL from its stored path and content hash. */
   resolveImageUrl?: (imageUrl: string | null | undefined, hash?: string | null) => string | undefined;
   /** The page runs inside the mobile shell: options nobody can pick there are dropped. */

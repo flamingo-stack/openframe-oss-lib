@@ -664,7 +664,7 @@ class ScriptServiceTest {
         assertThat(active.getStatusChangedAt()).isNotNull();
         verify(scriptRepository).save(active);
         verify(scriptRepository, never()).deleteByTenantIdAndId(any(), any());
-        verify(deliveryRefresher).retireScript(SCRIPT_ID, "Script was deleted before the agent received it");
+        verify(deliveryRefresher).refreshForScript(SCRIPT_ID);
     }
 
     @Test
@@ -711,7 +711,7 @@ class ScriptServiceTest {
         assertThat(active.getStatus()).isEqualTo(ScriptStatus.ARCHIVED);
         assertThat(active.getStatusChangedAt()).isNotNull();
         verify(scriptRepository).save(active);
-        verify(deliveryRefresher).retireScript(SCRIPT_ID, "Script was archived before the agent received it");
+        verify(deliveryRefresher).refreshForScript(SCRIPT_ID);
     }
 
     @Test

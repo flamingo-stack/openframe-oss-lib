@@ -81,6 +81,9 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .build()
     );
 
+    // the streams of the path before the delivery engine, on every tenant NATS that ran an older release
+    private static final List<String> REMOVED_STREAMS = List.of("TOOL_INSTALLATION", "CLIENT_UPDATE", "CLIENT_UNINSTALL", "TOOL_UPDATE");
+
     private final NatsStreamManagementService natsStreamManagementService;
     private final AdditionalStreamConfigurationProvider additionalStreamConfigurationProvider;
 
@@ -90,6 +93,17 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
 
         additionalStreamConfigurationProvider.provide()
                 .forEach(natsStreamManagementService::save);
+
+        REMOVED_STREAMS.forEach(this::deleteRemovedStream);
+    }
+
+    // a stream left behind harms nothing and the next start tries again: it must not stop management from starting
+    private void deleteRemovedStream(String streamName) {
+        try {
+            natsStreamManagementService.deleteIfExists(streamName);
+        } catch (RuntimeException e) {
+            log.error("Removed stream not deleted, the next start tries again: stream={}", streamName, e);
+        }
     }
 
 }

@@ -4,20 +4,25 @@ import { ExternalLink } from 'lucide-react';
 import { toGoogleSheetsEmbedUrl, toGoogleSheetsOriginalUrl } from '../../utils/embed-url-converters';
 import { GoogleSheetsIcon } from '../icons-v2-generated';
 import { Button } from '../ui';
+import { useLoadingScope } from '../ui/loading-scope';
 import { EmbedViewerFrame } from './embed-viewer-frame';
 
 export interface GoogleSheetsViewerProps {
   externalUrl: string;
   fileName?: string;
   height?: string;
+  /** The document is being read: the viewer draws its loading form. A loading scope does the same. */
+  loading?: boolean;
 }
 
-export function GoogleSheetsViewer({ externalUrl, fileName, height }: GoogleSheetsViewerProps) {
+export function GoogleSheetsViewer({ externalUrl, fileName, height, loading = false }: GoogleSheetsViewerProps) {
   const displayName = fileName || 'Google Sheet';
+  // In a loading scope the document is being read: the frame draws its loading form, never "not configured".
+  const isLoading = useLoadingScope() || loading;
 
   // Historical shape: no URL at all → standalone empty state with NO header
   // (the frame's empty body keeps the header — that's the figma behavior).
-  if (!externalUrl) {
+  if (!externalUrl && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <GoogleSheetsIcon className="mb-4 h-16 w-16 text-ods-text-secondary" />
@@ -43,8 +48,9 @@ export function GoogleSheetsViewer({ externalUrl, fileName, height }: GoogleShee
           Open in Google Sheets
         </Button>
       }
-      src={toGoogleSheetsEmbedUrl(externalUrl)}
+      src={externalUrl ? toGoogleSheetsEmbedUrl(externalUrl) : null}
       height={height}
+      loading={loading}
     />
   );
 }

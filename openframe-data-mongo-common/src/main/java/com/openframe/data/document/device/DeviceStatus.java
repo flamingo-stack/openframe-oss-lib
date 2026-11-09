@@ -17,4 +17,8 @@ public enum DeviceStatus {
 
     public static final Set<DeviceStatus> CONNECTED = EnumSet.of(ONLINE, OFFLINE);
     public static final Set<DeviceStatus> DELETING_OR_DELETED = EnumSet.of(PENDING_DELETION, DELETED);
+
+    public boolean isConnected() {
+        return CONNECTED.contains(this);
+    }
 }

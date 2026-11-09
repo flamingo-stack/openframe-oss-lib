@@ -17,6 +17,7 @@ import com.openframe.authz.service.sso.apple.AppleAuthorizationCodeClient;
 import com.openframe.authz.service.sso.apple.AppleTokenService;
 import com.openframe.authz.service.sso.apple.AppleNativeTokenVerifier;
 import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
+import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
@@ -206,9 +207,11 @@ public class AuthorizationServerConfig {
      * UserDetailsService for Spring Security authentication
      */
     @Bean
-    public UserDetailsService userDetailsService(UserService userService) {
+    public UserDetailsService userDetailsService(UserService userService, TenantService tenantService) {
         return username -> {
             String tenantId = getTenantId();
+            // Before the user lookup, so the refusal is the same for every email and reveals no account.
+            tenantService.refuseLoginUnlessActive(tenantId);
             AuthUser user = userService.findActiveByEmailAndTenant(username.toLowerCase(Locale.ROOT), tenantId)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 

@@ -111,7 +111,9 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
             className={cn(cardClasses, 'absolute right-full top-0 mr-[var(--spacing-system-s)] hover:bg-ods-bg-hover')}
           />
         )}
-        <div className={cardClasses}>
+        {/* The card clips its content at the border's inner curve, so a filled section at its edge (the MSP card)
+            meets the border; nothing in it floats out. */}
+        <div className={cn(cardClasses, !bare && 'overflow-hidden')}>
           <div className="flex items-center justify-between gap-4 px-4 py-3">
             <div className="flex items-center gap-3">
               {userIcon && !isLoading ? (
@@ -176,8 +178,8 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
           </div>
           {/* MSP branding slot — home-screen only; `ticketInfo` (open chat)
               claims this space, so it wins when both are provided. The card
-              already draws the chrome: strip the section's own ring and keep
-              only the bottom rounding so its bg fits the card corners. */}
+              already draws the chrome and clips its corners: strip the
+              section's own ring and rounding. */}
           {!ticketInfo && (mspLoading || mspOrganization) && (
             <>
               <div className="h-px bg-ods-border" />
@@ -185,7 +187,7 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
                 name=""
                 {...mspOrganization}
                 loading={mspLoading || !mspOrganization}
-                className={cn('rounded-none ring-0', !bare && 'rounded-b-md', mspOrganization?.className)}
+                className={cn('rounded-none ring-0', mspOrganization?.className)}
               />
             </>
           )}

@@ -86,7 +86,8 @@ public class LocalDeliverySink implements DeliverySink {
         String subject = spec.subject(machineId);
         DeliveryPayload payload = request.getPayload();
         try {
-            publisher.publish(subject, payload);
+            DeliveryPayload wireForm = spec.wireForm(payload);
+            publisher.publish(subject, wireForm);
         } catch (RuntimeException natsDown) {
             metrics.recordPublishFailed(type);
             log.warn("Delivery recorded but not published, left to the sweep: type={} targetId={} machineId={}",

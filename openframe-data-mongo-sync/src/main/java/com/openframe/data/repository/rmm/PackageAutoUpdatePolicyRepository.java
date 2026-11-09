@@ -19,6 +19,8 @@ public interface PackageAutoUpdatePolicyRepository extends MongoRepository<Packa
 
     List<PackageAutoUpdatePolicy> findByTenantIdAndSoftwareIdIn(String tenantId, Collection<String> softwareIds);
 
+    boolean existsByTenantIdAndSoftwareId(String tenantId, String softwareId);
+
     List<PackageAutoUpdatePolicy> findByTenantIdAndMachineIdAndSoftwareIdIn(String tenantId, String machineId,
                                                                             Collection<String> softwareIds);
 
@@ -32,11 +34,13 @@ public interface PackageAutoUpdatePolicyRepository extends MongoRepository<Packa
     Optional<PackageAutoUpdatePolicy> findByTenantIdAndMachineIdAndPackageManagerAndPackageName(
             String tenantId, String machineId, PackageManagerType packageManager, String packageName);
 
-    @Query("{ '_id': ?0 }")
-    @Update("{ '$set': { 'retryRequestId': ?1 } }")
-    long markRetryScheduled(String policyId, String requestId);
+    // Both write only while the policy is still on and still at the version the caller read: a newer order
+    // (markOrdered) or a re-enable in between makes them match nothing, and the caller backs off.
+    @Query("{ '_id': ?0, 'enabled': true, 'lastVersion': ?1 }")
+    @Update("{ '$set': { 'retryRequestId': ?2 } }")
+    long markRetryScheduled(String policyId, String lastVersion, String requestId);
 
-    @Query("{ '_id': ?0 }")
-    @Update("{ '$set': { 'enabled': false, 'updatedBy': ?1, 'updatedAt': ?2 } }")
-    long disable(String policyId, String actor, Instant at);
+    @Query("{ '_id': ?0, 'enabled': true, 'lastVersion': ?1 }")
+    @Update("{ '$set': { 'enabled': false, 'updatedBy': ?2, 'updatedAt': ?3 } }")
+    long disable(String policyId, String lastVersion, String actor, Instant at);
 }

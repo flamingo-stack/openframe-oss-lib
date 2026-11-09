@@ -62,7 +62,10 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
+    @Mock private DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
+    @Mock private TenantSoftwareReadModelQuery tenantSoftwareReadModelQuery;
     @Mock private SoftwareAutoUpdateService autoUpdateService;
+    @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private OrganizationRepository organizationRepository;
 
@@ -71,7 +74,8 @@ class SoftwareInventoryServiceFleetPagingTest {
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader, autoUpdateService, tagAssignmentRepository, organizationRepository);
+                tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }
@@ -102,10 +106,42 @@ class SoftwareInventoryServiceFleetPagingTest {
     }
 
     @Test
-    void turnOffAutoUpdate_unknownSoftware_notFound() {
+    void turnOffAutoUpdate_unknownSoftware_notFound_nothingTurnedOff() {
         // execution / verifications
         assertThatThrownBy(() -> service.turnOffAutoUpdate("not-a-title", "admin@x"))
                 .isInstanceOf(NotFoundException.class);
+        verify(autoUpdateService, never()).turnOff(anyString(), anyString());
+    }
+
+    @Test
+    void turnOffAutoUpdate_titleFleetDoesNotListYet_turnsOffItsPolicies() {
+        // setup: on a device, so a policy names it, but not yet counted by Fleet
+        when(autoUpdateService.hasPolicy("3522")).thenReturn(true);
+        SoftwareResponse fromPolicy = SoftwareResponse.builder().id("3522").name("7zip.7zip").build();
+        when(autoUpdateService.titleFromPolicies("3522")).thenReturn(fromPolicy);
+
+        // execution
+        SoftwareResponse result = service.turnOffAutoUpdate("3522", "admin@x");
+
+        // verifications
+        assertThat(result).isSameAs(fromPolicy);
+        verify(autoUpdateService).turnOff("3522", "admin@x");
+        verify(autoUpdateService).applyToSoftware(List.of(fromPolicy));
+    }
+
+    @Test
+    void turnOffAutoUpdate_knownTitle_turnsOffThenReturnsIt() {
+        // setup
+        SoftwareTitle chrome = fleetTitle("Chrome", 42L, 7);
+        when(fleet.getSoftwareTitle(42L)).thenReturn(chrome);
+
+        // execution
+        SoftwareResponse result = service.turnOffAutoUpdate("42", "admin@x");
+
+        // verifications
+        assertThat(result.getName()).isEqualTo("Chrome");
+        verify(autoUpdateService).turnOff("42", "admin@x");
+        verify(autoUpdateService, never()).titleFromPolicies(anyString());
     }
 
     @Test
