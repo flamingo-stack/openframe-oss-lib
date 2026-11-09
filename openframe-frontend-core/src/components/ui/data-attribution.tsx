@@ -42,8 +42,8 @@ function Separator() {
 }
 
 /**
- * THE "Data synced from <source> · Last updated: <date>" line every synced
- * surface shows (the cap table, the financials, the Trust Center). The date is
+ * THE "Data from <source> · Last updated: <date>" line every surface showing another system's data
+ * draws (the cap table, the financials, the Trust Center). The date is
  * UTC (`formatDate`), so a server-rendered page and its hydrated copy print the
  * same text.
  */
@@ -53,7 +53,7 @@ export function DataAttribution({ icon, source, lastUpdated, action }: DataAttri
     <div className={LINE_CLASS}>
       <div className={ITEM_CLASS}>
         {icon}
-        <span>Data synced from {source}</span>
+        <span>Data from {source}</span>
       </div>
       <Separator />
       <span className={UPDATED_CLASS}>Last updated: {lastUpdated ? formatDate(lastUpdated) : 'Never'}</span>
@@ -73,7 +73,7 @@ function DataAttributionSkeleton({ icon, action }: Pick<DataAttributionProps, 'i
       <div className={ITEM_CLASS}>
         {icon ?? <UnifiedSkeleton className={cn(TOOL_MARK_CLASS, 'rounded')} />}
         <span>
-          Data synced from <TextLineSkeleton type="inherit" as="span" className={`${WORD_BAR_CLASS} w-20`} />
+          Data from <TextLineSkeleton type="inherit" as="span" className={`${WORD_BAR_CLASS} w-20`} />
         </span>
       </div>
       <Separator />

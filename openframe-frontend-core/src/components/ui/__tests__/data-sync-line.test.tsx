@@ -8,19 +8,19 @@ import { DataSyncIcon, DataSyncLine } from '../data-attribution';
 describe('DataSyncLine', () => {
   it('names the system the records are mirrored from and when it last read them', () => {
     render(<DataSyncLine sync={{ source: 'clickup', syncedAt: '2026-10-15T12:00:00Z' }} />);
-    expect(screen.getByText('Data synced from ClickUp')).toBeInTheDocument();
+    expect(screen.getByText('Data from ClickUp')).toBeInTheDocument();
     expect(screen.getByText(/^Last updated: /)).not.toHaveTextContent('Never');
   });
 
   it('says a mirror that never ran never synced', () => {
     render(<DataSyncLine sync={{ source: 'github', syncedAt: null }} />);
-    expect(screen.getByText('Data synced from GitHub')).toBeInTheDocument();
+    expect(screen.getByText('Data from GitHub')).toBeInTheDocument();
     expect(screen.getByText('Last updated: Never')).toBeInTheDocument();
   });
 
   it.each(Object.keys(DATA_SYNC_SOURCES) as DataSyncSource[])('names and marks %s', source => {
     render(<DataSyncLine sync={{ source, syncedAt: null }} />);
-    expect(screen.getByText(`Data synced from ${DATA_SYNC_SOURCES[source]}`)).toBeInTheDocument();
+    expect(screen.getByText(`Data from ${DATA_SYNC_SOURCES[source]}`)).toBeInTheDocument();
   });
 
   it("draws a source's mark at the size asked for", () => {
@@ -30,17 +30,17 @@ describe('DataSyncLine', () => {
 
   it('draws nothing when the host states no sync, and its skeleton while loading', () => {
     const { rerender } = render(<DataSyncLine sync={null} />);
-    expect(screen.queryByText(/Data synced from/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Data from/)).not.toBeInTheDocument();
     rerender(<DataSyncLine loading />);
     // Its own words are drawn for real; the source and the date are bars, never a word of their own.
-    expect(screen.getByText(/Data synced from/)).toBeInTheDocument();
+    expect(screen.getByText(/Data from/)).toBeInTheDocument();
     expect(screen.getByText(/Last updated:/)).toBeInTheDocument();
     expect(screen.queryByText(/Never/)).not.toBeInTheDocument();
   });
 
   it('draws no line while loading when the host states no sync', () => {
     render(<DataSyncLine loading stated={false} />);
-    expect(screen.queryByText(/Data synced from/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Data from/)).not.toBeInTheDocument();
   });
 
   it("a page whose records are mirrored holds its row's skeleton before the list reports; one that is not draws none", () => {
@@ -49,12 +49,12 @@ describe('DataSyncLine', () => {
         <PageDataSyncRow />
       </PageDataSyncProvider>,
     );
-    expect(screen.getByText(/Data synced from/)).toBeInTheDocument();
+    expect(screen.getByText(/Data from/)).toBeInTheDocument();
     rerender(
       <PageDataSyncProvider key="authored" stated={false}>
         <PageDataSyncRow />
       </PageDataSyncProvider>,
     );
-    expect(screen.queryByText(/Data synced from/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Data from/)).not.toBeInTheDocument();
   });
 });
