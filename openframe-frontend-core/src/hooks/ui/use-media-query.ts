@@ -40,6 +40,7 @@ export function useMediaQuery(query: string): boolean | undefined {
 export const breakpoints = {
   md: `(min-width: ${LAYOUT_STEPS.md.viewport}px)`, // Tablet
   lg: `(min-width: ${LAYOUT_STEPS.lg.viewport}px)`, // Desktop
+  xl: `(min-width: ${LAYOUT_STEPS.xl.viewport}px)`, // Wide desktop
 };
 
 /** @deprecated Use useMdUp instead */

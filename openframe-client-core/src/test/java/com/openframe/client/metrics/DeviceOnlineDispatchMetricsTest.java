@@ -17,11 +17,12 @@ class DeviceOnlineDispatchMetricsTest {
 
     private final DeviceOnlineDispatchRepository repository = mock(DeviceOnlineDispatchRepository.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    // Micrometer gauges hold their object weakly: without this reference a GC turns them into NaN.
+    private final DeviceOnlineDispatchMetrics metrics =
+            new DeviceOnlineDispatchMetrics(repository, registry, BATCH_SIZE);
 
     @Test
     void gaugeReportsNewSentinelCountAfterRefresh() {
-        DeviceOnlineDispatchMetrics metrics = new DeviceOnlineDispatchMetrics(repository, registry, BATCH_SIZE);
-
         // Before the first refresh the gauge sits at its initial value.
         assertThat(registry.get(PENDING_GAUGE).gauge().value()).isEqualTo(0.0);
 
@@ -33,16 +34,12 @@ class DeviceOnlineDispatchMetricsTest {
 
     @Test
     void batchSizeGaugePublishesConfiguredThreshold() {
-        new DeviceOnlineDispatchMetrics(repository, registry, BATCH_SIZE);
-
         // The alert compares pending > batch_size, so the configured batch-size is published as a gauge.
         assertThat(registry.get(BATCH_SIZE_GAUGE).gauge().value()).isEqualTo(500.0);
     }
 
     @Test
     void refreshSwallowsRepositoryErrorsAndKeepsLastValue() {
-        DeviceOnlineDispatchMetrics metrics = new DeviceOnlineDispatchMetrics(repository, registry, BATCH_SIZE);
-
         when(repository.countByStatus(DeviceOnlineDispatchStatus.NEW)).thenReturn(10L);
         metrics.refreshPending();
 

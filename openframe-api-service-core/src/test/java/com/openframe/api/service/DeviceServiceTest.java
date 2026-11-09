@@ -291,6 +291,7 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
@@ -313,6 +314,7 @@ class DeviceServiceTest {
                 .hasMessage("mongo hiccup");
 
         verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
+        verify(machineWriter, never()).update(any(), any(MachineUpdate.class));
         verify(machineRepository, never()).save(any());
         assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
         verifyNoInteractions(deviceStatusProcessor);
@@ -326,6 +328,7 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
@@ -340,6 +343,7 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
 
@@ -355,6 +359,7 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ARCHIVED);
         when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ONLINE);
 
@@ -369,6 +374,7 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
@@ -383,11 +389,60 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
         verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
         verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: writes only the status field and post-processes the stored result")
+    void statusChange_fieldLevelWrite_postProcessesTheWrittenMachine() {
+        Machine m = new Machine();
+        m.setMachineId("m-off");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
+
+        service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
+
+        ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
+        verify(machineWriter).update(eq("m-off"), update.capture());
+        assertThat(update.getValue().paths()).containsExactly("status");
+        ArgumentCaptor<Machine> processed = ArgumentCaptor.forClass(Machine.class);
+        verify(deviceStatusProcessor).postProcessStatusUpdated(processed.capture());
+        assertThat(processed.getValue().getStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        verify(machineRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: a device removed between the read and the write is not found")
+    void statusChange_deviceGoneBeforeTheWrite_notFound() {
+        Machine m = new Machine();
+        m.setMachineId("m-off");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
+        when(machineWriter.update(eq("m-off"), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE))
+                .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(deviceStatusProcessor);
+    }
+
+    private void stubStatusWrite(Machine stored) {
+        when(machineWriter.update(eq(stored.getMachineId()), any(MachineUpdate.class)))
+                .thenAnswer(inv -> {
+                    Machine after = new Machine();
+                    after.setMachineId(stored.getMachineId());
+                    after.setTenantId(stored.getTenantId());
+                    after.setStatus(stored.getStatus());
+                    inv.getArgument(1, MachineUpdate.class).applyTo(after);
+                    return Optional.of(new MachineWriteResult(stored, after));
+                });
     }
 
 
