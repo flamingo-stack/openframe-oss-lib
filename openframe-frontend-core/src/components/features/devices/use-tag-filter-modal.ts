@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useMdUp } from '../../../hooks/ui/use-media-query';
+import { useContentLgUp, useContentMdUp, useContentXlUp } from '../../../hooks/ui/use-content-breakpoint';
 import type { DeviceFilters } from './types';
 
 function isCompleteTag(tag: string): boolean {
@@ -19,7 +19,13 @@ interface FilterOption {
 interface UseTagFilterModalParams {
   tags: string[];
   deviceFilters: DeviceFilters | null;
-  columns: Array<{ key: string; label: string; filterable?: boolean; filterOptions?: FilterOption[] }>;
+  columns: Array<{
+    key: string;
+    label: string;
+    filterable?: boolean;
+    filterOptions?: FilterOption[];
+    inWindowLgToXl?: boolean;
+  }>;
   /** `useApiParams`' setter, each device list param is a list of ids. */
   setParams: (params: Record<string, string[]>) => void;
   /**
@@ -39,7 +45,11 @@ export function useTagFilterModal({
   setParams,
   onApplied = scrollMainToTop,
 }: UseTagFilterModalParams) {
-  const isMdUp = useMdUp();
+  // The content area's step, not the window's: the table header follows it, and a docked side panel narrows it while
+  // the window stays wide.
+  const isMdUp = useContentMdUp();
+  const lgUp = useContentLgUp();
+  const xlUp = useContentXlUp();
   const [isOpen, setIsOpen] = useState(false);
 
   // FilterModal calls onFilterChange first, then onTagsChange.
@@ -49,16 +59,19 @@ export function useTagFilterModal({
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
 
-  const filterGroups = useMemo(() => {
-    if (isMdUp) return [];
-    return columns
-      .filter(column => column.filterable)
-      .map(column => ({
-        id: column.key,
-        title: column.label,
-        options: column.filterOptions || [],
-      }));
-  }, [columns, isMdUp]);
+  // Below md the table draws no header, so every column filters here; from lg until xl only the columns whose header
+  // has no funnel there do.
+  const filterGroups = useMemo(
+    () =>
+      columns
+        .filter(column => column.filterable && (!isMdUp || (lgUp && xlUp === false && column.inWindowLgToXl)))
+        .map(column => ({
+          id: column.key,
+          title: column.label,
+          options: column.filterOptions || [],
+        })),
+    [columns, isMdUp, lgUp, xlUp],
+  );
 
   const tagFilterKeys = useMemo(() => {
     if (!deviceFilters?.tagKeys) return [];
@@ -79,6 +92,9 @@ export function useTagFilterModal({
     pendingFiltersRef.current = columnFilters;
   }, []);
 
+  // Only a host that draws the directory columns has the USER and SOURCES groups: another's list params stay untouched
+  const hasDirectoryGroups = useMemo(() => columns.some(column => column.key === 'user'), [columns]);
+
   // Step 2: combine with buffered filters and flush (called second by FilterModal)
   const handleTagsChange = useCallback(
     (newTags: string[]) => {
@@ -87,12 +103,14 @@ export function useTagFilterModal({
         statuses: cf.status || [],
         osTypes: cf.os || [],
         organizationIds: cf.organization || [],
+        // FilterModal drops a group with nothing ticked, so a missing group clears its param
+        ...(hasDirectoryGroups && { userLinks: cf.user || [], directorySources: cf.sources || [] }),
         tags: newTags.filter(isCompleteTag),
       });
       pendingFiltersRef.current = {};
       onApplied();
     },
-    [setParams, onApplied],
+    [setParams, onApplied, hasDirectoryGroups],
   );
 
   return {
