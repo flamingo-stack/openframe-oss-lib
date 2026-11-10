@@ -303,8 +303,18 @@ export const ApprovalRow: Story = {
     });
     return (
       <div className="flex flex-col items-start gap-2">
-        <ApprovalRequestNotificationTile notification={approval(null)} presentation="row" onApprove={() => {}} onReject={() => {}} />
-        <ApprovalRequestNotificationTile notification={approval('APPROVED')} presentation="row" onApprove={() => {}} onReject={() => {}} />
+        <ApprovalRequestNotificationTile
+          notification={approval(null)}
+          presentation="row"
+          onApprove={() => {}}
+          onReject={() => {}}
+        />
+        <ApprovalRequestNotificationTile
+          notification={approval('APPROVED')}
+          presentation="row"
+          onApprove={() => {}}
+          onReject={() => {}}
+        />
       </div>
     );
   },

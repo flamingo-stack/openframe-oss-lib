@@ -15,6 +15,7 @@ import {
   APPROVAL_BUTTON_CLASS,
   APPROVAL_TOGGLE_BUTTON_CLASS,
   LOCKSCREEN_APPROVAL_BUTTON_CLASS,
+  NotificationMark,
   NotificationTile,
 } from './notification-tile';
 import { approvalMetaToBatchData, getApprovalMeta, resolutionToStatus } from './types';
@@ -153,9 +154,11 @@ function LoadedApprovalRequestRow({
   return (
     <output className={cn(APPROVAL_ROW_CLASS, className)} aria-label={label}>
       <span role="img" aria-label={label} className="flex size-4 shrink-0 items-center justify-center">
-        {notification.icon ?? <span className="size-1.5 rounded-full bg-ods-accent" />}
+        <NotificationMark imageUrl={notification.imageUrl} icon={notification.icon} dotClassName="bg-ods-accent" />
       </span>
-      {notification.title ? <span className="min-w-0 truncate text-ods-text-primary text-h6">{notification.title}</span> : null}
+      {notification.title ? (
+        <span className="min-w-0 truncate text-ods-text-primary text-h6">{notification.title}</span>
+      ) : null}
       {status === 'pending' ? (
         <span className="flex shrink-0 items-center gap-[var(--spacing-system-xxs)]">
           <Button

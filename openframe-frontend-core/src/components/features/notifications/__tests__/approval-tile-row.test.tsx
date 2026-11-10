@@ -4,7 +4,7 @@
  * status, and in a loading scope the row draws its own skeleton.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LoadingScope } from '../../../ui/loading-scope';
 import { ApprovalRequestNotificationTile } from '../approval-request-notification-tile';
@@ -27,7 +27,9 @@ const notification = (resolution: 'APPROVED' | null = null): Notification => ({
 });
 
 const renderRow = (n: Notification, onApprove = vi.fn(async () => {})) =>
-  render(<ApprovalRequestNotificationTile notification={n} presentation="row" onApprove={onApprove} onReject={vi.fn()} />);
+  render(
+    <ApprovalRequestNotificationTile notification={n} presentation="row" onApprove={onApprove} onReject={vi.fn()} />,
+  );
 
 describe('ApprovalRequestNotificationTile presentation="row"', () => {
   it('names the agent on its mark, shows the title and both buttons, and no description or time', () => {
@@ -56,6 +58,17 @@ describe('ApprovalRequestNotificationTile presentation="row"', () => {
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
   });
 
+  it("draws the notification's image over its icon, and falls back to the icon when the image fails", () => {
+    renderRow({ ...notification(), imageUrl: 'https://example.test/jen.png' });
+    const mark = within(screen.getByRole('img', { name: 'Fae asks' }));
+    const image = mark.getByRole('presentation');
+    expect(image).toHaveAttribute('src', expect.stringContaining('jen.png'));
+    expect(mark.queryByTestId('mark')).not.toBeInTheDocument();
+    fireEvent.error(image);
+    expect(mark.queryByRole('presentation')).not.toBeInTheDocument();
+    expect(mark.getByTestId('mark')).toBeInTheDocument();
+  });
+
   it('dims Approve while the scripted tap lands', () => {
     render(
       <ApprovalRequestNotificationTile
@@ -72,7 +85,12 @@ describe('ApprovalRequestNotificationTile presentation="row"', () => {
   it('draws its own skeleton in a loading scope', () => {
     render(
       <LoadingScope>
-        <ApprovalRequestNotificationTile notification={notification()} presentation="row" onApprove={vi.fn()} onReject={vi.fn()} />
+        <ApprovalRequestNotificationTile
+          notification={notification()}
+          presentation="row"
+          onApprove={vi.fn()}
+          onReject={vi.fn()}
+        />
       </LoadingScope>,
     );
     expect(screen.queryByText('Install Figma for Jen?')).not.toBeInTheDocument();
