@@ -166,8 +166,9 @@ function LoadedApprovalRequestRow({
             data-pressed={approvePressed || undefined}
             className={cn(
               APPROVAL_ROW_BUTTON_CLASS,
-              'transition-[filter,transform] duration-200 motion-reduce:transition-none',
-              approvePressed && 'scale-[0.98] brightness-75',
+              // The press, by transform and opacity only (compositor properties; a filter repaints every frame).
+              'transition-[opacity,transform] duration-200 motion-reduce:transition-none',
+              approvePressed && 'scale-[0.98] opacity-75',
             )}
           >
             Approve
