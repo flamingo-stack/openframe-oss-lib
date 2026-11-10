@@ -422,7 +422,7 @@ export function AppLayout({
             // column's min width and scrolls sideways here, under the page header, with the
             // vertical scrollbar still on screen. Its blocks sit in the content scope (`contents`).
             hasChatColumn &&
-              'group-data-[squeezed]/work-area-page:overflow-x-auto group-data-[squeezed]/work-area-page:[&>div>*]:min-w-[var(--work-area-min-width)]',
+              'group-data-[squeezed]/work-area-page:overflow-x-auto [&>div>*]:group-data-[squeezed]/work-area-page:min-w-[var(--work-area-min-width)]',
             contentCovered && 'hidden',
             // While the panel is drawn over the page, keep the page's own
             // z-indexed layers (sticky headers, fixed bars) under it.
