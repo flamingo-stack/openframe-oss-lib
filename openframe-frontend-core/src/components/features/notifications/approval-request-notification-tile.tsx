@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useToast } from '../../../hooks/use-toast';
 import { cn } from '../../../utils/cn';
+import { errorMessage } from '../../../utils/common';
 import { ApprovalBatchMessage, ApprovalStatusTag } from '../../chat/approval-batch-message';
 import { ExpandChevron } from '../../chat/expand-chevron';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
@@ -100,6 +102,56 @@ export function ApprovalRequestNotificationTile({
   );
 }
 
+/**
+ * ONE decision on an approval, for every look (card, lockscreen, row): the status shown (the backend's resolution
+ * wins; until it arrives, this user's own click, optimistically), whether a request is in flight, and `decide`. A
+ * failed request rolls the optimistic status back AND says so (the lib's error toast, with the request's own
+ * message): the buttons coming back alone read as nothing happened. `onComplete` runs only after a success, outside
+ * the request's try, so a throwing consumer callback never rolls back a decision the server already took.
+ */
+function useApprovalDecision({
+  notification,
+  approvalRequestId,
+  resolution,
+  onComplete,
+}: {
+  notification: Notification;
+  approvalRequestId: string | undefined;
+  resolution: Parameters<typeof resolutionToStatus>[0];
+  onComplete?: (id: string) => void;
+}) {
+  const { toast } = useToast();
+  const [processing, setProcessing] = useState(false);
+  const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null);
+  const resolvedStatus = resolutionToStatus(resolution);
+  const status: ChatApprovalStatus = resolvedStatus !== 'pending' ? resolvedStatus : (localStatus ?? 'pending');
+
+  const decide = async (
+    nextStatus: 'approved' | 'rejected',
+    action: (approvalRequestId: string) => void | Promise<void>,
+  ) => {
+    if (!approvalRequestId) return;
+    setProcessing(true);
+    setLocalStatus(nextStatus);
+    try {
+      await action(approvalRequestId);
+    } catch (error) {
+      setLocalStatus(null);
+      toast({
+        title: nextStatus === 'approved' ? 'Could not approve' : 'Could not reject',
+        description: errorMessage(error, 'The request failed. Try again.'),
+        variant: 'destructive',
+      });
+      return;
+    } finally {
+      setProcessing(false);
+    }
+    onComplete?.(notification.id);
+  };
+
+  return { status, processing, decide };
+}
+
 /** The row's frame: the lockscreen tile's corners, border and surface, around one line. Shared with its skeleton. */
 export const APPROVAL_ROW_CLASS =
   'inline-flex max-w-full items-center gap-[var(--spacing-system-xs)] whitespace-nowrap rounded-2xl border border-ods-border bg-ods-card py-[var(--spacing-system-xs)] pl-[var(--spacing-system-s)] pr-[var(--spacing-system-xs)] text-h6';
@@ -126,30 +178,19 @@ function LoadedApprovalRequestRow({
   approvePressed = false,
   className,
 }: ApprovalRowProps) {
-  const [processing, setProcessing] = useState(false);
-  const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null);
   const approval = getApprovalMeta(notification);
+  const {
+    status,
+    processing,
+    decide: resolve,
+  } = useApprovalDecision({
+    notification,
+    approvalRequestId: approval?.approvalRequestId,
+    resolution: approval?.resolution,
+    onComplete,
+  });
   if (!approval) return null;
-  const resolvedStatus = resolutionToStatus(approval.resolution);
-  const status: ChatApprovalStatus = resolvedStatus !== 'pending' ? resolvedStatus : (localStatus ?? 'pending');
   const label = notification.type ?? 'Approval Required';
-
-  const resolve = async (
-    nextStatus: 'approved' | 'rejected',
-    action: (approvalRequestId: string) => void | Promise<void>,
-  ) => {
-    setProcessing(true);
-    setLocalStatus(nextStatus);
-    try {
-      await action(approval.approvalRequestId);
-    } catch {
-      setLocalStatus(null);
-      return;
-    } finally {
-      setProcessing(false);
-    }
-    onComplete?.(notification.id);
-  };
 
   return (
     <output className={cn(APPROVAL_ROW_CLASS, className)} aria-label={label}>
@@ -230,13 +271,17 @@ function ApprovalRequestTile({
   // Toggling the command section pins the tile so a live pop-up doesn't
   // auto-dismiss out from under the user mid-read.
   const [pinned, setPinned] = useState(defaultExpanded);
-  const [processing, setProcessing] = useState(false);
-  // Optimistic status for this user's own click; backend resolution (below) wins once it arrives.
-  const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null);
-
   const approval = getApprovalMeta(notification);
-  const resolvedStatus = resolutionToStatus(approval?.resolution);
-  const status: ChatApprovalStatus = resolvedStatus !== 'pending' ? resolvedStatus : (localStatus ?? 'pending');
+  const {
+    status,
+    processing,
+    decide: resolve,
+  } = useApprovalDecision({
+    notification,
+    approvalRequestId: approval?.approvalRequestId,
+    resolution: approval?.resolution,
+    onComplete,
+  });
 
   const batchData = useMemo(() => (approval ? approvalMetaToBatchData(approval) : null), [approval]);
 
@@ -255,25 +300,6 @@ function ApprovalRequestTile({
   const escalated = escalatedCalls.length > 0;
   const commandWord = batchData.toolCalls.length > 1 ? 'commands' : 'command';
   const toggleLabel = `${expanded ? 'Hide' : 'Show'} ${commandWord} section`;
-
-  const resolve = async (
-    nextStatus: 'approved' | 'rejected',
-    action: (approvalRequestId: string) => void | Promise<void>,
-  ) => {
-    setProcessing(true);
-    setLocalStatus(nextStatus);
-    try {
-      await action(batchData.approvalRequestId);
-    } catch {
-      setLocalStatus(null); // roll back the optimistic flip; the request failed
-      return;
-    } finally {
-      setProcessing(false);
-    }
-    // Outside the try: a throwing consumer callback must not roll back a request
-    // that already succeeded server-side.
-    onComplete?.(notification.id);
-  };
 
   return (
     <NotificationTile
