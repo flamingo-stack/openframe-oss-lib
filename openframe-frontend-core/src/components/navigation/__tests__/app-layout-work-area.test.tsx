@@ -4,7 +4,7 @@
  * `workAreaMode`, `endSidebarConfig`).
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppColumnHeader } from '../app-column-header';
@@ -180,6 +180,41 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     fireEvent.pointerMove(grip, { clientX: 1000 - 784 - 60, pointerId: 2 });
     expect(onSqueezePast).toHaveBeenCalledTimes(2);
     expect(onSqueezePast).toHaveBeenLastCalledWith('start');
+  });
+
+  it('keeps the dragged width when the row changes under the drag (a sidebar folding away)', () => {
+    rowWidth(1000);
+    // jsdom has no ResizeObserver: one the test can fire, as the row's would.
+    const observers: Array<() => void> = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        private readonly callback: () => void;
+        constructor(callback: () => void) {
+          this.callback = callback;
+          observers.push(() => this.callback());
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    render(squeezable());
+    const grip = divider();
+    grip.setPointerCapture = vi.fn();
+    grip.releasePointerCapture = vi.fn();
+    fireEvent.pointerDown(grip, { clientX: 500, pointerId: 1, button: 0 });
+    fireEvent.pointerMove(grip, { clientX: 108, pointerId: 1 });
+    expect(chatColumn()).toHaveStyle({ width: '108px' });
+    // The left sidebar folds: the row widens by 224px over a few frames, mid-drag.
+    for (const width of [1080, 1160, 1224]) {
+      rowWidth(width);
+      act(() => {
+        for (const fire of observers) fire();
+      });
+      expect(chatColumn()).toHaveStyle({ width: '108px' });
+      expect(screen.getByText('chat: squeezed at 360')).toBeInTheDocument();
+    }
+    vi.unstubAllGlobals();
   });
 
   it('without squeezeFloor no column is ever squeezed', () => {

@@ -202,31 +202,14 @@ export function AppLayoutWorkArea({
   const clampChatWidth = useCallback((next: number) => clamp(next, floor, maxChatWidth), [floor, maxChatWidth]);
   const chatWidth = measured ? Math.round(clampChatWidth(share * rowWidth)) : null;
 
-  // Which column is narrower than `minColumnWidth` at a given chat width.
-  const squeezeAt = useCallback(
-    (width: number | null): Squeeze =>
-      width === null || !measured
-        ? NOT_SQUEEZED
-        : { chat: width < minColumnWidth, page: rowWidth - width < minColumnWidth },
-    [measured, minColumnWidth, rowWidth],
-  );
-  // While the divider is dragged the width is written to the DOM, not to state (see
-  // `PanelResizeHandle`): the squeeze follows the drag, and re-renders only when it flips.
-  const [dragSqueeze, setDragSqueeze] = useState<Squeeze | null>(null);
-  const dragChatWidth = useCallback(
-    (next: number) => {
-      if (chatRef.current) {
-        chatRef.current.style.width = `${next}px`;
-        // The squeezed chat's sticky header spans what is on screen (`--work-area-visible-width`).
-        chatRef.current.style.setProperty('--work-area-visible-width', `${next}px`);
-      }
-      const nextSqueeze = squeezeAt(next);
-      setDragSqueeze(previous =>
-        previous?.chat === nextSqueeze.chat && previous.page === nextSqueeze.page ? previous : nextSqueeze,
-      );
-    },
-    [squeezeAt],
-  );
+  // The width the drag has reached, until it is released: what the chat column draws while it
+  // is dragged. State, not a write to the DOM: the row can change under a drag (a sidebar
+  // folding away, frame by frame), and each render then drew the chosen share's width over the
+  // dragged one — the column jumped back and forth. Cheap: the columns' content is the same
+  // elements every render, and React skips them.
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const dragChatWidth = useCallback((next: number) => setDragWidth(Math.round(next)), []);
+  const shownChatWidth = dragWidth === null ? chatWidth : Math.round(clampChatWidth(dragWidth));
 
   // Once per drag: the host's answer (a sidebar folding away) is not asked for twice.
   const squeezedPastRef = useRef(false);
@@ -243,7 +226,7 @@ export function AppLayoutWorkArea({
   const chooseWidth = useCallback(
     (next: number) => {
       squeezedPastRef.current = false;
-      setDragSqueeze(null);
+      setDragWidth(null);
       if (!measured) return;
       const nextShare = clampChatWidth(next) / rowWidth;
       setChosenShare(nextShare);
@@ -252,7 +235,7 @@ export function AppLayoutWorkArea({
     [measured, clampChatWidth, rowWidth, storage],
   );
   const resetWidth = useCallback(() => {
-    setDragSqueeze(null);
+    setDragWidth(null);
     setChosenShare(DEFAULT_CHAT_SHARE);
     storage?.clear();
   }, [storage]);
@@ -265,7 +248,11 @@ export function AppLayoutWorkArea({
 
   const chatHidden = shown === 'page';
   const pageHidden = shown === 'chat';
-  const squeeze = shown === 'split' ? (dragSqueeze ?? squeezeAt(chatWidth)) : NOT_SQUEEZED;
+  // Which column is narrower than `minColumnWidth` at the width on screen.
+  const squeeze: Squeeze =
+    shown === 'split' && shownChatWidth !== null && measured
+      ? { chat: shownChatWidth < minColumnWidth, page: rowWidth - shownChatWidth < minColumnWidth }
+      : NOT_SQUEEZED;
   const chatColumnState = useMemo<WorkAreaColumnState>(
     () => ({ squeezed: squeeze.chat, minWidth: minColumnWidth }),
     [squeeze.chat, minColumnWidth],
@@ -308,8 +295,8 @@ export function AppLayoutWorkArea({
             shown === 'split'
               ? ({
                   ...minWidthVar,
-                  width: chatWidth ?? `${DEFAULT_CHAT_SHARE * 100}%`,
-                  '--work-area-visible-width': chatWidth === null ? '100%' : `${chatWidth}px`,
+                  width: shownChatWidth ?? `${DEFAULT_CHAT_SHARE * 100}%`,
+                  '--work-area-visible-width': shownChatWidth === null ? '100%' : `${shownChatWidth}px`,
                 } as CSSProperties)
               : minWidthVar
           }
@@ -341,7 +328,7 @@ export function AppLayoutWorkArea({
           <PanelResizeHandle
             side="left"
             variant="inLayout"
-            size={chatWidth ?? 0}
+            size={shownChatWidth ?? 0}
             minSize={floor}
             maxSize={maxChatWidth}
             clampSize={clampChatWidth}
