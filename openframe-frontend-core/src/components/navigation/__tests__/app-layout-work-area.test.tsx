@@ -178,39 +178,21 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     expect(shadow()).toHaveClass('left-0', 'bg-gradient-to-r');
   });
 
-  it('a drag on past the floor asks once for room on that side, again on the next drag', () => {
+  it('folds no sidebar when the divider is dragged on past the floor: it just stops there', () => {
     rowWidth(1000);
-    const onSqueezePast = vi.fn();
-    render(
-      <AppLayoutWorkArea
-        mode="split"
-        chat={<Column name="chat" />}
-        page={<Column name="page" />}
-        squeezeFloor={0.3}
-        onSqueezePast={onSqueezePast}
-      />,
-    );
+    render(squeezable());
     const grip = divider();
     grip.setPointerCapture = vi.fn();
     grip.releasePointerCapture = vi.fn();
-    // From 500px: the page's floor is at 892, so 920 is 28px past it (not enough), 960 is 68px.
     fireEvent.pointerDown(grip, { clientX: 500, pointerId: 1, button: 0 });
-    fireEvent.pointerMove(grip, { clientX: 920, pointerId: 1 });
-    expect(onSqueezePast).not.toHaveBeenCalled();
-    fireEvent.pointerMove(grip, { clientX: 960, pointerId: 1 });
-    fireEvent.pointerMove(grip, { clientX: 1100, pointerId: 1 });
-    expect(onSqueezePast).toHaveBeenCalledTimes(1);
-    expect(onSqueezePast).toHaveBeenLastCalledWith('end');
-    fireEvent.pointerUp(grip, { clientX: 1100, pointerId: 1 });
-
-    // The chat's floor is at 108: from 892, 892 - 784 = 108, so 40 more px is past it.
-    fireEvent.pointerDown(grip, { clientX: 1000, pointerId: 2, button: 0 });
-    fireEvent.pointerMove(grip, { clientX: 1000 - 784 - 60, pointerId: 2 });
-    expect(onSqueezePast).toHaveBeenCalledTimes(2);
-    expect(onSqueezePast).toHaveBeenLastCalledWith('start');
+    fireEvent.pointerMove(grip, { clientX: 1400, pointerId: 1 });
+    // At the page's floor and no further: nothing outside the work area is asked to make room.
+    expect(chatColumn()).toHaveStyle({ width: '892px' });
+    fireEvent.pointerUp(grip, { clientX: 1400, pointerId: 1 });
+    expect(chatColumn()).toHaveStyle({ width: '892px' });
   });
 
-  it('keeps the dragged width when the row changes under the drag (a sidebar folding away)', () => {
+  it('keeps the dragged width when the row changes under the drag (a sidebar toggled, the window resized)', () => {
     rowWidth(1000);
     // jsdom has no ResizeObserver: one the test can fire, as the row's would.
     const observers: Array<() => void> = [];
@@ -233,7 +215,7 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     fireEvent.pointerDown(grip, { clientX: 500, pointerId: 1, button: 0 });
     fireEvent.pointerMove(grip, { clientX: 108, pointerId: 1 });
     expect(chatColumn()).toHaveStyle({ width: '108px' });
-    // The left sidebar folds: the row widens by 224px over a few frames, mid-drag.
+    // The row widens by 224px over a few frames, mid-drag (a sidebar folding, animated).
     for (const width of [1080, 1160, 1224]) {
       rowWidth(width);
       act(() => {

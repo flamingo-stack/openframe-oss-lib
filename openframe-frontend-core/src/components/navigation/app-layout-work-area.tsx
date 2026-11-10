@@ -32,8 +32,6 @@ export type AppLayoutWorkAreaMode = 'chat' | 'split' | 'page';
 
 /** The narrowest either column gets in `split`. */
 export const WORK_AREA_MIN_COLUMN_WIDTH = 360;
-/** How far past the squeeze floor a drag goes before `onSqueezePast` fires, px. */
-export const SQUEEZE_PAST_PX = 48;
 /** Where the divider starts until the user moves it: the middle. */
 const DEFAULT_CHAT_SHARE = 0.5;
 
@@ -136,13 +134,6 @@ export interface AppLayoutWorkAreaProps {
    */
   squeezeFloor?: number;
   /**
-   * With `squeezeFloor`: the divider is dragged on past the floor (the column on that
-   * side already squeezed to it) — `'start'` past the chat's floor, toward the area's
-   * start; `'end'` past the page's, toward its end. Once per drag, `SQUEEZE_PAST_PX`
-   * beyond it. A host collapses the sidebar on that side, so the drag keeps winning room.
-   */
-  onSqueezePast?: (side: 'start' | 'end') => void;
-  /**
    * `localStorage` key for the divider position, kept as the chat column's share
    * of the area (so a wider window widens both). Omit to keep it for the mount only.
    */
@@ -203,7 +194,6 @@ export function AppLayoutWorkArea({
   page,
   minColumnWidth = WORK_AREA_MIN_COLUMN_WIDTH,
   squeezeFloor,
-  onSqueezePast,
   storageKey,
   chatLabel = 'Chat',
   pageClassName,
@@ -256,28 +246,15 @@ export function AppLayoutWorkArea({
 
   // The width the drag has reached, until it is released: what the chat column draws while it
   // is dragged. State, not a write to the DOM: the row can change under a drag (a sidebar
-  // folding away, frame by frame), and each render then drew the chosen share's width over the
+  // toggled and animating, the window resized), and each render then drew the chosen share's width over the
   // dragged one — the column jumped back and forth. Cheap: the columns' content is the same
   // elements every render, and React skips them.
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const dragChatWidth = useCallback((next: number) => setDragWidth(Math.round(next)), []);
   const shownChatWidth = dragWidth === null ? chatWidth : Math.round(clampChatWidth(dragWidth));
 
-  // Once per drag: the host's answer (a sidebar folding away) is not asked for twice.
-  const squeezedPastRef = useRef(false);
-  const squeezable = floor < minColumnWidth;
-  const dragPastLimit = useCallback(
-    (edge: 'min' | 'max', by: number) => {
-      if (!squeezable || !onSqueezePast || squeezedPastRef.current || by < SQUEEZE_PAST_PX) return;
-      squeezedPastRef.current = true;
-      onSqueezePast(edge === 'min' ? 'start' : 'end');
-    },
-    [squeezable, onSqueezePast],
-  );
-
   const chooseWidth = useCallback(
     (next: number) => {
-      squeezedPastRef.current = false;
       setDragWidth(null);
       if (!measured) return;
       const nextShare = clampChatWidth(next) / rowWidth;
@@ -400,7 +377,6 @@ export function AppLayoutWorkArea({
             clampSize={clampChatWidth}
             onSize={chooseWidth}
             onDrag={dragChatWidth}
-            onDragPastLimit={dragPastLimit}
             onReset={resetWidth}
             ariaLabel={`Resize ${chatLabel.toLowerCase()} column`}
             className="inset-y-0 left-0 w-6 -translate-x-1/2 justify-center pl-0"
