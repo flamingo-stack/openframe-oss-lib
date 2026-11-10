@@ -394,15 +394,19 @@ public class FleetMdmClient {
     }
 
     private static void validateQuery(String query) {
-        if (query == null || query.trim().isEmpty()) {
+        if (isBlank(query)) {
             throw new FleetMdmArgumentException("Query cannot be null or empty");
         }
     }
 
     private static void validateIdentifier(String identifier) {
-        if (identifier == null || identifier.trim().isEmpty()) {
+        if (isBlank(identifier)) {
             throw new FleetMdmArgumentException("Host identifier cannot be null or empty");
         }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private HttpRequest buildRunQueryRequest(long hostId, String query) throws IOException {
