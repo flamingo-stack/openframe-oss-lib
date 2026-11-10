@@ -1,8 +1,11 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { forwardRef, type ImgHTMLAttributes } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { ChatMessageRow } from '../../components/chat/chat-message-row';
+import { EntityImage } from '../../components/ui/entity-image';
+import { LoadingScope } from '../../components/ui/loading-scope';
 import { SquareAvatar } from '../../components/ui/square-avatar';
-import Image from '../../embed-shims/next-image';
+import Image, { registerImage } from '../../embed-shims/next-image';
 import { type EmbedAuthAdapter, setEmbedAuthAdapter } from '../../utils/embed-authed-fetch';
 import { clearAuthedAssetCache, useAuthedAsset } from '../use-authed-asset-src';
 
@@ -12,6 +15,8 @@ import { clearAuthedAssetCache, useAuthedAsset } from '../use-authed-asset-src';
  * bearer.
  */
 const GATEWAY = 'https://gw.example';
+// The store's RELEASE_DELAY_MS, which it does not export.
+const RELEASE_DELAY_MS = 60_000;
 
 let token: string | undefined;
 const credentialListeners = new Set<() => void>();
@@ -94,6 +99,7 @@ describe('useAuthedAsset', () => {
     act(() => credential('t1'));
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(result.current.src).toMatch(/^blob:/);
+    expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(result.current.src);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`${GATEWAY}/api/images/user/1`);
@@ -108,6 +114,64 @@ describe('useAuthedAsset', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'));
   });
 
+  it('fetches a picture drawn before any adapter once the adapter, registered without a credential, announces one', async () => {
+    const { result } = renderHook(() => useAuthedAsset('/images/user/20'));
+    expect(result.current.status).toBe('native');
+    act(() => setEmbedAuthAdapter(shellAdapter));
+    await waitFor(() => expect(result.current.status).toBe('pending'));
+
+    act(() => credential('t1'));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+  });
+
+  it('keeps listening for the credential for the pictures still mounted when another one unmounts', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    const leaving = renderHook(() => useAuthedAsset('/images/user/21'));
+    const staying = renderHook(() => useAuthedAsset('/images/user/22'));
+    expect(staying.result.current.status).toBe('pending');
+    leaving.unmount();
+
+    act(() => credential('t1'));
+    await waitFor(() => expect(staying.result.current.status).toBe('ready'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(`${GATEWAY}/api/images/user/22`);
+  });
+
+  it("holds one subscription to the adapter's credential for all its consumers, and lets go of it with the last", async () => {
+    function countingSubscriptions(): { adapter: EmbedAuthAdapter; live: Set<symbol> } {
+      const live = new Set<symbol>();
+      const subscribe = () => {
+        const subscription = Symbol('subscription');
+        live.add(subscription);
+        return () => live.delete(subscription);
+      };
+      return { adapter: { ...shellAdapter, subscribe }, live };
+    }
+    const first = countingSubscriptions();
+    setEmbedAuthAdapter(first.adapter);
+    const consumers = ['/images/user/23', '/images/user/24', '/images/user/24'].map(src =>
+      renderHook(() => useAuthedAsset(src)),
+    );
+    expect(first.live.size).toBe(1);
+
+    // The host's provider remounting with a new adapter: the subscription moves to it.
+    const second = countingSubscriptions();
+    act(() => {
+      setEmbedAuthAdapter(null);
+      setEmbedAuthAdapter(second.adapter);
+    });
+    await act(() => Promise.resolve());
+    expect(first.live.size).toBe(0);
+    expect(second.live.size).toBe(1);
+
+    for (const consumer of consumers) consumer.unmount();
+    expect(second.live.size).toBe(0);
+    // With nobody left to tell, a later registration is not followed either.
+    setEmbedAuthAdapter(null);
+    setEmbedAuthAdapter(second.adapter);
+    expect(second.live.size).toBe(0);
+  });
+
   it('reports a failure, and retries it when the credential changes', async () => {
     setEmbedAuthAdapter(shellAdapter);
     credential('expired');
@@ -119,6 +183,44 @@ describe('useAuthedAsset', () => {
 
     act(() => credential('fresh'));
     await waitFor(() => expect(result.current.status).toBe('ready'));
+  });
+
+  it('retries a request that got no answer when the credential changes', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('t1');
+    fetchMock.mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')));
+    const { result } = renderHook(() => useAuthedAsset('/images/user/25'));
+    await waitFor(() => expect(result.current.status).toBe('failed'));
+
+    act(() => credential('t2'));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a refusal other than a 401 when the credential changes', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('t1');
+    fetchMock.mockImplementation(() => Promise.resolve(new Response('', { status: 403 })));
+    const { result } = renderHook(() => useAuthedAsset('/images/user/26'));
+    await waitFor(() => expect(result.current.status).toBe('failed'));
+
+    act(() => credential('t2'));
+    await act(() => new Promise(resolve => setTimeout(resolve, 0)));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry a 401 when the browser comes back online, as only a new credential can lift it', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('t1');
+    fetchMock.mockImplementation(() => Promise.resolve(new Response('', { status: 401 })));
+    const { result } = renderHook(() => useAuthedAsset('/images/user/27'));
+    await waitFor(() => expect(result.current.status).toBe('failed'));
+
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await act(() => new Promise(resolve => setTimeout(resolve, 0)));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("treats a page answered for a picture as a failure (a shell's asset server falls back to its SPA)", async () => {
@@ -166,6 +268,74 @@ describe('useAuthedAsset', () => {
     expect((fetchMock.mock.calls[1] as [string, RequestInit])[1].headers).toMatchObject({
       Authorization: 'Bearer second-session',
     });
+  });
+
+  it('drops a picture fetched under the previous session when the cache is cleared while it is in flight', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('first');
+    let answerFirst: (response: Response) => void = () => {};
+    fetchMock.mockImplementationOnce(() => new Promise<Response>(resolve => (answerFirst = resolve)));
+    const { result } = renderHook(() => useAuthedAsset('/images/user/28'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      clearAuthedAssetCache();
+      token = undefined;
+    });
+    act(() => answerFirst(picture()));
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
+    const fenced = vi.mocked(URL.createObjectURL).mock.results[0]?.value as string;
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(fenced);
+    expect(result.current.status).toBe('pending');
+
+    act(() => credential('second'));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.src).not.toBe(fenced);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect((fetchMock.mock.calls[1] as [string, RequestInit])[1].headers).toMatchObject({
+      Authorization: 'Bearer second',
+    });
+  });
+
+  it('revokes a picture a minute after its last consumer let go, and fetches it again for the next one', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('t1');
+    const first = renderHook(() => useAuthedAsset('/images/user/29'));
+    await waitFor(() => expect(first.result.current.status).toBe('ready'));
+    const blob = first.result.current.src;
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    first.unmount();
+    vi.advanceTimersByTime(RELEASE_DELAY_MS);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(blob);
+    vi.useRealTimers();
+
+    const next = renderHook(() => useAuthedAsset('/images/user/29'));
+    await waitFor(() => expect(next.result.current.status).toBe('ready'));
+    expect(next.result.current.src).not.toBe(blob);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the picture for a consumer back within that minute, counting the minute from the last release', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('t1');
+    const first = renderHook(() => useAuthedAsset('/images/user/30'));
+    await waitFor(() => expect(first.result.current.status).toBe('ready'));
+    const blob = first.result.current.src;
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    first.unmount();
+    vi.advanceTimersByTime(RELEASE_DELAY_MS / 2);
+    const back = renderHook(() => useAuthedAsset('/images/user/30'));
+    expect(back.result.current.src).toBe(blob);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    back.unmount();
+    // Past the minute of the first release, inside the second's.
+    vi.advanceTimersByTime(RELEASE_DELAY_MS / 2 + 1);
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(RELEASE_DELAY_MS / 2);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(blob);
   });
 
   it('stays failed while a retry runs, so a fallback does not flicker back to a placeholder', async () => {
@@ -248,6 +418,30 @@ describe('useAuthedAsset', () => {
     expect(refreshes).toBe(1);
   });
 
+  it('does not retry a refusal the refresh could not lift each time another consumer joins the picture', async () => {
+    let refreshes = 0;
+    setEmbedAuthAdapter({
+      ...shellAdapter,
+      refresh: () => {
+        refreshes++;
+        credential(`t${refreshes + 1}`);
+        return Promise.resolve(true);
+      },
+    });
+    credential('t1');
+    fetchMock.mockImplementation(() => Promise.resolve(new Response('', { status: 401 })));
+    const first = renderHook(() => useAuthedAsset('/images/user/31'));
+    await waitFor(() => expect(first.result.current.status).toBe('failed'));
+    const fetches = fetchMock.mock.calls.length;
+
+    for (let i = 0; i < 3; i++) {
+      renderHook(() => useAuthedAsset('/images/user/31'));
+      await act(() => new Promise(resolve => setTimeout(resolve, 0)));
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(fetches);
+    expect(refreshes).toBe(1);
+  });
+
   it('fetches a waiting picture on its next render when a credential appeared unannounced', async () => {
     setEmbedAuthAdapter(shellAdapter);
     const { result, rerender } = renderHook(() => useAuthedAsset('/images/user/15'));
@@ -274,6 +468,15 @@ describe('useAuthedAsset', () => {
 });
 
 describe('the boxed Image draws through the store', () => {
+  afterEach(() => {
+    registerImage(null as never);
+  });
+
+  const hide = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    img.style.display = 'none';
+  };
+
   it("draws its box while the credential is missing, then the fetched picture, keeping the picture's address", async () => {
     setEmbedAuthAdapter(shellAdapter);
     render(<Image src="/images/user/7" alt="Ann" width={32} height={32} />);
@@ -298,10 +501,6 @@ describe('the boxed Image draws through the store', () => {
     setEmbedAuthAdapter(shellAdapter);
     credential('expired');
     fetchMock.mockImplementationOnce(() => Promise.resolve(new Response('', { status: 401 })));
-    const hide = (e: React.SyntheticEvent<HTMLImageElement>) => {
-      const img = e.currentTarget;
-      img.style.display = 'none';
-    };
     render(<Image src="/images/user/16" alt="Di" width={32} height={32} onError={hide} />);
     const failed = await screen.findByRole('img', { name: 'Di' });
     fireEvent.error(failed);
@@ -310,6 +509,29 @@ describe('the boxed Image draws through the store', () => {
     act(() => credential('fresh'));
     await waitFor(() => expect(screen.getByRole('img', { name: 'Di' }).getAttribute('src')).toMatch(/^blob:/));
     expect(screen.getByRole('img', { name: 'Di' })).toBeVisible();
+  });
+
+  it('draws a retried picture into a new element of a registered host image too', async () => {
+    const HostImage = forwardRef<HTMLImageElement, ImgHTMLAttributes<HTMLImageElement> & { unoptimized?: boolean }>(
+      function HostImageImpl({ alt, unoptimized: _unoptimized, ...props }, ref) {
+        return <img ref={ref} alt={alt} data-host-image="" {...props} />;
+      },
+    );
+    registerImage(HostImage);
+    setEmbedAuthAdapter(shellAdapter);
+    credential('expired');
+    fetchMock.mockImplementationOnce(() => Promise.resolve(new Response('', { status: 401 })));
+    render(<Image src="/images/host/1" alt="Ed" width={32} height={32} onError={hide} />);
+    const failed = await screen.findByRole('img', { name: 'Ed' });
+    expect(failed).toHaveAttribute('data-host-image');
+    fireEvent.error(failed);
+    expect(failed).not.toBeVisible();
+
+    act(() => credential('fresh'));
+    await waitFor(() => expect(screen.getByRole('img', { name: 'Ed' }).getAttribute('src')).toMatch(/^blob:/));
+    const drawn = screen.getByRole('img', { name: 'Ed' });
+    expect(drawn).toHaveAttribute('data-host-image');
+    expect(drawn).toBeVisible();
   });
 });
 
@@ -323,6 +545,34 @@ describe('SquareAvatar', () => {
     rerender(<SquareAvatar src="https://cdn.example/fixed.png" alt="Cy Doe" />);
     expect(screen.getByRole('img', { name: 'Cy Doe' }).getAttribute('src')).toBe('https://cdn.example/fixed.png');
     expect(screen.getByText('CD')).toHaveClass('hidden');
+  });
+
+  it('shows initials while an authed picture fetch failed, and the picture once a new credential fetches it', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('expired');
+    fetchMock.mockImplementationOnce(() => Promise.resolve(new Response('', { status: 401 })));
+    render(<SquareAvatar src="/images/avatar/1" alt="Fay Lu" />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await act(() => new Promise(resolve => setTimeout(resolve, 0)));
+    // Handed the raw URL instead, the avatar would draw it natively here, fail it, and let go of the entry.
+    expect(screen.queryByRole('img', { name: 'Fay Lu' })).toBeNull();
+    expect(screen.getByText('FL')).not.toHaveClass('hidden');
+
+    act(() => credential('fresh'));
+    const img = await screen.findByRole('img', { name: 'Fay Lu' });
+    expect(img.getAttribute('src')).toMatch(/^blob:/);
+  });
+
+  it('fetches no picture in a loading scope, even with a credential to send', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('t1');
+    render(
+      <LoadingScope>
+        <SquareAvatar src="/images/avatar/2" alt="Gus Ho" />
+      </LoadingScope>,
+    );
+    await act(() => new Promise(resolve => setTimeout(resolve, 0)));
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -342,5 +592,42 @@ describe('ChatMessageRow', () => {
     });
     const img = await screen.findByRole('img', { name: 'Eve Ng' });
     expect(img.getAttribute('src')).toMatch(/^blob:/);
+  });
+});
+
+describe('EntityImage', () => {
+  it('shows the initials tile while an authed logo fetch failed, and the logo once a new credential fetches it', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('expired');
+    fetchMock.mockImplementationOnce(() => Promise.resolve(new Response('', { status: 401 })));
+    render(<EntityImage src="/images/logo/1" alt="Acme Corp" />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await act(() => new Promise(resolve => setTimeout(resolve, 0)));
+    // Handed the raw URL instead, the image would draw it natively here, fail it, and let go of the entry.
+    expect(screen.queryByRole('img', { name: 'Acme Corp' })).toBeNull();
+    expect(screen.getByLabelText('Acme Corp')).toHaveTextContent('AC');
+
+    act(() => credential('fresh'));
+    const img = await screen.findByRole('img', { name: 'Acme Corp' });
+    expect(img.getAttribute('src')).toMatch(/^blob:/);
+  });
+
+  it('shows the initials tile instead of a broken image when a plain logo fails to load', () => {
+    render(<EntityImage src="https://cdn.example/logo.png" alt="Bolt Labs" />);
+    fireEvent.error(screen.getByRole('img', { name: 'Bolt Labs' }));
+    expect(screen.queryByRole('img', { name: 'Bolt Labs' })).toBeNull();
+    expect(screen.getByLabelText('Bolt Labs')).toHaveTextContent('BL');
+  });
+
+  it('fetches no logo in a loading scope, even with a credential to send', async () => {
+    setEmbedAuthAdapter(shellAdapter);
+    credential('t1');
+    render(
+      <LoadingScope>
+        <EntityImage src="/images/logo/2" alt="Cora Inc" />
+      </LoadingScope>,
+    );
+    await act(() => new Promise(resolve => setTimeout(resolve, 0)));
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

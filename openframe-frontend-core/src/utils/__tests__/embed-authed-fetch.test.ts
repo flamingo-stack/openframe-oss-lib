@@ -397,4 +397,26 @@ describe('assetLoadMode (native subresources that cannot carry a header)', () =>
     expect(assetLoadMode('data:image/png;base64,AAAA')).toBe('native');
     expect(assetLoadMode('blob:http://localhost:3000/abc')).toBe('native');
   });
+
+  describe('on a native shell page', () => {
+    let realLocation: Location;
+
+    beforeEach(() => {
+      realLocation = window.location;
+    });
+    afterEach(() => {
+      Object.defineProperty(window, 'location', { configurable: true, value: realLocation });
+    });
+
+    it.each(['capacitor://localhost', 'tauri://localhost'])(
+      'is native for the shell bundle’s own assets on %s, even with a credential',
+      page => {
+        Object.defineProperty(window, 'location', { configurable: true, value: { href: `${page}/tickets/` } });
+        setEmbedAuthAdapter({ ...bearer, hasCredential: () => true, allowedOrigins: ['https://gateway.example'] });
+        expect(assetLoadMode('/assets/logo.svg')).toBe('native');
+        expect(assetLoadMode(`${page}/x.png`)).toBe('native');
+        expect(assetLoadMode('https://gateway.example/api/images/user/1')).toBe('bearer');
+      },
+    );
+  });
 });

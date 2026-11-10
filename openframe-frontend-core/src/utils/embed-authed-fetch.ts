@@ -239,7 +239,9 @@ export function assetLoadMode(url: string): AssetLoadMode {
   if (!target || (target.protocol !== 'http:' && target.protocol !== 'https:')) return 'native';
   if (!adapter.hasCredential) return adapter.getHeaders?.().Authorization !== undefined ? 'bearer' : 'native';
   if (adapter.hasCredential()) return 'bearer';
-  // The page's own origin without a credential: the host authenticates there natively (cookies).
+  // The page's own origin without a credential: cookie-auth web authenticates there by cookie, and a shell's http(s)
+  // page origin (`https://localhost`, `http://tauri.localhost`) is its own bundle. A header-auth web host lacks one
+  // there only while signed out, and its next credential change re-classifies the picture.
   return isPageOriginUrl(target, origins) ? 'native' : 'awaiting-credential';
 }
 
