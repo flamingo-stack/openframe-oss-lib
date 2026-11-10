@@ -23,10 +23,7 @@ import {
 import { approvalMetaToBatchData, getApprovalMeta, resolutionToStatus } from './types';
 import type { Notification } from './types';
 
-export interface ApprovalRequestNotificationTileProps {
-  notification: Notification;
-  onApprove: (approvalRequestId: string) => void | Promise<void>;
-  onReject: (approvalRequestId: string) => void | Promise<void>;
+interface ApprovalRequestNotificationTileOptions {
   /**
    * Marks the notification complete: the tile's ✓, and after a successful
    * Approve / Reject. Omit it for a card with no notification behind it (built
@@ -58,7 +55,44 @@ export interface ApprovalRequestNotificationTileProps {
   timeLabel?: string;
 }
 
-export function ApprovalRequestNotificationTile({
+/**
+ * The approval and its two decisions, or `loading` while the host reads it: the tile then draws its own loading form
+ * for its presentation (the row's, or the tile's with its button row), as it does in a loading scope.
+ */
+export type ApprovalRequestNotificationTileProps = ApprovalRequestNotificationTileOptions &
+  (
+    | {
+        notification: Notification;
+        onApprove: (approvalRequestId: string) => void | Promise<void>;
+        onReject: (approvalRequestId: string) => void | Promise<void>;
+        loading?: boolean;
+      }
+    | { loading: true; notification?: undefined; onApprove?: undefined; onReject?: undefined }
+  );
+
+type LoadedApprovalRequestNotificationTileProps = ApprovalRequestNotificationTileOptions & {
+  notification: Notification;
+  onApprove: (approvalRequestId: string) => void | Promise<void>;
+  onReject: (approvalRequestId: string) => void | Promise<void>;
+};
+
+/** An approval request in any look; ONE switch: in a loading scope (or `loading`) its own loading form. */
+export function ApprovalRequestNotificationTile(props: ApprovalRequestNotificationTileProps) {
+  if (useLoadingScope() || props.loading || !props.notification) {
+    if (props.presentation === 'row') return <ApprovalRequestRowSkeleton className={props.className} />;
+    return (
+      <NotificationTile
+        loading
+        variant="approval"
+        presentation={props.presentation === 'lockscreen' ? 'lockscreen' : 'card'}
+        className={props.className}
+      />
+    );
+  }
+  return <LoadedApprovalRequestNotificationTile {...props} />;
+}
+
+function LoadedApprovalRequestNotificationTile({
   notification,
   onApprove,
   onReject,
@@ -71,10 +105,10 @@ export function ApprovalRequestNotificationTile({
   presentation = 'card',
   approvePressed = false,
   timeLabel,
-}: ApprovalRequestNotificationTileProps) {
+}: LoadedApprovalRequestNotificationTileProps) {
   if (presentation === 'row') {
     return (
-      <ApprovalRequestRow
+      <LoadedApprovalRequestRow
         notification={notification}
         onApprove={onApprove}
         onReject={onReject}
@@ -160,15 +194,9 @@ export const APPROVAL_ROW_CLASS =
 const APPROVAL_ROW_BUTTON_CLASS = 'shrink-0';
 
 type ApprovalRowProps = Pick<
-  ApprovalRequestNotificationTileProps,
+  LoadedApprovalRequestNotificationTileProps,
   'notification' | 'onApprove' | 'onReject' | 'onComplete' | 'approvePressed' | 'className'
 >;
-
-/** `presentation="row"`: ONE switch, in a loading scope its own loading form. */
-function ApprovalRequestRow(props: ApprovalRowProps) {
-  if (useLoadingScope()) return <ApprovalRequestRowSkeleton className={props.className} />;
-  return <LoadedApprovalRequestRow {...props} />;
-}
 
 function LoadedApprovalRequestRow({
   notification,
@@ -248,7 +276,7 @@ export function ApprovalRequestRowSkeleton({ className }: { className?: string }
   );
 }
 
-type ApprovalTileProps = Omit<ApprovalRequestNotificationTileProps, 'presentation'> & {
+type ApprovalTileProps = Omit<LoadedApprovalRequestNotificationTileProps, 'presentation'> & {
   presentation: 'card' | 'lockscreen';
 };
 

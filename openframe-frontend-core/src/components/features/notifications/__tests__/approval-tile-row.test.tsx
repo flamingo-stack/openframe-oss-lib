@@ -82,6 +82,15 @@ describe('ApprovalRequestNotificationTile presentation="row"', () => {
     expect(screen.getByRole('button', { name: 'Approve' })).toHaveAttribute('data-pressed', 'true');
   });
 
+  it('draws its loading form for each presentation when given `loading`, with no notification yet', () => {
+    const { rerender } = render(<ApprovalRequestNotificationTile loading presentation="row" />);
+    expect(screen.getByRole('status', { hidden: true })).toHaveAttribute('aria-hidden');
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    rerender(<ApprovalRequestNotificationTile loading presentation="lockscreen" />);
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Install Figma for Jen?')).not.toBeInTheDocument();
+  });
+
   it('draws its own skeleton in a loading scope', () => {
     render(
       <LoadingScope>
