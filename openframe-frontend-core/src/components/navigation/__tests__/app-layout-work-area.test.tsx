@@ -102,6 +102,16 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     );
   }
   const shadow = () => screen.queryByTestId('work-area-squeeze-shadow');
+  const shadowSides = () =>
+    screen.queryAllByTestId('work-area-squeeze-shadow').map(element => element.getAttribute('data-work-area-shadow'));
+  /** jsdom lays nothing out: give the chat column a sideways scroller's metrics, then scroll it. */
+  function scrollChat(scrollLeft: number) {
+    const column = chatColumn();
+    Object.defineProperty(column, 'scrollWidth', { configurable: true, value: 360 });
+    Object.defineProperty(column, 'clientWidth', { configurable: true, value: 108 });
+    column.scrollLeft = scrollLeft;
+    fireEvent.scroll(column);
+  }
 
   it('lets the divider fold either column down to 30% of its min width', () => {
     rowWidth(1000);
@@ -120,10 +130,9 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     expect(chatColumn()).toHaveStyle({ width: '892px' });
     expect(screen.getByText('page: squeezed at 360')).toBeInTheDocument();
     expect(screen.getByText('chat: full at 360')).toBeInTheDocument();
-    expect(shadow()).toHaveAttribute('data-work-area-shadow', 'page');
-    // The divider's line is the page's `border-l`: the page's shadow starts past it, never over it.
-    expect(shadow()).toHaveClass('left-px');
-    expect(shadow()).not.toHaveClass('left-0');
+    // Its content shows from its start: what is hidden is past its right edge, so the shadow is there.
+    expect(shadowSides()).toEqual(['page-end']);
+    expect(shadow()).toHaveClass('right-0', 'bg-gradient-to-l');
   });
 
   it('squeezes the chat the other way, and lets go once both fit again', () => {
@@ -132,7 +141,8 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     fireEvent.keyDown(divider(), { key: 'Home' });
     expect(chatColumn()).toHaveStyle({ width: '108px' });
     expect(screen.getByText('chat: squeezed at 360')).toBeInTheDocument();
-    expect(shadow()).toHaveAttribute('data-work-area-shadow', 'chat');
+    // The chat shows its start: its hidden end is at the divider.
+    expect(shadowSides()).toEqual(['chat-end']);
     fireEvent.doubleClick(divider());
     expect(screen.getByText('chat: full at 360')).toBeInTheDocument();
     expect(shadow()).not.toBeInTheDocument();
@@ -151,7 +161,21 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     // Written to the column while dragging, clamped at the floor of the page's side.
     expect(chatColumn()).toHaveStyle({ width: '892px' });
     expect(screen.getByText('page: squeezed at 360')).toBeInTheDocument();
-    expect(shadow()).toHaveAttribute('data-work-area-shadow', 'page');
+    expect(shadowSides()).toEqual(['page-end']);
+  });
+
+  it('shades the side a squeezed column hides as it is scrolled: its end, both, then its start', () => {
+    rowWidth(1000);
+    render(squeezable());
+    fireEvent.keyDown(divider(), { key: 'Home' });
+    scrollChat(0);
+    expect(shadowSides()).toEqual(['chat-end']);
+    scrollChat(100);
+    expect(shadowSides()).toEqual(['chat-end', 'chat-start']);
+    scrollChat(252);
+    expect(shadowSides()).toEqual(['chat-start']);
+    // Its start's shadow is at the row's left edge, fading to the right.
+    expect(shadow()).toHaveClass('left-0', 'bg-gradient-to-r');
   });
 
   it('a drag on past the floor asks once for room on that side, again on the next drag', () => {

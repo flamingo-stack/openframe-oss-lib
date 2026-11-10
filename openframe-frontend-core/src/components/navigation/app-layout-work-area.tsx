@@ -63,6 +63,56 @@ interface Squeeze {
 
 const NOT_SQUEEZED: Squeeze = { chat: false, page: false };
 
+/** Which sides of a sideways scroller's content are out of view. */
+interface HiddenSides {
+  start: boolean;
+  end: boolean;
+}
+
+/** A squeezed column not measured yet shows its start: the rest of it is past its end. */
+const AT_START: HiddenSides = { start: false, end: true };
+const NO_HIDDEN_SIDES: HiddenSides = { start: false, end: false };
+
+function hiddenSidesOf(element: HTMLElement): HiddenSides {
+  // Nothing laid out (no layout engine, a column not drawn yet): assume its start.
+  if (element.scrollWidth === 0) return AT_START;
+  const overflow = element.scrollWidth - element.clientWidth;
+  if (overflow <= 1) return NO_HIDDEN_SIDES;
+  return { start: element.scrollLeft > 1, end: element.scrollLeft < overflow - 1 };
+}
+
+/**
+ * The sides of `element`'s content scrolled out of view, live (its scroll, its size), while
+ * `active`: where a squeezed column's shadow goes, on the side that hides something.
+ */
+function useHiddenSides(element: HTMLElement | null, active: boolean): HiddenSides {
+  const [sides, setSides] = useState<HiddenSides>(AT_START);
+  useIsomorphicLayoutEffect(() => {
+    if (!active || !element) {
+      setSides(AT_START);
+      return undefined;
+    }
+    const update = () =>
+      setSides(previous => {
+        const next = hiddenSidesOf(element);
+        return previous.start === next.start && previous.end === next.end ? previous : next;
+      });
+    update();
+    element.addEventListener('scroll', update, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(element);
+    return () => {
+      element.removeEventListener('scroll', update);
+      observer?.disconnect();
+    };
+  }, [element, active]);
+  return active ? sides : NO_HIDDEN_SIDES;
+}
+
+/** A squeezed column's edge fade: the page background fading out (the lib's edge fade, as the quick actions' carousel). */
+const SQUEEZE_SHADOW_CLASS =
+  'pointer-events-none absolute inset-y-0 z-10 w-6 to-transparent duration-150 animate-in fade-in motion-reduce:animate-none';
+
 export interface AppLayoutWorkAreaProps {
   mode: AppLayoutWorkAreaMode;
   /**
@@ -79,8 +129,10 @@ export interface AppLayoutWorkAreaProps {
    * Lets the divider squeeze a column below `minColumnWidth`, down to this share of
    * it (0.3: 108px of 360), so the other one keeps growing. A squeezed column keeps
    * its content at `minColumnWidth` and scrolls it sideways (`useWorkAreaColumn`: the
-   * column's own scroller does it), its header stays on screen, and a shadow along the
-   * divider marks it. Omit (default): no column gets narrower than `minColumnWidth`.
+   * column's own scroller does it), its header stays on screen, and a shadow on each of its
+   * edges that hides content (scrolled out of view) marks it: at first its far edge, the
+   * page's right one, the chat's at the divider. Omit (default): no column gets narrower
+   * than `minColumnWidth`.
    */
   squeezeFloor?: number;
   /**
@@ -138,7 +190,7 @@ function useContentWidth(element: HTMLElement | null): number | null {
  * the arrow keys (Shift for bigger steps), Home / End for the extremes, double
  * click for the middle. Neither column gets narrower than `minColumnWidth` —
  * unless `squeezeFloor` lets the divider fold one further, its content kept at
- * `minColumnWidth` and scrolled sideways, a shadow along the divider; with no room
+ * `minColumnWidth` and scrolled sideways, a shadow on each side it hides; with no room
  * for two such columns the area shows the page column alone.
  *
  * Both columns are content areas (`ods-content-area`): their tokens, their
@@ -245,6 +297,7 @@ export function AppLayoutWorkArea({
     setChatElement(node);
   }, []);
   const chatContentWidth = useContentWidth(chatElement);
+  const [pageElement, setPageElement] = useState<HTMLDivElement | null>(null);
 
   const chatHidden = shown === 'page';
   const pageHidden = shown === 'chat';
@@ -261,6 +314,15 @@ export function AppLayoutWorkArea({
     () => ({ squeezed: squeeze.page, minWidth: minColumnWidth }),
     [squeeze.page, minColumnWidth],
   );
+  // The squeezed columns' scrollers: the chat column itself; in the page column the host's
+  // scroller (`AppLayout`'s `<main>`, `data-work-area-scroller`), else the column.
+  const [pageScroller, setPageScroller] = useState<HTMLElement | null>(null);
+  useIsomorphicLayoutEffect(() => {
+    if (!pageElement) return;
+    setPageScroller(pageElement.querySelector<HTMLElement>('[data-work-area-scroller]') ?? pageElement);
+  }, [pageElement, squeeze.page]);
+  const chatHiddenSides = useHiddenSides(chatElement, squeeze.chat);
+  const pageHiddenSides = useHiddenSides(pageScroller, squeeze.page);
   // The width a squeezed column's content keeps, for its scroller (`[&>*]:min-w-[var(--work-area-min-width)]`).
   const minWidthVar = { '--work-area-min-width': `${minColumnWidth}px` } as CSSProperties;
 
@@ -311,20 +373,22 @@ export function AppLayoutWorkArea({
       {shown === 'split' && (
         // A zero-wide slot on the columns' border: the handle straddles it.
         <div className="relative w-0 shrink-0">
-          {/* A squeezed column is folded under the divider: a shadow along it, on its side. */}
-          {(squeeze.chat || squeeze.page) && (
+          {/* A squeezed column's shadows along the divider: the chat's end, the page's start
+              (past the page's `border-l`, the divider's line, which it would cover otherwise). */}
+          {chatHiddenSides.end && (
             <div
               aria-hidden
               data-testid="work-area-squeeze-shadow"
-              data-work-area-shadow={squeeze.chat ? 'chat' : 'page'}
-              className={cn(
-                // The lib's edge fade (the quick actions' carousel, scrolled tables): the page
-                // background fading out. Over the columns, which are their own stacking contexts.
-                'pointer-events-none absolute inset-y-0 z-10 w-6 to-transparent duration-150 animate-in fade-in motion-reduce:animate-none',
-                // On the page's side it starts past the page's `border-l` (the divider's line), which
-                // it would cover otherwise; on the chat's side the line is already beyond it.
-                squeeze.chat ? 'right-0 bg-gradient-to-l from-ods-bg' : 'left-px bg-gradient-to-r from-ods-bg',
-              )}
+              data-work-area-shadow="chat-end"
+              className={cn(SQUEEZE_SHADOW_CLASS, 'right-0 bg-gradient-to-l from-ods-bg')}
+            />
+          )}
+          {pageHiddenSides.start && (
+            <div
+              aria-hidden
+              data-testid="work-area-squeeze-shadow"
+              data-work-area-shadow="page-start"
+              className={cn(SQUEEZE_SHADOW_CLASS, 'left-px bg-gradient-to-r from-ods-bg')}
             />
           )}
           <PanelResizeHandle
@@ -345,6 +409,7 @@ export function AppLayoutWorkArea({
         </div>
       )}
       <div
+        ref={setPageElement}
         aria-hidden={pageHidden || undefined}
         inert={pageHidden}
         data-work-area-column="page"
@@ -360,6 +425,23 @@ export function AppLayoutWorkArea({
       >
         <WorkAreaColumnContext.Provider value={pageColumnState}>{page}</WorkAreaColumnContext.Provider>
       </div>
+      {/* The squeezed columns' shadows at the row's outer edges: the chat's start, the page's end. */}
+      {chatHiddenSides.start && (
+        <div
+          aria-hidden
+          data-testid="work-area-squeeze-shadow"
+          data-work-area-shadow="chat-start"
+          className={cn(SQUEEZE_SHADOW_CLASS, 'left-0 bg-gradient-to-r from-ods-bg')}
+        />
+      )}
+      {pageHiddenSides.end && (
+        <div
+          aria-hidden
+          data-testid="work-area-squeeze-shadow"
+          data-work-area-shadow="page-end"
+          className={cn(SQUEEZE_SHADOW_CLASS, 'right-0 bg-gradient-to-l from-ods-bg')}
+        />
+      )}
     </div>
   );
 }

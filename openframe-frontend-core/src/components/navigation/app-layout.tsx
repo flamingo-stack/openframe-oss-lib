@@ -429,6 +429,9 @@ export function AppLayout({
             contentOverlapped && 'isolate',
             mainClassName,
           )}
+          // The page column's sideways scroller while it is squeezed: the work area reads how
+          // far it is scrolled to shade the side of the page that is out of view.
+          data-work-area-scroller={hasChatColumn ? '' : undefined}
           // A floating dock and a page's action bar lie over the page's end: the
           // page runs on by their height, so its last line clears them. The dock's
           // share is a variable too, for a page that runs on under it, and the

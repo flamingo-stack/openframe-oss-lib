@@ -92,5 +92,30 @@ describe('MobileBurgerMenu sectioned', () => {
     expect(screen.getByRole('dialog', { name: 'Mobile navigation menu', hidden: true })).toHaveClass(
       'translate-x-full',
     );
+    // Waiting past the screen's right edge, it must not widen the page: its layer clips sideways.
+    expect(screen.getByTestId('mobile-menu-layer')).toHaveClass('overflow-x-clip');
+  });
+
+  it('is a new panel when its side changes (a flag resolving after the first paint), not one sliding across', () => {
+    const { rerender } = render(
+      <MobileBurgerMenu
+        isOpen={false}
+        onClose={vi.fn()}
+        config={{ variant: 'grouped', items, currentPath: '/devices' }}
+      />,
+    );
+    const leftPanel = screen.getByRole('dialog', { name: 'Mobile navigation menu', hidden: true });
+    expect(leftPanel).toHaveClass('-translate-x-full');
+    rerender(
+      <MobileBurgerMenu
+        isOpen={false}
+        onClose={vi.fn()}
+        config={{ variant: 'sectioned', side: 'right', items, currentPath: '/devices' }}
+      />,
+    );
+    const rightPanel = screen.getByRole('dialog', { name: 'Mobile navigation menu', hidden: true });
+    expect(rightPanel).toHaveClass('translate-x-full');
+    // Remounted: the closed panel waits at its own edge from its first frame, with no slide to get there.
+    expect(rightPanel).not.toBe(leftPanel);
   });
 });

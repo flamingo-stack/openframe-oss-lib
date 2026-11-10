@@ -281,8 +281,15 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
       // The drawer's own stacking layer, below the header: the scrim, the panel
       // and the host its popups portal into (the account menu), so a menu opened
       // in the panel stacks over it instead of under its `z-[101]`. The layer
-      // itself takes no clicks; its children opt back in.
-      <div className="pointer-events-none absolute inset-0 z-[101] md:hidden" style={{ top: HEADER_HEIGHT }}>
+      // itself takes no clicks; its children opt back in. `overflow-x-clip`: a closed drawer
+      // from the right waits past the screen's edge, which must not widen the page (sideways
+      // scroll, a zoomed-out phone); clip, not hidden, so the layer is no scroller and its
+      // popups still reach past it up and down.
+      <div
+        data-testid="mobile-menu-layer"
+        className="pointer-events-none absolute inset-0 z-[101] overflow-x-clip md:hidden"
+        style={{ top: HEADER_HEIGHT }}
+      >
         <div
           className={cn(
             'absolute inset-0',
@@ -297,6 +304,9 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
         {/* The sidebar as a drawer from the left, 300px (at most 85% of the
             phone), with the sidebar's rows, slots and active resolution. */}
         <div
+          // A drawer that changes sides (the host's config resolving after the first paint: a
+          // flag) is a new panel, not one sliding across the screen from one edge to the other.
+          key={fromRight ? 'end' : 'start'}
           ref={panelRef}
           className={cn(
             // Sectioned: the navigation's own width (`expandedWidth`, the desktop's 200px).
