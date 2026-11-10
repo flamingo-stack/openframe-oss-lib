@@ -211,7 +211,9 @@ interface RowStateProps {
 /** The row's end, flush right where every row's count sits. */
 function RowEnd({ count, tone = 'accent' }: { count: number; tone?: 'accent' | 'warning' }) {
   if (count <= 0) return null;
-  // Warning: the design's counter tag (Figma `nav/item` "Counter is a tag (warning)"), 28px tall.
+  // Warning: the design's counter tag (Figma `nav/item` "Counter is a tag (warning)", start-work
+  // 1408:294259), 28px tall, on the v2 warning colours (sec ground, border, text); a count, so
+  // flat on hover.
   if (tone === 'warning')
     return (
       <Tag
@@ -219,7 +221,10 @@ function RowEnd({ count, tone = 'accent' }: { count: number; tone?: 'accent' | '
         data-testid="nav-row-count"
         label={count > 99 ? '99+' : String(count)}
         variant="warning"
-        className="ml-auto h-7 shrink-0"
+        className={cn(
+          'ml-auto h-7 shrink-0 border border-ods-warning-tint-border bg-ods-warning-tint text-ods-warning-tint-text',
+          'hover:bg-ods-warning-tint active:bg-ods-warning-tint',
+        )}
       />
     );
   return <CountPill count={count} className="ml-auto" />;

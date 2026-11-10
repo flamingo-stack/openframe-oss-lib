@@ -138,6 +138,12 @@
   --ods-shell-open-yellow-sec: #291f09;
   --ods-shell-open-yellow-sec-hover: #322507;
   --ods-shell-open-yellow-sec-action: #3c2b01;
+  /* ODS v2 attention colors/warning sec, warning border, warning text: the warning
+   * tag of the v2 palette (the shell's counters). The lib's warning tokens keep
+   * their older values until the palette sync. */
+  --ods-shell-attention-warning-sec: #2d1c0f;
+  --ods-shell-attention-warning-border: #542e0c;
+  --ods-shell-attention-warning-text: #ffb984;
 
   /* Shadcn/ui HSL bridge — DARK (mirrors app-globals.css :root).
    * Re-declared here so toggling data-theme also flips shadcn-mapped
@@ -244,6 +250,9 @@
   --ods-shell-open-yellow-sec: #fafafa;
   --ods-shell-open-yellow-sec-hover: #f5f5f5;
   --ods-shell-open-yellow-sec-action: #f0f0f0;
+  --ods-shell-attention-warning-sec: #ebdfbb;
+  --ods-shell-attention-warning-border: #cd9e18;
+  --ods-shell-attention-warning-text: #b98a04;
 
   /* Shadcn/ui HSL bridge — LIGHT */
   --background: 0 0% 98%; /* #fafafa */
@@ -370,6 +379,10 @@
   --color-accent-tint: var(--ods-shell-open-yellow-sec);
   --color-accent-tint-hover: var(--ods-shell-open-yellow-sec-hover);
   --color-accent-tint-active: var(--ods-shell-open-yellow-sec-action);
+  /* The shell's warning tag (a row's counter): v2 warning sec / border / text. */
+  --color-warning-tint: var(--ods-shell-attention-warning-sec);
+  --color-warning-tint-border: var(--ods-shell-attention-warning-border);
+  --color-warning-tint-text: var(--ods-shell-attention-warning-text);
 
   /* Status Colors */
   --color-success: var(--ods-attention-green-success);

@@ -7,6 +7,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Collapse02Icon } from '../../icons-v2-generated';
 import { AppColumnHeader } from '../app-column-header';
 import { AppLayout } from '../app-layout';
 import { AppLayoutWorkArea, type AppLayoutWorkAreaMode, useWorkAreaColumn } from '../app-layout-work-area';
@@ -257,6 +258,18 @@ describe('AppColumnHeader', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     rerender(<AppColumnHeader title="Devices" layoutAction="restore-split" onLayoutAction={onLayout} />);
     expect(screen.getByRole('button', { name: 'Show side by side' })).toBeInTheDocument();
+  });
+
+  it('draws restore split with its own glyph (ODS collapse-02), full screen with expand-01', () => {
+    const glyph = (name: string) => screen.getByRole('button', { name }).innerHTML;
+    const { rerender } = render(
+      <AppColumnHeader title="Devices" layoutAction="fullscreen" onLayoutAction={() => undefined} />,
+    );
+    const fullScreen = glyph('Full screen');
+    rerender(<AppColumnHeader title="Devices" layoutAction="restore-split" onLayoutAction={() => undefined} />);
+    const restore = glyph('Show side by side');
+    expect(restore).not.toBe(fullScreen);
+    expect(restore).toContain(render(<Collapse02Icon className="h-5 w-5" />).container.innerHTML);
   });
 
   it('draws its cells as the chat column header does: 56px, a 20px primary glyph', () => {

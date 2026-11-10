@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
-import { Expand01Icon, XmarkIcon } from '../icons-v2-generated';
+import { Collapse02Icon, Expand01Icon, XmarkIcon } from '../icons-v2-generated';
 import { HeaderButton } from './header-button';
 import { COLUMN_HEADER_CELL, SQUEEZED_HIDDEN, SQUEEZED_KEPT_CELL, SQUEEZED_STICKY_HEADER } from './work-area-squeeze';
 
@@ -11,8 +11,8 @@ import { COLUMN_HEADER_CELL, SQUEEZED_HIDDEN, SQUEEZED_KEPT_CELL, SQUEEZED_STICK
  * - `fullscreen`: the column takes the whole work area (the other one is hidden);
  * - `restore-split`: the hidden column comes back beside this one.
  *
- * The design draws both with the same corners glyph, so they differ in their
- * accessible name (and tooltip) only.
+ * Full screen draws the outward corners (`expand-01`), restore split the inward ones
+ * (ODS `collapse-02`, Figma open-design-system 143:1075).
  */
 export type AppColumnHeaderLayoutAction = 'fullscreen' | 'restore-split';
 
@@ -89,7 +89,13 @@ export function AppColumnHeader({
       {layoutAction && (
         <HeaderButton
           className={cellClass}
-          icon={<Expand01Icon className="h-5 w-5" />}
+          icon={
+            layoutAction === 'restore-split' ? (
+              <Collapse02Icon className="h-5 w-5" />
+            ) : (
+              <Expand01Icon className="h-5 w-5" />
+            )
+          }
           onClick={onLayoutAction}
           aria-label={layoutLabel}
           title={layoutLabel}

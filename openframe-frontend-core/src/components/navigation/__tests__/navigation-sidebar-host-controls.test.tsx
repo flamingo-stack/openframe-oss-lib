@@ -118,7 +118,15 @@ describe('NavigationSidebarActionRow', () => {
     const row = screen.getByRole('button', { name: 'New Chat (3)' });
     const tag = within(row).getByTestId('nav-row-count');
     expect(tag.tagName).toBe('SPAN');
-    expect(tag).toHaveClass('h-7', 'bg-ods-warning-secondary', 'text-ods-warning');
+    // The v2 warning tag (Figma start-work 1408:294259): sec ground, its border, its text.
+    expect(tag).toHaveClass(
+      'h-7',
+      'border',
+      'border-ods-warning-tint-border',
+      'bg-ods-warning-tint',
+      'text-ods-warning-tint-text',
+    );
+    expect(tag).not.toHaveClass('bg-ods-warning-secondary', 'text-ods-warning');
     expect(tag).toHaveTextContent('3');
   });
 

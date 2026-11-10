@@ -287,6 +287,10 @@ const config: Config = {
             secondary: 'var(--color-warning-secondary)',
             'secondary-hover': 'var(--color-warning-secondary-hover)',
             'secondary-active': 'var(--color-warning-secondary-active)',
+            // The three-column shell's warning tag (ODS v2 warning sec / border / text).
+            tint: 'var(--color-warning-tint)',
+            'tint-border': 'var(--color-warning-tint-border)',
+            'tint-text': 'var(--color-warning-tint-text)',
           },
           info: {
             DEFAULT: 'var(--color-info)',
