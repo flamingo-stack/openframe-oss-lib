@@ -1,3 +1,5 @@
+#[cfg(windows)]
+mod download;
 mod webview2_installer;
 
 use tracing::{info, warn};
