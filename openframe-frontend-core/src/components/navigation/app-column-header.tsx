@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Expand01Icon, XmarkIcon } from '../icons-v2-generated';
 import { HeaderButton } from './header-button';
-import { SQUEEZED_HIDDEN, SQUEEZED_SHARED_CELL, SQUEEZED_SR_ONLY } from './work-area-squeeze';
+import { SQUEEZED_HIDDEN, SQUEEZED_SHARED_CELL, SQUEEZED_SR_ONLY, SQUEEZED_STICKY_HEADER } from './work-area-squeeze';
 
 /**
  * What the layout button of a column header does:
@@ -68,6 +68,7 @@ export function AppColumnHeader({
       // tokens when the column is a content area narrower than 720px (the split's 480px).
       className={cn(
         'ods-viewport-layer flex h-14 shrink-0 items-stretch border-b border-ods-border-panel bg-ods-panel',
+        SQUEEZED_STICKY_HEADER,
         className,
       )}
       data-column-header=""

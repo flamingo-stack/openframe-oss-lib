@@ -73,6 +73,11 @@ export interface PanelResizeHandleProps {
   onDrag?: (next: number) => void;
   /** A double click on the handle: back to the default size. */
   onReset?: () => void;
+  /**
+   * The drag goes on past `minSize` / `maxSize` (the panel already stopped there): which
+   * edge, and by how many px the pointer is beyond it. Every move while it is.
+   */
+  onDragPastLimit?: (edge: 'min' | 'max', by: number) => void;
   /** `overlay` is the body-level `Drawer`'s handle, `inLayout` the wider one of
    *  `AppLayoutDrawer`. They differ in track width and grip colour only. */
   variant: 'overlay' | 'inLayout';
@@ -93,6 +98,7 @@ export function PanelResizeHandle({
   panelRef,
   onDrag,
   onReset,
+  onDragPastLimit,
   variant,
   ariaLabel,
   className,
@@ -134,7 +140,12 @@ export function PanelResizeHandle({
     if (!start) return;
     if (!onDrag && !panelRef?.current) return;
     const delta = isHorizontal ? e.clientX - start.x : e.clientY - start.y;
-    const next = clampSize(start.size + delta * direction);
+    const wanted = start.size + delta * direction;
+    const next = clampSize(wanted);
+    if (onDragPastLimit) {
+      if (wanted < minSize) onDragPastLimit('min', minSize - wanted);
+      else if (wanted > maxSize) onDragPastLimit('max', wanted - maxSize);
+    }
     dragSizeRef.current = next;
     if (onDrag) {
       onDrag(next);

@@ -20,3 +20,10 @@ export const SQUEEZED_HIDDEN =
  */
 export const SQUEEZED_SHARED_CELL =
   'group-data-[squeezed]/work-area-chat:w-auto group-data-[squeezed]/work-area-chat:min-w-0 group-data-[squeezed]/work-area-chat:flex-1 group-data-[squeezed]/work-area-page:w-auto group-data-[squeezed]/work-area-page:min-w-0 group-data-[squeezed]/work-area-page:flex-1';
+
+/**
+ * A column header while its chat column is squeezed: the column scrolls sideways, the
+ * header sticks to its start and spans what is on screen (`--work-area-visible-width`).
+ */
+export const SQUEEZED_STICKY_HEADER =
+  'group-data-[squeezed]/work-area-chat:sticky group-data-[squeezed]/work-area-chat:left-0 group-data-[squeezed]/work-area-chat:z-10 group-data-[squeezed]/work-area-chat:w-[var(--work-area-visible-width)]';

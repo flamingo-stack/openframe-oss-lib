@@ -3,7 +3,12 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Arrow02RightIcon, Ellipsis01Icon, Refresh01LeftIcon, SidebarIcon, XmarkIcon } from '../icons-v2-generated';
-import { SQUEEZED_HIDDEN, SQUEEZED_SHARED_CELL, SQUEEZED_SR_ONLY } from '../navigation/work-area-squeeze';
+import {
+  SQUEEZED_HIDDEN,
+  SQUEEZED_SHARED_CELL,
+  SQUEEZED_SR_ONLY,
+  SQUEEZED_STICKY_HEADER,
+} from '../navigation/work-area-squeeze';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -132,7 +137,8 @@ export function MingoChatHeader({
         'flex h-14 w-full shrink-0 overflow-hidden border-b',
         isColumn
           ? // Chrome, not content: the window's tokens even in a column narrower than 720px.
-            'ods-viewport-layer border-ods-border-panel bg-ods-panel'
+            // Squeezed: it sticks to the column's visible start while the chat scrolls sideways.
+            cn('ods-viewport-layer border-ods-border-panel bg-ods-panel', SQUEEZED_STICKY_HEADER)
           : 'divide-x divide-ods-border border-ods-border',
       )}
       data-look={isColumn ? 'column' : undefined}

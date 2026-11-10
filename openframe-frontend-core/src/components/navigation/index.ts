@@ -75,6 +75,7 @@ export type {
 export { SIDE_PANEL_FRAME_WIDTH } from './app-layout-side-panel';
 export {
   AppLayoutWorkArea,
+  SQUEEZE_PAST_PX,
   useWorkAreaColumn,
   WORK_AREA_MIN_COLUMN_WIDTH,
   WorkAreaColumnContext,

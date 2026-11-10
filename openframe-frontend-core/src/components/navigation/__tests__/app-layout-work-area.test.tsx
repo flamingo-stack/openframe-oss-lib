@@ -150,6 +150,38 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     expect(shadow()).toHaveAttribute('data-work-area-shadow', 'page');
   });
 
+  it('a drag on past the floor asks once for room on that side, again on the next drag', () => {
+    rowWidth(1000);
+    const onSqueezePast = vi.fn();
+    render(
+      <AppLayoutWorkArea
+        mode="split"
+        chat={<Column name="chat" />}
+        page={<Column name="page" />}
+        squeezeFloor={0.3}
+        onSqueezePast={onSqueezePast}
+      />,
+    );
+    const grip = divider();
+    grip.setPointerCapture = vi.fn();
+    grip.releasePointerCapture = vi.fn();
+    // From 500px: the page's floor is at 892, so 920 is 28px past it (not enough), 960 is 68px.
+    fireEvent.pointerDown(grip, { clientX: 500, pointerId: 1, button: 0 });
+    fireEvent.pointerMove(grip, { clientX: 920, pointerId: 1 });
+    expect(onSqueezePast).not.toHaveBeenCalled();
+    fireEvent.pointerMove(grip, { clientX: 960, pointerId: 1 });
+    fireEvent.pointerMove(grip, { clientX: 1100, pointerId: 1 });
+    expect(onSqueezePast).toHaveBeenCalledTimes(1);
+    expect(onSqueezePast).toHaveBeenLastCalledWith('end');
+    fireEvent.pointerUp(grip, { clientX: 1100, pointerId: 1 });
+
+    // The chat's floor is at 108: from 892, 892 - 784 = 108, so 40 more px is past it.
+    fireEvent.pointerDown(grip, { clientX: 1000, pointerId: 2, button: 0 });
+    fireEvent.pointerMove(grip, { clientX: 1000 - 784 - 60, pointerId: 2 });
+    expect(onSqueezePast).toHaveBeenCalledTimes(2);
+    expect(onSqueezePast).toHaveBeenLastCalledWith('start');
+  });
+
   it('without squeezeFloor no column is ever squeezed', () => {
     rowWidth(1000);
     render(<AppLayoutWorkArea mode="split" chat={<Column name="chat" />} page={<Column name="page" />} />);
