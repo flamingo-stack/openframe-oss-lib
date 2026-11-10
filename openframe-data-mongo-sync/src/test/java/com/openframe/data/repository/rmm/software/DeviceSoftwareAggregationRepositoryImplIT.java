@@ -1,7 +1,6 @@
 package com.openframe.data.repository.rmm.software;
 
 import com.openframe.data.document.rmm.software.DeviceSoftware;
-import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,8 +55,6 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
         SoftwareTitleRollup rollup = repository.rollUpTitle(TENANT, CHROME).orElseThrow();
 
         assertThat(rollup.devicesCount()).isEqualTo(2);
-        assertThat(rollup.installations()).extracting(Software.Installation::getMachineId)
-                .containsExactly("m1", "m2");
     }
 
     @Test

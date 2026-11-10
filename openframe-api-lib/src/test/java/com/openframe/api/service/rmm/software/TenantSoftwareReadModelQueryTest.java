@@ -59,15 +59,14 @@ class TenantSoftwareReadModelQueryTest {
 
     @InjectMocks private TenantSoftwareReadModelQuery query;
 
-    private static Software.Installation installation(String machineId, String... versions) {
-        return Software.Installation.builder().machineId(machineId).versions(List.of(versions)).build();
+    private static Software software(long titleId, String source) {
+        return software(titleId, source, 0);
     }
 
-    private static Software software(long titleId, String source, Software.Installation... installations) {
+    private static Software software(long titleId, String source, int devicesCount) {
         return Software.builder()
                 .tenantId(TENANT).softwareTitleId(titleId).name("jq").source(source)
-                .latestVersion("1.7").devicesCount(installations.length).cveCount(2)
-                .installations(List.of(installations))
+                .latestVersion("1.7").devicesCount(devicesCount).cveCount(2)
                 .build();
     }
 
@@ -99,7 +98,7 @@ class TenantSoftwareReadModelQueryTest {
 
     @Test
     void get_takesTheProjectedCurrentAndOlderVersions() {
-        Software jq = software(42L, "homebrew_packages", installation("m1", "1.6"));
+        Software jq = software(42L, "homebrew_packages", 1);
         jq.setCurrentVersion("1.7");
         jq.setOlderVersionsCount(2);
         when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(jq));
@@ -112,7 +111,7 @@ class TenantSoftwareReadModelQueryTest {
 
     @Test
     void get_projectedWithoutVersions_noCurrentVersion() {
-        Software jq = software(42L, "homebrew_packages", installation("m1", "1.6"));
+        Software jq = software(42L, "homebrew_packages", 1);
         jq.setOlderVersionsCount(0);
         when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(jq));
 
@@ -123,11 +122,8 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
-    void get_notProjectedWithVersionCountsYet_countsTheInstallations() {
-        Software.Installation onM1 = installation("m1", "1.6");
-        Software.Installation onM2 = installation("m2", "1.7");
-        Software.Installation onM3 = installation("m3", "1.7");
-        Software jq = software(42L, "homebrew_packages", onM1, onM2, onM3);
+    void get_notProjectedWithVersionCountsYet_reportsNoVersionsInUse() {
+        Software jq = software(42L, "homebrew_packages", 3);
         when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(jq));
 
         SoftwareResponse row = query.get(TENANT, "42");
@@ -135,8 +131,8 @@ class TenantSoftwareReadModelQueryTest {
         assertThat(row.getId()).isEqualTo("42");
         assertThat(row.getSource()).isEqualTo(SoftwareSource.BREW);
         assertThat(row.getType()).isEqualTo(SoftwareType.PACKAGE);
-        assertThat(row.getCurrentVersion()).isEqualTo("1.7");          // the version on the most devices
-        assertThat(row.getOlderVersionsCount()).isEqualTo(1);           // 1.6 besides it
+        assertThat(row.getCurrentVersion()).isNull();
+        assertThat(row.getOlderVersionsCount()).isNull();
         assertThat(row.getLatestVersion()).isEqualTo("1.7");
         assertThat(row.getDevicesCount()).isEqualTo(3);
         assertThat(row.getVulnerabilitySummary().getCveCount()).isEqualTo(2);
@@ -152,7 +148,7 @@ class TenantSoftwareReadModelQueryTest {
 
     @Test
     void listSoftware_searchAndVulnerable_pickTheMatchingQuery_sortedAndPaged() {
-        Software one = software(1L, "apps", installation("m1", "1.0"));
+        Software one = software(1L, "apps", 1);
         Page<Software> page = new PageImpl<>(List.of(one), PageRequest.of(1, 1), 3);
         when(softwareRepository.findByTenantIdAndNameLowerContainingAndCveCountGreaterThanAndDevicesCountGreaterThan(
                 eq(TENANT), eq("jq"), eq(0), eq(0), any(Pageable.class))).thenReturn(page);
@@ -286,7 +282,7 @@ class TenantSoftwareReadModelQueryTest {
     @Test
     void allForFilters_withAndWithoutSearch() {
         when(softwareRepository.findByTenantIdAndDevicesCountGreaterThan(TENANT, 0, Pageable.unpaged()))
-                .thenReturn(new PageImpl<>(List.of(software(1L, "apps", installation("m1", "1.0")))));
+                .thenReturn(new PageImpl<>(List.of(software(1L, "apps", 1))));
         when(softwareRepository.findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(TENANT, "jq", 0, Pageable.unpaged()))
                 .thenReturn(Page.empty());
 
@@ -300,7 +296,7 @@ class TenantSoftwareReadModelQueryTest {
         Software chrome = Software.builder().tenantId(TENANT).softwareTitleId(7L).name("Google Chrome").source("programs")
                 .vendor("Google LLC").upgradeCode("{UPGRADE}").arpKeys(List.of("Google Chrome"))
                 .packageFamilyNames(List.of("google.chrome_x")).systemComponent(false)
-                .packageMatch(stored).installations(List.of(installation("m1", "130.0"))).build();
+                .packageMatch(stored).build();
         when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 7L)).thenReturn(Optional.of(chrome));
 
         SoftwareResponse row = query.get(TENANT, "7");

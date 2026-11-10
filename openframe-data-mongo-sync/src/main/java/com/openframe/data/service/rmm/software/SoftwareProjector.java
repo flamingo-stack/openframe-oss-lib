@@ -67,7 +67,6 @@ public class SoftwareProjector {
         String currentVersion = currentVersion(devicesByVersion);
         software.setCurrentVersion(currentVersion);
         software.setOlderVersionsCount(Math.max(0, devicesByVersion.size() - 1));
-        software.setInstallations(rollup.installations());
         software.setDevicesCount(rollup.devicesCount());
         software.setCveCount(rollup.cveCount());
         software.setUpdatedAt(Instant.now());

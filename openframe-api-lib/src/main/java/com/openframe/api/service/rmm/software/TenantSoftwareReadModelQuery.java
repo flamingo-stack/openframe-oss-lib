@@ -225,9 +225,6 @@ public class TenantSoftwareReadModelQuery {
     // currentVersion is the version on the most devices and olderVersionsCount the other versions in use, as the
     // Fleet path reports them, so the catalog status reads both paths the same way
     private static SoftwareResponse toResponse(Software sw) {
-        VersionsInUse inUse = sw.getOlderVersionsCount() == null
-                ? versionsInUseFromInstallations(sw)
-                : new VersionsInUse(sw.getCurrentVersion(), sw.getOlderVersionsCount());
         Long titleId = sw.getSoftwareTitleId();
         String id = titleId == null ? null : titleId.toString();
         String fleetSource = sw.getSource();
@@ -249,31 +246,11 @@ public class TenantSoftwareReadModelQuery {
         row.setSystemComponent(sw.getSystemComponent());
         row.setPackageMatch(sw.getPackageMatch());
         row.setType(type);
-        row.setCurrentVersion(inUse.currentVersion());
+        row.setCurrentVersion(sw.getCurrentVersion());
         row.setLatestVersion(sw.getLatestVersion());
-        row.setOlderVersionsCount(inUse.olderVersionsCount());
+        row.setOlderVersionsCount(sw.getOlderVersionsCount());
         row.setDevicesCount(sw.getDevicesCount());
         row.setVulnerabilitySummary(summary);
         return row;
-    }
-
-    private static VersionsInUse versionsInUseFromInstallations(Software sw) {
-        List<String> installedVersions = sw.getInstallations() == null ? List.<String>of() : sw.getInstallations().stream()
-                .map(Software.Installation::getVersions)
-                .filter(Objects::nonNull)
-                .flatMap(List::stream)
-                .filter(Objects::nonNull)
-                .toList();
-        Map<String, Long> devicesByVersion = installedVersions.stream()
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-        String currentVersion = devicesByVersion.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(null);
-        int olderVersionsCount = Math.max(0, devicesByVersion.size() - 1);
-        return new VersionsInUse(currentVersion, olderVersionsCount);
-    }
-
-    private record VersionsInUse(String currentVersion, int olderVersionsCount) {
     }
 }

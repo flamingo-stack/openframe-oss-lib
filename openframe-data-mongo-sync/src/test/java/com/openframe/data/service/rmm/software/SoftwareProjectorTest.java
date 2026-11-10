@@ -64,12 +64,9 @@ class SoftwareProjectorTest {
 
     @Test
     void project_withInstalls_storesTheRollup() {
-        List<Software.Installation> installations = List.of(
-                Software.Installation.builder().machineId("m1").versions(List.of("1.0", "2.0")).build(),
-                Software.Installation.builder().machineId("m2").versions(List.of("1.5")).build());
         when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup()
                 .devicesCount(2).name("Google Chrome").source("apps")
-                .versions(List.of("1.0", "1.5", "2.0")).cveCount(2).installations(installations).build()));
+                .versions(List.of("1.0", "1.5", "2.0")).cveCount(2).build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
 
         assertThat(projector.project("t1", 42L)).isEqualTo(2);
@@ -83,7 +80,6 @@ class SoftwareProjectorTest {
         assertThat(saved.getNameLower()).isEqualTo("google chrome");
         assertThat(saved.getSource()).isEqualTo("apps");
         assertThat(saved.getLatestVersion()).isEqualTo("2.0");
-        assertThat(saved.getInstallations()).isEqualTo(installations);
         assertThat(saved.getDevicesCount()).isEqualTo(2);
         assertThat(saved.getCveCount()).isEqualTo(2);
         assertThat(saved.getUpdatedAt()).isNotNull();
@@ -308,7 +304,6 @@ class SoftwareProjectorTest {
         private List<String> installerTypes = List.of();
         private boolean systemComponent;
         private Map<String, Integer> devicesByVersion = Map.of("1.0", 1);
-        private List<Software.Installation> installations = List.of();
 
         RollupBuilder devicesCount(int value) { devicesCount = value; return this; }
         RollupBuilder name(String value) { name = value; return this; }
@@ -322,11 +317,10 @@ class SoftwareProjectorTest {
         RollupBuilder installerTypes(List<String> value) { installerTypes = value; return this; }
         RollupBuilder systemComponent(boolean value) { systemComponent = value; return this; }
         RollupBuilder devicesByVersion(Map<String, Integer> value) { devicesByVersion = value; return this; }
-        RollupBuilder installations(List<Software.Installation> value) { installations = value; return this; }
 
         SoftwareTitleRollup build() {
             return new SoftwareTitleRollup(devicesCount, name, source, vendor, upgradeCode, versions, cveCount,
-                    arpKeys, packageFamilyNames, installerTypes, systemComponent, devicesByVersion, installations);
+                    arpKeys, packageFamilyNames, installerTypes, systemComponent, devicesByVersion);
         }
     }
 }
