@@ -4,9 +4,9 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Arrow02RightIcon, Ellipsis01Icon, Refresh01LeftIcon, SidebarIcon, XmarkIcon } from '../icons-v2-generated';
 import {
+  COLUMN_HEADER_CELL,
   SQUEEZED_HIDDEN,
-  SQUEEZED_SHARED_CELL,
-  SQUEEZED_SR_ONLY,
+  SQUEEZED_KEPT_CELL,
   SQUEEZED_STICKY_HEADER,
 } from '../navigation/work-area-squeeze';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from '../ui/actions-menu';
@@ -99,10 +99,10 @@ export function MingoChatHeader({
   const isColumn = isPage && look === 'column';
   const glyph = isColumn ? 20 : 24;
   // The column look: the panel's border between the title and the avatar, the default one between the buttons.
-  const cellClass = cn('w-14', isColumn && 'border-l border-ods-border text-ods-text-primary [&_svg]:h-5 [&_svg]:w-5');
-  // The column look in a squeezed work-area column: the host's cells (Full screen, Close) stay, sharing
-  // the width; the title is read but not drawn, the avatar, the ⋯ and Unarchive wait for the room.
-  const keptCellClass = cn(cellClass, isColumn && SQUEEZED_SHARED_CELL);
+  const cellClass = isColumn ? COLUMN_HEADER_CELL : 'w-14';
+  // The column look in a squeezed work-area column: the title truncates, the host's cells (Full screen,
+  // Close) keep their 56px until there is no room left; the avatar, the ⋯ and Unarchive wait for the room.
+  const keptCellClass = cn(cellClass, isColumn && SQUEEZED_KEPT_CELL);
   const foldedCellClass = cn(cellClass, isColumn && SQUEEZED_HIDDEN);
   const showAvatar = !!avatar && !!(avatar.name || avatar.avatarUrl);
   const menuGroups: ActionsMenuGroup[] = [
@@ -157,12 +157,7 @@ export function MingoChatHeader({
 
       {isColumn ? (
         // The column look: the title alone, in from the column's edge.
-        <div
-          className={cn(
-            'flex min-w-0 flex-1 items-center pl-[var(--spacing-system-l)] pr-[var(--spacing-system-sf)]',
-            SQUEEZED_SR_ONLY,
-          )}
-        >
+        <div className="flex min-w-0 flex-1 items-center pl-[var(--spacing-system-l)] pr-[var(--spacing-system-sf)]">
           {titleNode}
         </div>
       ) : isPage ? (

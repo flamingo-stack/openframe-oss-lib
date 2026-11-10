@@ -6,20 +6,24 @@
  * lands in the column's DOM. No imports: chat and navigation both read it.
  */
 
-/** Gone while squeezed, still read by assistive tech (a column's title). */
-export const SQUEEZED_SR_ONLY =
-  'group-data-[squeezed]/work-area-chat:sr-only group-data-[squeezed]/work-area-page:sr-only';
+/**
+ * A button cell of a work-area column header (the chat's `MingoChatHeader look="column"`, the
+ * page's `AppColumnHeader`): 56px square, the default border before it, a 20px primary glyph.
+ * One string, so both columns draw their Full screen and Close alike.
+ */
+export const COLUMN_HEADER_CELL = 'w-14 border-l border-ods-border text-ods-text-primary [&_svg]:h-5 [&_svg]:w-5';
 
 /** Gone while squeezed (an avatar, a ⋯ menu, a host's extra cells). */
 export const SQUEEZED_HIDDEN =
   'group-data-[squeezed]/work-area-chat:hidden group-data-[squeezed]/work-area-page:hidden';
 
 /**
- * A header cell kept while squeezed (Full screen, Close): the kept cells share the
- * column's width instead of their fixed 56px, so none is cut off at the 108px floor.
+ * A header cell kept while squeezed (Full screen, Close): its square 56px as long as the
+ * header has room (the title truncating first), narrower only once it has none, so two
+ * cells still fit the 108px floor.
  */
-export const SQUEEZED_SHARED_CELL =
-  'group-data-[squeezed]/work-area-chat:w-auto group-data-[squeezed]/work-area-chat:min-w-0 group-data-[squeezed]/work-area-chat:flex-1 group-data-[squeezed]/work-area-page:w-auto group-data-[squeezed]/work-area-page:min-w-0 group-data-[squeezed]/work-area-page:flex-1';
+export const SQUEEZED_KEPT_CELL =
+  'group-data-[squeezed]/work-area-chat:min-w-0 group-data-[squeezed]/work-area-chat:shrink group-data-[squeezed]/work-area-chat:px-0 group-data-[squeezed]/work-area-page:min-w-0 group-data-[squeezed]/work-area-page:shrink group-data-[squeezed]/work-area-page:px-0';
 
 /**
  * A column header while its chat column is squeezed: the column scrolls sideways, the

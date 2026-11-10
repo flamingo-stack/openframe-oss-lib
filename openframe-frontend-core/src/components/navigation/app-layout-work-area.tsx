@@ -321,7 +321,9 @@ export function AppLayoutWorkArea({
                 // The lib's edge fade (the quick actions' carousel, scrolled tables): the page
                 // background fading out. Over the columns, which are their own stacking contexts.
                 'pointer-events-none absolute inset-y-0 z-10 w-6 to-transparent duration-150 animate-in fade-in motion-reduce:animate-none',
-                squeeze.chat ? 'right-0 bg-gradient-to-l from-ods-bg' : 'left-0 bg-gradient-to-r from-ods-bg',
+                // On the page's side it starts past the page's `border-l` (the divider's line), which
+                // it would cover otherwise; on the chat's side the line is already beyond it.
+                squeeze.chat ? 'right-0 bg-gradient-to-l from-ods-bg' : 'left-px bg-gradient-to-r from-ods-bg',
               )}
             />
           )}

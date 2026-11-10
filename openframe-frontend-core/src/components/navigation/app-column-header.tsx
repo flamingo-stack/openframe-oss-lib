@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Expand01Icon, XmarkIcon } from '../icons-v2-generated';
 import { HeaderButton } from './header-button';
-import { SQUEEZED_HIDDEN, SQUEEZED_SHARED_CELL, SQUEEZED_SR_ONLY, SQUEEZED_STICKY_HEADER } from './work-area-squeeze';
+import { COLUMN_HEADER_CELL, SQUEEZED_HIDDEN, SQUEEZED_KEPT_CELL, SQUEEZED_STICKY_HEADER } from './work-area-squeeze';
 
 /**
  * What the layout button of a column header does:
@@ -59,8 +59,9 @@ export function AppColumnHeader({
   closeLabel = 'Close',
   className,
 }: AppColumnHeaderProps) {
-  // Squeezed (the work area's divider folded the column): the layout and close cells stay, sharing the width.
-  const cellClass = cn('border-l border-ods-border', SQUEEZED_SHARED_CELL);
+  // Squeezed (the work area's divider folded the column): the title truncates, the layout and close cells
+  // keep their 56px until there is no room left. The cells are the chat column header's (`COLUMN_HEADER_CELL`).
+  const cellClass = cn(COLUMN_HEADER_CELL, SQUEEZED_KEPT_CELL);
   const layoutLabel = layoutAction ? (layoutActionLabel ?? LAYOUT_LABEL[layoutAction]) : undefined;
   return (
     <div
@@ -80,7 +81,6 @@ export function AppColumnHeader({
         className={cn(
           'flex min-w-0 flex-1 items-center pr-[var(--spacing-system-sf)]',
           leading ? 'pl-[var(--spacing-system-xsf)]' : 'pl-[var(--spacing-system-lf)]',
-          SQUEEZED_SR_ONLY,
         )}
       >
         <span className="min-w-0 truncate text-ods-text-primary text-shell-body">{title}</span>

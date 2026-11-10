@@ -120,6 +120,9 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     expect(screen.getByText('page: squeezed at 360')).toBeInTheDocument();
     expect(screen.getByText('chat: full at 360')).toBeInTheDocument();
     expect(shadow()).toHaveAttribute('data-work-area-shadow', 'page');
+    // The divider's line is the page's `border-l`: the page's shadow starts past it, never over it.
+    expect(shadow()).toHaveClass('left-px');
+    expect(shadow()).not.toHaveClass('left-0');
   });
 
   it('squeezes the chat the other way, and lets go once both fit again', () => {
@@ -254,6 +257,43 @@ describe('AppColumnHeader', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     rerender(<AppColumnHeader title="Devices" layoutAction="restore-split" onLayoutAction={onLayout} />);
     expect(screen.getByRole('button', { name: 'Show side by side' })).toBeInTheDocument();
+  });
+
+  it('draws its cells as the chat column header does: 56px, a 20px primary glyph', () => {
+    render(
+      <AppColumnHeader
+        title="Devices"
+        layoutAction="fullscreen"
+        onLayoutAction={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+    for (const name of ['Full screen', 'Close']) {
+      const cell = screen.getByRole('button', { name });
+      expect(cell).toHaveClass('w-14', 'text-ods-text-primary', '[&_svg]:h-5', '[&_svg]:w-5');
+      expect(cell).not.toHaveClass('w-[var(--top-nav-cell,3.5rem)]', '[&_svg]:h-6');
+    }
+  });
+
+  it('in a squeezed column keeps the title drawn and the square cells, which shrink only out of room', () => {
+    render(
+      <div data-testid="squeezed-column" data-squeezed="" className="group/work-area-page">
+        <AppColumnHeader
+          title="Devices"
+          layoutAction="fullscreen"
+          onLayoutAction={() => undefined}
+          onClose={() => undefined}
+        />
+      </div>,
+    );
+    // The title truncates instead of leaving the cells alone in the bar: nothing is drawn only for assistive tech.
+    expect(screen.getByText('Devices')).toBeInTheDocument();
+    expect(screen.getByTestId('squeezed-column').innerHTML).not.toContain('sr-only');
+    for (const name of ['Full screen', 'Close']) {
+      const cell = screen.getByRole('button', { name });
+      expect(cell).toHaveClass('w-14', 'group-data-[squeezed]/work-area-page:shrink');
+      expect(cell).not.toHaveClass('group-data-[squeezed]/work-area-page:flex-1');
+    }
   });
 });
 
