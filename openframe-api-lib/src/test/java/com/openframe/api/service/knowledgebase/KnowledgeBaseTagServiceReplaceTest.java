@@ -27,12 +27,14 @@ class KnowledgeBaseTagServiceReplaceTest {
 
     private final TagRepository tags = mock(TagRepository.class);
     private final TagAssignmentRepository assignments = mock(TagAssignmentRepository.class);
+    private final KnowledgeBaseItemRepository items = mock(KnowledgeBaseItemRepository.class);
     private final KnowledgeBaseTagService service = new KnowledgeBaseTagService(
-            tags, assignments, mock(KnowledgeBaseItemRepository.class));
+            tags, assignments, items);
 
     @Test
     @DisplayName("replacing tags adds the missing ones, removes the rest and leaves the kept ones alone")
     void replaceAppliesOnlyTheDifference() {
+        when(items.existsById("a1")).thenReturn(true);
         when(tags.existsById("t2")).thenReturn(true);
         when(tags.existsById("t3")).thenReturn(true);
         when(assignments.findByEntityIdAndEntityType("a1", TYPE)).thenReturn(List.of(tagged("t1"), tagged("t2")));

@@ -132,10 +132,7 @@ public class SoftwareBundleService {
         }
         List<SoftwareBundlePackage> packages = toDomainPackages(input.getPackages());
         validatePackages(packages);
-        List<PackageManagerType> managers = managersOf(packages);
-        packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
-        Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
-        rejectDevicesWithoutCompatiblePackage(machineIds, packages, deviceOsTypes);
+        Map<String, OsType> deviceOsTypes = requireEligibleDeviceOsTypes(machineIds, packages);
         PackageUpdateSettings updateSettings = PackageUpdateSettingsMapper.updateSettings(input.getAction(), input.getUpdateSettings());
         SoftwareAutoUpdate autoUpdate = PackageUpdateSettingsMapper.autoUpdate(input.getAction(), input.getAutoUpdate());
 
@@ -166,6 +163,20 @@ public class SoftwareBundleService {
         log.info("Submitted software bundle id={} mode={} action={} devices={} packages={} actor={}",
                 entity.getId(), entity.getMode(), entity.getAction(), machineIds.size(), packages.size(), actor);
         return toResponse(entity);
+    }
+
+    public void requireDeviceEligibility(List<String> machineIds, List<SoftwarePackageInput> packages) {
+        List<SoftwareBundlePackage> requested = toDomainPackages(packages);
+        requireEligibleDeviceOsTypes(machineIds, requested);
+    }
+
+    private Map<String, OsType> requireEligibleDeviceOsTypes(List<String> machineIds,
+                                                           List<SoftwareBundlePackage> packages) {
+        List<PackageManagerType> managers = managersOf(packages);
+        packageManagerAvailability.requireSoftwareManageable(machineIds, managers);
+        Map<String, OsType> deviceOsTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
+        rejectDevicesWithoutCompatiblePackage(machineIds, packages, deviceOsTypes);
+        return deviceOsTypes;
     }
 
     private void writeActionResults(SoftwareBundle bundle, List<SoftwareBundlePackage> packages,
