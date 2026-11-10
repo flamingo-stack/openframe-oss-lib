@@ -61,7 +61,6 @@ use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
-use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
 use crate::services::github_download_service::GithubDownloadService;
@@ -294,12 +293,8 @@ impl Client {
             deactivation_service.clone(),
         );
 
-        // Initialize encryption service
-        let encryption_service = EncryptionService::new();
-
         // Initialize shared token service
-        let shared_token_service =
-            SharedTokenService::new(directory_manager.clone(), encryption_service.clone());
+        let shared_token_service = SharedTokenService::new(directory_manager.clone());
 
         // Initialize authentication service
         let auth_service = AgentAuthService::new(

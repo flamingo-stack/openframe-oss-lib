@@ -202,6 +202,45 @@ jobs:
       - name: Test
         run: make -C clients/openframe-client test
 
+  build-rust-common:
+    name: "Build Rust common (${{ matrix.os }})"
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changes || '{}').rust == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Prepare Rust tools
+        uses: ./.github/steps/rust-setup
+        with:
+          path: clients/openframe-common
+          components: clippy,rustfmt
+          shared-key: openframe-common-${{ matrix.os }}
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack@0.6.46
+
+      - name: Lint (cargo fmt --check + cargo clippy -D warnings)
+        run: make -C clients/openframe-common lint
+
+      - name: Check every feature combination
+        run: make -C clients/openframe-common hack
+
+      - name: Test
+        run: make -C clients/openframe-common test
+
   cleanup:
     name: Cleanup
     if: github.event_name == 'pull_request' && github.event.pull_request.state != 'open'

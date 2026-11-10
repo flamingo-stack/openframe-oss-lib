@@ -3,7 +3,6 @@ use crate::clients::AuthClient;
 use crate::platform::directories::DirectoryManager;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::shared_token_service::SharedTokenService;
-use crate::services::EncryptionService;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use std::sync::Mutex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -319,7 +318,7 @@ async fn registered_manager(dir: &tempfile::TempDir, base_url: String) -> TokenR
         .unwrap();
     let deactivation = DeactivationService::new(&dm);
     let auth_client = AuthClient::new(base_url, reqwest::Client::new(), deactivation.clone());
-    let shared = SharedTokenService::new(dm, EncryptionService::new());
+    let shared = SharedTokenService::new(dm);
     let auth = AgentAuthService::new(auth_client, config, shared);
     TokenRefreshRunManager::new(auth, deactivation).with_timing(FAST)
 }

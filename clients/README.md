@@ -14,10 +14,14 @@ clients/
 ├── Makefile            # hook setup only: `make -C clients setup-hooks`
 ├── rustfmt.toml        # formatting config (applies to every crate below it)
 ├── .githooks/          # pre-commit (fmt) + pre-push (clippy)
-└── openframe-client/   # the standalone library crate (openframe-agent-lib)
-    ├── Cargo.toml      # incl. [lints.clippy] policy
+├── openframe-client/   # the standalone library crate (openframe-agent-lib)
+│   ├── Cargo.toml      # incl. [lints.clippy] policy
+│   ├── Cargo.lock
+│   └── Makefile        # fmt / fmt-check / clippy / lint / build / test
+└── openframe-common/   # code shared by the agent and the desktop apps
+    ├── Cargo.toml      # opt-in parts behind cargo features
     ├── Cargo.lock
-    └── Makefile        # fmt / fmt-check / clippy / lint / build / test
+    └── Makefile        # fmt / fmt-check / clippy / lint / hack / test
 ```
 
 ## One-time setup
@@ -29,12 +33,13 @@ make -C clients setup-hooks
 
 This enables the committed git hooks:
 
-- **pre-commit** → `cargo fmt --all -- --check` (fails on unformatted Rust).
-- **pre-push** → `cargo clippy --all-targets -- -D warnings`.
+- **pre-commit** → `cargo fmt --all -- --check` in each crate with staged Rust.
+- **pre-push** → `make clippy` in every crate (`-D warnings`).
 
-Both hooks only fire when the change touches the Rust client, and skip cleanly
-if `cargo` is not installed, so they do not get in the way of Java-only work.
-CI (`.github/workflows/rust-client.yml`) runs the same gate authoritatively.
+Both hooks only fire when the change touches Rust under `clients/`, and skip
+cleanly if `cargo` (or `make`, for pre-push) is not installed, so they do not get
+in the way of Java-only work. CI (`.github/workflows/build.yml`) runs the same
+gate authoritatively.
 
 Requires a stable Rust toolchain (`rustup` recommended) with the `rustfmt` and
 `clippy` components.
