@@ -487,6 +487,10 @@ export { copyrightLine } from './copyright-line';
 export * from './path-pattern';
 export * from './random-id';
 export * from './demo-clock';
+// THE motion vocabulary (easings, durations, stagger, idle drift).
+export * from './motion';
+// The clock of a scripted scene with overlapping beats (pausable schedule + one registry of element animations).
+export * from './motion-timeline';
 export * from './identity-tint';
 export { createFenceTracker, isBlankLine } from './markdown-fences';
 export type { FenceTracker, FenceLineRole } from './markdown-fences';

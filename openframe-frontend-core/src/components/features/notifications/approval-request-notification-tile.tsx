@@ -8,7 +8,9 @@ import { useCollapsible } from '../../chat/hooks/use-collapsible';
 import { PolicyEscalationAlert, isPolicyEscalated } from '../../chat/policy-review';
 import type { ChatApprovalStatus } from '../../chat/types';
 import { AlertCircleIcon } from '../../icons-v2-generated';
+import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
+import { useLoadingScope } from '../../ui/loading-scope';
 import {
   APPROVAL_BUTTON_CLASS,
   APPROVAL_TOGGLE_BUTTON_CLASS,
@@ -38,8 +40,12 @@ export interface ApprovalRequestNotificationTileProps {
   /**
    * `lockscreen`: the approval as a phone shows it (see `NotificationTile`):
    * two compact buttons and no command drawer.
+   * `row`: the lockscreen look in ONE line, for a surface too small for a tile (a scene in a page's margin): the
+   * agent's mark (its `type`, "Mingo asks", is the mark's accessible name), the title, then Approve and Reject, or
+   * once resolved the status. The row keeps its left edge, so the title never moves when its buttons become the
+   * status. No description, no time, no command drawer.
    */
-  presentation?: 'card' | 'lockscreen';
+  presentation?: 'card' | 'lockscreen' | 'row';
   /**
    * Show Approve as being pressed (a scripted demo's "the tap lands" beat):
    * the button dims for as long as this is true. No effect once resolved.
@@ -63,6 +69,158 @@ export function ApprovalRequestNotificationTile({
   approvePressed = false,
   timeLabel,
 }: ApprovalRequestNotificationTileProps) {
+  if (presentation === 'row') {
+    return (
+      <ApprovalRequestRow
+        notification={notification}
+        onApprove={onApprove}
+        onReject={onReject}
+        onComplete={onComplete}
+        approvePressed={approvePressed}
+        className={className}
+      />
+    );
+  }
+  return (
+    <ApprovalRequestTile
+      notification={notification}
+      onApprove={onApprove}
+      onReject={onReject}
+      onComplete={onComplete}
+      onSettle={onSettle}
+      liveDurationMs={liveDurationMs}
+      defaultExpanded={defaultExpanded}
+      className={className}
+      titleLines={titleLines}
+      presentation={presentation}
+      approvePressed={approvePressed}
+      timeLabel={timeLabel}
+    />
+  );
+}
+
+/** The row's frame: the lockscreen tile's corners, border and surface, around one line. Shared with its skeleton. */
+export const APPROVAL_ROW_CLASS =
+  'inline-flex max-w-full items-center gap-[var(--spacing-system-xs)] whitespace-nowrap rounded-2xl border border-ods-border bg-ods-card py-[var(--spacing-system-xs)] pl-[var(--spacing-system-s)] pr-[var(--spacing-system-xs)] text-h6';
+
+/** The row's two buttons: compact, their own width. */
+const APPROVAL_ROW_BUTTON_CLASS = 'shrink-0';
+
+type ApprovalRowProps = Pick<
+  ApprovalRequestNotificationTileProps,
+  'notification' | 'onApprove' | 'onReject' | 'onComplete' | 'approvePressed' | 'className'
+>;
+
+/** `presentation="row"`: ONE switch, in a loading scope its own loading form. */
+function ApprovalRequestRow(props: ApprovalRowProps) {
+  if (useLoadingScope()) return <ApprovalRequestRowSkeleton className={props.className} />;
+  return <LoadedApprovalRequestRow {...props} />;
+}
+
+function LoadedApprovalRequestRow({
+  notification,
+  onApprove,
+  onReject,
+  onComplete,
+  approvePressed = false,
+  className,
+}: ApprovalRowProps) {
+  const [processing, setProcessing] = useState(false);
+  const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null);
+  const approval = getApprovalMeta(notification);
+  if (!approval) return null;
+  const resolvedStatus = resolutionToStatus(approval.resolution);
+  const status: ChatApprovalStatus = resolvedStatus !== 'pending' ? resolvedStatus : (localStatus ?? 'pending');
+  const label = notification.type ?? 'Approval Required';
+
+  const resolve = async (
+    nextStatus: 'approved' | 'rejected',
+    action: (approvalRequestId: string) => void | Promise<void>,
+  ) => {
+    setProcessing(true);
+    setLocalStatus(nextStatus);
+    try {
+      await action(approval.approvalRequestId);
+    } catch {
+      setLocalStatus(null);
+      return;
+    } finally {
+      setProcessing(false);
+    }
+    onComplete?.(notification.id);
+  };
+
+  return (
+    <output className={cn(APPROVAL_ROW_CLASS, className)} aria-label={label}>
+      <span role="img" aria-label={label} className="flex size-4 shrink-0 items-center justify-center">
+        {notification.icon ?? <span className="size-1.5 rounded-full bg-ods-accent" />}
+      </span>
+      {notification.title ? <span className="min-w-0 truncate text-ods-text-primary text-h6">{notification.title}</span> : null}
+      {status === 'pending' ? (
+        <span className="flex shrink-0 items-center gap-[var(--spacing-system-xxs)]">
+          <Button
+            variant="accent"
+            size="small"
+            onClick={() => resolve('approved', onApprove)}
+            disabled={processing}
+            data-pressed={approvePressed || undefined}
+            className={cn(
+              APPROVAL_ROW_BUTTON_CLASS,
+              'transition-[filter,transform] duration-200 motion-reduce:transition-none',
+              approvePressed && 'scale-[0.98] brightness-75',
+            )}
+          >
+            Approve
+          </Button>
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => resolve('rejected', onReject)}
+            disabled={processing}
+            className={APPROVAL_ROW_BUTTON_CLASS}
+          >
+            Reject
+          </Button>
+        </span>
+      ) : (
+        <span className="shrink-0 pr-[var(--spacing-system-xxs)]">
+          <ApprovalStatusTag status={status} />
+        </span>
+      )}
+    </output>
+  );
+}
+
+/** The row while it is read, box for box: the frame, the mark, a title's line and the two buttons. */
+export function ApprovalRequestRowSkeleton({ className }: { className?: string }) {
+  return (
+    <output aria-hidden className={cn(APPROVAL_ROW_CLASS, className)}>
+      <UnifiedSkeleton as="span" width="1rem" className="h-4 shrink-0 rounded-full" />
+      <TextLineSkeleton as="span" type="h6" className="w-32" />
+      <InteractiveSkeleton.Button size="small" className="w-20" />
+      <InteractiveSkeleton.Button size="small" className="w-16" />
+    </output>
+  );
+}
+
+type ApprovalTileProps = Omit<ApprovalRequestNotificationTileProps, 'presentation'> & {
+  presentation: 'card' | 'lockscreen';
+};
+
+function ApprovalRequestTile({
+  notification,
+  onApprove,
+  onReject,
+  onComplete,
+  onSettle,
+  liveDurationMs,
+  defaultExpanded = false,
+  className,
+  titleLines,
+  presentation,
+  approvePressed = false,
+  timeLabel,
+}: ApprovalTileProps) {
   const lockscreen = presentation === 'lockscreen';
   const [expanded, setExpanded] = useState(defaultExpanded);
   // Toggling the command section pins the tile so a live pop-up doesn't
