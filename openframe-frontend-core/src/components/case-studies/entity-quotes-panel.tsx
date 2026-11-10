@@ -6,7 +6,7 @@ import { StackedRowsPanel } from '../ui';
 import { useLoadingScope } from '../ui/loading-scope';
 
 export interface EntityQuotesPanelProps {
-  /** A record's `quotes` column (case study, customer interview, prospect call). */
+  /** A record's `quotes` column (case study, customer interview, recorded call). */
   quotes: readonly EntityQuote[] | null | undefined;
   className?: string;
 }
