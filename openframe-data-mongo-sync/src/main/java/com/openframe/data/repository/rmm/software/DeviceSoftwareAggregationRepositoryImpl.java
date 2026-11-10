@@ -1,7 +1,6 @@
 package com.openframe.data.repository.rmm.software;
 
 import com.openframe.data.document.rmm.software.DeviceSoftware;
-import com.openframe.data.document.rmm.software.Software;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
@@ -41,14 +40,11 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                         .append("systemComponentReported", new Document("$sum", new Document("$cond",
                                 List.of(new Document("$eq", List.of(new Document("$type", "$systemComponent"), "bool")), 1, 0))))
                         .append("systemComponentSet", new Document("$sum", new Document("$cond",
-                                List.of(new Document("$eq", List.of("$systemComponent", true)), 1, 0))))
-                        .append("installations", new Document("$push", new Document("machineId", "$machineId")
-                                .append("versions", "$versions"))));
+                                List.of(new Document("$eq", List.of("$systemComponent", true)), 1, 0)))));
         Document summaryProject = new Document("$project", new Document("_id", 0)
                         .append("devicesCount", 1)
                         .append("name", 1)
                         .append("source", 1)
-                        .append("installations", 1)
                         .append("systemComponentReported", 1)
                         .append("systemComponentSet", 1)
                         .append("vendor", new Document("$arrayElemAt", List.of("$vendors", 0)))
@@ -128,22 +124,10 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
         int reported = intValue(doc.get("systemComponentReported"));
         int set = intValue(doc.get("systemComponentSet"));
         boolean systemComponent = reported > 0 && reported == set;
-        List<Software.Installation> installations = doc.getList("installations", Document.class, List.of()).stream()
-                .map(DeviceSoftwareAggregationRepositoryImpl::toInstallation)
-                .toList();
         Map<String, Integer> devicesByVersion = versionCounts.stream()
                 .collect(Collectors.toMap(count -> count.getString("_id"), count -> intValue(count.get("devices"))));
         return new SoftwareTitleRollup(devicesCount, name, source, vendor, upgradeCode, versions, cveCount,
-                arpKeys, packageFamilyNames, installerTypes, systemComponent, devicesByVersion, installations);
-    }
-
-    private static Software.Installation toInstallation(Document installation) {
-        String machineId = installation.getString("machineId");
-        List<String> versions = installation.getList("versions", String.class);
-        return Software.Installation.builder()
-                .machineId(machineId)
-                .versions(versions)
-                .build();
+                arpKeys, packageFamilyNames, installerTypes, systemComponent, devicesByVersion);
     }
 
     private static CveRollup toCveRollup(Document doc) {
@@ -161,7 +145,8 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
         String source = title.getString("source");
         String installedVersion = title.getString("installedVersion");
         int devicesCount = intValue(title.get("devicesCount"));
-        return new CveRollup.Title(softwareTitleId.longValue(), name, source, installedVersion, devicesCount);
+        long titleId = softwareTitleId.longValue();
+        return new CveRollup.Title(titleId, name, source, installedVersion, devicesCount);
     }
 
     private static List<String> strings(Document doc, String field) {

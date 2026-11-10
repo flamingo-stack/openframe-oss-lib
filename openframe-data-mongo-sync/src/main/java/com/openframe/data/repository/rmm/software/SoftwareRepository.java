@@ -21,8 +21,6 @@ public interface SoftwareRepository extends MongoRepository<Software, String> {
 
     List<Software> findByTenantIdAndSoftwareTitleIdIn(String tenantId, Collection<Long> softwareTitleIds);
 
-    List<Software> findByTenantIdAndInstallationsMachineId(String tenantId, String machineId);
-
     Page<Software> findByTenantIdAndDevicesCountGreaterThan(String tenantId, int min, Pageable pageable);
 
     Page<Software> findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(

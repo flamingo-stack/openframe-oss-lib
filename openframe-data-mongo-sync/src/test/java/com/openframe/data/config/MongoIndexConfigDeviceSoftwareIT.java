@@ -1,6 +1,7 @@
 package com.openframe.data.config;
 
 import com.openframe.data.document.rmm.software.DeviceSoftware;
+import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.integration.BaseMongoIntegrationTest;
 import com.openframe.data.integration.support.RmmIntegrationTestApplication;
 import org.bson.Document;
@@ -25,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MongoIndexConfigDeviceSoftwareIT extends BaseMongoIntegrationTest {
 
     private static final String COLLECTION = "device_software";
+    private static final String SOFTWARE = "software";
 
     @Autowired private MongoTemplate mongoTemplate;
 
@@ -43,6 +45,13 @@ class MongoIndexConfigDeviceSoftwareIT extends BaseMongoIntegrationTest {
                 new CompoundIndexDefinition(
                         new Document("tenantId", 1).append("softwareTitleId", 1).append("machineConnected", 1)
                                 .append("machineId", 1)).named("tenant_title_connected"));
+        mongoTemplate.dropCollection(Software.class);
+        mongoTemplate.indexOps(Software.class).createIndex(
+                new CompoundIndexDefinition(
+                        new Document("tenantId", 1).append("installations.machineId", 1)).named("installations_machine"));
+        mongoTemplate.indexOps(Software.class).createIndex(
+                new CompoundIndexDefinition(
+                        new Document("tenantId", 1).append("devicesCount", -1)).named("tenant_devices"));
         config = new MongoIndexConfig();
         ReflectionTestUtils.setField(config, "mongoTemplate", mongoTemplate);
     }
@@ -55,14 +64,26 @@ class MongoIndexConfigDeviceSoftwareIT extends BaseMongoIntegrationTest {
     }
 
     @Test
+    void initIndexes_dropsTheSoftwareInstallationsIndex_keepsTheOthers() {
+        config.initIndexes();
+
+        assertThat(indexNames(SOFTWARE)).doesNotContain("installations_machine").contains("tenant_devices");
+    }
+
+    @Test
     void initIndexes_twice_doesNotFailWhenTheIndexesAreAlreadyGone() {
         config.initIndexes();
         config.initIndexes();
 
         assertThat(indexNames()).doesNotContain("tenant_title", "tenant_vuln");
+        assertThat(indexNames(SOFTWARE)).doesNotContain("installations_machine");
     }
 
     private List<String> indexNames() {
-        return mongoTemplate.indexOps(COLLECTION).getIndexInfo().stream().map(IndexInfo::getName).toList();
+        return indexNames(COLLECTION);
+    }
+
+    private List<String> indexNames(String collection) {
+        return mongoTemplate.indexOps(collection).getIndexInfo().stream().map(IndexInfo::getName).toList();
     }
 }
