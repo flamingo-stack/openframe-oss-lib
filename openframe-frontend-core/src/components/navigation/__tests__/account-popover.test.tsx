@@ -104,6 +104,21 @@ describe('AccountPopover', () => {
     expect(nameHidden()).toBe(false);
   });
 
+  it('is the avatar alone with avatarOnly at full width: named, its name and email in the menu header, opening upward', async () => {
+    render(<AccountPopover avatarOnly name="Ada Lovelace" email="ada@example.com" items={entries()} />);
+    const trigger = screen.getByRole('button', { name: 'Account: Ada Lovelace' });
+    expect(trigger).toHaveAttribute('title', 'Ada Lovelace');
+    // A square around the avatar, not the row's full width; the name's column taken out.
+    expect(trigger).toHaveClass('size-8', 'justify-center');
+    expect(trigger).not.toHaveClass('w-full');
+    expect(/class="[^"]*\bflex-1\b[^"]*\bhidden\b/.test(document.body.innerHTML)).toBe(true);
+
+    const menu = await openMenu(trigger);
+    expect(menu).toHaveTextContent('Ada Lovelace');
+    expect(menu).toHaveTextContent('ada@example.com');
+    expect(menu).toHaveAttribute('data-side', 'top');
+  });
+
   it("puts an item's unread count on its icon, and the unread dot on the avatar", async () => {
     const hasDot = () =>
       /class="[^"]*\bbg-ods-warning\b/.test(screen.getByRole('button', { name: /Ada Lovelace/ }).innerHTML);
