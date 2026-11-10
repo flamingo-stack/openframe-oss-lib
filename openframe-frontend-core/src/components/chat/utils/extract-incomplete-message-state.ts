@@ -3,6 +3,7 @@
  * Used to continue building messages across realtime connections
  */
 
+import { keptPolicyReview } from '../../../chat-protocol/policy-review';
 import type { InitializeExtras } from '../stream/chat-stream-reducer';
 import type { ProcessedMessage, MessageSegment, PendingApproval, ExecutingToolState } from '../types';
 
@@ -51,6 +52,7 @@ export function extractIncompleteMessageState(
             toolFunction: segment.data.toolFunction,
             toolTitle: segment.data.toolTitle,
             toolExplanation: segment.data.toolExplanation,
+            ...keptPolicyReview(segment.data.policyReview),
             parameters: segment.data.parameters,
           });
           hasIncompleteState = true;

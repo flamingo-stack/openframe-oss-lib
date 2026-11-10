@@ -47,7 +47,7 @@ class SsoFlowCookiesTest {
         AuthStateUtils.clearOtherSsoFlowCookies(response, SsoFlowCookieNames.OF_SSO_INVITE);
 
         assertThat(clearedNames(response))
-                .containsExactlyInAnyOrder(SsoFlowCookieNames.OF_SSO_REG, SsoFlowCookieNames.OF_SSO_LOGIN);
+                .containsExactly(SsoFlowCookieNames.OF_SSO_LOGIN);
     }
 
     @Test

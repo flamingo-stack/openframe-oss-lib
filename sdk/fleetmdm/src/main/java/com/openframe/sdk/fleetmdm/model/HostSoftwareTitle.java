@@ -12,7 +12,11 @@ public class HostSoftwareTitle {
 
     private Long id;
     private String name;
+    @JsonProperty("bundle_identifier")
+    private String bundleIdentifier;
     private String source;
+    @JsonProperty("upgrade_code")
+    private String upgradeCode;
 
     @JsonProperty("installed_versions")
     private List<HostSoftwareInstalledVersion> installedVersions;

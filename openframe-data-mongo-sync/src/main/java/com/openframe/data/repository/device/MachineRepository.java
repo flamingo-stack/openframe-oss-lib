@@ -5,7 +5,10 @@ import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -26,6 +29,11 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     List<Machine> findByMachineIdIn(Collection<String> machineIds);
 
     List<Machine> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds);
+
+    Page<Machine> findByTenantIdAndMachineIdIn(String tenantId, Collection<String> machineIds, Pageable pageable);
+
+    Page<Machine> findByTenantIdAndMachineIdInAndHostnameContainingIgnoreCase(
+            String tenantId, Collection<String> machineIds, String hostname, Pageable pageable);
 
     List<Machine> findByTenantIdAndOsUuidIn(String tenantId, Collection<String> osUuids);
 
@@ -58,4 +66,8 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
     boolean existsByOrganizationId(String organizationId);
 
     boolean existsByOrganizationIdAndStatusNotIn(String organizationId, Collection<DeviceStatus> statuses);
+
+    // Only the names of a reconcile batch's machines, across tenants; only the shared stream calls it.
+    @Query(fields = "{ 'tenantId': 1, 'machineId': 1, 'hostname': 1, 'nickname': 1 }")
+    List<Machine> findByTenantIdInAndMachineIdIn(Collection<String> tenantIds, Collection<String> machineIds);
 }

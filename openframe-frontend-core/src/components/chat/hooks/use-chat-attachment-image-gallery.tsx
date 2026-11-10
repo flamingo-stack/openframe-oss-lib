@@ -11,8 +11,9 @@
  *     while closed.
  *
  * Behavior on click:
- *   1. Filter for `<img>` whose `src` starts with the runtime's
- *      `attachmentViewUrlPrefix` (so non-chat images don't intercept).
+ *   1. Filter for `<img>` whose address (`assetSrcOf`) starts with the
+ *      runtime's `attachmentViewUrlPrefix` (so non-chat images don't
+ *      intercept).
  *   2. Walk up to the nearest `[data-message-role]` ancestor — the
  *      boundary the chat-shell wraps each message bubble with.
  *   3. Collect ALL chat-attachment `<img>`s inside that boundary in
@@ -51,32 +52,32 @@ export function useChatAttachmentImageGallery() {
     const onClick = (ev: Event) => {
       const target = ev.target as HTMLElement | null;
       if (!target) return;
-      // Match an <img> whose `src` starts with the proxy URL prefix.
+      // Match an <img> whose address starts with the proxy URL prefix.
       const img = target.closest('img');
-      if (!img || !img.src.startsWith(absolutize(viewUrlPrefix))) return;
+      if (!img || !assetSrcOf(img).startsWith(absolutize(viewUrlPrefix))) return;
 
       // Walk up to the message-bubble boundary.
       const bubble = img.closest('[data-message-role]');
       if (!bubble) {
         // Fallback: open the modal with just the clicked image.
         ev.preventDefault();
-        setState({ isOpen: true, images: [img.src], initialIndex: 0 });
+        setState({ isOpen: true, images: [assetSrcOf(img)], initialIndex: 0 });
         return;
       }
 
       // Collect all chat-attachment images inside this bubble in DOM
-      // order. The `closest` lookup matched img.src.startsWith already,
+      // order. The `closest` lookup matched the clicked one's address already,
       // but we re-check below because `querySelectorAll` returns ALL
       // <img>s in the bubble (avatar images etc.).
       const allImgs = Array.from(bubble.querySelectorAll('img'));
-      const matching = allImgs.filter(el => el.src.startsWith(absolutize(viewUrlPrefix)));
+      const matching = allImgs.filter(el => assetSrcOf(el).startsWith(absolutize(viewUrlPrefix)));
       if (matching.length === 0) return;
 
       const idx = Math.max(0, matching.indexOf(img));
       ev.preventDefault();
       setState({
         isOpen: true,
-        images: matching.map(el => el.src),
+        images: matching.map(assetSrcOf),
         initialIndex: idx,
       });
     };
@@ -111,4 +112,14 @@ function absolutize(prefix: string): string {
   if (prefix.startsWith('http://') || prefix.startsWith('https://')) return prefix;
   if (typeof window === 'undefined') return prefix;
   return `${window.location.origin}${prefix.startsWith('/') ? '' : '/'}${prefix}`;
+}
+
+/**
+ * The address an `<img>` was asked to draw. Where auth rides in a header, the boxed `Image` draws a blob fetched
+ * with it and keeps the address in `data-asset-src`: `.src` would be `blob:…`, matching no prefix, and the gallery
+ * would never open in the native shells. Resolved against the page, as `.src` is: on dev-ticket web it is relative.
+ */
+function assetSrcOf(img: HTMLImageElement): string {
+  const declared = img.dataset.assetSrc;
+  return declared ? new URL(declared, window.location.href).href : img.src;
 }

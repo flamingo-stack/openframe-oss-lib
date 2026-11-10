@@ -29,6 +29,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   // Doc tables
   'openframe-docs': 'openframe',
   'data-room-docs': 'shield',
+  'company-policies': 'book-open',
 
   // CMS / programs
   'blog-posts': 'newspaper',
@@ -136,6 +137,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   // Doc tables
   'openframe-docs': 'OpenFrame Docs',
   'data-room-docs': 'Data Room',
+  'company-policies': 'Company Policies',
 
   // CMS / programs
   'blog-posts': 'Blog Posts',
@@ -197,7 +199,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   // Product-hub internal
   'design-docs': 'Design Docs',
   'openframe-tenants': 'OpenFrame Tenants',
-  'prospect-calls': 'Prospect calls',
+  'prospect-calls': 'Recorded calls',
 
   // Code intelligence
   'code-rules': 'Code Rules',
@@ -242,6 +244,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   // Doc tables
   markdown: 'openframe-docs',
   data_room_doc: 'data-room-docs',
+  policy_doc: 'company-policies',
 
   // CMS / programs
   blog_post: 'blog-posts',

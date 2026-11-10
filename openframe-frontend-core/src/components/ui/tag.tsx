@@ -201,6 +201,20 @@ function isEmptyTagLabel(label: React.ReactNode): boolean {
   return label == null || label === false || (typeof label === 'string' && label.trim() === '');
 }
 
+/** The tones a badge colour keeps when it is drawn as a tag. */
+const BADGE_COLOR_TAG_TONES = ['success', 'warning', 'error'] as const;
+
+/**
+ * THE tag variant for a badge colour that is data (a `StatusBadge` colour scheme a vocabulary row stores): the three
+ * semantic tones carry over, every other colour reads grey. Every card that draws such a colour as a tag reads it
+ * here, so a status is the same tone in a badge and in a chat card.
+ */
+export function tagVariantForBadgeColor(
+  color: string | null | undefined,
+): (typeof BADGE_COLOR_TAG_TONES)[number] | 'grey' {
+  return BADGE_COLOR_TAG_TONES.find(tone => tone === color) ?? 'grey';
+}
+
 export { Tag, tagVariants };
 
 /**

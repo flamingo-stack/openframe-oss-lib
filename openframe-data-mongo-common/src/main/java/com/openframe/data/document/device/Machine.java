@@ -8,6 +8,7 @@ import lombok.Data;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
@@ -39,11 +40,13 @@ public class Machine implements TenantScoped {
     private String organizationId;
     private String userId;      // User who installed the agent; optional, absent for older registrations
     private String hostname;
+    private String computerName;    // Fleet computer_name, filled where blank; not exposed in GraphQL
     private String displayName;
     private String nickname;
     private String serialNumber;
     private String manufacturer;
     private String model;
+    private Instant hostFactsCheckedAt;   // last time the Fleet host facts backfill tried this machine; null = never
     @Indexed
     private DeviceType type;
     @Indexed
@@ -58,10 +61,17 @@ public class Machine implements TenantScoped {
     private Instant lastSecurityScan;
     private Instant lastComplianceScan;
     private List<ComplianceRequirement> complianceRequirements;
+    // Directory summary of the machine's linked directory records. Only an external directory integration writes it,
+    // so it stays null in OSS, and GraphQL reads null as [] / NONE.
+    private List<DirectorySource> directorySources;
+    private DirectoryUserLink directoryUserLink;
+    private List<String> directoryUserIds;      // directory account ids, the primary user first
+    private String directoryUserName;           // display name of the user when PRIMARY
     @CreatedDate
     private Instant registeredAt;  // When device was first registered (replaces createdAt)
     @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
-    private Long version = 0L;
+    @Version
+    private Long version;
 }

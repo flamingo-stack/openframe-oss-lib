@@ -1,5 +1,6 @@
 package com.openframe.api.relay;
 
+import com.openframe.api.dto.device.MachineTag;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionResponse;
 import com.openframe.api.dto.rmm.schedule.ScriptScheduleResponse;
@@ -63,6 +64,12 @@ public class ApiNodeLoaderConfiguration {
     @Bean
     public NodeLoader<Tag> tagNodeLoader(TagService tagService) {
         return LookupNodeLoader.byRawId(NodeType.TAG, Tag.class, tagService::findById);
+    }
+
+    @Bean
+    public NodeLoader<MachineTag> machineTagNodeLoader(TagService tagService) {
+        return LookupNodeLoader.byRawId(NodeType.MACHINE_TAG, MachineTag.class,
+                rawId -> findMachineTag(tagService, rawId));
     }
 
     @Bean
@@ -147,6 +154,12 @@ public class ApiNodeLoaderConfiguration {
         TicketService service = ticketService.getIfAvailable();
         return Optional.ofNullable(service)
                 .flatMap(tickets -> tickets.getTicket(principal, rawId));
+    }
+
+    private static Optional<MachineTag> findMachineTag(TagService tagService, String rawId) {
+        List<String> ids = List.of(rawId);
+        List<MachineTag> machineTags = tagService.getMachineTagsByIds(ids);
+        return machineTags.stream().findFirst();
     }
 
     private static Optional<UserResponse> findUser(UserService userService, String rawId) {

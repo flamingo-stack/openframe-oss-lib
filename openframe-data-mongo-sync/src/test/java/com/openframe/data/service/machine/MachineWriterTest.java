@@ -1,24 +1,44 @@
 package com.openframe.data.service.machine;
 
 import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.repository.device.publishing.MachineAggregateSpec;
+import com.openframe.data.repository.device.publishing.MachineEvent;
+import com.openframe.publishing.api.OutboxPublisher;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
+import static com.openframe.data.service.machine.MachineFields.COMPUTER_NAME;
+import static com.openframe.data.service.machine.MachineFields.DIRECTORY_SOURCES;
+import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_IDS;
+import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_LINK;
+import static com.openframe.data.service.machine.MachineFields.DIRECTORY_USER_NAME;
 import static com.openframe.data.service.machine.MachineFields.LAST_SEEN;
+import static com.openframe.data.service.machine.MachineFields.MANUFACTURER;
+import static com.openframe.data.service.machine.MachineFields.MODEL;
 import static com.openframe.data.service.machine.MachineFields.NICKNAME;
+import static com.openframe.data.service.machine.MachineFields.OS_UUID;
+import static com.openframe.data.service.machine.MachineFields.SERIAL_NUMBER;
 import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,7 +58,13 @@ class MachineWriterTest {
     @BeforeEach
     void setUp() {
         template = mock(MongoTemplate.class);
-        writer = new MachineWriter(template);
+        writer = new MachineWriter(template, absent(), absent());
+    }
+
+    // Publishing off: no OutboxPublisher bean.
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> absent() {
+        return mock(ObjectProvider.class);
     }
 
     private void storedDocumentIs(Machine machine) {
@@ -161,5 +187,106 @@ class MachineWriterTest {
         assertThat(writer.update("m1", machineUpdate())).isEmpty();
 
         verifyNoInteractions(template);
+    }
+
+    @Test
+    @DisplayName("hardware facts and the directory summary are writable fields: each lands in $set under its own path and on the after image")
+    void writesHardwareAndDirectoryFields() {
+        storedDocumentIs(new Machine());
+
+        MachineWriteResult result = writer.update("m1", machineUpdate()
+                        .set(SERIAL_NUMBER, "C02XG2JHJG5H")
+                        .set(MODEL, "MacBookPro18,3")
+                        .set(MANUFACTURER, "Apple Inc.")
+                        .set(OS_UUID, "6F1A2B3C-0000-4D5E-8F90-123456789ABC")
+                        .set(COMPUTER_NAME, "Jane's MacBook Pro")
+                        .set(DIRECTORY_SOURCES, List.of(DirectorySource.MICROSOFT_365))
+                        .set(DIRECTORY_USER_LINK, DirectoryUserLink.PRIMARY)
+                        .set(DIRECTORY_USER_IDS, List.of("acc-1"))
+                        .set(DIRECTORY_USER_NAME, "Jane Doe"))
+                .orElseThrow();
+
+        assertThat(setClause(capturedUpdate())).containsOnlyKeys("serialNumber", "model", "manufacturer", "osUuid",
+                "computerName", "directorySources", "directoryUserLink", "directoryUserIds", "directoryUserName",
+                "updatedAt");
+        Machine after = result.after();
+        assertThat(after).extracting(Machine::getSerialNumber, Machine::getModel, Machine::getManufacturer,
+                        Machine::getOsUuid, Machine::getComputerName)
+                .containsExactly("C02XG2JHJG5H", "MacBookPro18,3", "Apple Inc.",
+                        "6F1A2B3C-0000-4D5E-8F90-123456789ABC", "Jane's MacBook Pro");
+        assertThat(after).extracting(Machine::getDirectorySources, Machine::getDirectoryUserLink,
+                        Machine::getDirectoryUserIds, Machine::getDirectoryUserName)
+                .containsExactly(List.of(DirectorySource.MICROSOFT_365), DirectoryUserLink.PRIMARY,
+                        List.of("acc-1"), "Jane Doe");
+    }
+
+    @Test
+    @DisplayName("clearing the directory summary writes explicit nulls, so a machine whose links went away reads as NONE again")
+    void clearsDirectoryFields() {
+        storedDocumentIs(new Machine());
+
+        writer.update("m1", machineUpdate()
+                .set(DIRECTORY_SOURCES, null)
+                .set(DIRECTORY_USER_LINK, null)
+                .set(DIRECTORY_USER_IDS, null)
+                .set(DIRECTORY_USER_NAME, null));
+
+        assertThat(setClause(capturedUpdate()))
+                .containsEntry("directorySources", null)
+                .containsEntry("directoryUserLink", null)
+                .containsEntry("directoryUserIds", null)
+                .containsEntry("directoryUserName", null);
+    }
+
+    // Heartbeat and status writes change no copied name, so they stay out of the outbox transaction.
+    @Test
+    void aStatusWrite_isNotPublished_evenWithPublishingOn() {
+        OutboxPublisher publisher = mock(OutboxPublisher.class);
+        MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
+        ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
+        ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider);
+        Machine stored = new Machine();
+        storedDocumentIs(stored);
+
+        publishingWriter.update("m1", machineUpdate().set(STATUS, DeviceStatus.OFFLINE));
+
+        verifyNoInteractions(publisher);
+        capturedUpdate();
+    }
+
+    @Test
+    void aNicknameWrite_isPublishedForTheMachinesDocument() {
+        OutboxPublisher publisher = mock(OutboxPublisher.class);
+        MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
+        ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
+        ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider);
+        Machine stored = new Machine();
+        stored.setId("doc-1");
+        when(template.findOne(any(Query.class), eq(Machine.class))).thenReturn(stored);
+
+        publishingWriter.update("m1", machineUpdate().set(NICKNAME, "Reception iMac"));
+
+        verify(publisher).publishChangedByIds(eq(spec), eq(List.of("doc-1")), any());
+    }
+
+    // A field added to MachineEvent must be added to EVENT_PATHS too, or its writes would not be published.
+    @Test
+    void theEventPaths_areTheFieldsOfMachineEvent_butTheId() {
+        Set<String> eventFields = Arrays.stream(MachineEvent.class.getDeclaredFields())
+                .filter(field -> !Modifier.isStatic(field.getModifiers()))
+                .map(Field::getName)
+                .filter(name -> !name.equals("machineId"))
+                .collect(Collectors.toSet());
+
+        assertThat(MachineWriter.EVENT_PATHS).isEqualTo(eventFields);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> present(T bean) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(bean);
+        return provider;
     }
 }
