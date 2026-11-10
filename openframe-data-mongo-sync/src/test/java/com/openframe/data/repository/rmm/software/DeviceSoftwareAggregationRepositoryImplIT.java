@@ -170,6 +170,28 @@ class DeviceSoftwareAggregationRepositoryImplIT extends BaseMongoIntegrationTest
         assertThat(firefox.installedVersion()).isEqualTo("5.0");
     }
 
+    @Test
+    @DisplayName("cve machines: each connected machine of this tenant once, whatever the number of its affected titles")
+    void cveMachines_distinctConnectedMachinesOfTheTenant() {
+        save(row(TENANT, "m1", CHROME).vulnerabilities(List.of("CVE-1")).build());
+        save(row(TENANT, "m1", FIREFOX).vulnerabilities(List.of("CVE-1", "CVE-2")).build());
+        save(row(TENANT, "m2", CHROME).vulnerabilities(List.of("CVE-1")).build());
+        save(row(TENANT, "m3", CHROME).vulnerabilities(List.of("CVE-1")).machineConnected(false).build());
+        save(row(TENANT, "m4", FIREFOX).vulnerabilities(List.of("CVE-2")).build());
+        save(row(OTHER_TENANT, "m9", CHROME).vulnerabilities(List.of("CVE-1")).build());
+
+        assertThat(repository.machineIdsWithCve(TENANT, "CVE-1")).containsExactlyInAnyOrder("m1", "m2");
+    }
+
+    @Test
+    @DisplayName("cve machines: no connected row carries the CVE -> empty")
+    void cveMachines_none() {
+        save(row(TENANT, "m1", CHROME).vulnerabilities(List.of("CVE-1")).machineConnected(false).build());
+
+        assertThat(repository.machineIdsWithCve(TENANT, "CVE-1")).isEmpty();
+        assertThat(repository.machineIdsWithCve(TENANT, "CVE-404")).isEmpty();
+    }
+
     private void save(DeviceSoftware row) {
         mongoTemplate.save(row);
     }
