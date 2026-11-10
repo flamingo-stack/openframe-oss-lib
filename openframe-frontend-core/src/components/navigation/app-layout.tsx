@@ -166,6 +166,8 @@ export interface AppLayoutProps {
   workAreaMode?: AppLayoutWorkAreaMode;
   /** `localStorage` key for the divider position (`chatColumn` only). */
   workAreaStorageKey?: string;
+  /** How far the divider may squeeze a column below its min width (`AppLayoutWorkArea` `squeezeFloor`). */
+  workAreaSqueezeFloor?: number;
   /**
    * A bar at the top of the page column, over `<main>` and outside its scroll (e.g. an
    * `AppColumnHeader` with the page's title and the work area's layout buttons). Keep it
@@ -220,6 +222,7 @@ export function AppLayout({
   chatColumn,
   workAreaMode = 'page',
   workAreaStorageKey,
+  workAreaSqueezeFloor,
   pageHeader,
   endSidebarConfig,
   animateSidebars = false,
@@ -412,6 +415,11 @@ export function AppLayout({
           ref={setMainElement}
           className={cn(
             adaptive ? 'ods-content-area min-w-0 flex-1 overflow-y-auto' : 'flex-1 overflow-y-auto',
+            // A squeezed page column (`AppLayoutWorkArea` `squeezeFloor`): the page keeps the
+            // column's min width and scrolls sideways here, under the page header, with the
+            // vertical scrollbar still on screen. Its blocks sit in the content scope (`contents`).
+            hasChatColumn &&
+              'group-data-[squeezed]/work-area-page:overflow-x-auto group-data-[squeezed]/work-area-page:[&>div>*]:min-w-[var(--work-area-min-width)]',
             contentCovered && 'hidden',
             // While the panel is drawn over the page, keep the page's own
             // z-indexed layers (sticky headers, fixed bars) under it.
@@ -535,6 +543,7 @@ export function AppLayout({
                     chat={chatColumn}
                     page={pageColumn}
                     storageKey={workAreaStorageKey}
+                    squeezeFloor={workAreaSqueezeFloor}
                   />
                 ) : (
                   pageColumn

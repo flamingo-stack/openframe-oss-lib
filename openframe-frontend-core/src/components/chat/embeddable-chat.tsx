@@ -2777,6 +2777,9 @@ function EmbeddableChatInner({
       data-testid="chat-content-panel"
       className={cn(
         'flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]',
+        // A squeezed chat column (`AppLayoutWorkArea` `squeezeFloor`): the thread keeps the
+        // column's min width and scrolls sideways here, under the chat's header.
+        'group-data-[squeezed]/work-area-chat:overflow-x-auto',
         // With a host block above the composer the thread keeps room
         // for a line and the working status: the block gives way
         // instead (below), so the status never lands on it. Not when
@@ -2786,7 +2789,10 @@ function EmbeddableChatInner({
         hasAboveComposer && !splitMode && 'min-h-32',
       )}
     >
-      <div key={contentViewKey} className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0">
+      <div
+        key={contentViewKey}
+        className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0 group-data-[squeezed]/work-area-chat:min-w-[var(--work-area-min-width)]"
+      >
         {hasConversation ? (
           <div className="flex min-h-0 flex-1 flex-col">
             {/* While the thread loads the list draws its own loading

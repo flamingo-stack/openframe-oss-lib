@@ -1,6 +1,15 @@
 'use client';
 
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ContentAreaWidthContext, contentBreakpointFor } from '../../hooks/ui/use-content-breakpoint';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
@@ -26,6 +35,32 @@ export const WORK_AREA_MIN_COLUMN_WIDTH = 360;
 /** Where the divider starts until the user moves it: the middle. */
 const DEFAULT_CHAT_SHARE = 0.5;
 
+/**
+ * What a column of the work area knows about its own width: whether it is squeezed
+ * (`squeezeFloor`) — narrower on screen than `minWidth`, its content laid out at
+ * `minWidth` and scrolled sideways inside it — and that width. Outside a work area:
+ * `null`.
+ */
+export interface WorkAreaColumnState {
+  squeezed: boolean;
+  /** The width the column's content is laid out at while squeezed, px. */
+  minWidth: number;
+}
+
+export const WorkAreaColumnContext = createContext<WorkAreaColumnState | null>(null);
+
+/** The work-area column this is drawn in (`WorkAreaColumnState`), or `null` outside one. */
+export function useWorkAreaColumn(): WorkAreaColumnState | null {
+  return useContext(WorkAreaColumnContext);
+}
+
+interface Squeeze {
+  chat: boolean;
+  page: boolean;
+}
+
+const NOT_SQUEEZED: Squeeze = { chat: false, page: false };
+
 export interface AppLayoutWorkAreaProps {
   mode: AppLayoutWorkAreaMode;
   /**
@@ -38,6 +73,14 @@ export interface AppLayoutWorkAreaProps {
   page: ReactNode;
   /** Narrowest column in `split`, px. Default {@link WORK_AREA_MIN_COLUMN_WIDTH}. */
   minColumnWidth?: number;
+  /**
+   * Lets the divider squeeze a column below `minColumnWidth`, down to this share of
+   * it (0.3: 108px of 360), so the other one keeps growing. A squeezed column keeps
+   * its content at `minColumnWidth` and scrolls it sideways (`useWorkAreaColumn`: the
+   * column's own scroller does it), its header stays on screen, and a shadow along the
+   * divider marks it. Omit (default): no column gets narrower than `minColumnWidth`.
+   */
+  squeezeFloor?: number;
   /**
    * `localStorage` key for the divider position, kept as the chat column's share
    * of the area (so a wider window widens both). Omit to keep it for the mount only.
@@ -84,8 +127,10 @@ function useContentWidth(element: HTMLElement | null): number | null {
  * The chat column and the page column of `AppLayout`, side by side or one at a
  * time (`mode`). In `split` a divider sits between them: drag it, step it with
  * the arrow keys (Shift for bigger steps), Home / End for the extremes, double
- * click for the middle. Neither column gets narrower than `minColumnWidth`; with
- * no room for two such columns the area shows the page column alone.
+ * click for the middle. Neither column gets narrower than `minColumnWidth` —
+ * unless `squeezeFloor` lets the divider fold one further, its content kept at
+ * `minColumnWidth` and scrolled sideways, a shadow along the divider; with no room
+ * for two such columns the area shows the page column alone.
  *
  * Both columns are content areas (`ods-content-area`): their tokens, their
  * `content-md:` / `content-lg:` classes and `useContentBreakpoint()` follow the
@@ -96,6 +141,7 @@ export function AppLayoutWorkArea({
   chat,
   page,
   minColumnWidth = WORK_AREA_MIN_COLUMN_WIDTH,
+  squeezeFloor,
   storageKey,
   chatLabel = 'Chat',
   pageClassName,
@@ -137,15 +183,40 @@ export function AppLayoutWorkArea({
   const canSplit = !measured || rowWidth >= 2 * minColumnWidth;
   const hasChat = chat !== null;
   const shown: AppLayoutWorkAreaMode = !hasChat ? 'page' : mode === 'split' && !canSplit ? 'page' : mode;
-  const maxChatWidth = Math.max(minColumnWidth, rowWidth - minColumnWidth);
-  const clampChatWidth = useCallback(
-    (next: number) => clamp(next, minColumnWidth, maxChatWidth),
-    [minColumnWidth, maxChatWidth],
-  );
+  // The narrowest a column gets on screen: `minColumnWidth`, or its squeeze floor.
+  const floor =
+    squeezeFloor !== undefined && squeezeFloor > 0 && squeezeFloor < 1
+      ? Math.round(minColumnWidth * squeezeFloor)
+      : minColumnWidth;
+  const maxChatWidth = Math.max(floor, rowWidth - floor);
+  const clampChatWidth = useCallback((next: number) => clamp(next, floor, maxChatWidth), [floor, maxChatWidth]);
   const chatWidth = measured ? Math.round(clampChatWidth(share * rowWidth)) : null;
+
+  // Which column is narrower than `minColumnWidth` at a given chat width.
+  const squeezeAt = useCallback(
+    (width: number | null): Squeeze =>
+      width === null || !measured
+        ? NOT_SQUEEZED
+        : { chat: width < minColumnWidth, page: rowWidth - width < minColumnWidth },
+    [measured, minColumnWidth, rowWidth],
+  );
+  // While the divider is dragged the width is written to the DOM, not to state (see
+  // `PanelResizeHandle`): the squeeze follows the drag, and re-renders only when it flips.
+  const [dragSqueeze, setDragSqueeze] = useState<Squeeze | null>(null);
+  const dragChatWidth = useCallback(
+    (next: number) => {
+      if (chatRef.current) chatRef.current.style.width = `${next}px`;
+      const nextSqueeze = squeezeAt(next);
+      setDragSqueeze(previous =>
+        previous?.chat === nextSqueeze.chat && previous.page === nextSqueeze.page ? previous : nextSqueeze,
+      );
+    },
+    [squeezeAt],
+  );
 
   const chooseWidth = useCallback(
     (next: number) => {
+      setDragSqueeze(null);
       if (!measured) return;
       const nextShare = clampChatWidth(next) / rowWidth;
       setChosenShare(nextShare);
@@ -154,6 +225,7 @@ export function AppLayoutWorkArea({
     [measured, clampChatWidth, rowWidth, storage],
   );
   const resetWidth = useCallback(() => {
+    setDragSqueeze(null);
     setChosenShare(DEFAULT_CHAT_SHARE);
     storage?.clear();
   }, [storage]);
@@ -166,6 +238,17 @@ export function AppLayoutWorkArea({
 
   const chatHidden = shown === 'page';
   const pageHidden = shown === 'chat';
+  const squeeze = shown === 'split' ? (dragSqueeze ?? squeezeAt(chatWidth)) : NOT_SQUEEZED;
+  const chatColumnState = useMemo<WorkAreaColumnState>(
+    () => ({ squeezed: squeeze.chat, minWidth: minColumnWidth }),
+    [squeeze.chat, minColumnWidth],
+  );
+  const pageColumnState = useMemo<WorkAreaColumnState>(
+    () => ({ squeezed: squeeze.page, minWidth: minColumnWidth }),
+    [squeeze.page, minColumnWidth],
+  );
+  // The width a squeezed column's content keeps, for its scroller (`[&>*]:min-w-[var(--work-area-min-width)]`).
+  const minWidthVar = { '--work-area-min-width': `${minColumnWidth}px` } as CSSProperties;
 
   return (
     <div ref={setRow} className={cn('relative flex min-h-0 min-w-0 flex-1', className)} data-work-area={shown}>
@@ -179,31 +262,51 @@ export function AppLayoutWorkArea({
           aria-hidden={chatHidden || undefined}
           inert={chatHidden}
           data-work-area-column="chat"
+          data-squeezed={squeeze.chat || undefined}
           className={cn(
-            'ods-content-area relative flex min-h-0 min-w-0 flex-col overflow-hidden',
+            // `group/work-area-chat`: the column's scroller widens its content while squeezed.
+            'group/work-area-chat ods-content-area relative flex min-h-0 min-w-0 flex-col overflow-hidden',
             shown === 'chat' && 'flex-1',
             shown === 'split' && 'shrink-0',
             chatHidden && 'hidden',
           )}
-          style={shown === 'split' ? { width: chatWidth ?? `${DEFAULT_CHAT_SHARE * 100}%` } : undefined}
+          style={
+            shown === 'split' ? { ...minWidthVar, width: chatWidth ?? `${DEFAULT_CHAT_SHARE * 100}%` } : minWidthVar
+          }
         >
-          <ContentAreaWidthContext.Provider value={chatContentWidth}>
-            <div className="ods-content-scope">{chat}</div>
-          </ContentAreaWidthContext.Provider>
+          <WorkAreaColumnContext.Provider value={chatColumnState}>
+            <ContentAreaWidthContext.Provider value={chatContentWidth}>
+              <div className="ods-content-scope">{chat}</div>
+            </ContentAreaWidthContext.Provider>
+          </WorkAreaColumnContext.Provider>
         </div>
       )}
       {shown === 'split' && (
         // A zero-wide slot on the columns' border: the handle straddles it.
         <div className="relative w-0 shrink-0">
+          {/* A squeezed column is folded under the divider: a shadow along it, on its side. */}
+          {(squeeze.chat || squeeze.page) && (
+            <div
+              aria-hidden
+              data-testid="work-area-squeeze-shadow"
+              data-work-area-shadow={squeeze.chat ? 'chat' : 'page'}
+              className={cn(
+                'pointer-events-none absolute inset-y-0 z-10 w-3 to-transparent duration-150 animate-in fade-in motion-reduce:animate-none',
+                squeeze.chat
+                  ? 'right-0 bg-gradient-to-l from-[var(--shadow-column-edge)]'
+                  : 'left-0 bg-gradient-to-r from-[var(--shadow-column-edge)]',
+              )}
+            />
+          )}
           <PanelResizeHandle
             side="left"
             variant="inLayout"
             size={chatWidth ?? 0}
-            minSize={minColumnWidth}
+            minSize={floor}
             maxSize={maxChatWidth}
             clampSize={clampChatWidth}
             onSize={chooseWidth}
-            panelRef={chatRef}
+            onDrag={dragChatWidth}
             onReset={resetWidth}
             ariaLabel={`Resize ${chatLabel.toLowerCase()} column`}
             className="inset-y-0 left-0 w-6 -translate-x-1/2 justify-center pl-0"
@@ -215,14 +318,17 @@ export function AppLayoutWorkArea({
         aria-hidden={pageHidden || undefined}
         inert={pageHidden}
         data-work-area-column="page"
+        data-squeezed={squeeze.page || undefined}
+        style={minWidthVar}
         className={cn(
-          'relative flex min-h-0 min-w-0 flex-1',
+          // `group/work-area-page`: `AppLayout`'s `<main>` widens its content while squeezed.
+          'group/work-area-page relative flex min-h-0 min-w-0 flex-1',
           shown === 'split' && 'border-l border-ods-border',
           pageHidden && 'hidden',
           pageClassName,
         )}
       >
-        {page}
+        <WorkAreaColumnContext.Provider value={pageColumnState}>{page}</WorkAreaColumnContext.Provider>
       </div>
     </div>
   );

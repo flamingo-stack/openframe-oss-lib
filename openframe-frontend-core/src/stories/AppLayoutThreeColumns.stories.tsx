@@ -156,7 +156,7 @@ function ChatsFooter({ minimized, onCollapse }: { minimized: boolean; onCollapse
  * the right. A chat opens in the chat column; a navigation entry opens its page
  * beside it; each column's header takes its side full screen or closes it.
  */
-function ThreeColumns({ initialMode }: { initialMode: AppLayoutWorkAreaMode }) {
+function ThreeColumns({ initialMode, squeezeFloor }: { initialMode: AppLayoutWorkAreaMode; squeezeFloor?: number }) {
   const [mode, setMode] = useState<AppLayoutWorkAreaMode>(initialMode);
   const [chat, setChat] = useState<DialogItem | null>(initialMode === 'page' ? null : CHATS[0]);
   const [path, setPath] = useState(initialMode === 'chat' ? null : '/devices');
@@ -239,8 +239,21 @@ function ThreeColumns({ initialMode }: { initialMode: AppLayoutWorkAreaMode }) {
       desktopHeader={false}
       mobileBurgerMenuProps={{}}
       animateSidebars
+      pageHeader={
+        <AppColumnHeader
+          title={page?.label ?? 'Page'}
+          layoutAction={mode === 'split' ? 'fullscreen' : chat ? 'restore-split' : undefined}
+          onLayoutAction={() => setMode(mode === 'split' ? 'page' : 'split')}
+          onClose={() => {
+            setPath(null);
+            setMode('chat');
+          }}
+          closeLabel="Close page"
+        />
+      }
       workAreaMode={mode}
-      workAreaStorageKey="storybook.work-area"
+      workAreaStorageKey={squeezeFloor ? 'storybook.work-area-squeeze' : 'storybook.work-area'}
+      workAreaSqueezeFloor={squeezeFloor}
       chatColumn={
         <div className="flex h-full flex-col">
           <AppColumnHeader
@@ -257,17 +270,17 @@ function ThreeColumns({ initialMode }: { initialMode: AppLayoutWorkAreaMode }) {
       }
     >
       <div className="flex h-full flex-col">
-        <AppColumnHeader
-          title={page?.label ?? 'Page'}
-          layoutAction={mode === 'split' ? 'fullscreen' : chat ? 'restore-split' : undefined}
-          onLayoutAction={() => setMode(mode === 'split' ? 'page' : 'split')}
-          onClose={() => {
-            setPath(null);
-            setMode('chat');
-          }}
-          closeLabel="Close page"
-        />
-        <div className="p-[var(--spacing-system-l)] text-ods-text-secondary text-h6">Content of {page?.label}</div>
+        <div className="flex flex-col gap-[var(--spacing-system-m)] p-[var(--spacing-system-l)] text-ods-text-secondary text-h6">
+          <p>Content of {page?.label}</p>
+          {/* Three blocks across: squeezed below the column's min width, they keep it and scroll sideways. */}
+          <div className="grid grid-cols-3 gap-[var(--spacing-system-xsf)]">
+            {['Online', 'Offline', 'Pending'].map(label => (
+              <div key={label} className="rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]">
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </AppLayout>
   );
@@ -283,3 +296,8 @@ const placeholderArgs = {
 export const Split: Story = { args: placeholderArgs, render: () => <ThreeColumns initialMode="split" /> };
 export const ChatFullScreen: Story = { args: placeholderArgs, render: () => <ThreeColumns initialMode="chat" /> };
 export const PageFullScreen: Story = { args: placeholderArgs, render: () => <ThreeColumns initialMode="page" /> };
+/** `workAreaSqueezeFloor` 0.3: drag the divider past a column's 360px; it folds to 108px, scrolls sideways, a shadow marks it. */
+export const SplitSqueezable: Story = {
+  args: placeholderArgs,
+  render: () => <ThreeColumns initialMode="split" squeezeFloor={0.3} />,
+};

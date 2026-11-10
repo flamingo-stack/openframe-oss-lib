@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Expand01Icon, XmarkIcon } from '../icons-v2-generated';
 import { HeaderButton } from './header-button';
+import { SQUEEZED_HIDDEN, SQUEEZED_SHARED_CELL, SQUEEZED_SR_ONLY } from './work-area-squeeze';
 
 /**
  * What the layout button of a column header does:
@@ -58,7 +59,8 @@ export function AppColumnHeader({
   closeLabel = 'Close',
   className,
 }: AppColumnHeaderProps) {
-  const cellClass = 'border-l border-ods-border';
+  // Squeezed (the work area's divider folded the column): the layout and close cells stay, sharing the width.
+  const cellClass = cn('border-l border-ods-border', SQUEEZED_SHARED_CELL);
   const layoutLabel = layoutAction ? (layoutActionLabel ?? LAYOUT_LABEL[layoutAction]) : undefined;
   return (
     <div
@@ -70,16 +72,19 @@ export function AppColumnHeader({
       )}
       data-column-header=""
     >
-      {leading && <div className="flex shrink-0 items-center pl-[var(--spacing-system-sf)]">{leading}</div>}
+      {leading && (
+        <div className={cn('flex shrink-0 items-center pl-[var(--spacing-system-sf)]', SQUEEZED_HIDDEN)}>{leading}</div>
+      )}
       <div
         className={cn(
           'flex min-w-0 flex-1 items-center pr-[var(--spacing-system-sf)]',
           leading ? 'pl-[var(--spacing-system-xsf)]' : 'pl-[var(--spacing-system-lf)]',
+          SQUEEZED_SR_ONLY,
         )}
       >
         <span className="min-w-0 truncate text-ods-text-primary text-shell-body">{title}</span>
       </div>
-      {actions}
+      {actions && <div className={cn('flex shrink-0 items-stretch', SQUEEZED_HIDDEN)}>{actions}</div>}
       {layoutAction && (
         <HeaderButton
           className={cellClass}

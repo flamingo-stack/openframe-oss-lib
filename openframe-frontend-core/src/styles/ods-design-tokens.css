@@ -63,6 +63,9 @@
   --shadow-card-hover: var(--shadow-md);
   --shadow-modal: var(--shadow-xl);
   --shadow-dropdown: var(--shadow-lg);
+  /* The colour of the shadow a squeezed work-area column casts along the divider
+     (AppLayoutWorkArea squeezeFloor), fading out from it. Placeholder until the design names one. */
+  --shadow-column-edge: rgba(0, 0, 0, 0.4);
   /* Figma media-frame elevation (Flamingo website carousels/panels, 4033:90570) */
   --shadow-media-frame: 0px 24px 48px 0px rgba(0, 0, 0, 0.24);
   --shadow-tooltip: var(--shadow-base);

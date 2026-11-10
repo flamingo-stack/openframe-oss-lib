@@ -73,8 +73,13 @@ export type {
   AppLayoutSidePanelRenderState,
 } from './app-layout-side-panel';
 export { SIDE_PANEL_FRAME_WIDTH } from './app-layout-side-panel';
-export { AppLayoutWorkArea, WORK_AREA_MIN_COLUMN_WIDTH } from './app-layout-work-area';
-export type { AppLayoutWorkAreaMode, AppLayoutWorkAreaProps } from './app-layout-work-area';
+export {
+  AppLayoutWorkArea,
+  useWorkAreaColumn,
+  WORK_AREA_MIN_COLUMN_WIDTH,
+  WorkAreaColumnContext,
+} from './app-layout-work-area';
+export type { AppLayoutWorkAreaMode, AppLayoutWorkAreaProps, WorkAreaColumnState } from './app-layout-work-area';
 export { AppColumnHeader } from './app-column-header';
 export type { AppColumnHeaderLayoutAction, AppColumnHeaderProps } from './app-column-header';
 

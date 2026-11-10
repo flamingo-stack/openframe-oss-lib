@@ -9,7 +9,7 @@ import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppColumnHeader } from '../app-column-header';
 import { AppLayout } from '../app-layout';
-import { AppLayoutWorkArea, type AppLayoutWorkAreaMode } from '../app-layout-work-area';
+import { AppLayoutWorkArea, type AppLayoutWorkAreaMode, useWorkAreaColumn } from '../app-layout-work-area';
 
 /** jsdom has no layout: every element reports this width. */
 function rowWidth(px: number) {
@@ -86,6 +86,77 @@ describe('AppLayoutWorkArea', () => {
     expect(shownHeading('Thread')).not.toBeInTheDocument();
     expect(shownHeading('Page body')).toBeInTheDocument();
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+});
+
+describe('AppLayoutWorkArea squeezeFloor', () => {
+  /** A column's body that says whether its column is squeezed. */
+  function Column({ name }: { name: string }) {
+    const column = useWorkAreaColumn();
+    return <p>{`${name}: ${column?.squeezed ? 'squeezed' : 'full'} at ${column?.minWidth ?? '?'}`}</p>;
+  }
+  function squeezable() {
+    return (
+      <AppLayoutWorkArea mode="split" chat={<Column name="chat" />} page={<Column name="page" />} squeezeFloor={0.3} />
+    );
+  }
+  const shadow = () => screen.queryByTestId('work-area-squeeze-shadow');
+
+  it('lets the divider fold either column down to 30% of its min width', () => {
+    rowWidth(1000);
+    render(squeezable());
+    expect(divider()).toHaveAttribute('aria-valuemin', '108');
+    expect(divider()).toHaveAttribute('aria-valuemax', '892');
+    expect(screen.getByText('chat: full at 360')).toBeInTheDocument();
+    expect(screen.getByText('page: full at 360')).toBeInTheDocument();
+    expect(shadow()).not.toBeInTheDocument();
+  });
+
+  it('squeezes the page past its min width: it keeps 360px of content, a shadow on its side', () => {
+    rowWidth(1000);
+    render(squeezable());
+    fireEvent.keyDown(divider(), { key: 'End' });
+    expect(chatColumn()).toHaveStyle({ width: '892px' });
+    expect(screen.getByText('page: squeezed at 360')).toBeInTheDocument();
+    expect(screen.getByText('chat: full at 360')).toBeInTheDocument();
+    expect(shadow()).toHaveAttribute('data-work-area-shadow', 'page');
+  });
+
+  it('squeezes the chat the other way, and lets go once both fit again', () => {
+    rowWidth(1000);
+    render(squeezable());
+    fireEvent.keyDown(divider(), { key: 'Home' });
+    expect(chatColumn()).toHaveStyle({ width: '108px' });
+    expect(screen.getByText('chat: squeezed at 360')).toBeInTheDocument();
+    expect(shadow()).toHaveAttribute('data-work-area-shadow', 'chat');
+    fireEvent.doubleClick(divider());
+    expect(screen.getByText('chat: full at 360')).toBeInTheDocument();
+    expect(shadow()).not.toBeInTheDocument();
+  });
+
+  it("follows a drag: squeezed as soon as the divider passes the other column's min width", () => {
+    rowWidth(1000);
+    render(squeezable());
+    const grip = divider();
+    grip.setPointerCapture = vi.fn();
+    grip.releasePointerCapture = vi.fn();
+    fireEvent.pointerDown(divider(), { clientX: 500, pointerId: 1, button: 0 });
+    fireEvent.pointerMove(divider(), { clientX: 600, pointerId: 1 });
+    expect(screen.getByText('page: full at 360')).toBeInTheDocument();
+    fireEvent.pointerMove(divider(), { clientX: 2000, pointerId: 1 });
+    // Written to the column while dragging, clamped at the floor of the page's side.
+    expect(chatColumn()).toHaveStyle({ width: '892px' });
+    expect(screen.getByText('page: squeezed at 360')).toBeInTheDocument();
+    expect(shadow()).toHaveAttribute('data-work-area-shadow', 'page');
+  });
+
+  it('without squeezeFloor no column is ever squeezed', () => {
+    rowWidth(1000);
+    render(<AppLayoutWorkArea mode="split" chat={<Column name="chat" />} page={<Column name="page" />} />);
+    fireEvent.keyDown(divider(), { key: 'End' });
+    expect(chatColumn()).toHaveStyle({ width: '640px' });
+    expect(screen.getByText('page: full at 360')).toBeInTheDocument();
+    expect(shadow()).not.toBeInTheDocument();
   });
 });
 

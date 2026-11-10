@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Arrow02RightIcon, Ellipsis01Icon, Refresh01LeftIcon, SidebarIcon, XmarkIcon } from '../icons-v2-generated';
+import { SQUEEZED_HIDDEN, SQUEEZED_SHARED_CELL, SQUEEZED_SR_ONLY } from '../navigation/work-area-squeeze';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -94,6 +95,10 @@ export function MingoChatHeader({
   const glyph = isColumn ? 20 : 24;
   // The column look: the panel's border between the title and the avatar, the default one between the buttons.
   const cellClass = cn('w-14', isColumn && 'border-l border-ods-border text-ods-text-primary [&_svg]:h-5 [&_svg]:w-5');
+  // The column look in a squeezed work-area column: the host's cells (Full screen, Close) stay, sharing
+  // the width; the title is read but not drawn, the avatar, the ⋯ and Unarchive wait for the room.
+  const keptCellClass = cn(cellClass, isColumn && SQUEEZED_SHARED_CELL);
+  const foldedCellClass = cn(cellClass, isColumn && SQUEEZED_HIDDEN);
   const showAvatar = !!avatar && !!(avatar.name || avatar.avatarUrl);
   const menuGroups: ActionsMenuGroup[] = [
     ...(menuItems.length > 0 ? [{ items: menuItems, separator: true }] : []),
@@ -146,7 +151,12 @@ export function MingoChatHeader({
 
       {isColumn ? (
         // The column look: the title alone, in from the column's edge.
-        <div className="flex min-w-0 flex-1 items-center pl-[var(--spacing-system-l)] pr-[var(--spacing-system-sf)]">
+        <div
+          className={cn(
+            'flex min-w-0 flex-1 items-center pl-[var(--spacing-system-l)] pr-[var(--spacing-system-sf)]',
+            SQUEEZED_SR_ONLY,
+          )}
+        >
           {titleNode}
         </div>
       ) : isPage ? (
@@ -179,7 +189,12 @@ export function MingoChatHeader({
       )}
 
       {isColumn && showAvatar && (
-        <div className="flex w-14 shrink-0 items-center justify-center border-l border-ods-border-panel">
+        <div
+          className={cn(
+            'flex w-14 shrink-0 items-center justify-center border-l border-ods-border-panel',
+            SQUEEZED_HIDDEN,
+          )}
+        >
           <SquareAvatar
             variant="round"
             sizePx={20}
@@ -191,7 +206,7 @@ export function MingoChatHeader({
         </div>
       )}
       {onRestore && (
-        <Button variant="cell" className={cellClass} onClick={onRestore} aria-label="Unarchive chat">
+        <Button variant="cell" className={foldedCellClass} onClick={onRestore} aria-label="Unarchive chat">
           <Refresh01LeftIcon size={glyph} />
         </Button>
       )}
@@ -201,7 +216,7 @@ export function MingoChatHeader({
           onCloseAutoFocus={e => e.preventDefault()}
           groups={menuGroups}
           customTrigger={
-            <Button variant="cell" className={cellClass} aria-label="Chat actions">
+            <Button variant="cell" className={foldedCellClass} aria-label="Chat actions">
               <Ellipsis01Icon size={glyph} />
             </Button>
           }
@@ -211,7 +226,7 @@ export function MingoChatHeader({
         <Button
           key={action.id}
           variant="cell"
-          className={cellClass}
+          className={keptCellClass}
           onClick={action.onClick}
           aria-label={action.label}
           title={action.label}
