@@ -12,6 +12,7 @@ export * from './use-batch-images';
 export * from './use-authenticated-image';
 export * from './use-authed-asset-src';
 export * from './use-authed-image-src';
+export * from './use-image-fallback';
 
 // URL State Management hooks
 export * from './state';

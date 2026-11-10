@@ -19,8 +19,10 @@
  * "N replies" badge; the ticket feed passes `<TicketAttachmentsList>`.
  */
 
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import Image from '../../embed-shims/next-image';
+import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
+import { useImageFallback } from '../../hooks/use-image-fallback';
 import { AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
@@ -84,11 +86,10 @@ function ChatMessageRowLoaded(props: ChatMessageRowProps) {
   const proxiedAvatar = useProxiedImageUrl(avatarUrl ?? '');
   const resolvedAvatar = proxiedAvatar || avatarUrl || undefined;
   // Fall back to the initials box if the avatar load FAILS (transient CDN 429,
-  // ad-blocker, dead URL) instead of showing a broken image. Keyed on the URL
-  // (not a bool) so a later render with a DIFFERENT avatar re-attempts the load
-  // rather than inheriting a stale failure.
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const src = resolvedAvatar && resolvedAvatar !== failedSrc ? resolvedAvatar : undefined;
+  // ad-blocker, dead URL) instead of showing a broken image.
+  // Keyed on the store's answer, not the URL: this row keeps holding the avatar's store entry, so where it needs the
+  // bearer, a fetch that got no answer, or a 401 the session can refresh past, is retried and the picture comes back.
+  const { src, onError } = useImageFallback(useAuthedImageSrc(resolvedAvatar));
   const hasBody = typeof body === 'string' ? body.trim().length > 0 : body != null && body !== false;
 
   return (
@@ -103,7 +104,7 @@ function ChatMessageRowLoaded(props: ChatMessageRowProps) {
           className={cn(AVATAR_BOX_CLASS, 'object-cover')}
           width={AVATAR_SIZE_PX.md}
           height={AVATAR_SIZE_PX.md}
-          onError={() => setFailedSrc(resolvedAvatar ?? null)}
+          onError={onError}
         />
       ) : (
         <div

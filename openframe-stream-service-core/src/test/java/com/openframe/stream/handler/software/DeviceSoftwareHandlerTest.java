@@ -2,8 +2,7 @@ package com.openframe.stream.handler.software;
 
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.service.rmm.software.SoftwareProjector;
-import com.openframe.data.service.rmm.software.VulnerabilityProjector;
+import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareInstalledVersion;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
@@ -21,6 +20,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,8 +39,7 @@ class DeviceSoftwareHandlerTest {
     @Mock private FleetHostResolver fleetHostResolver;
     @Mock private FleetHostSoftwareCache fleetHostSoftwareCache;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
-    @Mock private SoftwareProjector softwareProjector;
-    @Mock private VulnerabilityProjector vulnerabilityProjector;
+    @Mock private SoftwareProjectionTrigger projectionTrigger;
 
     @InjectMocks private DeviceSoftwareHandler handler;
 
@@ -106,7 +105,7 @@ class DeviceSoftwareHandlerTest {
 
         handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
-        verifyNoInteractions(fleetHostSoftwareCache, deviceSoftwareRepository, softwareProjector);
+        verifyNoInteractions(fleetHostSoftwareCache, deviceSoftwareRepository, projectionTrigger);
     }
 
     @Test
@@ -141,8 +140,7 @@ class DeviceSoftwareHandlerTest {
         verify(deviceSoftwareRepository).delete(deleted.capture());
         assertThat(deleted.getValue().getSoftwareTitleId()).isEqualTo(99L);
 
-        verify(softwareProjector).project("t1", 42L);
-        verify(softwareProjector).project("t1", 99L);
+        verify(projectionTrigger).titlesChanged("t1", Set.of(42L, 99L));
     }
 
     @Test
@@ -161,9 +159,8 @@ class DeviceSoftwareHandlerTest {
         verify(deviceSoftwareRepository).save(captor.capture());
         assertThat(captor.getValue().getVulnerabilities()).containsExactly("CVE-1", "CVE-2");
 
-        verify(softwareProjector).project("t1", 42L);
-        verify(vulnerabilityProjector).project("t1", "CVE-1");
-        verify(vulnerabilityProjector).project("t1", "CVE-2");
+        verify(projectionTrigger).titlesChanged("t1", Set.of(42L));
+        verify(projectionTrigger).cvesChanged("t1", Set.of("CVE-1", "CVE-2"));
     }
 
     @Test
@@ -178,7 +175,7 @@ class DeviceSoftwareHandlerTest {
 
         verify(deviceSoftwareRepository, never()).save(any());
         verify(deviceSoftwareRepository).delete(any(DeviceSoftware.class));
-        verify(softwareProjector).project(eq("t1"), eq(42L));
+        verify(projectionTrigger).titlesChanged(eq("t1"), eq(Set.of(42L)));
     }
 
     // a later commit on the same host must not reuse the list fetched for an earlier one

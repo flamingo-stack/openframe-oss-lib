@@ -13,7 +13,7 @@ import { setEmbedAuthAdapter } from '../embed-authed-fetch';
 
 /**
  * `isAppOriginUrl` is the line untrusted markdown's media may not cross (see
- * `rehypeStripUnsafe`). Unlike `needsBearerAssetFetch` it does not care how the
+ * `rehypeStripUnsafe`). Unlike `assetLoadMode` it does not care how the
  * host authenticates: it answers whether the URL is the app's at all.
  */
 describe('isAppOriginUrl (where untrusted markdown may load media from)', () => {

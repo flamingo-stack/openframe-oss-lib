@@ -28,7 +28,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // enabled. A promise that never settles keeps the test offline AND free of state
 // updates landing outside `act` — the provider's stream stays down either way,
 // since it waits on a non-anon identity that never arrives.
-vi.mock('../../utils/embed-authed-fetch', () => ({
+vi.mock('../../utils/embed-authed-fetch', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   embedAuthedFetch: vi.fn(() => new Promise(() => {})),
 }));
 

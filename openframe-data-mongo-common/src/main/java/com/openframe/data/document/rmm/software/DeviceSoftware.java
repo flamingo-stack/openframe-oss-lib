@@ -25,11 +25,11 @@ import java.util.List;
         name = "tenant_machine",
         def = "{'tenantId': 1, 'machineId': 1}")
 @CompoundIndex(
-        name = "tenant_title",
-        def = "{'tenantId': 1, 'softwareTitleId': 1}")
+        name = "tenant_title_connected",
+        def = "{'tenantId': 1, 'softwareTitleId': 1, 'machineConnected': 1, 'machineId': 1}")
 @CompoundIndex(
-        name = "tenant_vuln",
-        def = "{'tenantId': 1, 'vulnerabilities': 1}")
+        name = "tenant_vuln_connected",
+        def = "{'tenantId': 1, 'vulnerabilities': 1, 'machineConnected': 1, 'machineId': 1}")
 public class DeviceSoftware implements TenantScoped {
 
     @Id
