@@ -15,6 +15,7 @@ import graphql.schema.GraphQLEnumValueDefinition;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLInputObjectField;
 import graphql.schema.GraphQLInputObjectType;
+import graphql.schema.GraphQLNamedOutputType;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLTypeUtil;
@@ -256,6 +257,47 @@ class ApiSubgraphSchemaTest {
 
         // verifications
         assertThat(entities).isNotNull();
+    }
+
+    @Test
+    void machineTags_deprecatedInFavourOfTagAssignments() {
+        // setup
+        GraphQLFieldDefinition tags = schema.getObjectType("Machine").getFieldDefinition("tags");
+
+        // execution
+        String reason = tags.getDeprecationReason();
+
+        // verifications
+        assertThat(tags.isDeprecated()).isTrue();
+        assertThat(reason).contains("tagAssignments");
+    }
+
+    @Test
+    void machineTagAssignments_nonNullListOfMachineTags() {
+        // setup
+        GraphQLFieldDefinition definition = schema.getObjectType("Machine").getFieldDefinition("tagAssignments");
+
+        // execution
+        String printed = GraphQLTypeUtil.simplePrint(definition.getType());
+
+        // verifications
+        assertThat(printed).isEqualTo("[MachineTag!]!");
+    }
+
+    @Test
+    void machineTag_nodeWithTheTagDefinitionUnderIt() {
+        // setup
+        GraphQLObjectType machineTag = schema.getObjectType("MachineTag");
+
+        // execution
+        List<String> interfaces = machineTag.getInterfaces().stream()
+                .map(GraphQLNamedOutputType::getName)
+                .toList();
+        String tagType = GraphQLTypeUtil.simplePrint(machineTag.getFieldDefinition("tag").getType());
+
+        // verifications
+        assertThat(interfaces).contains("Node");
+        assertThat(tagType).isEqualTo("Tag!");
     }
 
     private static Stream<Arguments> entityKeys() {

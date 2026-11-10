@@ -15,9 +15,11 @@ import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,7 @@ public class TenantSoftwareReadModelQuery {
             "cveCount", "cveCount");
 
     private final SoftwareRepository softwareRepository;
+    private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final VulnerabilityRepository vulnerabilityRepository;
     private final MachineRepository machineRepository;
 
@@ -123,23 +126,24 @@ public class TenantSoftwareReadModelQuery {
     public List<SoftwareOnDeviceResponse> devicesForSoftwareRows(String tenantId, String softwareId, String search,
                                                                  String latestVersion) {
         Software software = load(tenantId, softwareId);
-        List<Software.Installation> installations = software.getInstallations() == null
-                ? List.of() : software.getInstallations();
-        List<String> machineIds = installations.stream()
-                .map(Software.Installation::getMachineId).filter(Objects::nonNull).distinct().toList();
+        List<DeviceSoftware> installed = deviceSoftwareRepository
+                .findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(
+                        tenantId, software.getSoftwareTitleId());
+        List<String> machineIds = installed.stream()
+                .map(DeviceSoftware::getMachineId).filter(Objects::nonNull).distinct().toList();
         Map<String, Machine> machineById = machineRepository.findByMachineIdIn(machineIds).stream()
                 .collect(Collectors.toMap(Machine::getMachineId, Function.identity(), (a, b) -> a));
-        return installations.stream()
-                .filter(installation -> machineById.containsKey(installation.getMachineId()))
-                .map(installation -> toOnDevice(installation, machineById, latestVersion))
+        return installed.stream()
+                .filter(row -> machineById.containsKey(row.getMachineId()))
+                .map(row -> toOnDevice(row, machineById, latestVersion))
                 .filter(row -> matchesHostname(row, search))
                 .toList();
     }
 
-    private static SoftwareOnDeviceResponse toOnDevice(Software.Installation installation, Map<String, Machine> machineById,
+    private static SoftwareOnDeviceResponse toOnDevice(DeviceSoftware installed, Map<String, Machine> machineById,
                                                        String latestVersion) {
-        Machine machine = machineById.get(installation.getMachineId());
-        List<String> versions = installation.getVersions() == null ? List.of() : installation.getVersions();
+        Machine machine = machineById.get(installed.getMachineId());
+        List<String> versions = installed.getVersions() == null ? List.of() : installed.getVersions();
         String shown = String.join(", ", versions);
         SoftwareOnDeviceStatus status = isUpToDate(versions, latestVersion)
                 ? SoftwareOnDeviceStatus.UP_TO_DATE : SoftwareOnDeviceStatus.OUTDATED;
@@ -221,19 +225,11 @@ public class TenantSoftwareReadModelQuery {
     // currentVersion is the version on the most devices and olderVersionsCount the other versions in use, as the
     // Fleet path reports them, so the catalog status reads both paths the same way
     private static SoftwareResponse toResponse(Software sw) {
-        List<String> installedVersions = installedVersions(sw);
-        Map<String, Long> devicesByVersion = installedVersions.stream()
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-        String currentVersion = devicesByVersion.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(null);
         Long titleId = sw.getSoftwareTitleId();
         String id = titleId == null ? null : titleId.toString();
         String fleetSource = sw.getSource();
         FleetSoftwareCategory category = FleetSoftwareCategory.of(fleetSource);
         SoftwareType type = FleetSoftwareType.of(fleetSource);
-        int olderVersions = Math.max(0, devicesByVersion.size() - 1);
 
         SoftwareVulnerabilitySummaryResponse summary = new SoftwareVulnerabilitySummaryResponse();
         summary.setCveCount(sw.getCveCount());
@@ -250,23 +246,11 @@ public class TenantSoftwareReadModelQuery {
         row.setSystemComponent(sw.getSystemComponent());
         row.setPackageMatch(sw.getPackageMatch());
         row.setType(type);
-        row.setCurrentVersion(currentVersion);
+        row.setCurrentVersion(sw.getCurrentVersion());
         row.setLatestVersion(sw.getLatestVersion());
-        row.setOlderVersionsCount(olderVersions);
+        row.setOlderVersionsCount(sw.getOlderVersionsCount());
         row.setDevicesCount(sw.getDevicesCount());
         row.setVulnerabilitySummary(summary);
         return row;
-    }
-
-    private static List<String> installedVersions(Software sw) {
-        if (sw.getInstallations() == null) {
-            return List.of();
-        }
-        return sw.getInstallations().stream()
-                .map(Software.Installation::getVersions)
-                .filter(Objects::nonNull)
-                .flatMap(List::stream)
-                .filter(Objects::nonNull)
-                .toList();
     }
 }
