@@ -41,7 +41,7 @@ export interface VideoTeaser {
 export interface EntityQuote {
   key: string;
   text: string;
-  /** Who said it, when the recording has several voices (a prospect call). Case studies attribute to their customer instead. */
+  /** Who said it, when the recording has several voices (a recorded call). Case studies attribute to their customer instead. */
   speaker?: string | null;
   /** `ai` while the text is exactly what Transcribe & Summarize extracted; an editor edit makes it `manual`. */
   source?: 'ai' | 'manual';
@@ -142,5 +142,5 @@ export type VideoProcessingEntityType =
   | 'what_i_shipped'
   | 'how_i_work'
   | 'walkthrough_video'
-  | 'prospect_call';
+  | 'recorded_call';
 // Fri May 15 14:58:59 EDT 2026
