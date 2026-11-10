@@ -55,19 +55,6 @@ export interface StandardLeafRenderers {
  * guard has exactly one definition.
  */
 /**
- * Inline content image (blog / docs / chat attachments). A standalone
- * component — NOT inline JSX in the `img` renderer — because it must call
- * `useAuthedImageSrc`: in bearer-mode native shells (`capacitor://`,
- * `tauri://`) a gateway-hosted image can't load through a plain `<img>` (no
- * Authorization header on native asset loads), so the hook swaps in an authed
- * blob URL; everywhere else it returns `src` untouched. While the blob fetch
- * is in flight `resolvedSrc` is null and the component renders nothing — same
- * as the no-src case. Ported from #1548 into the unified engine (the original
- * lived in the now-deleted `ui/simple-markdown-renderer.tsx`). Sizing matches
- * the engine's cap: 400x400 intrinsic, `w-auto h-auto max-h-[400px]` drives
- * the actual rendered box; click-to-expand surfaces provide full resolution.
- */
-/**
  * The page title, a section heading and a paragraph of rendered markdown (before the text size): read by the
  * renderer and by every skeleton that stands in for a markdown body.
  */
@@ -76,16 +63,23 @@ export const MARKDOWN_H2_CLASS =
   'mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary';
 export const MARKDOWN_PARAGRAPH_CLASS = 'mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0';
 
+/**
+ * Inline content image (blog / docs / chat attachments). The boxed `Image` resolves and authenticates it
+ * (`useAuthedAsset`); this component reads the same store only to draw nothing while there is nothing to draw (the
+ * authed fetch in flight or failed, as with no src), where `Image` would draw its box or the failing URL. Ported from
+ * #1548 into the unified engine (the original lived in the now-deleted `ui/simple-markdown-renderer.tsx`). Sizing
+ * matches the engine's cap: 400x400 intrinsic, `w-auto h-auto max-h-[400px]` drives the actual rendered box;
+ * click-to-expand surfaces provide full resolution.
+ */
 const MarkdownContentImage: React.FC<{ src: string; alt?: string }> = ({ src, alt }) => {
   // In a loading scope the image is a box and nothing is fetched: the authed fetch is skipped, and the `Image` shim
   // draws its skeleton box (`HeldImage`) without reading `src`. `src` is passed only so the box is drawn at all.
   const inScope = useLoadingScope();
-  const authedSrc = useAuthedImageSrc(inScope ? undefined : src);
-  const resolvedSrc = inScope ? src : authedSrc;
-  if (!resolvedSrc) return null;
+  const drawable = useAuthedImageSrc(inScope ? undefined : src);
+  if (!inScope && !drawable) return null;
   return (
     <Image
-      src={resolvedSrc}
+      src={src}
       alt={alt ?? 'No image available'}
       width={400}
       height={400}
@@ -363,9 +357,10 @@ export function buildBaseComponents({
 
     // --- images ---
     // Inline content image renderer (blog, docs, chat attachments) —
-    // delegates to `MarkdownContentImage` (above), which handles bearer-mode
-    // authed loading for native shells and the 400x400 cap with click-to-
-    // expand for full resolution.
+    // delegates to `MarkdownContentImage` (above), which draws nothing until
+    // there is a picture to draw and applies the 400x400 cap with click-to-
+    // expand for full resolution; the boxed `Image` it renders resolves and
+    // authenticates it.
     //
     // A third-party `src` never reaches here unless the composition set
     // `allowRemoteMedia`: `rehypeStripUnsafe` moves it to `data-blocked-src`,

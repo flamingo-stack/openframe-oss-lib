@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
+import { useImageFallback } from '../../hooks/use-image-fallback';
 import { TILE_SIZE } from '../../styles/component-sizes';
 import { IMAGE_FIXED_PX } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
@@ -37,20 +37,12 @@ export interface EntityImageProps {
 export function EntityImage({ src, alt, fallbackText, sizeClassName, className }: EntityImageProps) {
   // In a loading scope the image is its skeleton, and it is not fetched.
   const held = useLoadingScope();
-  const authedSrc = useAuthedImageSrc(held ? undefined : src);
-  const resolvedSrc = authedSrc;
-  // Which src failed, rather than a bare "failed" flag reset from an effect on
-  // every src change. The reset is then implicit — a new src simply is not the
-  // one that failed — so the fallback initials never survive into the render
-  // that swapped the image, and a new src costs no second render pass.
-  const [failedSrc, setFailedSrc] = React.useState<string | null>(null);
-  const imageFailed = resolvedSrc !== undefined && failedSrc === resolvedSrc;
+  const { src: resolvedSrc, onError } = useImageFallback(useAuthedImageSrc(held ? undefined : src));
 
   if (held) return <EntityImageSkeleton sizeClassName={sizeClassName} className={className} />;
-  const showFallback = imageFailed || !resolvedSrc;
   const initials = personInitials(fallbackText ?? alt);
 
-  if (showFallback) {
+  if (!resolvedSrc) {
     return (
       <div
         aria-label={alt}
@@ -70,7 +62,7 @@ export function EntityImage({ src, alt, fallbackText, sizeClassName, className }
     <Image
       src={resolvedSrc}
       alt={alt ?? ''}
-      onError={() => setFailedSrc(resolvedSrc)}
+      onError={onError}
       className={cn(
         'shrink-0 border border-ods-border object-contain',
         ENTITY_IMAGE_RADIUS_CLASS,

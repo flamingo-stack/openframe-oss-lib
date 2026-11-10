@@ -2,7 +2,7 @@ package com.openframe.processing.config;
 
 import com.openframe.processing.fixture.Widgets.RecordingProjection;
 import com.openframe.processing.fixture.Widgets.WidgetSpec;
-import com.openframe.processing.topic.EventTopicCreator;
+import com.openframe.processing.topic.EventTopicCheck;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import com.openframe.publishing.config.EventsAutoConfiguration;
 import org.junit.jupiter.api.Test;
@@ -13,7 +13,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Without a broker: the switch, and the settings a creator cannot start without.
+// Without a broker: the switch, and the settings the check cannot start without.
 class EventTopicsAutoConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
@@ -23,10 +23,10 @@ class EventTopicsAutoConfigurationTest {
             .withBean(WidgetSpec.class, () -> new WidgetSpec(List.of(new RecordingProjection("widget-on-organizations"))));
 
     @Test
-    void topicCreation_isOffByDefault() {
+    void theTopicCheck_isOffByDefault() {
         runner.withPropertyValues("openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                         "openframe.events.processing.kafka.topic-prefix=events.")
-                .run(context -> assertThat(context).hasNotFailed().doesNotHaveBean(EventTopicCreator.class));
+                .run(context -> assertThat(context).hasNotFailed().doesNotHaveBean(EventTopicCheck.class));
     }
 
     @Test

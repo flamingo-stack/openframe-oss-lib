@@ -9,7 +9,8 @@ import { act, render, screen } from '@testing-library/react';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../utils/embed-authed-fetch', () => ({
+vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   embedAuthedFetch: vi.fn(() => new Promise(() => {})),
 }));
 

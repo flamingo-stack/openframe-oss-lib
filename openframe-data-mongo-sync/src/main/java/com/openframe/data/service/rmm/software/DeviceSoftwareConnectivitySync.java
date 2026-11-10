@@ -16,8 +16,7 @@ import java.util.Set;
 public class DeviceSoftwareConnectivitySync {
 
     private final DeviceSoftwareRepository deviceSoftwareRepository;
-    private final SoftwareProjector softwareProjector;
-    private final VulnerabilityProjector vulnerabilityProjector;
+    private final SoftwareProjectionTrigger projectionTrigger;
 
     public void onConnectivityChanged(String tenantId, String machineId, boolean connected) {
         if (tenantId == null || machineId == null) {
@@ -47,8 +46,8 @@ public class DeviceSoftwareConnectivitySync {
         }
         // one bulk write for the whole machine
         long changed = deviceSoftwareRepository.setMachineConnectedByTenantIdAndMachineId(tenantId, machineId, connected);
-        affectedTitles.forEach(titleId -> softwareProjector.project(tenantId, titleId));
-        affectedCves.forEach(cve -> vulnerabilityProjector.project(tenantId, cve));
+        projectionTrigger.titlesChanged(tenantId, affectedTitles);
+        projectionTrigger.cvesChanged(tenantId, affectedCves);
         int titleCount = affectedTitles.size();
         int cveCount = affectedCves.size();
         log.info("Machine {} tenantId={} connectivity -> {}: updated {} device_software row(s), re-projected {} title(s), {} CVE(s)",

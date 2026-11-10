@@ -4,15 +4,17 @@ import com.openframe.client.service.agentregistration.fleet.FleetHostFactsWriter
 import com.openframe.client.service.agentregistration.fleet.FleetMdmClients;
 import com.openframe.data.document.tool.ToolType;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmNotFoundException;
 import com.openframe.sdk.fleetmdm.model.Host;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static java.util.Comparator.comparing;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -42,30 +44,60 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
         try {
             FleetMdmClient fleetClient = fleetMdmClients.client();
 
-            List<Host> hosts = fleetClient.searchHosts(agentToolId, 0, 2);
-            
-            if (hosts.isEmpty()) {
-                throw new IllegalStateException("No hosts found in Fleet MDM for UUID: " + agentToolId);
-            }
-            logHosts(machineId, agentToolId, hosts);
-
-            List<Host> uuidMatched = hosts.stream()
-                    .filter(host -> agentToolId.equals(host.getUuid()))
-                    .toList();
-
-            return uuidMatched.stream()
-                    .filter(host -> agentToolId.equals(host.getUuid()))
-                    .filter(host -> isNotBlank(host.getOsqueryVersion()))
-                    .max(Comparator.comparing(host -> isNotBlank(host.getLastEnrolledAt()) ? host.getLastEnrolledAt() : ""))
-                    .map(host -> {
-                        logOsqueryHostIdMatch(machineId, agentToolId, host);
-                        return processMatchingHost(machineId, agentToolId, host);
-                    })
+            return findHostByUuid(fleetClient, machineId, agentToolId)
+                    .or(() -> findHostByOsqueryHostId(fleetClient, machineId, agentToolId))
+                    .map(host -> processMatchingHost(machineId, agentToolId, host))
                     .orElseGet(() -> processNoMatchingHost(machineId, agentToolId, lastAttempt));
         } catch (Exception e) {
             log.error("Failed to transform Fleet MDM agent tool ID, machineId={}, uuid={}", machineId, agentToolId, e);
             throw new IllegalStateException("Failed to transform Fleet MDM agent tool ID", e);
         }
+    }
+
+    private Optional<Host> findHostByUuid(FleetMdmClient fleetClient, String machineId, String uuid) {
+        List<Host> hosts = fleetClient.searchHosts(uuid, 0, 2);
+        logHosts(machineId, uuid, hosts);
+
+        Optional<Host> newestEnrolled = hosts.stream()
+                .filter(host -> uuid.equals(host.getUuid()))
+                .filter(FleetMdmAgentIdTransformer::hasOsqueryVersion)
+                .max(comparing(FleetMdmAgentIdTransformer::lastEnrolledAtOrEmpty));
+
+        newestEnrolled.ifPresent(host -> logUuidMatch(machineId, uuid, host));
+        return newestEnrolled;
+    }
+
+    // Instance-mode devices (ORBIT_HOST_IDENTIFIER=instance) report an osquery_host_id the host search never matches.
+    private Optional<Host> findHostByOsqueryHostId(FleetMdmClient fleetClient, String machineId, String osqueryHostId) {
+        Optional<Host> enrolledWithId = fetchHostByIdentifier(fleetClient, machineId, osqueryHostId)
+                .filter(candidate -> isEnrolledWithOsqueryHostId(candidate, osqueryHostId))
+                .filter(FleetMdmAgentIdTransformer::hasOsqueryVersion);
+
+        enrolledWithId.ifPresent(matched -> logOsqueryHostIdMatch(machineId, osqueryHostId, matched));
+        return enrolledWithId;
+    }
+
+    private Optional<Host> fetchHostByIdentifier(FleetMdmClient fleetClient, String machineId, String identifier) {
+        try {
+            Host host = fleetClient.getHostByIdentifier(identifier);
+            return Optional.of(host);
+        } catch (FleetMdmNotFoundException e) {
+            log.info("No Fleet host for identifier, machineId={}, identifier={}", machineId, identifier);
+            return Optional.empty();
+        }
+    }
+
+    private static boolean isEnrolledWithOsqueryHostId(Host host, String osqueryHostId) {
+        return osqueryHostId.equals(host.getOsqueryHostId());
+    }
+
+    private static boolean hasOsqueryVersion(Host host) {
+        return isNotBlank(host.getOsqueryVersion());
+    }
+
+    private static String lastEnrolledAtOrEmpty(Host host) {
+        String lastEnrolledAt = host.getLastEnrolledAt();
+        return isNotBlank(lastEnrolledAt) ? lastEnrolledAt : "";
     }
 
     private String processMatchingHost(String machineId, String agentToolId, Host host) {
@@ -93,10 +125,16 @@ public class FleetMdmAgentIdTransformer implements ToolAgentIdTransformer {
         return agentToolId;
     }
 
-    private void logOsqueryHostIdMatch(String machineId, String uuid, Host host) {
+    private void logUuidMatch(String machineId, String uuid, Host host) {
         Long hostId = host.getId();
         String osqueryHostId = host.getOsqueryHostId();
-        log.info("Matched host by osquery_host_id, machineId={}, uuid={}, host_id={}, osquery_host_id={}", machineId, uuid, hostId, osqueryHostId);
+        log.info("Matched host by uuid, machineId={}, uuid={}, host_id={}, osquery_host_id={}", machineId, uuid, hostId, osqueryHostId);
+    }
+
+    private void logOsqueryHostIdMatch(String machineId, String osqueryHostId, Host host) {
+        Long hostId = host.getId();
+        String uuid = host.getUuid();
+        log.info("Matched host by osquery_host_id, machineId={}, osquery_host_id={}, host_id={}, uuid={}", machineId, osqueryHostId, hostId, uuid);
     }
 
     private void logHosts(String machineId, String uuid, List<Host> hosts) {
