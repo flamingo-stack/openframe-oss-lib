@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
+import com.openframe.api.dto.device.MachineTag;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 @Service
@@ -146,7 +148,31 @@ public class TagService {
      */
     public List<List<Tag>> getTagsForMachines(List<String> machineIds) {
         log.debug("Getting tags for {} machines", machineIds.size());
+        return loadPerMachine(machineIds, this::buildTag);
+    }
 
+    // One node per assignment: the assignment's own id and values, the stored Tag under it, so clients caching by id
+    // never merge two devices sharing a tag.
+    public List<List<MachineTag>> getTagAssignmentsForMachines(List<String> machineIds) {
+        log.debug("Getting tag assignments for {} machines", machineIds.size());
+        return loadPerMachine(machineIds, this::buildMachineTag);
+    }
+
+    public List<MachineTag> getMachineTagsByIds(List<String> assignmentIds) {
+        log.debug("Getting {} device tag assignments by id", assignmentIds.size());
+        List<TagAssignment> assignments = tagAssignmentRepository
+                .findByIdInAndEntityType(assignmentIds, TagEntityType.DEVICE);
+        if (assignments.isEmpty()) {
+            return List.of();
+        }
+        Map<String, Tag> tagsById = findTagsOf(assignments);
+        return assignments.stream()
+                .map(assignment -> buildMachineTag(assignment, tagsById.get(assignment.getTagId())))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private <T> List<List<T>> loadPerMachine(List<String> machineIds, BiFunction<TagAssignment, Tag, T> mapper) {
         if (machineIds.isEmpty()) {
             return new ArrayList<>();
         }
@@ -156,30 +182,33 @@ public class TagService {
 
         if (allAssignments.isEmpty()) {
             return machineIds.stream()
-                    .map(id -> new ArrayList<Tag>())
+                    .map(id -> new ArrayList<T>())
                     .collect(Collectors.toList());
         }
 
         Map<String, List<TagAssignment>> assignmentsByEntityId = allAssignments.stream()
                 .collect(Collectors.groupingBy(TagAssignment::getEntityId));
-
-        Set<String> allTagIds = allAssignments.stream()
-                .map(TagAssignment::getTagId)
-                .collect(Collectors.toSet());
-        List<Tag> allTags = tagRepository.findAllById(new ArrayList<>(allTagIds));
-        Map<String, Tag> tagsById = allTags.stream()
-                .collect(Collectors.toMap(Tag::getId, tag -> tag));
+        Map<String, Tag> tagsById = findTagsOf(allAssignments);
 
         return machineIds.stream()
                 .map(machineId -> {
                     List<TagAssignment> assignments = assignmentsByEntityId
                             .getOrDefault(machineId, List.of());
                     return assignments.stream()
-                            .map(assignment -> buildTag(assignment, tagsById.get(assignment.getTagId())))
+                            .map(assignment -> mapper.apply(assignment, tagsById.get(assignment.getTagId())))
                             .filter(Objects::nonNull)
                             .collect(Collectors.toList());
                 })
                 .collect(Collectors.toList());
+    }
+
+    private Map<String, Tag> findTagsOf(List<TagAssignment> assignments) {
+        Set<String> tagIds = assignments.stream()
+                .map(TagAssignment::getTagId)
+                .collect(Collectors.toSet());
+        List<Tag> tags = tagRepository.findAllById(new ArrayList<>(tagIds));
+        return tags.stream()
+                .collect(Collectors.toMap(Tag::getId, tag -> tag));
     }
 
     /**
@@ -267,6 +296,21 @@ public class TagService {
         tagAssignmentRepository.deleteByTagId(tagId);
         tagRepository.deleteById(tagId);
         log.info("Tag deleted with cascade: {}", tagId);
+    }
+
+    private MachineTag buildMachineTag(TagAssignment assignment, Tag tag) {
+        if (tag == null) {
+            log.warn("Tag not found for assignment: {}", assignment.getTagId());
+            return null;
+        }
+
+        return MachineTag.builder()
+                .id(assignment.getId())
+                .tag(tag)
+                .values(assignment.getValues() != null ? assignment.getValues() : List.of())
+                .taggedAt(assignment.getTaggedAt())
+                .taggedBy(assignment.getTaggedBy())
+                .build();
     }
 
     private Tag buildTag(TagAssignment assignment, Tag tag) {

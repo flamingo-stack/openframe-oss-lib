@@ -38,6 +38,7 @@ public class FleetSoftwareMapper {
                 .fleetSource(FleetSource.of(title.getSource()))
                 .publisher(firstText(versions, SoftwareTitleVersion::getVendor))
                 .upgradeCode(title.getUpgradeCode())
+                .bundleIdentifier(title.getBundleIdentifier())
                 .build();
     }
 

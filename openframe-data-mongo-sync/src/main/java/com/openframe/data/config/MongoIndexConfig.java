@@ -95,6 +95,10 @@ public class MongoIndexConfig implements SmartLifecycle {
         dropStaleIndex("tags", "key_org_idx");
         dropStaleIndex("tags", "key_org_entity_idx");
 
+        dropStaleIndex("device_software", "tenant_title");
+        dropStaleIndex("device_software", "tenant_vuln");
+        dropStaleIndex("software", "installations_machine");
+
         // Scripts: name uniqueness IGNORES soft-deleted rows so a user can
         // reuse the name of a script they previously deleted — a PARTIAL unique
         // index scoped to the non-deleted statuses. The plain {tenantId, name}

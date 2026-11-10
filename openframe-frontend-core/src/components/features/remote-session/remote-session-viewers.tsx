@@ -24,6 +24,11 @@ export interface RemoteSessionViewersProps {
   /** Faces shown before the rest collapse into "+N". */
   max?: number;
   className?: string;
+  /**
+   * The list opened or closed: lets a bar that hides on idle stay up while it is open. Not called when the list
+   * closes because everyone left: the stack is gone then, and so is what held the bar.
+   */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -31,17 +36,25 @@ export interface RemoteSessionViewersProps {
  * colour) that opens the full list. Shown to the host, to the watchers and to
  * the end user.
  */
-export function RemoteSessionViewers({ viewers, max = 4, className }: RemoteSessionViewersProps) {
+export function RemoteSessionViewers({ viewers, max = 4, className, onOpenChange }: RemoteSessionViewersProps) {
   const [open, setOpen] = useState(false);
-  if (viewers.length === 0) return null;
+  if (viewers.length === 0) {
+    // Everyone left while the list was open: it closes, and does not open by itself when someone joins again.
+    if (open) setOpen(false);
+    return null;
+  }
 
   const ordered = hostFirst(viewers);
   const faces = ordered.slice(0, max);
   const overflow = ordered.length - faces.length;
   const Chevron = open ? Chevron02UpIcon : Chevron02DownIcon;
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    onOpenChange?.(next);
+  };
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={changeOpen}>
       <DropdownMenuTrigger
         aria-label={`In this session: ${ordered.map(viewerLabel).join(', ')}`}
         className={cn(
