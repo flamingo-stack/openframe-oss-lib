@@ -9,6 +9,8 @@ import { LoadingItems, useLoadingScope } from '../loading-scope';
 import type { NoDataProps } from '../no-data';
 import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
+import { useDataTableLayout } from './data-table-grid';
+import { DataTableGridBody } from './data-table-grid-body';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
 import { PlaceholderRows, ReservedEmptyState } from './data-table-reserved-rows';
 import { DataTableRow } from './data-table-row';
@@ -114,7 +116,22 @@ const getNoRows = () => 0;
  * `onRowClick` / `rowHref` / `rowClassName` (if function) with `useCallback`
  * in the consumer to get the full benefit.
  */
-export function DataTableBody<T = unknown>({
+export function DataTableBody<T = unknown>(props: DataTableBodyProps<T>) {
+  const layout = useDataTableLayout();
+  if (layout !== 'grid') return <DataTableCardsBody {...props} />;
+  // A grid table is card rows below `md` and the grid from `md` up. Both forms are in the tree and CSS picks one:
+  // a breakpoint read in JS answers a frame late, and the table would redraw itself on every first paint.
+  return (
+    <>
+      <div className="content-md:hidden">
+        <DataTableCardsBody {...props} />
+      </div>
+      <DataTableGridBody {...props} />
+    </>
+  );
+}
+
+function DataTableCardsBody<T = unknown>({
   loading: loadingProp,
   loadingCells = false,
   emptyMessage,

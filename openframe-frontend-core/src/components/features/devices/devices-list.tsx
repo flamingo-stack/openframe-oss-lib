@@ -2,7 +2,14 @@
 
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { useStickyToolbar } from '../../../hooks/ui/use-sticky-toolbar';
-import { type ColumnFiltersState, DataTable, type NoDataProps, type OnChangeFn } from '../../ui';
+import {
+  type ColumnFiltersState,
+  DataTable,
+  type DataTableLayout,
+  type DataTableSettings,
+  type NoDataProps,
+  type OnChangeFn,
+} from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { DevicesFilterToolbar } from './devices-filter-toolbar';
 import { DevicesTableBody, getDeviceActionsColumn, getDeviceFilterColumns } from './devices-table-columns';
@@ -92,6 +99,15 @@ export interface DevicesListProps<T extends DeviceRow = DeviceRow> {
   hideColumns?: string[];
   /** Filter keys to drop from the funnels AND the modal; the column itself stays. */
   hideFilters?: string[];
+  /**
+   * The table's layout: `grid` draws 48px one-line rows in one bordered block from `md` up (see `DevicesTableBody`).
+   * Named apart from the view mode, whose own `grid` is the tile view. Default `cards`.
+   */
+  tableLayout?: DataTableLayout;
+  /** Grid layout: the table's height; `'fill'` makes the table the scroll area (see `DevicesTableBody`). */
+  tableMaxHeight?: number | string;
+  /** Grid layout: the table's settings (the gear's menu of columns, the saved column layout). */
+  tableSettings?: DataTableSettings;
   /** Per-row overflow menu. Omit for a read-only list. */
   rowActions?: (device: T) => ReactNode;
 
@@ -177,6 +193,9 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
   onNarrowingChange = NOOP,
   hideColumns,
   hideFilters,
+  tableLayout,
+  tableMaxHeight,
+  tableSettings,
   rowActions,
   emptyState,
   narrowedEmptyState,
@@ -335,6 +354,9 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
           onColumnFiltersChange={onColumnFiltersChange}
           actionsColumn={actionsColumn}
           hideColumns={hideColumns}
+          layout={tableLayout}
+          tableMaxHeight={tableMaxHeight}
+          tableSettings={tableSettings}
           disableColumnFilters={hideFilters}
           totalCount={totalCount}
           footerSlot={

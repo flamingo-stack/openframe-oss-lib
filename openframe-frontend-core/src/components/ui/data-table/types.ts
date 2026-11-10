@@ -1,4 +1,4 @@
-import type { RowData } from '@tanstack/react-table';
+import type { CellContext, RowData } from '@tanstack/react-table';
 import type { ReactNode } from 'react';
 
 export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl';
@@ -84,5 +84,21 @@ declare module '@tanstack/react-table' {
      * column with no label.
      */
     headerLoading?: boolean;
+    /**
+     * The cell's form in the GRID layout (`<DataTable layout="grid">`): one 48px line, normally a `DataTable.Cell`.
+     * `cell` stays the card-row form, which the same table still draws below `md`. A column without it draws `cell`
+     * in both layouts (clipped to one line in the grid).
+     */
+    gridCell?: (context: CellContext<TData, TValue>) => ReactNode;
+    /**
+     * What a non-data column is in the grid layout: the selection column (always first, pinned left) or a row-action
+     * column (always last, pinned right). Set by `selectionColumn()` / `actionColumn()`, not by hand.
+     */
+    gridKind?: 'select' | 'action';
+    /**
+     * The column's name where columns are listed by name (the grid table's settings menu), in sentence case:
+     * "Device", "Last login". Without it the list shows the header text, or the column id when the header is a node.
+     */
+    label?: string;
   }
 }
