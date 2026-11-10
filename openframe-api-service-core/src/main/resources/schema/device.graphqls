@@ -81,7 +81,10 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     timezone: String
     registeredAt: Instant
     updatedAt: Instant
-    tags: [Tag]
+    """The device's tag assignments, one node per (device, tag): the device's own values and tagged date, with the
+    stored tag definition under `tag`. Batched per device list like `tags`."""
+    tagAssignments: [MachineTag!]!
+    tags: [Tag] @deprecated(reason: "Use tagAssignments: per-device values under the tag's id collide in Relay caches.")
     toolConnections: [ToolConnection]
     installedAgents: [InstalledAgent]
     """Package managers as last reported by the device agent. Null until the first report."""
@@ -101,6 +104,16 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     """The current user's unread notifications about this device (entity DEVICE, machineId). Counts the same
     read states as unreadCountsByCategory, so a row and the sidebar badge agree. 0 when none."""
     unreadNotificationCount: Int!
+}
+
+"""A tag assigned to one device. `id` is the tag assignment's, unique per (device, tag) and resolvable through
+`node(id:)`; `tag` is the stored definition only (its own createdAt, no device values)."""
+type MachineTag implements Node {
+    id: ID!
+    tag: Tag!
+    values: [String!]!
+    taggedAt: Instant
+    taggedBy: String
 }
 
 type DeviceEnrollment {
