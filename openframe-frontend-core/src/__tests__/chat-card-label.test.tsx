@@ -12,7 +12,7 @@ import { getSourceLabel, SOURCE_ICON_NAMES, DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID } 
 describe('chatCardLabel', () => {
   it('returns the registered label for a document type', () => {
     expect(chatCardLabel('design_doc')).toBe('Design doc');
-    expect(chatCardLabel('prospect_call')).toBe('Prospect call');
+    expect(chatCardLabel('prospect_call')).toBe('Call');
   });
 
   it('returns undefined for an unregistered type', () => {

@@ -1457,7 +1457,7 @@ interface GlyphCardConfig {
  *  `list-url.ts` builder + the `source-icons.ts` label / icon / type entries. */
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   openframe_tenant: { label: 'OpenFrame tenant' },
-  prospect_call: { label: 'Prospect call', media: true },
+  prospect_call: { label: 'Call', media: true },
   // Code intelligence (product-hub internal): the review rules a repository is
   // held to, the repositories themselves, and one row per deployment
   // environment. Glyph cards like their siblings — none of the three has a

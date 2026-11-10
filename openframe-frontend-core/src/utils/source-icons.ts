@@ -199,7 +199,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   // Product-hub internal
   'design-docs': 'Design Docs',
   'openframe-tenants': 'OpenFrame Tenants',
-  'prospect-calls': 'Prospect calls',
+  'prospect-calls': 'Recorded calls',
 
   // Code intelligence
   'code-rules': 'Code Rules',
