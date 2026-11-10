@@ -12,9 +12,11 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -51,6 +53,7 @@ class TenantSoftwareReadModelQueryTest {
     private static final String TENANT = "t1";
 
     @Mock private SoftwareRepository softwareRepository;
+    @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private VulnerabilityRepository vulnerabilityRepository;
     @Mock private MachineRepository machineRepository;
 
@@ -66,6 +69,11 @@ class TenantSoftwareReadModelQueryTest {
                 .latestVersion("1.7").devicesCount(installations.length).cveCount(2)
                 .installations(List.of(installations))
                 .build();
+    }
+
+    private static DeviceSoftware installed(String machineId, String... versions) {
+        return DeviceSoftware.builder().tenantId(TENANT).machineId(machineId).softwareTitleId(42L)
+                .machineConnected(true).versions(List.of(versions)).build();
     }
 
     private static Machine machine(String machineId, String hostname) {
@@ -90,7 +98,32 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
-    void get_mapsTheTitleLikeTheFleetPath() {
+    void get_takesTheProjectedCurrentAndOlderVersions() {
+        Software jq = software(42L, "homebrew_packages", installation("m1", "1.6"));
+        jq.setCurrentVersion("1.7");
+        jq.setOlderVersionsCount(2);
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(jq));
+
+        SoftwareResponse row = query.get(TENANT, "42");
+
+        assertThat(row.getCurrentVersion()).isEqualTo("1.7");
+        assertThat(row.getOlderVersionsCount()).isEqualTo(2);
+    }
+
+    @Test
+    void get_projectedWithoutVersions_noCurrentVersion() {
+        Software jq = software(42L, "homebrew_packages", installation("m1", "1.6"));
+        jq.setOlderVersionsCount(0);
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(jq));
+
+        SoftwareResponse row = query.get(TENANT, "42");
+
+        assertThat(row.getCurrentVersion()).isNull();
+        assertThat(row.getOlderVersionsCount()).isZero();
+    }
+
+    @Test
+    void get_notProjectedWithVersionCountsYet_countsTheInstallations() {
         Software.Installation onM1 = installation("m1", "1.6");
         Software.Installation onM2 = installation("m2", "1.7");
         Software.Installation onM3 = installation("m3", "1.7");
@@ -171,12 +204,10 @@ class TenantSoftwareReadModelQueryTest {
 
     @Test
     void devicesForSoftwareRows_statusAgainstTheGivenLatest_allVersionsMustReachIt() {
-        Software.Installation latest = installation("m1", "10.0");
-        Software.Installation older = installation("m2", "9.0");
-        Software.Installation both = installation("m3", "10.0", "9.0");
-        Software.Installation onAGoneMachine = installation("gone", "10.0");
-        Software app = software(42L, "apps", latest, older, both, onAGoneMachine);
-        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(app));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps")));
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
+                .thenReturn(List.of(installed("m1", "10.0"), installed("m2", "9.0"), installed("m3", "10.0", "9.0"),
+                        installed("gone", "10.0")));
         Machine alpha = machine("m1", "alpha");
         Machine beta = machine("m2", "beta");
         Machine gamma = machine("m3", "gamma");
@@ -193,9 +224,34 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
+    void devicesForSoftwareRows_unknownTitle_throwsNotFoundWithoutReadingDevices() {
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> query.devicesForSoftwareRows(TENANT, "42", null, null))
+                .isInstanceOf(NotFoundException.class);
+        verifyNoInteractions(deviceSoftwareRepository);
+    }
+
+    @Test
+    void devicesForSoftwareRows_aDeviceWithoutVersions_showsNoVersionAndIsOutdated() {
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps")));
+        DeviceSoftware noVersions = installed("m1");
+        noVersions.setVersions(null);
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
+                .thenReturn(List.of(noVersions));
+        when(machineRepository.findByMachineIdIn(List.of("m1"))).thenReturn(List.of(machine("m1", "alpha")));
+
+        SoftwareOnDeviceResponse row = query.devicesForSoftwareRows(TENANT, "42", null, "1.0").getFirst();
+
+        assertThat(row.getSoftwareVersion()).isNull();
+        assertThat(row.getStatus()).isEqualTo(SoftwareOnDeviceStatus.OUTDATED);
+    }
+
+    @Test
     void devicesForSoftwareRows_searchByHostname_noLatestMeansOutdated() {
-        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps",
-                installation("m1", "1.0"), installation("m2", "1.0"))));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps")));
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
+                .thenReturn(List.of(installed("m1", "1.0"), installed("m2", "1.0")));
         when(machineRepository.findByMachineIdIn(anyList())).thenReturn(List.of(
                 machine("m1", "Alpha-laptop"), machine("m2", "beta")));
 
