@@ -20,8 +20,6 @@ public interface DeviceSoftwareRepository extends MongoRepository<DeviceSoftware
     List<DeviceSoftware> findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(
             String tenantId, Long softwareTitleId);
 
-    List<DeviceSoftware> findByTenantIdAndVulnerabilitiesContainingAndMachineConnectedTrue(String tenantId, String cveId);
-
     long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 
     @Query("{ 'tenantId': ?0, 'machineId': ?1, 'machineConnected': { '$ne': ?2 } }")

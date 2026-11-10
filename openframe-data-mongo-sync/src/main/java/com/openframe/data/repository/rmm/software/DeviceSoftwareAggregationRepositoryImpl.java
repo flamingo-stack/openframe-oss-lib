@@ -7,12 +7,15 @@ import org.bson.Document;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -102,6 +105,17 @@ public class DeviceSoftwareAggregationRepositoryImpl implements DeviceSoftwareAg
                         .append("devicesCount", distinctCount(union("$machineSets")))));
         Document rollup = aggregateOne(stages);
         return Optional.ofNullable(rollup).map(DeviceSoftwareAggregationRepositoryImpl::toCveRollup);
+    }
+
+    @Override
+    public List<String> machineIdsWithCve(String tenantId, String cveId) {
+        Criteria connectedWithCve = Criteria.where("tenantId").is(tenantId)
+                .and("vulnerabilities").is(cveId)
+                .and("machineConnected").is(true);
+        Query query = new Query(connectedWithCve);
+        return mongoTemplate.findDistinct(query, "machineId", DeviceSoftware.class, String.class).stream()
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private Document aggregateOne(List<AggregationOperation> stages) {
