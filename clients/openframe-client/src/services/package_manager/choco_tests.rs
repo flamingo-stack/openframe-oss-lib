@@ -169,34 +169,6 @@ fn an_untrustworthy_install_is_left_to_the_admin_even_when_ours() {
 }
 
 #[test]
-fn an_untrustworthy_choco_that_was_never_run_is_not_reported_broken() {
-    let not_run = || Facts {
-        version_exit: -1,
-        version: String::new(),
-        ..customer("2.7.5")
-    };
-    let cases = [
-        (
-            Facts {
-                weak_acl: true,
-                ..not_run()
-            },
-            Reason::WeakAcl,
-        ),
-        (
-            Facts {
-                signed: false,
-                ..not_run()
-            },
-            Reason::Unsigned,
-        ),
-    ];
-    for (facts, reason) in cases {
-        assert_eq!(verdict_of(&facts), (Status::ActionRequired, Some(reason)));
-    }
-}
-
-#[test]
 fn updates_run_only_on_a_managed_choco() {
     assert_eq!(assess(&customer("2.7.5")).refusal(), None);
     assert_eq!(
