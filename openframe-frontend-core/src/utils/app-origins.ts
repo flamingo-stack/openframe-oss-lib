@@ -50,12 +50,17 @@ export function readAppOrigins(): AppOrigins {
 /** Called when a host registers, replaces or clears its auth adapter, which can change `allowedOrigins`. */
 export const subscribeAppOrigins: (listener: () => void) => () => void = subscribeRegisteredAdapter;
 
-/**
- * `url` resolved against the page when it belongs to the app, otherwise `null`.
- *
- * The page match compares scheme and host instead of `URL.origin`, which is
- * `"null"` for a `capacitor://` page.
- */
+/** Scheme and host, not `URL.origin`, which is `"null"` for a `capacitor://` page. */
+function isOnPage(target: URL, page: URL): boolean {
+  return target.protocol === page.protocol && target.host === page.host;
+}
+
+/** Whether `target` is on the page's own origin rather than on an origin the host sanctioned. */
+export function isPageOriginUrl(target: URL, origins: AppOrigins = readAppOrigins()): boolean {
+  return isOnPage(target, new URL(origins.pageUrl ?? SERVER_PAGE_URL));
+}
+
+/** `url` resolved against the page when it belongs to the app, otherwise `null`. */
 export function resolveAppOriginUrl(url: string, origins: AppOrigins = readAppOrigins()): URL | null {
   let page: URL;
   let target: URL;
@@ -65,7 +70,7 @@ export function resolveAppOriginUrl(url: string, origins: AppOrigins = readAppOr
   } catch {
     return null;
   }
-  if (target.protocol === page.protocol && target.host === page.host) return target;
+  if (isOnPage(target, page)) return target;
   if (target.protocol !== 'http:' && target.protocol !== 'https:') return null;
   return origins.allowedOrigins.includes(target.origin) ? target : null;
 }
