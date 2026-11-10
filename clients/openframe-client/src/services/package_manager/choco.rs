@@ -20,19 +20,7 @@ function Invoke-Choco {
 "#;
 
 #[cfg(target_os = "windows")]
-const FACTS_SCRIPT: &str = r#"$run = Invoke-Choco --version
-$versionExit = $run.exit
-$version = ''
-if ($run.output.Count -gt 0) { $version = ([string]$run.output[-1]).Trim() }
-
-$pinned = $false
-if ($versionExit -eq 0) {
-    $run = Invoke-Choco pin list --limit-output
-    if ($run.exit -ne 0) { exit 3 }
-    $pinned = @($run.output | Where-Object { ([string]$_ -split '\|')[0] -eq 'chocolatey' }).Count -gt 0
-}
-
-$weakSids = 'S-1-1-0', 'S-1-5-11', 'S-1-5-32-545'
+const FACTS_SCRIPT: &str = r#"$weakSids = 'S-1-1-0', 'S-1-5-11', 'S-1-5-32-545'
 $writeRights = 0x500C0006
 function Test-WeakAcl($path) {
     if (-not (Test-Path -LiteralPath $path)) { return $false }
@@ -43,11 +31,26 @@ function Test-WeakAcl($path) {
     }
     return $false
 }
-$weakAcl = (Test-WeakAcl $root) -or (Test-WeakAcl (Join-Path $root 'bin'))
+$folders = @($root) + @('bin', 'extensions', 'helpers', 'hooks', 'tools' | ForEach-Object { Join-Path $root $_ })
+$weakAcl = @($folders | Where-Object { Test-WeakAcl $_ }).Count -gt 0
 
 $signature = Get-AuthenticodeSignature -LiteralPath $choco
 if ($signature.Status -notin 'Valid', 'NotSigned', 'HashMismatch', 'NotTrusted') { exit 4 }
 $signed = ($signature.Status -eq 'Valid') -and $signature.SignerCertificate -and ($signature.SignerCertificate.Subject -like '*Chocolatey Software*')
+
+$versionExit = -1
+$version = ''
+$pinned = $false
+if ((-not $weakAcl) -and $signed) {
+    $run = Invoke-Choco --version
+    $versionExit = $run.exit
+    if ($run.output.Count -gt 0) { $version = ([string]$run.output[-1]).Trim() }
+    if ($versionExit -eq 0) {
+        $run = Invoke-Choco pin list --limit-output
+        if ($run.exit -ne 0) { exit 3 }
+        $pinned = @($run.output | Where-Object { ([string]$_ -split '\|')[0] -eq 'chocolatey' }).Count -gt 0
+    }
+}
 
 $otherInstall = @(
     (Join-Path $env:ProgramData 'chocolatey'), "$env:SystemDrive\Chocolatey" |
@@ -158,6 +161,19 @@ enum Reason {
 enum AdminOption {
     DontTouch,
     AdminFix,
+}
+
+impl ChocoReport {
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+    pub(super) fn refusal(&self) -> Option<String> {
+        match (self.status, self.reason) {
+            (Status::Managed, _) => None,
+            (_, Some(reason)) => Some(format!(
+                "Chocolatey on this device needs action: {reason:?}"
+            )),
+            (_, None) => Some("Chocolatey on this device must be upgraded first".to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -276,29 +292,24 @@ fn assess(facts: &Facts) -> ChocoReport {
 
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 fn verdict(facts: &Facts, version: Option<&Version>) -> Verdict {
-    let Some(version) = version else {
-        return Verdict::ActionRequired(Reason::Broken);
-    };
-    let reason = if facts.other_install {
-        Reason::SeveralInstalls
-    } else if facts.weak_acl {
-        Reason::WeakAcl
-    } else if !facts.signed {
-        Reason::Unsigned
-    } else if facts.licensed {
-        Reason::Licensed
-    } else if version.major < 2 {
-        Reason::Version1
-    } else if precedence(version, &MANAGED_FROM) != Ordering::Less {
-        return Verdict::Managed;
-    } else if facts.pinned {
-        Reason::Pinned
-    } else if parse_version(&facts.upgrade_blocked)
-        .is_some_and(|blocked| precedence(&blocked, version) == Ordering::Equal)
-    {
-        Reason::UpgradeBlocked
-    } else {
-        return Verdict::UpgradeRequired;
+    let reason = match version {
+        _ if facts.other_install => Reason::SeveralInstalls,
+        _ if facts.weak_acl => Reason::WeakAcl,
+        _ if !facts.signed => Reason::Unsigned,
+        None => Reason::Broken,
+        Some(_) if facts.licensed => Reason::Licensed,
+        Some(version) if version.major < 2 => Reason::Version1,
+        Some(version) if precedence(version, &MANAGED_FROM) != Ordering::Less => {
+            return Verdict::Managed
+        }
+        Some(_) if facts.pinned => Reason::Pinned,
+        Some(version)
+            if parse_version(&facts.upgrade_blocked)
+                .is_some_and(|blocked| precedence(&blocked, version) == Ordering::Equal) =>
+        {
+            Reason::UpgradeBlocked
+        }
+        Some(_) => return Verdict::UpgradeRequired,
     };
     Verdict::ActionRequired(reason)
 }

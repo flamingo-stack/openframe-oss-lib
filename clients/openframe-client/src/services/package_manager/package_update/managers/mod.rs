@@ -34,7 +34,7 @@ pub(super) enum ProbeState {
     NotInstalled,
     UpToDate,
     Outdated,
-    /// Installed, but this manager will not upgrade it (no source, unknown version, pinned).
+    /// This manager will not upgrade it (no source, unknown version, pinned, a Chocolatey that needs action).
     NotUpgradable(String),
 }
 
@@ -48,8 +48,8 @@ pub(super) enum UpgradeOutcome {
     /// The app's files are in use: a holder the gate did not see.
     #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     InUse(String),
-    /// The manager declined this package (pinned, disabled, nothing for this platform).
-    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    /// The manager declined this package (pinned, disabled, nothing for this platform, a Chocolatey that needs action).
+    #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
     NotUpgradable(String),
     /// Another installer, a pending reboot or no user session; retried later.
     Busy(String),

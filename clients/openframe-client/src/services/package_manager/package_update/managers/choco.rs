@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use super::{last_line, Probe, ProbeState, QueryError, UpgradeOutcome, PROBE_TIMEOUT_SECS};
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::PackageRef;
-use crate::services::package_manager::choco::{root, SCRIPT_PRELUDE};
+use crate::services::package_manager::choco::{report, root, SCRIPT_PRELUDE};
 use crate::services::package_manager::update_gate;
 
 const PROBE_SCRIPT: &str = r#"$id = $args[1]
@@ -25,11 +25,11 @@ ConvertTo-Json -Compress -InputObject @{ installed = $installed; upgrade = $upgr
 
 const UPGRADE_SCRIPT: &str = r#"$ErrorActionPreference = 'Continue'
 $global:LASTEXITCODE = 1
-& $choco upgrade $args[1] "--source=$($args[2])" -y --no-progress --fail-on-not-installed --execution-timeout=540
+& $choco upgrade $args[1] "--source=$($args[2])" -y --no-progress --fail-on-not-installed --execution-timeout=480
 exit $LASTEXITCODE
 "#;
 
-const UPGRADE_TIMEOUT_SECS: u32 = 570;
+const UPGRADE_TIMEOUT_SECS: u32 = 510;
 
 const NOTHING_TO_DO: i32 = 2;
 const PENDING_REBOOT: i32 = 350;
@@ -50,6 +50,21 @@ pub(super) async fn probe(package: &PackageRef) -> Result<Probe, QueryError> {
             "not a choco package: {package:?}"
         )));
     };
+    match report().await.map(|report| report.refusal()) {
+        Some(None) => {}
+        Some(Some(reason)) => {
+            return Ok(Probe {
+                state: ProbeState::NotUpgradable(reason),
+                installed_version: None,
+                available_version: None,
+            })
+        }
+        None => {
+            return Err(QueryError::Failed(
+                "could not read the Chocolatey install".to_string(),
+            ))
+        }
+    }
     let result = execute_script(ScriptParams {
         code: &format!("{SCRIPT_PRELUDE}{PROBE_SCRIPT}"),
         shell: "powershell",
@@ -77,6 +92,11 @@ pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
         Err(e) => {
             return UpgradeOutcome::Busy(format!("could not check for a running Chocolatey: {e}"))
         }
+    }
+    match report().await.map(|report| report.refusal()) {
+        Some(None) => {}
+        Some(Some(reason)) => return UpgradeOutcome::NotUpgradable(reason),
+        None => return UpgradeOutcome::Busy("could not read the Chocolatey install".to_string()),
     }
     let result = execute_script(ScriptParams {
         code: &format!("{SCRIPT_PRELUDE}{UPGRADE_SCRIPT}"),
