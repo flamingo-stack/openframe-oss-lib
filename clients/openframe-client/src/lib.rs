@@ -388,10 +388,12 @@ impl Client {
         let package_upgrades = InProgress::default();
         let agent_restart = Latch::default();
 
-        let feature_flags_service = Arc::new(FeatureFlagsService::load(
-            directory_manager.secured_dir().join("feature_flags.json"),
-            env!("OPENFRAME_VERSION").to_string(),
-        ));
+        let feature_flags_service = Arc::new(FeatureFlagsService::load_saved(&directory_manager));
+        crate::services::package_manager::enable_chocolatey(
+            feature_flags_service
+                .flags()
+                .is_enabled(Feature::Chocolatey),
+        );
         let package_auto_update_enabled = feature_flags_service
             .flags()
             .is_enabled(Feature::PackageAutoUpdate);

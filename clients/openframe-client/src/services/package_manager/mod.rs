@@ -8,6 +8,7 @@ mod support;
 pub mod update_gate;
 
 pub use support::is_supported;
+pub(crate) use support::{chocolatey_enabled, enable_chocolatey};
 
 use crate::models::PackageRef;
 use serde::Serialize;

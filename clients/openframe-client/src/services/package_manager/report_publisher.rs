@@ -74,7 +74,8 @@ impl PackageManagerReportPublisher {
             })
             .collect();
 
-        let chocolatey = if package_managers.get(&ManagerId::Choco) == Some(&ManagerState::Present)
+        let chocolatey = if super::chocolatey_enabled()
+            && package_managers.get(&ManagerId::Choco) == Some(&ManagerState::Present)
         {
             choco::report().await
         } else {

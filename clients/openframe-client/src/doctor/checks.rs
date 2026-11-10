@@ -371,6 +371,16 @@ pub fn check_webview2_runtime() -> Option<CheckResult> {
 
 #[cfg(windows)]
 pub fn check_dotnet_framework() -> Option<CheckResult> {
+    use crate::models::Feature;
+    use crate::platform::DirectoryManager;
+    use crate::services::feature_flags_service::FeatureFlagsService;
+
+    if !FeatureFlagsService::load_saved(&DirectoryManager::new())
+        .flags()
+        .is_enabled(Feature::Chocolatey)
+    {
+        return None;
+    }
     crate::platform::dotnet_framework::dotnet_release().map(dotnet_framework_result)
 }
 

@@ -8,6 +8,7 @@ use tracing::{info, warn};
 use crate::models::{
     DeliveryRef, FeatureFlag, FeatureFlags, FeatureFlagsMessage, FeatureFlagsState,
 };
+use crate::platform::DirectoryManager;
 use crate::utils::fs::atomic_write;
 use crate::utils::version_comparator::parse_version;
 
@@ -25,6 +26,13 @@ pub enum FlagsApplied {
 }
 
 impl FeatureFlagsService {
+    pub(crate) fn load_saved(directory_manager: &DirectoryManager) -> Self {
+        Self::load(
+            directory_manager.secured_dir().join("feature_flags.json"),
+            env!("OPENFRAME_VERSION").to_string(),
+        )
+    }
+
     pub fn load(path: PathBuf, version: String) -> Self {
         let state = match std::fs::read(&path) {
             Ok(bytes) => match serde_json::from_slice::<FeatureFlagsState>(&bytes) {

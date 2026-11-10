@@ -55,19 +55,33 @@ const STORELESS_EDITIONS: &[&str] = &[
 
 const MULTI_SESSION_EDITIONS: &[&str] = &["ServerRdsh"];
 
-pub fn is_supported(id: ManagerId) -> bool {
-    support_of(id, current()) == Support::Supported
+static CHOCOLATEY_ENABLED: OnceLock<bool> = OnceLock::new();
+
+pub(crate) fn enable_chocolatey(enabled: bool) {
+    let _ = CHOCOLATEY_ENABLED.set(enabled);
 }
 
-fn support_of(id: ManagerId, spec: &OsSpec) -> Support {
+pub(crate) fn chocolatey_enabled() -> bool {
+    CHOCOLATEY_ENABLED.get().copied().unwrap_or(false)
+}
+
+pub fn is_supported(id: ManagerId) -> bool {
+    support_of(id, current(), chocolatey_enabled()) == Support::Supported
+}
+
+fn support_of(id: ManagerId, spec: &OsSpec, chocolatey_enabled: bool) -> Support {
     match id {
         ManagerId::Brew => brew(spec),
         ManagerId::Winget => winget(spec),
-        ManagerId::Choco => choco(spec),
+        ManagerId::Choco => choco(spec, chocolatey_enabled),
     }
 }
 
-fn choco(spec: &OsSpec) -> Support {
+fn choco(spec: &OsSpec, enabled: bool) -> Support {
+    if !enabled {
+        return Support::Unsupported("Chocolatey is not enabled");
+    }
+
     if spec.os != Os::Windows {
         return Support::Unsupported("Chocolatey is Windows only");
     }
@@ -138,7 +152,7 @@ fn current() -> &'static OsSpec {
 fn log_spec(spec: &OsSpec) {
     let verdicts: BTreeMap<ManagerId, Support> = ManagerId::ALL
         .iter()
-        .map(|id| (*id, support_of(*id, spec)))
+        .map(|id| (*id, support_of(*id, spec, chocolatey_enabled())))
         .collect();
 
     info!(
