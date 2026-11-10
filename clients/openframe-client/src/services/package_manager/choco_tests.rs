@@ -214,16 +214,6 @@ fn updates_run_only_on_a_managed_choco() {
 }
 
 #[test]
-fn only_an_action_required_choco_offers_admin_options() {
-    assert!(assess(&customer("2.7.5")).options.is_empty());
-    assert!(assess(&customer("2.3.0")).options.is_empty());
-    assert_eq!(
-        assess(&customer("1.4.0")).options,
-        vec![AdminOption::DontTouch, AdminOption::AdminFix]
-    );
-}
-
-#[test]
 fn our_choco_owns_every_package_but_itself() {
     let report = assess(&ours("2.7.5"));
     assert!(report.ours);
@@ -261,13 +251,13 @@ fn report_serialises_to_the_agreed_wire_shape() {
     let managed = serde_json::to_string(&assess(&ours("2.7.5"))).unwrap();
     assert_eq!(
         managed,
-        r#"{"version":"2.7.5","edition":"OPEN_SOURCE","ours":true,"status":"MANAGED","options":[],"packages":["7zip","GoogleChrome"],"existingPackages":[]}"#
+        r#"{"version":"2.7.5","edition":"OPEN_SOURCE","ours":true,"status":"MANAGED","packages":["7zip","GoogleChrome"],"existingPackages":[]}"#
     );
 
     let action = serde_json::to_string(&assess(&customer("1.4.0"))).unwrap();
     assert_eq!(
         action,
-        r#"{"version":"1.4.0","edition":"OPEN_SOURCE","ours":false,"status":"ACTION_REQUIRED","reason":"VERSION_1","options":["DONT_TOUCH","ADMIN_FIX"],"packages":[],"existingPackages":["7zip","GoogleChrome"]}"#
+        r#"{"version":"1.4.0","edition":"OPEN_SOURCE","ours":false,"status":"ACTION_REQUIRED","reason":"VERSION_1","packages":[],"existingPackages":["7zip","GoogleChrome"]}"#
     );
 }
 

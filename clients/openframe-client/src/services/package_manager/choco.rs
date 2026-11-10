@@ -122,7 +122,6 @@ pub(super) struct ChocoReport {
     status: Status,
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<Reason>,
-    options: Vec<AdminOption>,
     packages: Vec<String>,
     existing_packages: Vec<String>,
 }
@@ -154,13 +153,6 @@ enum Reason {
     Unsigned,
     WeakAcl,
     SeveralInstalls,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum AdminOption {
-    DontTouch,
-    AdminFix,
 }
 
 impl ChocoReport {
@@ -252,14 +244,10 @@ fn assess(facts: &Facts) -> ChocoReport {
     let ours = same_dir(&facts.marker, &facts.root);
     let verdict = verdict(facts, version.as_ref());
 
-    let (status, reason, options) = match verdict {
-        Verdict::Managed => (Status::Managed, None, Vec::new()),
-        Verdict::UpgradeRequired => (Status::UpgradeRequired, None, Vec::new()),
-        Verdict::ActionRequired(reason) => (
-            Status::ActionRequired,
-            Some(reason),
-            vec![AdminOption::DontTouch, AdminOption::AdminFix],
-        ),
+    let (status, reason) = match verdict {
+        Verdict::Managed => (Status::Managed, None),
+        Verdict::UpgradeRequired => (Status::UpgradeRequired, None),
+        Verdict::ActionRequired(reason) => (Status::ActionRequired, Some(reason)),
     };
 
     let (packages, existing_packages) = facts
@@ -284,7 +272,6 @@ fn assess(facts: &Facts) -> ChocoReport {
         ours,
         status,
         reason,
-        options,
         packages,
         existing_packages,
     }
