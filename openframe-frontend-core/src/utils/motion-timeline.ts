@@ -35,28 +35,51 @@ export interface MotionTimeline {
   stop(): void;
 }
 
-/** One frame's largest step: a tab that slept, a frame that stalled, never jumps the scene ahead. */
-const MAX_FRAME_MS = 64;
+/**
+ * How late a wake may land before the clock stops counting the delay: a tab that slept, a stalled main thread,
+ * never jumps the scene ahead.
+ */
+const MAX_LATE_MS = 64;
 
+/**
+ * The clock wakes the main thread only when a beat is due (a timer to the next one), never on every frame: the motion
+ * itself is Web Animations, which the compositor plays alone, so a frame callback per vsync would only keep the page
+ * rendering (measured on the flamingo.run hero: about 5 s of main-thread work per 10 s at a 4x CPU throttle).
+ */
 export function createMotionTimeline(): MotionTimeline {
   let queue: Array<{ t: number; fn: () => void }> = [];
   const live = new Set<Animation>();
   let clock = 0;
-  let last = 0;
-  let frame = 0;
+  // The wall time the clock last caught up to.
+  let anchor = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let held = false;
   let running = false;
 
-  const tick = (now: number) => {
-    // The next frame is asked for first, so nothing a beat does can stop the clock.
-    frame = requestAnimationFrame(tick);
-    const dt = last ? Math.min(MAX_FRAME_MS, now - last) : 0;
-    last = now;
-    if (held) return;
-    clock += dt;
-    // Due beats run in time order; a beat may schedule another, which the next frame picks up.
+  const wall = () => (typeof performance === 'undefined' ? Date.now() : performance.now());
+
+  // Bring the clock up to now (only while playing). `limit` caps it: a late wake never runs beats ahead of their time.
+  const catchUp = (limit = Infinity) => {
+    const t = wall();
+    if (running && !held) clock = Math.min(clock + Math.max(0, t - anchor), limit);
+    anchor = t;
+  };
+
+  // `schedule` and `wake` call each other: the timer for the next due beat, and what runs when it fires.
+  let wake: (target: number) => void = () => {};
+  const schedule = () => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+    if (!running || held || queue.length === 0) return;
+    const next = Math.min(...queue.map(q => q.t));
+    timer = setTimeout(() => wake(next), Math.max(0, next - clock));
+  };
+
+  wake = (target: number) => {
+    timer = undefined;
+    catchUp(target + MAX_LATE_MS);
+    // Due beats run in time order; a beat may schedule another, which the next wake picks up.
     const due = queue.filter(q => q.t <= clock).sort((a, b) => a.t - b.t);
-    if (due.length === 0) return;
     queue = queue.filter(q => q.t > clock);
     for (const q of due) {
       // One failing beat is reported and skipped; the beats after it, and the scene, go on.
@@ -66,6 +89,7 @@ export function createMotionTimeline(): MotionTimeline {
         console.error('[motion-timeline] a scheduled beat failed', error);
       }
     }
+    schedule();
   };
 
   const settle = (animation: Animation) => {
@@ -80,7 +104,9 @@ export function createMotionTimeline(): MotionTimeline {
 
   return {
     at(delayMs, fn) {
+      catchUp();
       queue.push({ t: clock + Math.max(0, delayMs), fn });
+      schedule();
     },
     animate(el, keyframes, options = {}) {
       if (!el || typeof (el as HTMLElement).animate !== 'function') return null;
@@ -94,26 +120,31 @@ export function createMotionTimeline(): MotionTimeline {
       return animation;
     },
     setHeld(next) {
+      if (next === held) return;
+      catchUp();
       held = next;
-      // Re-anchored so the frame after a hold does not count the time held.
-      last = 0;
       for (const animation of live) {
         if (next) animation.pause();
         else animation.play();
       }
+      schedule();
     },
     get held() {
       return held;
     },
-    now: () => clock,
+    now() {
+      catchUp();
+      return clock;
+    },
     start() {
-      if (running || typeof requestAnimationFrame !== 'function') return;
+      if (running || typeof setTimeout !== 'function') return;
       running = true;
-      last = 0;
-      frame = requestAnimationFrame(tick);
+      anchor = wall();
+      schedule();
     },
     stop() {
-      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
       running = false;
       queue = [];
       for (const animation of [...live]) {
@@ -121,7 +152,6 @@ export function createMotionTimeline(): MotionTimeline {
         live.delete(animation);
       }
       clock = 0;
-      last = 0;
     },
   };
 }

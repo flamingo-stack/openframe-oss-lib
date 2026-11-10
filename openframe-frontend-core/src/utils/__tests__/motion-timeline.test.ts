@@ -5,17 +5,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMotionTimeline } from '../motion-timeline';
 
-/** A frame clock the test drives: `advance(ms)` runs frames 16 ms apart. */
-let frames: Array<(now: number) => void> = [];
+/** A wall clock and timers the test drives: `advance(ms)` moves time, firing each timer when its time comes. */
+let timers: Array<{ id: number; at: number; fn: () => void }> = [];
 let now = 0;
+let nextId = 1;
+let wakes = 0;
 function advance(ms: number) {
   const end = now + ms;
-  while (now < end) {
-    now += 16;
-    const due = frames;
-    frames = [];
-    for (const cb of due) cb(now);
+  for (;;) {
+    const due = timers.filter(t => t.at <= end).sort((x, y) => x.at - y.at)[0];
+    if (!due) break;
+    now = Math.max(now, due.at);
+    timers = timers.filter(t => t !== due);
+    wakes += 1;
+    due.fn();
   }
+  now = end;
 }
 
 class FakeAnimation {
@@ -50,11 +55,17 @@ function fakeElement() {
 }
 
 beforeEach(() => {
-  frames = [];
+  timers = [];
   now = 0;
-  vi.stubGlobal('requestAnimationFrame', (cb: (now: number) => void) => frames.push(cb));
-  vi.stubGlobal('cancelAnimationFrame', () => {
-    frames = [];
+  wakes = 0;
+  vi.stubGlobal('performance', { now: () => now });
+  vi.stubGlobal('setTimeout', (fn: () => void, ms = 0) => {
+    const id = nextId++;
+    timers.push({ id, at: now + ms, fn });
+    return id;
+  });
+  vi.stubGlobal('clearTimeout', (id: number) => {
+    timers = timers.filter(t => t.id !== id);
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -102,7 +113,7 @@ describe('createMotionTimeline', () => {
     expect(b.playState).toBe('running');
   });
 
-  it('settles an element\'s running animation before starting its next one', () => {
+  it("settles an element's running animation before starting its next one", () => {
     const tl = createMotionTimeline();
     const el = fakeElement();
     const first = tl.animate(el, [{ opacity: 1 }]) as unknown as FakeAnimation;
@@ -126,19 +137,28 @@ describe('createMotionTimeline', () => {
     expect(tl.now()).toBe(0);
   });
 
-  it('never jumps more than a frame\'s worth after a stall', () => {
+  it('never jumps ahead after a stall: a late wake runs only the beats that were due', () => {
     const tl = createMotionTimeline();
-    const ran = vi.fn();
-    tl.at(500, ran);
+    const ran: string[] = [];
+    tl.at(500, () => ran.push('due'));
+    tl.at(900, () => ran.push('later'));
     tl.start();
-    advance(16);
-    // One frame arrives 10 s late (a tab that slept).
+    // The wake for 500 ms arrives 10 s late (a tab that slept, a stalled main thread).
     now += 10_000;
-    const due = frames;
-    frames = [];
-    for (const cb of due) cb(now);
-    expect(tl.now()).toBeLessThanOrEqual(64);
-    expect(ran).not.toHaveBeenCalled();
+    advance(0);
+    expect(ran).toEqual(['due']);
+    expect(tl.now()).toBeLessThanOrEqual(500 + 64);
+  });
+
+  it('wakes only when a beat is due, never on every frame', () => {
+    const tl = createMotionTimeline();
+    tl.at(1000, () => {});
+    tl.at(3000, () => {});
+    tl.start();
+    advance(5000);
+    expect(wakes).toBe(2);
+    advance(10_000);
+    expect(wakes).toBe(2);
   });
 
   it('keeps going when a beat throws: the beats after it run and the clock goes on', () => {
