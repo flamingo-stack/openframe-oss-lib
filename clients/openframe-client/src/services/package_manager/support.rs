@@ -1,4 +1,5 @@
 use super::ManagerId;
+use crate::platform::dotnet_framework::DOTNET_4_8_RELEASE;
 use std::collections::BTreeMap;
 use std::sync::{Once, OnceLock};
 use tracing::info;
@@ -53,8 +54,6 @@ const STORELESS_EDITIONS: &[&str] = &[
 ];
 
 const MULTI_SESSION_EDITIONS: &[&str] = &["ServerRdsh"];
-
-const DOTNET_4_8_RELEASE: u32 = 528040;
 
 pub fn is_supported(id: ManagerId) -> bool {
     support_of(id, current()) == Support::Supported
@@ -234,18 +233,13 @@ fn detect() -> OsSpec {
         .and_then(|key| key.get_value::<String, _>("CurrentBuildNumber").ok())
         .and_then(|value| value.trim().parse().ok());
 
-    let dotnet_release = hklm
-        .open_subkey(r"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full")
-        .and_then(|key| key.get_value::<u32, _>("Release"))
-        .ok();
-
     OsSpec {
         os: Os::Windows,
         arch,
         product_type,
         edition_id,
         build,
-        dotnet_release,
+        dotnet_release: crate::platform::dotnet_framework::dotnet_release(),
     }
 }
 

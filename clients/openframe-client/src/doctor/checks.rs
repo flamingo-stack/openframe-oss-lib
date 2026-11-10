@@ -369,6 +369,36 @@ pub fn check_webview2_runtime() -> Option<CheckResult> {
     None
 }
 
+#[cfg(windows)]
+pub fn check_dotnet_framework() -> Option<CheckResult> {
+    crate::platform::dotnet_framework::dotnet_release().map(dotnet_framework_result)
+}
+
+#[cfg(not(windows))]
+pub fn check_dotnet_framework() -> Option<CheckResult> {
+    None
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn dotnet_framework_result(release: u32) -> CheckResult {
+    use super::Remediation;
+    use crate::platform::dotnet_framework::DOTNET_4_8_RELEASE;
+
+    if release >= DOTNET_4_8_RELEASE {
+        return CheckResult::pass(
+            CheckCategory::Runtime,
+            "Runtime: .NET Framework 4.8 or later installed",
+        );
+    }
+    CheckResult::warn(
+        CheckCategory::Runtime,
+        &format!("Runtime: .NET Framework older than 4.8 (release {})", release),
+        "Chocolatey, which OpenFrame uses to install and update apps on Windows, needs .NET Framework 4.8. \
+         Install it from https://dotnet.microsoft.com/download/dotnet-framework/net48.",
+    )
+    .with_remediation(Remediation::InstallDotnet48)
+}
+
 pub fn check_proxy_env() -> Option<CheckResult> {
     let mut detected = Vec::new();
     for var in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"] {
@@ -419,3 +449,7 @@ fn service_config_dir() -> std::path::PathBuf {
         crate::platform::directories::get_install_directory().join("bin")
     }
 }
+
+#[cfg(test)]
+#[path = "checks_tests.rs"]
+mod tests;

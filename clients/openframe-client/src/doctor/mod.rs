@@ -28,6 +28,7 @@ pub enum CheckStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Remediation {
     InstallWebview2,
+    InstallDotnet48,
 }
 
 #[derive(Debug)]
@@ -150,6 +151,9 @@ pub async fn run_preinstall(params: &InstallConfigParams) -> DoctorReport {
     if let Some(webview2) = check_webview2_runtime() {
         results.push(webview2);
     }
+    if let Some(dotnet) = check_dotnet_framework() {
+        results.push(dotnet);
+    }
 
     let dir_manager = DirectoryManager::new();
     let disk_targets: Vec<(&std::path::Path, &str)> = vec![
@@ -265,6 +269,9 @@ pub async fn run_auth(params: &InstallConfigParams) -> DoctorReport {
     if let Some(webview2) = check_webview2_runtime() {
         results.push(webview2);
     }
+    if let Some(dotnet) = check_dotnet_framework() {
+        results.push(dotnet);
+    }
 
     // Install may lie far in the past (golden image, pre-provisioned package), and tool
     // provisioning starts as soon as this succeeds.
@@ -295,6 +302,9 @@ pub async fn run_healthcheck() -> DoctorReport {
 
     if let Some(webview2) = check_webview2_runtime() {
         results.push(webview2);
+    }
+    if let Some(dotnet) = check_dotnet_framework() {
+        results.push(dotnet);
     }
 
     let dir_manager = DirectoryManager::new();

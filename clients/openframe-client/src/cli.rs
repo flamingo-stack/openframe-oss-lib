@@ -146,9 +146,13 @@ fn print_heal_outcomes(heals: &[HealResult]) {
     for heal in heals {
         let label = match heal.remediation {
             Remediation::InstallWebview2 => "WebView2 Runtime install",
+            Remediation::InstallDotnet48 => ".NET Framework 4.8 install",
         };
         match &heal.outcome {
             HealOutcome::Healed => println!("  [+] {} fixed", label),
+            HealOutcome::RestartRequired => {
+                println!("  [+] {} done; restart Windows to finish it", label)
+            }
             HealOutcome::Failed(e) => println!("  [x] {} failed: {}", label, e),
         }
     }

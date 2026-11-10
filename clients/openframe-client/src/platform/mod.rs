@@ -5,6 +5,7 @@ pub mod console;
 pub mod detached_process;
 pub mod directories;
 pub mod dmg_extractor;
+pub mod dotnet_framework;
 pub mod file_acl;
 pub mod file_lock;
 pub mod installation_detector;

@@ -1,3 +1,4 @@
+mod dotnet48_installer;
 #[cfg(windows)]
 mod download;
 mod webview2_installer;
@@ -10,6 +11,7 @@ use super::{CheckResult, Remediation};
 #[derive(Debug)]
 pub enum HealOutcome {
     Healed,
+    RestartRequired,
     Failed(String),
 }
 
@@ -41,6 +43,12 @@ pub async fn heal(results: &[CheckResult]) -> Vec<HealResult> {
         let outcome = run_action(remediation).await;
         match &outcome {
             HealOutcome::Healed => info!("Doctor healing: {:?} healed", remediation),
+            HealOutcome::RestartRequired => {
+                info!(
+                    "Doctor healing: {:?} needs a restart to finish",
+                    remediation
+                )
+            }
             HealOutcome::Failed(e) => warn!("Doctor healing: {:?} failed: {}", remediation, e),
         }
         heals.push(HealResult {
@@ -54,6 +62,7 @@ pub async fn heal(results: &[CheckResult]) -> Vec<HealResult> {
 async fn run_action(remediation: Remediation) -> HealOutcome {
     match remediation {
         Remediation::InstallWebview2 => webview2_installer::install().await,
+        Remediation::InstallDotnet48 => dotnet48_installer::install().await,
     }
 }
 
