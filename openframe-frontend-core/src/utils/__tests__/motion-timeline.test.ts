@@ -140,4 +140,20 @@ describe('createMotionTimeline', () => {
     expect(tl.now()).toBeLessThanOrEqual(64);
     expect(ran).not.toHaveBeenCalled();
   });
+
+  it('keeps going when a beat throws: the beats after it run and the clock goes on', () => {
+    const tl = createMotionTimeline();
+    const ran: string[] = [];
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    tl.at(100, () => {
+      throw new Error('boom');
+    });
+    tl.at(100, () => ran.push('same frame'));
+    tl.at(500, () => ran.push('later'));
+    tl.start();
+    advance(600);
+    expect(ran).toEqual(['same frame', 'later']);
+    expect(error).toHaveBeenCalledOnce();
+    expect(tl.now()).toBeGreaterThan(500);
+  });
 });

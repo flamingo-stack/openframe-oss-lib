@@ -48,18 +48,24 @@ export function createMotionTimeline(): MotionTimeline {
   let running = false;
 
   const tick = (now: number) => {
+    // The next frame is asked for first, so nothing a beat does can stop the clock.
+    frame = requestAnimationFrame(tick);
     const dt = last ? Math.min(MAX_FRAME_MS, now - last) : 0;
     last = now;
-    if (!held) {
-      clock += dt;
-      // Due beats run in time order; a beat may schedule another, which the next frame picks up.
-      const due = queue.filter(q => q.t <= clock).sort((a, b) => a.t - b.t);
-      if (due.length > 0) {
-        queue = queue.filter(q => q.t > clock);
-        for (const q of due) q.fn();
+    if (held) return;
+    clock += dt;
+    // Due beats run in time order; a beat may schedule another, which the next frame picks up.
+    const due = queue.filter(q => q.t <= clock).sort((a, b) => a.t - b.t);
+    if (due.length === 0) return;
+    queue = queue.filter(q => q.t > clock);
+    for (const q of due) {
+      // One failing beat is reported and skipped; the beats after it, and the scene, go on.
+      try {
+        q.fn();
+      } catch (error) {
+        console.error('[motion-timeline] a scheduled beat failed', error);
       }
     }
-    frame = requestAnimationFrame(tick);
   };
 
   const settle = (animation: Animation) => {
