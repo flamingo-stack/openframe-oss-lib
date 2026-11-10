@@ -116,7 +116,7 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   // (ChatRef-shaped items, `handleEntityCardList`), like github / slack.
   design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
   openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
-  prospect_call: (ids, b) => `${b}/api/prospect-calls?ids=${ids.join(',')}`,
+  recorded_call: (ids, b) => `${b}/api/recorded-calls?ids=${ids.join(',')}`,
   // The public website's own pages (live source; ChatRef-shaped items like the objects above).
   site_page: (ids, b) => `${b}/api/site-pages?ids=${ids.join(',')}`,
   openframe_price: (ids, b) => `${b}/api/openframe-pricing?ids=${ids.join(',')}`,
