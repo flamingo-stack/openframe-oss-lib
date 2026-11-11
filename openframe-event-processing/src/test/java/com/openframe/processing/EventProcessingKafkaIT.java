@@ -15,6 +15,9 @@ import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import com.openframe.publishing.config.EventsAutoConfiguration;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -54,7 +57,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,14 +68,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-// A real broker: the module creates its topics, then record -> listener -> runner -> projection, and the error handler's retry and DLT.
+// A real broker: the topics exist as management creates them, then record -> listener -> runner -> projection, and the error handler's retry and DLT.
 @SpringBootTest(classes = EventProcessingKafkaIT.TestApplication.class,
         properties = {"openframe.events.enabled=true", "spring.data.mongodb.enabled=true",
                 "openframe.events.topics.organizations.enabled=true",
                 "openframe.events.processing.kafka.topic-prefix=events.",
                 "openframe.events.processing.kafka.group-prefix=processing-it.",
-                "openframe.events.processing.kafka.topics.events.replication-factor=1",
-                "openframe.events.processing.kafka.topics.dead-letter.replication-factor=1",
                 "openframe.events.processing.kafka.back-off.initial-interval=100ms",
                 "openframe.events.processing.kafka.back-off.max-interval=200ms"})
 @Testcontainers
@@ -92,9 +95,36 @@ class EventProcessingKafkaIT {
     @Container
     static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka:4.0.0"));
 
+    private static boolean topicsCreated;
+
     @DynamicPropertySource
     static void kafkaProperties(DynamicPropertyRegistry registry) {
-        registry.add("openframe.events.processing.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
+        registry.add("openframe.events.processing.kafka.bootstrap-servers", EventProcessingKafkaIT::bootstrapServersWithTopics);
+    }
+
+    // Read lazily, once the container runs; management creates the topics in a real environment, the stream only checks them.
+    private static synchronized String bootstrapServersWithTopics() {
+        if (!topicsCreated) {
+            createTopics();
+            topicsCreated = true;
+        }
+        return KAFKA.getBootstrapServers();
+    }
+
+    private static void createTopics() {
+        Map<String, Object> adminProperties = Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        Map<String, String> compacted = Map.of("cleanup.policy", "compact");
+        NewTopic events = new NewTopic(TOPIC, 1, (short) 1).configs(compacted);
+        NewTopic deadLetter = new NewTopic(DEAD_LETTER_TOPIC, 1, (short) 1);
+        List<NewTopic> topics = List.of(events, deadLetter);
+        try (AdminClient admin = AdminClient.create(adminProperties)) {
+            admin.createTopics(topics).all().get(30, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while creating the IT topics", interrupted);
+        } catch (ExecutionException | TimeoutException failure) {
+            throw new IllegalStateException("Could not create the IT topics", failure);
+        }
     }
 
     @Autowired @Qualifier("eventProcessingKafkaTemplate") private KafkaTemplate<String, byte[]> eventProcessingKafkaTemplate;

@@ -560,6 +560,20 @@ export interface EmbeddableChatProps {
    */
   threadHeaderActions?: ReadonlyArray<MingoChatHeaderAction>;
   /**
+   * How the header portalled into `threadContainer` looks: `'page'` (default) the page
+   * bar (title · owner · day); `'column'` a work-area chat column's header (Figma
+   * `chat/header`: the panel surface, the owner's avatar in a cell, 20px glyphs).
+   * Split layout only.
+   */
+  threadHeaderLook?: 'page' | 'column';
+  /**
+   * The portalled thread fades out at its end, into the composer under it, as a page
+   * fades under a floating dock (`ChatMessageList` `fadeEnd`). Split layout only.
+   */
+  threadFadeEnd?: boolean;
+  /** The composer's side inset (`ChatComposer` `inset`). Default `'always'`. */
+  composerInset?: 'always' | 'wide';
+  /**
    * The thread's column inside `threadContainer` — e.g. `mx-auto max-w-[760px]` to
    * centre it at the composer's width on a wide chat page; the header stays full
    * width. Omitted: the column fills the container (a narrow panel, a sheet).
@@ -1155,6 +1169,9 @@ function EmbeddableChatInner({
   rail = 'auto',
   threadContainer,
   threadHeaderActions,
+  threadHeaderLook = 'page',
+  threadFadeEnd = false,
+  composerInset = 'always',
   threadContentClassName,
   showModel = true,
   onModelClick,
@@ -2783,6 +2800,8 @@ function EmbeddableChatInner({
               messages={messages}
               isLoading={messagesInitialLoading}
               fill={previewMode}
+              // The split layout's column: the thread fades out into the composer under it.
+              fadeEnd={splitMode && threadFadeEnd}
               // v2 thread: names without the colon, 24px
               // faces, 16px between messages (shared with fae v2).
               appearance={appearance}
@@ -2985,6 +3004,7 @@ function EmbeddableChatInner({
       previewText={composerPreviewText ?? undefined}
       safeAreaBottom={safeAreaBottom}
       edgeLight={composerEdgeLight}
+      inset={composerInset}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
       attachmentsCount={stagedAttachments.length}
       onAddFiles={addAttachmentFiles}
@@ -3408,6 +3428,8 @@ function EmbeddableChatInner({
   const pageHeader = (
     <MingoChatHeader
       variant="page"
+      look={threadHeaderLook === 'column' ? 'column' : 'default'}
+      avatar={threadHeaderLook === 'column' && !archiveOpen && hasConversation ? headerAvatar : undefined}
       // Over the archive the header is the archive's (see the v2 header).
       title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
       meta={archiveOpen || !hasConversation ? undefined : [headerPersonName, chatDayLabel(activeDialog?.timestamp)]}
@@ -3431,7 +3453,9 @@ function EmbeddableChatInner({
     <div
       ref={setThreadBoundary}
       className={cn(
-        'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden',
+        // `overflow-clip`, not `hidden`: it clips the same, but is no scroll container, so the
+        // column header can stick (a squeezed work-area column scrolls sideways under it).
+        'flex h-full min-h-0 w-full min-w-0 flex-col overflow-clip',
         previewMode && 'pointer-events-none select-none',
       )}
     >

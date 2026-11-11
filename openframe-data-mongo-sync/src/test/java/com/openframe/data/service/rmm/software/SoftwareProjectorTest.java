@@ -1,14 +1,14 @@
 package com.openframe.data.service.rmm.software;
 
-import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
-import com.openframe.data.document.rmm.software.FleetSource;
-import com.openframe.data.document.rmm.software.DeviceSoftware;
-import com.openframe.data.document.rmm.software.Software;
-import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageMatchState;
+import com.openframe.data.document.rmm.software.Software;
+import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareAggregationRepository;
+import com.openframe.data.repository.rmm.software.SoftwareRepository;
+import com.openframe.data.repository.rmm.software.SoftwareTitleRollup;
 import com.openframe.data.service.rmm.software.matching.InstalledProgram;
 import com.openframe.data.service.rmm.software.matching.PackageMatch;
 import com.openframe.data.service.rmm.software.matching.SoftwarePackageMatcher;
@@ -19,17 +19,17 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Map;
-import java.util.IdentityHashMap;
-import java.util.ArrayList;
-import java.time.Instant;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,81 +40,55 @@ import static org.mockito.Mockito.when;
 class SoftwareProjectorTest {
 
     @Mock private SoftwareRepository softwareRepository;
-    @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
+    @Mock private DeviceSoftwareAggregationRepository aggregationRepository;
     @Mock private SoftwarePackageMatcher packageMatcher;
 
     @InjectMocks private SoftwareProjector projector;
 
     @Test
     void project_nullTenantOrTitle_isNoOp() {
-        projector.project(null, 42L);
-        projector.project("t1", null);
-        verifyNoInteractions(softwareRepository, deviceSoftwareRepository);
+        assertThat(projector.project(null, 42L)).isZero();
+        assertThat(projector.project("t1", null)).isZero();
+        verifyNoInteractions(softwareRepository, aggregationRepository);
     }
 
     @Test
     void project_noInstalls_deletesAggregate() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 42L)).thenReturn(List.of());
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.empty());
 
-        projector.project("t1", 42L);
+        assertThat(projector.project("t1", 42L)).isZero();
 
         verify(softwareRepository).deleteByTenantIdAndSoftwareTitleId("t1", 42L);
         verify(softwareRepository, never()).save(any());
     }
 
     @Test
-    void project_withInstalls_buildsAggregateFromEdgesWithDistinctDevices() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 42L)).thenReturn(List.of(
-                DeviceSoftware.builder().machineId("m1")
-                        .versions(List.of("1.0", "2.0")).vulnerabilities(List.of("CVE-1", "CVE-2"))
-                        .name("Google Chrome").source("apps").build(),
-                DeviceSoftware.builder().machineId("m2")
-                        .versions(List.of("1.5")).vulnerabilities(List.of("CVE-1"))  // duplicate across machines
-                        .name("Google Chrome").source("apps").build()));
+    void project_withInstalls_storesTheRollup() {
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup()
+                .devicesCount(2).name("Google Chrome").source("apps")
+                .versions(List.of("1.0", "1.5", "2.0")).cveCount(2).build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
 
-        projector.project("t1", 42L);
+        assertThat(projector.project("t1", 42L)).isEqualTo(2);
 
         ArgumentCaptor<Software> captor = ArgumentCaptor.forClass(Software.class);
         verify(softwareRepository).save(captor.capture());
         Software saved = captor.getValue();
         assertThat(saved.getTenantId()).isEqualTo("t1");
         assertThat(saved.getSoftwareTitleId()).isEqualTo(42L);
-        assertThat(saved.getName()).isEqualTo("Google Chrome");          // from the device edge
+        assertThat(saved.getName()).isEqualTo("Google Chrome");
         assertThat(saved.getNameLower()).isEqualTo("google chrome");
         assertThat(saved.getSource()).isEqualTo("apps");
-        assertThat(saved.getLatestVersion()).isEqualTo("2.0");           // max across all installed versions
-        assertThat(saved.getInstallations()).hasSize(2);
-        assertThat(saved.getInstallations().get(0).getVersions()).containsExactly("1.0", "2.0");
-        assertThat(saved.getDevicesCount()).isEqualTo(2);                // m1, m2 distinct
+        assertThat(saved.getLatestVersion()).isEqualTo("2.0");
+        assertThat(saved.getDevicesCount()).isEqualTo(2);
         assertThat(saved.getCveCount()).isEqualTo(2);
         assertThat(saved.getUpdatedAt()).isNotNull();
     }
 
     @Test
-    void project_withInstallsNoCves_zeroCveCount() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 42L)).thenReturn(List.of(
-                DeviceSoftware.builder().machineId("m1").versions(List.of("1.0")).vulnerabilities(List.of())
-                        .name("Custom App").source("programs").build()));
-        lenient().when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
-
-        projector.project("t1", 42L);
-
-        ArgumentCaptor<Software> captor = ArgumentCaptor.forClass(Software.class);
-        verify(softwareRepository).save(captor.capture());
-        Software saved = captor.getValue();
-        assertThat(saved.getName()).isEqualTo("Custom App");
-        assertThat(saved.getNameLower()).isEqualTo("custom app");
-        assertThat(saved.getSource()).isEqualTo("programs");
-        assertThat(saved.getCveCount()).isZero();
-    }
-
-    // versions are compared per numeric segment, not as text: "10.0" sorts before "9.0" as a string
-    @Test
     void project_latestVersion_isTheNumericMaximum() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 42L)).thenReturn(List.of(
-                DeviceSoftware.builder().machineId("m1").versions(List.of("9.0")).name("jq").source("apps").build(),
-                DeviceSoftware.builder().machineId("m2").versions(List.of("10.0")).name("jq").source("apps").build()));
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup()
+                .name("jq").versions(List.of("10.0", "9.0")).build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
 
         projector.project("t1", 42L);
@@ -125,16 +99,65 @@ class SoftwareProjectorTest {
     }
 
     @Test
-    void project_windowsProgram_storesTheUnionOfItsKeysAndTheMatch() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 7L)).thenReturn(List.of(
-                DeviceSoftware.builder().machineId("m1").name("Google Chrome").source("programs")
-                        .versions(List.of("130.0")).vendor("Google LLC").upgradeCode("{UPGRADE}")
-                        .arpKeys(List.of("Google Chrome")).packageFamilyNames(List.of("google.chrome_x"))
-                        .installerTypes(List.of("exe")).systemComponent(false).build(),
-                DeviceSoftware.builder().machineId("m2").name("Google Chrome").source("programs")
-                        .versions(List.of("129.0")).vendor("Google LLC")
-                        .arpKeys(List.of("{8A69D345-D564-463C-AFF1-A69D9E530F96}")).installerTypes(List.of("msi"))
-                        .systemComponent(null).build()));
+    void project_currentVersion_isOnTheMostDevices_olderVersionsAreTheRest() {
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup()
+                .devicesByVersion(Map.of("1.6", 1, "1.7", 2, "1.5", 1)).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
+
+        projector.project("t1", 42L);
+
+        ArgumentCaptor<Software> saved = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(saved.capture());
+        assertThat(saved.getValue().getCurrentVersion()).isEqualTo("1.7");
+        assertThat(saved.getValue().getOlderVersionsCount()).isEqualTo(2);
+    }
+
+    @Test
+    void project_currentVersion_tieGoesToTheNewerVersion() {
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup()
+                .devicesByVersion(Map.of("9.0", 2, "10.0", 2)).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
+
+        projector.project("t1", 42L);
+
+        ArgumentCaptor<Software> saved = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(saved.capture());
+        assertThat(saved.getValue().getCurrentVersion()).isEqualTo("10.0");
+        assertThat(saved.getValue().getOlderVersionsCount()).isEqualTo(1);
+    }
+
+    @Test
+    void project_noVersionCounts_noCurrentVersionAndNoOlderVersions() {
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup().devicesByVersion(Map.of()).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
+
+        projector.project("t1", 42L);
+
+        ArgumentCaptor<Software> saved = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(saved.capture());
+        assertThat(saved.getValue().getCurrentVersion()).isNull();
+        assertThat(saved.getValue().getOlderVersionsCount()).isZero();
+    }
+
+    @Test
+    void project_noVersions_noLatestVersion() {
+        when(aggregationRepository.rollUpTitle("t1", 42L)).thenReturn(Optional.of(rollup().versions(List.of()).build()));
+        lenient().when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
+
+        projector.project("t1", 42L);
+
+        ArgumentCaptor<Software> saved = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(saved.capture());
+        assertThat(saved.getValue().getLatestVersion()).isNull();
+    }
+
+    @Test
+    void project_windowsProgram_storesItsKeysAndTheMatch() {
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(rollup()
+                .name("Google Chrome").source("programs").vendor("Google LLC").upgradeCode("{UPGRADE}")
+                .arpKeys(List.of("Google Chrome", "{8A69D345-D564-463C-AFF1-A69D9E530F96}"))
+                .packageFamilyNames(List.of("google.chrome_x")).installerTypes(List.of("exe", "msi"))
+                .systemComponent(false).build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.empty());
         PackageCatalogEntry chrome = PackageCatalogEntry.builder()
                 .manager(PackageManagerType.WINGET).packageId("Google.Chrome").version("130.0").build();
@@ -144,6 +167,7 @@ class SoftwareProjectorTest {
 
         InstalledProgram program = asked.getFirst();
         assertThat(program.getFleetSource()).isEqualTo(FleetSource.PROGRAMS);
+        assertThat(program.getName()).isEqualTo("Google Chrome");
         assertThat(program.getPublisher()).isEqualTo("Google LLC");
         assertThat(program.getUpgradeCode()).isEqualTo("{UPGRADE}");
         assertThat(program.getProductCodes())
@@ -166,9 +190,22 @@ class SoftwareProjectorTest {
     }
 
     @Test
+    void project_systemComponent_isStored() {
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(rollup().systemComponent(true).build()));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.empty());
+        List<InstalledProgram> asked = stubMatch(PackageMatch.noPackage());
+
+        projector.project("t1", 7L);
+
+        assertThat(asked.getFirst().isSystemComponent()).isTrue();
+        ArgumentCaptor<Software> captor = ArgumentCaptor.forClass(Software.class);
+        verify(softwareRepository).save(captor.capture());
+        assertThat(captor.getValue().getSystemComponent()).isTrue();
+    }
+
+    @Test
     void project_noMatcherForTheSource_noStoredMatch() {
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 8L)).thenReturn(List.of(
-                DeviceSoftware.builder().machineId("m1").name("Slack").source("apps").versions(List.of("4.0")).build()));
+        when(aggregationRepository.rollUpTitle("t1", 8L)).thenReturn(Optional.of(rollup().name("Slack").build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 8L)).thenReturn(Optional.empty());
         when(packageMatcher.match(anyList())).thenReturn(Map.of());
 
@@ -178,14 +215,13 @@ class SoftwareProjectorTest {
         verify(softwareRepository).save(captor.capture());
         assertThat(captor.getValue().getPackageMatch()).isNull();
         assertThat(captor.getValue().getArpKeys()).isEmpty();
-        // no device reports the flag: not a SystemComponent
         assertThat(captor.getValue().getSystemComponent()).isFalse();
     }
 
     @Test
     void project_sameKeysAndFreshMatch_keepsTheStoredMatchWithoutAsking() {
         Software stored = chromeProjected(Instant.now().minus(Duration.ofHours(1)));
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 7L)).thenReturn(List.of(chromeOnM1()));
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup().build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.of(stored));
 
         projector.project("t1", 7L);
@@ -199,7 +235,7 @@ class SoftwareProjectorTest {
     @Test
     void project_sameKeysButStaleMatch_matchesAgain() {
         Software stored = chromeProjected(Instant.now().minus(SoftwareProjector.MATCH_TTL).minus(Duration.ofMinutes(1)));
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 7L)).thenReturn(List.of(chromeOnM1()));
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup().build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.of(stored));
         stubMatch(PackageMatch.noPackage());
 
@@ -213,9 +249,8 @@ class SoftwareProjectorTest {
     @Test
     void project_keyChanged_matchesAgain() {
         Software stored = chromeProjected(Instant.now());
-        DeviceSoftware msiNow = chromeOnM1();
-        msiNow.setArpKeys(List.of("{8A69D345-D564-463C-AFF1-A69D9E530F96}"));
-        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrue("t1", 7L)).thenReturn(List.of(msiNow));
+        when(aggregationRepository.rollUpTitle("t1", 7L)).thenReturn(Optional.of(chromeRollup()
+                .arpKeys(List.of("{8A69D345-D564-463C-AFF1-A69D9E530F96}")).build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 7L)).thenReturn(Optional.of(stored));
         List<InstalledProgram> asked = stubMatch(PackageMatch.ambiguous());
 
@@ -227,13 +262,11 @@ class SoftwareProjectorTest {
         assertThat(captor.getValue().getPackageMatch().getState()).isEqualTo(PackageMatchState.AMBIGUOUS);
     }
 
-    private static DeviceSoftware chromeOnM1() {
-        return DeviceSoftware.builder().machineId("m1").name("Google Chrome").source("programs")
-                .versions(List.of("130.0")).vendor("Google LLC").arpKeys(List.of("Google Chrome"))
-                .systemComponent(false).build();
+    private static RollupBuilder chromeRollup() {
+        return rollup().name("Google Chrome").source("programs").vendor("Google LLC")
+                .versions(List.of("130.0")).arpKeys(List.of("Google Chrome")).systemComponent(false);
     }
 
-    // what the projector stored for chromeOnM1 earlier: same keys, matched at the given time
     private static Software chromeProjected(Instant matchedAt) {
         return Software.builder().tenantId("t1").softwareTitleId(7L).name("Google Chrome").source("programs")
                 .vendor("Google LLC").arpKeys(List.of("Google Chrome")).packageFamilyNames(List.of()).systemComponent(false)
@@ -252,5 +285,42 @@ class SoftwareProjectorTest {
             return matches;
         });
         return asked;
+    }
+
+    private static RollupBuilder rollup() {
+        return new RollupBuilder();
+    }
+
+    private static final class RollupBuilder {
+        private int devicesCount = 1;
+        private String name = "App";
+        private String source = "apps";
+        private String vendor;
+        private String upgradeCode;
+        private List<String> versions = List.of("1.0");
+        private int cveCount;
+        private List<String> arpKeys = List.of();
+        private List<String> packageFamilyNames = List.of();
+        private List<String> installerTypes = List.of();
+        private boolean systemComponent;
+        private Map<String, Integer> devicesByVersion = Map.of("1.0", 1);
+
+        RollupBuilder devicesCount(int value) { devicesCount = value; return this; }
+        RollupBuilder name(String value) { name = value; return this; }
+        RollupBuilder source(String value) { source = value; return this; }
+        RollupBuilder vendor(String value) { vendor = value; return this; }
+        RollupBuilder upgradeCode(String value) { upgradeCode = value; return this; }
+        RollupBuilder versions(List<String> value) { versions = value; return this; }
+        RollupBuilder cveCount(int value) { cveCount = value; return this; }
+        RollupBuilder arpKeys(List<String> value) { arpKeys = value; return this; }
+        RollupBuilder packageFamilyNames(List<String> value) { packageFamilyNames = value; return this; }
+        RollupBuilder installerTypes(List<String> value) { installerTypes = value; return this; }
+        RollupBuilder systemComponent(boolean value) { systemComponent = value; return this; }
+        RollupBuilder devicesByVersion(Map<String, Integer> value) { devicesByVersion = value; return this; }
+
+        SoftwareTitleRollup build() {
+            return new SoftwareTitleRollup(devicesCount, name, source, vendor, upgradeCode, versions, cveCount,
+                    arpKeys, packageFamilyNames, installerTypes, systemComponent, devicesByVersion);
+        }
     }
 }

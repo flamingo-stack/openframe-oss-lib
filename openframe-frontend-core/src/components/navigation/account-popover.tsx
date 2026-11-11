@@ -56,6 +56,19 @@ export interface AccountPopoverProps {
    * in the rail), so outside a sidebar it is the avatar alone.
    */
   collapsed?: boolean;
+  /**
+   * Where the avatar sits while `collapsed`:
+   * - `start` (default): 8px in, on the rail rows' icon line;
+   * - `center`: centred in the trigger, for a rail whose buttons are centred
+   *   (the name is taken out of the row, so it no longer holds the avatar left).
+   */
+  collapsedAlign?: 'start' | 'center';
+  /**
+   * The trigger is the avatar alone at every width, the name and email only in the menu's
+   * header (a footer row that keeps its room for other buttons). Named for screen readers
+   * and in its tooltip; the menu still opens above it unless `collapsed`. Default `false`.
+   */
+  avatarOnly?: boolean;
   /** Controlled open state; pair with `onOpenChange`. Uncontrolled by default. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -120,12 +133,17 @@ export function AccountPopover({
   avatarUrl,
   items,
   collapsed = false,
+  collapsedAlign = 'start',
+  avatarOnly = false,
   open: openProp,
   onOpenChange,
   disabled = false,
   className,
 }: AccountPopoverProps) {
   const unread = items.some(entry => entry.type !== 'divider' && (entry.count ?? 0) > 0);
+  const centred = collapsed && collapsedAlign === 'center';
+  // No visible name: the trigger is named instead (its accessible name and tooltip).
+  const unnamed = collapsed || avatarOnly;
   // The name and subtitle a narrow sidebar clips: their full text in a tooltip
   // over them, only while clipped and where a pointer can hover. The rail's
   // tooltip is the trigger's `title`.
@@ -157,15 +175,21 @@ export function AccountPopover({
           disabled={disabled}
           // The visible name is the label when expanded; the rail shows only the
           // avatar, so it gets the name as its accessible name and tooltip.
-          aria-label={collapsed ? `Account: ${name}` : undefined}
-          title={collapsed ? name : undefined}
+          aria-label={unnamed ? `Account: ${name}` : undefined}
+          title={unnamed ? name : undefined}
           // The shape follows the sidebar's width (the `of-nav-sidebar`
           // container), as its rows do: the avatar holds its place — 8px in at
           // both widths, on the rows' icon line — and the name fades as the width
           // crosses 140px. `collapsed` flips on the click, mid-way through that.
           className={cn(
-            'group/account flex h-11 w-full min-w-0 items-center gap-[var(--spacing-system-xsf)] overflow-hidden rounded-md text-left',
-            'pl-[var(--spacing-system-xsf)] pr-0 @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]',
+            'group/account flex h-11 min-w-0 items-center gap-[var(--spacing-system-xsf)] overflow-hidden rounded-md text-left',
+            // Avatar only: a square around it, the size of the row's other buttons.
+            avatarOnly && !collapsed ? 'size-8 shrink-0 justify-center gap-0 p-0' : 'w-full',
+            centred && 'justify-center gap-0 px-0',
+            // The rail keeps the avatar 8px in, `avatarOnly` or not; only the square above has no padding.
+            !centred &&
+              (!avatarOnly || collapsed) &&
+              'pl-[var(--spacing-system-xsf)] pr-0 @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]',
             'transition-[padding,background-color] duration-200 hover:bg-ods-bg-hover data-[state=open]:bg-ods-bg-hover motion-reduce:transition-none',
             disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',
             className,
@@ -183,8 +207,11 @@ export function AccountPopover({
             {unread && <UnreadDot size="fixed" />}
           </span>
           <span
-            className="flex min-w-0 flex-1 flex-col opacity-0 transition-opacity duration-150 @[140px]/of-nav-sidebar:opacity-100 motion-reduce:transition-none"
-            aria-hidden={collapsed || undefined}
+            className={cn(
+              'min-w-0 flex-1 flex-col opacity-0 transition-opacity duration-150 @[140px]/of-nav-sidebar:opacity-100 motion-reduce:transition-none',
+              centred || avatarOnly ? 'hidden' : 'flex',
+            )}
+            aria-hidden={unnamed || undefined}
           >
             {/* The chevron follows the name, so it reads as this row's menu and not
                 as one more of the buttons a host sets at the row's end. */}

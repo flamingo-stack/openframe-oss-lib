@@ -1,6 +1,7 @@
 package com.openframe.external.controller;
 
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.exception.DeviceNotFoundException;
@@ -201,7 +202,7 @@ public class DeviceController {
                 .tagValues(tagValues)
                 .build();
         var filters = deviceFilterService.getDeviceFilters(
-                filterCriteria).join();
+                filterCriteria, DeviceFilterFacet.REST).join();
         return deviceMapper.toDeviceFilterResponse(filters);
     }
 

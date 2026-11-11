@@ -8,42 +8,22 @@
  * ternary (they drift: the pre-hook BlogCard chain couldn't recover from a
  * FAILING placeholder, EntityPortraitCard duplicated the same logic with
  * different state). Cards wire `src` + `onError` and render their own
- * empty-state when `src` is null.
- *
- * Implementation note: state is the SET of candidate URLs that failed, and
- * `src` is derived — so a prop change (new cover URL) re-resolves instantly
- * with no reset effect, and a URL that failed once isn't retried in a loop.
+ * empty-state when `src` is null. The chain itself is `useImageFallback`.
  */
 
-import { useCallback, useState, type SyntheticEvent } from 'react';
+import type { SyntheticEvent } from 'react';
+import { type ImageFallback, useImageFallback } from '../../../hooks/use-image-fallback';
 
-export interface CoverImageFallback {
-  /** Resolved source: first non-failed of [imageUrl, placeholderUrl], else null. */
-  src: string | null;
-  /** Wire to the media element's `onError`. */
-  onError: () => void;
-}
+export type CoverImageFallback = ImageFallback;
 
 export function useCoverImageFallback(imageUrl?: string | null, placeholderUrl?: string | null): CoverImageFallback {
-  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
-
-  const src =
-    imageUrl && !failed.has(imageUrl)
-      ? imageUrl
-      : placeholderUrl && !failed.has(placeholderUrl)
-        ? placeholderUrl
-        : null;
-
-  const onError = useCallback(() => {
-    if (!src) return;
-    setFailed(prev => new Set(prev).add(src));
-  }, [src]);
-
-  return { src, onError };
+  return useImageFallback(imageUrl, placeholderUrl);
 }
 
 /** Fallback for cards with NO placeholder chain (compact/sm image slots):
- *  a broken cover simply disappears, leaving the slot's background. */
+ *  a broken cover simply disappears, leaving the slot's background.
+ *  Legacy: a DOM write in `onError`, which the next src does not undo. New
+ *  code renders nothing when `useImageFallback(url).src` is null instead. */
 export const hideOnError = (e: SyntheticEvent<HTMLImageElement>) => {
   const img = e.currentTarget;
   img.style.display = 'none';

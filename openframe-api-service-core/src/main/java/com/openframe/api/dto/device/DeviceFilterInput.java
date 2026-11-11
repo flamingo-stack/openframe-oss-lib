@@ -2,6 +2,8 @@ package com.openframe.api.dto.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.rmm.script.OsType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,4 +23,6 @@ public class DeviceFilterInput {
     private List<String> organizationIds;
     private List<String> tagKeys;
     private List<String> tagValues;
+    private List<DirectorySource> directorySources;
+    private List<DirectoryUserLink> userLinks;
 } 
