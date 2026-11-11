@@ -234,6 +234,51 @@ describe('MingoChatRail variant="section"', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('MingoChatSearchModal: the arrow keys walk the results and Enter opens the one reached', () => {
+    const onSelectDialog = vi.fn();
+    render(
+      <MingoChatSearchModal
+        open
+        onOpenChange={vi.fn()}
+        onSearchChange={vi.fn()}
+        onSelectDialog={onSelectDialog}
+        dialogs={DIALOGS}
+      />,
+    );
+    const input = screen.getByPlaceholderText('Search for Chats');
+    const newest = () => within(screen.getByRole('dialog')).getByRole('button', { name: 'osquery check' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(newest()).toHaveAttribute('data-highlighted');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(newest()).not.toHaveAttribute('data-highlighted');
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(newest()).toHaveAttribute('data-highlighted');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSelectDialog).toHaveBeenCalledWith('a');
+  });
+
+  it('MingoChatSearchModal: Enter alone opens the first result once the list shows the term', async () => {
+    const onSelectDialog = vi.fn();
+    const onSearchChange = vi.fn();
+    render(
+      <MingoChatSearchModal
+        open
+        onOpenChange={vi.fn()}
+        onSearchChange={onSearchChange}
+        onSelectDialog={onSelectDialog}
+        dialogs={DIALOGS}
+      />,
+    );
+    const input = screen.getByPlaceholderText('Search for Chats');
+    fireEvent.change(input, { target: { value: 'osq' } });
+    // The term waits for its debounce: the first Enter sends it, it opens nothing.
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSearchChange).toHaveBeenLastCalledWith('osq');
+    expect(onSelectDialog).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSelectDialog).toHaveBeenCalledWith('a');
+  });
+
   it('keeps its own search state without a host one', async () => {
     render(<MingoChatRail variant="section" dialogs={DIALOGS} onSearchChange={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Search chats' }));
