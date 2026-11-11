@@ -1,6 +1,7 @@
 'use client';
 
 import { useContext, useSyncExternalStore, type ReactNode } from 'react';
+import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
 import { LoadingFallback } from '../../loading/loading-fallback';
 import { LoadingRegion } from '../../loading/loading-region';
@@ -64,6 +65,9 @@ export function DataTableGridBody<T = unknown>({
   const loading = inScope || loadingProp;
   const rows = table.getRowModel().rows;
   const hasRows = rows.length > 0;
+  // A grid table has no card body beside this one, so this body is the one that tells `<DataTable.InfiniteFooter>`
+  // its rows continue here. Without it the footer draws its own load-more rows too, as card rows under the grid.
+  useIsomorphicLayoutEffect(() => (hasRows ? loadMore.registerRowsBody() : undefined), [loadMore, hasRows]);
   const skeletonRows =
     skeletonRowsProp ?? dataTablePageSize(table) ?? (minRows && minRows > 0 ? minRows : DATA_TABLE_SKELETON_ROWS);
 

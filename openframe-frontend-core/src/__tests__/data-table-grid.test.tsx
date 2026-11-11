@@ -21,8 +21,7 @@ import { LoadingScope } from '../components/ui/loading-scope';
 
 /**
  * The grid layout (`<DataTable layout="grid">`). jsdom has no layout, so what is locked here is the structure and the
- * state: the column order and pinning rule, both forms of the body being in the tree (CSS picks one, so the first
- * render is the same at every width), the classes that make a row 48px and one line, selection on memoised rows, and
+ * state: the column order and pinning rule, the grid being the one form of the body at every width, the classes that make a row 48px and one line, selection on memoised rows, and
  * a checkbox inside a row link. Sizes, sticky positions and gradients are measured in the browser on the stories.
  */
 
@@ -108,6 +107,23 @@ function gridHeaderMarkup(container: HTMLElement): string {
 /** The markup of the grid form of the body (from its opening tag on). */
 function gridBodyMarkup(container: HTMLElement): string {
   return container.innerHTML.slice(container.innerHTML.indexOf('data-grid-body'));
+}
+
+/** How many row slots the table draws: a loaded row and a loading row carry the same marker. */
+function rowSlots(container: HTMLElement): number {
+  return container.innerHTML.split('data-loading-item').length - 1;
+}
+
+/** A grid table with rows and an infinite footer that is reading the next page. */
+function GridLoadingMore() {
+  const table = useDataTable<Item>({ data: ITEMS, columns: COLUMNS, getRowId: item => item.id });
+  return (
+    <DataTable table={table} layout="grid">
+      <DataTable.Header />
+      <DataTable.Body<Item> />
+      <DataTable.InfiniteFooter hasNextPage isFetchingNextPage onLoadMore={() => undefined} skeletonRows={2} />
+    </DataTable>
+  );
 }
 
 /** Which edges have a gradient, in document order. */
@@ -224,6 +240,12 @@ describe('createGridScrollController', () => {
 });
 
 describe('DataTable grid layout', () => {
+  it('draws the next page’s loading rows once, as grid rows: the footer adds none of its own', () => {
+    const { container } = render(<GridLoadingMore />);
+    // The loaded rows and the two loading rows the body draws; the footer's own two would make it two more.
+    expect(rowSlots(container)).toBe(ITEMS.length + 2);
+  });
+
   it('is the grid at every width: no card form in the tree, nothing hidden by a breakpoint', () => {
     const { container } = render(<Grid />);
     for (const part of ['data-grid-body', 'data-grid-header', 'data-grid-meta']) {

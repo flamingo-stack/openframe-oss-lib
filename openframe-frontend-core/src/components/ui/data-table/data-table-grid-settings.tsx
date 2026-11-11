@@ -3,7 +3,7 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import type { Column } from '@tanstack/react-table';
 import type React from 'react';
-import { useContext, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '../../../utils/cn';
 import { CheckboxCheckmarkIcon, CheckFillIcon, DraggerIcon, Settings02Icon } from '../../icons-v2-generated';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../dropdown-menu';
@@ -155,6 +155,11 @@ function GridSettingsMenu() {
     reorder(moveId(shown, id, to));
   };
 
+  // The drag listens on the window, which outlives the menu: a menu closed mid-drag (Escape) takes its listeners
+  // with it, and the order goes back to what it was.
+  const stopDragRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopDragRef.current?.(), []);
+
   const onDraggerPointerDown = (event: React.PointerEvent, id: string) => {
     if (event.button !== 0) return;
     const view = event.currentTarget.ownerDocument.defaultView;
@@ -180,11 +185,14 @@ function GridSettingsMenu() {
       order = next;
       setDrag({ id, order });
     };
+    const listening = new AbortController();
+    const stop = () => {
+      listening.abort();
+      stopDragRef.current = null;
+    };
     const onEnd = (end: PointerEvent) => {
       end.stopPropagation();
-      view.removeEventListener('pointermove', onMove, true);
-      view.removeEventListener('pointerup', onEnd, true);
-      view.removeEventListener('pointercancel', onEnd, true);
+      stop();
       // The click that ends the drag is not a pick of the row it ends on.
       const swallowClick = (click: MouseEvent) => {
         click.stopPropagation();
@@ -195,9 +203,11 @@ function GridSettingsMenu() {
       setDrag(null);
       reorder(order);
     };
-    view.addEventListener('pointermove', onMove, true);
-    view.addEventListener('pointerup', onEnd, true);
-    view.addEventListener('pointercancel', onEnd, true);
+    const options = { capture: true, signal: listening.signal };
+    view.addEventListener('pointermove', onMove, options);
+    view.addEventListener('pointerup', onEnd, options);
+    view.addEventListener('pointercancel', onEnd, options);
+    stopDragRef.current = stop;
   };
 
   const autoRefresh = settings?.autoRefresh;

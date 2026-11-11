@@ -1,4 +1,4 @@
-import { fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -86,6 +86,13 @@ function menuRows(): string[] {
   return screen
     .getAllByRole('menuitemcheckbox')
     .map(row => `${row.textContent}${row.getAttribute('aria-checked') === 'true' ? ' ✓' : ''}`);
+}
+
+/** The drag handle of a shown column's row in the menu. It is pointer-only, with no role or name: found by its marker. */
+function dragger(name: string): HTMLElement {
+  return within(screen.getByRole('menuitemcheckbox', { name })).getByText(
+    (_text, element) => element?.hasAttribute('data-settings-dragger') === true,
+  );
 }
 
 function openMenu() {
@@ -287,6 +294,17 @@ describe('<DataTable layout="grid" settings>', () => {
     // Past the end: nothing moves.
     fireEvent.keyDown(screen.getByRole('menuitemcheckbox', { name: 'Name' }), { key: 'ArrowDown', altKey: true });
     expect(headerColumns(container)).toEqual(['city', 'name']);
+  });
+
+  it('lets go of the window when the menu goes away mid-drag: a later pointer-up moves nothing', () => {
+    const { unmount } = render(<Grid settings={{ storageKey: STORAGE_KEY }} />);
+    openMenu();
+    fireEvent.pointerDown(dragger('City'), { button: 0 });
+    unmount();
+    // With the menu gone there are no rows to measure, so a move the drag still heard would put City first.
+    fireEvent.pointerMove(window);
+    fireEvent.pointerUp(window);
+    expect(stored()).toBeNull();
   });
 
   it('draws the layout kept in the browser: order, hidden columns, widths', () => {
