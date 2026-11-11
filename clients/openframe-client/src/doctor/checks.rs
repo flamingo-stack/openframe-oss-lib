@@ -369,27 +369,10 @@ pub fn check_webview2_runtime() -> Option<CheckResult> {
     None
 }
 
-#[cfg(windows)]
 pub fn check_dotnet_framework() -> Option<CheckResult> {
-    use crate::models::Feature;
-    use crate::platform::DirectoryManager;
-    use crate::services::feature_flags_service::FeatureFlagsService;
-
-    if !FeatureFlagsService::load_saved(&DirectoryManager::new())
-        .flags()
-        .is_enabled(Feature::Chocolatey)
-    {
-        return None;
-    }
     crate::platform::dotnet_framework::dotnet_release().map(dotnet_framework_result)
 }
 
-#[cfg(not(windows))]
-pub fn check_dotnet_framework() -> Option<CheckResult> {
-    None
-}
-
-#[cfg_attr(not(windows), allow(dead_code))]
 fn dotnet_framework_result(release: u32) -> CheckResult {
     use super::Remediation;
     use crate::platform::dotnet_framework::DOTNET_4_8_RELEASE;

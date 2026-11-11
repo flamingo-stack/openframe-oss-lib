@@ -138,7 +138,7 @@ fn heal_if_needed(results: &[CheckResult], rt: &Runtime) {
         "
 Attempting automatic fixes (this may take a few minutes)..."
     );
-    let heals = rt.block_on(crate::doctor::healing::heal(results));
+    let heals = rt.block_on(crate::doctor::prerequisites::heal(results));
     print_heal_outcomes(&heals);
 }
 
@@ -153,6 +153,10 @@ fn print_heal_outcomes(heals: &[HealResult]) {
             HealOutcome::RestartRequired => {
                 println!("  [+] {} done; restart Windows to finish it", label)
             }
+            HealOutcome::StillRunning => println!(
+                "  [!] {} still running in the background; run 'openframe-client doctor' later to check",
+                label
+            ),
             HealOutcome::Failed(e) => println!("  [x] {} failed: {}", label, e),
         }
     }

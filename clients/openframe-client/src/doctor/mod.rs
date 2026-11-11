@@ -1,5 +1,6 @@
 pub mod checks;
 pub mod healing;
+pub mod prerequisites;
 
 use crate::installation_initial_config_service::InstallConfigParams;
 use crate::platform::DirectoryManager;
@@ -148,12 +149,7 @@ pub async fn run_preinstall(params: &InstallConfigParams) -> DoctorReport {
         };
     }
 
-    if let Some(webview2) = check_webview2_runtime() {
-        results.push(webview2);
-    }
-    if let Some(dotnet) = check_dotnet_framework() {
-        results.push(dotnet);
-    }
+    results.extend(prerequisites::checks());
 
     let dir_manager = DirectoryManager::new();
     let disk_targets: Vec<(&std::path::Path, &str)> = vec![
@@ -266,12 +262,7 @@ pub async fn run_auth(params: &InstallConfigParams) -> DoctorReport {
 
     // The chat tool arrives right after registration, so its runtime is checked (and
     // healed) here rather than at install time, where no tools are provisioned yet.
-    if let Some(webview2) = check_webview2_runtime() {
-        results.push(webview2);
-    }
-    if let Some(dotnet) = check_dotnet_framework() {
-        results.push(dotnet);
-    }
+    results.extend(prerequisites::checks());
 
     // Install may lie far in the past (golden image, pre-provisioned package), and tool
     // provisioning starts as soon as this succeeds.
@@ -300,12 +291,7 @@ pub async fn run_healthcheck() -> DoctorReport {
         };
     }
 
-    if let Some(webview2) = check_webview2_runtime() {
-        results.push(webview2);
-    }
-    if let Some(dotnet) = check_dotnet_framework() {
-        results.push(dotnet);
-    }
+    results.extend(prerequisites::checks());
 
     let dir_manager = DirectoryManager::new();
     let config_path = dir_manager.secured_dir().join("initial_config.json");

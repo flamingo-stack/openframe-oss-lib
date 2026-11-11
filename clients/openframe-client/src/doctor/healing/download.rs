@@ -40,6 +40,44 @@ pub(super) async fn microsoft_installer(
     Ok(path)
 }
 
+pub(super) fn staged_running(prefix: &str) -> bool {
+    let dir_manager = crate::platform::DirectoryManager::new();
+    crate::platform::process_snapshot::snapshot()
+        .iter()
+        .any(|process| is_staged(&process.image, dir_manager.secured_dir(), prefix))
+}
+
+pub(super) fn staged(prefixes: &[&str]) -> Vec<PathBuf> {
+    let dir_manager = crate::platform::DirectoryManager::new();
+    let secured = dir_manager.secured_dir();
+    let Ok(entries) = std::fs::read_dir(secured) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            prefixes
+                .iter()
+                .any(|prefix| is_staged(path, secured, prefix))
+        })
+        .collect()
+}
+
+fn is_staged(path: &Path, secured: &Path, prefix: &str) -> bool {
+    let in_secured = path
+        .parent()
+        .is_some_and(|parent| parent.as_os_str().eq_ignore_ascii_case(secured.as_os_str()));
+    let named = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_ascii_lowercase)
+        .is_some_and(|name| {
+            name.starts_with(&format!("{}-", prefix.to_ascii_lowercase())) && name.ends_with(".exe")
+        });
+    in_secured && named
+}
+
 /// Streams the download to disk, capped so an oversized response cannot exhaust agent memory.
 async fn download(
     url: &str,
@@ -119,3 +157,7 @@ async fn verify_microsoft_signature(path: &Path, what: &str) -> anyhow::Result<(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "download_tests.rs"]
+mod tests;

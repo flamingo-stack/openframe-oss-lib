@@ -1,5 +1,5 @@
 use super::ManagerId;
-use crate::platform::dotnet_framework::DOTNET_4_8_RELEASE;
+use crate::platform::dotnet_framework::{dotnet_release, DOTNET_4_8_RELEASE};
 use std::collections::BTreeMap;
 use std::sync::{Once, OnceLock};
 use tracing::info;
@@ -66,7 +66,11 @@ pub(crate) fn chocolatey_enabled() -> bool {
 }
 
 pub fn is_supported(id: ManagerId) -> bool {
-    support_of(id, current(), chocolatey_enabled()) == Support::Supported
+    let spec = OsSpec {
+        dotnet_release: dotnet_release(),
+        ..current().clone()
+    };
+    support_of(id, &spec, chocolatey_enabled()) == Support::Supported
 }
 
 fn support_of(id: ManagerId, spec: &OsSpec, chocolatey_enabled: bool) -> Support {
@@ -253,7 +257,7 @@ fn detect() -> OsSpec {
         product_type,
         edition_id,
         build,
-        dotnet_release: crate::platform::dotnet_framework::dotnet_release(),
+        dotnet_release: dotnet_release(),
     }
 }
 

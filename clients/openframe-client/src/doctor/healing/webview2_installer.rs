@@ -4,6 +4,9 @@ use super::HealOutcome;
 #[cfg(windows)]
 const BOOTSTRAPPER_URL: &str = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
 
+#[cfg(windows)]
+pub(super) const INSTALLER_PREFIX: &str = "MicrosoftEdgeWebView2Setup";
+
 /// The bootstrapper downloads the full runtime during install, so allow plenty of time.
 #[cfg(windows)]
 const INSTALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
@@ -44,7 +47,7 @@ async fn try_install() -> anyhow::Result<()> {
 
     let installer_path = super::download::microsoft_installer(
         BOOTSTRAPPER_URL,
-        "MicrosoftEdgeWebView2Setup",
+        INSTALLER_PREFIX,
         "WebView2 bootstrapper",
         MAX_BOOTSTRAPPER_BYTES,
         DOWNLOAD_TIMEOUT,

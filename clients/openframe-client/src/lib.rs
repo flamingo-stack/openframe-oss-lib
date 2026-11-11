@@ -869,6 +869,10 @@ impl Client {
         if let Some(package_update) = &self.package_update {
             package_update.manager.start();
         }
+        tokio::spawn(crate::doctor::prerequisites::heal_on_start(
+            crate::doctor::prerequisites::record_path(&self.directory_manager),
+            crate::services::package_manager::chocolatey_enabled(),
+        ));
 
         if let Err(e) = self.tool_run_manager.run().await {
             error!("Failed to start tool run manager: {:#}", e);

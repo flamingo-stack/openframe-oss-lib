@@ -10,3 +10,8 @@ pub(crate) fn dotnet_release() -> Option<u32> {
         .and_then(|key| key.get_value::<u32, _>("Release"))
         .ok()
 }
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn dotnet_release() -> Option<u32> {
+    None
+}
