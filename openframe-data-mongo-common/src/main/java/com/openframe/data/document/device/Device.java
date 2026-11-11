@@ -22,7 +22,7 @@ public class Device implements TenantScoped {
     private String serialNumber;
     private String model;
     private String osVersion;
-    private String status;         // ACTIVE, OFFLINE, MAINTENANCE
+    private String status;         // lifecycle: PENDING, MANAGED, PENDING_DELETION, DELETED, ARCHIVED
     private DeviceType type;       // DESKTOP, LAPTOP, SERVER, etc.
     private Instant lastCheckin;
     private DeviceConfiguration configuration;

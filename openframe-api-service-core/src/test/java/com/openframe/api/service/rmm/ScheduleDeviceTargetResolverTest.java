@@ -57,8 +57,8 @@ class ScheduleDeviceTargetResolverTest {
         when(assignedRepository.findByTenantIdAndScriptScheduleId(TENANT, SCHEDULE_ID))
                 .thenReturn(List.of(pair("m-1"), pair("m-2"), pair("m-1")));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machineWithStatus("m-1", DeviceStatus.ONLINE),
-                        machineWithStatus("m-2", DeviceStatus.OFFLINE)));
+                .thenReturn(List.of(machineWithStatus("m-1", DeviceStatus.MANAGED),
+                        machineWithStatus("m-2", DeviceStatus.MANAGED)));
 
         assertThat(resolver.resolveTargetMachineIds(schedule)).containsExactly("m-1", "m-2");
     }
@@ -73,7 +73,7 @@ class ScheduleDeviceTargetResolverTest {
                 .thenReturn(List.of(pair("m-1"), pair("m-2"), pair("m-3"), pair("m-4")));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(
-                        machineWithStatus("m-1", DeviceStatus.ONLINE),
+                        machineWithStatus("m-1", DeviceStatus.MANAGED),
                         machineWithStatus("m-2", DeviceStatus.PENDING_DELETION),
                         machineWithStatus("m-3", DeviceStatus.DELETED)));
 

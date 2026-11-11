@@ -62,7 +62,7 @@ class MachinePackageManagersServiceTest {
         service = new MachinePackageManagersService(machineRepository, machineWriter, packageManagerProperties, bootstrapService);
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
     }
 
     @Test

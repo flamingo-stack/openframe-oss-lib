@@ -83,7 +83,7 @@ class CustomMachineRepositoryConnectivityTest {
     void buildDeviceQuery_connectivityExcluded_dropsTheConnectivityArmOnly() {
         // setup
         MachineQueryFilter filter = MachineQueryFilter.builder()
-                .connectivity(List.of("ONLINE")).statuses(List.of("ONLINE", "OFFLINE")).build();
+                .connectivity(List.of("ONLINE")).statuses(List.of("MANAGED", "PENDING")).build();
 
         // execution
         Document query = repository.buildDeviceQuery(filter, null, TELEMETRY_STATUS).getQueryObject();
@@ -91,7 +91,7 @@ class CustomMachineRepositoryConnectivityTest {
         // verifications
         assertThat(andClauses(query))
                 .noneMatch(clause -> clause.containsKey(TELEMETRY_STATUS))
-                .contains(new Document("status", new Document("$in", List.of("ONLINE", "OFFLINE"))));
+                .contains(new Document("status", new Document("$in", List.of("MANAGED", "PENDING"))));
     }
 
     @Test

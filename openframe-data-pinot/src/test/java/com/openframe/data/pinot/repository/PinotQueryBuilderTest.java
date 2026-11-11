@@ -78,10 +78,10 @@ class PinotQueryBuilderTest {
         void tenantIdIsFirstCondition() {
             String query = new PinotQueryBuilder(TABLE, TENANT_ID)
                     .select("id")
-                    .whereEquals("status", "ACTIVE")
+                    .whereEquals("status", "MANAGED")
                     .build();
             int tenantIdx = query.indexOf("tenantId = 'uuid-aaa'");
-            int statusIdx = query.indexOf("status = 'ACTIVE'");
+            int statusIdx = query.indexOf("status = 'MANAGED'");
             assertTrue(tenantIdx > 0 && tenantIdx < statusIdx,
                     "tenantId should appear before other filters in: " + query);
         }

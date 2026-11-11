@@ -9,9 +9,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeviceStatusTest {
 
     @Test
-    void connected_phaseTwo_managedPlusTheLegacyOnlineOffline() {
-        assertThat(DeviceStatus.CONNECTED).containsExactlyInAnyOrder(
-                DeviceStatus.MANAGED, DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
+    void connected_isManagedOnly() {
+        assertThat(DeviceStatus.CONNECTED).containsExactly(DeviceStatus.MANAGED);
     }
 
     @Test
@@ -21,13 +20,13 @@ class DeviceStatusTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "ONLINE", "OFFLINE"})
+    @EnumSource(value = DeviceStatus.class, names = {"MANAGED"})
     void isConnected_managedDevice_true(DeviceStatus status) {
         assertThat(status.isConnected()).isTrue();
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "ONLINE", "OFFLINE"}, mode = EnumSource.Mode.EXCLUDE)
+    @EnumSource(value = DeviceStatus.class, names = {"MANAGED"}, mode = EnumSource.Mode.EXCLUDE)
     void isConnected_otherStatus_false(DeviceStatus status) {
         assertThat(status.isConnected()).isFalse();
     }

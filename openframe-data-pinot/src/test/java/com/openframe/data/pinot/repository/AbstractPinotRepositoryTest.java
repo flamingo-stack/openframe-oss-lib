@@ -99,21 +99,21 @@ class AbstractPinotRepositoryTest {
             when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
             when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
             when(resultSet.getRowCount()).thenReturn(3);
-            when(resultSet.getString(0, 0)).thenReturn("ACTIVE");
+            when(resultSet.getString(0, 0)).thenReturn("MANAGED");
             when(resultSet.getLong(0, 1)).thenReturn(100L);
-            when(resultSet.getString(1, 0)).thenReturn("OFFLINE");
+            when(resultSet.getString(1, 0)).thenReturn("PENDING");
             when(resultSet.getLong(1, 1)).thenReturn(50L);
-            when(resultSet.getString(2, 0)).thenReturn("PENDING");
+            when(resultSet.getString(2, 0)).thenReturn("PENDING_DELETION");
             when(resultSet.getLong(2, 1)).thenReturn(10L);
 
             Map<String, Integer> result = repository.doExecuteKeyCountQuery("SELECT status, COUNT(*) FROM t GROUP BY status");
 
             assertEquals(3, result.size());
-            assertEquals(100, result.get("ACTIVE"));
-            assertEquals(50, result.get("OFFLINE"));
-            assertEquals(10, result.get("PENDING"));
+            assertEquals(100, result.get("MANAGED"));
+            assertEquals(50, result.get("PENDING"));
+            assertEquals(10, result.get("PENDING_DELETION"));
             // Verify insertion order
-            assertEquals(List.of("ACTIVE", "OFFLINE", "PENDING"), List.copyOf(result.keySet()));
+            assertEquals(List.of("MANAGED", "PENDING", "PENDING_DELETION"), List.copyOf(result.keySet()));
         }
 
         @Test
@@ -122,14 +122,14 @@ class AbstractPinotRepositoryTest {
             when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
             when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
             when(resultSet.getRowCount()).thenReturn(3);
-            when(resultSet.getString(0, 0)).thenReturn("ACTIVE");
+            when(resultSet.getString(0, 0)).thenReturn("MANAGED");
             when(resultSet.getLong(0, 1)).thenReturn(100L);
             when(resultSet.getString(1, 0)).thenReturn(null);  // skipped
             when(resultSet.getString(2, 0)).thenReturn("");    // skipped
 
             Map<String, Integer> result = repository.doExecuteKeyCountQuery("SELECT x FROM t");
             assertEquals(1, result.size());
-            assertEquals(100, result.get("ACTIVE"));
+            assertEquals(100, result.get("MANAGED"));
         }
 
         @Test

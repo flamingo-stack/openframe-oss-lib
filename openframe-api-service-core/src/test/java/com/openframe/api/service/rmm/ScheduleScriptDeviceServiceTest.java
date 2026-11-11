@@ -195,7 +195,7 @@ class ScheduleScriptDeviceServiceTest {
     }
 
     private static Machine machine(String machineId, String hostname, OsType osType) {
-        return machine(machineId, hostname, osType, DeviceStatus.ONLINE);
+        return machine(machineId, hostname, osType, DeviceStatus.MANAGED);
     }
 
     private static Machine machine(String machineId, String hostname, OsType osType, DeviceStatus status) {

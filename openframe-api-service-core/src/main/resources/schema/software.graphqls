@@ -365,7 +365,7 @@ input SoftwareOnDeviceFilterInput {
     deviceTagIds: [ID!]
     "The CUSTOMER filter of the Adopt device picker."
     organizationIds: [ID!]
-    "The STATUS filter of the Adopt device picker (the device's own status, e.g. ACTIVE = Managed)."
+    "The STATUS filter of the Adopt device picker (the device's own status, e.g. MANAGED)."
     deviceStatuses: [DeviceStatus!]
     installedBy: [SoftwareSource!]
     autoUpdateStatuses: [SoftwareAutoUpdateStatus!]

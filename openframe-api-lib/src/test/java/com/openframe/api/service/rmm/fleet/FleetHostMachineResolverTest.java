@@ -45,7 +45,7 @@ class FleetHostMachineResolverTest {
         Host host = new Host();
         host.setId(HOST_ID);
         host.setHostname(FLEET_HOSTNAME);
-        Machine machine = machine(null, DeviceStatus.ONLINE);
+        Machine machine = machine(null, DeviceStatus.MANAGED);
         machine.setMachineId("m-1");
         machine.setHostname(MACHINE_HOSTNAME);
         when(toolConnectionRepository.findByAgentToolIdInAndToolType(List.of("29"), ToolType.FLEET_MDM))
@@ -64,9 +64,9 @@ class FleetHostMachineResolverTest {
         // setup
         Host host = new Host();
         host.setId(HOST_ID);
-        Machine stale = machine(null, DeviceStatus.OFFLINE);
+        Machine stale = machine(null, DeviceStatus.MANAGED);
         stale.setMachineId("m-stale");
-        Machine current = machine(null, DeviceStatus.ONLINE);
+        Machine current = machine(null, DeviceStatus.MANAGED);
         current.setMachineId("m-current");
         when(toolConnectionRepository.findByAgentToolIdInAndToolType(List.of("29"), ToolType.FLEET_MDM))
                 .thenReturn(List.of(connection("m-stale", OLDER), connection("m-current", NEWER)));
@@ -85,7 +85,7 @@ class FleetHostMachineResolverTest {
         // setup
         Host host = new Host();
         host.setId(HOST_ID);
-        Machine live = machine(null, DeviceStatus.ONLINE);
+        Machine live = machine(null, DeviceStatus.MANAGED);
         live.setMachineId("m-live");
         Machine leaving = machine(null, DeviceStatus.PENDING_DELETION);
         leaving.setMachineId("m-leaving");
@@ -110,7 +110,7 @@ class FleetHostMachineResolverTest {
         when(toolConnectionRepository.findByAgentToolIdInAndToolType(List.of("29"), ToolType.FLEET_MDM))
                 .thenReturn(List.of(connection("m-foreign", NEWER)));
         when(machineRepository.findByTenantIdAndMachineIdIn(TENANT, List.of("m-foreign"))).thenReturn(List.of());
-        Machine own = machine("u-online", DeviceStatus.ONLINE);
+        Machine own = machine("u-online", DeviceStatus.MANAGED);
         when(machineRepository.findByTenantIdAndOsUuidIn(eq(TENANT), any())).thenReturn(List.of(own));
 
         // execution
@@ -124,7 +124,7 @@ class FleetHostMachineResolverTest {
     void resolve_noToolConnections_machineLookupByIdSkipped() {
         // setup
         when(machineRepository.findByTenantIdAndOsUuidIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("u-online", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("u-online", DeviceStatus.MANAGED)));
 
         // execution
         Map<Long, Machine> resolved = resolver.resolve(TENANT, List.of(host(1L, "u-online")));
@@ -135,20 +135,20 @@ class FleetHostMachineResolverTest {
     }
 
     @Test
-    @DisplayName("resolve: correlates only ONLINE/OFFLINE machines; deleted/archived/decommissioned are dropped")
-    void resolve_keepsOnlineAndOffline_dropsOthers() {
+    @DisplayName("resolve: correlates only MANAGED machines; pending/deleted/archived are dropped")
+    void resolve_keepsManaged_dropsOthers() {
         when(machineRepository.findByTenantIdAndOsUuidIn(eq(TENANT), any())).thenReturn(List.of(
-                machine("u-online", DeviceStatus.ONLINE),
-                machine("u-offline", DeviceStatus.OFFLINE),
+                machine("u-managed", DeviceStatus.MANAGED),
+                machine("u-pending", DeviceStatus.PENDING),
                 machine("u-deleted", DeviceStatus.DELETED),
                 machine("u-archived", DeviceStatus.ARCHIVED)));
         when(machineRepository.findByTenantIdAndSerialNumberIn(eq(TENANT), any())).thenReturn(List.of());
         when(machineRepository.findByTenantIdAndHostnameIn(eq(TENANT), any())).thenReturn(List.of());
 
         Map<Long, Machine> resolved = resolver.resolve(TENANT, List.of(
-                host(1L, "u-online"), host(2L, "u-offline"), host(3L, "u-deleted"), host(4L, "u-archived")));
+                host(1L, "u-managed"), host(2L, "u-pending"), host(3L, "u-deleted"), host(4L, "u-archived")));
 
-        assertThat(resolved.keySet()).containsExactlyInAnyOrder(1L, 2L);
+        assertThat(resolved.keySet()).containsExactly(1L);
     }
 
     @Test
@@ -161,7 +161,7 @@ class FleetHostMachineResolverTest {
 
         when(machineRepository.findByTenantIdAndOsUuidIn(eq(TENANT), any()))
                 .thenReturn(List.of(machine("u-deleted", DeviceStatus.DELETED)));
-        Machine online = machine(null, DeviceStatus.ONLINE);
+        Machine online = machine(null, DeviceStatus.MANAGED);
         online.setSerialNumber("SER-1");
         online.setMachineId("m-online");
         when(machineRepository.findByTenantIdAndSerialNumberIn(eq(TENANT), any())).thenReturn(List.of(online));

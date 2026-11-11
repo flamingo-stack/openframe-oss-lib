@@ -78,7 +78,6 @@ class DeviceOnlineDispatchServiceTest {
     void offlineMachine_staysNew() {
         DeviceFirstOnlineDispatch row = newRow(ROW_ID, MACHINE, SCHEDULE);
         Machine offline = onlineMachine(MACHINE);
-        offline.setStatus(DeviceStatus.OFFLINE);
         offline.setTelemetryStatus(TelemetryStatus.OFFLINE);
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
         stubTenant(TENANT, List.of(offline), List.of(schedule(SCHEDULE)));
@@ -300,7 +299,7 @@ class DeviceOnlineDispatchServiceTest {
         Machine m = new Machine();
         m.setTenantId(TENANT);
         m.setMachineId(machineId);
-        m.setStatus(DeviceStatus.ONLINE);
+        m.setStatus(DeviceStatus.MANAGED);
         m.setTelemetryStatus(TelemetryStatus.ONLINE);
         return m;
     }

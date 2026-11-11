@@ -136,14 +136,14 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("status facet does NOT filter by status from user selection")
         void statusFacetSkipsStatusFilter() {
             whenQueryReturnsEmptyRows();
-            repository.getStatusFilterOptions(TENANT_ID, List.of("ACTIVE"), List.of(),
+            repository.getStatusFilterOptions(TENANT_ID, List.of("MANAGED"), List.of(),
                     List.of("LAPTOP"), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             // deviceType filter should be applied
             assertTrue(query.contains("deviceType = 'LAPTOP'"), "deviceType missing: " + query);
             // status filter should NOT be applied (but the DELETED exclusion still is)
             assertTrue(query.contains("status != 'DELETED'"));
-            assertTrue(!query.contains("status = 'ACTIVE'"), "status = ACTIVE should be excluded: " + query);
+            assertTrue(!query.contains("status = 'MANAGED'"), "status = MANAGED should be excluded: " + query);
         }
 
         @Test
@@ -164,11 +164,11 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("explicitly selecting DELETED lifts the base guard so DELETED rows are counted")
         void statusFilterWithDeletedLiftsBaseGuard() {
             whenQueryReturnsEmptyRows();
-            repository.getDeviceTypeFilterOptions(TENANT_ID, List.of("ACTIVE", "DELETED"), List.of(),
+            repository.getDeviceTypeFilterOptions(TENANT_ID, List.of("MANAGED", "DELETED"), List.of(),
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             // The user's selection is applied verbatim (no status is silently dropped)...
-            assertTrue(query.contains("status = 'ACTIVE'"), "was: " + query);
+            assertTrue(query.contains("status = 'MANAGED'"), "was: " + query);
             assertTrue(query.contains("status = 'DELETED'"), "was: " + query);
             // ...and explicitly requesting DELETED opts into counting those rows.
             assertTrue(!query.contains("status != 'DELETED'"), "base guard should be lifted: " + query);
@@ -206,10 +206,10 @@ class PinotClientDeviceRepositoryTest {
         @DisplayName("connectivity facet does NOT filter by connectivity from user selection but keeps status")
         void connectivityFacetSkipsConnectivityFilter() {
             whenQueryReturnsEmptyRows();
-            repository.getConnectivityFilterOptions(TENANT_ID, List.of("ACTIVE"), List.of("ONLINE"),
+            repository.getConnectivityFilterOptions(TENANT_ID, List.of("MANAGED"), List.of("ONLINE"),
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
-            assertTrue(query.contains("status = 'ACTIVE'"), "status missing: " + query);
+            assertTrue(query.contains("status = 'MANAGED'"), "status missing: " + query);
             assertTrue(!query.contains("connectivity = 'ONLINE'"), "connectivity should be excluded: " + query);
         }
 
@@ -231,7 +231,7 @@ class PinotClientDeviceRepositoryTest {
                     List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
             String query = captureQuery();
             assertTrue(query.contains("connectivity = 'ONLINE'"), "was: " + query);
-            assertTrue(query.contains("status IN ('MANAGED', 'ONLINE', 'OFFLINE')"), "was: " + query);
+            assertTrue(query.contains("status IN ('MANAGED')"), "was: " + query);
         }
 
         @Test
@@ -284,17 +284,17 @@ class PinotClientDeviceRepositoryTest {
             when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
             when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
             when(resultSet.getRowCount()).thenReturn(2);
-            when(resultSet.getString(0, 0)).thenReturn("ACTIVE");
+            when(resultSet.getString(0, 0)).thenReturn("MANAGED");
             when(resultSet.getLong(0, 1)).thenReturn(10L);
-            when(resultSet.getString(1, 0)).thenReturn("OFFLINE");
+            when(resultSet.getString(1, 0)).thenReturn("PENDING");
             when(resultSet.getLong(1, 1)).thenReturn(5L);
 
             Map<String, Integer> result = repository.getStatusFilterOptions(
                     TENANT_ID, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
 
             assertEquals(2, result.size());
-            assertEquals(10, result.get("ACTIVE"));
-            assertEquals(5, result.get("OFFLINE"));
+            assertEquals(10, result.get("MANAGED"));
+            assertEquals(5, result.get("PENDING"));
         }
 
         @Test

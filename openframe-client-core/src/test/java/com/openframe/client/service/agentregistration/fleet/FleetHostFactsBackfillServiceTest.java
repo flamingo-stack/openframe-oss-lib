@@ -299,7 +299,7 @@ class FleetHostFactsBackfillServiceTest {
     private static Machine machine(String machineId) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         return machine;
     }
 }

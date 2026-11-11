@@ -57,7 +57,7 @@ class SoftwareScheduleExecutionServiceTest {
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-1", "m-2"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-1", DeviceStatus.ONLINE), machine("m-2", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m-1", TelemetryStatus.ONLINE), machine("m-2", TelemetryStatus.ONLINE)));
 
         service.runDueSchedules();
 
@@ -78,7 +78,7 @@ class SoftwareScheduleExecutionServiceTest {
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-1"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-1", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m-1", TelemetryStatus.ONLINE)));
 
         service.runDueSchedules();
 
@@ -99,7 +99,7 @@ class SoftwareScheduleExecutionServiceTest {
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-off"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-off", DeviceStatus.OFFLINE)));
+                .thenReturn(List.of(machine("m-off", TelemetryStatus.OFFLINE)));
         when(onlineDispatchRepository.findByTenantIdAndMachineIdAndScheduleId(eq(TENANT), anyString(), eq("ss-1")))
                 .thenReturn(Optional.empty());
 
@@ -125,7 +125,7 @@ class SoftwareScheduleExecutionServiceTest {
         due(schedule);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-off"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-off", DeviceStatus.OFFLINE)));
+                .thenReturn(List.of(machine("m-off", TelemetryStatus.OFFLINE)));
 
         service.runDueSchedules();
 
@@ -134,7 +134,7 @@ class SoftwareScheduleExecutionServiceTest {
     }
 
     @Test
-    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE goes to the offline branch")
+    @DisplayName("online is decided by telemetryStatus: a MANAGED device with telemetry OFFLINE goes to the offline branch")
     void runDue_statusOnlineTelemetryOffline_treatedAsOffline() {
         // setup
         SoftwareSchedule schedule = SoftwareSchedule.builder()
@@ -143,8 +143,7 @@ class SoftwareScheduleExecutionServiceTest {
                 .offlineBehavior(ScheduleOfflineBehavior.SKIP)
                 .build();
         due(schedule);
-        Machine staleStatus = machine("m-stale", DeviceStatus.ONLINE);
-        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        Machine staleStatus = machine("m-stale", TelemetryStatus.OFFLINE);
         when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-stale"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(staleStatus));
 
@@ -173,11 +172,11 @@ class SoftwareScheduleExecutionServiceTest {
                 .thenReturn(List.of(schedule));
     }
 
-    private static Machine machine(String machineId, DeviceStatus status) {
+    private static Machine machine(String machineId, TelemetryStatus telemetry) {
         Machine m = new Machine();
         m.setMachineId(machineId);
-        m.setStatus(status);
-        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
+        m.setStatus(DeviceStatus.MANAGED);
+        m.setTelemetryStatus(telemetry);
         return m;
     }
 }

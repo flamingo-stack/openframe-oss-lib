@@ -1,7 +1,6 @@
 package com.openframe.test.tests;
 
 import com.openframe.test.api.DeviceApi;
-import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.helpers.FleetWait;
 import com.openframe.test.api.ScriptApi;
@@ -28,7 +27,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
-import static com.openframe.test.data.generator.DeviceGenerator.osAndStatusDevicesFilter;
+import static com.openframe.test.data.generator.DeviceGenerator.osOnlineManagedDevicesFilter;
 import static com.openframe.test.data.generator.ScriptScheduleGenerator.nextSlot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -145,7 +144,7 @@ public class ScriptExecutionHistoryTest extends BaseTest {
      * here possible at all.
      */
     private static Script dispatchedScript() {
-        List<Machine> online = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
+        List<Machine> online = DeviceApi.getDevices(osOnlineManagedDevicesFilter("WINDOWS"));
         assumeTrue(!online.isEmpty(), "No ONLINE Windows device in this tenant, so no script can be dispatched"
                 + " and there is no execution history to read.");
 

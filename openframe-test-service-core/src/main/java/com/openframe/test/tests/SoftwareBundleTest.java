@@ -4,8 +4,8 @@ import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.SoftwareActionApi;
 import com.openframe.test.api.SoftwareBundleApi;
 import com.openframe.test.config.MachineConfig;
+import com.openframe.test.data.dto.device.DeviceConnectivity;
 import com.openframe.test.data.dto.device.DeviceFilterInput;
-import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.schedule.ScheduleDeviceEdge;
 import com.openframe.test.data.dto.shared.GraphqlError;
@@ -76,7 +76,7 @@ public class SoftwareBundleTest extends BaseTest {
     public static void pickDevice() {
         device = DeviceApi.getDevices(DeviceGenerator.osDevicesFilter(WINDOWS)).stream()
                 .filter(d -> HOSTNAME.equals(d.getHostname()))
-                .min(Comparator.comparing((Machine d) -> d.getStatus() != DeviceStatus.ONLINE))
+                .min(Comparator.comparing((Machine d) -> d.getConnectivity() != DeviceConnectivity.ONLINE))
                 .orElse(null);
     }
 
@@ -263,8 +263,8 @@ public class SoftwareBundleTest extends BaseTest {
     @Order(8)
     public void testSubmitInstallNow() {
         requireInstallBundle();
-        assumeTrue(device.getStatus() == DeviceStatus.ONLINE,
-                HOSTNAME + " is " + device.getStatus() + "; an install submitted now would wait for it and land after this run");
+        assumeTrue(device.getConnectivity() == DeviceConnectivity.ONLINE,
+                HOSTNAME + " is " + device.getConnectivity() + "; an install submitted now would wait for it and land after this run");
         String winget = DeviceApi.getPackageManagerState(device.getMachineId(), "winget");
         assumeTrue(winget == null || "PRESENT".equals(winget),
                 HOSTNAME + "'s agent reports winget=" + winget + "; an install cannot run while the package manager is not yet usable (MISSING or UNKNOWN)");

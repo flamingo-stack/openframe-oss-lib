@@ -280,20 +280,20 @@ class DeviceLocalScheduleServiceTest {
     }
 
     private static Machine online(String machineId, String timezone) {
-        return machine(machineId, timezone, DeviceStatus.ONLINE);
+        return machine(machineId, timezone, TelemetryStatus.ONLINE);
     }
 
     private static Machine offline(String machineId, String timezone) {
-        return machine(machineId, timezone, DeviceStatus.OFFLINE);
+        return machine(machineId, timezone, TelemetryStatus.OFFLINE);
     }
 
-    private static Machine machine(String machineId, String timezone, DeviceStatus status) {
+    private static Machine machine(String machineId, String timezone, TelemetryStatus telemetry) {
         Machine m = new Machine();
         m.setTenantId(TENANT);
         m.setMachineId(machineId);
         m.setTimezone(timezone);
-        m.setStatus(status);
-        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
+        m.setStatus(DeviceStatus.MANAGED);
+        m.setTelemetryStatus(telemetry);
         return m;
     }
 }

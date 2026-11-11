@@ -1,7 +1,6 @@
 package com.openframe.test.tests.ai;
 
 import com.openframe.test.api.DeviceApi;
-import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.helpers.ai.ApprovalPolicy;
 import com.openframe.test.helpers.ai.AssistantRunner;
@@ -16,7 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 
 import java.util.List;
 
-import static com.openframe.test.data.generator.DeviceGenerator.osAndStatusDevicesFilter;
+import static com.openframe.test.data.generator.DeviceGenerator.osOnlineManagedDevicesFilter;
 import static org.assertj.core.api.Assertions.assertThat;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -57,7 +56,7 @@ public abstract class MingoBaseTest extends BaseTest {
      * between them.
      */
     protected Machine onlineWindowsDevice() {
-        List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
+        List<Machine> devices = DeviceApi.getDevices(osOnlineManagedDevicesFilter("WINDOWS"));
         assertThat(devices).as("Expected at least one online Windows device with a Fleet connection").isNotEmpty();
         return DeviceApi.getDevice(devices.getFirst().getMachineId());
     }

@@ -72,9 +72,9 @@ class SoftwareScheduleOnlineDispatchServiceTest {
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
                 .thenReturn(List.of(online, offline, expired));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-online", DeviceStatus.ONLINE),
-                        machine("m-offline", DeviceStatus.OFFLINE),
-                        machine("m-expired", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m-online", TelemetryStatus.ONLINE),
+                        machine("m-offline", TelemetryStatus.OFFLINE),
+                        machine("m-expired", TelemetryStatus.ONLINE)));
         SoftwareSchedule schedule = SoftwareSchedule.builder().id(SCHEDULE_ID).tenantId(TENANT).status(ScriptStatus.ACTIVE).build();
         when(scheduleRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(schedule));
 
@@ -95,13 +95,12 @@ class SoftwareScheduleOnlineDispatchServiceTest {
     }
 
     @Test
-    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE is left NEW, nothing dispatched")
+    @DisplayName("online is decided by telemetryStatus: a MANAGED device with telemetry OFFLINE is left NEW, nothing dispatched")
     void statusOnlineTelemetryOffline_leftNew() {
         // setup
         Instant now = Instant.now();
         SoftwareScheduleOnlineDispatch row = sentinel("m-stale", now.plusSeconds(3600));
-        Machine staleStatus = machine("m-stale", DeviceStatus.ONLINE);
-        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        Machine staleStatus = machine("m-stale", TelemetryStatus.OFFLINE);
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
                 .thenReturn(List.of(row));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(staleStatus));
@@ -122,8 +121,8 @@ class SoftwareScheduleOnlineDispatchServiceTest {
         // setup
         Instant now = Instant.now();
         SoftwareScheduleOnlineDispatch row = sentinel("m-pending", now.plusSeconds(3600));
-        Machine pending = machine("m-pending", DeviceStatus.PENDING);
-        pending.setTelemetryStatus(TelemetryStatus.ONLINE);
+        Machine pending = machine("m-pending", TelemetryStatus.ONLINE);
+        pending.setStatus(DeviceStatus.PENDING);
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class)))
                 .thenReturn(List.of(row));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(pending));
@@ -149,11 +148,11 @@ class SoftwareScheduleOnlineDispatchServiceTest {
                 .status(DeviceOnlineDispatchStatus.NEW).build();
     }
 
-    private static Machine machine(String machineId, DeviceStatus status) {
+    private static Machine machine(String machineId, TelemetryStatus telemetry) {
         Machine m = new Machine();
         m.setMachineId(machineId);
-        m.setStatus(status);
-        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
+        m.setStatus(DeviceStatus.MANAGED);
+        m.setTelemetryStatus(telemetry);
         return m;
     }
 }

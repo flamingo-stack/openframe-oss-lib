@@ -97,7 +97,7 @@ class ScheduleFireDispatcherTest {
                 .sealed(encryptionService::encrypt)));
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m1"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m1", TelemetryStatus.ONLINE)));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of(script));
 
         dispatcher.dispatch(schedule, now);
@@ -122,7 +122,7 @@ class ScheduleFireDispatcherTest {
         ScheduleScript schedule = schedule(List.of("script-a", "script-b"));
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m1", "m2"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE), machine("m2", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m1", TelemetryStatus.ONLINE), machine("m2", TelemetryStatus.ONLINE)));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(script("script-a", ScriptShell.BASH), script("script-b", ScriptShell.POWERSHELL)));
 
@@ -190,7 +190,7 @@ class ScheduleFireDispatcherTest {
     void dispatch_noRunnableScripts_isNoOp() {
         when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
         lenient().when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m1", TelemetryStatus.ONLINE)));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any())).thenReturn(List.of());   // none resolve
 
         dispatcher.dispatch(schedule(List.of("gone")), Instant.now());
@@ -205,7 +205,7 @@ class ScheduleFireDispatcherTest {
     void dispatch_tokenizesCombinedArgs() {
         when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
         lenient().when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m1", TelemetryStatus.ONLINE)));
         Script withArgs = Script.builder()
                 .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.POWERSHELL)
                 .privilegeLevel(PrivilegeLevel.USER).scriptBody("param($Bucket)")
@@ -243,7 +243,7 @@ class ScheduleFireDispatcherTest {
     void dispatch_customParamsOverrideArgsAndEnv() {
         when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
         lenient().when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m1", TelemetryStatus.ONLINE)));
         Script scriptA = Script.builder()
                 .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
                 .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
@@ -282,7 +282,7 @@ class ScheduleFireDispatcherTest {
     void dispatch_customParamsNullFieldsInheritDefaults() {
         when(targetResolver.resolveTargetMachineIds(any())).thenReturn(List.of("m1"));
         lenient().when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m1", DeviceStatus.ONLINE)));
+                .thenReturn(List.of(machine("m1", TelemetryStatus.ONLINE)));
         Script scriptA = Script.builder()
                 .id("script-a").tenantId(TENANT).name("script-a").shell(ScriptShell.BASH)
                 .privilegeLevel(PrivilegeLevel.USER).scriptBody("echo a")
@@ -315,7 +315,7 @@ class ScheduleFireDispatcherTest {
         ScheduleScript schedule = schedule(List.of("script-a"));
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-online", "m-offline"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-online", DeviceStatus.ONLINE), machine("m-offline", DeviceStatus.OFFLINE)));
+                .thenReturn(List.of(machine("m-online", TelemetryStatus.ONLINE), machine("m-offline", TelemetryStatus.OFFLINE)));
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(script("script-a", ScriptShell.BASH)));
 
@@ -338,13 +338,12 @@ class ScheduleFireDispatcherTest {
     }
 
     @Test
-    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE is skipped like any offline target")
+    @DisplayName("online is decided by telemetryStatus: a MANAGED device with telemetry OFFLINE is skipped like any offline target")
     void dispatch_statusOnlineTelemetryOffline_notDispatched() {
         // setup
         Instant now = Instant.now();
         ScheduleScript schedule = schedule(List.of("script-a"));
-        Machine staleStatus = machine("m-stale", DeviceStatus.ONLINE);
-        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        Machine staleStatus = machine("m-stale", TelemetryStatus.OFFLINE);
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-stale"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(staleStatus));
 
@@ -363,7 +362,7 @@ class ScheduleFireDispatcherTest {
         // setup
         Instant now = Instant.now();
         ScheduleScript schedule = schedule(List.of("script-a"));
-        Machine noTelemetry = machine("m-new", DeviceStatus.ONLINE);
+        Machine noTelemetry = machine("m-new", TelemetryStatus.ONLINE);
         noTelemetry.setTelemetryStatus(null);
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-new"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(noTelemetry));
@@ -384,7 +383,7 @@ class ScheduleFireDispatcherTest {
         ScheduleScript schedule = retrySchedule(List.of("script-a"), 7200L);
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m-online", "m-offline"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-online", DeviceStatus.ONLINE), machine("m-offline", DeviceStatus.OFFLINE)));
+                .thenReturn(List.of(machine("m-online", TelemetryStatus.ONLINE), machine("m-offline", TelemetryStatus.OFFLINE)));
         when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT, "m-offline", SCHEDULE_ID))
                 .thenReturn(Optional.empty());
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
@@ -416,7 +415,7 @@ class ScheduleFireDispatcherTest {
         ScheduleScript schedule = retrySchedule(List.of("script-a"), 3600L);
         when(targetResolver.resolveTargetMachineIds(schedule)).thenReturn(List.of("m1", "m2"));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m1", DeviceStatus.OFFLINE), machine("m2", DeviceStatus.OFFLINE)));
+                .thenReturn(List.of(machine("m1", TelemetryStatus.OFFLINE), machine("m2", TelemetryStatus.OFFLINE)));
         when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(eq(TENANT), anyString(), eq(SCHEDULE_ID)))
                 .thenReturn(Optional.empty());
 
@@ -523,7 +522,7 @@ class ScheduleFireDispatcherTest {
         when(deliveryRouter.holdsForOfflineMachine(eq(DeliveryType.SCRIPT_SCHEDULE), anyString()))
                 .thenAnswer(invocation -> "m-new".equals(invocation.getArgument(1)));
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
-                .thenReturn(List.of(machine("m-old", DeviceStatus.OFFLINE)));
+                .thenReturn(List.of(machine("m-old", TelemetryStatus.OFFLINE)));
         when(dispatchRepository.findByTenantIdAndMachineIdAndScheduleId(TENANT, "m-old", SCHEDULE_ID))
                 .thenReturn(Optional.empty());
         when(scriptRepository.findByTenantIdAndIdIn(eq(TENANT), any()))
@@ -600,12 +599,12 @@ class ScheduleFireDispatcherTest {
                 .build();
     }
 
-    private static Machine machine(String machineId, DeviceStatus status) {
+    private static Machine machine(String machineId, TelemetryStatus telemetry) {
         Machine m = new Machine();
         m.setTenantId(TENANT);
         m.setMachineId(machineId);
-        m.setStatus(status);
-        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
+        m.setStatus(DeviceStatus.MANAGED);
+        m.setTelemetryStatus(telemetry);
         return m;
     }
 }

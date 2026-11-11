@@ -96,7 +96,7 @@ class DeviceLifecycleServiceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "ONLINE", "OFFLINE", "PENDING_DELETION", "DELETED", "ARCHIVED"})
+    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "PENDING_DELETION", "DELETED", "ARCHIVED"})
     void promoteIfReady_notPending_noop(DeviceStatus status) {
         // setup
         machine.setStatus(status);

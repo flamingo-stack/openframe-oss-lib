@@ -4,7 +4,7 @@ import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.OrganizationApi;
 import com.openframe.test.api.RemoteAccessPolicyApi;
 import com.openframe.test.context.PipelineContext;
-import com.openframe.test.data.dto.device.DeviceStatus;
+import com.openframe.test.data.dto.device.DeviceConnectivity;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.organization.CreateOrganizationRequest;
 import com.openframe.test.data.dto.organization.Organization;
@@ -194,7 +194,7 @@ public class RemoteAccessPolicyTest extends BaseTest {
     public void testDeviceInheritsPolicy() {
         box = DeviceApi.getDevices(DeviceGenerator.osDevicesFilter("WINDOWS")).stream()
                 .filter(m -> BOX_HOSTNAME.equalsIgnoreCase(m.getHostname()))
-                .min(Comparator.comparing(m -> m.getStatus() != DeviceStatus.ONLINE))
+                .min(Comparator.comparing(m -> m.getConnectivity() != DeviceConnectivity.ONLINE))
                 .orElse(null);
         assumeTrue(box != null, BOX_HOSTNAME + " is not enrolled in this tenant");
 

@@ -49,25 +49,20 @@ public class DeviceGenerator {
     }
 
     public static DeviceFilterInput listedStatusesDevicesFilter() {
-        return statusDevicesFilter(
-                DeviceStatus.MANAGED,
-                DeviceStatus.ONLINE,
-                DeviceStatus.OFFLINE,
-                DeviceStatus.ACTIVE,
-                DeviceStatus.INACTIVE,
-                DeviceStatus.MAINTENANCE,
-                DeviceStatus.DECOMMISSIONED,
-                DeviceStatus.PENDING);
+        return statusDevicesFilter(DeviceStatus.MANAGED, DeviceStatus.PENDING);
     }
 
     public static DeviceFilterInput statDevicesFilter() {
-        return statusDevicesFilter(
-                DeviceStatus.MANAGED,
-                DeviceStatus.ONLINE,
-                DeviceStatus.OFFLINE,
-                DeviceStatus.ACTIVE,
-                DeviceStatus.INACTIVE,
-                DeviceStatus.MAINTENANCE);
+        return statusDevicesFilter(DeviceStatus.MANAGED);
+    }
+
+    /** MANAGED devices of one OS that are talking to us right now: the only ones a command can be dispatched to. */
+    public static DeviceFilterInput osOnlineManagedDevicesFilter(String os) {
+        return DeviceFilterInput.builder()
+                .osTypes(List.of(os))
+                .statuses(List.of(DeviceStatus.MANAGED))
+                .connectivity(List.of(DeviceConnectivity.ONLINE))
+                .build();
     }
 
     public static DeviceFilterInput osAndStatusDevicesFilter(String os, DeviceStatus... statuses) {

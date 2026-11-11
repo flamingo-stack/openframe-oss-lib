@@ -86,7 +86,7 @@ class DeviceControllerTest {
         when(deviceService.queryDevices(any(), any(), any(), any())).thenReturn(page());
 
         mockMvc.perform(get(BASE)
-                        .param("statuses", "ONLINE,OFFLINE")
+                        .param("statuses", "MANAGED,PENDING")
                         .param("connectivity", "ONLINE")
                         .param("deviceTypes", "LAPTOP")
                         .param("deviceTypes", "SERVER")
@@ -106,7 +106,7 @@ class DeviceControllerTest {
         ArgumentCaptor<SortInput> sort = ArgumentCaptor.forClass(SortInput.class);
         verify(deviceService).queryDevices(filter.capture(), pagination.capture(), eq("reception"), sort.capture());
 
-        assertEquals(List.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE), filter.getValue().getStatuses());
+        assertEquals(List.of(DeviceStatus.MANAGED, DeviceStatus.PENDING), filter.getValue().getStatuses());
         assertEquals(List.of(TelemetryStatus.ONLINE), filter.getValue().getConnectivity());
         assertEquals(List.of(DeviceType.LAPTOP, DeviceType.SERVER), filter.getValue().getDeviceTypes());
         assertEquals(List.of(OsType.WINDOWS), filter.getValue().getOsTypes());
@@ -239,7 +239,7 @@ class DeviceControllerTest {
                 .andExpect(jsonPath("$.ip").value("192.168.1.100"))
                 .andExpect(jsonPath("$.macAddress").value("00:11:22:33:44:55"))
                 .andExpect(jsonPath("$.agentVersion").value("1.2.3"))
-                .andExpect(jsonPath("$.status").value("ONLINE"))
+                .andExpect(jsonPath("$.status").value("MANAGED"))
                 .andExpect(jsonPath("$.type").value("LAPTOP"))
                 .andExpect(jsonPath("$.osType").value("MAC_OS"))
                 .andExpect(jsonPath("$.customerId").value("cust-1"))
@@ -269,7 +269,7 @@ class DeviceControllerTest {
     void filtersPassEveryParamToTheDomainAndRenameOrganizationsToCustomers() throws Exception {
         when(deviceFilterService.getDeviceFilters(any(DeviceFilterCriteria.class), any())).thenReturn(CompletableFuture.completedFuture(
                 DeviceFilters.builder()
-                        .statuses(List.of(new DeviceFilterOption("ONLINE", "Online", 4)))
+                        .statuses(List.of(new DeviceFilterOption("MANAGED", "Managed", 4)))
                         .connectivity(List.of(new DeviceFilterOption("OFFLINE", "OFFLINE", 2)))
                         .deviceTypes(List.of(new DeviceFilterOption("LAPTOP", "Laptop", 3)))
                         .osTypes(List.of(new DeviceFilterOption("WINDOWS", "Windows", 2)))
@@ -279,7 +279,7 @@ class DeviceControllerTest {
                         .build()));
 
         mockMvc.perform(get(BASE + "/filters")
-                        .param("statuses", "ONLINE")
+                        .param("statuses", "MANAGED")
                         .param("connectivity", "OFFLINE")
                         .param("deviceTypes", "LAPTOP")
                         .param("osTypes", "WINDOWS", "MAC_OS")
@@ -287,8 +287,8 @@ class DeviceControllerTest {
                         .param("tagKeys", "site")
                         .param("tagValues", "hq"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.statuses[0].value").value("ONLINE"))
-                .andExpect(jsonPath("$.statuses[0].label").value("Online"))
+                .andExpect(jsonPath("$.statuses[0].value").value("MANAGED"))
+                .andExpect(jsonPath("$.statuses[0].label").value("Managed"))
                 .andExpect(jsonPath("$.statuses[0].count").value(4))
                 .andExpect(jsonPath("$.connectivity[0].value").value("OFFLINE"))
                 .andExpect(jsonPath("$.connectivity[0].count").value(2))
@@ -306,7 +306,7 @@ class DeviceControllerTest {
         ArgumentCaptor<DeviceFilterCriteria> filter = ArgumentCaptor.forClass(DeviceFilterCriteria.class);
         verify(deviceFilterService).getDeviceFilters(filter.capture(), any());
         assertEquals(DeviceFilterCriteria.builder()
-                .statuses(List.of(DeviceStatus.ONLINE))
+                .statuses(List.of(DeviceStatus.MANAGED))
                 .connectivity(List.of(TelemetryStatus.OFFLINE))
                 .deviceTypes(List.of(DeviceType.LAPTOP))
                 .osTypes(List.of(OsType.WINDOWS, OsType.MAC_OS))
@@ -439,7 +439,7 @@ class DeviceControllerTest {
         machine.setIp("192.168.1.100");
         machine.setMacAddress("00:11:22:33:44:55");
         machine.setAgentVersion("1.2.3");
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         machine.setType(DeviceType.LAPTOP);
         machine.setOsType(OsType.MAC_OS);
         machine.setOrganizationId("cust-1");
