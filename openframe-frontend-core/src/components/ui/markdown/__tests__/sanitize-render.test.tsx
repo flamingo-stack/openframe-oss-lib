@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 /**
  * RENDER-level sanitizer fixtures — the counterpart to
  * ./sanitize-invariant.test.ts, which asserts the SCHEMA.
@@ -15,7 +15,7 @@ import { render } from '@testing-library/react';
  * comes out of `SimpleMarkdownRenderer` (the CHAT surface — untrusted model
  * output), not on the schema that is supposed to produce it.
  */
-import { afterEach, describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { setEmbedAuthAdapter } from '../../../../utils/embed-authed-fetch';
 import { RichMarkdownRenderer, SimpleMarkdownRenderer } from '../index';
 
@@ -137,6 +137,8 @@ describe('sanitizer — positioning styles cannot lift content out of the flow',
 describe('sanitizer — chat media loads only from the app', () => {
   afterEach(() => {
     setEmbedAuthAdapter(null);
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   const LEAKS: Record<string, string> = {
@@ -196,10 +198,20 @@ describe('sanitizer — chat media loads only from the app', () => {
     expect(srcs[1]).toContain('/content/api/b.png');
   });
 
-  it('draws images from the gateway the host sanctions (native shell)', () => {
-    setEmbedAuthAdapter({ getHeaders: () => ({}), allowedOrigins: ['https://gateway.example'] });
-    const { container } = render(<SimpleMarkdownRenderer content={'![a](https://gateway.example/api/x.png)'} />);
-    expect(container.querySelector('img')?.getAttribute('src')).toContain('https://gateway.example/api/x.png');
+  it('draws images from the gateway the host sanctions (native shell), fetched with its bearer', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(new Blob(['png']), { headers: { 'Content-Type': 'image/png' } }))),
+    );
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:https://gateway.example/1');
+    setEmbedAuthAdapter({
+      getHeaders: () => ({ Authorization: 'Bearer t' }),
+      allowedOrigins: ['https://gateway.example'],
+    });
+    render(<SimpleMarkdownRenderer content={'![a](https://gateway.example/api/x.png)'} />);
+    const img = await screen.findByRole('img', { name: 'a' });
+    expect(img.getAttribute('src')).toBe('blob:https://gateway.example/1');
+    expect(img.dataset.assetSrc).toBe('https://gateway.example/api/x.png');
   });
 
   it('keeps the decoration around a dropped CSS url, and in-document SVG references', () => {
