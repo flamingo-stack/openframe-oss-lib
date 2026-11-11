@@ -51,8 +51,20 @@ describe('DevicesTableBody, grid layout', () => {
     expect(gridBodyMarkup(container)).not.toContain('mb-1');
   });
 
-  it('starts every grid row with the checkbox column, and the header with "select all"', () => {
+  it('draws no checkbox column unless asked: a grid row starts with the device', () => {
     const { container } = render(<DevicesTableBody devices={DEVICES} layout="grid" />);
+    expect(gridBodyMarkup(container)).not.toContain('data-grid-select');
+    expect(screen.queryByRole('checkbox', { name: 'Select all rows' })).toBeNull();
+    expect(screen.queryAllByRole('checkbox', { name: 'Select row' })).toHaveLength(0);
+  });
+
+  it('draws no checkbox column in a cards table, selectable or not', () => {
+    render(<DevicesTableBody devices={DEVICES} selectable />);
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  });
+
+  it('selectable: starts every grid row with the checkbox column, and the header with "select all"', () => {
+    const { container } = render(<DevicesTableBody devices={DEVICES} layout="grid" selectable />);
     const [first] = gridRows(container);
     // The selection cell is the first cell of the row, before the device's name.
     expect(first?.indexOf('data-grid-select')).toBeLessThan(first?.indexOf('reception-01') ?? -1);
@@ -60,8 +72,8 @@ describe('DevicesTableBody, grid layout', () => {
     expect(screen.getByRole('checkbox', { name: 'Select all rows' })).toBeTruthy();
   });
 
-  it('selects a row from its checkbox, and all rows from the header', () => {
-    render(<DevicesTableBody devices={DEVICES} layout="grid" />);
+  it('selectable: selects a row from its checkbox, and all rows from the header', () => {
+    render(<DevicesTableBody devices={DEVICES} layout="grid" selectable />);
     // The card form's (hidden) checkboxes come first in the document, then the grid form's.
     const rowBoxes = () => screen.getAllByRole('checkbox', { name: 'Select row' }).slice(DEVICES.length);
     const selectAll = () => screen.getByRole('checkbox', { name: 'Select all rows' });

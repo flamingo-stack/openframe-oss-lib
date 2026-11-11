@@ -197,6 +197,7 @@ function actionColumns(): ColumnDef<Device>[] {
 
 interface GridDemoProps {
   rowCount?: number;
+  /** The checkbox column, first and pinned left. Off unless the table has something to do with a selection. */
   selectable?: boolean;
   wide?: boolean;
   loading?: boolean;
@@ -211,7 +212,7 @@ interface GridDemoProps {
 
 function GridDemo({
   rowCount = 12,
-  selectable = true,
+  selectable = false,
   wide = true,
   loading = false,
   maxHeight,
@@ -282,11 +283,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Selection, sort, filters, pinned columns and horizontal scroll; the page scrolls vertically. */
+/** Sort, filters, pinned columns and horizontal scroll; the page scrolls vertically. */
 export const Basic: Story = {};
 
+/** With a checkbox column: it is the first column and stays in place, with the first data column, on horizontal scroll. */
+export const Selection: Story = { args: { selectable: true } };
+
 /** Columns narrower than the table: the last data column takes the free width, up to the action columns. */
-export const FewColumns: Story = { args: { wide: false, selectable: false, rowCount: 5 } };
+export const FewColumns: Story = { args: { wide: false, rowCount: 5 } };
 
 /** A long list on a scrolling page: the header sticks to the top and stays aligned with the body. */
 export const StickyHeader: Story = { args: { rowCount: 80, stickyHeader: true } };

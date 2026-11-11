@@ -83,4 +83,5 @@ needs the checklist above before a host asks it for the grid:
 | `DeviceSelector` | `size` / `minSize`, `gridCell` for the device and customer cells, its add / remove column as an action column |
 
 `DevicesTableBody` (`features/devices/devices-table-columns.tsx`) is the worked example: every column has a `size`, a
-`minSize` and a `gridCell`, its open column is kept by hand, and it adds `selectionColumn()` itself.
+`minSize` and a `gridCell`, its open column is kept by hand, and it adds `selectionColumn()` itself when the host
+passes `selectable` (off by default: the devices list has no bulk action yet).

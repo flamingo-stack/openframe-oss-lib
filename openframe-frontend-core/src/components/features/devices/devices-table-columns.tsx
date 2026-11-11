@@ -179,8 +179,13 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   /** Grid layout: the table's settings (the gear's menu of columns, the saved column layout). See `DataTable`. */
   tableSettings?: DataTableSettings;
   /**
-   * The selected rows, by row id (grid layout: its first column is the checkbox column). Omit both to let the table
-   * keep the selection itself.
+   * Grid layout: draw the checkbox column first (the design's `table/utility-cell`, type checkbox). Off by default:
+   * the devices list has nothing to do with a selection yet, and the design draws the column only on a table that
+   * does. Card rows never draw it.
+   */
+  selectable?: boolean;
+  /**
+   * The selected rows, by row id, of a `selectable` grid table. Omit both to let the table keep the selection itself.
    */
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
@@ -214,13 +219,15 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
   layout = 'cards',
   tableMaxHeight,
   tableSettings,
+  selectable: selectableGiven = false,
   rowSelection: rowSelectionGiven,
   onRowSelectionChange,
 }: DevicesTableBodyProps<T>) {
-  // The grid's checkbox column: the selection is the host's when it passes one, the table's own otherwise.
+  // The grid's checkbox column, when the host asks for it: the selection is the host's when it passes one, the
+  // table's own otherwise.
   const [ownRowSelection, setOwnRowSelection] = useState<RowSelectionState>({});
   const rowSelection = rowSelectionGiven ?? ownRowSelection;
-  const selectable = layout === 'grid';
+  const selectable = selectableGiven && layout === 'grid';
   const { getDeviceHref } = useDevicesViewConfig();
   const columns = useMemo<ColumnDef<T>[]>(() => {
     const hidden = new Set(hideColumns ?? []);
@@ -234,7 +241,7 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
       .map(c => (c.id && unfiltered.has(c.id) ? { ...c, meta: { ...c.meta, filter: undefined } } : c));
     const open = getDeviceOpenColumn<T>();
     const data = actionsColumn ? [...base, actionsColumn, open] : [...base, open];
-    // The grid table's first column is always the checkbox column.
+    // The checkbox column is the grid table's first column.
     return selectable ? [selectionColumn<T>(), ...data] : data;
   }, [deviceFilters, filtersPending, actionsColumn, hideColumns, directoryColumns, disableColumnFilters, selectable]);
 
