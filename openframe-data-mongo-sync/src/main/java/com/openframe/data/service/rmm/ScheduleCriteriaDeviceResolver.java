@@ -1,5 +1,6 @@
 package com.openframe.data.service.rmm;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
@@ -19,6 +20,9 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class ScheduleCriteriaDeviceResolver {
+
+    // criteria schedules only ever target managed devices; pending, deleting and archived ones are never a match
+    private static final List<String> MANAGED_STATUSES = DeviceStatus.CONNECTED.stream().map(Enum::name).toList();
 
     private final MachineRepository machineRepository;
 
@@ -70,6 +74,7 @@ public class ScheduleCriteriaDeviceResolver {
 
     private static MachineQueryFilter buildFilter(ScheduleDeviceCriteria criteria) {
         MachineQueryFilter filter = new MachineQueryFilter();
+        filter.setStatuses(MANAGED_STATUSES);
         if (criteria != null) {
             filter.setOrganizationIds(emptyToNull(criteria.getOrganizationIds()));
             filter.setDeviceTypes(deviceTypeNames(criteria.getDeviceTypes()));

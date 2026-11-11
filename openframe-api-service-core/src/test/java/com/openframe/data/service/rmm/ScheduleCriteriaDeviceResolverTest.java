@@ -55,6 +55,26 @@ class ScheduleCriteriaDeviceResolverTest {
         verify(machineRepository).findMachineIdsByCriteria(eq(TENANT), filter.capture(), eq(List.of(WINDOWS)));
         assertThat(filter.getValue().getOrganizationIds()).containsExactly("org-1");
         assertThat(filter.getValue().getDeviceTypes()).containsExactly(DeviceType.DESKTOP.name());
+        assertThat(filter.getValue().getStatuses()).containsExactlyInAnyOrder("MANAGED", "ONLINE", "OFFLINE");
+    }
+
+    @Test
+    @DisplayName("resolveMachineIds and count: only managed devices match criteria; PENDING, deleting and ARCHIVED never do")
+    void resolveAndCount_restrictToManagedStatuses() {
+        ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build();
+        when(machineRepository.findMachineIdsByCriteria(eq(TENANT), any(), eq(null))).thenReturn(List.of("m-1"));
+        when(machineRepository.countMachinesByCriteria(eq(TENANT), any(), eq(null))).thenReturn(1L);
+
+        resolver.resolveMachineIds(TENANT, criteria, null);
+        resolver.count(TENANT, criteria, null);
+
+        verify(machineRepository).findMachineIdsByCriteria(eq(TENANT), filterCaptor.capture(), eq(null));
+        verify(machineRepository).countMachinesByCriteria(eq(TENANT), filterCaptor.capture(), eq(null));
+        assertThat(filterCaptor.getAllValues())
+                .extracting(MachineQueryFilter::getStatuses)
+                .allSatisfy(statuses -> assertThat(statuses)
+                        .containsExactlyInAnyOrder("MANAGED", "ONLINE", "OFFLINE")
+                        .doesNotContain("PENDING", "PENDING_DELETION", "DELETED", "ARCHIVED"));
     }
 
     @Test

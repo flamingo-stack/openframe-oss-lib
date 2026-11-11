@@ -80,7 +80,7 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     );
     private static final String DEFAULT_SORT_FIELD = "_id";
     // The order a DESC status sort returns (the frontends send DESC meaning "online first"); ASC is its exact reverse.
-    static final List<String> STATUS_DESC_ORDER = List.of("ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
+    static final List<String> STATUS_DESC_ORDER = List.of("MANAGED", "ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
     private static final String STATUS_RANK_FIELD = "_statusRank";
     private static final int UNKNOWN_STATUS_RANK = 0;
     // "connectivity" sorts on telemetryStatus; DESC means online first, like the status sort.

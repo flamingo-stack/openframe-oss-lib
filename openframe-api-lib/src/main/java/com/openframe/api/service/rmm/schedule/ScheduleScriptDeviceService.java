@@ -350,7 +350,7 @@ public class ScheduleScriptDeviceService {
                 .toList();
         if (!nonDispatchable.isEmpty()) {
             throw new BadRequestException(
-                    "Device(s) are not in a dispatchable state (must be ONLINE or OFFLINE): " + nonDispatchable);
+                    "Device(s) are not in a dispatchable state (must be a managed device): " + nonDispatchable);
         }
 
         if (schedulePlatforms == null || schedulePlatforms.isEmpty()) {

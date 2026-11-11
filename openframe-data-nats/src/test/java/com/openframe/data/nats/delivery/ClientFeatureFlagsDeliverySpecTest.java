@@ -63,7 +63,8 @@ class ClientFeatureFlagsDeliverySpecTest {
         Set<DeviceStatus> statuses = spec.getDeliverableStatuses();
 
         // verifications
-        assertThat(statuses).containsExactlyInAnyOrder(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING);
+        assertThat(statuses).containsExactlyInAnyOrder(
+                DeviceStatus.MANAGED, DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING);
     }
 
     @Test
