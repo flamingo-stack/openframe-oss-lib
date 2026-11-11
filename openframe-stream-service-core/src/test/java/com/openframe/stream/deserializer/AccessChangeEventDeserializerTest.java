@@ -8,6 +8,9 @@ import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -180,6 +183,24 @@ class AccessChangeEventDeserializerTest {
         assertThat(result)
                 .returns(true, DeserializedDebeziumMessage::getSkipProcessing)
                 .returns(UnifiedEventType.UNKNOWN, DeserializedDebeziumMessage::getUnifiedEventType);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "yesterday"})
+    void deserialize_missingOrMalformedOccurredAt_skippedWithoutThrowing(String occurredAt) {
+        // setup
+        after.put("occurredAt", occurredAt);
+        CommonDebeziumMessage message = message(after);
+
+        // execution
+        DeserializedDebeziumMessage result = deserializer.deserialize(message, MessageType.ACCESS_CHANGE_EVENT);
+
+        // verifications
+        assertThat(result)
+                .returns(true, DeserializedDebeziumMessage::getSkipProcessing)
+                .returns(UnifiedEventType.UNKNOWN, DeserializedDebeziumMessage::getUnifiedEventType)
+                .returns("DIRECTORY_ACCOUNT_LINKED", DeserializedDebeziumMessage::getSourceEventType);
     }
 
     @Test

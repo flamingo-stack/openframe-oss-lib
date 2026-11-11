@@ -16,6 +16,7 @@ import tools.jackson.databind.node.ObjectNode;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 
@@ -68,8 +69,11 @@ public class AccessChangeEventDeserializer implements KafkaMessageDeserializer {
         DebeziumMessage.Payload<JsonNode> payload = message.getPayload();
         JsonNode after = payload.getAfter();
         String action = text(after, FIELD_ACTION);
-        String occurredAtText = text(after, FIELD_OCCURRED_AT);
-        Instant occurredAt = Instant.parse(occurredAtText);
+        Instant occurredAt = occurredAtOf(after);
+        if (occurredAt == null) {
+            log.warn("Skipping access change {} without a valid occurredAt", text(after, FIELD_ACCESS_CHANGE_ID));
+            return skipped(payload, action);
+        }
         UnifiedEventType eventType = eventTypeOf(action);
         boolean unknownAction = eventType == UnifiedEventType.UNKNOWN;
         if (unknownAction) {
@@ -101,6 +105,27 @@ public class AccessChangeEventDeserializer implements KafkaMessageDeserializer {
                 .tenantId(tenantId)
                 .organizationId(organizationId)
                 .organizationName(organizationName)
+                .build();
+    }
+
+    private static Instant occurredAtOf(JsonNode after) {
+        String occurredAtText = text(after, FIELD_OCCURRED_AT);
+        if (occurredAtText == null) {
+            return null;
+        }
+        try {
+            return Instant.parse(occurredAtText);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    private static DeserializedDebeziumMessage skipped(DebeziumMessage.Payload<JsonNode> payload, String action) {
+        return DeserializedDebeziumMessage.builder()
+                .payload(payload)
+                .sourceEventType(action)
+                .unifiedEventType(UnifiedEventType.UNKNOWN)
+                .skipProcessing(true)
                 .build();
     }
 
