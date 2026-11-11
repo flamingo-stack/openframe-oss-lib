@@ -186,6 +186,10 @@ public enum UnifiedEventType {
     GWS_AUDIT_FAILURE(Severity.WARNING, "Google Workspace failed directory operation"),
     GWS_AUDIT_OTHER(Severity.INFO, "Google Workspace directory audit event"),
 
+    IDENTITY_PROFILE_CREATED(Severity.INFO, "Profile created"),
+    IDENTITY_ACCOUNT_LINKED(Severity.INFO, "Account linked"),
+    IDENTITY_ACCOUNT_UNLINKED(Severity.INFO, "Account unlinked"),
+
     // Unknown events
     UNKNOWN(Severity.WARNING, "Unknown event");
 

@@ -29,6 +29,8 @@ public enum MessageType {
             List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     REMOTE_SESSION_AUDIT_EVENT(IntegratedToolType.MESHCENTRAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+    ACCESS_CHANGE_EVENT(IntegratedToolType.OPENFRAME, DataEnrichmentServiceType.PRE_ENRICHED,
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
 
     FLEET_MDM_HOST_SOFTWARE_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.MONGO_DEVICE_SOFTWARE), EventHandlerType.COMMON_TYPE);
