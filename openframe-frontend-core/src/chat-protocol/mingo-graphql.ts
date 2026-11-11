@@ -106,6 +106,17 @@ export const MINGO_MESSAGES_QUERY = `
               requiresApproval
               approvalStatus
               toolExecutionRequestId
+              policyReview {
+                decision
+                approvalLevel
+                policyLevel
+                operationCodes
+                matchedRules {
+                  code
+                  label
+                }
+                reason
+              }
             }
             ... on ExecutedToolData {
               integratedToolType
@@ -130,6 +141,17 @@ export const MINGO_MESSAGES_QUERY = `
                 requiresApproval
                 approvalType
                 toolCallArguments
+                policyReview {
+                  decision
+                  approvalLevel
+                  policyLevel
+                  operationCodes
+                  matchedRules {
+                    code
+                    label
+                  }
+                  reason
+                }
               }
             }
             ... on ApprovalResultData {
