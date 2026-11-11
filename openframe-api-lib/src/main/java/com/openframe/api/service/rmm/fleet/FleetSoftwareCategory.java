@@ -11,6 +11,7 @@ public enum FleetSoftwareCategory {
 
     CHOCOLATEY(SoftwareSource.CHOCOLATEY, "chocolatey_packages"),
     HOMEBREW(SoftwareSource.BREW, "homebrew_packages"),
+    WINGET(SoftwareSource.WINGET, "winget_packages"),
     OTHER(SoftwareSource.UNMANAGED);
 
     private final SoftwareSource source;

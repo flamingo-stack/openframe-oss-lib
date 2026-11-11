@@ -185,6 +185,7 @@ class SoftwareInventoryServiceTest {
                 titleWithSource("Chocolatey app 1", "chocolatey_packages"),
                 titleWithSource("Chocolatey app 2", "chocolatey_packages"),
                 titleWithSource("Homebrew tool",    "homebrew_packages"),
+                titleWithSource("Winget app",       "winget_packages"),
                 titleWithSource("Random pkg",       "programs")));      // unknown -> UNMANAGED
         when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
 
@@ -195,6 +196,7 @@ class SoftwareInventoryServiceTest {
                 .collect(java.util.stream.Collectors.toMap(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount));
         assertThat(sourceCounts).containsEntry(SoftwareSource.CHOCOLATEY.name(), 2);
         assertThat(sourceCounts).containsEntry(SoftwareSource.BREW.name(), 1);
+        assertThat(sourceCounts).containsEntry(SoftwareSource.WINGET.name(), 1);
         assertThat(sourceCounts).containsEntry(SoftwareSource.UNMANAGED.name(), 1);
     }
 

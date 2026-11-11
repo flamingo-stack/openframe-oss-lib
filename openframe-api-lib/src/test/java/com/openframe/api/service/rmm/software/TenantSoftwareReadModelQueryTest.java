@@ -53,7 +53,7 @@ import static org.mockito.Mockito.when;
 class TenantSoftwareReadModelQueryTest {
 
     private static final String TENANT = "t1";
-    private static final Set<String> MANAGER_SOURCES = Set.of("homebrew_packages", "chocolatey_packages");
+    private static final Set<String> MANAGER_SOURCES = Set.of("homebrew_packages", "chocolatey_packages", "winget_packages");
 
     @Mock private SoftwareRepository softwareRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
