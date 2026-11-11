@@ -160,8 +160,9 @@ jobs:
       - name: Upgrade npm
         run: npm install -g npm@11.9.0
 
+      # A release is built from the committed lockfile, the tree its tests ran on.
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build
         run: npm run build
