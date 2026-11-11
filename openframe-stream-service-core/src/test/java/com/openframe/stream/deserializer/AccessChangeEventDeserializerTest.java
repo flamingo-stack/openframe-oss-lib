@@ -152,6 +152,37 @@ class AccessChangeEventDeserializerTest {
     }
 
     @Test
+    void deserialize_unknownAction_skippedAsUnknownNotShownAsUnlink() {
+        // setup
+        after.put("action", "PROFILE_MERGED");
+        CommonDebeziumMessage message = message(after);
+
+        // execution
+        DeserializedDebeziumMessage result = deserializer.deserialize(message, MessageType.ACCESS_CHANGE_EVENT);
+
+        // verifications
+        assertThat(result)
+                .returns(true, DeserializedDebeziumMessage::getSkipProcessing)
+                .returns(UnifiedEventType.UNKNOWN, DeserializedDebeziumMessage::getUnifiedEventType)
+                .returns("Access change PROFILE_MERGED for Rhea Patel", DeserializedDebeziumMessage::getMessage);
+    }
+
+    @Test
+    void deserialize_missingAction_skippedAsUnknown() {
+        // setup
+        after.remove("action");
+        CommonDebeziumMessage message = message(after);
+
+        // execution
+        DeserializedDebeziumMessage result = deserializer.deserialize(message, MessageType.ACCESS_CHANGE_EVENT);
+
+        // verifications
+        assertThat(result)
+                .returns(true, DeserializedDebeziumMessage::getSkipProcessing)
+                .returns(UnifiedEventType.UNKNOWN, DeserializedDebeziumMessage::getUnifiedEventType);
+    }
+
+    @Test
     void deserialize_anyAction_noMachineNoAgentVisible() {
         // setup
         CommonDebeziumMessage message = message(after);

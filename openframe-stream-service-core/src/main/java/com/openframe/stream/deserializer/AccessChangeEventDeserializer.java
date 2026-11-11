@@ -1,10 +1,13 @@
 package com.openframe.stream.deserializer;
 
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
+import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.kafka.model.debezium.CommonDebeziumMessage;
+import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -16,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AccessChangeEventDeserializer implements KafkaMessageDeserializer {
@@ -37,11 +41,12 @@ public class AccessChangeEventDeserializer implements KafkaMessageDeserializer {
 
     private static final String PROFILE_CREATED = "PROFILE_CREATED";
     private static final String ACCOUNT_LINKED = "DIRECTORY_ACCOUNT_LINKED";
+    private static final String ACCOUNT_UNLINKED = "DIRECTORY_ACCOUNT_UNLINKED";
     private static final String VERIFIED_EMAIL = "VERIFIED_EMAIL";
     private static final Map<String, UnifiedEventType> EVENT_TYPES = Map.of(
             PROFILE_CREATED, UnifiedEventType.IDENTITY_PROFILE_CREATED,
             ACCOUNT_LINKED, UnifiedEventType.IDENTITY_ACCOUNT_LINKED,
-            "DIRECTORY_ACCOUNT_UNLINKED", UnifiedEventType.IDENTITY_ACCOUNT_UNLINKED);
+            ACCOUNT_UNLINKED, UnifiedEventType.IDENTITY_ACCOUNT_UNLINKED);
     private static final Map<String, String> SYSTEM_NAMES = Map.of(
             "MICROSOFT_365", "Microsoft 365",
             "GOOGLE_WORKSPACE", "Google Workspace");
@@ -49,6 +54,7 @@ public class AccessChangeEventDeserializer implements KafkaMessageDeserializer {
     private static final String LINKED_VERIFIED_MESSAGE = "Linked %s account to %s (verified address)";
     private static final String LINKED_BY_SYNC_MESSAGE = "Linked %s account to %s (created by the sync)";
     private static final String UNLINKED_MESSAGE = "Unlinked %s account from %s (account gone)";
+    private static final String UNKNOWN_ACTION_MESSAGE = "Access change %s for %s";
 
     private final ObjectMapper mapper;
 
@@ -59,27 +65,50 @@ public class AccessChangeEventDeserializer implements KafkaMessageDeserializer {
 
     @Override
     public DeserializedDebeziumMessage deserialize(CommonDebeziumMessage message, MessageType type) {
-        JsonNode after = message.getPayload().getAfter();
+        DebeziumMessage.Payload<JsonNode> payload = message.getPayload();
+        JsonNode after = payload.getAfter();
         String action = text(after, FIELD_ACTION);
-        Instant occurredAt = Instant.parse(text(after, FIELD_OCCURRED_AT));
-        UnifiedEventType eventType = EVENT_TYPES.get(action);
+        String occurredAtText = text(after, FIELD_OCCURRED_AT);
+        Instant occurredAt = Instant.parse(occurredAtText);
+        UnifiedEventType eventType = eventTypeOf(action);
+        boolean unknownAction = eventType == UnifiedEventType.UNKNOWN;
+        if (unknownAction) {
+            log.warn("Skipping access change {} with unknown action {}", text(after, FIELD_ACCESS_CHANGE_ID), action);
+        }
+        String ingestDay = DAY_FORMATTER.format(occurredAt);
+        String toolEventId = toolEventId(after);
+        String readableMessage = readableMessage(after, eventType, action);
+        IntegratedToolType integratedToolType = type.getIntegratedToolType();
+        String debeziumMessage = after.toString();
+        String details = details(after);
+        long eventTimestamp = occurredAt.toEpochMilli();
+        String tenantId = text(after, FIELD_TENANT_ID);
+        String organizationId = text(after, FIELD_ORGANIZATION_ID);
+        String organizationName = text(after, FIELD_ORGANIZATION_NAME);
         return DeserializedDebeziumMessage.builder()
-                .payload(message.getPayload())
-                .ingestDay(DAY_FORMATTER.format(occurredAt))
+                .payload(payload)
+                .ingestDay(ingestDay)
                 .sourceEventType(action)
-                .toolEventId(toolEventId(after))
+                .toolEventId(toolEventId)
                 .unifiedEventType(eventType)
-                .message(readableMessage(after, action))
-                .integratedToolType(type.getIntegratedToolType())
-                .debeziumMessage(after.toString())
-                .details(details(after))
-                .eventTimestamp(occurredAt.toEpochMilli())
-                .skipProcessing(false)
+                .message(readableMessage)
+                .integratedToolType(integratedToolType)
+                .debeziumMessage(debeziumMessage)
+                .details(details)
+                .eventTimestamp(eventTimestamp)
+                .skipProcessing(unknownAction)
                 .isVisible(true)
-                .tenantId(text(after, FIELD_TENANT_ID))
-                .organizationId(text(after, FIELD_ORGANIZATION_ID))
-                .organizationName(text(after, FIELD_ORGANIZATION_NAME))
+                .tenantId(tenantId)
+                .organizationId(organizationId)
+                .organizationName(organizationName)
                 .build();
+    }
+
+    private static UnifiedEventType eventTypeOf(String action) {
+        if (action == null) {
+            return UnifiedEventType.UNKNOWN;
+        }
+        return EVENT_TYPES.getOrDefault(action, UnifiedEventType.UNKNOWN);
     }
 
     private static String toolEventId(JsonNode after) {
@@ -91,17 +120,16 @@ public class AccessChangeEventDeserializer implements KafkaMessageDeserializer {
         return accessChangeId + TOOL_EVENT_ID_SEPARATOR + organizationId;
     }
 
-    private static String readableMessage(JsonNode after, String action) {
+    private static String readableMessage(JsonNode after, UnifiedEventType eventType, String action) {
         String person = text(after, FIELD_TARGET_PERSON_NAME);
         String systemCode = text(after, FIELD_SYSTEM);
         String system = SYSTEM_NAMES.getOrDefault(systemCode, systemCode);
-        if (PROFILE_CREATED.equals(action)) {
-            return CREATED_MESSAGE.formatted(person, system);
-        }
-        if (ACCOUNT_LINKED.equals(action)) {
-            return linkedMessage(after).formatted(system, person);
-        }
-        return UNLINKED_MESSAGE.formatted(system, person);
+        return switch (eventType) {
+            case IDENTITY_PROFILE_CREATED -> CREATED_MESSAGE.formatted(person, system);
+            case IDENTITY_ACCOUNT_LINKED -> linkedMessage(after).formatted(system, person);
+            case IDENTITY_ACCOUNT_UNLINKED -> UNLINKED_MESSAGE.formatted(system, person);
+            default -> UNKNOWN_ACTION_MESSAGE.formatted(action, person);
+        };
     }
 
     private static String linkedMessage(JsonNode after) {
@@ -113,8 +141,13 @@ public class AccessChangeEventDeserializer implements KafkaMessageDeserializer {
         ObjectNode details = mapper.createObjectNode();
         DETAIL_FIELDS.stream()
                 .filter(after::hasNonNull)
-                .forEach(field -> details.set(field, after.get(field)));
+                .forEach(field -> copyField(after, details, field));
         return details.toString();
+    }
+
+    private static void copyField(JsonNode after, ObjectNode details, String field) {
+        JsonNode value = after.get(field);
+        details.set(field, value);
     }
 
     private static String text(JsonNode node, String field) {
