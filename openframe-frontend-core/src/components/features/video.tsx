@@ -760,7 +760,15 @@ function YouTubeFacadeInner({
         className="group absolute inset-0 h-full overflow-hidden"
       >
         {poster ? (
-          <Image src={poster} alt={title} fill sizes={IMAGE_SLOT.full} priority={priority} unoptimized className="object-cover" />
+          <Image
+            src={poster}
+            alt={title}
+            fill
+            sizes={IMAGE_SLOT.full}
+            priority={priority}
+            unoptimized
+            className="object-cover"
+          />
         ) : (
           <picture>
             <source type="image/webp" srcSet={posterWebp} />
@@ -796,7 +804,7 @@ function YouTubeFacadeInner({
             <span className="whitespace-pre-line font-heading text-[length:var(--font-size-h5-caption)] font-semibold leading-[var(--font-line-space-h5-caption)] text-ods-text-primary content-md:text-[length:var(--font-size-h4-body)] content-md:leading-[var(--font-line-space-h4-body)]">
               {caption.title}
             </span>
-            {caption.meta && <span className="text-h6 text-ods-text-secondary">{caption.meta}</span>}
+            {caption.meta && <span className="text-ods-text-secondary text-h6">{caption.meta}</span>}
           </span>
         )}
       </Button>
