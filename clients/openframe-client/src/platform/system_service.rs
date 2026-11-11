@@ -923,14 +923,18 @@ async fn remove_service_windows(
         .as_deref()
         .map_or_else(|| "unknown".to_string(), |p| p.display().to_string());
     if let Some(dir) = only_under {
-        if !exe
-            .as_deref()
-            .is_some_and(|exe| crate::platform::lock_recovery::path_under(exe, dir))
-        {
+        let Some(exe) = exe.as_deref() else {
+            warn!(
+                "Leaving service {} in place: could not read its executable",
+                service_name
+            );
+            return Ok(());
+        };
+        if !crate::platform::lock_recovery::path_under(exe, dir) {
             info!(
                 "Leaving service {} in place: its executable {} is not under {}",
                 service_name,
-                exe_label,
+                exe.display(),
                 dir.display()
             );
             return Ok(());
@@ -940,7 +944,7 @@ async fn remove_service_windows(
         "Removing existing service {} (executable {})",
         service_name, exe_label
     );
-    if let Err(e) = stop_service_windows(service_name, true).await {
+    if let Err(e) = stop_service_windows(service_name, false).await {
         warn!(
             "Failed to stop service {} before delete: {e:#}",
             service_name
@@ -953,7 +957,7 @@ async fn remove_service_windows(
 /// reinstall can recreate it under the same name without hitting `ERROR_SERVICE_MARKED_FOR_DELETE`.
 #[cfg(target_os = "windows")]
 async fn delete_service_windows(service_name: &str) -> Result<()> {
-    use winapi::shared::winerror::ERROR_SERVICE_MARKED_FOR_DELETE;
+    use winapi::shared::winerror::{ERROR_SERVICE_DOES_NOT_EXIST, ERROR_SERVICE_MARKED_FOR_DELETE};
     use windows_service::service::ServiceAccess;
 
     if service_missing_timed(service_name)
@@ -981,6 +985,11 @@ async fn delete_service_windows(service_name: &str) -> Result<()> {
     .await?
     {
         Ok(()) => {}
+        Err(windows_service::Error::Winapi(e))
+            if e.raw_os_error() == Some(ERROR_SERVICE_DOES_NOT_EXIST as i32) =>
+        {
+            return Ok(());
+        }
         Err(windows_service::Error::Winapi(e))
             if e.raw_os_error() == Some(ERROR_SERVICE_MARKED_FOR_DELETE as i32) =>
         {
