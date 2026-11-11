@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,7 +19,7 @@ public interface SoftwareRepository extends MongoRepository<Software, String> {
 
     void deleteByTenantIdAndSoftwareTitleId(String tenantId, Long softwareTitleId);
 
-    List<Software> findByTenantIdAndInstallationsMachineId(String tenantId, String machineId);
+    List<Software> findByTenantIdAndSoftwareTitleIdIn(String tenantId, Collection<Long> softwareTitleIds);
 
     Page<Software> findByTenantIdAndDevicesCountGreaterThan(String tenantId, int min, Pageable pageable);
 

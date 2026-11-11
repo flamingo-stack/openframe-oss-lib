@@ -3,7 +3,10 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../../utils/embed-authed-fetch', () => ({ embedAuthedFetch: vi.fn() }));
+vi.mock('../../../../utils/embed-authed-fetch', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  embedAuthedFetch: vi.fn(),
+}));
 import { PageTopicsProvider } from '../../../../contexts/page-topics-context';
 import { embedAuthedFetch } from '../../../../utils/embed-authed-fetch';
 import { emptyStateUrlForTopic, useEmptyStateConfig } from '../use-empty-state-config';

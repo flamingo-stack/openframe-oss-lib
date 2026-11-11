@@ -109,6 +109,7 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
 
         // verifications
         verify(machineWriter, never()).update(anyString(), any(Criteria.class), any(MachineUpdate.class));
+        verify(machineRepository, never()).saveAll(any());
     }
 
     private void stubStale(Machine... machines) {

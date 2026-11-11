@@ -32,6 +32,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -75,6 +76,7 @@ class DeviceServiceTest {
     private TenantIdProvider tenantIdProvider;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Captor private ArgumentCaptor<MachineUpdate> statusUpdateCaptor;
 
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, deviceSoftwareConnectivitySync,
@@ -335,6 +337,7 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
@@ -357,6 +360,7 @@ class DeviceServiceTest {
                 .hasMessage("mongo hiccup");
 
         verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
+        verify(machineWriter, never()).update(any(), any(MachineUpdate.class));
         verify(machineRepository, never()).save(any());
         assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
         verifyNoInteractions(deviceStatusProcessor);
@@ -370,6 +374,7 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.MANAGED);
         when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
 
@@ -384,12 +389,14 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.MANAGED);
         when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
 
         verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-arc", false);
-        verify(machineRepository).save(m);
-        assertThat(m.getStatus()).isEqualTo(DeviceStatus.ARCHIVED);
+        verify(machineWriter).update(eq("m-arc"), statusUpdateCaptor.capture());
+        assertThat(statusUpdateCaptor.getValue().paths()).containsExactly("status");
+        verify(machineRepository, never()).save(any());
     }
 
     @Test
@@ -400,11 +407,12 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.PENDING);
         when(machineRepository.findByMachineId("m-pen")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-pen", DeviceStatus.ARCHIVED);
 
         verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
-        verify(machineRepository).save(m);
+        verify(machineWriter).update(eq("m-pen"), any(MachineUpdate.class));
     }
 
     @ParameterizedTest
@@ -430,11 +438,59 @@ class DeviceServiceTest {
         m.setTenantId("t-1");
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
         verify(deletedMachineCleanup).cleanUpDeletedMachine("t-1", "m-del");
         verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: writes only the status field and post-processes the stored result")
+    void statusChange_fieldLevelWrite_postProcessesTheWrittenMachine() {
+        Machine m = new Machine();
+        m.setMachineId("m-arc");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.MANAGED);
+        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
+
+        service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
+
+        verify(machineWriter).update(eq("m-arc"), statusUpdateCaptor.capture());
+        assertThat(statusUpdateCaptor.getValue().paths()).containsExactly("status");
+        ArgumentCaptor<Machine> processed = ArgumentCaptor.forClass(Machine.class);
+        verify(deviceStatusProcessor).postProcessStatusUpdated(processed.capture());
+        assertThat(processed.getValue().getStatus()).isEqualTo(DeviceStatus.ARCHIVED);
+        verify(machineRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateStatusByMachineId: a device removed between the read and the write is not found")
+    void statusChange_deviceGoneBeforeTheWrite_notFound() {
+        Machine m = new Machine();
+        m.setMachineId("m-arc");
+        m.setStatus(DeviceStatus.MANAGED);
+        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        when(machineWriter.update(eq("m-arc"), any(MachineUpdate.class))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED))
+                .isInstanceOf(DeviceNotFoundException.class);
+
+        verifyNoInteractions(deviceStatusProcessor);
+    }
+
+    private void stubStatusWrite(Machine stored) {
+        when(machineWriter.update(eq(stored.getMachineId()), any(MachineUpdate.class)))
+                .thenAnswer(inv -> {
+                    Machine after = new Machine();
+                    after.setMachineId(stored.getMachineId());
+                    after.setTenantId(stored.getTenantId());
+                    after.setStatus(stored.getStatus());
+                    inv.getArgument(1, MachineUpdate.class).applyTo(after);
+                    return Optional.of(new MachineWriteResult(stored, after));
+                });
     }
 
 

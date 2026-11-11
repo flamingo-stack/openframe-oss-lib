@@ -32,6 +32,7 @@ public class SoftwareResponse {
     // program by, and the match the read model stored for it
     private FleetSource fleetSource;
     private String upgradeCode;
+    private String bundleIdentifier;
     private List<String> productCodes;
     private List<String> packageFamilyNames;
     private Boolean systemComponent;

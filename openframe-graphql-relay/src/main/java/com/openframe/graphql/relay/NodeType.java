@@ -16,6 +16,7 @@ public enum NodeType {
     DIALOG("Dialog", "id"),
     MESSAGE("Message", "id"),
     TAG("Tag", "id"),
+    MACHINE_TAG("MachineTag", "id"),
     TOOL_CONNECTION("ToolConnection", "id"),
     INSTALLED_AGENT("InstalledAgent", "id"),
     LOG_EVENT("LogEvent", "id"),

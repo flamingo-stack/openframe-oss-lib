@@ -43,13 +43,20 @@ public class DeviceHeartbeatOfflineDetectionService {
         log.info("Successfully marked {} device(s) as OFFLINE", marked);
     }
 
-    // The guard re-checks the read in Mongo, so a heartbeat that lands meanwhile is never overwritten and no write conflicts.
+    // Field-level, one machine at a time: a whole-document save would overwrite what other writers set since the
+    // read. The guard re-checks the read in Mongo, so no write conflicts: a heartbeat that arrived meanwhile is never
+    // overwritten, and the lifecycle status is never touched here
     private boolean markDeviceAsOffline(Machine machine, Instant threshold) {
         MachineUpdate update = machineUpdate().set(TELEMETRY_STATUS, TelemetryStatus.OFFLINE);
-        Criteria guard = Criteria.where(LAST_SEEN.path()).lt(threshold)
-                .and(TELEMETRY_STATUS.path()).is(TelemetryStatus.ONLINE);
+        Criteria guard = stillSilentSince(threshold).and(TELEMETRY_STATUS.path()).is(TelemetryStatus.ONLINE);
         String machineId = machine.getMachineId();
-        log.info("Marking device {} as OFFLINE (status={}, lastSeen={})", machineId, machine.getStatus(), machine.getLastSeen());
-        return machineWriter.update(machineId, guard, update).isPresent();
+        boolean marked = machineWriter.update(machineId, guard, update).isPresent();
+        log.info("Marking device {} as OFFLINE (status={}, lastSeen={}, marked={})",
+                machineId, machine.getStatus(), machine.getLastSeen(), marked);
+        return marked;
+    }
+
+    private static Criteria stillSilentSince(Instant threshold) {
+        return Criteria.where(LAST_SEEN.path()).lt(threshold);
     }
 }

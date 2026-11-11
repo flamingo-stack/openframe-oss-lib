@@ -36,4 +36,9 @@ public interface ToolConnectionRepository extends MongoRepository<ToolConnection
     List<ToolConnection> findByToolType(ToolType toolType);
 
     List<ToolConnection> findByAgentToolIdInAndToolType(List<String> agentToolIds, ToolType toolType);
+
+    // The Fleet host facts backfill reads the connections of the machines it is due to try, through the
+    // tenant_machine_tool_idx index
+    List<ToolConnection> findByTenantIdAndMachineIdInAndToolTypeAndStatus(
+            String tenantId, Collection<String> machineIds, ToolType toolType, ConnectionStatus status);
 }

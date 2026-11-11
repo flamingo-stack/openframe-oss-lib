@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.dataloader.MachineTagDataLoader;
 import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationDataLoader;
 import com.openframe.api.dataloader.UnreadNotificationKey;
@@ -19,6 +20,7 @@ import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.dto.device.MachinePackageManagersResponse;
+import com.openframe.api.dto.device.MachineTag;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
@@ -29,6 +31,8 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.NotificationRecipientResolver;
 import com.openframe.api.service.TagService;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.installedagents.InstalledAgent;
@@ -161,6 +165,13 @@ public class DeviceDataFetcher {
     }
 
     @DgsData(parentType = "Machine")
+    public CompletableFuture<List<MachineTag>> tagAssignments(DgsDataFetchingEnvironment dfe) {
+        DataLoader<String, List<MachineTag>> dataLoader = dfe.getDataLoader(MachineTagDataLoader.NAME);
+        Machine machine = dfe.getSource();
+        return dataLoader.load(machine.getMachineId());
+    }
+
+    @DgsData(parentType = "Machine")
     public CompletableFuture<List<ToolConnection>> toolConnections(DgsDataFetchingEnvironment dfe) {
         DataLoader<String, List<ToolConnection>> dataLoader = dfe.getDataLoader("toolConnectionDataLoader");
         Machine machine = dfe.getSource();
@@ -212,6 +223,24 @@ public class DeviceDataFetcher {
     public boolean softwareManagementSupported(DgsDataFetchingEnvironment dfe) {
         Machine machine = dfe.getSource();
         return packageManagerAvailability.isSoftwareManageable(machine);
+    }
+
+    @DgsData(parentType = "Machine")
+    public List<DirectorySource> directorySources(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return mapper.toDirectorySources(machine);
+    }
+
+    @DgsData(parentType = "Machine")
+    public DirectoryUserLink directoryUserLink(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return mapper.toDirectoryUserLink(machine);
+    }
+
+    @DgsData(parentType = "Machine")
+    public List<String> directoryUserIds(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return mapper.toDirectoryUserIds(machine);
     }
 
     // The current user's unread notifications about this device, batched for the whole page: the

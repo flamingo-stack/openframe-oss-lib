@@ -73,4 +73,16 @@ class FleetSoftwareMapperTest {
         assertThat(FleetSoftwareMapper.allFlagged(null, HostSoftwareInstalledVersion::getSystemComponent)).isNull();
         assertThat(row.getSystemComponent()).isNull();
     }
+
+    @Test
+    void toResponse_carriesTheBundleIdentifier_keepsTheReportedName() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setName("\u200B");
+        title.setBundleIdentifier("com.apple.SettingsPlaceholder");
+
+        SoftwareResponse row = FleetSoftwareMapper.toResponse(title);
+
+        assertThat(row.getName()).isEqualTo("\u200B");
+        assertThat(row.getBundleIdentifier()).isEqualTo("com.apple.SettingsPlaceholder");
+    }
 }

@@ -25,6 +25,10 @@ type DeviceFilters {
     osTypes: [DeviceFilterOption!]!
     organizationIds: [DeviceFilterOption!]!
     tagKeys: [TagFilterOption!]!
+    """SOURCES filter options; [] in OSS, and on the schedule and bundle device pickers."""
+    directorySources: [DeviceFilterOption!]!
+    """USER filter options: PRIMARY, SHARED, NONE. A machine without a directory link counts as NONE."""
+    userLinks: [DeviceFilterOption!]!
     filteredCount: Int!
 }
 
@@ -48,6 +52,10 @@ input DeviceFilterInput {
     organizationIds: [String!]
     tagKeys: [String!]
     tagValues: [String!]
+    """SOURCES filter: machines one of these directories knows. Matches nothing in OSS."""
+    directorySources: [DirectorySource!]
+    """USER filter. NONE also matches a machine no external directory integration wrote (every machine in OSS)."""
+    userLinks: [DirectoryUserLink!]
 }
 
 type Machine implements Node @key(fields: "machineId") @shareable {
@@ -77,7 +85,10 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     timezone: String
     registeredAt: Instant
     updatedAt: Instant
-    tags: [Tag]
+    """The device's tag assignments, one node per (device, tag): the device's own values and tagged date, with the
+    stored tag definition under `tag`. Batched per device list like `tags`."""
+    tagAssignments: [MachineTag!]!
+    tags: [Tag] @deprecated(reason: "Use tagAssignments: per-device values under the tag's id collide in Relay caches.")
     toolConnections: [ToolConnection]
     installedAgents: [InstalledAgent]
     """Package managers as last reported by the device agent. Null until the first report."""
@@ -86,9 +97,27 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     from device pickers and skips it at dispatch; inventory and vulnerabilities still show it."""
     softwareManagementSupported: Boolean!
     enrollment: DeviceEnrollment
+    """SOURCES column: the directories that know this machine besides the agent; [] when none, and always in OSS."""
+    directorySources: [DirectorySource!]!
+    """USER column: who the machine is tied to; NONE when nobody, and always in OSS."""
+    directoryUserLink: DirectoryUserLink!
+    """Account ids (DirectoryAccount.id) of the tied users, the primary user first. SHARED shows 'N recent users' with N = its length."""
+    directoryUserIds: [String!]!
+    """Display name of the user for PRIMARY; null otherwise. devices(search) also matches it."""
+    directoryUserName: String
     """The current user's unread notifications about this device (entity DEVICE, machineId). Counts the same
     read states as unreadCountsByCategory, so a row and the sidebar badge agree. 0 when none."""
     unreadNotificationCount: Int!
+}
+
+"""A tag assigned to one device. `id` is the tag assignment's, unique per (device, tag) and resolvable through
+`node(id:)`; `tag` is the stored definition only (its own createdAt, no device values)."""
+type MachineTag implements Node {
+    id: ID!
+    tag: Tag!
+    values: [String!]!
+    taggedAt: Instant
+    taggedBy: String
 }
 
 type DeviceEnrollment {
@@ -137,6 +166,19 @@ enum DeviceType {
     VIRTUAL_MACHINE
     CONTAINER_HOST
     OTHER
+}
+
+"""Who the machine is tied to. PRIMARY: one declared user. SHARED: several users, or recent users only. NONE: nobody."""
+enum DirectoryUserLink {
+    PRIMARY
+    SHARED
+    NONE
+}
+
+"""A directory that knows the machine besides the agent."""
+enum DirectorySource {
+    MICROSOFT_365
+    GOOGLE_WORKSPACE
 }
 
 type DeviceConnection {

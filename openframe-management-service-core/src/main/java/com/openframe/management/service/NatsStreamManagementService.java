@@ -33,6 +33,19 @@ public class NatsStreamManagementService {
         }
     }
 
+    public void deleteIfExists(String streamName) {
+        try {
+            if (!existsByName(streamName)) {
+                return;
+            }
+            JetStreamManagement jetStreamManagement = natsConnection.jetStreamManagement();
+            jetStreamManagement.deleteStream(streamName);
+            log.info("Deleted stream {}", streamName);
+        } catch (Exception e) {
+            throw new NatsException("Error during stream " + streamName + " deletion", e);
+        }
+    }
+
     private boolean existsByName(String streamName) {
         try {
             JetStreamManagement jetStreamManagement = natsConnection.jetStreamManagement();

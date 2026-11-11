@@ -18,3 +18,14 @@ type Machine implements Node @key(fields: "machineId") {
 type Dialog implements Node @key(fields: "id", resolvable: false) {
     id: ID!
 }
+
+type Tag implements Node {
+    id: ID!
+    key: String!
+}
+
+type MachineTag implements Node {
+    id: ID!
+    tag: Tag!
+    values: [String!]!
+}
