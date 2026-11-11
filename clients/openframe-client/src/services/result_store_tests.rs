@@ -33,6 +33,7 @@ fn result(execution_id: &str, script_id: &str) -> RmmResult {
         execution_time_ms: 1,
         timed_out: false,
         error: None,
+        failure_reason: None,
         script_id: Some(script_id.to_string()),
         schedule_id: Some("sch".to_string()),
     }
@@ -115,6 +116,7 @@ async fn recover_distinguishes_started_flag() {
         let bytes = s.load_payload(key).await.unwrap().unwrap();
         let r: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(r["exit_code"], 85);
+        assert_eq!(r["failure_reason"], "INTERRUPTED");
         errors.push(r["error"].as_str().unwrap().to_string());
     }
     errors.sort();
@@ -192,10 +194,13 @@ async fn oversize_result_is_truncated_under_limit() {
     let mut r = result("ex", "a");
     r.stdout = "x".repeat(limit + 1024);
     r.stderr = "diagnostic".to_string();
+    r.timed_out = true;
+    r.failure_reason = Some(FailureReason::AgentTimedOut);
     let bytes = ResultStore::encode_result(&r, limit);
     assert!(bytes.len() <= limit);
     let decoded: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(decoded["error"], TRUNCATION_MARKER);
+    assert_eq!(decoded["failure_reason"], "AGENT_TIMED_OUT");
     assert_eq!(
         decoded["stderr"], "diagnostic",
         "stderr preferred over stdout"

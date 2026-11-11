@@ -26,6 +26,7 @@ fn exited(retcode: i32, stderr: &str) -> ExecResult {
         stderr: stderr.to_string(),
         retcode,
         timed_out: false,
+        agent_failure: None,
     }
 }
 

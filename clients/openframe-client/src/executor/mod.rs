@@ -38,4 +38,32 @@ pub struct ExecResult {
     pub stderr: String,
     pub retcode: i32,
     pub timed_out: bool,
+    pub agent_failure: Option<AgentFailure>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentFailure {
+    NoUserSession,
+    CouldNotLaunch,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub(crate) struct NoInteractiveUser(pub &'static str);
+
+impl ExecResult {
+    pub(crate) fn not_launched(e: anyhow::Error) -> Self {
+        let agent_failure = if e.is::<NoInteractiveUser>() {
+            AgentFailure::NoUserSession
+        } else {
+            AgentFailure::CouldNotLaunch
+        };
+        Self {
+            stdout: String::new(),
+            stderr: e.to_string(),
+            retcode: 85,
+            timed_out: false,
+            agent_failure: Some(agent_failure),
+        }
+    }
 }

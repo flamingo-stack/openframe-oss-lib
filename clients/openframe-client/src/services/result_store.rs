@@ -12,7 +12,7 @@ use tracing::{error, info, warn};
 use crate::config::update_config::{
     NATS_PAYLOAD_FALLBACK_BYTES, NATS_PAYLOAD_HEADROOM_BYTES, OUTBOX_MAX_ENTRIES,
 };
-use crate::models::RmmResult;
+use crate::models::{FailureReason, RmmResult};
 
 mod ledger;
 
@@ -279,6 +279,7 @@ impl ResultStore {
                 execution_time_ms: 0,
                 timed_out: false,
                 error: Some(error.to_string()),
+                failure_reason: Some(FailureReason::Interrupted),
                 script_id: record.script_id.clone(),
                 schedule_id: record.schedule_id.clone(),
             };

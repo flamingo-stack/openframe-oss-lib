@@ -29,7 +29,7 @@ pub mod update_state;
 
 pub use execution::{
     requires_stream_ack, BootstrapRoute, BootstrapScriptMessage, CommandMessage, ExecutionAck,
-    ExecutionMessage, ExecutionRequest, PrivilegeLevel, PrivilegePolicy, RmmResult,
+    ExecutionMessage, ExecutionRequest, FailureReason, PrivilegeLevel, PrivilegePolicy, RmmResult,
     RoutedScriptMessage, ScriptEnvVar, ScriptMessage, ScriptRoute, ScriptScheduleExecutionItem,
     ScriptScheduleExecutionMessage, ScriptShell, ScriptSpec, SoftwareRoute, SoftwareScriptMessage,
     EXECUTION_ACK_KIND,

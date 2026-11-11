@@ -51,6 +51,10 @@ async fn unknown_shell_is_85() {
     .await;
     assert_eq!(r.retcode, 85);
     assert!(r.stderr.contains("unsupported shell"));
+    assert_eq!(
+        r.agent_failure,
+        Some(crate::executor::AgentFailure::CouldNotLaunch)
+    );
 }
 
 async fn run(shell: &str, code: &str, args: &[String], env: &[String], timeout: u32) -> ExecResult {

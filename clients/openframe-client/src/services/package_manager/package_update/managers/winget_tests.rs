@@ -11,6 +11,7 @@ fn query(retcode: i32, stdout: &str) -> ExecResult {
         stderr: String::new(),
         retcode,
         timed_out: false,
+        agent_failure: None,
     }
 }
 
@@ -20,6 +21,7 @@ fn exited(retcode: u32) -> ExecResult {
         stderr: String::new(),
         retcode: retcode as i32,
         timed_out: false,
+        agent_failure: None,
     }
 }
 

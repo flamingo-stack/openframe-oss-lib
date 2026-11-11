@@ -27,6 +27,7 @@ async fn maps_successful_execution() {
     assert_eq!(r.exit_code, 0);
     assert!(!r.timed_out);
     assert!(r.error.is_none());
+    assert_eq!(r.failure_reason, None);
 }
 
 #[tokio::test]
@@ -36,6 +37,7 @@ async fn maps_timeout() {
     let r = ExecutionService::new().execute(&r, "m").await;
     assert_eq!(r.exit_code, 98);
     assert!(r.timed_out);
+    assert_eq!(r.failure_reason, Some(FailureReason::AgentTimedOut));
 }
 
 #[tokio::test]
@@ -46,6 +48,20 @@ async fn maps_spawn_failure_to_error() {
     assert_eq!(r.exit_code, 85);
     assert!(r.error.is_some());
     assert!(!r.timed_out);
+    assert_eq!(r.failure_reason, Some(FailureReason::CouldNotLaunch));
+}
+
+#[tokio::test]
+async fn a_script_own_exit_code_is_not_a_failure_reason() {
+    for code in [1, 85, 98] {
+        let script = format!("#!/bin/sh\necho boom >&2\nexit {code}\n");
+        let r = ExecutionService::new().execute(&req(&script), "m").await;
+        assert_eq!(r.exit_code, code);
+        assert_eq!(r.stderr, "boom\n");
+        assert!(!r.timed_out, "exit {code}");
+        assert!(r.error.is_none(), "exit {code}");
+        assert_eq!(r.failure_reason, None, "exit {code}");
+    }
 }
 
 #[tokio::test]
