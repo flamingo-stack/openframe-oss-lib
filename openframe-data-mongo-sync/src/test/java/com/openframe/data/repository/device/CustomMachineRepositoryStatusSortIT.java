@@ -39,12 +39,12 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
     @BeforeEach
     void seedInScrambledOrder() {
         mongoTemplate.dropCollection(Machine.class);
-        save("pending-2", TENANT, DeviceStatus.PENDING);
+        save("pending-1", TENANT, DeviceStatus.PENDING);
         save("deleting-1", TENANT, DeviceStatus.PENDING_DELETION);
         save("managed-1", TENANT, DeviceStatus.MANAGED);
         save("none-1", TENANT, null);
         save("managed-2", TENANT, DeviceStatus.MANAGED);
-        save("pending-1", TENANT, DeviceStatus.PENDING);
+        save("pending-2", TENANT, DeviceStatus.PENDING);
         save("managed-other-tenant", OTHER_TENANT, DeviceStatus.MANAGED);
     }
 

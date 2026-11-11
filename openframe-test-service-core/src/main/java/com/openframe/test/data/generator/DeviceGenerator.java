@@ -65,12 +65,6 @@ public class DeviceGenerator {
                 .build();
     }
 
-    public static DeviceFilterInput osAndStatusDevicesFilter(String os, DeviceStatus... statuses) {
-        return DeviceFilterInput.builder()
-                .osTypes(List.of(os))
-                .statuses(List.of(statuses))
-                .build();
-    }
 
     /**
      * Devices carrying {@code key:value}, e.g. {@code purpose:auto_test}. The API filters on key and

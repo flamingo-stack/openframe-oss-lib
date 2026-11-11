@@ -338,9 +338,10 @@ class DeviceControllerTest {
                 DeviceFilterFacet.FILTERED_COUNT), facets.getValue());
     }
 
-    @Test
-    void filtersWithUnknownStatusAre400TypeMismatch() throws Exception {
-        mockMvc.perform(get(BASE + "/filters").param("statuses", "BOGUS"))
+    @ParameterizedTest
+    @ValueSource(strings = {"BOGUS", "ONLINE", "OFFLINE"})
+    void filtersWithUnknownStatusAre400TypeMismatch(String status) throws Exception {
+        mockMvc.perform(get(BASE + "/filters").param("statuses", status))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"));
 
