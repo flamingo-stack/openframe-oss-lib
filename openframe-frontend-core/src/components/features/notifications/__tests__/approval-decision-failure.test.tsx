@@ -3,7 +3,7 @@
  * error toast carries the request's own message (the buttons coming back alone read as nothing happened).
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApprovalRequestNotificationTile } from '../approval-request-notification-tile';
 import { MINGO_APPROVAL_REQUEST_TYPE, type Notification } from '../types';
@@ -50,5 +50,34 @@ describe.each(['row', 'card'] as const)('a failed decision, presentation="%s"', 
     );
     expect(screen.queryByText('Approved')).not.toBeInTheDocument();
     expect(onComplete).not.toHaveBeenCalled();
+  });
+});
+
+describe.each(['row', 'card'] as const)('a double click, presentation="%s"', presentation => {
+  // React disables the buttons right after a single click event, so two clicks race only when they land in one batch
+  // of updates (a dispatch from code, or clicks queued before React re-renders).
+  it('decides once when a second click lands before the buttons are disabled', async () => {
+    let settle: () => void = () => {};
+    const onApprove = vi.fn(() => new Promise<void>(resolve => (settle = resolve)));
+    const onReject = vi.fn();
+    render(
+      <ApprovalRequestNotificationTile
+        notification={notification}
+        presentation={presentation}
+        onApprove={onApprove}
+        onReject={onReject}
+      />,
+    );
+    const approve = screen.getByRole('button', { name: 'Approve' });
+    const reject = screen.getByRole('button', { name: 'Reject' });
+    act(() => {
+      approve.click();
+      approve.click();
+      reject.click();
+    });
+    expect(onApprove).toHaveBeenCalledTimes(1);
+    expect(onReject).not.toHaveBeenCalled();
+    settle();
+    expect(await screen.findByText('Approved')).toBeInTheDocument();
   });
 });

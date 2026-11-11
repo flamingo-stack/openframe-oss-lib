@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useToast } from '../../../hooks/use-toast';
 import { cn } from '../../../utils/cn';
 import { errorMessage } from '../../../utils/common';
@@ -156,19 +156,22 @@ function useApprovalDecision({
 }) {
   const { toast } = useToast();
   const [processing, setProcessing] = useState(false);
+  // `processing` disables the buttons only once React re-renders; a second click in the same tick (a fast double click)
+  // would decide twice. The ref is set at once, so one decision is in flight at a time.
+  const inFlight = useRef(false);
   const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null);
   const resolvedStatus = resolutionToStatus(resolution);
   const status: ChatApprovalStatus = resolvedStatus !== 'pending' ? resolvedStatus : (localStatus ?? 'pending');
 
-  const decide = async (
+  const run = async (
+    id: string,
     nextStatus: 'approved' | 'rejected',
     action: (approvalRequestId: string) => void | Promise<void>,
   ) => {
-    if (!approvalRequestId) return;
     setProcessing(true);
     setLocalStatus(nextStatus);
     try {
-      await action(approvalRequestId);
+      await action(id);
     } catch (error) {
       setLocalStatus(null);
       toast({
@@ -181,6 +184,17 @@ function useApprovalDecision({
       setProcessing(false);
     }
     onComplete?.(notification.id);
+  };
+
+  const decide = (
+    nextStatus: 'approved' | 'rejected',
+    action: (approvalRequestId: string) => void | Promise<void>,
+  ): Promise<void> => {
+    if (!approvalRequestId || inFlight.current) return Promise.resolve();
+    inFlight.current = true;
+    return run(approvalRequestId, nextStatus, action).finally(() => {
+      inFlight.current = false;
+    });
   };
 
   return { status, processing, decide };
