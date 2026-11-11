@@ -83,6 +83,20 @@ describe('createMotionTimeline', () => {
     expect(ran).toEqual(['a', 'b']);
   });
 
+  it('never moves its clock backward when the host read the time before a late wake', () => {
+    const tl = createMotionTimeline();
+    const ran = vi.fn();
+    tl.at(100, ran);
+    tl.start();
+    // The page stalled past the beat; the host reads the time before the overdue timer gets to fire.
+    now = 1000;
+    const read = tl.now();
+    expect(read).toBe(1000);
+    advance(0);
+    expect(ran).toHaveBeenCalledTimes(1);
+    expect(tl.now()).toBeGreaterThanOrEqual(read);
+  });
+
   it('does not advance while held, and resumes with what was left', () => {
     const tl = createMotionTimeline();
     const ran = vi.fn();

@@ -34,9 +34,7 @@ describe.each(['row', 'card'] as const)('a failed decision, presentation="%s"', 
       <ApprovalRequestNotificationTile
         notification={notification}
         presentation={presentation}
-        onApprove={vi.fn(async () => {
-          throw new Error('Approval service is down');
-        })}
+        onApprove={vi.fn(() => Promise.reject(new Error('Approval service is down')))}
         onReject={vi.fn()}
         onComplete={onComplete}
       />,

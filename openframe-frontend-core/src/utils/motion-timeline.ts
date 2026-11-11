@@ -58,10 +58,11 @@ export function createMotionTimeline(): MotionTimeline {
 
   const wall = () => (typeof performance === 'undefined' ? Date.now() : performance.now());
 
-  // Bring the clock up to now (only while playing). `limit` caps it: a late wake never runs beats ahead of their time.
+  // Bring the clock up to now (only while playing). `limit` caps how far it moves: a late wake never runs beats ahead
+  // of their time. It never moves back: a host that read `now()` before an overdue wake already saw a later time.
   const catchUp = (limit = Infinity) => {
     const t = wall();
-    if (running && !held) clock = Math.min(clock + Math.max(0, t - anchor), limit);
+    if (running && !held) clock = Math.max(clock, Math.min(clock + Math.max(0, t - anchor), limit));
     anchor = t;
   };
 
