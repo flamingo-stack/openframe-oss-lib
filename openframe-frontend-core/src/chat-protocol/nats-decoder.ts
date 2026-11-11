@@ -20,6 +20,7 @@ import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import type { AskOptionData } from '../components/chat/types/message.types';
 import { ESCALATION_STATE, escalationResolvedStatus } from './events';
 import type { ApprovalToolCall, ChatStreamEvent } from './events';
+import { policyReviewField } from './policy-review';
 import { attachmentsEvent, sourceMetadataEvent } from './source-metadata';
 import { isRecord } from './wire-narrow';
 
@@ -57,6 +58,7 @@ function normalizeToolCalls(raw: unknown): ApprovalToolCall[] {
     requiresApproval: item.requiresApproval === true,
     approvalType: typeof item.approvalType === 'string' ? item.approvalType : null,
     toolCallArguments: isRecord(item.toolCallArguments) ? item.toolCallArguments : null,
+    ...policyReviewField(item.policyReview),
   }));
 }
 
@@ -166,6 +168,8 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
           // the EXECUTING segment held. Dropping it here therefore blanks the
           // card for the whole lifetime of the run.
           toolExplanation: typeof data.toolExplanation === 'string' ? data.toolExplanation : undefined,
+          // Rides the EXECUTING chunk only, like the explanation: the merge keeps it on the EXECUTED row.
+          ...policyReviewField(data.policyReview),
           parameters: isRecord(data.parameters) ? data.parameters : undefined,
           toolExecutionRequestId:
             typeof data.toolExecutionRequestId === 'string' ? data.toolExecutionRequestId : undefined,

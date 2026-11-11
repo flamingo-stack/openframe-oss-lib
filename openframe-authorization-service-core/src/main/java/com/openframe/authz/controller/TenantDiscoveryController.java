@@ -6,6 +6,7 @@ import com.openframe.authz.dto.TenantDiscoveryResponse;
 import com.openframe.authz.service.tenant.TenantDiscoveryService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.core.email.EmailDomainPolicy;
+import com.openframe.core.email.EmailVerdict;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -61,36 +62,22 @@ public class TenantDiscoveryController {
         // domain policy's external disposable-domain call.
         boolean taken = userService.existsActiveByEmail(normalizedEmail);
         if (taken) {
-            return EmailAvailabilityResponse.builder()
-                    .available(false)
-                    .reason(EmailAvailabilityResponse.Reason.TAKEN)
-                    .build();
+            return EmailAvailabilityResponse.taken();
         }
-
-        if (!emailDomainPolicy.isEmailAllowed(normalizedEmail)) {
-            return EmailAvailabilityResponse.builder()
-                    .available(false)
-                    .reason(EmailAvailabilityResponse.Reason.BLOCKED_DOMAIN)
-                    .build();
-        }
-
-        return EmailAvailabilityResponse.builder()
-                .available(true)
-                .build();
+        EmailVerdict verdict = emailDomainPolicy.verdict(email);
+        return EmailAvailabilityResponse.of(verdict);
     }
 
     /**
-     * Check an address against the email domain policy alone — ignoring whether it is already
-     * registered. Lets the UI flag a disposable or privacy-focused provider as the user types,
-     * without conflating it with the availability check.
+     * The email policy alone, ignoring whether the address is registered: lets the UI flag a blocked address or
+     * domain as the user types.
      */
     @GetMapping(value = "/email-domain-allowed", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(OK)
     public EmailDomainAllowedResponse emailDomainAllowed(
             @RequestParam @Email @NotBlank String email) {
 
-        return EmailDomainAllowedResponse.builder()
-                .allowed(emailDomainPolicy.isEmailAllowed(email.toLowerCase(Locale.ROOT)))
-                .build();
+        EmailVerdict verdict = emailDomainPolicy.verdict(email);
+        return EmailDomainAllowedResponse.of(verdict);
     }
 }

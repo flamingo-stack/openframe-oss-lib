@@ -41,6 +41,18 @@
       "name": "tagKeyValues",
       "dataType": "STRING",
       "singleValueField": false
+    },
+    {
+      "name": "directorySources",
+      "dataType": "STRING",
+      "singleValueField": false,
+      "defaultNullValue": ""
+    },
+    {
+      "name": "directoryUserLink",
+      "dataType": "STRING",
+      "singleValueField": true,
+      "defaultNullValue": "NONE"
     }
   ],
   "dateTimeFieldSpecs": [

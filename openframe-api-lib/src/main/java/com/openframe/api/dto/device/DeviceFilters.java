@@ -17,5 +17,7 @@ public class DeviceFilters {
     private List<DeviceFilterOption> osTypes;
     private List<DeviceFilterOption> organizationIds;
     private List<TagFilterOption> tagKeys;
+    private List<DeviceFilterOption> directorySources;
+    private List<DeviceFilterOption> userLinks;
     private Integer filteredCount;
 } 

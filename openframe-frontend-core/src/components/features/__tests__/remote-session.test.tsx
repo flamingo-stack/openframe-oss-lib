@@ -135,6 +135,35 @@ describe('RemoteSessionViewers', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('reports the list opening and closing, so a bar that hides on idle can stay up', () => {
+    const onOpenChange = vi.fn();
+    render(<RemoteSessionViewers viewers={viewers} onOpenChange={onOpenChange} />);
+    fireEvent.pointerDown(screen.getByRole('button', { name: /^In this session/ }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    expect(screen.getByRole('menuitem', { name: /Roman Smith \(host\)$/ })).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('closes the list when everyone leaves, and keeps it closed when someone joins again', () => {
+    const { rerender } = render(<RemoteSessionViewers viewers={viewers} />);
+    fireEvent.pointerDown(screen.getByRole('button', { name: /^In this session/ }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    rerender(<RemoteSessionViewers viewers={[]} />);
+    rerender(<RemoteSessionViewers viewers={viewers} />);
+    expect(screen.getByRole('button', { name: /^In this session/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
   it('sits beside the recording tag on the end user block', () => {
     render(
       <RemoteSessionSummary

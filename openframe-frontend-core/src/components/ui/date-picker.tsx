@@ -42,6 +42,8 @@ export interface DatePickerBaseProps {
   error?: string;
   /** When true, renders red error border */
   invalid?: boolean;
+  /** The trigger button's id: a label drawn outside the picker names it with `htmlFor`. */
+  id?: string;
 }
 
 export interface SingleDatePickerProps extends DatePickerBaseProps {
@@ -68,6 +70,10 @@ export type DatePickerProps = SingleDatePickerProps | RangeDatePickerProps;
 // way its user writes dates (`03/20/2026` in en-US, `20/03/2026` in en-AU).
 const defaultFormatDate = (date: Date): string =>
   formatDateWithTimezone(date, VIEWER_TIMEZONE, 'numeric', { viewerLocale: true });
+
+// A label tied to the trigger (`id`) becomes the button's whole accessible name, so the date it shows would go unread:
+// the trigger is described by its value instead.
+const triggerValueId = (id: string | undefined) => (id ? `${id}-value` : undefined);
 
 const formatDateRange = (range: DateRange | undefined, formatFn: (date: Date) => string): string => {
   if (!range?.from) return '';
@@ -667,6 +673,7 @@ export function DatePicker(props: DatePickerProps) {
     label,
     error,
     invalid = false,
+    id,
   } = props;
 
   const [open, setOpen] = useState(false);
@@ -701,6 +708,8 @@ export function DatePicker(props: DatePickerProps) {
         <Button
           variant="field"
           type="button"
+          id={id}
+          aria-describedby={triggerValueId(id)}
           disabled={disabled}
           // Same marker Input/Textarea/Select expose — it is how a form finds
           // (and scrolls to) the first field that failed validation.
@@ -709,6 +718,7 @@ export function DatePicker(props: DatePickerProps) {
         >
           <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
           <span
+            id={triggerValueId(id)}
             className={cn(
               'flex-1 truncate text-left',
               disabled ? 'text-ods-text-disabled' : displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
@@ -749,7 +759,7 @@ export function DatePicker(props: DatePickerProps) {
   );
 
   return (
-    <FieldWrapper label={label} error={error} errorSlot={'error' in props}>
+    <FieldWrapper label={label} htmlFor={id} error={error} errorSlot={'error' in props}>
       {picker}
     </FieldWrapper>
   );
@@ -799,6 +809,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
     label,
     error,
     invalid = false,
+    id,
   } = props;
   const [open, setOpen] = useState(false);
   const portalContainer = usePortalContainer();
@@ -883,6 +894,8 @@ export function DatePickerInput(props: DatePickerInputProps) {
           <Button
             variant="field"
             type="button"
+            id={id}
+            aria-describedby={triggerValueId(id)}
             disabled={disabled}
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
@@ -891,6 +904,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
           >
             <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
             <span
+              id={triggerValueId(id)}
               className={cn(
                 'flex-1 truncate text-left',
                 disabled
@@ -984,7 +998,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
   );
 
   return (
-    <FieldWrapper label={label} error={error} errorSlot={'error' in props} className={className}>
+    <FieldWrapper label={label} htmlFor={id} error={error} errorSlot={'error' in props} className={className}>
       {content}
     </FieldWrapper>
   );
@@ -1050,6 +1064,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
     label,
     error,
     invalid = false,
+    id,
   } = props;
   const [open, setOpen] = useState(false);
   const portalContainer = usePortalContainer();
@@ -1112,6 +1127,8 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
           <Button
             variant="field"
             type="button"
+            id={id}
+            aria-describedby={triggerValueId(id)}
             disabled={disabled}
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
@@ -1120,6 +1137,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
           >
             <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
             <span
+              id={triggerValueId(id)}
               className={cn(
                 'flex-1 truncate text-left',
                 disabled
@@ -1181,7 +1199,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
   );
 
   return (
-    <FieldWrapper label={label} error={error} errorSlot={'error' in props} className={className}>
+    <FieldWrapper label={label} htmlFor={id} error={error} errorSlot={'error' in props} className={className}>
       {content}
     </FieldWrapper>
   );

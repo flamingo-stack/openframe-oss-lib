@@ -3,7 +3,7 @@
 import { forwardRef, useState } from 'react';
 import type { HTMLAttributes } from 'react';
 import { cn } from '../../utils/cn';
-import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon } from '../icons-v2-generated';
+import { AlertCircleIcon, CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon } from '../icons-v2-generated';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import type { ToolType } from '../platform';
 import { ToolIcon } from '../tool-icon';
@@ -13,6 +13,7 @@ import { StatusLine } from '../ui/status-line';
 import { CHAT_BLOCK_CLASS, CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
+import { PolicyEscalationAlert, PolicyReviewRows, hasPolicyReviewRows, isPolicyEscalated } from './policy-review';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
 import type {
   ApprovalBlockVariant,
@@ -65,6 +66,11 @@ export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement
    * notification tile. Explanation bullets still render.
    */
   showFooterActions?: boolean;
+  /**
+   * Draw the "Mingo Escalated" band under each escalated command. Turn off when the host draws it itself — the
+   * approval notification tile shows it while its commands are folded away. Defaults to on.
+   */
+  showEscalationAlerts?: boolean;
 }
 
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS);
@@ -106,7 +112,7 @@ function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
 
 /**
  * Status icon for one tool call inside an approved/done batch.
- *  - pending batch     → null (chevron-only row, no status icon)
+ *  - pending batch     → null (chevron-only row, no status icon); a warning circle when Mingo escalated the call
  *  - approved, no exec → DotsLoaderIcon (queued / waiting for backend)
  *  - executing         → DotsLoaderIcon
  *  - done + success    → green check
@@ -115,10 +121,15 @@ function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
 function ExecutionStatusIcon({
   batchStatus,
   execution,
+  escalated,
 }: {
   batchStatus: ApprovalBatchSegment['status'];
   execution: ApprovalBatchExecutionState | undefined;
+  escalated: boolean;
 }) {
+  if (batchStatus === 'pending' && escalated)
+    // Decorative: the "Mingo Escalated" band under the row says it in words.
+    return <AlertCircleIcon className="h-4 w-4 text-ods-warning" aria-hidden />;
   if (batchStatus !== 'approved') return null;
   if (!execution || execution.status === 'executing')
     return <DotsLoaderIcon size={16} className="text-ods-text-secondary" />;
@@ -133,18 +144,30 @@ interface ToolCallRowProps {
   batchStatus: ApprovalBatchSegment['status'];
   execution: ApprovalBatchExecutionState | undefined;
   showExecutionStatus: boolean;
+  showEscalationAlert: boolean;
 }
 
 // ADMIN-only row: command preview header, expandable args/result. The client
 // variant never renders tool calls — see the `variant === 'client'` branch of
 // `<ApprovalBatchMessage>`.
-function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExecutionStatus }: ToolCallRowProps) {
+function ToolCallRow({
+  call,
+  expanded,
+  onToggle,
+  batchStatus,
+  execution,
+  showExecutionStatus,
+  showEscalationAlert,
+}: ToolCallRowProps) {
   const command = getCommandText(call);
   const args = getArgEntries(call);
   const toolType = (call.toolType as ToolType) || 'OPENFRAME';
   const { innerRef, containerStyle } = useCollapsible({ expanded });
   const result = execution?.status === 'done' ? execution.result : undefined;
-  const hasExpandableBody = args.length > 0 || (typeof result === 'string' && result.length > 0);
+  const review = call.policyReview;
+  const escalated = isPolicyEscalated(review);
+  const reviewRows = hasPolicyReviewRows(review);
+  const hasExpandableBody = args.length > 0 || reviewRows || (typeof result === 'string' && result.length > 0);
 
   return (
     <div className="flex w-full flex-col items-start border-b border-ods-border bg-ods-card last:border-b-0">
@@ -165,9 +188,10 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
         >
           {command}
         </div>
-        {showExecutionStatus && (
+        {/* The escalation mark is the review's, not the run's: it shows where the run status is off too. */}
+        {(showExecutionStatus || (batchStatus === 'pending' && escalated)) && (
           <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-            <ExecutionStatusIcon batchStatus={batchStatus} execution={execution} />
+            <ExecutionStatusIcon batchStatus={batchStatus} execution={execution} escalated={escalated} />
           </div>
         )}
         <div className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -182,16 +206,25 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
               {args.map(([key, value]) => (
                 <ArgRow key={key} argKey={key} value={value} />
               ))}
+              {reviewRows && (
+                <PolicyReviewRows
+                  review={review}
+                  className={args.length > 0 ? 'mt-[var(--spacing-system-xsf)]' : undefined}
+                />
+              )}
               {result && (
                 <ResultBlock
                   result={result}
-                  className={args.length > 0 ? 'mt-[var(--spacing-system-xsf)]' : undefined}
+                  className={args.length > 0 || reviewRows ? 'mt-[var(--spacing-system-xsf)]' : undefined}
                 />
               )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Outside the collapsible part: an escalation is read before anyone opens the command. */}
+      {showEscalationAlert && <PolicyEscalationAlert review={review} className="border-t border-ods-border" />}
     </div>
   );
 }
@@ -300,6 +333,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       assistantType: _assistantType,
       variant = 'admin',
       showFooterActions = true,
+      showEscalationAlerts = true,
       ...props
     },
     ref,
@@ -323,6 +357,8 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
     }
 
     const explanations = data.toolCalls.map(c => c.toolExplanation?.trim()).filter((s): s is string => !!s);
+    // An approval Mingo escalated is approved in the warning colour (Figma 1374-105483), the admin view only.
+    const escalated = !isClient && data.toolCalls.some(c => isPolicyEscalated(c.policyReview));
 
     const handleApprove = async () => {
       setIsProcessing(true);
@@ -346,12 +382,12 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       <>
         <Button
           size="small-legacy"
-          variant="accent"
+          variant={escalated ? 'warning' : 'accent'}
           onClick={handleApprove}
           disabled={isProcessing}
           className={cn(
-            'bg-ods-accent hover:bg-ods-accent/90',
-            'text-ods-bg text-h5',
+            !escalated && 'bg-ods-accent text-ods-bg hover:bg-ods-accent/90',
+            'text-h5',
             'h-8 px-[var(--spacing-system-xsf)]',
           )}
         >
@@ -430,6 +466,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
                 setExpandedId(prev => (prev === call.toolExecutionRequestId ? null : call.toolExecutionRequestId))
               }
               batchStatus={status}
+              showEscalationAlert={showEscalationAlerts}
               execution={data.executions?.[call.toolExecutionRequestId]}
               showExecutionStatus={showExecutionStatus}
             />

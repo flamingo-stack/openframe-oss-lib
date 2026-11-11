@@ -1,19 +1,29 @@
 'use client';
 
-import { clearAuthedAssetCache, useAuthedAssetSrc } from './use-authed-asset-src';
+import { type AuthedAsset, clearAuthedAssetCache, useAuthedAsset } from './use-authed-asset-src';
 
 /**
- * Image flavor of `useAuthedAssetSrc` — see that hook for the full contract.
- * Kept as its own export because it is the lib's most-used consumer (avatars,
- * entity images, markdown `<img>`) and because hosts already import this name.
+ * Image flavor of `useAuthedAsset` — see that hook for the full contract. The
+ * one place a picture's `Accept` is stated: a store entry keeps the `Accept` of
+ * whichever consumer acquired it first, so the boxed `Image` and every picture
+ * component around it must ask the same.
  *
  * Distinct from the legacy `useAuthenticatedImage`, which ALWAYS blob-fetches
  * with `credentials: 'include'` and its own global config. This hook is
  * pass-through-first and keys off the single auth knob the lib already has:
  * the registered `EmbedAuthAdapter`.
  */
+export function useAuthedImage(src?: string | null): AuthedAsset {
+  return useAuthedAsset(src, 'image/*');
+}
+
+/**
+ * `useAuthedImage`'s `src`. Kept as its own export because it is the lib's
+ * most-used consumer (avatars, entity images, markdown `<img>`) and because
+ * hosts already import this name.
+ */
 export function useAuthedImageSrc(src?: string | null): string | undefined {
-  return useAuthedAssetSrc(src, 'image/*');
+  return useAuthedImage(src).src;
 }
 
 /**

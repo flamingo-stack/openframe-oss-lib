@@ -1,10 +1,12 @@
 package com.openframe.data.repository.tool;
 
+import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,4 +33,9 @@ public interface ToolConnectionRepository extends MongoRepository<ToolConnection
     List<ToolConnection> findByToolType(ToolType toolType);
 
     List<ToolConnection> findByAgentToolIdInAndToolType(List<String> agentToolIds, ToolType toolType);
+
+    // The Fleet host facts backfill reads the connections of the machines it is due to try, through the
+    // tenant_machine_tool_idx index
+    List<ToolConnection> findByTenantIdAndMachineIdInAndToolTypeAndStatus(
+            String tenantId, Collection<String> machineIds, ToolType toolType, ConnectionStatus status);
 }

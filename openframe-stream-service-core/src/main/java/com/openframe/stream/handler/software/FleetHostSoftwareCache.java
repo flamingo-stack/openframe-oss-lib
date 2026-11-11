@@ -8,16 +8,19 @@ import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareResponse;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
-import lombok.RequiredArgsConstructor;
+import com.openframe.stream.service.FleetBaseUrlResolver;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class FleetHostSoftwareCache {
 
@@ -25,10 +28,20 @@ public class FleetHostSoftwareCache {
     private static final Duration TTL = Duration.ofMinutes(2);
 
     private final IntegratedToolRepository integratedToolRepository;
+    private final FleetBaseUrlResolver fleetBaseUrlResolver;
+
+    @Value("${fleet.mdm.base-url:}")
+    private String baseUrl;
 
     private final Cache<String, List<HostSoftwareTitle>> cache = Caffeine.newBuilder()
             .expireAfterWrite(TTL)
             .build();
+
+    public FleetHostSoftwareCache(IntegratedToolRepository integratedToolRepository,
+                                  @Autowired(required = false) FleetBaseUrlResolver fleetBaseUrlResolver) {
+        this.integratedToolRepository = integratedToolRepository;
+        this.fleetBaseUrlResolver = fleetBaseUrlResolver;
+    }
 
     // keyed by the source commit as well: one Fleet commit writes many host_software rows, and each row is an event
     public List<HostSoftwareTitle> hostSoftware(String tenantId, long hostId, long commitTs) {
@@ -65,6 +78,17 @@ public class FleetHostSoftwareCache {
         IntegratedTool tool = integratedToolRepository.findByTenantIdAndKey(tenantId, key)
                 .orElseThrow(() -> new IllegalStateException(
                         "Fleet MDM tool not configured for tenant " + tenantId + ": " + key));
-        return new FleetMdmClient(tool.apiUrl(), tool.apiToken(), tenantId);
+        return new FleetMdmClient(baseUrlFor(tenantId), tool.apiToken(), tenantId);
+    }
+
+    String baseUrlFor(String tenantId) {
+        if (fleetBaseUrlResolver != null) {
+            String resolved = fleetBaseUrlResolver.resolveBaseUrl(tenantId);
+            if (isNotBlank(resolved)) {
+                return resolved;
+            }
+            log.warn("[software-cdc] no per-tenant Fleet base URL for tenant {} — falling back to the static base url", tenantId);
+        }
+        return baseUrl;
     }
 }

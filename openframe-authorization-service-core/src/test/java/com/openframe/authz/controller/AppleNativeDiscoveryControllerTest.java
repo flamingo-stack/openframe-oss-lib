@@ -119,7 +119,7 @@ class AppleNativeDiscoveryControllerTest {
         when(userService.findActiveByEmail("x@y.com"))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(activeUser("u", "t", "x@y.com")));
-        when(tenantService.findById("t")).thenReturn(Optional.of(tenant("t", TenantStatus.INACTIVE)));
+        when(tenantService.findById("t")).thenReturn(Optional.of(tenant("t", TenantStatus.BLOCKED)));
 
         assertStatus(() -> controller.discover(discover()), HttpStatus.NOT_FOUND, "registration_required");
         assertStatus(() -> controller.discover(discover()), HttpStatus.FORBIDDEN, "account_inactive");

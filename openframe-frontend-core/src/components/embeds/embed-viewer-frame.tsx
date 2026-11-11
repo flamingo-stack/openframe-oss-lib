@@ -72,6 +72,9 @@ export interface EmbedViewerFrameProps {
   loadingActionCount?: number;
 }
 
+/** The header's loading form draws one button by default: most viewers have one action (the PDF viewer passes two). */
+export const EMBED_VIEWER_SKELETON_ACTIONS = 1;
+
 export function EmbedViewerFrame({
   icon,
   title,
@@ -89,7 +92,7 @@ export function EmbedViewerFrame({
   sandbox,
   className,
   fullscreenControl,
-  loadingActionCount = 1,
+  loadingActionCount = EMBED_VIEWER_SKELETON_ACTIONS,
 }: EmbedViewerFrameProps) {
   // ONE switch for the whole frame (header included): a page's loading scope, or the standard `loading` prop. The body
   // alone also waits while the viewer resolves where its frame points.
@@ -157,7 +160,12 @@ export function EmbedViewerFrame({
           <div className="flex w-full items-center gap-2 content-sm:w-auto">
             {Array.from({ length: loadingActionCount }, (_, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: loading buttons never reorder
-              <InteractiveSkeleton.Button key={i} size="small-legacy" className="flex-1 content-sm:flex-initial" />
+              <InteractiveSkeleton.Button
+                key={i}
+                data-loading-item
+                size="small-legacy"
+                className="flex-1 content-sm:flex-initial"
+              />
             ))}
           </div>
         ) : fullscreenControl && src ? (

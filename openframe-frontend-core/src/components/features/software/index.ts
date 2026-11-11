@@ -40,6 +40,7 @@ export { type PackageSearchSlotProps, SoftwareRowFields, type SoftwareRowFieldsP
 export {
   DEFAULT_SOFTWARE_UPDATE_POLICY,
   DEFAULT_SOFTWARE_UPDATE_SETTINGS,
+  defaultSoftwareUpdateSettings,
   SOFTWARE_UPDATE_COUNTDOWN_OPTIONS,
   SOFTWARE_UPDATE_DEADLINE_OPTIONS,
   type SoftwareUpdateMode,

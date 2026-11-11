@@ -3,6 +3,12 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Arrow02RightIcon, Ellipsis01Icon, Refresh01LeftIcon, SidebarIcon, XmarkIcon } from '../icons-v2-generated';
+import {
+  COLUMN_HEADER_CELL,
+  SQUEEZED_HIDDEN,
+  SQUEEZED_KEPT_CELL,
+  SQUEEZED_STICKY_HEADER,
+} from '../navigation/work-area-squeeze';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -26,13 +32,19 @@ export interface MingoChatHeaderProps {
    * ⋯; the list toggle, collapse and close are never drawn, whatever is passed.
    */
   variant?: 'panel' | 'page';
+  /**
+   * Page variant only. `'column'`: the header of a work-area chat column (Figma
+   * `chat/header`): the shell's panel surface and borders, the title in the shell's body
+   * type, no `meta`, the owner's `avatar` in its own cell, 20px glyphs. Default `'default'`.
+   */
+  look?: 'default' | 'column';
   title: string;
   /** Second line: the chat's owner. Panel variant. */
   subtitle?: string | null;
   /** Page variant: small parts after the title, each led by "·" (e.g. the
    *  owner and the day). Empty parts are skipped. */
   meta?: ReadonlyArray<string | null | undefined>;
-  /** The owner's avatar at the title cell's end. Panel variant. */
+  /** The owner's avatar at the title cell's end (panel variant), or in its own cell (`look="column"`). */
   avatar?: { name?: string | null; avatarUrl?: string | null } | null;
   /** Shows the chat list toggle at the start. Panel variant. */
   onToggleList?: () => void;
@@ -66,6 +78,7 @@ export interface MingoChatHeaderProps {
  */
 export function MingoChatHeader({
   variant = 'panel',
+  look = 'default',
   title,
   subtitle,
   meta,
@@ -83,6 +96,15 @@ export function MingoChatHeader({
   actions = [],
 }: MingoChatHeaderProps) {
   const isPage = variant === 'page';
+  const isColumn = isPage && look === 'column';
+  const glyph = isColumn ? 20 : 24;
+  // The column look: the panel's border between the title and the avatar, the default one between the buttons.
+  const cellClass = isColumn ? COLUMN_HEADER_CELL : 'w-14';
+  // The column look in a squeezed work-area column: the title truncates, the host's cells (Full screen,
+  // Close) keep their 56px until there is no room left; the avatar, the ⋯ and Unarchive wait for the room.
+  const keptCellClass = cn(cellClass, isColumn && SQUEEZED_KEPT_CELL);
+  const foldedCellClass = cn(cellClass, isColumn && SQUEEZED_HIDDEN);
+  const showAvatar = !!avatar && !!(avatar.name || avatar.avatarUrl);
   const menuGroups: ActionsMenuGroup[] = [
     ...(menuItems.length > 0 ? [{ items: menuItems, separator: true }] : []),
     ...(extraMenuItems.length > 0 ? [{ items: extraMenuItems }] : []),
@@ -98,11 +120,29 @@ export function MingoChatHeader({
       onCancel={() => onRenameCancel?.()}
     />
   ) : (
-    <p className={cn('truncate text-ods-text-primary text-h3', isPage && 'min-w-0')}>{title}</p>
+    <p
+      className={cn(
+        'truncate text-ods-text-primary',
+        isColumn ? 'min-w-0 flex-1 text-shell-body' : 'text-h3',
+        isPage && 'min-w-0',
+      )}
+    >
+      {title}
+    </p>
   );
 
   return (
-    <div className="flex h-14 w-full shrink-0 divide-x divide-ods-border overflow-hidden border-b border-ods-border">
+    <div
+      className={cn(
+        'flex h-14 w-full shrink-0 overflow-hidden border-b',
+        isColumn
+          ? // Chrome, not content: the window's tokens even in a column narrower than 720px.
+            // Squeezed: it sticks to the column's visible start while the chat scrolls sideways.
+            cn('ods-viewport-layer border-ods-border-panel bg-ods-panel', SQUEEZED_STICKY_HEADER)
+          : 'divide-x divide-ods-border border-ods-border',
+      )}
+      data-look={isColumn ? 'column' : undefined}
+    >
       {!isPage && onToggleList && (
         <Button
           variant="cell"
@@ -115,7 +155,12 @@ export function MingoChatHeader({
         </Button>
       )}
 
-      {isPage ? (
+      {isColumn ? (
+        // The column look: the title alone, in from the column's edge.
+        <div className="flex min-w-0 flex-1 items-center pl-[var(--spacing-system-l)] pr-[var(--spacing-system-sf)]">
+          {titleNode}
+        </div>
+      ) : isPage ? (
         // The page variant: one line, the title then its meta.
         <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)]">
           {titleNode}
@@ -144,9 +189,26 @@ export function MingoChatHeader({
         </div>
       )}
 
+      {isColumn && showAvatar && (
+        <div
+          className={cn(
+            'flex w-14 shrink-0 items-center justify-center border-l border-ods-border-panel',
+            SQUEEZED_HIDDEN,
+          )}
+        >
+          <SquareAvatar
+            variant="round"
+            sizePx={20}
+            src={avatar.avatarUrl || undefined}
+            alt={avatar.name || undefined}
+            fallback={avatar.name || undefined}
+            title={avatar.name || undefined}
+          />
+        </div>
+      )}
       {onRestore && (
-        <Button variant="cell" className="w-14" onClick={onRestore} aria-label="Unarchive chat">
-          <Refresh01LeftIcon size={24} />
+        <Button variant="cell" className={foldedCellClass} onClick={onRestore} aria-label="Unarchive chat">
+          <Refresh01LeftIcon size={glyph} />
         </Button>
       )}
       {menuGroups.length > 0 && (
@@ -155,8 +217,8 @@ export function MingoChatHeader({
           onCloseAutoFocus={e => e.preventDefault()}
           groups={menuGroups}
           customTrigger={
-            <Button variant="cell" className="w-14" aria-label="Chat actions">
-              <Ellipsis01Icon size={24} />
+            <Button variant="cell" className={foldedCellClass} aria-label="Chat actions">
+              <Ellipsis01Icon size={glyph} />
             </Button>
           }
         />
@@ -165,7 +227,7 @@ export function MingoChatHeader({
         <Button
           key={action.id}
           variant="cell"
-          className="w-14"
+          className={keptCellClass}
           onClick={action.onClick}
           aria-label={action.label}
           title={action.label}

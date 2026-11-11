@@ -52,3 +52,18 @@ describe('SoftwareActionForm layout options', () => {
     expect(screen.getByText('Timezone')).toBeTruthy();
   });
 });
+
+describe('SoftwareActionForm run modes', () => {
+  it('say when a device actually gets the run: offline devices get it once online, a schedule within 7 days', () => {
+    render(<SoftwareActionForm {...base} />);
+    expect(
+      screen.getByText('The update starts now on online devices, and on the others when they come online.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        'The update runs at the scheduled time. Devices offline then get it when they come back online, within 7 days.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/immediately/)).toBeNull();
+  });
+});
