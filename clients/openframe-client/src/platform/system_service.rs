@@ -906,39 +906,44 @@ async fn remove_service_windows(
     service_name: &str,
     only_under: Option<&std::path::Path>,
 ) -> Result<()> {
+    use windows_service::service::{ServiceAccess, ServiceType};
+
     if service_missing_timed(service_name).await? {
         return Ok(());
     }
     let name = service_name.to_string();
-    let exe = scm_call_timed(
+    let config = scm_call_timed(
         service_name,
         "config query",
         SCM_QUERY_TIMEOUT_SECS,
-        move || service_image_exe_path_windows(&name),
+        move || open_service_windows(&name, ServiceAccess::QUERY_CONFIG)?.query_config(),
     )
-    .await
-    .ok()
-    .flatten();
+    .await?
+    .with_context(|| format!("Could not read the config of service {}", service_name))?;
+    let exe = parse_exe_from_image_path(&config.executable_path.to_string_lossy());
     let exe_label = exe
         .as_deref()
         .map_or_else(|| "unknown".to_string(), |p| p.display().to_string());
     if let Some(dir) = only_under {
-        let Some(exe) = exe.as_deref() else {
-            warn!(
-                "Leaving service {} in place: could not read its executable",
-                service_name
-            );
-            return Ok(());
-        };
-        if !crate::platform::lock_recovery::path_under(exe, dir) {
+        if !exe
+            .as_deref()
+            .is_some_and(|exe| crate::platform::lock_recovery::path_under(exe, dir))
+        {
             info!(
                 "Leaving service {} in place: its executable {} is not under {}",
                 service_name,
-                exe.display(),
+                exe_label,
                 dir.display()
             );
             return Ok(());
         }
+    }
+    if !config.service_type.contains(ServiceType::OWN_PROCESS) {
+        return Err(anyhow::anyhow!(
+            "Refusing to delete service {} ({}): it does not run in its own process",
+            service_name,
+            exe_label
+        ));
     }
     warn!(
         "Removing existing service {} (executable {})",
