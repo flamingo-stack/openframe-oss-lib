@@ -3,6 +3,7 @@ pub mod agent_configuration_service;
 pub mod agent_registration_service;
 pub(crate) mod backend_call_retry;
 pub mod deactivation_service;
+pub mod delivery_results;
 pub mod deregistration_service;
 pub mod device_data_fetcher;
 pub mod encryption_service;

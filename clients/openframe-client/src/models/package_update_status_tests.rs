@@ -102,3 +102,36 @@ fn done_and_failed_carry_only_their_own_object() {
     );
     assert!(failed.get("waiting").is_none() && failed.get("done").is_none());
 }
+
+#[test]
+fn only_failures_a_re_run_may_fix_are_retryable() {
+    let cases = [
+        (FailReason::ManagerError, true),
+        (FailReason::Timeout, true),
+        (FailReason::CloseFailed, true),
+        (FailReason::ManagerMissing, false),
+        (FailReason::NotSupported, false),
+        (FailReason::Superseded, false),
+        (FailReason::NotInstalled, false),
+        (FailReason::NotUpgradable, false),
+    ];
+    for (reason, retryable) in cases {
+        assert_eq!(reason.retryable(), retryable, "{reason:?}");
+    }
+}
+
+#[test]
+fn a_fail_reason_name_is_its_wire_name() {
+    for reason in [
+        FailReason::ManagerError,
+        FailReason::ManagerMissing,
+        FailReason::CloseFailed,
+        FailReason::Timeout,
+        FailReason::NotSupported,
+        FailReason::Superseded,
+        FailReason::NotInstalled,
+        FailReason::NotUpgradable,
+    ] {
+        assert_eq!(serde_json::to_value(reason).unwrap(), json!(reason.name()));
+    }
+}

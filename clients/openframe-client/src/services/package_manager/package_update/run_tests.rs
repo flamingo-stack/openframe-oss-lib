@@ -7,15 +7,16 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::models::{
-    BrewKind, PackageRef, PackageUpdateMessage, PackageUpdateStatusMessage, SourceKind,
-    UpdateSource, UpdateStatus,
+    BrewKind, DeliveryRef, DeliveryResult, DeliveryResultMessage, PackageRef, PackageUpdateMessage,
+    PackageUpdateStatusMessage, SourceKind, UpdateSource, UpdateStatus,
 };
 use crate::platform::process_snapshot::RunningProcess;
 use crate::platform::DirectoryManager;
+use crate::services::delivery_results::DeliveryResults;
 use crate::services::package_manager::package_update::machine::Machine;
 use crate::services::package_manager::package_update::managers::Probe as Found;
 use crate::services::package_manager::package_update::{
-    OrderStore, RestartSignals, StatusReporter,
+    OrderStore, RestartSignals, StatusReporter, Submitted,
 };
 use crate::services::package_manager::update_gate::MainImages;
 use crate::services::tool_run_manager::ClientUpdatePendingFlag;
@@ -128,9 +129,10 @@ fn found(state: ProbeState, installed: &str, available: &str) -> Result<Found, Q
 }
 
 struct Fixture {
-    worker: Worker,
+    worker: Arc<Worker>,
     orders: Arc<OrderStore>,
     events: Arc<Mutex<Vec<PackageUpdateStatusMessage>>>,
+    results: Arc<Mutex<Vec<DeliveryResultMessage>>>,
     device: Arc<Mutex<Device>>,
     agent_restart: Latch,
     app: PathBuf,
@@ -169,6 +171,7 @@ impl Fixture {
         .unwrap();
         let orders = Arc::new(OrderStore::load(dir.path().join("package_updates.json")));
         let (status, events) = StatusReporter::in_memory();
+        let (results, settled) = DeliveryResults::in_memory();
         let agent_restart = Latch::default();
         let package_upgrades = InProgress::default();
         let worker = Worker {
@@ -178,6 +181,7 @@ impl Fixture {
             }),
             orders: orders.clone(),
             status,
+            results,
             config,
             signals: RestartSignals {
                 client_update: ClientUpdatePendingFlag::default().view(),
@@ -186,9 +190,10 @@ impl Fixture {
             package_upgrades,
         };
         Fixture {
-            worker,
+            worker: Arc::new(worker),
             orders,
             events,
+            results: settled,
             device,
             agent_restart,
             app,
@@ -217,7 +222,12 @@ impl Fixture {
         self.orders
             .submit(
                 MACHINE,
-                self.sequence.get(),
+                DeliveryRef {
+                    delivery_type: "PACKAGE_UPDATE".to_string(),
+                    target_id: request_id.to_string(),
+                    dispatch_id: format!("dispatch-{}", self.sequence.get()),
+                    sequence: Some(self.sequence.get()),
+                },
                 NOW,
                 PackageUpdateMessage {
                     request_id: request_id.to_string(),
@@ -239,10 +249,14 @@ impl Fixture {
     }
 
     async fn look(&self, order: &Order, p: &mut Progress, now: u64) -> bool {
-        matches!(
-            self.worker.look(MACHINE, order, p, now).await,
-            Verdict::Finished
-        )
+        self.ending(order, p, now).await.is_some()
+    }
+
+    async fn ending(&self, order: &Order, p: &mut Progress, now: u64) -> Option<Ending> {
+        match self.worker.look(MACHINE, order, p, now).await {
+            Verdict::Finished(ending) => Some(ending),
+            Verdict::Continue { .. } => None,
+        }
     }
 
     fn calls(&self) -> Vec<Call> {
@@ -529,4 +543,164 @@ async fn already_latest_from_the_manager_reports_the_version_read_after_it() {
     assert_eq!(done.done.unwrap().result, DoneResult::AlreadyLatest);
     assert_eq!(done.installed_version.as_deref(), Some("2.0"));
     assert_eq!(f.calls(), [Call::Probe, Call::Upgrade, Call::Reread]);
+}
+
+#[tokio::test]
+async fn only_a_failure_a_re_run_may_fix_ends_for_a_retry() {
+    let cases = [
+        (
+            UpgradeOutcome::Failed {
+                exit_code: 1,
+                message: "boom".to_string(),
+            },
+            true,
+        ),
+        (UpgradeOutcome::TimedOut, true),
+        (UpgradeOutcome::NotUpgradable("pinned".to_string()), false),
+        (
+            UpgradeOutcome::Upgraded {
+                reboot_required: false,
+            },
+            false,
+        ),
+    ];
+    for (upgrade, retry) in cases {
+        let f = Fixture::new();
+        f.device().upgrade = upgrade;
+        let order = f.submit("req-1", UpdateMode::Wait, 0);
+
+        let ending = f.ending(&order, &mut Progress::default(), NOW).await;
+
+        let reason = f.last().failed.map(|failed| failed.reason);
+        match ending {
+            Some(Ending::Retry { reason: ended, .. }) => {
+                assert!(retry, "{reason:?} must not be re-run");
+                assert_eq!(Some(ended), reason);
+            }
+            Some(Ending::Done) => assert!(!retry, "{reason:?} must be re-run"),
+            None => panic!("the order did not end"),
+        }
+    }
+}
+
+#[tokio::test]
+async fn the_worker_answers_every_dispatch_of_an_order_once_it_ends() {
+    let cases = [
+        (
+            UpgradeOutcome::Upgraded {
+                reboot_required: false,
+            },
+            DeliveryResult::Done,
+            Submitted::Stale,
+        ),
+        (
+            UpgradeOutcome::Failed {
+                exit_code: 1,
+                message: "boom".to_string(),
+            },
+            DeliveryResult::Failed,
+            Submitted::AlreadyFailed,
+        ),
+    ];
+    for (upgrade, result, re_sent) in cases {
+        let f = Fixture::new();
+        f.worker
+            .config
+            .save_registration_data(MACHINE.into(), "client".into(), "secret".into())
+            .await
+            .unwrap();
+        f.device().upgrade = upgrade;
+        f.submit("req-1", UpdateMode::Wait, 0);
+        let order = f.submit("req-1", UpdateMode::Wait, 0);
+
+        let worker = tokio::spawn(super::super::run(f.worker.clone()));
+        let settled = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+            loop {
+                let settled = f.results.lock().unwrap().clone();
+                if settled.len() >= 2 {
+                    return settled;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("the worker never answered");
+        worker.abort();
+
+        let dispatches: Vec<&str> = settled
+            .iter()
+            .map(|message| message.delivery.dispatch_id.as_str())
+            .collect();
+        assert_eq!(dispatches, ["dispatch-1", "dispatch-2"]);
+        assert!(settled.iter().all(|message| message.result == result));
+        assert!(f.orders.pending(MACHINE).is_empty());
+        let again = f
+            .orders
+            .submit(
+                MACHINE,
+                order.deliveries[1].clone(),
+                NOW,
+                PackageUpdateMessage {
+                    request_id: "req-1".to_string(),
+                    source: order.source.clone(),
+                    package: order.package.clone(),
+                    mode: UpdateMode::Wait,
+                    countdown_seconds: None,
+                },
+                0,
+            )
+            .unwrap();
+        assert_eq!(again, re_sent);
+    }
+}
+
+#[tokio::test]
+async fn an_older_rerun_during_the_countdown_keeps_its_deadline_and_a_newer_order_restarts_it() {
+    let f = Fixture::new();
+    f.app_runs(APP);
+    let order = f.submit("req-1", UpdateMode::Force, 60);
+    let mut p = Progress::default();
+    assert!(!f.look(&order, &mut p, NOW).await);
+    let closes_at = f.last().waiting.unwrap().closes_at;
+
+    let attached = f
+        .orders
+        .submit(
+            MACHINE,
+            DeliveryRef {
+                dispatch_id: "rerun".to_string(),
+                ..order.deliveries[0].clone()
+            },
+            NOW + 30,
+            PackageUpdateMessage {
+                request_id: "req-1".to_string(),
+                source: order.source.clone(),
+                package: order.package.clone(),
+                mode: UpdateMode::Wait,
+                countdown_seconds: None,
+            },
+            0,
+        )
+        .unwrap();
+    assert_eq!(attached, Submitted::Attached);
+    let current = f.orders.get("req-1").unwrap();
+    assert!(!f.look(&current, &mut p, NOW + 30).await);
+    assert_eq!(f.last().waiting.unwrap().closes_at, closes_at);
+    assert!(
+        f.look(&current, &mut p, NOW + 60).await,
+        "the forced close comes at the first deadline"
+    );
+
+    let f = Fixture::new();
+    f.app_runs(APP);
+    let order = f.submit("req-1", UpdateMode::Force, 60);
+    let mut p = Progress::default();
+    assert!(!f.look(&order, &mut p, NOW).await);
+    let newer = f.submit("req-1", UpdateMode::Force, 60);
+    assert!(!f.look(&newer, &mut p, NOW + 30).await);
+    assert!(
+        !f.look(&newer, &mut p, NOW + 60).await,
+        "a newer order starts its own countdown"
+    );
+    assert!(f.look(&newer, &mut p, NOW + 90).await);
 }

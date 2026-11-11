@@ -60,6 +60,7 @@ use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::deactivation_service::DeactivationService;
+use crate::services::delivery_results::DeliveryResults;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
@@ -537,11 +538,16 @@ impl Client {
             package_upgrades.view(),
             agent_restart.clone(),
         );
+        let delivery_results = DeliveryResults::new(
+            nats_message_publisher.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
         let command_context = CommandContext::new(
             nats_connection_manager.clone(),
             config_service.clone(),
             restart_gate.clone(),
-            nats_message_publisher.clone(),
+            delivery_results.clone(),
             result_store.clone(),
             flush_notify.clone(),
         );
@@ -555,12 +561,13 @@ impl Client {
                 flush_notify.clone(),
             );
             let listener = CommandListener::new(
-                PackageUpdateHandler::new(orders.clone(), status.clone()),
+                PackageUpdateHandler::new(orders.clone(), status.clone(), delivery_results.clone()),
                 command_context.clone(),
             );
             let manager = PackageUpdateRunManager::new(
                 orders,
                 status,
+                delivery_results,
                 config_service.clone(),
                 RestartSignals {
                     client_update: tool_run_manager.client_update_pending(),

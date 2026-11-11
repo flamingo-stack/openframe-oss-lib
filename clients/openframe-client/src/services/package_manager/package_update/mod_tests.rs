@@ -26,6 +26,7 @@ impl Fixture {
             machine: Box::new(System),
             orders,
             status,
+            results: DeliveryResults::in_memory().0,
             config,
             signals: RestartSignals {
                 client_update: ClientUpdatePendingFlag::default().view(),

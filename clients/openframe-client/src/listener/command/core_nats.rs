@@ -42,6 +42,28 @@ pub(super) async fn report_restart_completion<H: CommandHandler>(listener: &Comm
     }
 }
 
+pub(super) async fn fail_orphaned<H: CommandHandler>(listener: &CommandListener<H>) {
+    let Some(delivery_type) = H::DEFERRED_TYPE else {
+        return;
+    };
+    let machine_id = match listener.context.config_service.get_machine_id() {
+        Ok(machine_id) => machine_id,
+        Err(e) => {
+            error!(
+                kind = H::KIND,
+                "Cannot resolve machine id to check the commands answered later: {:#}", e
+            );
+            return;
+        }
+    };
+    let owed = listener.handler.owed_deliveries(&machine_id);
+    listener
+        .context
+        .delivery
+        .fail_orphaned(delivery_type, owed)
+        .await;
+}
+
 pub(super) async fn listen<H: CommandHandler>(listener: &CommandListener<H>) -> Result<()> {
     let nats = &listener.context.nats_connection_manager;
     let mut client_rx = nats.on_client_replaced();
@@ -100,6 +122,11 @@ async fn handle<H: CommandHandler>(
         Ok(Some(LedgerState::Settled(result))) => {
             info!(kind = H::KIND, dispatch_id = %dispatch_id, "Repeat of a settled command, re-sending its result");
             context.delivery.settle(machine_id, result).await;
+            return;
+        }
+        Ok(Some(LedgerState::Deferred)) => {
+            info!(kind = H::KIND, dispatch_id = %dispatch_id, "Repeat of a command answered later, acking it again");
+            context.delivery.acked(machine_id, &delivery).await;
             return;
         }
         Ok(Some(_)) => {
@@ -175,6 +202,10 @@ async fn conclude<H: CommandHandler>(
     match outcome {
         Outcome::Restarting => {
             info!(kind = H::KIND, dispatch_id = %dispatch_id, "Command restarts the agent, the next start reports it")
+        }
+        Outcome::Deferred => {
+            info!(kind = H::KIND, dispatch_id = %dispatch_id, "Command taken on, its result follows when it ends");
+            context.delivery.defer(&delivery).await;
         }
         Outcome::RestartRequired => {
             info!(kind = H::KIND, dispatch_id = %dispatch_id, "Command applied, restart required");

@@ -1,30 +1,29 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use anyhow::Result;
 use tokio::sync::Notify;
-use tokio::time::{timeout, Duration};
 use tracing::{error, info, warn};
 
-use crate::config::update_config::FLUSH_PUBLISH_TIMEOUT_SECS;
-use crate::models::{delivery_result_subject, DeliveryRef, DeliveryResult, DeliveryResultMessage};
-use crate::services::nats_message_publisher::NatsMessagePublisher;
+use crate::models::{delivery_result_subject, DeliveryRef, DeliveryResultMessage};
+use crate::services::delivery_results::DeliveryResults;
 use crate::services::result_store::{LedgerState, ResultStore};
 
 #[derive(Clone)]
 pub(super) struct Delivery {
-    publisher: NatsMessagePublisher,
+    results: DeliveryResults,
     store: Arc<ResultStore>,
     flush_notify: Arc<Notify>,
 }
 
 impl Delivery {
     pub(super) fn new(
-        publisher: NatsMessagePublisher,
+        results: DeliveryResults,
         store: Arc<ResultStore>,
         flush_notify: Arc<Notify>,
     ) -> Self {
         Self {
-            publisher,
+            results,
             store,
             flush_notify,
         }
@@ -35,6 +34,28 @@ impl Delivery {
             Ok(0) => {}
             Ok(_) => self.flush_notify.notify_one(),
             Err(e) => error!("Failed to recover interrupted commands: {:#}", e),
+        }
+    }
+
+    pub(super) async fn fail_orphaned(&self, delivery_type: &str, owned: HashSet<String>) {
+        match self
+            .store
+            .delivery_settle_orphaned(delivery_type.to_string(), owned)
+            .await
+        {
+            Ok(orphaned) if orphaned.is_empty() => {}
+            Ok(orphaned) => {
+                self.flush_notify.notify_one();
+                info!(
+                    delivery_type,
+                    count = orphaned.len(),
+                    "Reported commands whose work the agent lost as failed"
+                );
+            }
+            Err(e) => error!(
+                delivery_type,
+                "Failed to report commands whose work the agent lost: {:#}", e
+            ),
         }
     }
 
@@ -73,6 +94,22 @@ impl Delivery {
             warn!(
                 dispatch_id = %delivery.dispatch_id,
                 "Failed to mark the command as settled after the restart, the restart reports it failed: {:#}", e
+            );
+        }
+    }
+
+    pub(super) async fn defer(&self, delivery: &DeliveryRef) {
+        if !self.store.enabled() {
+            return;
+        }
+        if let Err(e) = self
+            .store
+            .delivery_defer(delivery.dispatch_id.clone())
+            .await
+        {
+            warn!(
+                dispatch_id = %delivery.dispatch_id,
+                "Failed to mark the command as answered later, a restart reports it failed: {:#}", e
             );
         }
     }
@@ -125,7 +162,7 @@ impl Delivery {
 
     pub(super) async fn acked(&self, machine_id: &str, delivery: &DeliveryRef) {
         let message = DeliveryResultMessage::acked(delivery.clone());
-        match self.send(machine_id, &message).await {
+        match self.results.send(machine_id, &message).await {
             Ok(()) => info!(dispatch_id = %delivery.dispatch_id, "Delivery ACKED"),
             Err(e) => warn!(
                 dispatch_id = %delivery.dispatch_id,
@@ -135,10 +172,7 @@ impl Delivery {
     }
 
     pub(super) async fn settle(&self, machine_id: &str, message: DeliveryResultMessage) -> bool {
-        if self.store.enabled() {
-            return self.queue(machine_id, message).await;
-        }
-        self.publish(machine_id, &message).await
+        self.results.settle(machine_id, message).await
     }
 
     // the agent removes itself right after, so the result cannot wait for the outbox
@@ -147,81 +181,6 @@ impl Delivery {
         machine_id: &str,
         message: DeliveryResultMessage,
     ) -> bool {
-        if !self.publish(machine_id, &message).await {
-            return self.store.enabled() && self.queue(machine_id, message).await;
-        }
-        if self.store.enabled() {
-            let dispatch_id = message.delivery.dispatch_id.clone();
-            if let Err(e) = self
-                .store
-                .delivery_record(delivery_result_subject(machine_id), message)
-                .await
-            {
-                warn!(
-                    dispatch_id = %dispatch_id,
-                    "Failed to keep the published result for repeats: {:#}", e
-                );
-            }
-        }
-        true
-    }
-
-    async fn queue(&self, machine_id: &str, message: DeliveryResultMessage) -> bool {
-        let dispatch_id = message.delivery.dispatch_id.clone();
-        let result = message.result;
-        match self
-            .store
-            .delivery_settle(delivery_result_subject(machine_id), message)
-            .await
-        {
-            Ok(()) => {
-                self.flush_notify.notify_one();
-                info!(dispatch_id = %dispatch_id, ?result, "Delivery result queued");
-                true
-            }
-            Err(e) => {
-                error!(
-                    dispatch_id = %dispatch_id,
-                    ?result,
-                    "Failed to persist delivery result, the backend closes it on timeout: {:#}", e
-                );
-                false
-            }
-        }
-    }
-
-    async fn publish(&self, machine_id: &str, message: &DeliveryResultMessage) -> bool {
-        let dispatch_id = &message.delivery.dispatch_id;
-        let result = message.result;
-        match self.send(machine_id, message).await {
-            Ok(()) => {
-                info!(dispatch_id = %dispatch_id, ?result, "Delivery result published");
-                true
-            }
-            Err(e) => {
-                error!(
-                    dispatch_id = %dispatch_id,
-                    ?result,
-                    "Failed to publish delivery result: {:#}", e
-                );
-                false
-            }
-        }
-    }
-
-    // ACKED goes out best effort, a result only once its stream stored it
-    async fn send(&self, machine_id: &str, message: &DeliveryResultMessage) -> Result<()> {
-        let subject = delivery_result_subject(machine_id);
-        let bytes = serde_json::to_vec(message)?;
-        let send = async {
-            if message.result == DeliveryResult::Acked {
-                self.publisher.publish_raw(&subject, &bytes).await
-            } else {
-                self.publisher.publish_acked(&subject, &bytes).await
-            }
-        };
-        timeout(Duration::from_secs(FLUSH_PUBLISH_TIMEOUT_SECS), send)
-            .await
-            .unwrap_or_else(|_| Err(anyhow::anyhow!("publish timed out")))
+        self.results.settle_now(machine_id, message).await
     }
 }

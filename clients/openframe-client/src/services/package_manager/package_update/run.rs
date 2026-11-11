@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use tracing::{info, warn};
 
 use super::managers::{ProbeState, QueryError, UpgradeOutcome, UPGRADE_TIMEOUT_SECS};
-use super::orders::Order;
+use super::orders::{Ending, Order};
 use super::status::{self, Report};
 use super::{relaunch, Worker};
 use crate::models::{
@@ -70,7 +70,7 @@ struct ReportKey {
 
 pub(super) enum Verdict {
     Continue { next_at: u64 },
-    Finished,
+    Finished(Ending),
 }
 
 impl Worker {
@@ -312,7 +312,7 @@ impl Worker {
         if !self.orders.start_installing(&order.request_id) {
             info!(request_id = %order.request_id, "Superseded before the forced close, dropping it");
             self.relaunch_closed(p).await;
-            return Verdict::Finished;
+            return Verdict::Finished(Ending::Done);
         }
         let pids: Vec<u32> = holders.iter().map(|holder| holder.pid).collect();
         let survivors = self.machine.close(&pids).await;
@@ -362,7 +362,7 @@ impl Worker {
                 if !self.orders.start_installing(&order.request_id) {
                     info!(request_id = %order.request_id, "Superseded before its install, dropping it");
                     self.relaunch_closed(p).await;
-                    return Verdict::Finished;
+                    return Verdict::Finished(Ending::Done);
                 }
                 running
             }
@@ -590,7 +590,7 @@ impl Worker {
         self.status
             .report(self.event(machine_id, order, p, Report::Done(done)))
             .await;
-        Verdict::Finished
+        Verdict::Finished(Ending::Done)
     }
 
     async fn fail(
@@ -604,6 +604,14 @@ impl Worker {
     ) -> Verdict {
         warn!(request_id = %order.request_id, ?reason, %message, "Package update failed");
         self.relaunch_closed(p).await;
+        let ending = if reason.retryable() {
+            Ending::Retry {
+                reason,
+                message: message.clone(),
+            }
+        } else {
+            Ending::Done
+        };
         let failed = Failed {
             reason,
             exit_code,
@@ -612,7 +620,7 @@ impl Worker {
         self.status
             .report(self.event(machine_id, order, p, Report::Failed(failed)))
             .await;
-        Verdict::Finished
+        Verdict::Finished(ending)
     }
 
     /// Brings back what a forced close stopped, whatever the install came to.

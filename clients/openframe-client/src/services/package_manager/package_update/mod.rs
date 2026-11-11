@@ -6,7 +6,7 @@ mod relaunch;
 mod run;
 mod status;
 
-pub use orders::{Order, OrderStore, Submitted};
+pub use orders::{Ending, Order, OrderStore, Submitted};
 pub use status::StatusReporter;
 
 use std::collections::HashMap;
@@ -17,6 +17,8 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tracing::{info, warn};
 
+use crate::models::{DeliveryRef, DeliveryResultMessage};
+use crate::services::delivery_results::DeliveryResults;
 use crate::services::tool_run_manager::ClientUpdatePending;
 use crate::services::AgentConfigurationService;
 use crate::utils::in_progress::InProgress;
@@ -46,6 +48,7 @@ struct Worker {
     machine: Box<dyn Machine>,
     orders: Arc<OrderStore>,
     status: StatusReporter,
+    results: DeliveryResults,
     config: AgentConfigurationService,
     signals: RestartSignals,
     package_upgrades: InProgress,
@@ -55,6 +58,7 @@ impl PackageUpdateRunManager {
     pub fn new(
         orders: Arc<OrderStore>,
         status: StatusReporter,
+        results: DeliveryResults,
         config: AgentConfigurationService,
         signals: RestartSignals,
         package_upgrades: InProgress,
@@ -64,6 +68,7 @@ impl PackageUpdateRunManager {
                 machine: Box::new(System),
                 orders,
                 status,
+                results,
                 config,
                 signals,
                 package_upgrades,
@@ -131,11 +136,10 @@ async fn run(worker: Arc<Worker>) {
                     p.next_at = next_at;
                     next_wake = next_wake.min(next_at);
                 }
-                Verdict::Finished => {
+                Verdict::Finished(ending) => {
                     progress.remove(&current.request_id);
-                    if let Err(e) = worker.orders.finish(&current.request_id) {
-                        warn!(request_id = %current.request_id, "Failed to persist a finished order: {:#}", e);
-                    }
+                    let deliveries = worker.orders.finish(&current.request_id, &ending);
+                    answer(&worker.results, &machine_id, deliveries, &ending).await;
                 }
             }
         }
@@ -148,6 +152,35 @@ async fn run(worker: Arc<Worker>) {
     }
 }
 
+/// A newer request for the same package replaced `old`: its status says so and every dispatch it collected is done.
+pub async fn supersede(
+    status: &StatusReporter,
+    results: &DeliveryResults,
+    machine_id: &str,
+    old: Order,
+) {
+    status.report_superseded(machine_id, &old).await;
+    answer(results, machine_id, old.deliveries, &Ending::Done).await;
+}
+
+/// Answers every dispatch an ended order collected: FAILED when a re-run may fix it, DONE otherwise.
+async fn answer(
+    results: &DeliveryResults,
+    machine_id: &str,
+    deliveries: Vec<DeliveryRef>,
+    ending: &Ending,
+) {
+    for delivery in deliveries {
+        let message = match ending {
+            Ending::Done => DeliveryResultMessage::done(delivery),
+            Ending::Retry { reason, message } => {
+                DeliveryResultMessage::failed(delivery, format!("{}: {message}", reason.name()))
+            }
+        };
+        results.settle(machine_id, message).await;
+    }
+}
+
 fn unix_now() -> u64 {
     crate::services::result_store::now_secs()
 }
@@ -155,3 +188,7 @@ fn unix_now() -> u64 {
 #[cfg(test)]
 #[path = "mod_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "end_to_end_tests.rs"]
+mod end_to_end_tests;

@@ -114,6 +114,28 @@ async fn a_restart_required_dispatch_waits_for_the_next_start() {
 }
 
 #[tokio::test]
+async fn a_deferred_dispatch_survives_restarts_until_its_owner_settles_it() {
+    let (s, _d) = store();
+    let order = delivery("PACKAGE_UPDATE", "order", Some(4));
+    accept(&s, &order, LedgerState::InFlight).await;
+
+    s.delivery_defer("order".to_string()).await.unwrap();
+
+    assert_eq!(s.recover_deliveries().await.unwrap(), 0);
+    assert_eq!(state(&s, "order").await, Some(LedgerState::Deferred));
+    assert_eq!(queued(&s, "order").await, None);
+    let failed = DeliveryResultMessage::failed(order, "MANAGER_ERROR: boom");
+    s.delivery_settle(SUBJECT.to_string(), failed.clone())
+        .await
+        .unwrap();
+    assert_eq!(
+        state(&s, "order").await,
+        Some(LedgerState::Settled(failed.clone()))
+    );
+    assert_eq!(queued(&s, "order").await, Some(failed));
+}
+
+#[tokio::test]
 async fn the_next_start_settles_only_its_own_type_waiting_for_the_restart() {
     let (s, _d) = store();
     let update = delivery("CLIENT_UPDATE", "update", Some(4));
@@ -211,4 +233,112 @@ async fn an_unreadable_ledger_entry_neither_blocks_recovery_nor_reads_as_known()
 
     assert_eq!(s.recover_deliveries().await.unwrap(), 1);
     assert_eq!(state(&s, "future").await, None);
+}
+
+#[tokio::test]
+async fn only_an_in_flight_row_moves_to_waiting() {
+    let (s, _d) = store();
+    let restarting = delivery("CLIENT_UPDATE", "restarting", Some(1));
+    let settled = delivery("PACKAGE_UPDATE", "settled", Some(2));
+    accept(&s, &restarting, LedgerState::AwaitingRestart).await;
+    let done = DeliveryResultMessage::done(settled);
+    s.delivery_settle(SUBJECT.to_string(), done.clone())
+        .await
+        .unwrap();
+
+    for id in ["restarting", "settled", "unknown"] {
+        s.delivery_defer(id.to_string()).await.unwrap();
+    }
+
+    assert_eq!(
+        state(&s, "restarting").await,
+        Some(LedgerState::AwaitingRestart)
+    );
+    assert_eq!(state(&s, "settled").await, Some(LedgerState::Settled(done)));
+    assert_eq!(state(&s, "unknown").await, None);
+}
+
+#[tokio::test]
+async fn a_result_settled_before_the_handler_defers_is_not_overwritten() {
+    let (s, _d) = store();
+    let order = delivery("PACKAGE_UPDATE", "order", Some(3));
+    accept(&s, &order, LedgerState::InFlight).await;
+    let done = DeliveryResultMessage::done(order);
+    s.delivery_settle(SUBJECT.to_string(), done.clone())
+        .await
+        .unwrap();
+
+    s.delivery_defer("order".to_string()).await.unwrap();
+
+    assert_eq!(state(&s, "order").await, Some(LedgerState::Settled(done)));
+}
+
+#[test]
+fn a_deferred_row_is_stored_under_its_own_name() {
+    assert_eq!(
+        serde_json::to_value(LedgerState::Deferred).unwrap(),
+        serde_json::json!("deferred")
+    );
+    assert_eq!(
+        serde_json::from_value::<LedgerState>(serde_json::json!("in_flight")).unwrap(),
+        LedgerState::InFlight
+    );
+}
+
+#[tokio::test]
+async fn deferred_rows_of_several_dispatches_settle_one_by_one() {
+    let (s, _d) = store();
+    let ids = ["wait", "now", "deadline"];
+    for (sequence, id) in ids.iter().enumerate() {
+        let order = delivery("PACKAGE_UPDATE", id, Some(sequence as i64));
+        accept(&s, &order, LedgerState::InFlight).await;
+        s.delivery_defer(id.to_string()).await.unwrap();
+    }
+    assert_eq!(s.recover_deliveries().await.unwrap(), 0);
+
+    let failed =
+        DeliveryResultMessage::failed(delivery("PACKAGE_UPDATE", "now", Some(1)), "TIMEOUT");
+    s.delivery_settle(SUBJECT.to_string(), failed.clone())
+        .await
+        .unwrap();
+
+    assert_eq!(state(&s, "wait").await, Some(LedgerState::Deferred));
+    assert_eq!(state(&s, "now").await, Some(LedgerState::Settled(failed)));
+    assert_eq!(state(&s, "deadline").await, Some(LedgerState::Deferred));
+    assert_eq!(queued(&s, "wait").await, None);
+}
+
+#[tokio::test]
+async fn deferred_rows_no_work_owns_fail_and_the_rest_stay() {
+    let (s, _d) = store();
+    let owned = delivery("PACKAGE_UPDATE", "owned", Some(1));
+    let lost = delivery("PACKAGE_UPDATE", "lost", Some(2));
+    let other_type = delivery("OTHER", "other-type", Some(3));
+    let in_flight = delivery("PACKAGE_UPDATE", "in-flight", Some(4));
+    for row in [&owned, &lost, &other_type] {
+        accept(&s, row, LedgerState::InFlight).await;
+        s.delivery_defer(row.dispatch_id.clone()).await.unwrap();
+    }
+    accept(&s, &in_flight, LedgerState::InFlight).await;
+
+    let failed = s
+        .delivery_settle_orphaned(
+            "PACKAGE_UPDATE".to_string(),
+            ["owned".to_string()].into_iter().collect(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(failed, vec![lost.clone()]);
+    let answer = DeliveryResultMessage::failed(lost, "the agent lost the work it took on");
+    assert_eq!(queued(&s, "lost").await, Some(answer.clone()));
+    assert_eq!(state(&s, "lost").await, Some(LedgerState::Settled(answer)));
+    assert_eq!(state(&s, "owned").await, Some(LedgerState::Deferred));
+    assert_eq!(state(&s, "other-type").await, Some(LedgerState::Deferred));
+    assert_eq!(state(&s, "in-flight").await, Some(LedgerState::InFlight));
+    assert!(s
+        .delivery_settle_orphaned("PACKAGE_UPDATE".to_string(), Default::default())
+        .await
+        .unwrap()
+        .contains(&owned));
 }
