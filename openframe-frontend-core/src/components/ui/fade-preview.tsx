@@ -59,7 +59,8 @@ export interface FadePreviewProps {
    * items past N unless `hiddenCount` says otherwise. Until the list holds N
    * items, `collapsedHeight` (or the height last measured) is kept. The first
    * paint (before any measure) is held for N up to 12; add rows to
-   * `UNMEASURED_ITEMS_CLASSES` for a longer preview.
+   * `UNMEASURED_ITEMS_CLASSES` for a longer preview. While collapsed, the items
+   * past N are `inert`: out of the tab order and the accessibility tree.
    */
   visibleItems?: number;
   /**
@@ -201,10 +202,15 @@ export function FadePreview({
     // collapsed height too. Overflow is read while collapsed (content taller
     // than the box), which is the only state the fade and the toggle depend on.
     if (itemMode) {
-      const count = el.firstElementChild?.children.length ?? 0;
+      const items = el.firstElementChild?.children;
+      const count = items?.length ?? 0;
       if (count !== itemCount) setItemCount(count);
       const next = measureItems(el, visible);
       if (next != null && next !== itemsHeight) setItemsHeight(next);
+      // The items past N are out of sight while collapsed: out of the tab order too, or focusing
+      // one scrolls the clipped box and leaves it scrolled.
+      for (let i = 0; i < count; i++) items?.[i]?.toggleAttribute('inert', !expanded && i >= visible);
+      if (!expanded) el.scrollTop = 0;
     }
     // Fill mode: the parent decides the height (CSS), only overflow is read.
     if (!fill) el.style.height = expanded ? `${el.scrollHeight}px` : cssLength(collapsed);

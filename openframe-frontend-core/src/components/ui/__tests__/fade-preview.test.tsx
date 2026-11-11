@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FADE_PREVIEW_MAX_UNMEASURED_ITEMS, FadePreview } from '../fade-preview';
@@ -63,5 +63,26 @@ describe('FadePreview item mode measure', () => {
       </FadePreview>,
     );
     expect(screen.getByTestId('list').parentElement).toHaveStyle({ height: '103px' });
+  });
+});
+
+describe('FadePreview item mode while collapsed', () => {
+  it('keeps the items past N out of the tab order until the reader expands', () => {
+    render(
+      <FadePreview visibleItems={2}>
+        <ul>
+          {[0, 1, 2, 3].map(i => (
+            <li key={i}>
+              <a href={`#${i}`}>item {i}</a>
+            </li>
+          ))}
+        </ul>
+      </FadePreview>,
+    );
+    const inert = () => screen.getAllByRole('listitem', { hidden: true }).map(li => li.hasAttribute('inert'));
+    expect(inert()).toEqual([false, false, true, true]);
+
+    fireEvent.click(screen.getByRole('button', { hidden: true }));
+    expect(inert()).toEqual([false, false, false, false]);
   });
 });
