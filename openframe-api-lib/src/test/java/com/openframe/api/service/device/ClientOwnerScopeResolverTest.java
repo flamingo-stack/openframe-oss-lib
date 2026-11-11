@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,13 +37,14 @@ class ClientOwnerScopeResolverTest {
         Machine machine = new Machine();
         machine.setMachineId("machine-1");
         machine.setOrganizationId("org-b");
+        machine.setOrganizationAssignedAt(Instant.parse("2026-10-20T10:00:00Z"));
         when(machineRepository.findByMachineId("machine-1")).thenReturn(Optional.of(machine));
 
         // execution
         ClientOwnerScope scope = resolver.scopeOf(AGENT);
 
         // verifications
-        assertThat(scope).isEqualTo(new ClientOwnerScope("machine-1", "org-b"));
+        assertThat(scope).isEqualTo(new ClientOwnerScope("machine-1", "org-b", Instant.parse("2026-10-20T10:00:00Z")));
     }
 
     @Test
@@ -54,7 +56,7 @@ class ClientOwnerScopeResolverTest {
         ClientOwnerScope scope = resolver.scopeOf(AGENT);
 
         // verifications
-        assertThat(scope).isEqualTo(new ClientOwnerScope("machine-1", null));
+        assertThat(scope).isEqualTo(new ClientOwnerScope("machine-1", null, null));
     }
 
     // A null machine would match every owner without a machineId, i.e. every admin item.
@@ -85,7 +87,7 @@ class ClientOwnerScopeResolverTest {
         ClientOwnerScope scope = resolver.forMachine("machine-1");
 
         // verifications
-        assertThat(scope).isEqualTo(new ClientOwnerScope("machine-1", "org-b"));
+        assertThat(scope).isEqualTo(new ClientOwnerScope("machine-1", "org-b", null));
     }
 
     @Test

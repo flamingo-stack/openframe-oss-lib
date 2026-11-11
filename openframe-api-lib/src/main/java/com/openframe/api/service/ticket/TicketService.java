@@ -127,7 +127,7 @@ public class TicketService {
         }
         ClientOwnerScope scope = clientOwnerScopeResolver.scopeOf(principal);
         return ticketRepository.findByIdAndOwnerMachineId(ticketId, scope.getMachineId())
-                .filter(ticket -> scope.allows(ticket.getOwner()));
+                .filter(ticket -> scope.allows(ticket.getOwner(), ticket.getCreatedAt()));
     }
 
     public Optional<Ticket> getTicketByNumber(AuthPrincipal principal, Integer ticketNumber) {
@@ -138,7 +138,7 @@ public class TicketService {
         }
         ClientOwnerScope scope = clientOwnerScopeResolver.scopeOf(principal);
         return ticketRepository.findByTicketNumberAndOwnerMachineId(ticketNumber, scope.getMachineId())
-                .filter(ticket -> scope.allows(ticket.getOwner()));
+                .filter(ticket -> scope.allows(ticket.getOwner(), ticket.getCreatedAt()));
     }
 
     public Optional<Ticket> findByIdOrNumber(AuthPrincipal principal, String ticketId, Integer ticketNumber) {

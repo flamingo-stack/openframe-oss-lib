@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 
@@ -27,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(MockitoExtension.class)
 class CustomTicketRepositoryFilterTest {
+
+    private static final Instant CUT_OFF = Instant.parse("2026-10-20T10:00:00Z");
 
     private static final String ESCALATED_BY_USER = "escalatedByUser";
     private static final String HAS_PENDING_APPROVAL = "hasPendingApproval";
@@ -146,7 +149,7 @@ class CustomTicketRepositoryFilterTest {
     @Test
     void buildTicketQuery_ownerScopeWithOrganization_machineAndOrganizationSnapshotOrLegacyNull() {
         // setup
-        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b");
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b", null);
 
         // execution
         Document query = repository.buildTicketQuery(null, null, null, scope).getQueryObject();
@@ -160,7 +163,7 @@ class CustomTicketRepositoryFilterTest {
     @Test
     void buildTicketQuery_ownerScopeWithoutOrganization_machineOnly() {
         // setup
-        ClientOwnerScope scope = new ClientOwnerScope("machine-1", null);
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", null, null);
 
         // execution
         Document query = repository.buildTicketQuery(null, null, null, scope).getQueryObject();
@@ -173,7 +176,7 @@ class CustomTicketRepositoryFilterTest {
     @Test
     void buildTicketQuery_ownerScopeAndSearch_bothClausesKept() {
         // setup
-        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b");
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b", null);
 
         // execution
         Document query = repository.buildTicketQuery(null, "printer", null, scope).getQueryObject();
@@ -183,11 +186,63 @@ class CustomTicketRepositoryFilterTest {
     }
 
     @Test
+    void buildTicketQuery_ownerScopeWithCutOffAndNoFilter_createdAtStartsAtTheCutOff() {
+        // setup
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b", CUT_OFF);
+
+        // execution
+        Document query = repository.buildTicketQuery(null, null, null, scope).getQueryObject();
+
+        // verifications
+        assertThat(query.get("createdAt", Document.class)).isEqualTo(new Document("$gte", CUT_OFF));
+    }
+
+    @Test
+    void buildTicketQuery_ownerScopeWithCutOffAndEarlierCreatedAtFrom_cutOffWins() {
+        // setup
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b", CUT_OFF);
+        TicketQueryFilter filter = TicketQueryFilter.builder().createdAtFrom(CUT_OFF.minusSeconds(60)).build();
+
+        // execution
+        Document query = repository.buildTicketQuery(filter, null, null, scope).getQueryObject();
+
+        // verifications
+        assertThat(query.get("createdAt", Document.class)).isEqualTo(new Document("$gte", CUT_OFF));
+    }
+
+    @Test
+    void buildTicketQuery_ownerScopeWithCutOffAndLaterCreatedAtFrom_filterWins() {
+        // setup
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b", CUT_OFF);
+        TicketQueryFilter filter = TicketQueryFilter.builder().createdAtFrom(CUT_OFF.plusSeconds(60)).build();
+
+        // execution
+        Document query = repository.buildTicketQuery(filter, null, null, scope).getQueryObject();
+
+        // verifications
+        assertThat(query.get("createdAt", Document.class)).isEqualTo(new Document("$gte", CUT_OFF.plusSeconds(60)));
+    }
+
+    @Test
+    void buildTicketQuery_ownerScopeWithCutOffAndCreatedAtTo_bothBoundsKept() {
+        // setup
+        ClientOwnerScope scope = new ClientOwnerScope("machine-1", "org-b", CUT_OFF);
+        TicketQueryFilter filter = TicketQueryFilter.builder().createdAtTo(CUT_OFF.plusSeconds(60)).build();
+
+        // execution
+        Document query = repository.buildTicketQuery(filter, null, null, scope).getQueryObject();
+
+        // verifications
+        assertThat(query.get("createdAt", Document.class))
+                .isEqualTo(new Document("$gte", CUT_OFF).append("$lt", CUT_OFF.plusSeconds(60)));
+    }
+
+    @Test
     void buildTicketQuery_noOwnerScope_noOwnerClauses() {
         // execution
         Document query = repository.buildTicketQuery(null, null, null, null).getQueryObject();
 
         // verifications
-        assertThat(query).doesNotContainKeys("owner.machineId", "owner.organizationId");
+        assertThat(query).doesNotContainKeys("owner.machineId", "owner.organizationId", "createdAt");
     }
 }

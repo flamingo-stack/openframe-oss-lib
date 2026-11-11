@@ -19,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +37,7 @@ class TicketServiceClientOwnerScopeTest {
 
     private static final AuthPrincipal AGENT = AuthPrincipal.builder().machineId("machine-1").actorType(ActorType.AGENT).build();
     private static final AuthPrincipal ADMIN = AuthPrincipal.builder().id("admin-1").actorType(ActorType.ADMIN).build();
-    private static final ClientOwnerScope UNDER_ORG_B = new ClientOwnerScope("machine-1", "org-b");
+    private static final ClientOwnerScope UNDER_ORG_B = new ClientOwnerScope("machine-1", "org-b", null);
 
     @Mock private TicketRepository ticketRepository;
     @Mock private TicketNumberService ticketNumberService;
@@ -96,6 +97,40 @@ class TicketServiceClientOwnerScopeTest {
 
         // verifications
         assertThat(found).contains(legacy);
+    }
+
+    @Test
+    void getTicket_agentAndTicketFromBeforeTheCurrentEnrollment_notFound() {
+        // setup
+        Instant assignedAt = Instant.parse("2026-10-20T10:00:00Z");
+        when(clientOwnerScopeResolver.isOwnerScoped(AGENT)).thenReturn(true);
+        when(clientOwnerScopeResolver.scopeOf(AGENT)).thenReturn(new ClientOwnerScope("machine-1", "org-b", assignedAt));
+        Ticket older = ownedBy("machine-1", "org-b");
+        older.setCreatedAt(assignedAt.minusSeconds(1));
+        when(ticketRepository.findByIdAndOwnerMachineId("t-1", "machine-1")).thenReturn(Optional.of(older));
+
+        // execution
+        Optional<Ticket> found = service.getTicket(AGENT, "t-1");
+
+        // verifications
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void getTicketByNumber_agentAndTicketFromBeforeTheCurrentEnrollment_notFound() {
+        // setup
+        Instant assignedAt = Instant.parse("2026-10-20T10:00:00Z");
+        when(clientOwnerScopeResolver.isOwnerScoped(AGENT)).thenReturn(true);
+        when(clientOwnerScopeResolver.scopeOf(AGENT)).thenReturn(new ClientOwnerScope("machine-1", "org-b", assignedAt));
+        Ticket older = ownedBy("machine-1", "org-b");
+        older.setCreatedAt(assignedAt.minusSeconds(1));
+        when(ticketRepository.findByTicketNumberAndOwnerMachineId(7, "machine-1")).thenReturn(Optional.of(older));
+
+        // execution
+        Optional<Ticket> found = service.getTicketByNumber(AGENT, 7);
+
+        // verifications
+        assertThat(found).isEmpty();
     }
 
     @Test

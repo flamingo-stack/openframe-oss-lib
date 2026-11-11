@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Objects;
 import java.util.Set;
 
 import static com.openframe.client.service.AgentAuthService.CLIENT_CREDENTIALS_GRANT_TYPE;
@@ -35,6 +36,7 @@ import static com.openframe.data.service.machine.MachineFields.HOSTNAME;
 import static com.openframe.data.service.machine.MachineFields.LAST_SEEN;
 import static com.openframe.data.service.machine.MachineFields.MANUFACTURER;
 import static com.openframe.data.service.machine.MachineFields.MODEL;
+import static com.openframe.data.service.machine.MachineFields.ORGANIZATION_ASSIGNED_AT;
 import static com.openframe.data.service.machine.MachineFields.ORGANIZATION_ID;
 import static com.openframe.data.service.machine.MachineFields.OS_TYPE;
 import static com.openframe.data.service.machine.MachineFields.OS_UUID;
@@ -116,6 +118,7 @@ public class AgentRegistrationService {
         registrationRequestFields(request).applyTo(machine);
         machine.setStatus(DeviceStatus.PENDING);
         machine.setOrganizationId(organizationId);
+        machine.setOrganizationAssignedAt(Instant.now());
         machine.setType(DeviceType.DESKTOP);
 
         Machine savedMachine = machineRepository.save(machine);
@@ -173,6 +176,9 @@ public class AgentRegistrationService {
         MachineUpdate update = registrationRequestFields(request).set(STATUS, DeviceStatus.PENDING);
         String organizationId = organizationIdResolver.resolve(request.getOrganizationId());
         update.set(ORGANIZATION_ID, organizationId);
+        if (isNewEnrollment(machineId, organizationId)) {
+            update.set(ORGANIZATION_ASSIGNED_AT, Instant.now());
+        }
 
         Machine machine = machineWriter.update(machineId, update)
                 .map(MachineWriteResult::after)
@@ -180,6 +186,12 @@ public class AgentRegistrationService {
 
         log.info("Updated machine {} on reinstall, organizationId {}", machineId, organizationId);
         return machine;
+    }
+
+    private boolean isNewEnrollment(String machineId, String organizationId) {
+        return machineRepository.findByMachineId(machineId)
+                .map(machine -> !Objects.equals(machine.getOrganizationId(), organizationId))
+                .orElse(false);
     }
 
     private MachineUpdate registrationRequestFields(AgentRegistrationRequest request) {

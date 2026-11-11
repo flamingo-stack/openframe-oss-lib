@@ -117,7 +117,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             addCriteriaIfNotEmpty(query, FIELD_ASSIGNED_TO, filter.getAssigneeIds());
             addCriteriaIfNotEmpty(query, FIELD_DEVICE_ID, filter.getDeviceIds());
             addCriteriaIfNotEmpty(query, FIELD_CREATION_SOURCE, filter.getCreationSources());
-            applyCreatedAtRange(query, filter.getCreatedAtFrom(), filter.getCreatedAtTo());
             applyActivityCriteria(query, filter.getActivity());
             applyFlag(query, FIELD_ESCALATED_BY_USER, filter.getEscalatedByUser());
             applyFlag(query, FIELD_HAS_PENDING_APPROVAL, filter.getHasPendingApproval());
@@ -126,8 +125,18 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         applyIdRestriction(query, restrictToTicketIds);
 
         applyOwnerScope(query, ownerScope);
+        applyCreatedAtRange(query, createdAtFrom(filter, ownerScope), filter == null ? null : filter.getCreatedAtTo());
         applySearchCriteria(query, search);
         return query;
+    }
+
+    private static Instant createdAtFrom(TicketQueryFilter filter, ClientOwnerScope ownerScope) {
+        Instant from = filter == null ? null : filter.getCreatedAtFrom();
+        Instant cutOff = ownerScope == null ? null : ownerScope.getOrganizationAssignedAt();
+        if (from == null || cutOff == null) {
+            return from == null ? cutOff : from;
+        }
+        return from.isAfter(cutOff) ? from : cutOff;
     }
 
     // A null snapshot (written before the backfill) stays visible: $in with null matches a missing field too.

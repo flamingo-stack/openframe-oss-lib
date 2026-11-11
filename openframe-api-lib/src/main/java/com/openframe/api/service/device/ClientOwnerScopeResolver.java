@@ -41,12 +41,11 @@ public class ClientOwnerScopeResolver {
         if (!hasText(machineId)) {
             throw new IllegalArgumentException("machineId is required for a client owner scope");
         }
-        String organizationId = machineRepository.findByMachineId(machineId)
-                .map(Machine::getOrganizationId)
-                .orElse(null);
-        if (organizationId == null) {
+        Machine machine = machineRepository.findByMachineId(machineId).orElse(null);
+        if (machine == null || machine.getOrganizationId() == null) {
             log.debug("No current organization for machine {}; owner scope falls back to machine only", machineId);
+            return new ClientOwnerScope(machineId, null, null);
         }
-        return new ClientOwnerScope(machineId, organizationId);
+        return new ClientOwnerScope(machineId, machine.getOrganizationId(), machine.getOrganizationAssignedAt());
     }
 }

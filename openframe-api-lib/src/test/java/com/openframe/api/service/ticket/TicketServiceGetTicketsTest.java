@@ -135,7 +135,7 @@ class TicketServiceGetTicketsTest {
     @Test
     void getTickets_agentPrincipal_queryScopedToOwnMachine() {
         AuthPrincipal agent = AuthPrincipal.builder().machineId("machine-1").actorType(ActorType.AGENT).build();
-        stubQuery(new ClientOwnerScope("machine-1", "org-b"));
+        stubQuery(new ClientOwnerScope("machine-1", "org-b", null));
         when(ticketRepository.findTicketsWithCursor(eq(query), isNull(), eq(3), isNull(), eq("DESC")))
                 .thenReturn(tickets(1));
 

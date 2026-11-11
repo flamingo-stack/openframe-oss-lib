@@ -100,7 +100,7 @@ class TicketServiceStatusFilterTest {
                 .actorType(ActorType.AGENT)
                 .machineId("machine-7")
                 .build();
-        ClientOwnerScope scope = new ClientOwnerScope("machine-7", "org-7");
+        ClientOwnerScope scope = new ClientOwnerScope("machine-7", "org-7", null);
         when(clientOwnerScopeResolver.isOwnerScoped(agent)).thenReturn(true);
         when(clientOwnerScopeResolver.scopeOf(agent)).thenReturn(scope);
         givenRepositoryReturns(List.of());
