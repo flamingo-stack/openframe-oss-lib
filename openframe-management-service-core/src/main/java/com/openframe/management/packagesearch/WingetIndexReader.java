@@ -19,7 +19,9 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -85,13 +87,24 @@ class WingetIndexReader {
         String jdbcUrl = "jdbc:sqlite:" + absoluteDb;
         try (Connection connection = DriverManager.getConnection(jdbcUrl)) {
             MatchingKeys keys = new MatchingKeys(
-                    readValuesByPackage(connection, PRODUCT_CODES_QUERY),
-                    readValuesByPackage(connection, UPGRADE_CODES_QUERY),
+                    readCodesByPackage(connection, PRODUCT_CODES_QUERY),
+                    readCodesByPackage(connection, UPGRADE_CODES_QUERY),
                     readValuesByPackage(connection, NORMALIZED_NAMES_QUERY),
                     readValuesByPackage(connection, NORMALIZED_PUBLISHERS_QUERY),
-                    readValuesByPackage(connection, PACKAGE_FAMILY_NAMES_QUERY));
+                    readCodesByPackage(connection, PACKAGE_FAMILY_NAMES_QUERY));
             return readEntries(connection, keys);
         }
+    }
+
+    // the matcher folds a device's codes to lower case; normalized names keep winget's case, e.g. (X64)
+    private static Map<Long, List<String>> readCodesByPackage(Connection connection, String query)
+            throws SQLException {
+        Map<Long, List<String>> codesByPackage = readValuesByPackage(connection, query);
+        codesByPackage.replaceAll((packageRowId, codes) -> codes.stream()
+                .filter(Objects::nonNull)
+                .map(code -> code.toLowerCase(Locale.ROOT))
+                .toList());
+        return codesByPackage;
     }
 
     private static Map<Long, List<String>> readValuesByPackage(Connection connection, String query)

@@ -50,8 +50,10 @@ public class WingetPackageMatcher implements PackageMatcher {
         if (productCodes.isEmpty() && upgradeCodes.isEmpty() && packageFamilyNames.isEmpty() && names.isEmpty()) {
             return new CatalogLookup(List.of());
         }
-        return new CatalogLookup(catalogRepository.findByManagerAndAnyMatchingKey(getManager(), productCodes,
-                upgradeCodes, packageFamilyNames, names));
+        PackageManagerType manager = getManager();
+        List<PackageCatalogEntry> entries = catalogRepository.findByManagerAndAnyMatchingKey(manager, productCodes,
+                upgradeCodes, packageFamilyNames, names);
+        return new CatalogLookup(entries);
     }
 
     private static Set<String> keys(List<ProgramKeys> programs, Function<ProgramKeys, List<String>> keysOf) {

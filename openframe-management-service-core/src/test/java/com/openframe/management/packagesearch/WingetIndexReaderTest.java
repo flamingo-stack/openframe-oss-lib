@@ -61,6 +61,33 @@ class WingetIndexReaderTest {
     }
 
     @Test
+    void read_codesInUpperCase_foldedToLowerCase(@TempDir Path tempDir) throws Exception {
+        // setup
+        Path db = tempDir.resolve("index.db");
+        createIndex(db);
+        insertPackage(db, "Mozilla.Firefox");
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + db);
+             Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO upgradecodes2(upgradecode, package) VALUES ('{0B36E3B7-0042-452D-B376-57E0C07ADDBB}', 1)");
+            statement.execute("INSERT INTO productcodes2(productcode, package) VALUES ('{ABCDEF01-2345-6789-ABCD-EF0123456789}', 1)");
+            statement.execute("INSERT INTO pfns2(pfn, package) VALUES ('Mozilla.Firefox_n80bbvh6b1yt2', 1)");
+            statement.execute("INSERT INTO norm_names2(norm_name, package) VALUES ('mozillafirefox(X64)', 1)");
+        }
+        byte[] index = Files.readAllBytes(db);
+        byte[] msix = msix("Public/index.db", index);
+
+        // execution
+        List<WingetEntry> entries = new WingetIndexReader().read(msix);
+
+        // verifications
+        assertThat(entries)
+                .extracting(WingetEntry::getUpgradeCodes, WingetEntry::getProductCodes, WingetEntry::getPackageFamilyNames,
+                        WingetEntry::getNormalizedNames)
+                .containsExactly(tuple(List.of(UPGRADE_CODE), List.of("{abcdef01-2345-6789-abcd-ef0123456789}"),
+                        List.of("mozilla.firefox_n80bbvh6b1yt2"), List.of("mozillafirefox(X64)")));
+    }
+
+    @Test
     void read_packageWithoutMatchingKeys_emptyKeys(@TempDir Path tempDir) throws Exception {
         // setup
         Path db = tempDir.resolve("index.db");
