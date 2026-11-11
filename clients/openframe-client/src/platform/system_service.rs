@@ -389,6 +389,77 @@ pub async fn service_clear_for_install(service_name: &str) -> bool {
     }
 }
 
+pub async fn delete_service(service_name: &str) -> Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        if service_missing_timed(service_name).await? {
+            return Ok(());
+        }
+        let name = service_name.to_string();
+        let exe = scm_call_timed(
+            service_name,
+            "config query",
+            SCM_QUERY_TIMEOUT_SECS,
+            move || service_image_exe_path_windows(&name),
+        )
+        .await
+        .ok()
+        .flatten();
+        info!(
+            "Deleting existing service {} ({})",
+            service_name,
+            exe.map(|p| p.display().to_string())
+                .unwrap_or_else(|| "image path unknown".to_string())
+        );
+        delete_service_windows(service_name).await
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = service_name;
+        Ok(())
+    }
+}
+
+pub async fn delete_service_installed_in(service_name: &str, dir: &std::path::Path) -> Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        if service_missing_timed(service_name).await? {
+            return Ok(());
+        }
+        let name = service_name.to_string();
+        let exe = scm_call_timed(
+            service_name,
+            "config query",
+            SCM_QUERY_TIMEOUT_SECS,
+            move || service_image_exe_path_windows(&name),
+        )
+        .await?
+        .with_context(|| format!("Could not read the image path of service {}", service_name))?;
+        let inside = std::path::PathBuf::from(exe.to_string_lossy().to_lowercase())
+            .starts_with(dir.to_string_lossy().to_lowercase());
+        if !inside {
+            warn!(
+                "Service {} runs {}, outside {}; leaving it in place",
+                service_name,
+                exe.display(),
+                dir.display()
+            );
+            return Ok(());
+        }
+        info!(
+            "Deleting leftover service {} ({})",
+            service_name,
+            exe.display()
+        );
+        delete_service_windows(service_name).await
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (service_name, dir);
+        Ok(())
+    }
+}
+
 #[cfg(target_os = "windows")]
 async fn stop_service_windows(service_name: &str, allow_delete: bool) -> Result<()> {
     use winapi::shared::winerror::{

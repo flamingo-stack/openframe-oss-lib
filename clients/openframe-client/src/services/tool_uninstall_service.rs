@@ -129,7 +129,24 @@ impl ToolUninstallService {
         for tool in installed_tools {
             info!("Processing uninstallation for tool: {}", tool.tool_agent_id);
 
-            if let Err(e) = self.uninstall_tool(&tool).await {
+            let result = self.uninstall_tool(&tool).await;
+
+            if let Installation::Service { service_name, .. } = &tool.installation {
+                let tool_folder = self.directory_manager.get_tool_folder(&tool.tool_agent_id);
+                if let Err(e) = crate::platform::system_service::delete_service_installed_in(
+                    service_name,
+                    &tool_folder,
+                )
+                .await
+                {
+                    warn!(
+                        "Failed to remove leftover service {} for tool {} (continuing): {:#}",
+                        service_name, tool.tool_agent_id, e
+                    );
+                }
+            }
+
+            if let Err(e) = result {
                 warn!(
                     "Failed to uninstall tool {} (continuing with remaining tools): {:#}",
                     tool.tool_agent_id, e

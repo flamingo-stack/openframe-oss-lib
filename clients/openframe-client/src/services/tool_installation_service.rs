@@ -665,6 +665,17 @@ impl ToolInstallationService {
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
+            if let Installation::Service { service_name, .. } = &installation {
+                crate::platform::system_service::delete_service(service_name)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Aborting install of {}: could not delete existing service '{}'; will retry",
+                            tool_agent_id, service_name
+                        )
+                    })?;
+            }
+
             let mut cmd = Command::new(&file_path);
             cmd.args(&installation_command_args);
             cmd.kill_on_drop(true);
