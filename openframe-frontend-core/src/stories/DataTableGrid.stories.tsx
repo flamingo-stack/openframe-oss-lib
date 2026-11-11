@@ -4,6 +4,9 @@
  * One bordered block of 48px rows with column dividers. The selection column and the first data column are pinned
  * left, the action columns pinned right, the rest scrolls sideways with a gradient on each edge that has more content.
  * Below `md` the same table draws card rows.
+ *
+ * What a table needs before it switches from cards (column sizes, one-line cells, action columns, a storage key):
+ * `docs/DATA_TABLE_GRID.md`.
  */
 
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';

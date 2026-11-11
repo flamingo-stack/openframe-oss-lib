@@ -18,6 +18,7 @@ import {
 } from '../../../ui';
 import { DATA_TABLE_SKELETON_ROWS } from '../../../ui/data-table/utils';
 import { InertWhileLoading, useLoadingScope } from '../../../ui/loading-scope';
+import { dataTableLayoutProps } from '../../feature-table-layout';
 import { OSTypeBadge } from '../../os-type-badge';
 import { formatLastOnline } from '../device-last-online';
 import { getDeviceName } from '../device-name';
@@ -154,6 +155,9 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   selectionMode,
   onSelectionModeChange,
   criteriaContent,
+  layout = 'cards',
+  tableMaxHeight,
+  tableSettings,
 }: DeviceSelectorProps<T>) {
   // ONE switch: in a page's loading state (or while the host reads the devices) the header, its row count and the
   // table draw as their loading state.
@@ -715,17 +719,16 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   // devices"), so it stays even at zero, that IS the answer the user is after.
   const showHeader = isCriteria || loading || devicesForTable.length > 0 || hasActiveFilter;
 
+  // The header's right slot: the bulk action, or the row count where there is none.
+  const headerSlot = bulkAction ?? (
+    <DataTable.RowCount itemName="device" totalCount={totalCount ?? server?.totalCount} loading={loading} />
+  );
+
   const deviceTable = (
-    <DataTable table={table}>
-      {showHeader && (
-        <DataTable.Header
-          rightSlot={
-            bulkAction ?? (
-              <DataTable.RowCount itemName="device" totalCount={totalCount ?? server?.totalCount} loading={loading} />
-            )
-          }
-        />
-      )}
+    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+      {/* The grid shows the same slot above the table; the card header carries it at its right end. */}
+      {showHeader && layout === 'grid' && <DataTable.Meta>{headerSlot}</DataTable.Meta>}
+      {showHeader && <DataTable.Header rightSlot={headerSlot} />}
       <DataTable.Body
         loading={loading}
         loadingCells

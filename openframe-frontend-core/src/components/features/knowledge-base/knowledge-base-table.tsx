@@ -11,6 +11,7 @@ import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { Tag as StatusTag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
+import { dataTableLayoutProps, type FeatureTableLayoutProps } from '../feature-table-layout';
 import { KNOWLEDGE_BASE_ITEM_ICON } from './knowledge-base-item-icon';
 import { KNOWLEDGE_BASE_STATUS_VARIANT, type KnowledgeBaseArticleStatus } from './knowledge-base-status';
 
@@ -141,7 +142,7 @@ export function getKnowledgeBaseColumns(mode: KnowledgeBaseTableMode): ColumnDef
   ];
 }
 
-export interface KnowledgeBaseTableBodyProps {
+export interface KnowledgeBaseTableBodyProps extends FeatureTableLayoutProps {
   items: KnowledgeBaseRow[];
   /**
    * Where a row leads, for the row link and the "open in new tab" button.
@@ -174,6 +175,9 @@ export function KnowledgeBaseTableBody({
   actionsColumn,
   totalCount,
   compact = false,
+  layout = 'cards',
+  tableMaxHeight,
+  tableSettings,
 }: KnowledgeBaseTableBodyProps) {
   const columns = useMemo<ColumnDef<KnowledgeBaseRow>[]>(() => {
     const base = getKnowledgeBaseColumns(mode);
@@ -195,18 +199,18 @@ export function KnowledgeBaseTableBody({
     enableSorting: false,
   });
 
+  const rowCount = (
+    <DataTable.RowCount itemName={mode === 'archive' ? 'article' : 'item'} totalCount={totalCount} loading={loading} />
+  );
+
   return (
-    <DataTable table={table}>
+    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+      {/* The grid's results count sits above the table; the card header carries its own (`rightSlot`). */}
+      {layout === 'grid' && <DataTable.Meta>{rowCount}</DataTable.Meta>}
       <DataTable.Header
         stickyHeader={!!stickyHeaderOffset}
         stickyHeaderOffset={stickyHeaderOffset}
-        rightSlot={
-          <DataTable.RowCount
-            itemName={mode === 'archive' ? 'article' : 'item'}
-            totalCount={totalCount}
-            loading={loading}
-          />
-        }
+        rightSlot={rowCount}
       />
       <DataTable.Body
         loading={loading}

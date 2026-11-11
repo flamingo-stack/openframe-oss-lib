@@ -6,6 +6,7 @@ import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { TruncateText } from '../../ui/truncate-text';
+import { dataTableLayoutProps, type FeatureTableLayoutProps, hasSlotContent } from '../feature-table-layout';
 import { OSTypeBadgeGroup } from '../os-type-badge-group';
 import { ScriptNameCell } from './script-cells';
 import { ScriptShellBadge } from './script-shell-badge';
@@ -27,7 +28,7 @@ export interface ScriptTableRow {
   href?: string;
 }
 
-export interface ScriptsTableProps {
+export interface ScriptsTableProps extends FeatureTableLayoutProps {
   rows: ScriptTableRow[];
   isLoading?: boolean;
   /** Column ids to leave out (`'authorId'`, `'supportedPlatforms'`, `'open'`). */
@@ -69,17 +70,20 @@ export function ScriptsTable({
   stickyHeaderOffset,
   rightSlot,
   skeletonRows,
+  layout = 'cards',
+  tableMaxHeight,
+  tableSettings,
 }: ScriptsTableProps) {
   // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header and the body's skeleton
   // rows alike.
   const loading = useLoadingScope() || isLoading;
   const columns = useMemo<ColumnDef<ScriptTableRow>[]>(() => {
-    const cell = (layout: ScriptsTableColumnLayout, render: (row: ScriptTableRow) => ReactNode) => ({
-      id: layout.id,
-      header: layout.header ?? '',
+    const cell = (columnLayout: ScriptsTableColumnLayout, render: (row: ScriptTableRow) => ReactNode) => ({
+      id: columnLayout.id,
+      header: columnLayout.header ?? '',
       cell: ({ row }: { row: Row<ScriptTableRow> }) => render(row.original),
       enableSorting: false,
-      meta: scriptsColumnMeta(layout),
+      meta: scriptsColumnMeta(columnLayout),
     });
     const all: ColumnDef<ScriptTableRow>[] = [
       cell(SCRIPT_COLUMNS.name, row => <ScriptNameCell name={row.name} description={row.description} />),
@@ -128,7 +132,9 @@ export function ScriptsTable({
   const showHeader = loading || rows.length > 0;
 
   return (
-    <DataTable table={table}>
+    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+      {/* The grid's results row sits above the table; the card header carries it in its right slot. */}
+      {showHeader && layout === 'grid' && hasSlotContent(rightSlot) && <DataTable.Meta>{rightSlot}</DataTable.Meta>}
       {showHeader && (
         <DataTable.Header stickyHeader={stickyHeader} stickyHeaderOffset={stickyHeaderOffset} rightSlot={rightSlot} />
       )}
