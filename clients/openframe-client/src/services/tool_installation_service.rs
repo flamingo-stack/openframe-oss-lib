@@ -665,13 +665,16 @@ impl ToolInstallationService {
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-            if let Installation::Service { service_name, .. } = &installation {
-                crate::platform::system_service::delete_service(service_name)
+            if let Installation::Service {
+                service_name: svc, ..
+            } = &installation
+            {
+                crate::platform::system_service::remove_service(svc, None)
                     .await
                     .with_context(|| {
                         format!(
-                            "Aborting install of {}: could not delete existing service '{}'; will retry",
-                            tool_agent_id, service_name
+                            "Aborting install of {}: existing service '{}' could not be removed; will retry",
+                            tool_agent_id, svc
                         )
                     })?;
             }

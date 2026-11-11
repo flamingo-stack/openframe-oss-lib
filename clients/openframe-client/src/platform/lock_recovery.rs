@@ -75,7 +75,7 @@ fn component_eq(a: &Component, b: &Component) -> bool {
 
 /// True when `child` is `base` itself or lies beneath it.
 #[cfg(any(target_os = "windows", test))]
-fn path_under(child: &Path, base: &Path) -> bool {
+pub(crate) fn path_under(child: &Path, base: &Path) -> bool {
     let mut c = child.components();
     for b in base.components() {
         match c.next() {

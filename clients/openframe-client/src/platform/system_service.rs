@@ -389,73 +389,17 @@ pub async fn service_clear_for_install(service_name: &str) -> bool {
     }
 }
 
-pub async fn delete_service(service_name: &str) -> Result<()> {
+pub async fn remove_service(
+    service_name: &str,
+    only_under: Option<&std::path::Path>,
+) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
-        if service_missing_timed(service_name).await? {
-            return Ok(());
-        }
-        let name = service_name.to_string();
-        let exe = scm_call_timed(
-            service_name,
-            "config query",
-            SCM_QUERY_TIMEOUT_SECS,
-            move || service_image_exe_path_windows(&name),
-        )
-        .await
-        .ok()
-        .flatten();
-        info!(
-            "Deleting existing service {} ({})",
-            service_name,
-            exe.map(|p| p.display().to_string())
-                .unwrap_or_else(|| "image path unknown".to_string())
-        );
-        delete_service_windows(service_name).await
+        remove_service_windows(service_name, only_under).await
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = service_name;
-        Ok(())
-    }
-}
-
-pub async fn delete_service_installed_in(service_name: &str, dir: &std::path::Path) -> Result<()> {
-    #[cfg(target_os = "windows")]
-    {
-        if service_missing_timed(service_name).await? {
-            return Ok(());
-        }
-        let name = service_name.to_string();
-        let exe = scm_call_timed(
-            service_name,
-            "config query",
-            SCM_QUERY_TIMEOUT_SECS,
-            move || service_image_exe_path_windows(&name),
-        )
-        .await?
-        .with_context(|| format!("Could not read the image path of service {}", service_name))?;
-        let inside = std::path::PathBuf::from(exe.to_string_lossy().to_lowercase())
-            .starts_with(dir.to_string_lossy().to_lowercase());
-        if !inside {
-            warn!(
-                "Service {} runs {}, outside {}; leaving it in place",
-                service_name,
-                exe.display(),
-                dir.display()
-            );
-            return Ok(());
-        }
-        info!(
-            "Deleting leftover service {} ({})",
-            service_name,
-            exe.display()
-        );
-        delete_service_windows(service_name).await
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = (service_name, dir);
+        let _ = (service_name, only_under);
         Ok(())
     }
 }
@@ -957,10 +901,59 @@ async fn kill_processes_by_exe_path_windows(exe_path: &std::path::Path) -> usize
     killed
 }
 
-/// Mark a wedged service for deletion via the SCM and wait for it to disappear, so a follow-up
+#[cfg(target_os = "windows")]
+async fn remove_service_windows(
+    service_name: &str,
+    only_under: Option<&std::path::Path>,
+) -> Result<()> {
+    if service_missing_timed(service_name).await? {
+        return Ok(());
+    }
+    let name = service_name.to_string();
+    let exe = scm_call_timed(
+        service_name,
+        "config query",
+        SCM_QUERY_TIMEOUT_SECS,
+        move || service_image_exe_path_windows(&name),
+    )
+    .await
+    .ok()
+    .flatten();
+    let exe_label = exe
+        .as_deref()
+        .map_or_else(|| "unknown".to_string(), |p| p.display().to_string());
+    if let Some(dir) = only_under {
+        if !exe
+            .as_deref()
+            .is_some_and(|exe| crate::platform::lock_recovery::path_under(exe, dir))
+        {
+            info!(
+                "Leaving service {} in place: its executable {} is not under {}",
+                service_name,
+                exe_label,
+                dir.display()
+            );
+            return Ok(());
+        }
+    }
+    warn!(
+        "Removing existing service {} (executable {})",
+        service_name, exe_label
+    );
+    if let Err(e) = stop_service_windows(service_name, true).await {
+        warn!(
+            "Failed to stop service {} before delete: {e:#}",
+            service_name
+        );
+    }
+    delete_service_windows(service_name).await
+}
+
+/// Mark a service for deletion via the SCM and wait for it to disappear, so a follow-up
 /// reinstall can recreate it under the same name without hitting `ERROR_SERVICE_MARKED_FOR_DELETE`.
 #[cfg(target_os = "windows")]
 async fn delete_service_windows(service_name: &str) -> Result<()> {
+    use winapi::shared::winerror::ERROR_SERVICE_MARKED_FOR_DELETE;
     use windows_service::service::ServiceAccess;
 
     if service_missing_timed(service_name)
@@ -979,14 +972,28 @@ async fn delete_service_windows(service_name: &str) -> Result<()> {
     // The handle is opened, used, and dropped inside the closure — SCM only finalizes removal
     // once the last open handle is released.
     let name = service_name.to_string();
-    scm_call_timed(
+    match scm_call_timed(
         service_name,
         "delete call",
         SCM_QUERY_TIMEOUT_SECS,
         move || open_service_windows(&name, ServiceAccess::DELETE)?.delete(),
     )
     .await?
-    .with_context(|| format!("open/DeleteService failed for {}", service_name))?;
+    {
+        Ok(()) => {}
+        Err(windows_service::Error::Winapi(e))
+            if e.raw_os_error() == Some(ERROR_SERVICE_MARKED_FOR_DELETE as i32) =>
+        {
+            info!(
+                "Service {} is already marked for deletion; waiting for it to go",
+                service_name
+            );
+        }
+        Err(e) => {
+            return Err(e)
+                .with_context(|| format!("open/DeleteService failed for {}", service_name))
+        }
+    }
 
     let mut query_failures = 0u32;
     for _ in 1..=SERVICE_STOP_MAX_ATTEMPTS {
