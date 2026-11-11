@@ -2,8 +2,10 @@ package com.openframe.stream.handler.rmm;
 
 import tools.jackson.databind.JsonNode;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
-import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
+import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
@@ -12,6 +14,9 @@ import com.openframe.stream.handler.MessageHandler;
 import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import com.openframe.stream.service.rmm.AgentResultReport;
+import com.openframe.stream.service.rmm.ExecutionOutcome;
+import com.openframe.stream.service.rmm.ExecutionOutcomeClassifier;
 import com.openframe.stream.service.rmm.ScheduleScriptExecutionAggregator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,11 +39,13 @@ public class ScriptExecutionHandler implements MessageHandler<DeserializedDebezi
     private static final String FIELD_STDOUT = "stdout";
     private static final String FIELD_STDERR = "stderr";
     private static final String FIELD_ERROR = "error";
+    private static final String FIELD_FAILURE_REASON = "failureReason";
 
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final ScheduleScriptExecutionAggregator scheduleScriptExecutionAggregator;
     private final DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
     private final RmmExecutionMetrics executionMetrics;
+    private final ExecutionOutcomeClassifier outcomeClassifier;
 
     @Override
     public EventHandlerType getType() {
@@ -119,7 +126,7 @@ public class ScriptExecutionHandler implements MessageHandler<DeserializedDebezi
 
     private void applyResult(ScriptExecution row, JsonNode after) {
         ExecutionStatus previous = row.getStatus();
-        if (isTerminal(previous)) {
+        if (isFinal(row)) {
             log.warn("Execution executionId={} is already in terminal status={} — refusing to overwrite", row.getExecutionId(), previous);
             return;
         }
@@ -130,10 +137,14 @@ public class ScriptExecutionHandler implements MessageHandler<DeserializedDebezi
         String stdout = stringOrNull(after, FIELD_STDOUT);
         String stderr = stringOrNull(after, FIELD_STDERR);
         String error = stringOrNull(after, FIELD_ERROR);
+        String agentFailureReason = stringOrNull(after, FIELD_FAILURE_REASON);
 
         Instant now = Instant.now();
-        ExecutionStatus newStatus = decideStatus(exitCode, timedOut, error);
+        ExecutionOutcome outcome = outcomeClassifier.classify(
+                new AgentResultReport(exitCode, timedOut, error, agentFailureReason), isSystemOwned(row));
+        ExecutionStatus newStatus = outcome.status();
         row.setStatus(newStatus);
+        row.setFailureReason(outcome.failureReason());
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
         row.setExitCode(exitCode);
@@ -149,20 +160,23 @@ public class ScriptExecutionHandler implements MessageHandler<DeserializedDebezi
         row.setStderrTruncated(truncStderr.truncated);
 
         scriptExecutionRepository.save(row);
-        executionMetrics.recordScriptCompleted(newStatus, row.getSource(), row.getPackageManager(), row.getDispatchedAt(), now);
-        log.info("Transitioned Execution row: executionId={} status={}→{} exitCode={} timedOut={}",
-                row.getExecutionId(), previous, newStatus, exitCode, timedOut);
+        executionMetrics.recordScriptCompleted(outcome, row.getSource(), row.getPackageManager(), row.getDispatchedAt(), now);
+        log.info("Transitioned Execution row: executionId={} status={}→{} failureReason={} exitCode={} timedOut={}",
+                row.getExecutionId(), previous, newStatus, outcome.failureReason(), exitCode, timedOut);
     }
 
-    private static boolean isTerminal(ExecutionStatus status) {
-        return status == ExecutionStatus.SUCCESS || status == ExecutionStatus.FAILED;
+    private static boolean isFinal(ScriptExecution row) {
+        ExecutionStatus status = row.getStatus();
+        if (status == null || !status.isTerminal()) {
+            return false;
+        }
+        ExecutionFailureReason reason = row.getFailureReason();
+        return status != ExecutionStatus.FAILED || reason == null || !reason.isWatchdogVerdict();
     }
 
-    private static ExecutionStatus decideStatus(Integer exitCode, Boolean timedOut, String error) {
-        boolean failed = Boolean.TRUE.equals(timedOut)
-                || (exitCode != null && exitCode != 0)
-                || (error != null && !error.isBlank());
-        return failed ? ExecutionStatus.FAILED : ExecutionStatus.SUCCESS;
+    private static boolean isSystemOwned(ScriptExecution row) {
+        ExecutionSource source = row.getSource();
+        return (source != null && source.isSystemOwned()) || row.getSoftwareAction() != null;
     }
 
     /**

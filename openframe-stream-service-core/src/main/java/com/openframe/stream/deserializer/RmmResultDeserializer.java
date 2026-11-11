@@ -3,6 +3,7 @@ package com.openframe.stream.deserializer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
+import com.openframe.stream.service.rmm.AgentResultReport;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -36,6 +37,7 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
     private static final String FIELD_EXECUTION_TIME_MS = "executionTimeMs";
     private static final String FIELD_TIMED_OUT = "timedOut";
     private static final String FIELD_ERROR = "error";
+    private static final String FIELD_FAILURE_REASON = "failureReason";
     private static final String FIELD_EVENT_TIMESTAMP = "eventTimestamp";
 
     private static final String DETAILS_OUTPUT = "output";
@@ -43,6 +45,7 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
     private static final String DETAILS_EXECUTION_TIME_MS = "execution_time_ms";
     private static final String DETAILS_TIMED_OUT = "timed_out";
     private static final String DETAILS_ERROR = "error";
+    private static final String DETAILS_FAILURE_REASON = "failure_reason";
 
     protected RmmResultDeserializer(ObjectMapper mapper) {
         super(mapper, List.of(), List.of());
@@ -100,8 +103,21 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
         }
     }
 
-    protected boolean isFailed(JsonNode after) {
-        return hasTimedOut(after) || hasNonZeroExitCode(after) || parseStringField(after, FIELD_ERROR).isPresent();
+    protected AgentResultReport agentReport(JsonNode after) {
+        Integer exitCode = parseStringField(after, FIELD_EXIT_CODE).map(RmmResultDeserializer::intOrNull).orElse(null);
+        return new AgentResultReport(
+                exitCode,
+                hasTimedOut(after),
+                parseStringField(after, FIELD_ERROR).orElse(null),
+                parseStringField(after, FIELD_FAILURE_REASON).orElse(null));
+    }
+
+    private static Integer intOrNull(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private boolean hasTimedOut(JsonNode after) {
@@ -134,6 +150,7 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
             ObjectNode errorNode = mapper.createObjectNode();
             stderr.ifPresent(s -> errorNode.put(DETAILS_OUTPUT, s));
             error.ifPresent(e -> errorNode.put(DETAILS_ERROR, e));
+            parseStringField(after, FIELD_FAILURE_REASON).ifPresent(r -> errorNode.put(DETAILS_FAILURE_REASON, r));
             parseStringField(after, FIELD_EXIT_CODE)
                     .ifPresent(rc -> putIntOrString(errorNode, DETAILS_EXIT_CODE, rc));
             if (timedOut) {

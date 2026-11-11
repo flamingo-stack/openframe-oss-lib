@@ -1,6 +1,7 @@
 package com.openframe.client.listener.packageupdate;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -42,14 +43,15 @@ public class PackageUpdateExecutionRecorder {
                     return;
                 }
                 if (row.getStatus() != ExecutionStatus.RUNNING) {
-                    update(row, ExecutionStatus.RUNNING, null, null, null, null);
+                    update(row, ExecutionStatus.RUNNING, null, null, null, null, null);
                 }
                 row.setWaiting(true);
             }
-            case DONE -> update(row, ExecutionStatus.SUCCESS, now, null, summary(event), null);
+            case DONE -> update(row, ExecutionStatus.SUCCESS, null, now, null, summary(event), null);
             case FAILED -> {
                 Failed failed = event.getFailed();
-                update(row, ExecutionStatus.FAILED, now, exitCode(failed), null, error(failed));
+                update(row, ExecutionStatus.FAILED, ExecutionFailureReason.SYSTEM_SCRIPT_ERROR, now, exitCode(failed), null,
+                        error(failed));
             }
         }
         row.setStatusChangedAt(now);
@@ -62,7 +64,8 @@ public class PackageUpdateExecutionRecorder {
             return;
         }
         Instant now = Instant.now();
-        update(row, ExecutionStatus.FAILED, now, null, null, UNDELIVERED_ERROR + " (" + failure + ")");
+        update(row, ExecutionStatus.FAILED, ExecutionFailureReason.NO_ACK, now, null, null,
+                UNDELIVERED_ERROR + " (" + failure + ")");
         row.setStatusChangedAt(now);
         scriptExecutionRepository.save(row);
     }
@@ -81,9 +84,10 @@ public class PackageUpdateExecutionRecorder {
         return row;
     }
 
-    private static void update(ScriptExecution row, ExecutionStatus status, Instant finishedAt, Integer exitCode,
-                               String stdout, String error) {
+    private static void update(ScriptExecution row, ExecutionStatus status, ExecutionFailureReason failureReason,
+                               Instant finishedAt, Integer exitCode, String stdout, String error) {
         row.setStatus(status);
+        row.setFailureReason(failureReason);
         row.setWaiting(null);
         row.setFinishedAt(finishedAt);
         row.setExitCode(exitCode);

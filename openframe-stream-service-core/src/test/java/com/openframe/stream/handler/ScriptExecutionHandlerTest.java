@@ -6,10 +6,12 @@ import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
-import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
@@ -19,12 +21,15 @@ import com.openframe.stream.handler.rmm.ScriptExecutionHandler;
 import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import com.openframe.stream.service.rmm.ExecutionOutcomeClassifier;
 import com.openframe.stream.service.rmm.ScheduleScriptExecutionAggregator;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -64,7 +69,8 @@ class ScriptExecutionHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new ScriptExecutionHandler(
-                scriptExecutionRepository, scheduleScriptExecutionAggregator, deviceOnlineDispatchRepository, new RmmExecutionMetrics(meterRegistry));
+                scriptExecutionRepository, scheduleScriptExecutionAggregator, deviceOnlineDispatchRepository,
+                new RmmExecutionMetrics(meterRegistry), new ExecutionOutcomeClassifier(true));
     }
 
     @Test
@@ -207,13 +213,14 @@ class ScriptExecutionHandlerTest {
         handler.handle(messageWith(EXECUTION_ID, 1, false, null, 42L, "", "Error: No available formula"), new IntegratedToolEnrichedData());
 
         assertThat(meterRegistry.get(COMPLETED_COUNTER)
-                .tags("kind", "script", "status", "FAILED", "source", "PACKAGE_INSTALLATION", "manager", "BREW")
+                .tags("kind", "script", "status", "FAILED", "source", "PACKAGE_INSTALLATION", "manager", "BREW",
+                        "reason", "SYSTEM_SCRIPT_ERROR")
                 .counter().count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("handle: non-zero exitCode → FAILED")
-    void handle_nonZeroExit_transitionsRowToFailing() {
+    @DisplayName("handle: non-zero exitCode with no failure reason → SCRIPT_ERROR, no reason, counted as SCRIPT_ERROR")
+    void handle_nonZeroExit_transitionsRowToScriptError() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
@@ -222,11 +229,126 @@ class ScriptExecutionHandlerTest {
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SCRIPT_ERROR);
+        assertThat(captor.getValue().getFailureReason()).isNull();
+        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "script", "status", "SCRIPT_ERROR", "reason", "NONE")
+                .counter().count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("handle: timedOut=true → FAILED even with null/zero exitCode")
+    @DisplayName("handle: the agent's failure_reason → FAILED with that reason, even though the exit code is the script's")
+    void handle_agentFailureReason_transitionsRowToFailedWithReason() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWithReason(EXECUTION_ID, 85, "NO_USER_SESSION"), new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getFailureReason()).isEqualTo(ExecutionFailureReason.NO_USER_SESSION);
+        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("status", "FAILED", "reason", "NO_USER_SESSION")
+                .counter().count()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("handle: a failure_reason this backend does not know → FAILED / UNKNOWN, not a dropped result")
+    void handle_unknownAgentFailureReason_transitionsRowToUnknown() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWithReason(EXECUTION_ID, 85, "SOMETHING_NEWER"), new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getFailureReason()).isEqualTo(ExecutionFailureReason.UNKNOWN);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ExecutionFailureReason.class, names = {"NO_ACK", "NO_AGENT_RESULT"})
+    @DisplayName("handle: a real result after a watchdog verdict overrides it and re-aggregates the schedule header")
+    void handle_lateResultAfterWatchdogVerdict_overridesIt(ExecutionFailureReason verdict) {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setScheduleId(SCHEDULE_ID);
+        row.setStatus(ExecutionStatus.FAILED);
+        row.setFailureReason(verdict);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, 42L, "ok\n", ""), new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        assertThat(captor.getValue().getFailureReason()).isNull();
+        verify(scheduleScriptExecutionAggregator).aggregate(TENANT_ID, EXECUTION_ID);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ExecutionFailureReason.class, names = {"NO_ACK", "NO_AGENT_RESULT"}, mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("handle: a FAILED row whose reason is not a watchdog verdict stays final")
+    void handle_failedWithAgentReason_doesNotOverwrite(ExecutionFailureReason reason) {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setStatus(ExecutionStatus.FAILED);
+        row.setFailureReason(reason);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
+
+        verify(scriptExecutionRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ExecutionStatus.class, names = {"SUCCESS", "SCRIPT_ERROR"})
+    @DisplayName("handle: SUCCESS and SCRIPT_ERROR stay final, a duplicate frame does not overwrite them")
+    void handle_settledByAgent_doesNotOverwrite(ExecutionStatus settled) {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setStatus(settled);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, null, null, null, null), new IntegratedToolEnrichedData());
+
+        verify(scriptExecutionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("handle: exit 0 with the agent's output-truncation marker in error → SUCCESS, truncation is not a failure")
+    void handle_truncationMarker_isSuccess() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 0, false, "output truncated: exceeded transport size limit", null, null, null),
+                new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("handle: software row exits non-zero → FAILED / SYSTEM_SCRIPT_ERROR even when its source is not a package one")
+    void handle_softwareActionRow_isSystemOwned() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setSoftwareAction(SoftwareAction.INSTALL);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 2, false, null, null, null, null), new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
+        verify(scriptExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getFailureReason()).isEqualTo(ExecutionFailureReason.SYSTEM_SCRIPT_ERROR);
+    }
+
+    @Test
+    @DisplayName("handle: timedOut=true → FAILED / AGENT_TIMED_OUT even with null/zero exitCode")
     void handle_timedOut_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
@@ -237,21 +359,23 @@ class ScriptExecutionHandlerTest {
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getFailureReason()).isEqualTo(ExecutionFailureReason.AGENT_TIMED_OUT);
         assertThat(captor.getValue().getTimedOut()).isTrue();
     }
 
     @Test
-    @DisplayName("handle: agent-level error set → FAILED (even with exitCode=0)")
-    void handle_agentError_transitionsRowToFailing() {
+    @DisplayName("handle: an agent without failure_reason, exit 85 with a launch error → FAILED / COULD_NOT_LAUNCH, error kept")
+    void handle_legacyLaunchError_transitionsRowToCouldNotLaunch() {
         ScriptExecution row = runningRow(EXECUTION_ID);
         when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
 
-        handler.handle(messageWith(EXECUTION_ID, 0, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
+        handler.handle(messageWith(EXECUTION_ID, 85, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<ScriptExecution> captor = ArgumentCaptor.forClass(ScriptExecution.class);
         verify(scriptExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getFailureReason()).isEqualTo(ExecutionFailureReason.COULD_NOT_LAUNCH);
         assertThat(captor.getValue().getError()).isEqualTo("SHELL_UNAVAILABLE");
     }
 
@@ -479,6 +603,12 @@ class ScriptExecutionHandlerTest {
         DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();
         message.setTenantId(TENANT_ID);
         message.setPayload(payload);
+        return message;
+    }
+
+    private DeserializedDebeziumMessage messageWithReason(String executionId, Integer exitCode, String failureReason) {
+        DeserializedDebeziumMessage message = messageWith(executionId, exitCode, false, null, null, null, null);
+        ((ObjectNode) message.getPayload().getAfter()).put("failureReason", failureReason);
         return message;
     }
 

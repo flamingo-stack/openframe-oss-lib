@@ -16,6 +16,7 @@ import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
+import com.openframe.stream.service.rmm.ExecutionOutcomeClassifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,8 @@ class ScriptResultDeserializerTest {
 
     @BeforeEach
     void setUp() {
-        deserializer = new ScriptResultDeserializer(mapper, scriptExecutionRepository, scriptRepository);
+        deserializer = new ScriptResultDeserializer(mapper, scriptExecutionRepository, scriptRepository,
+                new ExecutionOutcomeClassifier(true));
     }
 
     @Test
@@ -90,9 +92,47 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    void sourceEventType_agentErrorWithoutExitCode_isScriptRunFailed() {
+    void sourceEventType_agentFailureReason_isScriptRunFailed() {
         // setup
-        ObjectNode after = mapper.createObjectNode().put("error", "binary not found");
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 85).put("failureReason", "NO_USER_SESSION");
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FAILED);
+    }
+
+    @Test
+    void sourceEventType_truncatedOutputOfCleanRun_isScriptRunFinished() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 0)
+                .put("error", "output truncated: exceeded transport size limit");
+
+        // execution
+        Optional<String> sourceEventType = deserializer.getSourceEventType(after);
+
+        // verifications
+        assertThat(sourceEventType).contains(SourceEventTypes.Rmm.SCRIPT_RUN_FINISHED);
+    }
+
+    @Test
+    void getError_carriesTheAgentFailureReason() throws Exception {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 98).put("timedOut", true)
+                .put("failureReason", "AGENT_TIMED_OUT");
+
+        // execution
+        String error = deserializer.getError(after);
+
+        // verifications
+        assertThat(mapper.readTree(error).path("failure_reason").asString()).isEqualTo("AGENT_TIMED_OUT");
+    }
+
+    @Test
+    void sourceEventType_legacyLaunchError_isScriptRunFailed() {
+        // setup
+        ObjectNode after = mapper.createObjectNode().put("exitCode", 85).put("error", "binary not found");
 
         // execution
         Optional<String> sourceEventType = deserializer.getSourceEventType(after);

@@ -1,6 +1,7 @@
 package com.openframe.client.listener.packageupdate;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -154,6 +155,7 @@ class PackageUpdateExecutionRecorderTest {
         assertThat(row.getWaiting()).isNull();
         assertThat(row.getFinishedAt()).isNotNull();
         assertThat(row.getError()).isEqualTo("MANAGER_ERROR: winget exited 1");
+        assertThat(row.getFailureReason()).isEqualTo(ExecutionFailureReason.SYSTEM_SCRIPT_ERROR);
         assertThat(row.getExitCode()).isEqualTo(1);
         assertThat(row.getStdout()).isNull();
     }
@@ -188,6 +190,7 @@ class PackageUpdateExecutionRecorderTest {
         verify(scriptExecutionRepository).save(row);
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(row.getError()).isEqualTo("The device did not receive the update (EXHAUSTED)");
+        assertThat(row.getFailureReason()).isEqualTo(ExecutionFailureReason.NO_ACK);
         assertThat(row.getFinishedAt()).isNotNull();
         assertThat(row.getStatusChangedAt()).isNotNull();
         assertThat(row.getExitCode()).isNull();

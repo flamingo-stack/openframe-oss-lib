@@ -69,6 +69,7 @@ public class ScriptExecution implements TenantScoped {
     private String packageUpdateRequestId;
 
     private ExecutionStatus status;
+    private ExecutionFailureReason failureReason;
     private Boolean waiting;
 
     private Instant dispatchedAt;

@@ -50,4 +50,6 @@ public abstract sealed class RmmResultMessage
     private Boolean timedOut;
 
     private String error;
+
+    private String failureReason;
 }

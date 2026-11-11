@@ -9,6 +9,7 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.ScriptExecution;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
@@ -188,6 +189,7 @@ public class ScriptDeliveryRetryService {
 
     private void markDeliveryFailed(ScriptExecution row, Instant now, String error) {
         row.setStatus(ExecutionStatus.FAILED);
+        row.setFailureReason(ExecutionFailureReason.NO_ACK);
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
         row.setError(error);
