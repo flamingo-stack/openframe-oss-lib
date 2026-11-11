@@ -66,6 +66,12 @@ describe('ComposerSheet', () => {
     expect(within(card).getByText('thread')).toBeInTheDocument();
   });
 
+  it('meets a bar above it with flushTop: no top corners, no top border, the rest of the card kept', () => {
+    render(sheet({ flushTop: true, resizable: false }));
+    const card = screen.getByTestId('composer-sheet-card');
+    expect(card).toHaveClass('rounded-md', 'rounded-t-none', 'border', 'border-t-0');
+  });
+
   it('resizes from a tab standing on its top edge, and resets on a double click', () => {
     const onResetHeight = vi.fn();
     render(sheet({ onResetHeight }));

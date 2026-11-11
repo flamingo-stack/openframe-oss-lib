@@ -6,11 +6,16 @@ import { OpenframeTextIcon } from '../icons-v2-generated/logos/openframe-text-ic
 
 export interface NavigationSidebarHeaderProps {
   minimized: boolean;
+  /** The border under the row. Default `border-ods-border`. */
+  borderClassName?: string;
 }
 
-export function NavigationSidebarHeader({ minimized }: NavigationSidebarHeaderProps) {
+export function NavigationSidebarHeader({
+  minimized,
+  borderClassName = 'border-ods-border',
+}: NavigationSidebarHeaderProps) {
   return (
-    <div className="flex h-14 items-center justify-start border-b border-ods-border p-[var(--spacing-system-m)]">
+    <div className={cn('flex h-14 items-center justify-start border-b p-[var(--spacing-system-m)]', borderClassName)}>
       <div className="flex-shrink-0">
         <OpenframeLogoIcon
           secondaryColor="var(--color-accent-primary)"
