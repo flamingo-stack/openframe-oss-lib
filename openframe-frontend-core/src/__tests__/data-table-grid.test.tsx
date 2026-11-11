@@ -345,6 +345,31 @@ describe('DataTable grid layout', () => {
     expect(container.innerHTML).not.toContain('--dtc2-g: 1');
   });
 
+  it('follows the pointer while a handle is dragged and keeps the last position on release', () => {
+    const { container } = render(<Grid />);
+    const handle = screen.getByRole('separator', { name: 'Resize Owner column' });
+    fireEvent.pointerDown(handle, { button: 0, clientX: 500, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 520, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 540, pointerId: 1 });
+    fireEvent.pointerUp(handle, { pointerId: 1 });
+    // 200 + 40: the moves of one frame are one write, and the release writes what is pending.
+    expect(columnWidth(container, 2)).toBe(240);
+  });
+
+  it('ends a drag whose pointer capture is lost, with no release to follow', () => {
+    const { container } = render(<Grid />);
+    const handle = screen.getByRole('separator', { name: 'Resize Owner column' });
+    fireEvent.pointerDown(handle, { button: 0, clientX: 500, pointerId: 1 });
+    fireEvent.pointerMove(handle, { clientX: 540, pointerId: 1 });
+    fireEvent.lostPointerCapture(handle, { pointerId: 1 });
+    expect(container.innerHTML).not.toContain('--dtc2-g: 1');
+    expect(columnWidth(container, 2)).toBe(240);
+    // The drag is over: the pointer no longer moves the column.
+    fireEvent.pointerMove(handle, { clientX: 700, pointerId: 1 });
+    fireEvent.pointerUp(handle, { pointerId: 1 });
+    expect(columnWidth(container, 2)).toBe(240);
+  });
+
   it('shows an applied sort on the header: primary label, direction arrow', () => {
     const { container } = render(<Grid />);
     const label = () => screen.getByText('Name');

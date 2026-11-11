@@ -6,7 +6,9 @@ import {
   DataTable,
   gridPrefsStorageKey,
   selectionColumn,
+  multiSelectFilterFn,
   type ColumnDef,
+  type ColumnFiltersState,
   type DataTableSettings,
 } from '../components/ui/data-table';
 import {
@@ -339,6 +341,70 @@ describe('<DataTable layout="grid" settings>', () => {
       'true',
     );
     expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('resets the filter of a column it hides, and no other filter', () => {
+    const FILTER_COLUMNS: ColumnDef<Item>[] = [
+      { id: 'name', accessorKey: 'name', header: 'Name', size: 280 },
+      {
+        id: 'owner',
+        accessorKey: 'owner',
+        header: 'Owner',
+        size: 200,
+        // Typed for an erased row; the lib's own tables hand it to a typed column the same way.
+        filterFn: multiSelectFilterFn as unknown as ColumnDef<Item>['filterFn'],
+        meta: { filter: { options: [{ id: 'Ada', label: 'Ada', value: 'Ada' }] } },
+      },
+      { id: 'city', accessorKey: 'city', header: 'City', size: 160 },
+    ];
+    function FilteredGrid() {
+      const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([{ id: 'owner', value: ['Ada'] }]);
+      const table = useDataTable<Item>({
+        data: ITEMS,
+        columns: FILTER_COLUMNS,
+        getRowId: item => item.id,
+        clientSideFiltering: true,
+        state: { columnFilters },
+        onColumnFiltersChange: setColumnFilters,
+      });
+      return (
+        <DataTable table={table} layout="grid" settings={{}}>
+          <DataTable.Header />
+          <DataTable.Body<Item> />
+        </DataTable>
+      );
+    }
+    const { container } = render(<FilteredGrid />);
+    // Filtered to Ada's row: Beta (Bob's) is not in the table.
+    expect(gridBodyMarkup(container)).not.toContain('Beta');
+    openMenu();
+    // Another column goes: the Owner filter stays.
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'City' }));
+    expect(gridBodyMarkup(container)).not.toContain('Beta');
+    // The filtered column goes: nothing on screen would show its filter, so the filter goes with it.
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Owner' }));
+    expect(gridBodyMarkup(container)).toContain('Beta');
+  });
+
+  it('does not render the header again for a resize: only the root restates the widths', () => {
+    const renders = { name: 0 };
+    const COUNTED: ColumnDef<Item>[] = [
+      {
+        id: 'name',
+        accessorKey: 'name',
+        size: 280,
+        header: () => {
+          renders.name += 1;
+          return 'Name';
+        },
+      },
+      { id: 'owner', accessorKey: 'owner', header: 'Owner', size: 200 },
+    ];
+    const { container } = render(<Grid settings={{}} columns={COUNTED} />);
+    const before = renders.name;
+    fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize Owner column' }), { key: 'ArrowRight' });
+    expect(container.innerHTML).toContain('--dtc1-w: 216px');
+    expect(renders.name).toBe(before);
   });
 
   it('gives the gear a column of its own when the table has no action column', () => {

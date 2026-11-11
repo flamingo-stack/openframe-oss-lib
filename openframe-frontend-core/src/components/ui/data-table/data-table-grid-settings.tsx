@@ -78,8 +78,9 @@ const keepOpen = (event: Event) => event.preventDefault();
 
 /**
  * The settings menu (the design's `table/settings-menu`): auto-refresh when the page offers it, then the columns the
- * table shows, in order, then the columns the viewer hid. A row switches its column on or off; a shown column moves
- * by its dragger, or with Alt + Arrow Up / Down. Selection and action columns are not listed: they are always there.
+ * table shows, in order, then the columns the viewer hid. A row switches its column on or off (hiding a column also
+ * resets its filter); a shown column moves by its dragger, or with Alt + Arrow Up / Down. Selection and action columns
+ * are not listed: they are always there.
  */
 function GridSettingsMenu() {
   const table = useDataTableContext();
@@ -119,6 +120,10 @@ function GridSettingsMenu() {
     // The last shown column stays: a table needs one.
     if (shown.length <= 1) return;
     refocusRef.current = id;
+    // A hidden column does not go on filtering: its header, the one place that shows and resets its filter, is gone
+    // with it, and the list would stay narrowed with nothing on screen to say why.
+    const column = table.getColumn(id);
+    if (column?.getIsFiltered()) column.setFilterValue(undefined);
     store.update(current => ({
       ...current,
       order: ordered,

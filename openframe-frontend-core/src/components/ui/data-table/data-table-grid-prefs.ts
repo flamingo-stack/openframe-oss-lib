@@ -140,13 +140,31 @@ export function useGridPrefs(): GridColumnPrefs {
 }
 
 /**
+ * One part of the table's column layout, live. A component reads the part it draws and renders for no other change:
+ * the header and the body read the order and the hidden columns, so a resize (a new `sizing` on every step of a drag)
+ * renders neither.
+ */
+export function useGridPref<S>(select: (prefs: GridColumnPrefs) => S): S {
+  const { store } = useContext(GridPrefsContext);
+  return useSyncExternalStore(
+    store.subscribe,
+    () => select(store.get()),
+    () => select(store.getServer()),
+  );
+}
+
+const selectOrder = (prefs: GridColumnPrefs) => prefs.order;
+const selectHidden = (prefs: GridColumnPrefs) => prefs.hidden;
+
+/**
  * The grid's columns as the header and the rows draw them: the table's visible columns with the viewer's order and
  * hidden columns applied. Widths are not part of it (every cell reads its width from the root's CSS variables), so a
  * resize builds no new structure and renders no row.
  */
 export function useGridStructure<T>(visibleColumns: Column<T, unknown>[]): GridLayout {
   const { settingsEnabled } = useContext(GridPrefsContext);
-  const { order, hidden } = useGridPrefs();
+  const order = useGridPref(selectOrder);
+  const hidden = useGridPref(selectHidden);
   return useMemo(
     () => buildGridLayout(visibleColumns, { order, hidden, settings: settingsEnabled }),
     [visibleColumns, order, hidden, settingsEnabled],

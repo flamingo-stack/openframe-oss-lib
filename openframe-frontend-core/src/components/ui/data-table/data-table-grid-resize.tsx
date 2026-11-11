@@ -6,7 +6,7 @@ import { useContext, useSyncExternalStore } from 'react';
 import { cn } from '../../../utils/cn';
 import { PanelResizeGrip } from '../panel-resize-handle';
 import { useGridScroll, type GridColumn } from './data-table-grid';
-import { GridPrefsContext, useGridPrefs } from './data-table-grid-prefs';
+import { GridPrefsContext, useGridPref } from './data-table-grid-prefs';
 
 /**
  * The narrowest a grid column may be, by what its cells hold (the design's "min width rules"): about nine characters
@@ -23,6 +23,9 @@ const PINNED_MAX_SHARE = 0.4;
 const KEY_STEP = 16;
 /** How many loaded rows an auto-fit measures. */
 const AUTO_FIT_ROWS = 200;
+
+/** What ends a resize drag. */
+const DRAG_END_EVENTS = ['pointerup', 'pointercancel', 'lostpointercapture'] as const;
 
 const getNoColumn = () => null;
 
@@ -95,8 +98,8 @@ function widestContent(gridColumn: GridColumn, headerCell: HTMLElement): number 
 
 /**
  * The handle on a header cell's right edge that resizes its column (the design's `resize-handle`): shown on header
- * hover, accent while dragging. A drag changes this column only: the free width goes to the last data column, and a table wider
- * than its viewport scrolls. A double click fits the column to its widest content; the arrow keys move the edge.
+ * hover, accent while dragging. A drag changes this column only: the free width goes to the last data column, and a
+ * table wider than its viewport scrolls. A double click fits the column to its widest content; the arrow keys move the edge.
  */
 export function GridResizeHandle({
   column,
@@ -108,7 +111,8 @@ export function GridResizeHandle({
   label: string;
 }) {
   const { store } = useContext(GridPrefsContext);
-  const size = useGridPrefs().sizing[gridColumn.id] ?? column.getSize();
+  // This column's width only: a drag on another column does not render this handle.
+  const size = useGridPref(prefs => prefs.sizing[gridColumn.id]) ?? column.getSize();
   const { controller } = useGridScroll();
   const resizing =
     useSyncExternalStore(controller.resizing.subscribe, controller.resizing.get, getNoColumn) === gridColumn.id;
@@ -143,17 +147,36 @@ export function GridResizeHandle({
     }
     controller.resizing.set(gridColumn.id);
 
-    const onMove = (move: PointerEvent) => setSize(clamp(startSize + move.clientX - startX, limits), false);
+    // One write per frame, however many moves the pointer reports in it: the last position wins.
+    const view = handle.ownerDocument.defaultView;
+    let pending: number | null = null;
+    let frame = 0;
+    const flush = () => {
+      frame = 0;
+      if (pending === null) return;
+      setSize(pending, false);
+      pending = null;
+    };
+    const onMove = (move: PointerEvent) => {
+      pending = clamp(startSize + move.clientX - startX, limits);
+      if (!view) flush();
+      else if (!frame) frame = view.requestAnimationFrame(flush);
+    };
+    // The drag ends once, whichever way: the button is released, the pointer is cancelled, or the capture is lost
+    // (the browser took the pointer for a gesture, the handle left the page) with no `pointerup` to follow.
+    let ended = false;
     const onEnd = () => {
+      if (ended) return;
+      ended = true;
+      if (frame) view?.cancelAnimationFrame(frame);
+      flush();
       controller.resizing.set(null);
       store.persist();
       handle.removeEventListener('pointermove', onMove);
-      handle.removeEventListener('pointerup', onEnd);
-      handle.removeEventListener('pointercancel', onEnd);
+      for (const type of DRAG_END_EVENTS) handle.removeEventListener(type, onEnd);
     };
     handle.addEventListener('pointermove', onMove);
-    handle.addEventListener('pointerup', onEnd);
-    handle.addEventListener('pointercancel', onEnd);
+    for (const type of DRAG_END_EVENTS) handle.addEventListener(type, onEnd);
   };
 
   const onDoubleClick = (event: React.MouseEvent<HTMLSpanElement>) => {
