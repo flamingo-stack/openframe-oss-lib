@@ -45,7 +45,7 @@ import Image from '../../embed-shims/next-image';
 import { useNearViewport } from '../../hooks/use-near-viewport';
 import { IMAGE_SLOT } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
-import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { youtubePosterUrl } from '../../utils/youtube-poster';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { useLoadingScope } from '../ui/loading-scope';
@@ -101,6 +101,16 @@ function subscribeToFilePlayer(listener: () => void): () => void {
 const loadedFilePlayer = () => filePlayer;
 const noFilePlayer = () => null;
 
+/** The poster a YouTube video has before its player is drawn, so the box is never empty and the page's HTML carries it. */
+function youtubeIdPoster(kind: string, url: string): string | undefined {
+  if (kind !== 'youtube') return undefined;
+  const id = extractYouTubeId(url);
+  return id ? youtubePosterUrl(id) : undefined;
+}
+
+/** A YouTube video's box is 16:9 whatever its layout: the facade draws it so, and the box before it is the same. */
+const YT_BOX_STYLE = { paddingBottom: '56.25%' } as const;
+
 /**
  * The video's box with its poster in it, until the player is drawn. The poster is a real image, not a CSS background:
  * a background is found only after layout and is never ranked, so on a page whose video is the largest thing painted
@@ -108,14 +118,15 @@ const noFilePlayer = () => null;
  */
 const PosterBox = forwardRef<
   HTMLDivElement,
-  { poster?: string | null; className?: string; priority?: boolean; fill?: boolean }
->(function PosterBoxView({ poster, className, priority, fill }, ref) {
+  { poster?: string | null; className?: string; priority?: boolean; fill?: boolean; youtube?: boolean }
+>(function PosterBoxView({ poster, className, priority, fill, youtube }, ref) {
   return (
     <div
       ref={ref}
       aria-hidden="true"
-      className={cn('relative overflow-hidden', className)}
-      style={fill ? { width: '100%', height: '100%' } : undefined}
+      // A YouTube video's box is the facade's own (`relative w-full` + 16:9), so nothing moves when the player is drawn.
+      className={cn('relative overflow-hidden', youtube && 'w-full', className)}
+      style={fill ? { width: '100%', height: '100%' } : youtube ? YT_BOX_STYLE : undefined}
     >
       {poster ? (
         <Image
@@ -248,7 +259,8 @@ export function Video(props: VideoProps): React.ReactElement | null {
     return wrapWithLayout(
       <PosterBox
         ref={nearRef}
-        poster={props.poster}
+        poster={props.poster || youtubeIdPoster(effectiveKind, url)}
+        youtube={effectiveKind === 'youtube'}
         className={props.className}
         priority={'priority' in props ? props.priority : undefined}
       />,
@@ -459,15 +471,6 @@ interface YouTubeFacadeInnerProps extends VideoYouTubeFacadeProps {
 
 const YT_NOCOOKIE_ORIGIN = 'https://www.youtube-nocookie.com';
 
-// Poster thumbnail tiers, best → always-present. YouTube serves each size at a
-// fixed path on i.ytimg.com. `maxresdefault` is 1280×720 (crisp) but is only
-// generated for uploads whose source was ≥720p, so it can 404; `mqdefault` is
-// 320×180 and ALWAYS exists. BOTH are 16:9 — unlike the letterboxed 4:3 `hq`/`sd`
-// sizes — so an `object-cover` frame never shows black bars regardless of tier.
-// The facade starts at `maxresdefault` and drops to `mqdefault` on load error,
-// so low-res-only videos render exactly as they did before this change.
-const YT_POSTER_TIERS = ['maxresdefault', 'mqdefault'] as const;
-
 // YouTube IFrame Player API state codes — documented integers.
 // https://developers.google.com/youtube/iframe_api_reference#Playback_status
 const YT_STATE_ENDED = 0;
@@ -588,25 +591,8 @@ function YouTubeFacadeInner({
     return `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`;
   }, [videoId, minimalControls, muted]);
 
-  // Poster starts at the highest tier and steps down on load error (see
-  // `YT_POSTER_TIERS`). Reset to the top tier whenever the video changes so a
-  // new id gets a fresh shot at its `maxresdefault`.
-  // Adjusted while rendering — React's documented pattern for a prop-driven
-  // reset — rather than from an effect: `posterJpg`/`posterWebp` are built from
-  // the tier two lines below, so an effect made the new video's first paint
-  // request the PREVIOUS video's degraded tier and only then step back up.
-  const [posterTier, setPosterTier] = useState(0);
-  const [posterTierFor, setPosterTierFor] = useState(videoId);
-  if (posterTierFor !== videoId) {
-    setPosterTierFor(videoId);
-    setPosterTier(0);
-  }
-  const posterQuality = YT_POSTER_TIERS[posterTier];
-  const posterJpg = `https://i.ytimg.com/vi/${videoId}/${posterQuality}.jpg`;
-  const posterWebp = `https://i.ytimg.com/vi_webp/${videoId}/${posterQuality}.webp`;
-  // On a 404 (e.g. no `maxresdefault`) drop one tier; clamp at the last so a
-  // genuinely missing thumbnail can't loop.
-  const handlePosterError = () => setPosterTier(tier => Math.min(tier + 1, YT_POSTER_TIERS.length - 1));
+  // YouTube's own poster is the one size every public video has (`youtubePosterUrl`): never a guess that can 404.
+  const youtubePoster = youtubePosterUrl(videoId);
   // The page's own poster that fails to load gives way to YouTube's thumbnail; a new poster gets its own try.
   const [failedPoster, setFailedPoster] = useState<string | null>(null);
   const ownPoster = poster && poster !== failedPoster ? poster : null;
@@ -716,7 +702,7 @@ function YouTubeFacadeInner({
   }, [suspended, activated]);
 
   const wrapperClass = `relative w-full ${className ?? ''}`;
-  const wrapperStyle = { paddingBottom: '56.25%' as const };
+  const wrapperStyle = YT_BOX_STYLE;
 
   if (activated && failed) {
     return (
@@ -762,38 +748,18 @@ function YouTubeFacadeInner({
         }}
         className="group absolute inset-0 h-full overflow-hidden"
       >
-        {ownPoster ? (
-          <Image
-            src={ownPoster}
-            alt={title}
-            fill
-            sizes={IMAGE_SLOT.full}
-            priority={priority}
-            unoptimized
-            onError={() => setFailedPoster(ownPoster)}
-            className="object-cover"
-          />
-        ) : (
-          <picture>
-            <source type="image/webp" srcSet={posterWebp} />
-            <img
-              src={posterJpg}
-              alt={title}
-              // A YouTube poster is 16:9; the attributes state the ratio before it arrives (the box sizes it).
-              width={1280}
-              height={720}
-              loading="lazy"
-              onError={handlePosterError}
-              // React 18 wants lowercase (`fetchpriority` DOM attribute);
-              // React 19 wants camelCase (`fetchPriority` prop). Detect at
-              // module load and spread the right shape so both runtimes
-              // render the DOM attribute cleanly with no console warnings.
-              {...fetchPriorityProp(priority)}
-              decoding={priority ? 'sync' : 'async'}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-          </picture>
-        )}
+        {/* The page's own poster, else YouTube's (`youtubePosterUrl`, a size every public video has; 4:3 with the
+            16:9 frame letterboxed inside, which `object-cover` crops away exactly in this 16:9 box). */}
+        <Image
+          src={ownPoster ?? youtubePoster}
+          alt={title}
+          fill
+          sizes={IMAGE_SLOT.full}
+          priority={priority}
+          unoptimized
+          onError={ownPoster ? () => setFailedPoster(ownPoster) : undefined}
+          className="object-cover"
+        />
         <div className="absolute inset-0 flex items-center justify-center bg-ods-bg bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
           {/* THE shared center play badge (video-center-badge.tsx) — same disc
               as strip cards / carousel thumbs / unmute chip; hero size + the
