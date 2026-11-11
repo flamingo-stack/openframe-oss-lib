@@ -465,9 +465,10 @@ export function useGridControllerElements(controller: GridScrollController) {
 }
 
 /**
- * A 40px fade into the rows' fill on one edge of the scroll viewport, shown only while there is more content behind
- * that edge. A horizontal one starts at the pinned block's edge (`offset`), never over a pinned column; render it in
- * the `relative` box around the viewport.
+ * A 40px shade on one edge of the scroll viewport, shown only while there is more content behind that edge: the
+ * design's `scroll-gradient`, as the table spec places it (bg-color `openframe`, the page's colour, darker than the
+ * header and the rows it lies on). A horizontal one starts at the pinned block's edge (`offset`), never over a pinned
+ * column; render it in the `relative` box around the viewport.
  */
 export function GridGradient({
   edge,
@@ -494,7 +495,7 @@ export function GridGradient({
         visible ? 'opacity-100' : 'opacity-0',
       )}
       style={{
-        background: `linear-gradient(${angle}, transparent 0%, var(--color-bg-card) 100%)`,
+        background: `linear-gradient(${angle}, transparent 0%, var(--color-bg) 100%)`,
         ...(edge === 'left' ? { left: offset } : {}),
         ...(edge === 'right' ? { right: offset } : {}),
         ...(edge === 'top' ? { top } : {}),

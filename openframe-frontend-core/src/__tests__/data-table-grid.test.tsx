@@ -104,6 +104,13 @@ function gradientEdges(container: HTMLElement): string[] {
   return [...container.innerHTML.matchAll(/data-grid-gradient="(\w+)"/g)].map(match => match[1] ?? '');
 }
 
+/** Each gradient's inline style, in document order. */
+function gradientStyles(container: HTMLElement): string[] {
+  return [...container.innerHTML.matchAll(/data-grid-gradient="\w+"[^>]*style="([^"]*)"/g)].map(
+    match => match[1] ?? '',
+  );
+}
+
 /** Every checkbox of the table's rows, in document order: the card form's rows first, then the grid form's. */
 function gridRowCheckbox(index: number, rowCount = ITEMS.length): HTMLElement {
   const all = screen.getAllByRole('checkbox', { name: 'Select row' });
@@ -248,6 +255,10 @@ describe('DataTable grid layout', () => {
     expect(openingTag(container, 'data-grid-header')).toContain('sticky top-0');
     // Four gradients, one per edge, around the one viewport.
     expect(gradientEdges(container)).toEqual(['left', 'right', 'top', 'bottom']);
+    // Each is the design's shade: into the page's colour, darker than the rows, never into the rows' own fill.
+    const shades = gradientStyles(container);
+    expect(shades).toHaveLength(4);
+    expect(shades.every(shade => shade.includes('var(--color-bg) 100%'))).toBe(true);
   });
 
   it('draws loading rows as grid rows: one bar per data cell, none in the utility cells', () => {
