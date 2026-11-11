@@ -41,6 +41,7 @@ import {
   useSyncExternalStore,
   type ComponentType,
 } from 'react';
+import { useEndpointsRuntime } from '../../contexts/endpoints-runtime-context';
 import Image from '../../embed-shims/next-image';
 import { useNearViewport } from '../../hooks/use-near-viewport';
 import { IMAGE_SLOT } from '../../styles/image-sizes';
@@ -101,11 +102,19 @@ function subscribeToFilePlayer(listener: () => void): () => void {
 const loadedFilePlayer = () => filePlayer;
 const noFilePlayer = () => null;
 
+/**
+ * A YouTube video's poster: the host's resolver when it names one (`youtubePosterBaseUrl`, the sharpest size the
+ * video really has), else `hqdefault` (`youtubePosterUrl`), the size every public video has. Never a guessed size.
+ */
+function youtubePosterFor(videoId: string, resolverBase: string | undefined): string {
+  return resolverBase ? `${resolverBase.replace(/\/$/, '')}/${encodeURIComponent(videoId)}` : youtubePosterUrl(videoId);
+}
+
 /** The poster a YouTube video has before its player is drawn, so the box is never empty and the page's HTML carries it. */
-function youtubeIdPoster(kind: string, url: string): string | undefined {
+function youtubeIdPoster(kind: string, url: string, resolverBase: string | undefined): string | undefined {
   if (kind !== 'youtube') return undefined;
   const id = extractYouTubeId(url);
-  return id ? youtubePosterUrl(id) : undefined;
+  return id ? youtubePosterFor(id, resolverBase) : undefined;
 }
 
 /** A YouTube video's box is 16:9 whatever its layout: the facade draws it so, and the box before it is the same. */
@@ -242,6 +251,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
   // Hooks run unconditionally; the gate only applies when `lazy` is set.
   const { ref: nearRef, isNear } = useNearViewport<HTMLDivElement>();
   const loading = useLoadingScope();
+  const youtubePosterBase = useEndpointsRuntime()?.youtubePosterBaseUrl;
   const url = props.url;
   const layout = props.layout ?? 'native';
   // ONE switch: in a loading scope with no url yet (it is read) the video is its skeleton and no player is mounted;
@@ -259,7 +269,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
     return wrapWithLayout(
       <PosterBox
         ref={nearRef}
-        poster={props.poster || youtubeIdPoster(effectiveKind, url)}
+        poster={props.poster || youtubeIdPoster(effectiveKind, url, youtubePosterBase)}
         youtube={effectiveKind === 'youtube'}
         className={props.className}
         priority={'priority' in props ? props.priority : undefined}
@@ -591,11 +601,23 @@ function YouTubeFacadeInner({
     return `${YT_NOCOOKIE_ORIGIN}/embed/${videoId}?${params.toString()}`;
   }, [videoId, minimalControls, muted]);
 
-  // YouTube's own poster is the one size every public video has (`youtubePosterUrl`): never a guess that can 404.
-  const youtubePoster = youtubePosterUrl(videoId);
-  // The page's own poster that fails to load gives way to YouTube's thumbnail; a new poster gets its own try.
-  const [failedPoster, setFailedPoster] = useState<string | null>(null);
-  const ownPoster = poster && poster !== failedPoster ? poster : null;
+  // The posters to try, in order: the page's own, the host's resolver (the sharpest size the video has), and
+  // `hqdefault`, which every public video has. One that fails to load gives way to the next; never a guessed size.
+  const youtubePosterBase = useEndpointsRuntime()?.youtubePosterBaseUrl;
+  const posterCandidates = useMemo(
+    () =>
+      [
+        ...new Set([poster, youtubePosterFor(videoId, youtubePosterBase), youtubePosterUrl(videoId)].filter(Boolean)),
+      ] as string[],
+    [poster, videoId, youtubePosterBase],
+  );
+  const [failedPosters, setFailedPosters] = useState<readonly string[]>([]);
+  const posterIndex = Math.max(
+    0,
+    posterCandidates.findIndex(c => !failedPosters.includes(c)),
+  );
+  const shownPoster = posterCandidates[posterIndex];
+  const hasNextPoster = posterIndex < posterCandidates.length - 1;
 
   // ---------------------------------------------------------------------------
   // YouTube control-fade accelerator (user-locked target: ~1s).
@@ -748,16 +770,16 @@ function YouTubeFacadeInner({
         }}
         className="group absolute inset-0 h-full overflow-hidden"
       >
-        {/* The page's own poster, else YouTube's (`youtubePosterUrl`, a size every public video has; 4:3 with the
-            16:9 frame letterboxed inside, which `object-cover` crops away exactly in this 16:9 box). */}
+        {/* The first poster that loads (`posterCandidates`). `object-cover` fills this 16:9 box with any of them,
+            and crops `hqdefault`'s letterbox bars (4:3 with the 16:9 frame inside) away exactly. */}
         <Image
-          src={ownPoster ?? youtubePoster}
+          src={shownPoster}
           alt={title}
           fill
           sizes={IMAGE_SLOT.full}
           priority={priority}
           unoptimized
-          onError={ownPoster ? () => setFailedPoster(ownPoster) : undefined}
+          onError={hasNextPoster ? () => setFailedPosters(tried => [...tried, shownPoster]) : undefined}
           className="object-cover"
         />
         <div className="absolute inset-0 flex items-center justify-center bg-ods-bg bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">

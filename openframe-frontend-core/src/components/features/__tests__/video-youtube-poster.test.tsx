@@ -3,7 +3,7 @@
  * size that can 404 (`maxresdefault`, `sddefault`) and never a WebP copy, which some videos lack at every size.
  * It is drawn before the player is (the page's server HTML carries it) and by the player itself.
  */
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { forwardRef } from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,6 +14,7 @@ vi.mock('@mux/mux-player-react', () => {
   return { default: Fake };
 });
 
+import { EndpointsRuntimeContext, type EndpointsRuntime } from '../../../contexts/endpoints-runtime-context';
 import { youtubePosterUrl } from '../../../utils/youtube-poster';
 import { Video } from '../video';
 
@@ -53,5 +54,26 @@ describe('Video — YouTube poster', () => {
     const { container } = render(<Video kind="youtube" url={ID} title="Demo" poster={own} lazy={false} />);
     expect(imageSources(container.innerHTML)).toContain(own);
     expect(container.innerHTML).not.toContain('i.ytimg.com');
+  });
+
+  describe("with the host's poster resolver", () => {
+    const RESOLVER = '/api/youtube-poster';
+    const runtime = { youtubePosterBaseUrl: RESOLVER } as EndpointsRuntime;
+    const withResolver = (node: React.ReactElement) => (
+      <EndpointsRuntimeContext.Provider value={runtime}>{node}</EndpointsRuntimeContext.Provider>
+    );
+
+    it('the server HTML and the player draw the resolver, which knows the sharpest size the video has', () => {
+      const html = renderToString(withResolver(<Video kind="youtube" url={ID} />));
+      expect(imageSources(html)).toContain(`${RESOLVER}/${ID}`);
+      const { container } = render(withResolver(<Video kind="youtube" url={ID} title="Demo" lazy={false} />));
+      expect(imageSources(container.innerHTML)).toContain(`${RESOLVER}/${ID}`);
+    });
+
+    it('a resolver that fails gives way to hqdefault, which every public video has', () => {
+      render(withResolver(<Video kind="youtube" url={ID} title="Demo" lazy={false} />));
+      fireEvent.error(screen.getByAltText('Demo'));
+      expect(screen.getByAltText('Demo').getAttribute('src')).toBe(POSTER);
+    });
   });
 });
