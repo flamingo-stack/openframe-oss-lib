@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { ContentAreaWidthContext, contentBreakpointFor } from '../../hooks/ui/use-content-breakpoint';
+import { ContentAreaWidthContext, contentStepFor } from '../../hooks/ui/use-content-breakpoint';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import type { NavigationSidebarConfig } from '../../types/navigation';
 import { cn } from '../../utils';
@@ -203,14 +203,14 @@ export function AppLayout({
 
   useIsomorphicLayoutEffect(() => {
     if (!adaptive || !mainElement) return undefined;
-    // Every reader asks for the breakpoint (`useContentBreakpoint`), so only a
-    // crossing re-renders the layout: kept at the old width, the state bails out.
+    // Every reader asks for a step (`useContentBreakpoint`, `useContentXlUp`), so
+    // only a crossing re-renders the layout: kept at the old width, the state bails out.
     // Per pixel, the uncompiled layout and every breakpoint consumer re-rendered on
     // each frame of a sidebar toggle, a window drag or a side-panel resize.
     const update = () => {
       const width = mainElement.clientWidth;
       setContentWidth(previous =>
-        previous !== null && contentBreakpointFor(previous) === contentBreakpointFor(width) ? previous : width,
+        previous !== null && contentStepFor(previous) === contentStepFor(width) ? previous : width,
       );
     };
     update();

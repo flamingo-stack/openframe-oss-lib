@@ -35,11 +35,13 @@ import java.util.concurrent.CompletableFuture;
 
 import static com.openframe.api.dto.device.DeviceFilterFacet.CONNECTIVITY;
 import static com.openframe.api.dto.device.DeviceFilterFacet.DEVICE_TYPES;
+import static com.openframe.api.dto.device.DeviceFilterFacet.DIRECTORY_SOURCES;
 import static com.openframe.api.dto.device.DeviceFilterFacet.FILTERED_COUNT;
 import static com.openframe.api.dto.device.DeviceFilterFacet.ORGANIZATION_IDS;
 import static com.openframe.api.dto.device.DeviceFilterFacet.OS_TYPES;
 import static com.openframe.api.dto.device.DeviceFilterFacet.STATUSES;
 import static com.openframe.api.dto.device.DeviceFilterFacet.TAG_KEYS;
+import static com.openframe.api.dto.device.DeviceFilterFacet.USER_LINKS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -68,6 +70,8 @@ class DeviceFiltersSelectionSetTest {
                 osTypes: [DeviceFilterOption]
                 organizationIds: [DeviceFilterOption]
                 tagKeys: [TagFilterOption]
+                directorySources: [DeviceFilterOption]
+                userLinks: [DeviceFilterOption]
                 filteredCount: Int
             }
             type DeviceFilterOption { value: String label: String count: Int }
@@ -142,9 +146,19 @@ class DeviceFiltersSelectionSetTest {
                     osTypes { value count }
                     organizationIds { value count }
                     tagKeys { key value count }
+                    directorySources { value count }
+                    userLinks { value count }
                     filteredCount
                 } }"""))
-                .containsExactlyInAnyOrder(STATUSES, CONNECTIVITY, DEVICE_TYPES, OS_TYPES, ORGANIZATION_IDS, TAG_KEYS, FILTERED_COUNT);
+                .containsExactlyInAnyOrder(STATUSES, CONNECTIVITY, DEVICE_TYPES, OS_TYPES, ORGANIZATION_IDS, TAG_KEYS,
+                        DIRECTORY_SOURCES, USER_LINKS, FILTERED_COUNT);
+    }
+
+    @Test
+    void directoryColumnsSelection_narrowsToTheirTwoFacets() {
+        // The SOURCES and USER filters of the devices list ask for these two alone
+        assertThat(facetsFor("{ deviceFilters { directorySources { value count } userLinks { value count } } }"))
+                .containsExactlyInAnyOrder(DIRECTORY_SOURCES, USER_LINKS);
     }
 
     @Test

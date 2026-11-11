@@ -5,14 +5,19 @@ import com.openframe.api.dto.rmm.software.SoftwareType;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
+import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.Software;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -21,17 +26,30 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @RequiredArgsConstructor
 public class DeviceSoftwareReadModelQuery {
 
+    private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareRepository softwareRepository;
 
     public List<SoftwareResponse> rowsForDevice(String tenantId, String machineId, String search) {
-        return softwareRepository.findByTenantIdAndInstallationsMachineId(tenantId, machineId).stream()
-                .map(sw -> toResponse(sw, machineId))
+        List<DeviceSoftware> installed = deviceSoftwareRepository.findByTenantIdAndMachineId(tenantId, machineId).stream()
+                .filter(DeviceSoftware::isMachineConnected)
+                .filter(row -> row.getSoftwareTitleId() != null)
+                .toList();
+        if (installed.isEmpty()) {
+            return List.of();
+        }
+        List<Long> titleIds = installed.stream().map(DeviceSoftware::getSoftwareTitleId).distinct().toList();
+        Map<Long, Software> softwareByTitle = softwareRepository.findByTenantIdAndSoftwareTitleIdIn(tenantId, titleIds)
+                .stream()
+                .collect(Collectors.toMap(Software::getSoftwareTitleId, Function.identity(), (a, b) -> a));
+        return installed.stream()
+                .filter(row -> softwareByTitle.containsKey(row.getSoftwareTitleId()))
+                .map(row -> toResponse(softwareByTitle.get(row.getSoftwareTitleId()), row))
                 .filter(row -> matchesSearch(row, search))
                 .toList();
     }
 
-    private static SoftwareResponse toResponse(Software sw, String machineId) {
-        List<String> versions = versionsOnDevice(sw, machineId);
+    private static SoftwareResponse toResponse(Software sw, DeviceSoftware installed) {
+        List<String> versions = versionsOnDevice(installed);
         String currentVersion = versions.isEmpty() ? null : versions.getFirst();
         Long titleId = sw.getSoftwareTitleId();
         String id = titleId == null ? null : titleId.toString();
@@ -62,15 +80,11 @@ public class DeviceSoftwareReadModelQuery {
         return row;
     }
 
-    private static List<String> versionsOnDevice(Software sw, String machineId) {
-        if (sw.getInstallations() == null) {
+    private static List<String> versionsOnDevice(DeviceSoftware installed) {
+        if (installed.getVersions() == null) {
             return List.of();
         }
-        return sw.getInstallations().stream()
-                .filter(installation -> machineId.equals(installation.getMachineId()))
-                .map(Software.Installation::getVersions)
-                .filter(Objects::nonNull)
-                .flatMap(List::stream)
+        return installed.getVersions().stream()
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();

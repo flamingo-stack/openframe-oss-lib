@@ -146,6 +146,21 @@ right in every host.
 
 - Lint enforces both: `flamingo/no-raw-anchor` and `@next/next/no-img-element`. The only exemptions are the
   named blocks in `eslint.config.mjs` (the primitives' own fallbacks, a `blob:` preview).
+- The boxed `Image` is also where a picture gets its address and its credential (`useAuthedImage`,
+  `src/hooks/use-authed-image-src.ts`, over `useAuthedAsset`). The host's `EmbedAuthAdapter.resolveAssetUrl` moves a
+  backend path to its gateway, and `assetLoadMode` decides how it loads (`AssetLoadMode` in
+  `src/utils/embed-authed-fetch.ts` lists the hosts): natively, or waiting for the credential, fetched with it and
+  drawn from a blob. A picture drawn any other way 401s where auth rides in a header, or never reaches the gateway.
+- A picture with a fallback (initials, a placeholder) takes it from `useImageFallback` (`src/hooks/use-image-fallback.ts`).
+  A picture that can need the host's bearer (an avatar or a logo from the host's data) keys it on the store's answer,
+  `useImageFallback(useAuthedImageSrc(src))`, as `SquareAvatar` does: the component then keeps holding the store
+  entry, so a fetch that got no answer, or a 401 the session can refresh past, is retried and the picture comes back.
+  Keyed on the raw URL, the failed picture lets go of the entry and nothing retries it. Public pictures (the entity
+  cards' covers) may key on the URL. Never hide a picture or show the fallback by writing to the DOM in `onError`
+  (`hideOnError` and a few older components still do; do not copy them): React does not undo the write, so when a src
+  that loads arrives, the fallback is still showing.
+- A component that needs to know whether its picture is waiting, ready or failed reads `useAuthedAsset`, not a
+  module cache of its own.
 - A picture whose slot the caller measured asks for that width with `optimizedWidth` (the host's resizer
   answers the URL). Do not build a resized URL by hand next to an `<Image>`.
 - An AI agent's picture is its identity's (`AgentMark`, `EntityIcon`, fed by `AgentIdentityProvider`). The

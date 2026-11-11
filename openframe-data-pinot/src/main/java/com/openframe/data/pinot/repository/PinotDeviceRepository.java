@@ -13,7 +13,9 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues
+            List<String> tagKeyValues,
+    List<String> directorySources,
+    List<String> userLinks
     );
 
     Map<String, Integer> getConnectivityFilterOptions(
@@ -24,7 +26,9 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks
     );
 
     Map<String, Integer> getDeviceTypeFilterOptions(
@@ -35,7 +39,9 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks
     );
 
     Map<String, Integer> getOsTypeFilterOptions(
@@ -46,7 +52,9 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks
     );
 
     Map<String, Integer> getOrganizationFilterOptions(
@@ -57,7 +65,9 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks
     );
 
     /**
@@ -71,7 +81,41 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks
+    );
+
+    /**
+     * SOURCES filter options from the directorySources MV column. A machine no directory knows adds no bucket.
+     */
+    Map<String, Integer> getDirectorySourceFilterOptions(
+            String tenantId,
+            List<String> statuses,
+            List<String> connectivity,
+            List<String> deviceTypes,
+            List<String> osTypes,
+            List<String> organizationIds,
+            List<String> tagKeys,
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks
+    );
+
+    /**
+     * USER filter options from the directoryUserLink column. A machine no external directory integration wrote is NONE.
+     */
+    Map<String, Integer> getUserLinkFilterOptions(
+            String tenantId,
+            List<String> statuses,
+            List<String> connectivity,
+            List<String> deviceTypes,
+            List<String> osTypes,
+            List<String> organizationIds,
+            List<String> tagKeys,
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks
     );
 
     int getFilteredDeviceCount(
@@ -82,6 +126,8 @@ public interface PinotDeviceRepository {
             List<String> osTypes,
             List<String> organizationIds,
             List<String> tagKeys,
-            List<String> tagKeyValues
+            List<String> tagKeyValues,
+            List<String> directorySources,
+            List<String> userLinks
     );
 }

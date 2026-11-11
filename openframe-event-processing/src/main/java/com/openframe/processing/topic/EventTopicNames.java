@@ -1,17 +1,16 @@
 package com.openframe.processing.topic;
 
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties;
+import com.openframe.publishing.api.topic.EventTopicCatalog;
 
-// The one place that names a published type's topic, its DLT and its projections' listeners; the listeners, the DLT recoverer and the topic creator use it.
+// The names the listeners, the DLT recoverer and the topic check use; topic names come from EventTopicCatalog, which management creates them from.
 public final class EventTopicNames {
-
-    private static final String DEAD_LETTER_SUFFIX = "-dlt";
 
     private EventTopicNames() {
     }
 
     public static String topicOf(String topicPrefix, String typeName) {
-        return topicPrefix + typeName;
+        return EventTopicCatalog.topicOf(topicPrefix, typeName);
     }
 
     // <type>.<projection>: the listener's id and group suffix; a type has no dot, so two never collide.
@@ -20,7 +19,7 @@ public final class EventTopicNames {
     }
 
     public static String deadLetterTopicOf(String topic) {
-        return topic + DEAD_LETTER_SUFFIX;
+        return EventTopicCatalog.deadLetterTopicOf(topic);
     }
 
     // No default: a service must name its topics, and the dev shareds on one Kafka cluster must not share one.
@@ -34,7 +33,7 @@ public final class EventTopicNames {
 
     private static String required(String value, String key) {
         if (value == null || value.isBlank()) {
-            throw new IllegalStateException("openframe.events.processing.kafka." + key + " is required when event processing or topic creation is on");
+            throw new IllegalStateException("openframe.events.processing.kafka." + key + " is required when event processing or the topic check is on");
         }
         return value;
     }

@@ -37,9 +37,8 @@ public class DeliveryRouter {
     }
 
     // true when a route carried the command. False is a machine the type cannot reach, not a failure: an agent
-    // below the engine's floor on a type that never had a legacy subject (the flags) or whose legacy subject is a
-    // broadcast only (the updates), or a type switched off everywhere. Counted, not alerted: it is the expected
-    // state of an old agent
+    // below the engine's floor on a type without a legacy subject (every type but the script batch), or a type
+    // switched off everywhere. Counted, not alerted: it is the expected state of an old agent
     public boolean dispatch(DeliverySeed seed) {
         if (seed.getAudience() == DeliveryAudience.EVERY_MACHINE) {
             return dispatchToEveryMachine(seed);

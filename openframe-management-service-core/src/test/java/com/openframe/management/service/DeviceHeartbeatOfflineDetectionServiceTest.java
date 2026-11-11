@@ -53,12 +53,14 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
 
         // verifications
         verify(machineWriter).update(eq("m-1"), guardCaptor.capture(), updateCaptor.capture());
+        assertThat(updateCaptor.getValue().paths()).containsExactlyInAnyOrder("telemetryStatus", "status");
         Machine updated = applied(updateCaptor.getValue());
         assertThat(updated.getStatus()).isEqualTo(DeviceStatus.OFFLINE);
         assertThat(updated.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
         Document guard = guardCaptor.getValue().getCriteriaObject();
         assertThat(guard.get("lastSeen", Document.class)).containsKey("$lt");
         assertThat(guard.get("status")).isEqualTo(DeviceStatus.ONLINE);
+        assertThat(guard).doesNotContainKey("telemetryStatus");
         verify(machineRepository, never()).saveAll(any());
     }
 
@@ -77,8 +79,12 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
         verify(machineWriter).update(eq("m-1"), guardCaptor.capture(), updateCaptor.capture());
         assertThat(updateCaptor.getValue().paths()).containsExactly("telemetryStatus");
         Document guard = guardCaptor.getValue().getCriteriaObject();
+        assertThat(guard.get("lastSeen", Document.class)).containsKey("$lt");
         assertThat(guard.get("telemetryStatus")).isEqualTo(TelemetryStatus.ONLINE);
         assertThat(guard).doesNotContainKey("status");
+        Machine updated = applied(machine, updateCaptor.getValue());
+        assertThat(updated.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
+        assertThat(updated.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
     }
 
     @Test
@@ -109,6 +115,7 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
 
         // verifications
         verify(machineWriter, never()).update(anyString(), any(Criteria.class), any(MachineUpdate.class));
+        verify(machineRepository, never()).saveAll(any());
     }
 
     private static Optional<MachineWriteResult> written(Machine machine) {
@@ -116,9 +123,13 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
     }
 
     private static Machine applied(MachineUpdate update) {
-        Machine machine = new Machine();
-        update.applyTo(machine);
-        return machine;
+        return applied(new Machine(), update);
+    }
+
+    private static Machine applied(Machine stored, MachineUpdate update) {
+        Machine copy = machine("copy", stored.getStatus(), stored.getTelemetryStatus());
+        update.applyTo(copy);
+        return copy;
     }
 
     private static Machine machine(String machineId, DeviceStatus status, TelemetryStatus telemetryStatus) {

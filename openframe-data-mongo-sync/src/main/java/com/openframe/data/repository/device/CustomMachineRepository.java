@@ -44,6 +44,12 @@ public interface CustomMachineRepository {
      */
     void updateLastSeen(String machineId, Instant lastSeen);
 
+    // Bypasses save and MachineWriter like updateLastSeen: the marker is not part of the Pinot payload
+    void markHostFactsChecked(String machineId, Instant checkedAt);
+
+    // Live machines missing a Fleet host fact, never checked or checked before checkedBefore: never checked first
+    List<Machine> findDueForFleetHostFacts(String tenantId, Instant checkedBefore, int limit);
+
     boolean isSortableField(String field);
 
     String getDefaultSortField();

@@ -23,6 +23,16 @@ class NodeTypeTest {
         assertThat(type).contains(NodeType.GUARDRAIL_POLICY);
     }
 
+    @Test
+    void findByTypeName_machineTag_itsOwnNodeTypeBesideTag() {
+        // execution
+        Optional<NodeType> type = NodeType.findByTypeName("MachineTag");
+
+        // verifications
+        assertThat(type).contains(NodeType.MACHINE_TAG);
+        assertThat(NodeType.MACHINE_TAG.getRawIdProperty()).isEqualTo("id");
+    }
+
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", UNKNOWN_TYPE_NAME, "GUARDRAIL_POLICY"})

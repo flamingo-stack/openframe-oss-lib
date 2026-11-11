@@ -4,8 +4,7 @@ import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.service.rmm.software.SoftwareProjector;
-import com.openframe.data.service.rmm.software.VulnerabilityProjector;
+import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,8 +21,7 @@ public class DeletedMachineCleanup {
     private final ScriptScheduleMachineAssignedRepository assignedRepository;
     private final DeviceOnlineDispatchRepository onlineDeviceDispatchRepository;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
-    private final SoftwareProjector softwareProjector;
-    private final VulnerabilityProjector vulnerabilityProjector;
+    private final SoftwareProjectionTrigger projectionTrigger;
 
     public void cleanUpDeletedMachine(String tenantId, String machineId) {
         if (tenantId == null || machineId == null) {
@@ -62,8 +60,8 @@ public class DeletedMachineCleanup {
         }
 
         long removed = deviceSoftwareRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
-        affectedTitles.forEach(titleId -> softwareProjector.project(tenantId, titleId));
-        affectedCves.forEach(cve -> vulnerabilityProjector.project(tenantId, cve));
+        projectionTrigger.titlesChanged(tenantId, affectedTitles);
+        projectionTrigger.cvesChanged(tenantId, affectedCves);
 
         int titleCount = affectedTitles.size();
         int cveCount = affectedCves.size();

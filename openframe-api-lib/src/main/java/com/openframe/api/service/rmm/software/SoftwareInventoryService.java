@@ -577,6 +577,7 @@ public class SoftwareInventoryService {
                 .fleetSource(FleetSource.of(title.getSource()))
                 .publisher(FleetSoftwareMapper.firstText(installed, HostSoftwareInstalledVersion::getVendor))
                 .upgradeCode(title.getUpgradeCode())
+                .bundleIdentifier(title.getBundleIdentifier())
                 .productCodes(FleetSoftwareMapper.distinctText(installed, HostSoftwareInstalledVersion::getArpKey))
                 .packageFamilyNames(FleetSoftwareMapper.distinctText(installed, HostSoftwareInstalledVersion::getPackageFamilyName))
                 .systemComponent(FleetSoftwareMapper.allFlagged(installed, HostSoftwareInstalledVersion::getSystemComponent))
