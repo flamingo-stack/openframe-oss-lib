@@ -8,6 +8,7 @@ import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils/cn';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
 import {
+  ChatBlankIcon,
   ChatsIcon,
   Ellipsis01Icon,
   Filter01Icon,
@@ -102,6 +103,7 @@ interface HistoryListProps extends Pick<
   /** Each row's ⋯ (Rename, Copy link, Compact, Archive); none in the search results. */
   menuFor?: (dialog: DialogItem) => ActionsMenuItem[];
   hasSearch: boolean;
+  density?: 'default' | 'compact';
 }
 
 /** The chats grouped by day, or what stands in for them: loading, empty, failed. */
@@ -122,6 +124,7 @@ function HistoryList({
   loadMore = 'scroll',
   menuFor,
   hasSearch,
+  density = 'default',
 }: HistoryListProps) {
   // The viewport root: whatever scrolls the list (the sidebar body, the search
   // modal) clips the sentinel, and the viewport sees nothing in a closed drawer
@@ -147,6 +150,14 @@ function HistoryList({
         title="No chats found"
         description="Try another search term"
       />
+    ) : density === 'compact' ? (
+      // The three-column shell (Figma 1409:305752): centred in the room the list leaves.
+      <ChatListEmptyState
+        density="compact"
+        icon={<ChatBlankIcon size={20} />}
+        title="No current chats"
+        description="Previous Mingo sessions will show here"
+      />
     ) : (
       <ChatListEmptyState
         icon={<ChatsIcon size={24} />}
@@ -159,16 +170,24 @@ function HistoryList({
   const groups = groupDialogsByDay(dialogs);
   // The chat being started is today's, on top.
   const draftInToday = !!draftTitle && groups[0]?.key === 'today';
+  const compact = density === 'compact';
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+    <div className={cn('flex flex-col', compact ? 'gap-[var(--spacing-system-mf)]' : 'gap-[var(--spacing-system-xs)]')}>
       {draftTitle && !draftInToday && (
-        <DayGroup label="Today">
-          <SectionRow title={draftTitle} active />
+        // Today's, as the draft always is: under "Current chats" in compact, as the mapped today group.
+        <DayGroup label="Today" density={density} labelHidden={compact}>
+          <SectionRow title={draftTitle} active density={density} />
         </DayGroup>
       )}
       {groups.map((group, index) => (
-        <DayGroup key={group.key} label={group.label}>
-          {index === 0 && draftInToday && <SectionRow title={draftTitle} active />}
+        <DayGroup
+          key={group.key}
+          label={group.label}
+          density={density}
+          // Compact: today's chats sit right under the "Current chats" caption, which names them.
+          labelHidden={compact && group.key === 'today'}
+        >
+          {index === 0 && draftInToday && <SectionRow title={draftTitle} active density={density} />}
           {group.items.map(dialog => (
             <SectionRow
               key={dialog.id}
@@ -182,6 +201,7 @@ function HistoryList({
               ownerAvatarUrl={dialog.owner?.avatarUrl || undefined}
               onSelect={onSelect}
               menuItems={menuFor?.(dialog)}
+              density={density}
             />
           ))}
         </DayGroup>
@@ -246,6 +266,7 @@ export function MingoChatHistorySection({
   ownedByOther,
   currentUserId,
   className,
+  density = 'default',
 }: MingoChatListProps) {
   const captionId = useId();
   const visitor = useVisitorOs();
@@ -319,15 +340,45 @@ export function MingoChatHistorySection({
         ]
       : [];
 
+  // Compact (the three-column shell, Figma `nav/section-header`): the caption is
+  // "Current chats" over today's chats, its actions 16px search and ⋯, the scope
+  // folded into the ⋯ as its first group.
+  const compact = density === 'compact';
+  const iconSize = compact ? 16 : 20;
+  // The icon button kind sizes its glyph itself (24px from md): the compact
+  // caption's 16px glyphs (Figma `nav/section-header`) take it back.
+  const iconButtonClass = cn(ICON_BUTTON_CLASS, compact && 'size-4 md:size-4 [&_svg]:size-4 md:[&_svg]:size-4');
+  const moreGroups: Array<{ items: ActionsMenuItem[] }> = [];
+  if (compact && scopeMenu.length > 0) moreGroups.push({ items: scopeMenu });
+  if (moreMenu.length > 0) moreGroups.push({ items: moreMenu });
+
   return (
     <TooltipProvider delayDuration={300}>
       <section
         aria-labelledby={captionId}
-        className={cn('flex w-full min-w-0 flex-col gap-[var(--spacing-system-xs)]', className)}
+        className={cn(
+          'flex w-full min-w-0 flex-col',
+          // Compact: the section takes the sidebar's spare height, so an empty list centres in it.
+          compact ? 'flex-1 gap-[var(--spacing-system-xxs)]' : 'gap-[var(--spacing-system-xs)]',
+          className,
+        )}
       >
-        <div className="flex shrink-0 items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-xs)]">
-          <h2 id={captionId} className="min-w-0 flex-1 truncate text-ods-text-secondary text-h5">
-            Chat history
+        <div
+          className={cn(
+            'flex shrink-0 items-center',
+            compact
+              ? 'gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-xsf)]'
+              : 'gap-[var(--spacing-system-xs)] px-[var(--spacing-system-xs)]',
+          )}
+        >
+          <h2
+            id={captionId}
+            className={cn(
+              'min-w-0 flex-1 truncate text-h5',
+              compact ? 'text-ods-text-panel-secondary' : 'text-ods-text-secondary',
+            )}
+          >
+            {compact ? 'Current chats' : 'Chat history'}
           </h2>
           {onSearchChange && (
             <Tooltip>
@@ -338,15 +389,15 @@ export function MingoChatHistorySection({
                   aria-label="Search chats"
                   aria-keyshortcuts={shortcut ? (usesCommandKey(visitor.os) ? 'Meta+K' : 'Control+K') : undefined}
                   onClick={() => setSearchOpen(true)}
-                  className={ICON_BUTTON_CLASS}
+                  className={iconButtonClass}
                 >
-                  <SearchIcon size={20} />
+                  <SearchIcon size={iconSize} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">{shortcut ? `Search chats · ${shortcut}` : 'Search chats'}</TooltipContent>
             </Tooltip>
           )}
-          {scopeMenu.length > 0 && (
+          {!compact && scopeMenu.length > 0 && (
             <Tooltip>
               <ActionsMenuDropdown
                 triggerAriaLabel="Filter chats"
@@ -370,16 +421,16 @@ export function MingoChatHistorySection({
               </TooltipContent>
             </Tooltip>
           )}
-          {moreMenu.length > 0 && (
+          {moreGroups.length > 0 && (
             <Tooltip>
               <ActionsMenuDropdown
                 triggerAriaLabel="More"
-                groups={[{ items: moreMenu }]}
+                groups={moreGroups}
                 onCloseAutoFocus={e => e.preventDefault()}
                 customTrigger={
                   <TooltipTrigger asChild>
-                    <Button variant="transparent" size="icon" aria-label="More" className={ICON_BUTTON_CLASS}>
-                      <Ellipsis01Icon size={20} />
+                    <Button variant="transparent" size="icon" aria-label="More" className={iconButtonClass}>
+                      <Ellipsis01Icon size={iconSize} />
                     </Button>
                   </TooltipTrigger>
                 }
@@ -395,6 +446,7 @@ export function MingoChatHistorySection({
           draftTitle={draftTitle}
           onSelect={onSelectDialog}
           loadMore={loadMore}
+          density={density}
           menuFor={dialog =>
             chatDialogMenuItems({
               onCopyLink: onRequestCopyLink && (() => onRequestCopyLink(dialog)),
@@ -537,18 +589,38 @@ function SearchModalContent({ initialValue, onSearchChange, onClose, children }:
   );
 }
 
-function DayGroup({ label, children }: { label: string; children: ReactNode }) {
+function DayGroup({
+  label,
+  children,
+  density = 'default',
+  labelHidden = false,
+}: {
+  label: string;
+  children: ReactNode;
+  density?: 'default' | 'compact';
+  /** The caption above already names the day: the label is for assistive tech only. */
+  labelHidden?: boolean;
+}) {
   const labelId = useId();
   return (
     // A day that arrives with a page (or replaces the placeholder) fades in rather than popping.
     <div
       role="group"
       aria-labelledby={labelId}
-      className="flex shrink-0 flex-col duration-300 animate-in fade-in motion-reduce:animate-none"
+      className={cn(
+        'flex shrink-0 flex-col duration-300 animate-in fade-in motion-reduce:animate-none',
+        density === 'compact' && 'gap-[var(--spacing-system-xxs)]',
+      )}
     >
       <p
         id={labelId}
-        className="px-[var(--spacing-system-xs)] py-[var(--spacing-system-xxs)] text-ods-text-secondary text-h6"
+        className={cn(
+          'px-[var(--spacing-system-xs)] py-[var(--spacing-system-xxs)]',
+          labelHidden && 'sr-only',
+          density === 'compact'
+            ? 'px-[var(--spacing-system-xsf)] py-0 text-ods-text-panel-secondary text-h5'
+            : 'text-ods-text-secondary text-h6',
+        )}
       >
         {label}
       </p>
@@ -568,6 +640,7 @@ interface SectionRowProps {
   ownerAvatarUrl?: string;
   onSelect?: (id: string) => void;
   menuItems?: ActionsMenuItem[];
+  density?: 'default' | 'compact';
 }
 
 /**
@@ -585,6 +658,7 @@ function SectionRow({
   ownerAvatarUrl,
   onSelect,
   menuItems = [],
+  density = 'default',
 }: SectionRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const hasMenu = menuItems.length > 0;
@@ -595,6 +669,7 @@ function SectionRow({
     <div className="group/row relative shrink-0 duration-300 animate-in fade-in motion-reduce:animate-none">
       <ChatListItem
         active={active}
+        size={density}
         title={title}
         tabIndex={dialog ? undefined : -1}
         onClick={dialog ? () => onSelect?.(dialog.id) : undefined}
