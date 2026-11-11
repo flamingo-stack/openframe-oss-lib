@@ -1,5 +1,6 @@
 package com.openframe.client.service;
 
+import com.openframe.client.exception.MachineNotFoundException;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.repository.device.MachineRepository;
@@ -15,6 +16,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,5 +55,19 @@ class InstalledAgentServiceTest {
         assertThat(installedAgentCaptor.getValue())
                 .extracting(InstalledAgent::getMachineId, InstalledAgent::getAgentType, InstalledAgent::getVersion, InstalledAgent::getStatus)
                 .containsExactly(MACHINE_ID, AGENT_TYPE, VERSION, ConnectionStatus.CONNECTED);
+    }
+
+    @Test
+    void addInstalledAgent_machineMissing_throwsMachineNotFound() {
+        // setup
+        when(machineRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);
+
+        // execution
+        MachineNotFoundException ex = assertThrows(MachineNotFoundException.class,
+                () -> service.addInstalledAgent(MACHINE_ID, AGENT_TYPE, VERSION, false));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("Machine not found: " + MACHINE_ID);
+        verify(installedAgentRepository, never()).save(any(InstalledAgent.class));
     }
 }
