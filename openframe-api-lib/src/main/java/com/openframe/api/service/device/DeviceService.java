@@ -42,6 +42,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -94,7 +95,7 @@ public class DeviceService {
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
         if (!DeviceStatus.CONNECTED.contains(machine.getStatus())) {
             throw new BadRequestException(
-                    "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
+                    "Machine is not in a dispatchable state (must be a managed device): " + machineId);
         }
     }
 
@@ -345,8 +346,14 @@ public class DeviceService {
                 .collect(Collectors.toList());
     }
 
+    // the API only ends a device's life; registration, promotion and the archive job own every other transition
+    private static final Set<DeviceStatus> API_SETTABLE_STATUSES = EnumSet.of(DeviceStatus.DELETED, DeviceStatus.ARCHIVED);
+
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);
+        if (!API_SETTABLE_STATUSES.contains(status)) {
+            throw new BadRequestException("Device status can only be set to DELETED or ARCHIVED, got " + status);
+        }
         Machine machine = machineRepository.findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
         if (machine.getStatus() == status) {

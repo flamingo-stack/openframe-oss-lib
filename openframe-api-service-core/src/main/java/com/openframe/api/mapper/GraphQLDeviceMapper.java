@@ -9,6 +9,7 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.packagesearch.PackageManagerState;
@@ -70,7 +71,7 @@ public class GraphQLDeviceMapper {
                 .registeredAt(machine.getRegisteredAt())
                 .connectedAt(connectedAt)
                 .inventoryConnectedAt(inventoryConnectedAt)
-                .ready(connectedAt != null && inventoryConnectedAt != null)
+                .ready(machine.getStatus() != DeviceStatus.PENDING)
                 .build();
     }
 

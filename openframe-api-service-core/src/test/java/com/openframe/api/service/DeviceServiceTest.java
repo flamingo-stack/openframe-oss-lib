@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -44,6 +45,7 @@ import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
 import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -361,15 +363,15 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("updateStatusByMachineId: a non-DELETE status change does NOT touch schedule assignments")
-    void nonDeleteStatus_noAssignmentCleanup() {
+    @DisplayName("updateStatusByMachineId: archiving a MANAGED device does not touch schedule assignments")
+    void archiving_noAssignmentCleanup() {
         Machine m = new Machine();
-        m.setMachineId("m-off");
+        m.setMachineId("m-arc");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.ONLINE);
-        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
+        m.setStatus(DeviceStatus.MANAGED);
+        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
 
-        service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
+        service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
 
         verify(deletedMachineCleanup, never()).cleanUpDeletedMachine(any(), any());
     }
@@ -380,41 +382,44 @@ class DeviceServiceTest {
         Machine m = new Machine();
         m.setMachineId("m-arc");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.ONLINE);
+        m.setStatus(DeviceStatus.MANAGED);
         when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
 
         verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-arc", false);
-        verify(deletedMachineCleanup, never()).cleanUpDeletedMachine(any(), any());
+        verify(machineRepository).save(m);
+        assertThat(m.getStatus()).isEqualTo(DeviceStatus.ARCHIVED);
     }
 
     @Test
-    @DisplayName("updateStatusByMachineId: restoring an archived device re-enters CONNECTED, so it counts again")
-    void restoringArchived_syncsConnectivityOn() {
+    @DisplayName("updateStatusByMachineId: archiving a PENDING device was never CONNECTED, so the counters are not touched")
+    void archivingPending_noConnectivitySync() {
         Machine m = new Machine();
-        m.setMachineId("m-arc");
+        m.setMachineId("m-pen");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.ARCHIVED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        m.setStatus(DeviceStatus.PENDING);
+        when(machineRepository.findByMachineId("m-pen")).thenReturn(Optional.of(m));
 
-        service().updateStatusByMachineId("m-arc", DeviceStatus.ONLINE);
-
-        verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-arc", true);
-    }
-
-    @Test
-    @DisplayName("updateStatusByMachineId: ONLINE<->OFFLINE stays within CONNECTED, so the counters are not touched")
-    void onlineToOffline_noConnectivitySync() {
-        Machine m = new Machine();
-        m.setMachineId("m-off");
-        m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.ONLINE);
-        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
-
-        service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
+        service().updateStatusByMachineId("m-pen", DeviceStatus.ARCHIVED);
 
         verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
+        verify(machineRepository).save(m);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"DELETED", "ARCHIVED"}, mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("updateStatusByMachineId: only DELETED and ARCHIVED can be set through the API")
+    void updateStatus_outsideWhitelist_badRequestAndNothingRead(DeviceStatus status) {
+        DeviceService s = service();
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> s.updateStatusByMachineId("m-1", status));
+
+        assertThat(ex.getMessage()).contains("only be set to DELETED or ARCHIVED");
+        verify(machineRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).save(any());
+        verifyNoInteractions(deletedMachineCleanup, deviceSoftwareConnectivitySync, deviceStatusProcessor);
     }
 
     @Test

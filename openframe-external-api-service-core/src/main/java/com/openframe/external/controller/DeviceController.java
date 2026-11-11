@@ -69,8 +69,9 @@ public class DeviceController {
     @GetMapping
     @ResponseStatus(OK)
     public DevicesResponse getDevices(
-            @Parameter(description = "Device lifecycle statuses to filter by. `connectivity` is the online/offline filter; " +
-                    "`ONLINE`/`OFFLINE` in `statuses` stop matching in the next release and are removed the release after.")
+            @Parameter(description = "Device lifecycle statuses to filter by: PENDING, MANAGED, PENDING_DELETION, DELETED, " +
+                    "ARCHIVED. `connectivity` is the online/offline filter; `ONLINE`/`OFFLINE` in `statuses` no longer " +
+                    "match any device and are removed in the next release.")
             @RequestParam(required = false) List<DeviceStatus> statuses,
 
             @Parameter(description = "Connectivity to filter by: ONLINE (agent talking to us right now) or OFFLINE")
@@ -176,8 +177,9 @@ public class DeviceController {
     @GetMapping("/filters")
     @ResponseStatus(OK)
     public DeviceFilterResponse getDeviceFilters(
-            @Parameter(description = "Device lifecycle statuses to filter by. `connectivity` is the online/offline filter; " +
-                    "`ONLINE`/`OFFLINE` in `statuses` stop matching in the next release and are removed the release after.")
+            @Parameter(description = "Device lifecycle statuses to filter by: PENDING, MANAGED, PENDING_DELETION, DELETED, " +
+                    "ARCHIVED. `connectivity` is the online/offline filter; `ONLINE`/`OFFLINE` in `statuses` no longer " +
+                    "match any device and are removed in the next release.")
             @RequestParam(required = false) List<DeviceStatus> statuses,
 
             @Parameter(description = "Connectivity to filter by: ONLINE (agent talking to us right now) or OFFLINE")
