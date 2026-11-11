@@ -112,6 +112,7 @@ export * from './conversation-card';
 export * from './capability-explorer';
 export { VIDEO_PLAYBACK_FAILED_EVENT } from './video-shared';
 export type {
+  VideoCaption,
   VideoFailureKind,
   VideoFailureReason,
   VideoLayout,

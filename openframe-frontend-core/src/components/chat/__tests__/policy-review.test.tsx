@@ -144,7 +144,7 @@ describe('the review on the wire', () => {
       approvalRequestId: 'req-1',
       approvalType: 'ADMIN',
       toolCalls: [{ toolName: 'runCommand', policyReview: wireEscalated }, { toolName: 'runCommand' }],
-    } as Parameters<typeof approvalMetaToBatchData>[0]);
+    });
     expect(data.toolCalls[0]?.policyReview).toEqual(escalated);
     expect('policyReview' in (data.toolCalls[1] ?? {})).toBe(false);
   });
