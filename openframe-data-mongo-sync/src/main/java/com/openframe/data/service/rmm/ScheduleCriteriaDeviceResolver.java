@@ -50,7 +50,7 @@ public class ScheduleCriteriaDeviceResolver {
     }
 
     public boolean matches(Machine machine, ScheduleDeviceCriteria criteria, Collection<OsType> supportedPlatforms) {
-        if (machine == null) {
+        if (machine == null || !DeviceStatus.CONNECTED.contains(machine.getStatus())) {
             return false;
         }
         List<String> organizationIds = criteria == null ? null : criteria.getOrganizationIds();

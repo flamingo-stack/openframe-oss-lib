@@ -86,6 +86,13 @@ describe('MingoChatRail variant="section"', () => {
     expect(rows[0]).toHaveAttribute('aria-current', 'true');
   });
 
+  it("compact: a chat being started with no chat of today's yet has its Today label for screen readers only", () => {
+    useFixedClock();
+    render(<MingoChatRail variant="section" density="compact" dialogs={DIALOGS.slice(2)} draftTitle="New Chat" />);
+    const today = screen.getByRole('group', { name: 'Today' });
+    expect(within(today).getByText('Today')).toHaveClass('sr-only');
+  });
+
   it('shows the status glyphs, and the owner only on someone else’s chat', () => {
     const owner = { name: 'Roman Smith' };
     render(
@@ -267,6 +274,14 @@ describe('MingoChatRail variant="section"', () => {
     );
     expect(screen.getByRole('img', { name: 'Owner: Pavlo Shylo' })).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Owner: Roman Smith' })).not.toBeInTheDocument();
+  });
+
+  it('compact: an empty list says so in sentence case, centred in the room the section takes', () => {
+    render(<MingoChatRail variant="section" density="compact" dialogs={[]} />);
+    expect(screen.getByText('No current chats')).toHaveClass('text-shell-body');
+    expect(screen.getByText('Previous Mingo sessions will show here')).toHaveClass('text-h6');
+    expect(screen.getByRole('region', { name: 'Current chats' })).toHaveClass('flex-1');
+    expect(screen.queryByText('No Current Chats')).toBeNull();
   });
 
   it('switches the scope from the filter menu, and lights the filter while all chats show', () => {

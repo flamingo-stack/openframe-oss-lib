@@ -298,7 +298,7 @@ class MachineStatusServiceTest {
     }
 
     @Test
-    void updateToOnline_machineGoneBeforeTheWrite_noEventButPromotionStillChecked() {
+    void updateToOnline_machineGoneBeforeTheWrite_noEventNoPromotion() {
         // setup
         stubMachine(DeviceStatus.PENDING, TelemetryStatus.OFFLINE);
         when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class))).thenReturn(Optional.empty());
@@ -307,8 +307,23 @@ class MachineStatusServiceTest {
         service.updateToOnline(MACHINE_ID, LATER);
 
         // verifications
+        verifyNoInteractions(eventPublisher, deviceLifecycleService);
+    }
+
+    @Test
+    void updateToOffline_firstEverFlip_firstConnectedAtStampedWithoutCameOnline() {
+        // setup
+        stubMachine(DeviceStatus.PENDING, null);
+        stubWriter();
+
+        // execution
+        service.updateToOffline(MACHINE_ID, LATER);
+
+        // verifications
+        Machine written = written();
+        assertThat(written.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
+        assertThat(written.getFirstConnectedAt()).isEqualTo(LATER);
         verifyNoInteractions(eventPublisher);
-        verify(deviceLifecycleService).promoteIfReady(MACHINE_ID);
     }
 
     @Test

@@ -58,6 +58,13 @@ import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 @RequiredArgsConstructor
 public class DeviceService {
 
+    // the API only ends a device's life; registration, promotion and the archive job own every other transition
+    private static final Set<DeviceStatus> API_SETTABLE_STATUSES = EnumSet.of(DeviceStatus.DELETED, DeviceStatus.ARCHIVED);
+    private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
+            .filter(status -> !DeviceStatus.CONNECTED.contains(status))
+            .map(Enum::name)
+            .toList();
+
     private final MachineRepository machineRepository;
     private final DeletedMachineCleanup deletedMachineCleanup;
     private final DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
@@ -252,12 +259,6 @@ public class DeviceService {
                 .build();
     }
 
-
-    private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
-            .filter(status -> !DeviceStatus.CONNECTED.contains(status))
-            .map(Enum::name)
-            .toList();
-
     private MachineQueryFilter scheduleDeviceFilter(DeviceFilterCriteria filter,
                                                     Collection<OsType> osTypeScope,
                                                     Collection<String> restrictToMachineIds) {
@@ -350,9 +351,6 @@ public class DeviceService {
                 .distinct()
                 .collect(Collectors.toList());
     }
-
-    // the API only ends a device's life; registration, promotion and the archive job own every other transition
-    private static final Set<DeviceStatus> API_SETTABLE_STATUSES = EnumSet.of(DeviceStatus.DELETED, DeviceStatus.ARCHIVED);
 
     public void updateStatusByMachineId(@NotBlank String machineId, @NotNull DeviceStatus status) {
         log.info("Updating device status. machineId={}, newStatus={}", machineId, status);

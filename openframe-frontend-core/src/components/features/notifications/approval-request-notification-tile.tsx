@@ -1,27 +1,29 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useToast } from '../../../hooks/use-toast';
 import { cn } from '../../../utils/cn';
+import { errorMessage } from '../../../utils/common';
 import { ApprovalBatchMessage, ApprovalStatusTag } from '../../chat/approval-batch-message';
 import { ExpandChevron } from '../../chat/expand-chevron';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
 import { PolicyEscalationAlert, isPolicyEscalated } from '../../chat/policy-review';
 import type { ChatApprovalStatus } from '../../chat/types';
 import { AlertCircleIcon } from '../../icons-v2-generated';
+import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
+import { useLoadingScope } from '../../ui/loading-scope';
 import {
   APPROVAL_BUTTON_CLASS,
   APPROVAL_TOGGLE_BUTTON_CLASS,
   LOCKSCREEN_APPROVAL_BUTTON_CLASS,
+  NotificationMark,
   NotificationTile,
 } from './notification-tile';
 import { approvalMetaToBatchData, getApprovalMeta, resolutionToStatus } from './types';
 import type { Notification } from './types';
 
-export interface ApprovalRequestNotificationTileProps {
-  notification: Notification;
-  onApprove: (approvalRequestId: string) => void | Promise<void>;
-  onReject: (approvalRequestId: string) => void | Promise<void>;
+interface ApprovalRequestNotificationTileOptions {
   /**
    * Marks the notification complete: the tile's ✓, and after a successful
    * Approve / Reject. Omit it for a card with no notification behind it (built
@@ -38,8 +40,12 @@ export interface ApprovalRequestNotificationTileProps {
   /**
    * `lockscreen`: the approval as a phone shows it (see `NotificationTile`):
    * two compact buttons and no command drawer.
+   * `row`: the lockscreen look in ONE line, for a surface too small for a tile (a scene in a page's margin): the
+   * agent's mark (its `type`, "Mingo asks", is the mark's accessible name), the title, then Approve and Reject, or
+   * once resolved the status. The row keeps its left edge, so the title never moves when its buttons become the
+   * status. No description, no time, no command drawer.
    */
-  presentation?: 'card' | 'lockscreen';
+  presentation?: 'card' | 'lockscreen' | 'row';
   /**
    * Show Approve as being pressed (a scripted demo's "the tap lands" beat):
    * the button dims for as long as this is true. No effect once resolved.
@@ -49,7 +55,44 @@ export interface ApprovalRequestNotificationTileProps {
   timeLabel?: string;
 }
 
-export function ApprovalRequestNotificationTile({
+/**
+ * The approval and its two decisions, or `loading` while the host reads it: the tile then draws its own loading form
+ * for its presentation (the row's, or the tile's with its button row), as it does in a loading scope.
+ */
+export type ApprovalRequestNotificationTileProps = ApprovalRequestNotificationTileOptions &
+  (
+    | {
+        notification: Notification;
+        onApprove: (approvalRequestId: string) => void | Promise<void>;
+        onReject: (approvalRequestId: string) => void | Promise<void>;
+        loading?: boolean;
+      }
+    | { loading: true; notification?: undefined; onApprove?: undefined; onReject?: undefined }
+  );
+
+type LoadedApprovalRequestNotificationTileProps = ApprovalRequestNotificationTileOptions & {
+  notification: Notification;
+  onApprove: (approvalRequestId: string) => void | Promise<void>;
+  onReject: (approvalRequestId: string) => void | Promise<void>;
+};
+
+/** An approval request in any look; ONE switch: in a loading scope (or `loading`) its own loading form. */
+export function ApprovalRequestNotificationTile(props: ApprovalRequestNotificationTileProps) {
+  if (useLoadingScope() || props.loading || !props.notification) {
+    if (props.presentation === 'row') return <ApprovalRequestRowSkeleton className={props.className} />;
+    return (
+      <NotificationTile
+        loading
+        variant="approval"
+        presentation={props.presentation === 'lockscreen' ? 'lockscreen' : 'card'}
+        className={props.className}
+      />
+    );
+  }
+  return <LoadedApprovalRequestNotificationTile {...props} />;
+}
+
+function LoadedApprovalRequestNotificationTile({
   notification,
   onApprove,
   onReject,
@@ -62,19 +105,225 @@ export function ApprovalRequestNotificationTile({
   presentation = 'card',
   approvePressed = false,
   timeLabel,
-}: ApprovalRequestNotificationTileProps) {
+}: LoadedApprovalRequestNotificationTileProps) {
+  if (presentation === 'row') {
+    return (
+      <LoadedApprovalRequestRow
+        notification={notification}
+        onApprove={onApprove}
+        onReject={onReject}
+        onComplete={onComplete}
+        approvePressed={approvePressed}
+        className={className}
+      />
+    );
+  }
+  return (
+    <ApprovalRequestTile
+      notification={notification}
+      onApprove={onApprove}
+      onReject={onReject}
+      onComplete={onComplete}
+      onSettle={onSettle}
+      liveDurationMs={liveDurationMs}
+      defaultExpanded={defaultExpanded}
+      className={className}
+      titleLines={titleLines}
+      presentation={presentation}
+      approvePressed={approvePressed}
+      timeLabel={timeLabel}
+    />
+  );
+}
+
+/**
+ * ONE decision on an approval, for every look (card, lockscreen, row): the status shown (the backend's resolution
+ * wins; until it arrives, this user's own click, optimistically), whether a request is in flight, and `decide`. A
+ * failed request rolls the optimistic status back AND says so (the lib's error toast, with the request's own
+ * message): the buttons coming back alone read as nothing happened. `onComplete` runs only after a success, outside
+ * the request's try, so a throwing consumer callback never rolls back a decision the server already took.
+ */
+function useApprovalDecision({
+  notification,
+  approvalRequestId,
+  resolution,
+  onComplete,
+}: {
+  notification: Notification;
+  approvalRequestId: string | undefined;
+  resolution: Parameters<typeof resolutionToStatus>[0];
+  onComplete?: (id: string) => void;
+}) {
+  const { toast } = useToast();
+  const [processing, setProcessing] = useState(false);
+  // `processing` disables the buttons only once React re-renders; a second click in the same tick (a fast double click)
+  // would decide twice. The ref is set at once, so one decision is in flight at a time.
+  const inFlight = useRef(false);
+  const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null);
+  const resolvedStatus = resolutionToStatus(resolution);
+  const status: ChatApprovalStatus = resolvedStatus !== 'pending' ? resolvedStatus : (localStatus ?? 'pending');
+
+  const run = async (
+    id: string,
+    nextStatus: 'approved' | 'rejected',
+    action: (approvalRequestId: string) => void | Promise<void>,
+  ) => {
+    setProcessing(true);
+    setLocalStatus(nextStatus);
+    try {
+      await action(id);
+    } catch (error) {
+      setLocalStatus(null);
+      toast({
+        title: nextStatus === 'approved' ? 'Could not approve' : 'Could not reject',
+        description: errorMessage(error, 'The request failed. Try again.'),
+        variant: 'destructive',
+      });
+      return;
+    } finally {
+      setProcessing(false);
+    }
+    onComplete?.(notification.id);
+  };
+
+  const decide = (
+    nextStatus: 'approved' | 'rejected',
+    action: (approvalRequestId: string) => void | Promise<void>,
+  ): Promise<void> => {
+    if (!approvalRequestId || inFlight.current) return Promise.resolve();
+    inFlight.current = true;
+    return run(approvalRequestId, nextStatus, action).finally(() => {
+      inFlight.current = false;
+    });
+  };
+
+  return { status, processing, decide };
+}
+
+/** The row's frame: the lockscreen tile's corners, border and surface, around one line. Shared with its skeleton. */
+export const APPROVAL_ROW_CLASS =
+  'inline-flex max-w-full items-center gap-[var(--spacing-system-xs)] whitespace-nowrap rounded-2xl border border-ods-border bg-ods-card py-[var(--spacing-system-xs)] pl-[var(--spacing-system-s)] pr-[var(--spacing-system-xs)] text-h6';
+
+/** The row's two buttons: compact, their own width. */
+const APPROVAL_ROW_BUTTON_CLASS = 'shrink-0';
+
+type ApprovalRowProps = Pick<
+  LoadedApprovalRequestNotificationTileProps,
+  'notification' | 'onApprove' | 'onReject' | 'onComplete' | 'approvePressed' | 'className'
+>;
+
+function LoadedApprovalRequestRow({
+  notification,
+  onApprove,
+  onReject,
+  onComplete,
+  approvePressed = false,
+  className,
+}: ApprovalRowProps) {
+  const approval = getApprovalMeta(notification);
+  const {
+    status,
+    processing,
+    decide: resolve,
+  } = useApprovalDecision({
+    notification,
+    approvalRequestId: approval?.approvalRequestId,
+    resolution: approval?.resolution,
+    onComplete,
+  });
+  if (!approval) return null;
+  const label = notification.type ?? 'Approval Required';
+
+  return (
+    <output className={cn(APPROVAL_ROW_CLASS, className)} aria-label={label}>
+      <span role="img" aria-label={label} className="flex size-4 shrink-0 items-center justify-center">
+        <NotificationMark imageUrl={notification.imageUrl} icon={notification.icon} dotClassName="bg-ods-accent" />
+      </span>
+      {notification.title ? (
+        <span className="min-w-0 truncate text-ods-text-primary text-h6">{notification.title}</span>
+      ) : null}
+      {status === 'pending' ? (
+        <span className="flex shrink-0 items-center gap-[var(--spacing-system-xxs)]">
+          <Button
+            variant="accent"
+            size="small"
+            onClick={() => resolve('approved', onApprove)}
+            disabled={processing}
+            data-pressed={approvePressed || undefined}
+            className={cn(
+              APPROVAL_ROW_BUTTON_CLASS,
+              // The press, by transform and opacity only (compositor properties; a filter repaints every frame).
+              'transition-[opacity,transform] duration-200 motion-reduce:transition-none',
+              approvePressed && 'scale-[0.98] opacity-75',
+            )}
+          >
+            Approve
+          </Button>
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => resolve('rejected', onReject)}
+            disabled={processing}
+            className={APPROVAL_ROW_BUTTON_CLASS}
+          >
+            Reject
+          </Button>
+        </span>
+      ) : (
+        <span className="shrink-0 pr-[var(--spacing-system-xxs)]">
+          <ApprovalStatusTag status={status} />
+        </span>
+      )}
+    </output>
+  );
+}
+
+/** The row while it is read, box for box: the frame, the mark, a title's line and the two buttons. */
+export function ApprovalRequestRowSkeleton({ className }: { className?: string }) {
+  return (
+    <output aria-hidden className={cn(APPROVAL_ROW_CLASS, className)}>
+      <UnifiedSkeleton as="span" width="1rem" className="h-4 shrink-0 rounded-full" />
+      <TextLineSkeleton as="span" type="h6" className="w-32" />
+      <InteractiveSkeleton.Button size="small" className="w-20" />
+      <InteractiveSkeleton.Button size="small" className="w-16" />
+    </output>
+  );
+}
+
+type ApprovalTileProps = Omit<LoadedApprovalRequestNotificationTileProps, 'presentation'> & {
+  presentation: 'card' | 'lockscreen';
+};
+
+function ApprovalRequestTile({
+  notification,
+  onApprove,
+  onReject,
+  onComplete,
+  onSettle,
+  liveDurationMs,
+  defaultExpanded = false,
+  className,
+  titleLines,
+  presentation,
+  approvePressed = false,
+  timeLabel,
+}: ApprovalTileProps) {
   const lockscreen = presentation === 'lockscreen';
   const [expanded, setExpanded] = useState(defaultExpanded);
   // Toggling the command section pins the tile so a live pop-up doesn't
   // auto-dismiss out from under the user mid-read.
   const [pinned, setPinned] = useState(defaultExpanded);
-  const [processing, setProcessing] = useState(false);
-  // Optimistic status for this user's own click; backend resolution (below) wins once it arrives.
-  const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null);
-
   const approval = getApprovalMeta(notification);
-  const resolvedStatus = resolutionToStatus(approval?.resolution);
-  const status: ChatApprovalStatus = resolvedStatus !== 'pending' ? resolvedStatus : (localStatus ?? 'pending');
+  const {
+    status,
+    processing,
+    decide: resolve,
+  } = useApprovalDecision({
+    notification,
+    approvalRequestId: approval?.approvalRequestId,
+    resolution: approval?.resolution,
+    onComplete,
+  });
 
   const batchData = useMemo(() => (approval ? approvalMetaToBatchData(approval) : null), [approval]);
 
@@ -93,25 +342,6 @@ export function ApprovalRequestNotificationTile({
   const escalated = escalatedCalls.length > 0;
   const commandWord = batchData.toolCalls.length > 1 ? 'commands' : 'command';
   const toggleLabel = `${expanded ? 'Hide' : 'Show'} ${commandWord} section`;
-
-  const resolve = async (
-    nextStatus: 'approved' | 'rejected',
-    action: (approvalRequestId: string) => void | Promise<void>,
-  ) => {
-    setProcessing(true);
-    setLocalStatus(nextStatus);
-    try {
-      await action(batchData.approvalRequestId);
-    } catch {
-      setLocalStatus(null); // roll back the optimistic flip; the request failed
-      return;
-    } finally {
-      setProcessing(false);
-    }
-    // Outside the try: a throwing consumer callback must not roll back a request
-    // that already succeeded server-side.
-    onComplete?.(notification.id);
-  };
 
   return (
     <NotificationTile
