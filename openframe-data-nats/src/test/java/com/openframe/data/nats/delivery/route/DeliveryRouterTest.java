@@ -4,6 +4,8 @@ import com.openframe.data.document.clientconfiguration.OpenFrameClientConfigurat
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientUninstallDeliverySeed;
 import com.openframe.data.nats.delivery.ClientUpdateDeliverySeed;
+import com.openframe.data.nats.delivery.ScriptScheduleDeliverySeed;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.service.machine.AgentVersionService;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryAudience;
@@ -31,6 +33,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+// the routes as they stand: the legacy one carries the script batch alone, the engine every type with a spec
 @ExtendWith(MockitoExtension.class)
 class DeliveryRouterTest {
 
@@ -43,17 +46,21 @@ class DeliveryRouterTest {
     @Mock private DeliveryRoute engine;
 
     private DeliveryRouter router;
+    private ScriptScheduleDeliverySeed scriptBatch;
     private ClientUninstallDeliverySeed uninstall;
     private ClientUpdateDeliverySeed everyMachine;
 
     @BeforeEach
     void setUp() {
         lenient().when(legacy.getGeneration()).thenReturn(0);
-        lenient().when(legacy.getTypes()).thenReturn(EnumSet.of(DeliveryType.CLIENT_UNINSTALL, DeliveryType.CLIENT_UPDATE));
+        lenient().when(legacy.getTypes()).thenReturn(EnumSet.of(DeliveryType.SCRIPT_SCHEDULE));
         lenient().when(engine.getGeneration()).thenReturn(1);
-        lenient().when(engine.getTypes()).thenReturn(EnumSet.of(DeliveryType.CLIENT_UNINSTALL, DeliveryType.CLIENT_UPDATE, DeliveryType.CLIENT_FEATURE_FLAGS));
+        lenient().when(engine.getTypes()).thenReturn(EnumSet.of(DeliveryType.SCRIPT_SCHEDULE, DeliveryType.CLIENT_UNINSTALL,
+                DeliveryType.CLIENT_UPDATE, DeliveryType.CLIENT_FEATURE_FLAGS));
         when(routes.orderedStream()).thenReturn(Stream.of(legacy, engine));
         router = new DeliveryRouter(routes, agentVersions, metrics);
+        ScriptScheduleExecutionMessage batch = ScriptScheduleExecutionMessage.builder().executionId("exec-1").build();
+        scriptBatch = ScriptScheduleDeliverySeed.skippingOffline(MACHINE_ID, batch);
         uninstall = new ClientUninstallDeliverySeed(MACHINE_ID);
         everyMachine = ClientUpdateDeliverySeed.forEveryMachine(OpenFrameClientConfiguration.builder().version("1.6.0").build());
     }
@@ -62,30 +69,30 @@ class DeliveryRouterTest {
     void dispatch_engineReachesTheMachine_newestGenerationWins() {
         // setup
         when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.of("1.6.0"));
-        when(engine.canReach(DeliveryType.CLIENT_UNINSTALL, "1.6.0")).thenReturn(true);
+        when(engine.canReach(DeliveryType.SCRIPT_SCHEDULE, "1.6.0")).thenReturn(true);
 
         // execution
-        boolean carried = router.dispatch(uninstall);
+        boolean carried = router.dispatch(scriptBatch);
 
         // verifications
         assertThat(carried).isTrue();
-        verify(engine).send(uninstall);
+        verify(engine).send(scriptBatch);
         verify(legacy, never()).send(any());
     }
 
     @Test
-    void dispatch_agentBelowTheEngine_legacyCarriesIt() {
+    void dispatch_scriptBatchForAnAgentBelowTheEngine_legacyCarriesIt() {
         // setup
         when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.of("1.5.0"));
-        when(engine.canReach(DeliveryType.CLIENT_UNINSTALL, "1.5.0")).thenReturn(false);
-        when(legacy.canReach(DeliveryType.CLIENT_UNINSTALL, "1.5.0")).thenReturn(true);
+        when(engine.canReach(DeliveryType.SCRIPT_SCHEDULE, "1.5.0")).thenReturn(false);
+        when(legacy.canReach(DeliveryType.SCRIPT_SCHEDULE, "1.5.0")).thenReturn(true);
 
         // execution
-        boolean carried = router.dispatch(uninstall);
+        boolean carried = router.dispatch(scriptBatch);
 
         // verifications
         assertThat(carried).isTrue();
-        verify(legacy).send(uninstall);
+        verify(legacy).send(scriptBatch);
         verify(engine, never()).send(any());
     }
 
@@ -93,15 +100,32 @@ class DeliveryRouterTest {
     void dispatch_versionUnknown_routesAskedWithAnEmptyVersion() {
         // setup
         when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.empty());
-        when(engine.canReach(DeliveryType.CLIENT_UNINSTALL, "")).thenReturn(false);
-        when(legacy.canReach(DeliveryType.CLIENT_UNINSTALL, "")).thenReturn(true);
+        when(engine.canReach(DeliveryType.SCRIPT_SCHEDULE, "")).thenReturn(false);
+        when(legacy.canReach(DeliveryType.SCRIPT_SCHEDULE, "")).thenReturn(true);
+
+        // execution
+        boolean carried = router.dispatch(scriptBatch);
+
+        // verifications
+        assertThat(carried).isTrue();
+        verify(legacy).send(scriptBatch);
+    }
+
+    @Test
+    void dispatch_engineOnlyTypeForAnAgentTheEngineDoesNotAdmit_nothingSentAndReportedSo() {
+        // setup
+        when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.of("1.5.0"));
+        when(engine.canReach(DeliveryType.CLIENT_UNINSTALL, "1.5.0")).thenReturn(false);
 
         // execution
         boolean carried = router.dispatch(uninstall);
 
         // verifications
-        assertThat(carried).isTrue();
-        verify(legacy).send(uninstall);
+        assertThat(carried).isFalse();
+        verify(engine, never()).send(any());
+        verify(legacy, never()).canReach(any(), any());
+        verify(legacy, never()).send(any());
+        verify(metrics).recordUnreachable(DeliveryType.CLIENT_UNINSTALL, DeliveryAudience.MACHINE);
     }
 
     @Test
@@ -112,20 +136,19 @@ class DeliveryRouterTest {
         when(legacy.canReach(any(), anyString())).thenReturn(false);
 
         // execution
-        boolean carried = router.dispatch(uninstall);
+        boolean carried = router.dispatch(scriptBatch);
 
         // verifications
         assertThat(carried).isFalse();
         verify(engine, never()).send(any());
         verify(legacy, never()).send(any());
-        verify(metrics).recordUnreachable(DeliveryType.CLIENT_UNINSTALL, DeliveryAudience.MACHINE);
+        verify(metrics).recordUnreachable(DeliveryType.SCRIPT_SCHEDULE, DeliveryAudience.MACHINE);
     }
 
     @Test
-    void dispatch_everyMachine_eachRouteThatCarriesTheTypeSendsItsOwnBroadcast() {
+    void dispatch_everyMachine_theEngineAloneCarriesIt() {
         // setup
         when(engine.canReachEveryMachine(DeliveryType.CLIENT_UPDATE)).thenReturn(true);
-        when(legacy.canReachEveryMachine(DeliveryType.CLIENT_UPDATE)).thenReturn(true);
 
         // execution
         boolean carried = router.dispatch(everyMachine);
@@ -133,15 +156,15 @@ class DeliveryRouterTest {
         // verifications
         assertThat(carried).isTrue();
         verify(engine).sendToEveryMachine(everyMachine);
-        verify(legacy).sendToEveryMachine(everyMachine);
+        verify(legacy, never()).canReachEveryMachine(any());
+        verify(legacy, never()).sendToEveryMachine(any());
         verify(agentVersions, never()).find(any());
     }
 
     @Test
-    void dispatch_everyMachineNoRouteOpen_nothingSentAndReportedSo() {
+    void dispatch_everyMachineEngineClosed_nothingSentAndReportedSo() {
         // setup
         when(engine.canReachEveryMachine(DeliveryType.CLIENT_UPDATE)).thenReturn(false);
-        when(legacy.canReachEveryMachine(DeliveryType.CLIENT_UPDATE)).thenReturn(false);
 
         // execution
         boolean carried = router.dispatch(everyMachine);
@@ -181,19 +204,36 @@ class DeliveryRouterTest {
         // verifications
         assertThat(carried).isFalse();
     }
+
     @Test
     void holdsForOfflineMachine_theReachingRouteAnswers() {
         // setup
         when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.of("1.6.0"));
-        when(engine.canReach(DeliveryType.CLIENT_UNINSTALL, "1.6.0")).thenReturn(true);
-        when(engine.holdsForOfflineMachine(DeliveryType.CLIENT_UNINSTALL)).thenReturn(true);
+        when(engine.canReach(DeliveryType.SCRIPT_SCHEDULE, "1.6.0")).thenReturn(true);
+        when(engine.holdsForOfflineMachine(DeliveryType.SCRIPT_SCHEDULE)).thenReturn(true);
 
         // execution
-        boolean held = router.holdsForOfflineMachine(DeliveryType.CLIENT_UNINSTALL, MACHINE_ID);
+        boolean held = router.holdsForOfflineMachine(DeliveryType.SCRIPT_SCHEDULE, MACHINE_ID);
 
         // verifications
         assertThat(held).isTrue();
         verify(legacy, never()).holdsForOfflineMachine(any());
+    }
+
+    @Test
+    void holdsForOfflineMachine_scriptBatchBelowTheEngine_legacyAnswers() {
+        // setup
+        when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.of("1.5.0"));
+        when(engine.canReach(DeliveryType.SCRIPT_SCHEDULE, "1.5.0")).thenReturn(false);
+        when(legacy.canReach(DeliveryType.SCRIPT_SCHEDULE, "1.5.0")).thenReturn(true);
+        when(legacy.holdsForOfflineMachine(DeliveryType.SCRIPT_SCHEDULE)).thenReturn(false);
+
+        // execution
+        boolean held = router.holdsForOfflineMachine(DeliveryType.SCRIPT_SCHEDULE, MACHINE_ID);
+
+        // verifications
+        assertThat(held).isFalse();
+        verify(engine, never()).holdsForOfflineMachine(any());
     }
 
     @Test

@@ -24,6 +24,8 @@ import { forwardRef, type ComponentType, type CSSProperties, type ImgHTMLAttribu
 
 import { UnifiedSkeleton } from '../components/loading/unified-skeleton';
 import { useLoadingScope } from '../components/ui/loading-scope';
+import type { AuthedAsset } from '../hooks/use-authed-asset-src';
+import { useAuthedImage } from '../hooks/use-authed-image-src';
 import { cn } from '../utils/cn';
 import { fetchPriorityProp } from '../utils/fetch-priority';
 
@@ -49,6 +51,8 @@ type ImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'placeholder
   optimizedWidth?: number;
   onLoadingComplete?: (img: HTMLImageElement) => void;
   loader?: unknown;
+  /** The picture's address when `src` is the blob fetched from it (set by the shim; see `drawnAsset`). */
+  'data-asset-src'?: string;
 };
 
 /** What the shim renders once a host has registered `next/image`. */
@@ -122,12 +126,22 @@ function HeldImage({ className, style, width, height, fill }: ImageProps) {
 const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ optimizedWidth, ...given }, ref) {
   // In a loading scope the picture is a box of its own size, and it is not fetched.
   const held = useLoadingScope();
-  if (held) return <HeldImage {...given} />;
   // A picture asked for at a width is the host resizer's URL, drawn as it comes.
-  const props: ImageProps =
+  const sized: ImageProps =
     optimizedWidth && resizer && typeof given.src === 'string'
       ? { ...given, src: resizer(given.src, optimizedWidth), unoptimized: true }
       : given;
+  // Every picture is drawn from where it lives and with the credential it needs: the host's `resolveAssetUrl`
+  // sends a backend path to its gateway, and a bearer-auth host's picture is fetched with the bearer and drawn
+  // from a blob (`useAuthedAsset`). Cookie-auth web and public pictures pass through unchanged.
+  const asset = useAuthedImage(!held && typeof sized.src === 'string' ? sized.src : undefined);
+  // Waiting for the credential or for the fetch: the picture's box, with nothing requested.
+  if (held || asset.status === 'pending') return <HeldImage {...given} />;
+  const props: ImageProps = typeof sized.src !== 'string' ? sized : drawnAsset(sized, asset);
+  // The element that failed is not the one a retry draws into: a caller that hid it in `onError` would keep it
+  // hidden. Only that transition remounts: a native in-place src swap keeps the old picture until the new one loads
+  // (a bearer swap draws the box while the new blob is fetched).
+  const key = asset.status === 'failed' ? 'failed' : undefined;
   // `priority` means "this is the picture the page is waiting for", so its
   // request is ranked high on EVERY host. Stated here, once: since Next 16
   // `priority` only preloads and no longer ranks the request, and the plain
@@ -139,7 +153,7 @@ const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ 
   // (priority, placeholder, sizes, loader…) reaches the real component intact.
   if (impl) {
     const Real = impl;
-    return <Real ref={ref} {...props} fetchPriority={fetchPriority} />;
+    return <Real key={key} ref={ref} {...props} fetchPriority={fetchPriority} />;
   }
 
   // Fallback path — plain <img>. Drops Next-only props and reduces
@@ -183,6 +197,7 @@ const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ 
     : style;
   return (
     <img
+      key={key}
       ref={ref}
       src={srcStr}
       alt={alt ?? ''}
@@ -196,5 +211,21 @@ const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ 
     />
   );
 });
+
+/**
+ * The props drawn for a string `src` once `useAuthedAsset` answered:
+ *
+ * - `native` / `ready`: its `src` (the URL, or the fetched blob). A blob goes to no optimizer.
+ * - `failed`: the URL itself, so the element fails the way a plain `<img>` would and the caller's `onError`
+ *   fallback runs. It used to stay blank, with nothing to tell the caller.
+ *
+ * `data-asset-src` keeps the URL on the element when the drawn `src` is a blob, for code that reads a picture's
+ * address off the DOM (the chat's click-to-expand gallery).
+ */
+function drawnAsset(props: ImageProps, asset: AuthedAsset): ImageProps {
+  const src = asset.status === 'failed' ? asset.url : asset.src;
+  if (asset.status !== 'ready') return { ...props, src };
+  return { ...props, src, unoptimized: true, 'data-asset-src': asset.url };
+}
 
 export default Image;

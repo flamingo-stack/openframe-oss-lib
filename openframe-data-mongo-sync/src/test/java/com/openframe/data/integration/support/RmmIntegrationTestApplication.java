@@ -1,5 +1,6 @@
 package com.openframe.data.integration.support;
 
+import com.openframe.data.repository.rmm.software.CustomSoftwareRepositoryImpl;
 import com.openframe.data.repository.rmm.CustomPackageAutoUpdatePolicyRepositoryImpl;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.repository.rmm.CustomScriptRepositoryImpl;
@@ -7,6 +8,7 @@ import com.openframe.data.repository.rmm.CustomScriptScheduleRepositoryImpl;
 import com.openframe.data.repository.rmm.CustomScheduleScriptExecutionRepositoryImpl;
 import com.openframe.data.repository.rmm.CustomScriptExecutionRepositoryImpl;
 import com.openframe.data.repository.rmm.SoftwareActionAggregationRepositoryImpl;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareAggregationRepositoryImpl;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Import;
@@ -37,7 +39,9 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         CustomScheduleScriptExecutionRepositoryImpl.class,
         CustomScriptExecutionRepositoryImpl.class,
         SoftwareActionAggregationRepositoryImpl.class,
-        CustomPackageAutoUpdatePolicyRepositoryImpl.class
+        DeviceSoftwareAggregationRepositoryImpl.class,
+        CustomPackageAutoUpdatePolicyRepositoryImpl.class,
+        CustomSoftwareRepositoryImpl.class
 })
 public class RmmIntegrationTestApplication {
 }

@@ -261,6 +261,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
       <YouTubeFacade
         url={url}
         title={props.title}
+        poster={props.poster}
         priority={props.priority}
         className={props.className}
         minimalControls={props.minimalControls}
@@ -403,6 +404,7 @@ function FirstFramePreview({
 interface YouTubeFacadeProps extends VideoYouTubeFacadeProps {
   url: string;
   title?: string;
+  poster?: string | null;
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
@@ -412,6 +414,7 @@ interface YouTubeFacadeProps extends VideoYouTubeFacadeProps {
 function YouTubeFacade({
   url,
   title = 'YouTube Video',
+  poster,
   priority,
   className,
   minimalControls,
@@ -430,6 +433,7 @@ function YouTubeFacade({
     <YouTubeFacadeInner
       videoId={videoId}
       title={title}
+      poster={poster}
       priority={priority}
       className={className}
       minimalControls={minimalControls}
@@ -442,6 +446,8 @@ function YouTubeFacade({
 interface YouTubeFacadeInnerProps extends VideoYouTubeFacadeProps {
   videoId: string;
   title: string;
+  /** The page's own cover; omitted, YouTube's thumbnail. */
+  poster?: string | null;
   priority?: boolean;
   className?: string;
   minimalControls?: boolean;
@@ -507,12 +513,15 @@ function toYouTubeMessage(parsed: unknown): YouTubeInfoDeliveryMessage | null {
 function YouTubeFacadeInner({
   videoId,
   title,
+  poster,
   priority,
   className,
   minimalControls,
   muted,
   autoActivate,
   suspended,
+  caption,
+  onPlay,
 }: YouTubeFacadeInnerProps): React.ReactElement {
   const [activated, setActivated] = useState(Boolean(autoActivate));
   // A host that flips `autoActivate` on later (an accordion step expanding)
@@ -598,6 +607,9 @@ function YouTubeFacadeInner({
   // On a 404 (e.g. no `maxresdefault`) drop one tier; clamp at the last so a
   // genuinely missing thumbnail can't loop.
   const handlePosterError = () => setPosterTier(tier => Math.min(tier + 1, YT_POSTER_TIERS.length - 1));
+  // The page's own poster that fails to load gives way to YouTube's thumbnail; a new poster gets its own try.
+  const [failedPoster, setFailedPoster] = useState<string | null>(null);
+  const ownPoster = poster && poster !== failedPoster ? poster : null;
 
   // ---------------------------------------------------------------------------
   // YouTube control-fade accelerator (user-locked target: ~1s).
@@ -744,28 +756,44 @@ function YouTubeFacadeInner({
         variant="card"
         type="button"
         aria-label={`Play: ${title}`}
-        onClick={() => setActivated(true)}
+        onClick={() => {
+          setActivated(true);
+          onPlay?.();
+        }}
         className="group absolute inset-0 h-full overflow-hidden"
       >
-        <picture>
-          <source type="image/webp" srcSet={posterWebp} />
-          <img
-            src={posterJpg}
+        {ownPoster ? (
+          <Image
+            src={ownPoster}
             alt={title}
-            // A YouTube poster is 16:9; the attributes state the ratio before it arrives (the box sizes it).
-            width={1280}
-            height={720}
-            loading="lazy"
-            onError={handlePosterError}
-            // React 18 wants lowercase (`fetchpriority` DOM attribute);
-            // React 19 wants camelCase (`fetchPriority` prop). Detect at
-            // module load and spread the right shape so both runtimes
-            // render the DOM attribute cleanly with no console warnings.
-            {...fetchPriorityProp(priority)}
-            decoding={priority ? 'sync' : 'async'}
-            className="absolute inset-0 h-full w-full object-cover"
+            fill
+            sizes={IMAGE_SLOT.full}
+            priority={priority}
+            unoptimized
+            onError={() => setFailedPoster(ownPoster)}
+            className="object-cover"
           />
-        </picture>
+        ) : (
+          <picture>
+            <source type="image/webp" srcSet={posterWebp} />
+            <img
+              src={posterJpg}
+              alt={title}
+              // A YouTube poster is 16:9; the attributes state the ratio before it arrives (the box sizes it).
+              width={1280}
+              height={720}
+              loading="lazy"
+              onError={handlePosterError}
+              // React 18 wants lowercase (`fetchpriority` DOM attribute);
+              // React 19 wants camelCase (`fetchPriority` prop). Detect at
+              // module load and spread the right shape so both runtimes
+              // render the DOM attribute cleanly with no console warnings.
+              {...fetchPriorityProp(priority)}
+              decoding={priority ? 'sync' : 'async'}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          </picture>
+        )}
         <div className="absolute inset-0 flex items-center justify-center bg-ods-bg bg-opacity-20 transition-opacity duration-200 group-hover:bg-opacity-30">
           {/* THE shared center play badge (video-center-badge.tsx) — same disc
               as strip cards / carousel thumbs / unmute chip; hero size + the
@@ -775,6 +803,14 @@ function YouTubeFacadeInner({
             className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent"
           />
         </div>
+        {caption && (
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-[var(--spacing-system-xxs)] bg-gradient-to-b from-transparent to-ods-bg p-[var(--spacing-system-l)] pt-[var(--spacing-system-xl)] text-left">
+            <span className="whitespace-pre-line font-heading text-[length:var(--font-size-h5-caption)] font-semibold leading-[var(--font-line-space-h5-caption)] text-ods-text-primary content-md:text-[length:var(--font-size-h4-body)] content-md:leading-[var(--font-line-space-h4-body)]">
+              {caption.title}
+            </span>
+            {caption.meta && <span className="text-ods-text-secondary text-h6">{caption.meta}</span>}
+          </span>
+        )}
       </Button>
     </div>
   );

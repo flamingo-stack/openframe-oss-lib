@@ -211,9 +211,12 @@ export interface NavigationSidebarConfig {
    * bordered card holding the parent and its children (one level only) — with
    * 44px rows and a label-only active pill. Only one group is open at a time:
    * the one holding the active entry. The mobile burger menu follows the same
-   * switch.
+   * switch. `'sectioned'` draws every entry with `children` as a section of its
+   * own, divided by the border: a 32px category row (grey, with a fold chevron)
+   * over 40px rows with 14px labels; every section open until the user folds it
+   * (`groupsStorageKey` keeps the folds), the active entry's section unfolding.
    */
-  variant?: 'flat' | 'grouped';
+  variant?: 'flat' | 'grouped' | 'sectioned';
   /**
    * The current location, pathname plus query string (`/monitoring?tab=policies`).
    * Lets the sidebar resolve the active entry itself — through `match`, or an
@@ -231,7 +234,20 @@ export interface NavigationSidebarConfig {
    */
   sectionSlot?: NavigationSidebarSlot;
   /**
-   * The expanded sidebar's width in px (grouped variant; default 224). Applied
+   * The border and spacing between the tree (and the top slot) and `sectionSlot`.
+   * Default true; `false` puts the section right under them (the three-column
+   * shell's chat list under "Start Work").
+   */
+  sectionDivider?: boolean;
+  /**
+   * `sectionSlot` takes the body's spare height (the slot's own root should grow into
+   * it, `flex-1`), so what the section centres — an empty chat list — sits in the
+   * middle of the sidebar rather than under its caption. Default false: the section is
+   * as tall as its content. The three-column shell's chats sidebar sets it.
+   */
+  sectionFill?: boolean;
+  /**
+   * The expanded sidebar's width in px (grouped and sectioned variants; default 224). Applied
    * to the desktop sidebar, the tablet overlay and its push slot, and written to
    * `NAVIGATION_SIDEBAR_WIDTH_VAR` while expanded — so a host's pre-paint seed
    * must write the same number (`'<expandedWidth>px'`, or `'56px'` when the
@@ -274,6 +290,33 @@ export interface NavigationSidebarConfig {
    */
   revealSignal?: number;
   /**
+   * The tablet form at desktop widths too: the rail in the flow, and the toggle (or a
+   * reveal) opens the expanded sidebar OVER the content, with the scrim, closing on
+   * Escape, a click outside or a pick — as between md and lg. For a host that keeps
+   * the content beside the sidebars at a minimum width (a narrow window, a wide
+   * sidebar beside it). The desktop preference (`collapsed`, the stored one) is kept,
+   * untouched, and back in force once this turns off. While it is on, a change of
+   * `currentPath` closes the overlay too. `'drawer'`: the same from md up, and no rail
+   * either — closed, the sidebar takes no room and shows nothing; `revealSignal` opens
+   * it (a host's own top bar button). Default `false`.
+   */
+  overlay?: boolean | 'drawer';
+  /**
+   * The desktop form from md up, not only from lg: no tablet form between md and lg (the
+   * rail it starts on, the overlay it opens, the scrim). The sidebar stays in the flow
+   * with the desktop preference (`collapsed`, the stored one), so it collapses only when
+   * the user (or the host) collapses it. For a host that lets its content scroll sideways
+   * rather than fold its sidebars on a narrower window. `overlay` still wins where it is
+   * set. Default `false`.
+   */
+  desktopFromMd?: boolean;
+  /**
+   * A dismiss command: every CHANGE of this number (not its first value) closes the
+   * overlay (tablet, `overlay`), e.g. when a pick inside a slot (a chat in the history)
+   * has done what the user opened the sidebar for. The desktop preference is untouched.
+   */
+  dismissSignal?: number;
+  /**
    * Let the user resize the expanded sidebar on desktop: a drag handle astride
    * its right edge (the grip the Mingo chat drawer had), arrow keys, Home and
    * End on it, a double click back to the default. The default stays
@@ -281,6 +324,45 @@ export interface NavigationSidebarConfig {
    * widths, as before.
    */
   resizable?: NavigationSidebarResizeConfig;
+  /**
+   * The window edge the sidebar stands on. `'right'`: its border is on its
+   * left, the tablet overlay opens from the right edge, the resize handle sits
+   * on its left edge and the toggle's chevron is mirrored. It keeps its desktop
+   * width in its own custom property (`NAVIGATION_SIDEBAR_END_WIDTH_VAR`), so a
+   * left and a right sidebar never share a pre-paint seed. Default `'left'`.
+   */
+  side?: 'left' | 'right';
+  /**
+   * The sidebar's ground. `'card'` (default): `bg-ods-card` and the default border.
+   * `'panel'`: the three-column shell's panel (ODS v2 `backgrounds/panel`), its
+   * borders and dividers `borders/subtle` on a left sidebar, the default border
+   * on a right one (as the Figma shell draws them).
+   */
+  surface?: 'card' | 'panel';
+  /**
+   * The footer slot's own inset (8px across, 4px down). Default true; `false`
+   * hands the whole 56px band to the slot (a footer laid out as one row).
+   */
+  footerInset?: boolean;
+  /** The logo row at the top. Default true; `false` starts the sidebar with its rows. */
+  header?: boolean;
+  /**
+   * The collapse toggle at the bottom. `'row'` (default): the "Hide Menu" row.
+   * `'icon'`: a 56px footer with a 32px sidebar icon button (left-aligned, centred
+   * in the rail).
+   * `'none'`: no toggle; the host draws its own (e.g. in `footerSlot`) and
+   * drives `collapsed` / `onCollapsedChange`.
+   */
+  toggle?: 'row' | 'icon' | 'none';
+  /**
+   * Grouped variant: how many groups may be open. `'single'` (default): one at
+   * a time, the active entry's. `'multi'`: each group opens and folds on its
+   * own, the group of the active entry opens when the page changes, and the
+   * open set is kept under `groupsStorageKey`.
+   */
+  groupMode?: 'single' | 'multi';
+  /** `localStorage` key for the open groups of `groupMode: 'multi'`. Omit to keep them for the mount only. */
+  groupsStorageKey?: string;
 }
 
 /** What a slot render function is told about the place it is drawn in. */
@@ -292,6 +374,13 @@ export interface NavigationSidebarSlotState {
    * its sidebar copy shares — renders only where this is `false`.
    */
   inDrawer: boolean;
+  /**
+   * The sidebar's own collapse toggle, for a host that draws its own collapse
+   * control in the slot (`toggle: 'none'`): on desktop it flips the preference
+   * (`onCollapsedChange`), on tablet and with `overlay` it opens or closes the
+   * overlay instead. Absent in the burger menu, which has nothing to collapse.
+   */
+  toggle?: () => void;
 }
 
 /**

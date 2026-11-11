@@ -47,12 +47,13 @@ public class SoftwareDataFetcher {
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
-        Integer perPage = first != null ? first : last;
+        int perPage = PageCursors.pageSize(first, last);
         Boolean vulnerable = filter != null && filter.getMinSeverity() != null
                 && filter.getMinSeverity() != SoftwareCveSeverity.NONE
                 ? Boolean.TRUE : null;
+        Boolean manageable = filter == null ? null : filter.getManageable();
         return PageCursors.toConnection(softwareInventoryService.listSoftware(
-                search, page, perPage, sort, vulnerable));
+                search, page, perPage, sort, vulnerable, manageable));
     }
 
     @DgsQuery
@@ -62,7 +63,7 @@ public class SoftwareDataFetcher {
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
-        Integer perPage = first != null ? first : last;
+        int perPage = PageCursors.pageSize(first, last);
         return PageCursors.toConnection(
                 softwareInventoryService.listSoftwareForDevice(machineId, filter, search, page, perPage, sort));
     }
@@ -74,7 +75,7 @@ public class SoftwareDataFetcher {
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
-        Integer perPage = first != null ? first : last;
+        int perPage = PageCursors.pageSize(first, last);
         return PageCursors.toConnection(
                 softwareInventoryService.listDevicesForSoftware(softwareId, filter, search, page, perPage, sort));
     }
@@ -86,7 +87,7 @@ public class SoftwareDataFetcher {
             @InputArgument Integer last, @InputArgument String before,
             @InputArgument String search, @InputArgument SortInput sort) {
         int page = PageCursors.decodePage(after != null ? after : before);
-        Integer perPage = first != null ? first : last;
+        int perPage = PageCursors.pageSize(first, last);
         String sortField = sort == null ? null : sort.getField();
         boolean asc = sort != null && sort.getDirection() == SortDirection.ASC;
         return PageCursors.toConnection(softwareInventoryService.listVulnerabilitiesForSoftware(

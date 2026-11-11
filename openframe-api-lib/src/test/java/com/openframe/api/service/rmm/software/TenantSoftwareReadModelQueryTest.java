@@ -12,11 +12,14 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
+import com.openframe.data.repository.rmm.software.SoftwareTitleQuery;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageMatchState;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
@@ -35,6 +38,7 @@ import org.springframework.data.domain.Sort;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,23 +53,29 @@ import static org.mockito.Mockito.when;
 class TenantSoftwareReadModelQueryTest {
 
     private static final String TENANT = "t1";
+    private static final Set<String> MANAGER_SOURCES = Set.of("homebrew_packages", "chocolatey_packages", "winget_packages");
 
     @Mock private SoftwareRepository softwareRepository;
+    @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private VulnerabilityRepository vulnerabilityRepository;
     @Mock private MachineRepository machineRepository;
 
     @InjectMocks private TenantSoftwareReadModelQuery query;
 
-    private static Software.Installation installation(String machineId, String... versions) {
-        return Software.Installation.builder().machineId(machineId).versions(List.of(versions)).build();
+    private static Software software(long titleId, String source) {
+        return software(titleId, source, 0);
     }
 
-    private static Software software(long titleId, String source, Software.Installation... installations) {
+    private static Software software(long titleId, String source, int devicesCount) {
         return Software.builder()
                 .tenantId(TENANT).softwareTitleId(titleId).name("jq").source(source)
-                .latestVersion("1.7").devicesCount(installations.length).cveCount(2)
-                .installations(List.of(installations))
+                .latestVersion("1.7").devicesCount(devicesCount).cveCount(2)
                 .build();
+    }
+
+    private static DeviceSoftware installed(String machineId, String... versions) {
+        return DeviceSoftware.builder().tenantId(TENANT).machineId(machineId).softwareTitleId(42L)
+                .machineConnected(true).versions(List.of(versions)).build();
     }
 
     private static Machine machine(String machineId, String hostname) {
@@ -90,11 +100,33 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
-    void get_mapsTheTitleLikeTheFleetPath() {
-        Software.Installation onM1 = installation("m1", "1.6");
-        Software.Installation onM2 = installation("m2", "1.7");
-        Software.Installation onM3 = installation("m3", "1.7");
-        Software jq = software(42L, "homebrew_packages", onM1, onM2, onM3);
+    void get_takesTheProjectedCurrentAndOlderVersions() {
+        Software jq = software(42L, "homebrew_packages", 1);
+        jq.setCurrentVersion("1.7");
+        jq.setOlderVersionsCount(2);
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(jq));
+
+        SoftwareResponse row = query.get(TENANT, "42");
+
+        assertThat(row.getCurrentVersion()).isEqualTo("1.7");
+        assertThat(row.getOlderVersionsCount()).isEqualTo(2);
+    }
+
+    @Test
+    void get_projectedWithoutVersions_noCurrentVersion() {
+        Software jq = software(42L, "homebrew_packages", 1);
+        jq.setOlderVersionsCount(0);
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(jq));
+
+        SoftwareResponse row = query.get(TENANT, "42");
+
+        assertThat(row.getCurrentVersion()).isNull();
+        assertThat(row.getOlderVersionsCount()).isZero();
+    }
+
+    @Test
+    void get_notProjectedWithVersionCountsYet_reportsNoVersionsInUse() {
+        Software jq = software(42L, "homebrew_packages", 3);
         when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(jq));
 
         SoftwareResponse row = query.get(TENANT, "42");
@@ -102,8 +134,8 @@ class TenantSoftwareReadModelQueryTest {
         assertThat(row.getId()).isEqualTo("42");
         assertThat(row.getSource()).isEqualTo(SoftwareSource.BREW);
         assertThat(row.getType()).isEqualTo(SoftwareType.PACKAGE);
-        assertThat(row.getCurrentVersion()).isEqualTo("1.7");          // the version on the most devices
-        assertThat(row.getOlderVersionsCount()).isEqualTo(1);           // 1.6 besides it
+        assertThat(row.getCurrentVersion()).isNull();
+        assertThat(row.getOlderVersionsCount()).isNull();
         assertThat(row.getLatestVersion()).isEqualTo("1.7");
         assertThat(row.getDevicesCount()).isEqualTo(3);
         assertThat(row.getVulnerabilitySummary().getCveCount()).isEqualTo(2);
@@ -118,20 +150,19 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
-    void listSoftware_searchAndVulnerable_pickTheMatchingQuery_sortedAndPaged() {
-        Software one = software(1L, "apps", installation("m1", "1.0"));
+    void listSoftware_searchAndVulnerable_narrowTheQuery_sortedAndPaged() {
+        Software one = software(1L, "apps", 1);
         Page<Software> page = new PageImpl<>(List.of(one), PageRequest.of(1, 1), 3);
-        when(softwareRepository.findByTenantIdAndNameLowerContainingAndCveCountGreaterThanAndDevicesCountGreaterThan(
-                eq(TENANT), eq("jq"), eq(0), eq(0), any(Pageable.class))).thenReturn(page);
+        when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(page);
         SortInput sort = new SortInput();
         sort.setField("devicesCount");
         sort.setDirection(SortDirection.DESC);
 
-        PageResult<SoftwareResponse> result = query.listSoftware(TENANT, "JQ", 1, 1, sort, true);
+        PageResult<SoftwareResponse> result = query.listSoftware(TENANT, "JQ", 1, 1, sort, true, null);
 
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(softwareRepository).findByTenantIdAndNameLowerContainingAndCveCountGreaterThanAndDevicesCountGreaterThan(
-                eq(TENANT), eq("jq"), eq(0), eq(0), pageable.capture());
+        verify(softwareRepository).findTitles(eq(new SoftwareTitleQuery(TENANT, "jq", true, null, MANAGER_SOURCES)),
+                pageable.capture());
         assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.DESC, "devicesCount"));
         assertThat(pageable.getValue().getPageSize()).isEqualTo(1);
         assertThat(result.items()).extracting(SoftwareResponse::getId).containsExactly("1");
@@ -141,42 +172,38 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
-    void listSoftware_noSearchNoFlag_allWithDevices_byNameAscending() {
-        when(softwareRepository.findByTenantIdAndDevicesCountGreaterThan(eq(TENANT), eq(0), any(Pageable.class)))
-                .thenReturn(Page.empty());
+    void listSoftware_noSearchNoFlags_allWithDevices_byNameAscending() {
+        when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
 
-        query.listSoftware(TENANT, null, 0, null, null, null);
+        query.listSoftware(TENANT, null, 0, null, null, null, null);
 
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(softwareRepository).findByTenantIdAndDevicesCountGreaterThan(eq(TENANT), eq(0), pageable.capture());
+        verify(softwareRepository).findTitles(eq(new SoftwareTitleQuery(TENANT, null, false, null, MANAGER_SOURCES)),
+                pageable.capture());
         assertThat(pageable.getValue().getSort()).isEqualTo(Sort.by(Sort.Direction.ASC, "nameLower"));
         assertThat(pageable.getValue().getPageSize()).isEqualTo(20);
     }
 
+    // a blank search is no search; the manageable flag reaches the query as it is, true or false
     @Test
-    void listSoftware_searchOnly_and_vulnerableOnly_useTheirOwnQueries() {
-        when(softwareRepository.findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(
-                eq(TENANT), eq("jq"), eq(0), any(Pageable.class))).thenReturn(Page.empty());
-        when(softwareRepository.findByTenantIdAndCveCountGreaterThanAndDevicesCountGreaterThan(
-                eq(TENANT), eq(0), eq(0), any(Pageable.class))).thenReturn(Page.empty());
+    void listSoftware_blankSearch_manageableFlag_passedToTheQuery() {
+        when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
 
-        query.listSoftware(TENANT, "jq", 0, 10, null, false);
-        query.listSoftware(TENANT, " ", 0, 10, null, true);
+        query.listSoftware(TENANT, " ", 0, 10, null, false, true);
+        query.listSoftware(TENANT, "jq", 0, 10, null, null, false);
 
-        verify(softwareRepository).findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(
-                eq(TENANT), eq("jq"), eq(0), any(Pageable.class));
-        verify(softwareRepository).findByTenantIdAndCveCountGreaterThanAndDevicesCountGreaterThan(
-                eq(TENANT), eq(0), eq(0), any(Pageable.class));
+        verify(softwareRepository).findTitles(eq(new SoftwareTitleQuery(TENANT, null, false, true, MANAGER_SOURCES)),
+                any(Pageable.class));
+        verify(softwareRepository).findTitles(eq(new SoftwareTitleQuery(TENANT, "jq", false, false, MANAGER_SOURCES)),
+                any(Pageable.class));
     }
 
     @Test
     void devicesForSoftwareRows_statusAgainstTheGivenLatest_allVersionsMustReachIt() {
-        Software.Installation latest = installation("m1", "10.0");
-        Software.Installation older = installation("m2", "9.0");
-        Software.Installation both = installation("m3", "10.0", "9.0");
-        Software.Installation onAGoneMachine = installation("gone", "10.0");
-        Software app = software(42L, "apps", latest, older, both, onAGoneMachine);
-        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(app));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps")));
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
+                .thenReturn(List.of(installed("m1", "10.0"), installed("m2", "9.0"), installed("m3", "10.0", "9.0"),
+                        installed("gone", "10.0")));
         Machine alpha = machine("m1", "alpha");
         Machine beta = machine("m2", "beta");
         Machine gamma = machine("m3", "gamma");
@@ -193,9 +220,34 @@ class TenantSoftwareReadModelQueryTest {
     }
 
     @Test
+    void devicesForSoftwareRows_unknownTitle_throwsNotFoundWithoutReadingDevices() {
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> query.devicesForSoftwareRows(TENANT, "42", null, null))
+                .isInstanceOf(NotFoundException.class);
+        verifyNoInteractions(deviceSoftwareRepository);
+    }
+
+    @Test
+    void devicesForSoftwareRows_aDeviceWithoutVersions_showsNoVersionAndIsOutdated() {
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps")));
+        DeviceSoftware noVersions = installed("m1");
+        noVersions.setVersions(null);
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
+                .thenReturn(List.of(noVersions));
+        when(machineRepository.findByMachineIdIn(List.of("m1"))).thenReturn(List.of(machine("m1", "alpha")));
+
+        SoftwareOnDeviceResponse row = query.devicesForSoftwareRows(TENANT, "42", null, "1.0").getFirst();
+
+        assertThat(row.getSoftwareVersion()).isNull();
+        assertThat(row.getStatus()).isEqualTo(SoftwareOnDeviceStatus.OUTDATED);
+    }
+
+    @Test
     void devicesForSoftwareRows_searchByHostname_noLatestMeansOutdated() {
-        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps",
-                installation("m1", "1.0"), installation("m2", "1.0"))));
+        when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 42L)).thenReturn(Optional.of(software(42L, "apps")));
+        when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleIdAndMachineConnectedTrueOrderByMachineIdAsc(TENANT, 42L))
+                .thenReturn(List.of(installed("m1", "1.0"), installed("m2", "1.0")));
         when(machineRepository.findByMachineIdIn(anyList())).thenReturn(List.of(
                 machine("m1", "Alpha-laptop"), machine("m2", "beta")));
 
@@ -229,9 +281,9 @@ class TenantSoftwareReadModelQueryTest {
 
     @Test
     void allForFilters_withAndWithoutSearch() {
-        when(softwareRepository.findByTenantIdAndDevicesCountGreaterThan(TENANT, 0, Pageable.unpaged()))
-                .thenReturn(new PageImpl<>(List.of(software(1L, "apps", installation("m1", "1.0")))));
-        when(softwareRepository.findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(TENANT, "jq", 0, Pageable.unpaged()))
+        when(softwareRepository.findTitles(new SoftwareTitleQuery(TENANT, null, false, null, MANAGER_SOURCES), Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(software(1L, "apps", 1))));
+        when(softwareRepository.findTitles(new SoftwareTitleQuery(TENANT, "jq", false, null, MANAGER_SOURCES), Pageable.unpaged()))
                 .thenReturn(Page.empty());
 
         assertThat(query.allForFilters(TENANT, null)).extracting(SoftwareResponse::getType).containsExactly(SoftwareType.APPLICATION);
@@ -244,7 +296,7 @@ class TenantSoftwareReadModelQueryTest {
         Software chrome = Software.builder().tenantId(TENANT).softwareTitleId(7L).name("Google Chrome").source("programs")
                 .vendor("Google LLC").upgradeCode("{UPGRADE}").arpKeys(List.of("Google Chrome"))
                 .packageFamilyNames(List.of("google.chrome_x")).systemComponent(false)
-                .packageMatch(stored).installations(List.of(installation("m1", "130.0"))).build();
+                .packageMatch(stored).build();
         when(softwareRepository.findByTenantIdAndSoftwareTitleId(TENANT, 7L)).thenReturn(Optional.of(chrome));
 
         SoftwareResponse row = query.get(TENANT, "7");

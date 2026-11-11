@@ -29,6 +29,8 @@ export interface DevicesFilterToolbarProps {
   selectedTags: FilterModalProps['selectedTags'];
   onTagsChange: FilterModalProps['onTagsChange'];
   isLoading?: boolean;
+  /** The search field's prompt. Default "Search for Devices". */
+  searchPlaceholder?: string;
 
   /**
    * When true (default), pins the toolbar at the top with the same negative-margin
@@ -41,7 +43,10 @@ export interface DevicesFilterToolbarProps {
   /**
    * Attach to the pinned row so a caller can measure it, its height is what the
    * sticky table header parks below, and it CHANGES as the tag-chip row appears
-   * and collapses. See `useStickyToolbar`.
+   * and collapses. See `useStickyToolbar`. `DevicesPanelView` measures its toolbar itself
+   * unless a host passes this ref: that host then owns the measurement and publishes
+   * `--sticky-toolbar-h` itself (`useStickyToolbar`'s `containerStyle`), or the pinned
+   * headers keep the desktop toolbar's 96px.
    */
   toolbarRef?: Ref<HTMLDivElement>;
 }
@@ -67,6 +72,7 @@ export function DevicesFilterToolbar({
   selectedTags,
   onTagsChange,
   isLoading,
+  searchPlaceholder = 'Search for Devices',
   sticky = true,
   toolbarRef,
 }: DevicesFilterToolbarProps) {
@@ -87,7 +93,7 @@ export function DevicesFilterToolbar({
             onSearchChange={onSearchChange}
             onTagRemove={onTagRemove}
             onClearAll={onClearAll}
-            placeholder="Search for Devices"
+            placeholder={searchPlaceholder}
             addMorePlaceholder="Add More..."
           />
         </div>

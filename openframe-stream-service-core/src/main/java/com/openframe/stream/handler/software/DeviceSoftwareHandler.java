@@ -4,8 +4,7 @@ import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.service.rmm.software.SoftwareProjector;
-import com.openframe.data.service.rmm.software.VulnerabilityProjector;
+import com.openframe.data.service.rmm.software.SoftwareProjectionTrigger;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareInstalledVersion;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
@@ -39,8 +38,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
-    private final SoftwareProjector softwareProjector;
-    private final VulnerabilityProjector vulnerabilityProjector;
+    private final SoftwareProjectionTrigger projectionTrigger;
 
     @Override
     public EventHandlerType getType() {
@@ -125,6 +123,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftware.setPackageFamilyNames(valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName));
             deviceSoftware.setInstallerTypes(valuesOf(title, HostSoftwareInstalledVersion::getInstallerType));
             deviceSoftware.setSystemComponent(systemComponentOf(title));
+            deviceSoftware.setWingetId(firstOf(title, HostSoftwareInstalledVersion::getWingetId));
             deviceSoftware.setVulnerabilities(vulnerabilities);
             deviceSoftware.setUpdatedAt(now);
             if (newRow) {
@@ -142,8 +141,8 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             }
         }
 
-        affectedTitles.forEach(titleId -> softwareProjector.project(host.tenantId(), titleId));
-        affectedCves.forEach(cve -> vulnerabilityProjector.project(host.tenantId(), cve));
+        projectionTrigger.titlesChanged(host.tenantId(), affectedTitles);
+        projectionTrigger.cvesChanged(host.tenantId(), affectedCves);
     }
 
     private static List<String> versionsOf(HostSoftwareTitle title) {

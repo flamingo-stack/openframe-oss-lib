@@ -12,7 +12,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { createRef, type Ref, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../utils/embed-authed-fetch', () => ({
+vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   embedAuthedFetch: vi.fn(() => new Promise(() => {})),
 }));
 
@@ -166,6 +167,22 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(screen.queryByText('hello')).not.toBeInTheDocument();
     const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
     expect(active.map(button => button.textContent)).toEqual(['New Chat']);
+  });
+
+  it('titles the chat "What to ask Mingo?" while it holds only the answer; the list row stays "New Chat"', () => {
+    renderHost();
+    // The header's title is a `p`; the list's entry of the same name is a button's label.
+    const titled = () => screen.queryAllByText('What to ask Mingo?', { selector: 'p' });
+    expect(titled()).toHaveLength(0);
+
+    fireEvent.click(whatToAsk());
+
+    expect(titled().length).toBeGreaterThan(0);
+    const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
+    expect(active.map(button => button.textContent)).toEqual(['New Chat']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
+    expect(titled()).toHaveLength(0);
   });
 
   it('replaces the new chat exchange with a fresh one on another click', () => {

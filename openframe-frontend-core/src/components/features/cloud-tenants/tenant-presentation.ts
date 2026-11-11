@@ -11,10 +11,12 @@
 import type { ComponentType, SVGProps } from 'react';
 import { formatRelativeTimeFrom } from '../../../utils/date-utils';
 import { formatDate } from '../../../utils/format-date';
+import { presentationFor } from '../../../utils/presentation-for';
 import { GoogleLogoIcon } from '../../icons-v2-generated/brand-logos/google-logo-icon';
 import { Office365LogoIcon } from '../../icons-v2-generated/brand-logos/office-365-logo-icon';
 import { CodingForkIcon } from '../../icons-v2-generated/coding/coding-fork-icon';
 import type { TagProps } from '../../ui/tag';
+import type { TenantLicenseSummary } from './tenant-row';
 
 /** What a cell shows when it has no value. */
 export const TENANT_EMPTY_VALUE = '—';
@@ -32,10 +34,6 @@ export type TenantAccessState =
 
 /** The directory providers a tenant connects to. */
 export type TenantProvider = 'MICROSOFT_365' | 'GOOGLE_WORKSPACE';
-
-function presentationFor<K extends string, V>(map: Record<K, V>, key: string | null | undefined): V | undefined {
-  return key != null && key in map ? map[key as K] : undefined;
-}
 
 // Colours read off the Figma list (node 1699-8249): red for the two states that
 // need the customer's admin, grey for read-only, outline for write-available,
@@ -108,4 +106,48 @@ export function formatLastRead(iso: string | null | undefined, now: Date = new D
 export function usersCountLabel(count: number | null | undefined): string {
   if (count == null) return TENANT_EMPTY_VALUE;
   return `${count} ${count === 1 ? 'User' : 'Users'}`;
+}
+
+/** The multi-customer list's count line (Figma 3025-3536): "227 users", the empty mark before the first read. */
+export function lowercaseUsersCountLabel(count: number | null | undefined): string {
+  if (count == null) return TENANT_EMPTY_VALUE;
+  return `${count} ${count === 1 ? 'user' : 'users'}`;
+}
+
+/**
+ * "30 of 412 unattributed" while some synced users belong to no customer (no customer's rule claims them), or `null`
+ * while every user is attributed or nothing has been read.
+ */
+export function unattributedLabel(
+  unattributed: number | null | undefined,
+  users: number | null | undefined,
+): string | null {
+  if (unattributed == null || unattributed <= 0) return null;
+  return users == null ? `${unattributed} unattributed` : `${unattributed} of ${users} unattributed`;
+}
+
+/** The share of purchased seats left unused that the list calls out: every row of Figma 3025-3536 falls on its side. */
+const UNUSED_WARNING_SHARE = 0.1;
+
+export interface TenantLicenseLines {
+  value: string;
+  detail: string | null;
+  /** The detail is worth a look: draw it in the warning colour. */
+  warning: boolean;
+}
+
+/**
+ * The LICENCES cell: "118 of 120" over "2 unused"; "88 assigned" over "Total not available" where the provider reports
+ * no purchased seats; the empty mark until the numbers have been read.
+ */
+export function licenseSummaryLines(summary: TenantLicenseSummary | null | undefined): TenantLicenseLines {
+  if (!summary) return { value: TENANT_EMPTY_VALUE, detail: null, warning: false };
+  const { assigned, purchased } = summary;
+  if (purchased == null) return { value: `${assigned} assigned`, detail: 'Total not available', warning: false };
+  const unused = summary.unused ?? purchased - assigned;
+  return {
+    value: `${assigned} of ${purchased}`,
+    detail: unused < 0 ? `${-unused} over` : `${unused} unused`,
+    warning: unused > 0 && unused / purchased >= UNUSED_WARNING_SHARE,
+  };
 }
