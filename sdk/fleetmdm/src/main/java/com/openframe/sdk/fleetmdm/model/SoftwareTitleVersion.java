@@ -17,4 +17,7 @@ public class SoftwareTitleVersion {
 
     @JsonProperty("hosts_count")
     private Integer hostsCount;
+
+    // reported only by the OpenFrame Fleet (fleetmdm#256); per-install details are on the host's installed versions
+    private String vendor;
 }

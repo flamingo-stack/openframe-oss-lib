@@ -101,6 +101,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
   demoteMarkdownH1ToH2,
   skeletonSections,
   skeletonLines,
+  skeletonTitle,
 }) => {
   const { ogScraperUrl } = useRichMarkdownRuntime();
 
@@ -158,6 +159,7 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
       allowRemoteMedia
       skeletonSections={skeletonSections}
       skeletonLines={skeletonLines}
+      skeletonTitle={skeletonTitle}
     />
   );
 };
@@ -174,6 +176,7 @@ const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
   demoteMarkdownH1ToH2 = false,
   skeletonSections,
   skeletonLines,
+  skeletonTitle,
   // Runtime overrides; provider fills the defaults
   redditProxyUrl,
   twitterProxyUrl,
@@ -199,6 +202,7 @@ const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
         demoteMarkdownH1ToH2={demoteMarkdownH1ToH2}
         skeletonSections={skeletonSections}
         skeletonLines={skeletonLines}
+        skeletonTitle={skeletonTitle}
       />
     </RichMarkdownRuntimeProvider>
   );

@@ -14,10 +14,9 @@ import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.util.SsoAuthentication;
-import com.openframe.authz.web.SignupSourceCookie;
+import com.openframe.authz.web.DownloadCookieReader;
 import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
-import com.openframe.data.document.tenant.Tenant;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -32,7 +31,6 @@ import java.io.IOException;
 import java.util.Optional;
 
 import static com.openframe.authz.web.Redirects.foundAtRoot;
-import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
 import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
 import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
 import static com.openframe.core.exception.AuthErrorCode.ORGANIZATION_SSO_REQUIRED;
@@ -136,9 +134,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
         String tenantId = authUser.getTenantId();
         ensureGenericProviderAllowed(tenantId, provider);
 
-        tenantService.findById(tenantId)
-                .filter(Tenant::isActive)
-                .orElseThrow(() -> new AuthFlowException(ACCOUNT_INACTIVE, "Your account is not active. Please contact your administrator."));
+        tenantService.refuseLoginUnlessActive(tenantId);
 
         // Only now — the login is fully allowed (trusted routing, provider permitted, tenant
         // active). A link written before these checks would outlive a REJECTED login and later
@@ -202,7 +198,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
             String ticket = signupTicketService.create(email, names[0], names[1], provider,
                     OidcUserUtils.emailVerifiedClaimAllows(user),
                     ssoIdentityService.subjectOf(provider, user.getClaims()).orElse(null),
-                    SignupSourceCookie.read(request));
+                    DownloadCookieReader.read(request));
             log.info("event=sso-login-continue-registration-mobile provider={}", provider);
             foundAtRoot(response, "/oauth/signup-continue?signupTicket=" + urlEncode(ticket)
                     + "&redirectTo=" + urlEncode(payload.redirectTo()));

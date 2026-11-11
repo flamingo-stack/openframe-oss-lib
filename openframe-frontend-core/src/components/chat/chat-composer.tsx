@@ -107,6 +107,12 @@ export interface ChatComposerProps {
   /** Mingo's AI edge light (`MingoEdgeLight`, the header launcher's) travelling
    *  around the input card. Not on an archived chat. Default `false`. */
   edgeLight?: boolean;
+  /**
+   * The side inset of the composer in its box: `'always'` (default) the 12–16px
+   * `spacing-system-m`; `'wide'` only from the content area's md step (720px of
+   * content) — in a narrow column the host's own padding is the composer's edge.
+   */
+  inset?: 'always' | 'wide';
 }
 
 /**
@@ -152,6 +158,7 @@ export function ChatComposer({
   footerActions,
   safeAreaBottom = true,
   edgeLight = false,
+  inset = 'always',
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived;
   const locked = lock != null;
@@ -296,7 +303,10 @@ export function ChatComposer({
 
   return (
     <div
-      className="flex flex-shrink-0 flex-col gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-xxs)]"
+      className={cn(
+        'flex flex-shrink-0 flex-col gap-[var(--spacing-system-xxs)] pb-[var(--spacing-system-xxs)]',
+        inset === 'wide' ? 'px-0 content-md:px-[var(--spacing-system-m)]' : 'px-[var(--spacing-system-m)]',
+      )}
       // Tight `xxs` bottom padding (the model/usage row already sits just below
       // the input); `max(…, safe-area-inset)` still clears the iOS home bar —
       // unless the host's layout already does (`safeAreaBottom={false}`).

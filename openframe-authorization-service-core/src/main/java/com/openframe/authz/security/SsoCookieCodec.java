@@ -36,20 +36,12 @@ public class SsoCookieCodec {
         }
     }
 
-    public String encodeTenant(SsoTenantRegCookiePayload payload) {
-        return encode(payload);
-    }
-
     public String encodeInvite(SsoInviteCookiePayload payload) {
         return encode(payload);
     }
 
     public String encodeLogin(SsoLoginCookiePayload payload) {
         return encode(payload);
-    }
-
-    public Optional<SsoTenantRegCookiePayload> decodeTenant(String token) {
-        return decode(token, SsoTenantRegCookiePayload.class);
     }
 
     public Optional<SsoInviteCookiePayload> decodeInvite(String token) {

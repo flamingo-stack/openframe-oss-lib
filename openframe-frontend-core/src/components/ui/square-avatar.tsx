@@ -3,6 +3,7 @@
 import { type HTMLAttributes, memo, forwardRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
+import { useImageFallback } from '../../hooks/use-image-fallback';
 import { AVATAR_SIZE, AVATAR_SIZE_PX, type AvatarSize } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
@@ -66,7 +67,9 @@ const SquareAvatar = memo(
       // is not fetched.
       const inScope = useLoadingScope();
       const held = inScope || !!loading;
-      const authedSrc = useAuthedImageSrc(held ? undefined : src);
+      // The initials fallback used to be written into the DOM from `onError`, and the hidden picture stayed hidden
+      // for the avatar's lifetime, even once a src that loads arrived.
+      const { src: resolvedSrc, onError } = useImageFallback(useAuthedImageSrc(held ? undefined : src));
       if (held) {
         return (
           <SquareAvatarSkeleton
@@ -78,7 +81,6 @@ const SquareAvatar = memo(
           />
         );
       }
-      const resolvedSrc = authedSrc;
       const sizeClasses = AVATAR_SIZE;
       const sizePxBySize = AVATAR_SIZE_PX;
 
@@ -137,12 +139,7 @@ const SquareAvatar = memo(
               alt={alt || ''}
               width={sizePx ?? sizePxBySize[size]}
               height={sizePx ?? sizePxBySize[size]}
-              onError={e => {
-                const img = e.currentTarget;
-                img.style.display = 'none';
-                const el = img.previousElementSibling as HTMLElement;
-                if (el) el.classList.remove('hidden');
-              }}
+              onError={onError}
             />
           )}
         </div>

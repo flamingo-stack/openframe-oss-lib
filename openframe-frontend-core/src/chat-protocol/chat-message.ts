@@ -22,6 +22,7 @@ import type { ChatContextItem } from '../components/chat/types/context-item.type
 import type {
   ApprovalRequestField,
   AskOptionData,
+  PolicyReviewData,
   TicketEscalatedData,
   TicketEventData,
 } from '../components/chat/types/message.types';
@@ -191,6 +192,8 @@ export type ChatToolMetadata = {
   integratedToolType?: string;
   toolExplanation?: string;
   statusLabel?: string;
+  /** The security policy's review of the call: its approval card, or its run's chunk (EXECUTING only). */
+  policyReview?: PolicyReviewData;
   resolvedByName?: string | null;
   /** The batch a row with no approval of its own belongs to. */
   batchId?: string;

@@ -2,6 +2,8 @@ package com.openframe.api.dto.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
+import com.openframe.data.document.device.DirectorySource;
+import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import lombok.AllArgsConstructor;
@@ -31,6 +33,8 @@ public class DeviceFilterCriteria {
     private String pattern;
     private List<String> hostnames;
     private List<String> nicknames;
+    private List<DirectorySource> directorySources;
+    private List<DirectoryUserLink> userLinks;
 
     public DeviceFilterCriteria(List<DeviceStatus> statuses, List<DeviceType> deviceTypes, List<OsType> osTypes,
                                 List<String> organizationIds, List<String> tagKeys, List<String> tagValues,

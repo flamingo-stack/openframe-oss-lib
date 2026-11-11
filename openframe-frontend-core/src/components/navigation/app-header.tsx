@@ -65,6 +65,15 @@ export interface AppHeaderProps {
   /** Callback to toggle mobile menu */
   onToggleMobileMenu?: () => void;
   /**
+   * Below md, which edge the burger stands at: `'start'` (default) at the left, with the
+   * Mingo launcher at the end; `'end'` at the right, and the Mingo launcher (`showMingoAI`)
+   * at the left instead — for a shell whose chats are its left sidebar and its
+   * navigation the right one.
+   */
+  mobileMenuSide?: 'start' | 'end';
+  /** `'panel'`: the shell's panel ground (ODS v2 `backgrounds/panel`) instead of the card's. */
+  surface?: 'panel';
+  /**
    * When true, all header controls are disabled and visually dimmed
    * EXCEPT the mobile burger menu toggle, which remains interactive.
    */
@@ -180,6 +189,8 @@ export const AppHeader = React.memo(function AppHeaderImpl({
   className,
   isMobileMenuOpen,
   onToggleMobileMenu,
+  mobileMenuSide = 'start',
+  surface,
   disabled = false,
   loading: loadingProp = false,
   loadingActionCells,
@@ -187,6 +198,17 @@ export const AppHeader = React.memo(function AppHeaderImpl({
 }: AppHeaderProps) {
   const isMdUp = useMdUp() ?? false;
   const loading = useLoadingScope() || loadingProp;
+  const menuAtEnd = mobileMenuSide === 'end';
+  const burgerButton = (cellClassName: string) => (
+    <HeaderButton
+      onClick={onToggleMobileMenu}
+      isActive={isMobileMenuOpen}
+      icon={isMobileMenuOpen ? <XmarkIcon className="h-6 w-6" /> : <Menu01Icon className="h-6 w-6" />}
+      aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+      aria-expanded={isMobileMenuOpen}
+      className={cellClassName}
+    />
+  );
 
   // After the only hooks above, so the hook order is identical in both branches.
   if (loading) {
@@ -241,18 +263,22 @@ export const AppHeader = React.memo(function AppHeaderImpl({
     <TopNavigation
       className={cn('sticky top-0 z-40', className)}
       centerBreakpoint="md"
+      backgroundClassName={surface === 'panel' ? 'bg-ods-panel' : undefined}
       leading={
-        // Mobile: Burger Menu Button
-        !isMdUp && (
-          <HeaderButton
-            onClick={onToggleMobileMenu}
-            isActive={isMobileMenuOpen}
-            icon={isMobileMenuOpen ? <XmarkIcon className="h-6 w-6" /> : <Menu01Icon className="h-6 w-6" />}
-            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={isMobileMenuOpen}
-            className="border-r border-ods-border"
-          />
-        )
+        // Mobile: the burger at the start — or, with `mobileMenuSide="end"`, Mingo there.
+        !isMdUp &&
+        (menuAtEnd
+          ? showMingoAI && (
+              <HeaderMingoButton
+                onClick={onMingoAI}
+                isActive={isMingoAIActive}
+                closeWhenActive={mingoAICloseWhenActive}
+                iconOnly
+                disabled={disabled || !onMingoAI}
+                className={cn('border-r border-ods-border', dimmedClass)}
+              />
+            )
+          : burgerButton('border-r border-ods-border'))
       }
       logo={
         !isMdUp && (
@@ -386,7 +412,9 @@ export const AppHeader = React.memo(function AppHeaderImpl({
 
           {/* Mingo AI launcher — anchored at the very end of the header. On mobile
           it collapses to an icon-only affordance (no "Mingo AI" wordmark). */}
-          {showMingoAI && (
+          {/* With the burger at the end it closes the row, in Mingo's place. */}
+          {!isMdUp && menuAtEnd && burgerButton(cellDivider)}
+          {showMingoAI && !(menuAtEnd && !isMdUp) && (
             <HeaderMingoButton
               onClick={onMingoAI}
               isActive={isMingoAIActive}

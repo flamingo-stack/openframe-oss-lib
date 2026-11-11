@@ -15,13 +15,13 @@ import { defaultTableIdForDocumentType, getSourceLabel } from './source-icons';
 
 /**
  * Doc-table documentTypes: whole documents with their own viewer (markdown =
- * product docs, data_room_doc = data room). They carry an in-app `path` (handed
+ * product docs, data_room_doc = data room, policy_doc = company policies). They carry an in-app `path` (handed
  * to the host's composer as the slug), and a server never folds them
  * into one citation (`groupsByTable`); the strip still draws them as one chip
  * per table. The hub's per-source contract test pins this list to its
  * doc-table configs.
  */
-export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc'] as const;
+export const DOC_TABLE_TYPES = ['markdown', 'data_room_doc', 'policy_doc'] as const;
 
 /**
  * Which tables a SERVER gives the model as one search result: rows of a knowledge

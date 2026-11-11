@@ -22,6 +22,7 @@ import {
   type ChatSourcePart,
   type ChatToolMetadata,
 } from './chat-message';
+import { policyReviewField } from './policy-review';
 import { normalizeRecordUris, normalizeSourceId } from './record-link';
 import type { ChatStreamEntry, UiChunk } from './ui-chunks';
 import { isRecord } from './wire-narrow';
@@ -149,6 +150,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       ...(nonEmpty(data.integratedToolType) ? { integratedToolType: data.integratedToolType as string } : {}),
       ...(nonEmpty(data.toolExplanation) ? { toolExplanation: data.toolExplanation as string } : {}),
       ...(nonEmpty(data.statusLabel) ? { statusLabel: data.statusLabel as string } : {}),
+      ...policyReviewField(data.policyReview),
     };
     const title = nonEmpty(data.title);
     seenTools.add(toolCallId);
@@ -180,6 +182,7 @@ export function createMingoDecoder(options: { now?: () => string } = {}): MingoD
       const metadata: ChatToolMetadata = {
         ...(nonEmpty(call.toolType) ? { integratedToolType: call.toolType as string } : {}),
         ...(explanation ? { toolExplanation: explanation } : {}),
+        ...policyReviewField(call.policyReview),
         ...(requiresApproval ? {} : { batchId: requestId }),
       };
       const title = nonEmpty(call.toolTitle);

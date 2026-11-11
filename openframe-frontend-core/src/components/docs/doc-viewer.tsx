@@ -4,15 +4,15 @@ import type React from 'react';
 import { useMemo } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
 import type { DocContent, DocNode, DocRenderHandlers, DocSourceId } from '../../types/doc-source';
-import { findDocNodeByPath } from '../../utils/doc-tree-nav';
+import { findDocNodeByPath, rootDocumentPath } from '../../utils/doc-tree-nav';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MultiLevelNavigation, MobileNavigationDropdown } from '../navigation/multi-level-navigation';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { PersistentSidebar, PersistentMobileDropdown } from '../persistent-filter-controls';
 import { DocSearchBar, useDocSearch } from '../shared/doc-search';
 import { DataSyncLine } from '../ui/data-attribution';
+import { LoadingScope } from '../ui/loading-scope';
 import { useDocNavigation } from './doc-navigation-context';
 import { useDocsResolveLink } from './use-docs-resolve-link';
 import { useDocumentTree } from './use-document-tree';
@@ -45,13 +45,6 @@ export interface DocViewerProps {
    * interface in between.
    */
   renderContent: (content: DocContent, handlers: DocRenderHandlers) => React.ReactNode;
-
-  /**
-   * Render the loading skeleton. Receives the selected node's `documentType`
-   * (undefined while structure is still loading) so the caller can return a
-   * markdown-shaped skeleton vs an embed-shaped skeleton.
-   */
-  renderSkeleton: (documentType: DocNode['documentType']) => React.ReactNode;
 
   /**
    * Chat-source identifier — passed in by the page shell from server-side
@@ -88,6 +81,13 @@ export interface DocViewerProps {
   /** Initial doc path (URL `[...path]`). */
   docPath?: string;
 
+  /**
+   * The type of the document at `docPath`, when the page knows it before the tree is read (the host read it on the
+   * server). The content's loading state takes its shape from it on a page's first load (a Figma deck draws the embed
+   * skeleton, not a text page); once the tree is read, the selected node's own type decides.
+   */
+  initialDocumentType?: DocNode['documentType'];
+
   /** Sidebar header copy (`'DOCUMENTATION'`, `'DATA ROOM'`). */
   sidebarLabel?: string;
 
@@ -113,7 +113,7 @@ export interface DocViewerProps {
   /** Base route path for URL navigation. */
   baseRoute: string;
 
-  /** Empty state copy when no doc is selected. */
+  /** What the viewer says when the source holds no documents yet (default "No documents yet."). */
   emptyStateText?: string;
 
   /** Whether to render the doc-search bar (bound to chat). */
@@ -141,12 +141,13 @@ export function DocViewer(props: DocViewerProps) {
 
 /** The "On this page" column's heading: static copy, drawn for real loaded and loading. */
 const ON_THIS_PAGE_LABEL = 'ON THIS PAGE';
+/** The loading section list's click handler: it has no sections to click. */
+const NO_SECTION_CLICK = () => {};
 const ON_THIS_PAGE_HEADING_CLASS = 'mb-4 font-semibold text-ods-text-secondary text-h5';
 
 function DocViewerContent({
   sourceId,
   renderContent,
-  renderSkeleton,
   chatSource,
   title,
   subtitle,
@@ -154,6 +155,7 @@ function DocViewerContent({
   className = '',
   shell = true,
   docPath,
+  initialDocumentType,
   sidebarLabel = 'DOCUMENTATION',
   structureEndpoint,
   contentEndpoint,
@@ -245,11 +247,31 @@ function DocViewerContent({
   //   - the article max-width + sticky-nav visibility (markdown only)
   // `undefined` documentType is treated as `'markdown'` (per the DocNode
   // discriminator's documented default).
+  // Before the tree is read, the host's `initialDocumentType` (the page's own document) stands in. Once it is read, the
+  // root takes the type of the document it shows (`rootDocumentPath`), so a root Figma or PDF never flips to the text
+  // layout between the tree arriving and the document arriving.
+  const selectedNodePath =
+    structure.length > 0 && !selectedPath ? rootDocumentPath(structure, folderIndexFile) : selectedPath;
   const selectedNodeDocType =
-    selectedPath && structure.length > 0 ? findDocNodeByPath(selectedPath, structure)?.documentType : undefined;
-  // During loading, the in-flight content's type isn't known yet — fall back
-  // to the selected node's type (or markdown if neither is set).
-  const activeDocType = content?.documentType ?? selectedNodeDocType;
+    structure.length > 0
+      ? selectedNodePath
+        ? findDocNodeByPath(selectedNodePath, structure)?.documentType
+        : undefined
+      : initialDocumentType;
+  // While a document loads, `content` is still the PREVIOUS document's: the layout (the "On this page" column, the
+  // article width) follows the document being opened, never the one being left, or opening a Figma deck from a text
+  // page draws the text page's column beside the deck's skeleton. Loaded, the content's own type decides.
+  const isLoadingDocument = isLoadingContent || isLoadingStructure;
+  // While a document loads: its renderer with an EMPTY document of its type (the selected node's, or the host's
+  // `initialDocumentType` before the tree is read), drawn in a loading scope, so every renderer shows its own loading
+  // form.
+  const loadingContent = isLoadingDocument
+    ? renderContent(
+        { content: '', sections: [], path: selectedPath ?? '', documentType: selectedNodeDocType },
+        { onInternalLinkClick: navigateToDoc, currentPath: selectedPath ?? '', sourceId },
+      )
+    : null;
+  const activeDocType = isLoadingDocument ? selectedNodeDocType : (content?.documentType ?? selectedNodeDocType);
   const isMarkdownContent = !activeDocType || activeDocType === 'markdown';
   const showStickyNav = isMarkdownContent;
 
@@ -265,11 +287,10 @@ function DocViewerContent({
   const containerBgStyle =
     colorPalette.containerBackground !== 'transparent' ? { backgroundColor: colorPalette.containerBackground } : {};
 
-  const defaultEmptyText =
-    structure.length > 0
-      ? 'Select a document from the sidebar to view'
-      : 'No documents yet. Add content from the admin panel.';
-  const resolvedEmptyText = emptyStateText || defaultEmptyText;
+  // A source with documents and none open asks for one; an empty source says so in the host's words (a reader may
+  // not be the one who adds documents, so the default names no admin screen).
+  const resolvedEmptyText =
+    structure.length > 0 ? 'Select a document from the sidebar to view' : emptyStateText || 'No documents yet.';
 
   // Unified header: title/subtitle route through the canonical (frozen)
   // `PageLayout` `TitleBlock` (text-h2) — same as every other help-center page —
@@ -364,8 +385,10 @@ function DocViewerContent({
                       (app-globals.css) so content wraps instead of overflowing. */}
                   <div className={`w-full min-w-0 ${isMarkdownContent ? 'mx-auto max-w-4xl' : ''}`}>
                     <article className="space-y-2">
-                      {isLoadingContent || isLoadingStructure ? (
-                        renderSkeleton(selectedNodeDocType)
+                      {isLoadingDocument ? (
+                        // The document being opened draws its own loading form: its renderer, in a loading scope,
+                        // with an empty document of its type (no words, no address), never a skeleton picked here.
+                        <LoadingScope>{loadingContent}</LoadingScope>
                       ) : !content ? (
                         <div className="py-16 text-center">
                           <p className="text-ods-text-secondary text-h4">{resolvedEmptyText}</p>
@@ -376,22 +399,20 @@ function DocViewerContent({
                     </article>
                   </div>
 
-                  {isMarkdownContent && (isLoadingContent || isLoadingStructure) && (
+                  {isMarkdownContent && isLoadingDocument && (
                     <div className="hidden content-lg:block">
                       <div className="sticky top-24">
                         <h3 className={ON_THIS_PAGE_HEADING_CLASS}>{ON_THIS_PAGE_LABEL}</h3>
-                        <div className="space-y-0">
-                          {[130, 170, 190, 220, 110, 200, 80, 100, 120, 140, 90].map((w, i) => (
-                            <div
-                              key={i}
-                              className={`border-l-2 py-[13px] pl-3 ${
-                                i === 0 ? 'border-ods-accent' : 'border-transparent'
-                              }`}
-                            >
-                              <UnifiedSkeleton className="h-[13px] rounded" width={w} />
-                            </div>
-                          ))}
-                        </div>
+                        {/* The section list's own loading form (`StickySectionNav` with no sections, in a scope). */}
+                        <LoadingScope>
+                          <StickySectionNav
+                            sections={[]}
+                            activeSection=""
+                            onSectionClick={NO_SECTION_CLICK}
+                            ribbonPosition="left"
+                            ribbonColor="var(--ods-accent)"
+                          />
+                        </LoadingScope>
                       </div>
                     </div>
                   )}

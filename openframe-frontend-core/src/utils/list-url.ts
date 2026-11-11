@@ -99,7 +99,8 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   slack_message: (ids, b) => `${b}/api/slack-community/messages?ids=${ids.join(',')}`,
   hubspot_ticket: (ids, b) => `${b}/api/tickets/internal?ids=${ids.join(',')}`,
   hubspot_ticket_anon: (ids, b) => `${b}/api/tickets/known-issues?ids=${ids.join(',')}`,
-  data_room_doc: (ids, b) => `${b}/api/data-room/documents?ids=${ids.join(',')}`,
+  data_room_doc: (ids, b) => `${b}/api/libraries/data-room/documents?ids=${ids.join(',')}`,
+  policy_doc: (ids, b) => `${b}/api/libraries/company-policies/documents?ids=${ids.join(',')}`,
   markdown: (ids, b) => `${b}/api/docs/pages?ids=${ids.join(',')}`,
   financial_kpi: (ids, b) => `${b}/api/financials/kpis?ids=${ids.join(',')}`,
   cap_table: (ids, b) => `${b}/api/financials/cap-table?ids=${ids.join(',')}`,
@@ -115,7 +116,7 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   // (ChatRef-shaped items, `handleEntityCardList`), like github / slack.
   design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
   openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
-  prospect_call: (ids, b) => `${b}/api/prospect-calls?ids=${ids.join(',')}`,
+  recorded_call: (ids, b) => `${b}/api/recorded-calls?ids=${ids.join(',')}`,
   // The public website's own pages (live source; ChatRef-shaped items like the objects above).
   site_page: (ids, b) => `${b}/api/site-pages?ids=${ids.join(',')}`,
   openframe_price: (ids, b) => `${b}/api/openframe-pricing?ids=${ids.join(',')}`,

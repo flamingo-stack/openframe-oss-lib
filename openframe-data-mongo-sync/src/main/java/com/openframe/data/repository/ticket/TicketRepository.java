@@ -16,14 +16,6 @@ public interface TicketRepository extends MongoRepository<Ticket, String>, Custo
 
     Optional<Ticket> findByTicketNumber(Integer ticketNumber);
 
-    List<Ticket> findByOrganizationId(String organizationId);
-
-    List<Ticket> findByAssignedTo(String assignedTo);
-
-    List<Ticket> findByDeviceId(String deviceId);
-
-    List<Ticket> findByResolvedById(String resolvedById);
-
     List<Ticket> findByIdIn(List<String> ids);
 
     @Query("{ '_id': ?0, 'owner.machineId': ?1 }")

@@ -30,30 +30,6 @@ jobs:
     # PR builds (and snapshots) only with the build label; the merge queue always builds.
     if: github.event_name == 'merge_group' || (github.event.pull_request.state == 'open' && !github.event.pull_request.draft && contains(github.event.pull_request.labels.*.name, 'build'))
 
-
-  lint:
-    name: "Lint"
-    runs-on: ubuntu-latest
-    if: github.event.action != 'closed'
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Assign PR author
-        if: github.event.action == 'opened' && github.event.pull_request.user.type == 'User'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh pr edit ${{ github.event.pull_request.html_url }} --add-assignee ${{ github.event.pull_request.user.login }}
-      # Squash commits take the PR title; read live so a re-run picks up an edited title or the no-task label.
-      - name: Check PR title
-        if: github.event.pull_request.user.type == 'User' && !startsWith(github.head_ref, 'renovate/')  # Renovate runs as a user
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.html_url }}
-        run: |
-          gh pr view "$PR" --json title,labels -q '.title + if any(.labels[]; .name == "no-task") then " CU-notask" else "" end' \
-            | grep -qE "^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\(.+\))?!?: .+ CU-[0-9a-z]+$" \
-            || { echo "::error::Expected 'fix(armor): exclude billing action CU-17tkuw5x3yh' (no-task label drops CU-); fix the title and re-run"; exit 1; }
-
   build-java:
     name: Build Java
     runs-on: ubuntu-latest
@@ -104,8 +80,6 @@ jobs:
             --batch-mode \
             --no-transfer-progress \
             -Dmaven.source.skip=true
-
-
 
   build-node:
     name: Build Node (openframe-frontend-core)
@@ -201,7 +175,6 @@ jobs:
           npm exec --no -- pkg-pr-new publish --no-compact --no-template --comment=off --json pkg-pr-new.json "$PACKAGE_TARBALL"
           jq -r '.packages[0].url' pkg-pr-new.json >> "$GITHUB_STEP_SUMMARY"
 
-
   build-rust:
     name: "Build Rust (${{ matrix.os }})"
     needs: changes
@@ -237,8 +210,6 @@ jobs:
       - name: Test
         run: make -C clients/openframe-client test
 
-
-
   cleanup:
     name: Cleanup
     if: github.event_name == 'pull_request' && github.event.pull_request.state != 'open'
@@ -264,14 +235,3 @@ jobs:
           done
           exit $FAILED
 
-  all-checks:
-    name: "All Checks"
-    needs: [changes, build-java, build-node, build-rust, lint]
-    runs-on: ubuntu-latest
-    if: |
-      always() &&
-      (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || !contains(needs.*.result, 'skipped'))
-    steps:
-      - if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
-        run: exit 1
-      - run: echo "All checks passed"

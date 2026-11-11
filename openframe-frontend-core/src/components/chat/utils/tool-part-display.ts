@@ -46,6 +46,7 @@ export function toolExecutionDataOf(part: ChatToolPart): ToolExecutionData {
     ...(part.title !== undefined ? { toolTitle: part.title } : {}),
     ...(metadata?.toolExplanation !== undefined ? { toolExplanation: metadata.toolExplanation } : {}),
     ...(metadata?.statusLabel !== undefined ? { statusLabel: metadata.statusLabel } : {}),
+    ...(metadata?.policyReview !== undefined ? { policyReview: metadata.policyReview } : {}),
   };
   const parameters = argsOf(part.input);
   if (parameters) row.parameters = parameters;
@@ -182,6 +183,7 @@ function batchRowOf(part: ChatToolPart): PendingToolCallData {
     ...(title !== undefined ? { toolTitle: title } : {}),
     ...(explanation !== undefined ? { toolExplanation: explanation } : {}),
     ...(part.toolMetadata?.integratedToolType !== undefined ? { toolType: part.toolMetadata.integratedToolType } : {}),
+    ...(part.toolMetadata?.policyReview !== undefined ? { policyReview: part.toolMetadata.policyReview } : {}),
   };
 }
 

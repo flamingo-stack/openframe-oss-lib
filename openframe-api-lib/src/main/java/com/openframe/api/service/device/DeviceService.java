@@ -21,14 +21,15 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
-import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.device.MachineNameMatches;
+import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import com.openframe.data.service.rmm.DeletedMachineCleanup;
-import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.DeviceSoftwareConnectivitySync;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -48,6 +48,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.openframe.data.service.machine.MachineFields.NICKNAME;
+import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
 @Service
@@ -58,6 +59,7 @@ public class DeviceService {
 
     private final MachineRepository machineRepository;
     private final DeletedMachineCleanup deletedMachineCleanup;
+    private final DeviceSoftwareConnectivitySync deviceSoftwareConnectivitySync;
     private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
@@ -181,6 +183,9 @@ public class DeviceService {
                 .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.OS_TYPE)))
                 .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
                 .tagKeys(List.of())
+                // The pickers' Mongo facets have no directory dimension: the two filters apply, their counts are []
+                .directorySources(List.of())
+                .userLinks(List.of())
                 .filteredCount((int) machineRepository.countMachines(tenantId, filter, search))
                 .build();
     }
@@ -273,7 +278,9 @@ public class DeviceService {
                     .hostnames(filter.getHostnames())
                     .nicknames(filter.getNicknames())
                     .tagKeys(filter.getTagKeys())
-                    .tagValues(filter.getTagValues());
+                    .tagValues(filter.getTagValues())
+                    .directorySources(filter.getDirectorySources())
+                    .directoryUserLinks(filter.getUserLinks());
             filterOsTypes = filter.getOsTypes();
         }
         return builder.osTypes(resolveOsTypes(filterOsTypes, osTypeScope))
@@ -349,17 +356,22 @@ public class DeviceService {
             log.info("Device {} already has status {}", machineId, status);
             return;
         }
+        DeviceStatus previousStatus = machine.getStatus();
+        boolean connected = status.isConnected();
         if (status == DeviceStatus.DELETED) {
-            deletedMachineCleanup.removeFromSchedules(machine.getTenantId(), machineId);
+            deletedMachineCleanup.cleanUpDeletedMachine(machine.getTenantId(), machineId);
+        } else if (previousStatus.isConnected() != connected) {
+            deviceSoftwareConnectivitySync.onConnectivityChanged(machine.getTenantId(), machineId, connected);
         }
 
-        machine.setStatus(status);
-        machine.setUpdatedAt(Instant.now());
-        machineRepository.save(machine);
+        // Field-level: a whole-document save would overwrite what other writers set on the machine since the read
+        Machine updated = machineWriter.update(machineId, machineUpdate().set(STATUS, status))
+                .map(MachineWriteResult::after)
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
         log.info("Device {} status updated to {}", machineId, status);
 
         try {
-            deviceStatusProcessor.postProcessStatusUpdated(machine);
+            deviceStatusProcessor.postProcessStatusUpdated(updated);
         } catch (Exception e) {
             log.error("Post-processor failed for machineId={}: {}", machineId, e.getMessage(), e);
         }

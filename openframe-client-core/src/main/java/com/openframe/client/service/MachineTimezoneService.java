@@ -3,6 +3,7 @@ package com.openframe.client.service;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.service.machine.MachineWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.openframe.data.service.machine.MachineFields.TIMEZONE;
+import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Service
@@ -22,6 +25,7 @@ public class MachineTimezoneService {
     private static final Set<String> AVAILABLE_ZONES = ZoneId.getAvailableZoneIds();
 
     private final MachineRepository machineRepository;
+    private final MachineWriter machineWriter;
 
     public void updateTimezone(String machineId, String timezone) {
         if (isBlank(timezone)) {
@@ -51,8 +55,7 @@ public class MachineTimezoneService {
             return;
         }
 
-        machine.setTimezone(timezone);
-        machineRepository.save(machine);
+        machineWriter.update(machineId, machineUpdate().set(TIMEZONE, timezone));
         log.info("Updated timezone for machineId={} to {}", machineId, timezone);
     }
 

@@ -24,7 +24,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Identity + every other authed fetch: a promise that never settles keeps the
 // panel offline and free of state updates landing outside `act`.
-vi.mock('../../../utils/embed-authed-fetch', () => ({
+vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   embedAuthedFetch: vi.fn(() => new Promise(() => {})),
 }));
 

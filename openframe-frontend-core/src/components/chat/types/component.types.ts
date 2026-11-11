@@ -273,6 +273,13 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  This prop remains supported for callers that need a NON-binary
    *  override (custom max-w value, etc.). */
   contentClassName?: string;
+  /**
+   * The thread fades out over the scroller's last {@link CHAT_THREAD_FADE_PX} px, into
+   * what stands under it (a composer), as a page fades under a floating dock; the end
+   * of the content is padded by as much, so the last message clears the fade when
+   * scrolled to the end. Default `false`.
+   */
+  fadeEnd?: boolean;
   assistantType?: AssistantType;
   /** Viewer variant for approval blocks in every rendered message (incl. the
    *  sticky pending-approvals footer). `'admin'` (default) = full command

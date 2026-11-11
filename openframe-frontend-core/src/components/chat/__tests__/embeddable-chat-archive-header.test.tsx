@@ -10,7 +10,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../../utils/embed-authed-fetch', () => ({
+vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   embedAuthedFetch: vi.fn(() => new Promise(() => {})),
 }));
 
