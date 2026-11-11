@@ -36,6 +36,31 @@ class MessageTypeTest {
     }
 
     @Test
+    void accessChangeEvent_preEnrichedOpenframeToCassandraLokiPinot() {
+        // setup
+        MessageType type = MessageType.ACCESS_CHANGE_EVENT;
+
+        // execution
+        IntegratedToolType toolType = type.getIntegratedToolType();
+
+        // verifications
+        assertThat(toolType).isEqualTo(IntegratedToolType.OPENFRAME);
+        assertThat(type.getDataEnrichmentServiceType()).isEqualTo(DataEnrichmentServiceType.PRE_ENRICHED);
+        assertThat(type.getDestinationList())
+                .containsExactly(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+        assertThat(type.getEventHandlerType()).isEqualTo(EventHandlerType.COMMON_TYPE);
+    }
+
+    @Test
+    void openframeToolType_dbNameOpenframe() {
+        // execution
+        String dbName = IntegratedToolType.OPENFRAME.getDbName();
+
+        // verifications
+        assertThat(dbName).isEqualTo("openframe");
+    }
+
+    @Test
     void meshCentralEvent_routesToTheEventLogsPinotAndTheTenantRemoteSessionEvent() {
         // setup
         MessageType type = MessageType.MESHCENTRAL_EVENT;
