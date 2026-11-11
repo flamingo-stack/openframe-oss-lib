@@ -7,13 +7,13 @@ import {
   isValidElement,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
 import {
   DataTableLayoutContext,
@@ -133,7 +133,7 @@ export function DataTableRoot<T>({
 const GRID_HEADER_HEIGHT = 48;
 /** A `fill` table is never shorter than its header and a few rows, however little the page leaves it. */
 const MIN_FILL_HEIGHT = 240;
-/** A `fill` table's height until it has measured the page. */
+/** A `fill` table's height where it cannot measure the page: a server render. */
 const FILL_HEIGHT_FALLBACK = '70dvh';
 
 const getNoColumn = () => null;
@@ -150,12 +150,16 @@ function findScrollParent(element: HTMLElement): HTMLElement | null {
 
 /**
  * The height left for a `fill` table: from its top to the end of its scrolling ancestor, less the bottom paddings in
- * between (the page's own end spacing). Measured again whenever the page or what is above the table changes size.
+ * between (the page's own end spacing). Measured before the table's first paint, so it is never drawn at the fallback
+ * height, and again whenever the page or what is above the table changes size.
  */
 function useFillHeight(element: HTMLDivElement | null, enabled: boolean): number | null {
   const [height, setHeight] = useState<number | null>(null);
-  useEffect(() => {
-    if (!enabled || !element || typeof ResizeObserver === 'undefined') return undefined;
+  // A layout effect: its first measure lands in the same commit, before the browser paints. In a passive effect (or
+  // from the observer's first report) the table was painted once at the fallback height on every mount, and its
+  // bottom edge jumped a frame later.
+  useIsomorphicLayoutEffect(() => {
+    if (!enabled || !element) return undefined;
     const parent = findScrollParent(element);
     const measure = () => {
       const parentTop = parent ? parent.getBoundingClientRect().top : 0;
@@ -169,12 +173,13 @@ function useFillHeight(element: HTMLDivElement | null, enabled: boolean): number
       const top = element.getBoundingClientRect().top - parentTop + scrolled;
       setHeight(Math.max(MIN_FILL_HEIGHT, Math.floor(parentHeight - top - paddingBelow)));
     };
-    // The observer reports once on `observe`, which is the first measure.
+    measure();
+    window.addEventListener('resize', measure);
+    if (typeof ResizeObserver === 'undefined') return () => window.removeEventListener('resize', measure);
     const observer = new ResizeObserver(measure);
     observer.observe(parent ?? element.ownerDocument.documentElement);
     // What sits above the table (a banner, a toolbar that wraps) moves its top without resizing the page.
     for (let node = element.parentElement; node && node !== parent; node = node.parentElement) observer.observe(node);
-    window.addEventListener('resize', measure);
     return () => {
       observer.disconnect();
       window.removeEventListener('resize', measure);

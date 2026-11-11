@@ -66,7 +66,7 @@ function Grid({
   items?: Item[];
   layout?: 'grid' | 'cards';
   loading?: boolean;
-  maxHeight?: number;
+  maxHeight?: number | 'fill';
 }) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sort, setSort] = useState<DataTableSortState | null>(null);
@@ -368,6 +368,23 @@ describe('DataTable grid layout', () => {
     fireEvent.pointerMove(handle, { clientX: 700, pointerId: 1 });
     fireEvent.pointerUp(handle, { pointerId: 1 });
     expect(columnWidth(container, 2)).toBe(240);
+  });
+
+  it('measures a fill table before its first paint: it is never drawn at the fallback height', () => {
+    const { container } = render(<Grid maxHeight="fill" />);
+    // jsdom has no layout: the table's top is 0 and the window is 768px high, so the height left is the window's.
+    // What matters is that the first committed markup already holds a measured height, not `70dvh`.
+    expect(container.innerHTML).toContain(`--data-table-max-height: ${window.innerHeight}px`);
+    expect(container.innerHTML).not.toContain('70dvh');
+  });
+
+  it('keeps the results row one line high when it has no count to show', () => {
+    const { container } = render(<Grid items={[]} />);
+    const meta = openingTag(container, 'data-grid-meta');
+    // No rows: `DataTable.RowCount` draws nothing, and the row still reserves its line.
+    expect(meta).toContain('min-h-[calc(1lh+var(--spacing-system-xxs))]');
+    expect(meta).toContain('text-h6');
+    expect(screen.queryByText(/results?$/)).not.toBeInTheDocument();
   });
 
   it('shows an applied sort on the header: primary label, direction arrow', () => {
