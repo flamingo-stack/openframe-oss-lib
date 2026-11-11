@@ -302,6 +302,15 @@ export interface NavigationSidebarConfig {
    */
   overlay?: boolean | 'drawer';
   /**
+   * The desktop form from md up, not only from lg: no tablet form between md and lg (the
+   * rail it starts on, the overlay it opens, the scrim). The sidebar stays in the flow
+   * with the desktop preference (`collapsed`, the stored one), so it collapses only when
+   * the user (or the host) collapses it. For a host that lets its content scroll sideways
+   * rather than fold its sidebars on a narrower window. `overlay` still wins where it is
+   * set. Default `false`.
+   */
+  desktopFromMd?: boolean;
+  /**
    * A dismiss command: every CHANGE of this number (not its first value) closes the
    * overlay (tablet, `overlay`), e.g. when a pick inside a slot (a chat in the history)
    * has done what the user opened the sidebar for. The desktop preference is untouched.

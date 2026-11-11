@@ -183,6 +183,8 @@ function ThreeColumns({ initialMode, squeezeFloor }: { initialMode: AppLayoutWor
         sectionDivider: false,
         collapsed: chatsCollapsed,
         onCollapsedChange: setChatsCollapsed,
+        // No tablet rail between md and lg: the sidebars close only with their button.
+        desktopFromMd: true,
         topSlot: ({ minimized }) => (
           <NavigationSidebarActionRow
             size="sectioned"
@@ -229,6 +231,7 @@ function ThreeColumns({ initialMode, squeezeFloor }: { initialMode: AppLayoutWor
         expandedWidth: 200,
         collapsed: navCollapsed,
         onCollapsedChange: setNavCollapsed,
+        desktopFromMd: true,
         currentPath: mode === 'chat' ? undefined : (path ?? undefined),
         onNavigate: next => {
           setPath(next);

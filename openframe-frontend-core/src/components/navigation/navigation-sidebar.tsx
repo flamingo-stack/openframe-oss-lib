@@ -163,6 +163,24 @@ const SIDEBAR_GEOMETRY_CLASSES = {
 } as const;
 
 /**
+ * `config.desktopFromMd`: the desktop geometry from md up — in the flow, the desktop
+ * width — so nothing between md and lg turns it into the tablet rail. Spelled out for
+ * Tailwind's scan, as above.
+ */
+const SIDEBAR_DESKTOP_FROM_MD_GEOMETRY_CLASSES = {
+  left: {
+    default: 'md:relative md:inset-auto md:z-auto md:h-full md:w-[var(--of-navigation-sidebar-width,14rem)]',
+    custom:
+      'md:relative md:inset-auto md:z-auto md:h-full md:w-[var(--of-navigation-sidebar-width,var(--of-navigation-sidebar-expanded-width))]',
+  },
+  right: {
+    default: 'md:relative md:inset-auto md:z-auto md:h-full md:w-[var(--of-navigation-sidebar-end-width,14rem)]',
+    custom:
+      'md:relative md:inset-auto md:z-auto md:h-full md:w-[var(--of-navigation-sidebar-end-width,var(--of-navigation-sidebar-expanded-width))]',
+  },
+} as const;
+
+/**
  * `config.overlay`: the tablet geometry at every width from md up — no `lg:` rule puts
  * the sidebar back in the flow or gives it the desktop width, so the tablet width
  * classes below decide (the rail, or the overlay the user opened).
@@ -255,9 +273,12 @@ export function NavigationSidebar({
   // content area (overlay) instead of pushing it like on desktop. `config.overlay`
   // asks for that form on desktop too (the host keeps its content wide enough).
   // `'drawer'`: no rail either, from md up — closed it takes no room.
+  // `config.desktopFromMd`: the desktop form starts at md, so there is no tablet form.
+  const desktopFromMd = config.desktopFromMd === true;
+  const isDesktopUp = desktopFromMd ? isMdUp : isLgUp;
   const drawer = config.overlay === 'drawer' && isMdUp;
-  const forcedOverlay = (config.overlay === true && isLgUp) || drawer;
-  const isTablet = (isMdUp && !isLgUp) || forcedOverlay;
+  const forcedOverlay = (config.overlay === true && isDesktopUp) || drawer;
+  const isTablet = (isMdUp && !isDesktopUp) || forcedOverlay;
 
   // The edge it stands on (`config.side`), and the width property that goes with it.
   const side = config.side ?? 'left';
@@ -449,10 +470,10 @@ export function NavigationSidebar({
   useEffect(() => {
     if (revealHandledRef.current === revealSignal) return;
     revealHandledRef.current = revealSignal;
-    if (revealSignal === undefined || isTablet || !isLgUp || !desktopMinimized) return;
+    if (revealSignal === undefined || isTablet || !isDesktopUp || !desktopMinimized) return;
     if (!isControlled) setStoredMinimized(false);
     onCollapsedChange?.(false);
-  }, [revealSignal, isTablet, isLgUp, desktopMinimized, isControlled, setStoredMinimized, onCollapsedChange]);
+  }, [revealSignal, isTablet, isDesktopUp, desktopMinimized, isControlled, setStoredMinimized, onCollapsedChange]);
 
   // Dismiss the tablet overlay with Escape so it behaves like a transient panel
   useEffect(() => {
@@ -687,7 +708,7 @@ export function NavigationSidebar({
       <div
         className={cn(
           'fixed inset-0 z-[40] bg-ods-overlay',
-          forcedOverlay ? 'hidden md:block' : 'hidden md:block lg:hidden',
+          forcedOverlay ? 'hidden md:block' : desktopFromMd ? 'hidden' : 'hidden md:block lg:hidden',
           'transition-opacity duration-300',
           isOverlayOpen && !pushOnTablet ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
@@ -707,7 +728,9 @@ export function NavigationSidebar({
             ? 'hidden'
             : forcedOverlay
               ? 'hidden h-full flex-shrink-0 md:block'
-              : 'hidden h-full flex-shrink-0 md:block lg:hidden',
+              : desktopFromMd
+                ? 'hidden'
+                : 'hidden h-full flex-shrink-0 md:block lg:hidden',
           isOverlayOpen && pushOnTablet
             ? customExpandedWidth === null
               ? 'w-56'
@@ -728,17 +751,19 @@ export function NavigationSidebar({
           panel ? 'bg-ods-panel' : 'bg-ods-card',
           forcedOverlay
             ? SIDEBAR_OVERLAY_GEOMETRY_CLASSES[side]
-            : customExpandedWidth === null
-              ? SIDEBAR_GEOMETRY_CLASSES[side].default
-              : SIDEBAR_GEOMETRY_CLASSES[side].custom,
+            : (desktopFromMd ? SIDEBAR_DESKTOP_FROM_MD_GEOMETRY_CLASSES : SIDEBAR_GEOMETRY_CLASSES)[side][
+                customExpandedWidth === null ? 'default' : 'custom'
+              ],
           // The one width a viewport cannot imply: an overlay the user opened on
           // tablet. Only ever true after a click, so the first paint always gets
-          // the rail.
-          !isOverlayOpen
-            ? SIDEBAR_TABLET_WIDTH.rail
-            : customExpandedWidth === null
-              ? SIDEBAR_TABLET_WIDTH.overlay
-              : SIDEBAR_TABLET_WIDTH.customOverlay,
+          // the rail. None from md up where there is no tablet form (`desktopFromMd`):
+          // its `md:` width would contest the desktop one above.
+          (forcedOverlay || !desktopFromMd) &&
+            (!isOverlayOpen
+              ? SIDEBAR_TABLET_WIDTH.rail
+              : customExpandedWidth === null
+                ? SIDEBAR_TABLET_WIDTH.overlay
+                : SIDEBAR_TABLET_WIDTH.customOverlay),
           transitionsEnabled && widthTransition,
           // A drag on the resize handle in progress: the width follows the
           // pointer, with no transition trailing it (`dragExpandedWidth`).
@@ -747,7 +772,10 @@ export function NavigationSidebar({
           drawer && minimized && 'md:hidden',
           // Snaps where its width moves the content: the desktop rail, and the
           // tablet overlay too when it pushes (its slot above snaps with it).
-          !animateWidth && (pushOnTablet ? 'transition-none' : !forcedOverlay && 'lg:transition-none'),
+          !animateWidth &&
+            (pushOnTablet
+              ? 'transition-none'
+              : !forcedOverlay && (desktopFromMd ? 'md:transition-none' : 'lg:transition-none')),
           config.className,
         )}
         ref={asideRef}
@@ -871,11 +899,12 @@ export function NavigationSidebar({
             onDrag={dragExpandedWidth}
             onReset={resetChosenExpandedWidth}
             ariaLabel="Resize navigation sidebar"
-            className={
+            className={cn(
               side === 'right'
-                ? 'inset-y-0 hidden w-6 translate-x-1/2 justify-center pr-0 lg:flex'
-                : 'inset-y-0 hidden w-6 -translate-x-1/2 justify-center pl-0 lg:flex'
-            }
+                ? 'inset-y-0 hidden w-6 translate-x-1/2 justify-center pr-0'
+                : 'inset-y-0 hidden w-6 -translate-x-1/2 justify-center pl-0',
+              desktopFromMd ? 'md:flex' : 'lg:flex',
+            )}
             grip={<PanelResizeGrip />}
           />
         )}

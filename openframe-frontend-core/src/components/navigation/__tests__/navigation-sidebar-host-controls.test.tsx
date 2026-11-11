@@ -272,3 +272,54 @@ describe("NavigationSidebar overlay 'drawer'", () => {
     expect(sidebar()).toHaveClass('md:hidden');
   });
 });
+
+describe('NavigationSidebar desktopFromMd', () => {
+  const sidebar = () => screen.getByRole('complementary', { name: 'Main navigation sidebar' });
+  function Host({ desktopFromMd, overlay }: { desktopFromMd: boolean; overlay?: 'drawer' }) {
+    const [collapsed, setCollapsed] = useState(false);
+    return (
+      <NavigationSidebar
+        config={{
+          variant: 'sectioned',
+          items: [],
+          toggle: 'icon',
+          footerSlot: footer,
+          collapsed,
+          onCollapsedChange: setCollapsed,
+          desktopFromMd,
+          overlay,
+        }}
+      />
+    );
+  }
+
+  it('keeps the desktop form between md and lg: in the flow, the preference, no rail of its own', () => {
+    viewport('tablet');
+    const { rerender } = render(<Host desktopFromMd={false} />);
+    // Without it, a tablet starts on the rail whatever the preference.
+    expect(screen.getByText('rail')).toBeInTheDocument();
+
+    rerender(<Host desktopFromMd />);
+    expect(screen.getByText('full')).toBeInTheDocument();
+    expect(sidebar()).toHaveClass('md:relative', 'md:w-[var(--of-navigation-sidebar-width,14rem)]');
+    expect(sidebar()).not.toHaveClass('md:absolute');
+    expect(sidebar()).not.toHaveClass('md:w-14');
+
+    // Only the toggle collapses it, and that is the host's value (no overlay, no scrim).
+    fireEvent.click(screen.getByRole('button', { name: /collapse|hide|minimi/i }));
+    expect(screen.getByText('rail')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /expand|show|open/i }));
+    expect(screen.getByText('full')).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByText('full')).toBeInTheDocument();
+  });
+
+  it("gives way to overlay 'drawer'", () => {
+    viewport('tablet');
+    render(<Host desktopFromMd overlay="drawer" />);
+    expect(screen.getByRole('complementary', { name: 'Main navigation sidebar', hidden: true })).toHaveClass(
+      'md:absolute',
+      'md:hidden',
+    );
+  });
+});
