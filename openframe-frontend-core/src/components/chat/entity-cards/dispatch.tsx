@@ -1452,12 +1452,12 @@ interface GlyphCardConfig {
   media?: boolean;
 }
 /** Product-hub internal objects hydrated by their per-object card routes
- *  (`/api/design-docs`, `/api/openframe-tenants`, `/api/prospect-calls` — ChatRef-shaped items,
+ *  (`/api/design-docs`, `/api/openframe-tenants`, `/api/recorded-calls` — ChatRef-shaped items,
  *  same preset as github / slack). Adding one = one line here + the
  *  `list-url.ts` builder + the `source-icons.ts` label / icon / type entries. */
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   openframe_tenant: { label: 'OpenFrame tenant' },
-  prospect_call: { label: 'Call', media: true },
+  recorded_call: { label: 'Call', media: true },
   // Code intelligence (product-hub internal): the review rules a repository is
   // held to, the repositories themselves, and one row per deployment
   // environment. Glyph cards like their siblings — none of the three has a

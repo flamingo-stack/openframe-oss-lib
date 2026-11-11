@@ -412,7 +412,9 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
         {!(scopedEmpty && !hasQuery) && (
           <DataTable.Header
             stickyHeader
-            stickyHeaderOffset="top-[96px]"
+            // Under the page's search toolbar (`LogsPageView` publishes its height); 96px,
+            // the desktop toolbar's, where no page view measures one.
+            stickyHeaderOffset="top-[var(--sticky-toolbar-h,96px)]"
             rightSlot={<DataTable.RowCount loading={loading} />}
           />
         )}

@@ -33,6 +33,16 @@ const odsTypographyPlugin = plugin(({ addUtilities }) => {
       fontSize: 'var(--font-size-h4-body)',
       lineHeight: 'var(--font-line-space-h4-body)',
     },
+    // ODS v2 "h4 - body" (DM Sans medium, font size / line space h3 - body:
+    // 16/20, 14/20 on a phone) — the three-column shell's body text (the user's
+    // name, a column's title). Its own tokens until the typography sync moves
+    // text-h3/h4 off their older 18/24.
+    '.text-shell-body': {
+      fontFamily: 'var(--font-h4-family)',
+      fontWeight: 'var(--font-h4-weight)',
+      fontSize: 'var(--font-size-shell-body)',
+      lineHeight: 'var(--font-line-space-shell-body)',
+    },
     '.text-h5': {
       fontFamily: 'var(--font-h5-family)',
       fontWeight: 'var(--font-h5-weight)',
@@ -210,6 +220,8 @@ const config: Config = {
           'bg-inverted': 'var(--color-bg-inverted)',
           'card-hover': 'var(--color-bg-hover)',
           divider: 'var(--color-divider)',
+          // The three-column shell's sidebars (ODS v2 backgrounds/panel).
+          panel: 'var(--color-bg-panel)',
 
           // Borders
           border: {
@@ -217,6 +229,8 @@ const config: Config = {
             hover: 'var(--color-border-hover)',
             active: 'var(--color-border-active)',
             focus: 'var(--color-border-focus)',
+            // The three-column shell's sidebar dividers (ODS v2 borders/subtle).
+            panel: 'var(--color-border-panel)',
           },
 
           // Text
@@ -229,6 +243,8 @@ const config: Config = {
             disabled: 'var(--color-text-disabled)',
             'on-accent': 'var(--color-text-on-accent)',
             'on-dark': 'var(--color-text-on-dark)',
+            // Icons and category labels on the shell's panels (ODS v2 system greys/grey).
+            'panel-secondary': 'var(--color-text-panel-secondary)',
           },
 
           // Accent
@@ -241,6 +257,10 @@ const config: Config = {
             'secondary-active': 'var(--color-accent-secondary-active)',
             focus: 'var(--color-accent-focus)',
             disabled: 'var(--color-accent-disabled)',
+            // The active entry's ground in the shell's sidebars (ODS v2 open colors/yellow sec).
+            tint: 'var(--color-accent-tint)',
+            'tint-hover': 'var(--color-accent-tint-hover)',
+            'tint-active': 'var(--color-accent-tint-active)',
           },
 
           // Status
@@ -267,6 +287,10 @@ const config: Config = {
             secondary: 'var(--color-warning-secondary)',
             'secondary-hover': 'var(--color-warning-secondary-hover)',
             'secondary-active': 'var(--color-warning-secondary-active)',
+            // The three-column shell's warning tag (ODS v2 warning sec / border / text).
+            tint: 'var(--color-warning-tint)',
+            'tint-border': 'var(--color-warning-tint-border)',
+            'tint-text': 'var(--color-warning-tint-text)',
           },
           info: {
             DEFAULT: 'var(--color-info)',
