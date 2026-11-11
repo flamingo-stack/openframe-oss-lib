@@ -8,8 +8,8 @@ import type { DataTableLayout, DataTableProps, DataTableSettings } from '../ui/d
  */
 export interface FeatureTableLayoutProps {
   /**
-   * The table's layout. `grid`: one bordered block of 48px one-line rows from `md` up; below `md` the table draws its
-   * card rows in either layout. Default `cards`.
+   * The table's layout. `grid`: one bordered block of 48px one-line rows, at every width (a grid table has no card
+   * form). Default `cards`.
    */
   layout?: DataTableLayout;
   /**

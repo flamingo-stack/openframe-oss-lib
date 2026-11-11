@@ -4,8 +4,8 @@ import { DevicesTableBody } from './devices-table-columns';
 import type { DeviceRow } from './types';
 
 /**
- * The devices table in the grid layout: every cell is one 48px line. The card form of each cell (the tile, the tag
- * over its last-seen line, the two-line customer) stays for the card rows below `md`; these lock the grid form.
+ * The devices table in the grid layout: every cell is one 48px line, at every width. The card form of each cell (the
+ * tile, the tag over its last-seen line, the two-line customer) stays for the cards layout; these lock the grid form.
  */
 
 const DEVICES: DeviceRow[] = [
@@ -26,6 +26,12 @@ const DEVICES: DeviceRow[] = [
   },
   { id: 'd-2', machineId: 'm-2', status: 'ONLINE', hostname: 'maya-mba', nickname: null },
 ];
+
+/** The grid header's markup: from its opening tag to the grid body's. */
+function gridHeaderMarkup(container: HTMLElement): string {
+  const html = container.innerHTML;
+  return html.slice(html.indexOf('data-grid-header="'), html.indexOf('data-grid-body'));
+}
 
 /** The markup of the grid form of the body (from its opening tag on). */
 function gridBodyMarkup(container: HTMLElement): string {
@@ -74,8 +80,7 @@ describe('DevicesTableBody, grid layout', () => {
 
   it('selectable: selects a row from its checkbox, and all rows from the header', () => {
     render(<DevicesTableBody devices={DEVICES} layout="grid" selectable />);
-    // The card form's (hidden) checkboxes come first in the document, then the grid form's.
-    const rowBoxes = () => screen.getAllByRole('checkbox', { name: 'Select row' }).slice(DEVICES.length);
+    const rowBoxes = () => screen.getAllByRole('checkbox', { name: 'Select row' });
     const selectAll = () => screen.getByRole('checkbox', { name: 'Select all rows' });
 
     fireEvent.click(rowBoxes()[0]);
@@ -84,6 +89,17 @@ describe('DevicesTableBody, grid layout', () => {
 
     fireEvent.click(selectAll());
     expect(rowBoxes().every(box => box.getAttribute('aria-checked') === 'true')).toBe(true);
+  });
+
+  it('names no column while loading: the header is bars, and names its columns once loaded', () => {
+    const { container, rerender } = render(<DevicesTableBody devices={[]} isLoading layout="grid" />);
+    const header = () => gridHeaderMarkup(container);
+    expect(header()).toContain('data-grid-header-loading');
+    expect(header()).not.toMatch(/>(Device|Status|OS|Customer)</i);
+
+    rerender(<DevicesTableBody devices={DEVICES} layout="grid" />);
+    expect(header()).not.toContain('data-grid-header-loading');
+    expect(header()).toMatch(/>Device</i);
   });
 
   it('puts the last-seen time beside the status tag, not under it', () => {

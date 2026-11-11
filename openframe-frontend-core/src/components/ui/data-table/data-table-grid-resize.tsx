@@ -72,10 +72,9 @@ function resizeLimits(column: Column<unknown, unknown>, gridColumn: GridColumn, 
   }
   const min = Math.max(stated, naturalWidth(headerCell), widestTag > 0 ? widestTag + TAG_INSET : 0);
   const statedMax = column.columnDef.maxSize ?? Number.POSITIVE_INFINITY;
-  const max =
-    gridColumn.pin === 'left' && root
-      ? Math.min(statedMax, Math.floor(root.clientWidth * PINNED_MAX_SHARE))
-      : statedMax;
+  // The cap is for a column that IS pinned: the left block is not on a tablet or a phone, where it scrolls away.
+  const pinned = gridColumn.pin === 'left' && getComputedStyle(headerCell).position === 'sticky';
+  const max = pinned && root ? Math.min(statedMax, Math.floor(root.clientWidth * PINNED_MAX_SHARE)) : statedMax;
   return { min, max: Math.max(min, max) };
 }
 

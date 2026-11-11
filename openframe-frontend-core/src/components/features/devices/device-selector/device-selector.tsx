@@ -728,7 +728,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
       {/* The grid shows the same slot above the table; the card header carries it at its right end. */}
       {showHeader && layout === 'grid' && <DataTable.Meta>{headerSlot}</DataTable.Meta>}
-      {showHeader && <DataTable.Header rightSlot={headerSlot} />}
+      {showHeader && <DataTable.Header rightSlot={headerSlot} loading={loading} />}
       <DataTable.Body
         loading={loading}
         loadingCells

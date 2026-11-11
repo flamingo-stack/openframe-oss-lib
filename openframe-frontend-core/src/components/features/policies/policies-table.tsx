@@ -257,6 +257,7 @@ export function PoliciesTable({
           rightSlot={rightSlot}
           sort={sortState}
           onSortChange={sortable ? handleSortChange : undefined}
+          loading={loading}
         />
       )}
       <DataTable.Body

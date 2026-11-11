@@ -27,7 +27,7 @@ export function selectionColumn<T>({ id = 'select' }: { id?: string } = {}): Col
     size: GRID_UTILITY_COLUMN_SIZE,
     enableSorting: false,
     enableHiding: false,
-    // `hideAt: 'md'`: the column belongs to the grid. The card rows the same table draws below `md` do not show it.
+    // `hideAt: 'md'`: the column belongs to the grid. The same columns in the cards layout do not show it from `md`.
     meta: { gridKind: 'select', width: 'w-10 shrink-0 flex-none', hideAt: 'md' },
     cell: ({ row }) => (
       <Checkbox

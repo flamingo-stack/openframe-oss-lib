@@ -211,6 +211,7 @@ export function KnowledgeBaseTableBody({
         stickyHeader={!!stickyHeaderOffset}
         stickyHeaderOffset={stickyHeaderOffset}
         rightSlot={rowCount}
+        loading={loading}
       />
       <DataTable.Body
         loading={loading}

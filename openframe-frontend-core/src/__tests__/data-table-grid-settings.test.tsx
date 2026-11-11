@@ -81,11 +81,6 @@ function gridBodyMarkup(container: HTMLElement): string {
   return container.innerHTML.slice(container.innerHTML.indexOf('data-grid-body'));
 }
 
-/** The markup before the grid form of the body: the card rows. */
-function cardsMarkup(container: HTMLElement): string {
-  return container.innerHTML.slice(0, container.innerHTML.indexOf('data-grid-body'));
-}
-
 /** The menu's rows, top to bottom: `Name ✓` for a shown column, `Name` for a hidden one. */
 function menuRows(): string[] {
   return screen
@@ -320,10 +315,19 @@ describe('<DataTable layout="grid" settings>', () => {
     expect(localStorage.length).toBe(0);
   });
 
-  it('leaves the card rows as designed: the layout is the grid’s', () => {
+  it('leaves a cards table as designed: the stored layout is the grid’s', () => {
     store({ hidden: ['owner'] });
-    const { container } = render(<Grid settings={{ storageKey: STORAGE_KEY }} />);
-    expect(cardsMarkup(container)).toContain('Ada');
+    function Cards() {
+      const table = useDataTable<Item>({ data: ITEMS, columns: COLUMNS, getRowId: item => item.id });
+      return (
+        <DataTable table={table} settings={{ storageKey: STORAGE_KEY }}>
+          <DataTable.Header />
+          <DataTable.Body<Item> />
+        </DataTable>
+      );
+    }
+    render(<Cards />);
+    expect(screen.getByText('Ada')).toBeInTheDocument();
   });
 
   it('offers auto-refresh only when the page does, and hands the switch to the page', () => {

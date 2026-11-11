@@ -16,7 +16,7 @@ import { alignJustify } from './utils';
 
 /**
  * The table's two layouts. `cards` (default): every row is its own card. `grid`: one bordered block of 48px rows with
- * column dividers, pinned columns and horizontal scroll, from `md` up; below `md` a grid table still draws card rows.
+ * column dividers, pinned columns and horizontal scroll, at every width (a grid table has no card form).
  */
 export type DataTableLayout = 'cards' | 'grid';
 
@@ -56,7 +56,10 @@ export interface GridColumn {
 
 export interface GridLayout {
   columns: GridColumn[];
-  /** Summed width of the columns pinned to each side, in px: where the horizontal gradients start. */
+  /**
+   * Summed width of the columns pinned to each side, in px: where the horizontal gradients start. The left block is
+   * pinned from `lg` up only (see `GRID_LEFT_PIN_CLASS`).
+   */
   pinnedLeft: number;
   pinnedRight: number;
 }
@@ -202,6 +205,20 @@ export function buildGridLayout<T>(
   return { columns, pinnedLeft, pinnedRight };
 }
 
+/**
+ * The left block (the checkbox column and the first data column) is pinned on a desktop: from the WINDOW's `lg` step
+ * (1280px). On a tablet and a phone it scrolls with the other columns; the action columns are pinned right at every
+ * width. The rule is about the device, so it follows the window and not the content area: in a three-column shell the
+ * page's own width on a desktop is a tablet's (about 900px in a 1440px window), and the column stays pinned there.
+ */
+const GRID_LEFT_PIN_CLASS = 'lg:sticky lg:z-[1]';
+
+/**
+ * On the grid's root: the left gradient starts at the pinned-left block's edge where that block is pinned (from `lg`),
+ * and at the viewport's own edge where it is not.
+ */
+export const GRID_ROOT_CLASS = '[--dt-pin-l:0px] lg:[--dt-pin-l:var(--dt-pin-l-wide)]';
+
 /** One grid row, header or body: as wide as its columns, never narrower than the viewport. */
 export const GRID_ROW_CLASS = 'flex w-max min-w-full';
 
@@ -221,7 +238,8 @@ export function gridCellClass(column: GridColumn, section: 'header' | 'body'): s
       ),
     column.kind === 'select' && 'justify-center border-r',
     column.kind === 'action' && 'justify-center',
-    column.pin && 'sticky z-[1]',
+    column.pin === 'right' && 'sticky z-[1]',
+    column.pin === 'left' && GRID_LEFT_PIN_CLASS,
     // The pinned-right block's inner divider. It overlaps the column before it by its own 1px, so where that column
     // ends in a divider of its own the two read as one line.
     column.startsRightBlock && '-ml-px border-l',
@@ -257,7 +275,8 @@ export const GRID_PIN_RIGHT_VAR = 'var(--dt-pin-r)';
  */
 export function gridGeometryVars(layout: GridLayout, resizingColumnId: string | null): CSSProperties {
   const vars: Record<string, string> = {
-    '--dt-pin-l': `${layout.pinnedLeft}px`,
+    // Read through `--dt-pin-l`, which the root's class sets to this from `lg` up and to 0 below (`GRID_ROOT_CLASS`).
+    '--dt-pin-l-wide': `${layout.pinnedLeft}px`,
     '--dt-pin-r': `${layout.pinnedRight}px`,
   };
   for (const column of layout.columns) {

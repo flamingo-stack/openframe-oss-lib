@@ -427,6 +427,7 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
             // the desktop toolbar's, where no page view measures one.
             stickyHeaderOffset="top-[var(--sticky-toolbar-h,96px)]"
             rightSlot={<DataTable.RowCount loading={loading} />}
+            loading={loading}
           />
         )}
         <DataTable.Body

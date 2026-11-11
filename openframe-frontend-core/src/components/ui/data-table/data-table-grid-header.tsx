@@ -6,6 +6,7 @@ import { Arrow01DownIcon, Arrow01UpIcon, SwitchVrIcon } from '../../icons-v2-gen
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Checkbox } from '../checkbox';
 import { InfoHint } from '../info-hint';
+import { useLoadingScope } from '../loading-scope';
 import { useDataTableContext } from './data-table';
 import { DataTableColumnFilter } from './data-table-column-filter';
 import {
@@ -34,11 +35,13 @@ interface DataTableGridHeaderProps {
   stickyHeaderOffset?: string;
   sort: DataTableSortState | null;
   onSortChange?: (columnId: string) => void;
+  /** The table is loading: the header names no column (see `DataTableHeaderProps.loading`). */
+  loading?: boolean;
 }
 
 /**
- * The grid layout's header row (the design's `table/header-cell` and the header forms of `table/utility-cell`). Drawn
- * from `md` up; below it a grid table is card rows, which have no header.
+ * The grid layout's header row (the design's `table/header-cell` and the header forms of `table/utility-cell`), at
+ * every width.
  *
  * In page mode it is its own viewport, sticky to the page and kept at the body's horizontal position; in fixed-height
  * mode it is a sticky row inside the table's one viewport.
@@ -50,9 +53,13 @@ export function DataTableGridHeader({
   stickyHeaderOffset,
   sort,
   onSortChange,
+  loading: loadingProp,
 }: DataTableGridHeaderProps) {
   const table = useDataTableContext();
   const scroll = useGridScroll();
+  // The body's own switch: a page's loading scope, or the host's read.
+  const inScope = useLoadingScope();
+  const loading = inScope || loadingProp === true;
   const { headerViewportRef, onHeaderWheel, onHeaderScroll } = useGridScrollElements();
   const headerGroup = table.getHeaderGroups()[0];
   if (!headerGroup) return null;
@@ -67,6 +74,7 @@ export function DataTableGridHeader({
           header={headers.get(column.id)}
           sort={sort}
           onSortChange={onSortChange}
+          loading={loading}
         />
       ))}
     </div>
@@ -74,7 +82,7 @@ export function DataTableGridHeader({
 
   if (scroll.mode === 'fixed') {
     return (
-      <div data-grid-header className={cn('sticky top-0 z-[3] hidden w-max min-w-full content-md:block', className)}>
+      <div data-grid-header className={cn('sticky top-0 z-[3] w-max min-w-full', className)}>
         {row}
       </div>
     );
@@ -85,7 +93,7 @@ export function DataTableGridHeader({
       data-grid-header
       className={cn(
         // `peer`: the grid body after it drops its own top edge and corners (see `DataTableBody`).
-        'peer/gridheader hidden content-md:block',
+        'peer/gridheader',
         // A square page-coloured backing: no row shows behind the header's round corners while it is stuck.
         stickyHeader && `sticky z-10 bg-ods-bg ${stickyHeaderOffset ?? 'top-0'}`,
         className,
@@ -107,9 +115,13 @@ interface GridHeaderCellProps {
   header: AnyHeader | undefined;
   sort: DataTableSortState | null;
   onSortChange?: (columnId: string) => void;
+  loading: boolean;
 }
 
-function GridHeaderCell({ column, header, sort, onSortChange }: GridHeaderCellProps) {
+/** The header label: one line, never cut (the column's minimum width is its header's width). */
+const GRID_HEADER_LABEL_CLASS = 'whitespace-nowrap text-h5';
+
+function GridHeaderCell({ column, header, sort, onSortChange, loading }: GridHeaderCellProps) {
   const table = useDataTableContext();
   const box = gridCellClass(column, 'header');
   const style = gridCellStyle(column);
@@ -132,6 +144,18 @@ function GridHeaderCell({ column, header, sort, onSortChange }: GridHeaderCellPr
   if (column.settings) return <GridSettingsHeaderCell column={column} />;
   if (column.kind !== 'data' || !header || header.isPlaceholder) {
     return <div className={box} style={style} />;
+  }
+
+  // A loading table names no column: this may not be the column that ends up here (a column behind a flag still being
+  // read, the viewer's saved order), so the cell is a bar in the label's place, with no control.
+  if (loading) {
+    return (
+      <div className={box} style={style} data-grid-header-cell data-grid-header-loading>
+        <span className={cn(GRID_HEADER_LABEL_CLASS, 'text-ods-text-secondary')}>
+          <TextLineSkeleton type="inherit" as="span" className="w-24 max-w-full" />
+        </span>
+      </div>
+    );
   }
 
   const meta = header.column.columnDef.meta;
@@ -179,9 +203,6 @@ function GridHeaderCell({ column, header, sort, onSortChange }: GridHeaderCellPr
     </div>
   );
 }
-
-/** The header label: one line, never cut (the column's minimum width is its header's width). */
-const GRID_HEADER_LABEL_CLASS = 'whitespace-nowrap text-h5';
 
 function GridHeaderLabel({ header, applied }: { header: AnyHeader; applied: boolean }) {
   const headerDef = header.column.columnDef.header;

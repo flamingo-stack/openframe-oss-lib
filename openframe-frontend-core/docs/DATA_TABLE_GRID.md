@@ -1,8 +1,10 @@
 # Moving a table to the grid layout
 
 `<DataTable layout="grid">` draws one bordered table of 48px one-line rows, with pinned columns, column resize and
-(with `settings`) a gear menu whose column layout is kept in the browser. It applies from the content `md` step up;
-below it the same table draws its card rows, so a table's `cell` renderers stay.
+(with `settings`) a gear menu whose column layout is kept in the browser. It is the table at every width: a grid
+table has no card form. The action columns are pinned right everywhere; the checkbox column and the first data column
+are pinned left on a desktop (the window's `lg` step, 1280px), and scroll with the other columns on a tablet and a phone. A table's
+`cell` renderers stay for the hosts that still ask for cards.
 
 The layout is opt-in. A table that does not ask for it renders its card rows exactly as before.
 
@@ -15,9 +17,10 @@ Go through its column definitions:
 | `size` on every data column (px) | The grid lays columns out by `column.getSize()`. Without it a column is TanStack's default 150px. The `meta.width` classes are for card rows only. |
 | `minSize` where the cell holds more than text | A column cannot be resized below it. The default is 120 (text). Use `GRID_MIN_WIDTH.icon` (148) for an icon and text, `GRID_MIN_WIDTH.media` (160) for a picture or an avatar and text. |
 | `meta.gridCell` | The cell's form in the grid: ONE line, normally a `DataTable.Cell` (leading icon / picture / avatar, text, tag, secondary text, trailing mark). `cell` stays the card form. A column without `gridCell` draws `cell` clipped to one line. |
-| Row actions as action columns | One 56px column per action, pinned right, never hidden, not in the gear menu. Use `actionColumn({ id, cell })`. If the card rows hide the action below `md` (`hideAt: 'md'`), keep the column by hand instead: `size: GRID_ACTION_COLUMN_SIZE` and `meta: { gridKind: 'action', hideAt: 'md', ... }`. `actionColumn()` sets no `hideAt`, so it would add the action to the card rows. |
-| `selectionColumn()` first, only with a bulk action | The checkbox column: pinned left, selection in the table's `rowSelection` state. It is hidden in card rows. |
+| Row actions as action columns | One 56px column per action, pinned right, never hidden, not in the gear menu. Use `actionColumn({ id, cell })`. If the same columns also serve a cards table that hides the action from `md` (`hideAt: 'md'`), keep the column by hand instead: `size: GRID_ACTION_COLUMN_SIZE` and `meta: { gridKind: 'action', hideAt: 'md', ... }`. `actionColumn()` sets no `hideAt`, so it would add the action to that cards table. |
+| `selectionColumn()` first, only with a bulk action | The checkbox column: pinned left, selection in the table's `rowSelection` state. A cards table does not draw it. |
 | `meta.label` in sentence case | The column's name in the gear menu ("Last login"). Without it the menu shows the header text, or the column id when the header is a node. |
+| `loading` on `DataTable.Header` | Pass it what the body gets. A loading table names no column: each data header cell is a bar with no control, because the columns a loading table draws are not always the ones it loads with (a column behind a flag still being read, the viewer's saved order). A table that loads by a page loading scope needs nothing. |
 | `settings.storageKey`, unique per table | Names the saved layout (hidden columns, order, widths) in the browser's storage. Two tables with one key share a layout. `settings={{}}` gives the gear with nothing kept. |
 
 A column with no `meta.gridKind` is a data column: it can be resized, hidden and reordered, and the LAST data column
@@ -45,16 +48,16 @@ With `DataTable` directly, the results count goes in `<DataTable.Meta>`, a direc
   <DataTable.Meta>
     <DataTable.RowCount itemName="device" totalCount={totalCount} />
   </DataTable.Meta>
-  <DataTable.Header />
-  <DataTable.Body loadingCells />
+  <DataTable.Header loading={loading} />
+  <DataTable.Body loading={loading} loadingCells />
 </DataTable>
 ```
 
 ## What the grid does not read
 
 - `DataTable.Body`: `rowClassName`, `rowHeightClassName`, `compact`. Rows are 48px and touch.
-- `meta.width` and `meta.hideAt`. A column the card rows hide below `lg` shows from `md` in the grid; the viewer hides
-  columns in the gear menu instead.
+- `meta.width` and `meta.hideAt`. A column a cards table hides below `lg` shows at every width in the grid; the viewer
+  hides columns in the gear menu instead.
 - `DataTable.Header`'s `rightSlot`. The count sits above the table in `DataTable.Meta`.
 - `stickyHeader` and `stickyHeaderOffset` once `maxHeight` is set: the header is sticky inside the table's own viewport.
 - Sort on a column that also has a filter: the header draws the filter.

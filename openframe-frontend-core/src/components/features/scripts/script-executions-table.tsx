@@ -157,7 +157,7 @@ export function ScriptExecutionsTable({
     <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
       {/* The grid's results row sits above the table; the card header carries it in its right slot. */}
       {showHeader && layout === 'grid' && hasSlotContent(rightSlot) && <DataTable.Meta>{rightSlot}</DataTable.Meta>}
-      {showHeader && <DataTable.Header rightSlot={rightSlot} />}
+      {showHeader && <DataTable.Header rightSlot={rightSlot} loading={loading} />}
       <DataTable.Body
         loading={loading}
         loadingCells

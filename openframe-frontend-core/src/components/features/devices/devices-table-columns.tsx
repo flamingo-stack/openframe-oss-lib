@@ -166,8 +166,9 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
    */
   showHeader?: boolean;
   /**
-   * The table's layout. `grid`: 48px one-line rows in one bordered block, the device column pinned left and the
-   * action columns pinned right, from `md` up (card rows below it). Default `cards`.
+   * The table's layout. `grid`: 48px one-line rows in one bordered block at every width, the action columns pinned
+   * right, the device column pinned left from `lg` up (it scrolls with the rest on a tablet and a phone). Default
+   * `cards`.
    */
   layout?: DataTableLayout;
   /**
@@ -283,6 +284,7 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
           stickyHeader={!!stickyHeaderOffset}
           stickyHeaderOffset={stickyHeaderOffset}
           rightSlot={<DataTable.RowCount itemName="device" totalCount={totalCount} loading={isLoading} />}
+          loading={isLoading}
         />
       )}
       <DataTable.Body

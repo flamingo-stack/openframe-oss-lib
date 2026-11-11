@@ -105,7 +105,7 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
   /** Adds the USER and SOURCES columns and funnels, for a tenant with directories. Default: neither. */
   directoryColumns?: boolean;
   /**
-   * The table's layout: `grid` draws 48px one-line rows in one bordered block from `md` up (see `DevicesTableBody`).
+   * The table's layout: `grid` draws 48px one-line rows in one bordered block at every width (see `DevicesTableBody`).
    * Named apart from the view mode, whose own `grid` is the tile view. Default `cards`.
    */
   tableLayout?: DataTableLayout;

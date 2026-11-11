@@ -35,8 +35,7 @@ const GRID_ROW_HEIGHT = 48;
 const GRID_STACK_CLASS = '[&>*:last-child>*]:border-b-0';
 
 /**
- * The body of a grid table, from `md` up (below it `DataTable.Body` draws the card rows). The same states as the card
- * body, re-laid: loading rows are 48px grid rows, the empty state sits inside the bordered block, `minRows` pads with
+ * The body of a grid table, at every width. The same states as the card body, re-laid: loading rows are 48px grid rows, the empty state sits inside the bordered block, `minRows` pads with
  * 48px rows. `compact`, `rowHeightClassName` and `rowClassName` are card-row options and are not read here.
  */
 export function DataTableGridBody<T = unknown>({
@@ -142,7 +141,7 @@ export function DataTableGridBody<T = unknown>({
   if (scroll.mode === 'fixed') {
     // The table's one viewport (the root's) scrolls: the body is just its rows.
     return (
-      <div data-grid-body className={cn('hidden content-md:block', className)}>
+      <div data-grid-body className={className}>
         {content}
       </div>
     );
@@ -152,7 +151,7 @@ export function DataTableGridBody<T = unknown>({
     <div
       data-grid-body
       className={cn(
-        'relative hidden overflow-hidden rounded-md border border-ods-border bg-ods-card content-md:block',
+        'relative overflow-hidden rounded-md border border-ods-border bg-ods-card',
         // Under a grid header the two are one block: the header keeps the top edge and corners.
         'peer-data-[grid-header]/gridheader:rounded-t-none peer-data-[grid-header]/gridheader:border-t-0',
         className,

@@ -46,6 +46,13 @@ export interface DataTableHeaderProps {
    * toggle cycle (e.g. none → asc → desc → none) and the actual data sort.
    */
   onSortChange?: (columnId: string) => void;
+  /**
+   * Grid layout: the table is loading (pass what the body gets; a page's loading scope counts too). A loading table
+   * names no column: each data header cell draws a bar in its label's place and no control, because the columns a
+   * loading table draws, and their order, are not always the ones it loads with (a column behind a flag still being
+   * read, a layout the viewer saved). The card header does not use it.
+   */
+  loading?: boolean;
 }
 
 export function DataTableHeader(props: DataTableHeaderProps) {
@@ -55,8 +62,8 @@ export function DataTableHeader(props: DataTableHeaderProps) {
 }
 
 /**
- * A grid table's header: the grid header from `md` up, nothing below it (card rows have no header). `rightSlot` is a
- * card-header slot: in the grid the results count goes in `<DataTable.Meta>` above the table.
+ * A grid table's header: the grid header, at every width. `rightSlot` is a card-header slot: in the grid the results
+ * count goes in `<DataTable.Meta>` above the table.
  */
 function DataTableGridHeaderSwitch({
   className,
@@ -64,6 +71,7 @@ function DataTableGridHeaderSwitch({
   stickyHeaderOffset,
   sort = null,
   onSortChange,
+  loading,
 }: DataTableHeaderProps) {
   const table = useDataTableContext();
   const visibleColumns = table.getVisibleFlatColumns();
@@ -71,6 +79,7 @@ function DataTableGridHeaderSwitch({
   return (
     <DataTableGridHeader
       layout={layout}
+      loading={loading}
       className={className}
       stickyHeader={stickyHeader}
       stickyHeaderOffset={stickyHeaderOffset}

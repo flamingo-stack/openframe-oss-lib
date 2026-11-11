@@ -19,6 +19,7 @@ import {
   DataTableLayoutContext,
   GRID_PIN_LEFT_VAR,
   GRID_PIN_RIGHT_VAR,
+  GRID_ROOT_CLASS,
   GridGradient,
   GridScrollProvider,
   buildGridLayout,
@@ -67,7 +68,9 @@ export interface DataTableProps<T> {
   className?: string;
   /**
    * `cards` (default): every row is its own card. `grid`: one bordered block of 48px rows with column dividers, pinned
-   * columns and horizontal scroll, from `md` up; below `md` the same table draws card rows.
+   * columns and horizontal scroll, at every width. The action columns are pinned right everywhere; the first data
+   * column (and the checkbox column) is pinned left on a desktop (the window's `lg`), and scrolls with the rest on a
+   * tablet and a phone.
    */
   layout?: DataTableLayout;
   /**
@@ -248,7 +251,7 @@ function DataTableGridRoot({
   if (!fixed) {
     return (
       <GridProviders scroll={scroll} prefs={prefsContext} settings={settings}>
-        <div data-grid-root className={cn('flex w-full flex-col', className)} style={geometry}>
+        <div data-grid-root className={cn('flex w-full flex-col', GRID_ROOT_CLASS, className)} style={geometry}>
           {children}
         </div>
       </GridProviders>
@@ -266,27 +269,22 @@ function DataTableGridRoot({
       : maxHeight;
   return (
     <GridProviders scroll={scroll} prefs={prefsContext} settings={settings}>
-      <div data-grid-root className={cn('flex w-full flex-col', className)} style={geometry}>
+      <div data-grid-root className={cn('flex w-full flex-col', GRID_ROOT_CLASS, className)} style={geometry}>
         {parts.filter(isMeta)}
-        <div className="relative content-md:overflow-hidden content-md:rounded-md content-md:border content-md:border-ods-border content-md:bg-ods-card">
+        <div className="relative overflow-hidden rounded-md border border-ods-border bg-ods-card">
           <div
             ref={setViewport}
-            // The height applies with the grid, from `md`: below it the card rows grow with the page.
-            className="content-md:max-h-[var(--data-table-max-height)] content-md:overflow-auto"
+            className="max-h-[var(--data-table-max-height)] overflow-auto"
             style={{ '--data-table-max-height': maxHeightValue } as CSSProperties}
             onScroll={onViewportScroll}
           >
             {parts.filter(child => !isMeta(child))}
-            {scrollEndInset && (
-              <div aria-hidden className="hidden content-md:block" style={{ height: scrollEndInset }} />
-            )}
+            {scrollEndInset && <div aria-hidden style={{ height: scrollEndInset }} />}
           </div>
-          <div className="hidden content-md:block">
-            <GridGradient edge="left" offset={GRID_PIN_LEFT_VAR} />
-            <GridGradient edge="right" offset={GRID_PIN_RIGHT_VAR} />
-            <GridGradient edge="top" top={GRID_HEADER_HEIGHT} />
-            <GridGradient edge="bottom" />
-          </div>
+          <GridGradient edge="left" offset={GRID_PIN_LEFT_VAR} />
+          <GridGradient edge="right" offset={GRID_PIN_RIGHT_VAR} />
+          <GridGradient edge="top" top={GRID_HEADER_HEIGHT} />
+          <GridGradient edge="bottom" />
         </div>
       </div>
     </GridProviders>

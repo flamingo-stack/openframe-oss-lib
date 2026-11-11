@@ -137,7 +137,12 @@ export function ScriptSchedulesTable({
       {/* The grid's results row sits above the table; the card header carries it in its right slot. */}
       {showHeader && layout === 'grid' && hasSlotContent(rightSlot) && <DataTable.Meta>{rightSlot}</DataTable.Meta>}
       {showHeader && (
-        <DataTable.Header stickyHeader={stickyHeader} stickyHeaderOffset={stickyHeaderOffset} rightSlot={rightSlot} />
+        <DataTable.Header
+          stickyHeader={stickyHeader}
+          stickyHeaderOffset={stickyHeaderOffset}
+          rightSlot={rightSlot}
+          loading={loading}
+        />
       )}
       <DataTable.Body
         loading={loading}

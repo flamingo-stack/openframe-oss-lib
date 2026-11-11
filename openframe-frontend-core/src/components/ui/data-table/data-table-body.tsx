@@ -119,16 +119,8 @@ const getNoRows = () => 0;
 export function DataTableBody<T = unknown>(props: DataTableBodyProps<T>) {
   const layout = useDataTableLayout();
   if (layout !== 'grid') return <DataTableCardsBody {...props} />;
-  // A grid table is card rows below `md` and the grid from `md` up. Both forms are in the tree and CSS picks one:
-  // a breakpoint read in JS answers a frame late, and the table would redraw itself on every first paint.
-  return (
-    <>
-      <div className="content-md:hidden">
-        <DataTableCardsBody {...props} />
-      </div>
-      <DataTableGridBody {...props} />
-    </>
-  );
+  // A grid table is the grid at every width: it has no card form.
+  return <DataTableGridBody {...props} />;
 }
 
 function DataTableCardsBody<T = unknown>({

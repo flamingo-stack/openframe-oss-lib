@@ -2347,7 +2347,7 @@ exports[`feature tables, card layout (the default) > 'LogsTableView, empty' 1`] 
     class="flex w-full flex-col"
   >
     <div
-      class="hidden content-md:flex content-md:flex-col sticky z-10 bg-ods-bg top-[96px]"
+      class="hidden content-md:flex content-md:flex-col sticky z-10 bg-ods-bg top-[var(--sticky-toolbar-h,96px)]"
     >
       <div
         class="relative flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]"
@@ -2511,7 +2511,7 @@ exports[`feature tables, card layout (the default) > 'LogsTableView, loaded' 1`]
     class="flex w-full flex-col"
   >
     <div
-      class="hidden content-md:flex content-md:flex-col sticky z-10 bg-ods-bg top-[96px]"
+      class="hidden content-md:flex content-md:flex-col sticky z-10 bg-ods-bg top-[var(--sticky-toolbar-h,96px)]"
     >
       <div
         class="relative flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]"
@@ -3067,7 +3067,7 @@ exports[`feature tables, card layout (the default) > 'LogsTableView, loading' 1`
     class="flex w-full flex-col"
   >
     <div
-      class="hidden content-md:flex content-md:flex-col sticky z-10 bg-ods-bg top-[96px]"
+      class="hidden content-md:flex content-md:flex-col sticky z-10 bg-ods-bg top-[var(--sticky-toolbar-h,96px)]"
     >
       <div
         class="relative flex items-stretch gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]"

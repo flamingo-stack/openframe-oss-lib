@@ -86,8 +86,8 @@ declare module '@tanstack/react-table' {
     headerLoading?: boolean;
     /**
      * The cell's form in the GRID layout (`<DataTable layout="grid">`): one 48px line, normally a `DataTable.Cell`.
-     * `cell` stays the card-row form, which the same table still draws below `md`. A column without it draws `cell`
-     * in both layouts (clipped to one line in the grid).
+     * `cell` stays the card-row form, for the same table in the cards layout. A column without it draws `cell` in
+     * both layouts (clipped to one line in the grid).
      */
     gridCell?: (context: CellContext<TData, TValue>) => ReactNode;
     /**

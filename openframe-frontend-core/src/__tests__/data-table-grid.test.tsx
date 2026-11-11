@@ -17,6 +17,7 @@ import {
   type GridColumn,
 } from '../components/ui/data-table/data-table-grid';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
+import { LoadingScope } from '../components/ui/loading-scope';
 
 /**
  * The grid layout (`<DataTable layout="grid">`). jsdom has no layout, so what is locked here is the structure and the
@@ -83,7 +84,11 @@ function Grid({
       <DataTable.Meta>
         <DataTable.RowCount />
       </DataTable.Meta>
-      <DataTable.Header sort={sort} onSortChange={id => setSort({ id, desc: sort?.id === id ? !sort.desc : false })} />
+      <DataTable.Header
+        sort={sort}
+        onSortChange={id => setSort({ id, desc: sort?.id === id ? !sort.desc : false })}
+        loading={loading}
+      />
       <DataTable.Body<Item> loading={loading} skeletonRows={2} rowHref={item => `/items/${item.id}`} />
     </DataTable>
   );
@@ -92,6 +97,12 @@ function Grid({
 /** The opening tag of the element carrying `marker` (an attribute or a class), read off the markup. */
 function openingTag(container: HTMLElement, marker: string): string {
   return new RegExp(`<[a-z]+[^>]*${marker}[^>]*>`).exec(container.innerHTML)?.[0] ?? '';
+}
+
+/** The markup of the grid form of the body (from its opening tag on). */
+function gridHeaderMarkup(container: HTMLElement): string {
+  const html = container.innerHTML;
+  return html.slice(html.indexOf('data-grid-header="'), html.indexOf('data-grid-body'));
 }
 
 /** The markup of the grid form of the body (from its opening tag on). */
@@ -111,10 +122,10 @@ function gradientStyles(container: HTMLElement): string[] {
   );
 }
 
-/** Every checkbox of the table's rows, in document order: the card form's rows first, then the grid form's. */
-function gridRowCheckbox(index: number, rowCount = ITEMS.length): HTMLElement {
+/** A row's checkbox, by the row's place in the table. */
+function gridRowCheckbox(index: number): HTMLElement {
   const all = screen.getAllByRole('checkbox', { name: 'Select row' });
-  const checkbox = all[rowCount + index];
+  const checkbox = all[index];
   if (!checkbox) throw new Error(`no grid checkbox ${index}`);
   return checkbox;
 }
@@ -213,16 +224,33 @@ describe('createGridScrollController', () => {
 });
 
 describe('DataTable grid layout', () => {
-  it('keeps both forms of the body in the tree: card rows below md, the grid from md', () => {
+  it('is the grid at every width: no card form in the tree, nothing hidden by a breakpoint', () => {
     const { container } = render(<Grid />);
-    // No breakpoint is read in JS: the card form is hidden from md and the grid form shown from md, by class.
-    expect(container.innerHTML).toContain('class="content-md:hidden"');
-    expect(openingTag(container, 'data-grid-body')).toMatch(/\bhidden\b.*\bcontent-md:block\b/);
-    expect(openingTag(container, 'data-grid-header')).toMatch(/\bhidden\b.*\bcontent-md:block\b/);
-    expect(openingTag(container, 'data-grid-meta')).toMatch(/\bhidden\b.*\bcontent-md:flex\b/);
-    // The grid form draws the grid cells; the card form keeps the plain ones.
+    for (const part of ['data-grid-body', 'data-grid-header', 'data-grid-meta']) {
+      // `hidden` as a class of its own (not `overflow-hidden`), or anything switched at `md`.
+      expect(openingTag(container, part)).not.toMatch(/[\s"]hidden[\s"]|content-md:/);
+    }
+    // Each row is drawn once, as grid cells: the card cell (`cell`) of a column with a `gridCell` is not drawn.
     expect(screen.getByText('grid:Alpha')).toBeTruthy();
-    expect(screen.getByText('Alpha')).toBeTruthy();
+    expect(screen.queryByText('Alpha')).toBeNull();
+    expect(screen.getAllByRole('checkbox', { name: 'Select row' })).toHaveLength(ITEMS.length);
+  });
+
+  it('pins the action columns at every width, and the left block from the window’s lg up only', () => {
+    const { container } = render(<Grid />);
+    const [row] = gridBodyMarkup(container).split('group/gridrow').slice(1);
+    const cells = [...(row ?? '').matchAll(/class="([^"]*\bh-12\b[^"]*)"/g)].map(match => match[1] ?? '');
+    // select, name, owner, more.
+    expect(cells).toHaveLength(4);
+    const pin = (cell: string | undefined) =>
+      /(^| )sticky( |$)/.test(cell ?? '') ? 'always' : /(^| )lg:sticky( |$)/.test(cell ?? '') ? 'lg' : 'none';
+    expect(cells.map(pin)).toEqual(['lg', 'lg', 'none', 'always']);
+    // The left gradient starts at the pinned block's edge only where the block is pinned.
+    const root = openingTag(container, 'data-grid-root');
+    expect(root).toContain('[--dt-pin-l:0px]');
+    // The window's `lg`, not the content area's: a desktop keeps the pin in a narrow content column.
+    expect(root).toMatch(/ lg:\[--dt-pin-l:var\(--dt-pin-l-wide\)\]/);
+    expect(root).not.toContain('content-lg:');
   });
 
   it('leaves a cards table untouched: no grid form at all', () => {
@@ -270,6 +298,36 @@ describe('DataTable grid layout', () => {
     expect((rows[0]?.match(/w-3\/4/g) ?? []).length).toBe(2);
   });
 
+  it('names no column while loading: a bar in each data header cell, no sort control, no resize handle', () => {
+    const { container } = render(<Grid loading />);
+    const header = gridHeaderMarkup(container);
+    // name + owner.
+    expect(header.match(/data-grid-header-loading/g)).toHaveLength(2);
+    expect(header).not.toContain('>Name<');
+    expect(header).not.toContain('>Owner<');
+    expect(header).not.toContain('data-grid-resize-handle');
+    expect(header).not.toContain('cursor-pointer');
+    // "Select all" is no column name, and its place does not depend on the columns: it stays.
+    expect(header).toContain('Select all rows');
+  });
+
+  it('names no column in a page loading scope either, with no loading prop of its own', () => {
+    const { container } = render(
+      <LoadingScope bare>
+        <Grid />
+      </LoadingScope>,
+    );
+    expect(gridHeaderMarkup(container).match(/data-grid-header-loading/g)).toHaveLength(2);
+  });
+
+  it('names its columns once loaded', () => {
+    const { container } = render(<Grid />);
+    const header = gridHeaderMarkup(container);
+    expect(header).not.toContain('data-grid-header-loading');
+    expect(header).toContain('>Name<');
+    expect(header).toContain('>Owner<');
+  });
+
   it('repaints a row checkbox when only the selection changes (rows are memoised)', () => {
     render(<Grid />);
     expect(gridRowCheckbox(1).getAttribute('aria-checked')).toBe('false');
@@ -301,9 +359,9 @@ describe('DataTable grid layout', () => {
   it('an action button inside a row link does not follow the link; a plain cell does', () => {
     render(<Grid />);
     const onAction = new MouseEvent('click', { bubbles: true, cancelable: true });
-    // The grid form's buttons come after the card form's.
     const buttons = screen.getAllByRole('button', { name: 'More' });
-    const gridButton = buttons[ITEMS.length];
+    expect(buttons).toHaveLength(ITEMS.length);
+    const gridButton = buttons[0];
     if (!gridButton) throw new Error('no grid action button');
     fireEvent(gridButton, onAction);
     expect(onAction.defaultPrevented).toBe(true);
@@ -323,7 +381,7 @@ describe('DataTable grid layout', () => {
     // select 48, name 280, owner 200, more 56.
     expect([0, 1, 2, 3].map(index => columnWidth(container, index))).toEqual([48, 280, 200, 56]);
     expect(container.innerHTML).toContain('width: var(--dtc1-w)');
-    expect(container.innerHTML).toContain('--dt-pin-l: 328px');
+    expect(container.innerHTML).toContain('--dt-pin-l-wide: 328px');
   });
 
   it('resizes a column from its handle with the arrow keys, down to its minimum', () => {
