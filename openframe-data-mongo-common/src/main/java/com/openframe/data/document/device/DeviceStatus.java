@@ -19,7 +19,8 @@ public enum DeviceStatus {
 
     // "managed device": ONLINE/OFFLINE stay until migration 031 has rewritten them to MANAGED
     public static final Set<DeviceStatus> CONNECTED = EnumSet.of(MANAGED, ONLINE, OFFLINE);
-    // heartbeats keep connectivity moving but the lifecycle status never changes from these
+    // Heartbeats keep connectivity and lastSeen moving but never change these; an ARCHIVED device also stops taking
+    // hostname, timezone and package-manager reports and only a reinstall brings it back, as PENDING.
     public static final Set<DeviceStatus> FROZEN = EnumSet.of(PENDING_DELETION, DELETED, ARCHIVED);
 
     public boolean isConnected() {

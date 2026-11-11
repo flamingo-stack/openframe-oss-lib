@@ -65,8 +65,8 @@ public class MachineStatusService {
         TelemetryStatus previous = machine.getTelemetryStatus();
         if (previous == telemetry) {
             refreshLastSeen(machine, eventTimestamp);
-        } else {
-            recordFlip(machine, previous, telemetry, eventTimestamp);
+        } else if (!recordFlip(machine, previous, telemetry, eventTimestamp)) {
+            return;
         }
 
         if (machine.getStatus() == DeviceStatus.PENDING) {
@@ -86,7 +86,7 @@ public class MachineStatusService {
     }
 
     // Field-level: a whole-document save would overwrite what other writers set on the machine since it was read
-    private void recordFlip(Machine machine, TelemetryStatus previous, TelemetryStatus telemetry, Instant eventTimestamp) {
+    private boolean recordFlip(Machine machine, TelemetryStatus previous, TelemetryStatus telemetry, Instant eventTimestamp) {
         String machineId = machine.getMachineId();
         MachineUpdate update = machineUpdate()
                 .set(TELEMETRY_STATUS, telemetry)
@@ -97,7 +97,7 @@ public class MachineStatusService {
         Optional<MachineWriteResult> written = machineWriter.update(machineId, update);
         if (written.isEmpty()) {
             log.info("Machine {} disappeared before its connectivity {} could be recorded", machineId, telemetry);
-            return;
+            return false;
         }
         Machine updated = written.get().after();
         log.debug("Updated machineId={} to connectivity={} at {} (status {})",
@@ -107,6 +107,7 @@ public class MachineStatusService {
             log.info("Device came online (offline->online): machineId={}", machineId);
             eventPublisher.publishEvent(new DeviceCameOnlineEvent(this, updated));
         }
+        return true;
     }
 
     private void logStaleEvent(Machine machine, Instant eventTimestamp) {
