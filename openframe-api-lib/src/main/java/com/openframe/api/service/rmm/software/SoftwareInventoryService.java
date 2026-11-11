@@ -196,8 +196,9 @@ public class SoftwareInventoryService {
         }
         if (softwareReadModel) {
             String tenantId = tenantIdProvider.getTenantId();
-            return withStatuses(tenantSoftwareReadModelQuery.listSoftware(tenantId, search, page, perPage, sort,
-                    vulnerable, manageable));
+            PageResult<SoftwareResponse> readModelPage = tenantSoftwareReadModelQuery.listSoftware(tenantId, search,
+                    page, perPage, sort, vulnerable, manageable);
+            return withStatuses(readModelPage);
         }
         if (fleetPaging) {
             return withStatuses(softwarePageFromFleet(search, page, perPage, sort, vulnerable));
