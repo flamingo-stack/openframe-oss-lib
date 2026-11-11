@@ -27,6 +27,7 @@ import { useLoadingScope } from '../../ui/loading-scope';
 import { NoData, type NoDataProps } from '../../ui/no-data';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
+import { dataTableLayoutProps, type FeatureTableLayoutProps } from '../feature-table-layout';
 import { logSourceLabels } from './log-source-labels';
 import { LOG_COLUMN_WIDTHS } from './logs-table-columns';
 import type { LogsTableColumnId, LogsTableDateFilter, LogsTableFacets, UiLogEntry } from './types';
@@ -55,7 +56,7 @@ const EMPTY_DESCRIPTION =
  * Click handler that opens `href` in a new tab. The row is a link, and a link
  * cannot hold another link, so the button opens the tab itself.
  */
-export interface LogsTableViewProps<T extends UiLogEntry = UiLogEntry> {
+export interface LogsTableViewProps<T extends UiLogEntry = UiLogEntry> extends FeatureTableLayoutProps {
   /** The rows loaded so far. Keep the array stable between renders. */
   logs: T[];
   /** A new first page is in flight: the body shows skeleton rows. */
@@ -184,6 +185,9 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   guideButton,
   hiddenColumns,
   pageSize,
+  layout = 'cards',
+  tableMaxHeight,
+  tableSettings,
 }: LogsTableViewProps<T>) {
   // ONE switch: in a page's loading state the table is loading (its body draws the row skeletons, never the empty state).
   const loading = useLoadingScope() || loadingProp;
@@ -376,6 +380,9 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   // column header and render the unified `DataTable.Body` empty state.
   const scoped = deviceScoped || organizationLocked;
   const scopedEmpty = scoped && noRows;
+  // Keep the header while a query (search, filters, date range) is active, even with zero rows: its controls are
+  // the only way to change it.
+  const showHeader = !(scopedEmpty && !hasQuery);
 
   // The search field lives outside this view. It hides for the onboarding empty
   // state and for an empty scoped tab, and stays while a query is active so the
@@ -406,10 +413,14 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
 
   return (
     <>
-      <DataTable table={table}>
-        {/* Keep the header while a query (search, filters, date range) is active,
-            even with zero rows: its controls are the only way to change it. */}
-        {!(scopedEmpty && !hasQuery) && (
+      <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+        {/* The grid's results count sits above the table; the card header carries its own (`rightSlot`). */}
+        {showHeader && layout === 'grid' && (
+          <DataTable.Meta>
+            <DataTable.RowCount loading={loading} />
+          </DataTable.Meta>
+        )}
+        {showHeader && (
           <DataTable.Header
             stickyHeader
             stickyHeaderOffset="top-[96px]"
