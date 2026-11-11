@@ -257,7 +257,7 @@ describe('MingoChatRail variant="section"', () => {
     expect(onSelectDialog).toHaveBeenCalledWith('a');
   });
 
-  it('MingoChatSearchModal: Enter alone opens the first result once the list shows the term', async () => {
+  it('MingoChatSearchModal: Enter alone opens the first result once the list shows the term', () => {
     const onSelectDialog = vi.fn();
     const onSearchChange = vi.fn();
     render(
