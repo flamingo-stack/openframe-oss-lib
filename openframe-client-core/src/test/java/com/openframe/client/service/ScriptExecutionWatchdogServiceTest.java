@@ -132,7 +132,7 @@ class ScriptExecutionWatchdogServiceTest {
     }
 
     @Test
-    @DisplayName("only the stuck subset is saved; each reaped row gets FAILED / NO_AGENT_RESULT + finishedAt + an error naming its own threshold")
+    @DisplayName("only the stuck subset is saved; each reaped row gets FAILED / NO_AGENT_RESULT + timedOut + finishedAt + an error naming its own threshold")
     void reapsOnlyStuckSubset_andStampsRow() {
         ScriptExecution stuck = running(60, 200);     // threshold 180 < 200 → stuck
         ScriptExecution notStuck = running(600, 200);  // threshold 720 > 200 → fine
@@ -146,7 +146,7 @@ class ScriptExecutionWatchdogServiceTest {
         assertThat(captor.getValue()).containsExactly(stuck);
         assertThat(stuck.getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(stuck.getFailureReason()).isEqualTo(ExecutionFailureReason.NO_AGENT_RESULT);
-        assertThat(stuck.getTimedOut()).isNull();
+        assertThat(stuck.getTimedOut()).isTrue();
         assertThat(stuck.getFinishedAt()).isNotNull();
         assertThat(stuck.getError()).contains("180 seconds");   // 60 timeout + 120 grace
         // the healthy row is untouched

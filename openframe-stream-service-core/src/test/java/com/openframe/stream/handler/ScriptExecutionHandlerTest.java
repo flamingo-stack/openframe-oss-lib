@@ -275,6 +275,7 @@ class ScriptExecutionHandlerTest {
         row.setScheduleId(SCHEDULE_ID);
         row.setStatus(ExecutionStatus.FAILED);
         row.setFailureReason(verdict);
+        row.setTimedOut(true);
         when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
                 .thenReturn(Optional.of(row));
 
@@ -284,6 +285,7 @@ class ScriptExecutionHandlerTest {
         verify(scriptExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
         assertThat(captor.getValue().getFailureReason()).isNull();
+        assertThat(captor.getValue().getTimedOut()).isFalse();
         verify(scheduleScriptExecutionAggregator).aggregate(TENANT_ID, EXECUTION_ID);
     }
 

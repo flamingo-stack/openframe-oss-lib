@@ -65,6 +65,7 @@ public class ScriptExecutionWatchdogService {
         row.setFailureReason(ExecutionFailureReason.NO_AGENT_RESULT);
         row.setStatusChangedAt(now);
         row.setFinishedAt(now);
+        row.setTimedOut(Boolean.TRUE);
         row.setError(STUCK_ERROR_MESSAGE_FORMAT.formatted(thresholdSeconds));
         log.info("Reaping stuck Execution: executionId={} machineId={} runningSince={} thresholdSeconds={}",
                 row.getExecutionId(), row.getMachineId(), runningSince, thresholdSeconds);
