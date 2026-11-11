@@ -98,6 +98,12 @@ describe('Video — YouTube facade poster, caption and onPlay', () => {
     expect(iframe()).toBeInTheDocument();
   });
 
+  it("falls back to YouTube's thumbnail when the page's poster fails to load", () => {
+    render(<Video kind="youtube" url="dQw4w9WgXcQ" title={TITLE} poster="/missing.jpg" lazy={false} />);
+    fireEvent.error(screen.getByAltText(TITLE));
+    expect(screen.getByAltText(TITLE).getAttribute('src')).toContain('i.ytimg.com/vi/dQw4w9WgXcQ');
+  });
+
   it("keeps YouTube's thumbnail without a poster, and autoActivate is not a reported play", () => {
     const onPlay = vi.fn();
     render(<Video kind="youtube" url="dQw4w9WgXcQ" title={TITLE} lazy={false} />);

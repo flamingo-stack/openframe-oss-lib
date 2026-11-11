@@ -607,6 +607,9 @@ function YouTubeFacadeInner({
   // On a 404 (e.g. no `maxresdefault`) drop one tier; clamp at the last so a
   // genuinely missing thumbnail can't loop.
   const handlePosterError = () => setPosterTier(tier => Math.min(tier + 1, YT_POSTER_TIERS.length - 1));
+  // The page's own poster that fails to load gives way to YouTube's thumbnail; a new poster gets its own try.
+  const [failedPoster, setFailedPoster] = useState<string | null>(null);
+  const ownPoster = poster && poster !== failedPoster ? poster : null;
 
   // ---------------------------------------------------------------------------
   // YouTube control-fade accelerator (user-locked target: ~1s).
@@ -759,14 +762,15 @@ function YouTubeFacadeInner({
         }}
         className="group absolute inset-0 h-full overflow-hidden"
       >
-        {poster ? (
+        {ownPoster ? (
           <Image
-            src={poster}
+            src={ownPoster}
             alt={title}
             fill
             sizes={IMAGE_SLOT.full}
             priority={priority}
             unoptimized
+            onError={() => setFailedPoster(ownPoster)}
             className="object-cover"
           />
         ) : (
