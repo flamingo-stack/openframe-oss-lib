@@ -28,20 +28,22 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
     // count takes the query's skip and limit into account, so it runs before the page is applied
     @Override
     public Page<Software> findTitles(SoftwareTitleQuery titles, Pageable pageable) {
-        long total = mongoTemplate.count(Query.query(criteria(titles)), Software.class);
-        List<Software> content = mongoTemplate.find(Query.query(criteria(titles)).with(pageable), Software.class);
+        Criteria criteria = criteria(titles);
+        long total = mongoTemplate.count(Query.query(criteria), Software.class);
+        Query page = Query.query(criteria).with(pageable);
+        List<Software> content = mongoTemplate.find(page, Software.class);
         return new PageImpl<>(content, pageable, total);
     }
 
     private static Criteria criteria(SoftwareTitleQuery titles) {
-        Criteria criteria = Criteria.where("tenantId").is(titles.tenantId()).and("devicesCount").gt(0);
-        if (hasText(titles.nameLower())) {
-            criteria.and("nameLower").regex(Pattern.quote(titles.nameLower()));
+        Criteria criteria = Criteria.where("tenantId").is(titles.getTenantId()).and("devicesCount").gt(0);
+        if (hasText(titles.getNameLower())) {
+            criteria.and("nameLower").regex(Pattern.quote(titles.getNameLower()));
         }
-        if (titles.vulnerableOnly()) {
+        if (titles.isVulnerableOnly()) {
             criteria.and("cveCount").gt(0);
         }
-        Boolean manageable = titles.manageable();
+        Boolean manageable = titles.getManageable();
         if (manageable == null) {
             return criteria;
         }
@@ -50,14 +52,14 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
 
     private static Criteria managed(SoftwareTitleQuery titles) {
         return new Criteria().orOperator(
-                Criteria.where(SOURCE).in(titles.managerSources()),
+                Criteria.where(SOURCE).in(titles.getManagerSources()),
                 Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED));
     }
 
     // $ne also takes a title the matcher never saw
     private static Criteria unmanaged(SoftwareTitleQuery titles) {
         return new Criteria().andOperator(
-                Criteria.where(SOURCE).nin(titles.managerSources()),
+                Criteria.where(SOURCE).nin(titles.getManagerSources()),
                 Criteria.where(MATCH_STATE).ne(PackageMatchState.MATCHED));
     }
 }

@@ -34,6 +34,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -169,7 +170,8 @@ public class TenantSoftwareReadModelQuery {
     }
 
     public List<SoftwareResponse> allForFilters(String tenantId, String search) {
-        Page<Software> page = softwareRepository.findTitles(titles(tenantId, search, null, null), Pageable.unpaged());
+        SoftwareTitleQuery titles = titles(tenantId, search, null, null);
+        Page<Software> page = softwareRepository.findTitles(titles, Pageable.unpaged());
         return page.getContent().stream().map(TenantSoftwareReadModelQuery::toResponse).toList();
     }
 
@@ -188,7 +190,8 @@ public class TenantSoftwareReadModelQuery {
         int pageIndex = Math.max(page, 0);
         Pageable pageable = PageRequest.of(pageIndex, size, sortOf(sort));
 
-        Page<Software> result = softwareRepository.findTitles(titles(tenantId, search, vulnerable, manageable), pageable);
+        SoftwareTitleQuery titles = titles(tenantId, search, vulnerable, manageable);
+        Page<Software> result = softwareRepository.findTitles(titles, pageable);
 
         List<SoftwareResponse> rows = result.getContent().stream().map(TenantSoftwareReadModelQuery::toResponse).toList();
         return new PageResult<>(rows, result.hasNext(), pageIndex > 0, (int) result.getTotalElements(), pageIndex);
@@ -197,8 +200,9 @@ public class TenantSoftwareReadModelQuery {
     // "manageable" reads the match the projector stored, the same one the catalog status resolves on the rows
     private static SoftwareTitleQuery titles(String tenantId, String search, Boolean vulnerable, Boolean manageable) {
         String nameLower = isBlank(search) ? null : search.toLowerCase();
-        return new SoftwareTitleQuery(tenantId, nameLower, Boolean.TRUE.equals(vulnerable), manageable,
-                FleetSoftwareCategory.managerSources());
+        boolean vulnerableOnly = Boolean.TRUE.equals(vulnerable);
+        Set<String> managerSources = FleetSoftwareCategory.managerSources();
+        return new SoftwareTitleQuery(tenantId, nameLower, vulnerableOnly, manageable, managerSources);
     }
 
     private Sort sortOf(SortInput sort) {
