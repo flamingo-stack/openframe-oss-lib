@@ -186,8 +186,9 @@ export function AccountPopover({
             // Avatar only: a square around it, the size of the row's other buttons.
             avatarOnly && !collapsed ? 'size-8 shrink-0 justify-center gap-0 p-0' : 'w-full',
             centred && 'justify-center gap-0 px-0',
+            // The rail keeps the avatar 8px in, `avatarOnly` or not; only the square above has no padding.
             !centred &&
-              !avatarOnly &&
+              (!avatarOnly || collapsed) &&
               'pl-[var(--spacing-system-xsf)] pr-0 @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]',
             'transition-[padding,background-color] duration-200 hover:bg-ods-bg-hover data-[state=open]:bg-ods-bg-hover motion-reduce:transition-none',
             disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',

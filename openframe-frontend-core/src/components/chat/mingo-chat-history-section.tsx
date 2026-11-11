@@ -174,7 +174,8 @@ function HistoryList({
   return (
     <div className={cn('flex flex-col', compact ? 'gap-[var(--spacing-system-mf)]' : 'gap-[var(--spacing-system-xs)]')}>
       {draftTitle && !draftInToday && (
-        <DayGroup label="Today" density={density}>
+        // Today's, as the draft always is: under "Current chats" in compact, as the mapped today group.
+        <DayGroup label="Today" density={density} labelHidden={compact}>
           <SectionRow title={draftTitle} active density={density} />
         </DayGroup>
       )}

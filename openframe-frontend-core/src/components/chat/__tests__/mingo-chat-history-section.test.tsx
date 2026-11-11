@@ -86,6 +86,13 @@ describe('MingoChatRail variant="section"', () => {
     expect(rows[0]).toHaveAttribute('aria-current', 'true');
   });
 
+  it("compact: a chat being started with no chat of today's yet has its Today label for screen readers only", () => {
+    useFixedClock();
+    render(<MingoChatRail variant="section" density="compact" dialogs={DIALOGS.slice(2)} draftTitle="New Chat" />);
+    const today = screen.getByRole('group', { name: 'Today' });
+    expect(within(today).getByText('Today')).toHaveClass('sr-only');
+  });
+
   it('shows the status glyphs, and the owner only on someone else’s chat', () => {
     const owner = { name: 'Roman Smith' };
     render(

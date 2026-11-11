@@ -98,6 +98,11 @@ describe('AccountPopover', () => {
     expect(trigger()).toHaveClass('justify-center', 'gap-0', 'px-0');
     expect(nameHidden()).toBe(true);
 
+    // `avatarOnly` in the rail: the same 8px in, not a padless square.
+    rerender(<AccountPopover collapsed avatarOnly name="Ada Lovelace" items={entries()} />);
+    expect(trigger()).toHaveClass('pl-[var(--spacing-system-xsf)]');
+    expect(trigger()).not.toHaveClass('p-0');
+
     // Expanded, `collapsedAlign` changes nothing.
     rerender(<AccountPopover collapsedAlign="center" name="Ada Lovelace" items={entries()} />);
     expect(screen.getByRole('button', { name: /Ada Lovelace/ })).not.toHaveClass('justify-center');
