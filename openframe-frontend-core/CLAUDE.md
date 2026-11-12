@@ -226,6 +226,7 @@ import '@flamingo-stack/openframe-frontend-core/styles'
 ### Directories
 
 - `src/components/ui/` — base primitives (Button, Card, Input, Modal, Skeleton, data-table/, file-manager/, …)
+  - `data-table/` has two layouts: card rows (the default) and the opt-in grid (`layout="grid"`). What a table needs before it moves to the grid: `docs/DATA_TABLE_GRID.md`
 - `src/components/layout/` — **PageLayout + TitleBlock (⛔ FROZEN — never modify)**, PageContainer variants, ListPageLayout, PageHeading
 - `src/components/features/` — composed business components (auth, notifications/, time-tracker/, board/, ai-enrich/, FigmaPrototypeViewer, video pipeline, admin managers)
 - `src/components/navigation/` — Header, AppLayout, NavigationSidebar, SlidingSidebar, StickySectionNav

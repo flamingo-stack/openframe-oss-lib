@@ -2,6 +2,7 @@ use crate::models::installed_tool::{Installation, InstalledTool, ToolRecordState
 use crate::platform::system_service;
 use crate::services::installed_tools_service::InstalledToolsService;
 use crate::services::tool_command_params_resolver::ToolCommandParamsResolver;
+use crate::services::tool_connection_processing_manager::reap_orphaned_helpers;
 use crate::services::tool_kill_service::ToolKillService;
 use crate::services::tool_ops::ToolOps;
 use crate::utils::failure_log_backoff::FailureLogBackoff;
@@ -412,6 +413,7 @@ impl ToolRunManager {
                         sleep(Duration::from_secs(delay)).await;
                         continue;
                     }
+                    reap_orphaned_helpers(&tool, &params_processor.directory_manager).await;
                     kill_leftovers_now = false;
                 }
 

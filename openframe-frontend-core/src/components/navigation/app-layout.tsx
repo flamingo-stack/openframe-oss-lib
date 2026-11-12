@@ -168,6 +168,8 @@ export interface AppLayoutProps {
   workAreaStorageKey?: string;
   /** How far the divider may squeeze a column below its min width (`AppLayoutWorkArea` `squeezeFloor`). */
   workAreaSqueezeFloor?: number;
+  /** The columns actually on screen, whenever they change (`AppLayoutWorkArea` `onShownModeChange`). */
+  onWorkAreaShownModeChange?: (shown: AppLayoutWorkAreaMode) => void;
   /**
    * A bar at the top of the page column, over `<main>` and outside its scroll (e.g. an
    * `AppColumnHeader` with the page's title and the work area's layout buttons). Keep it
@@ -223,6 +225,7 @@ export function AppLayout({
   workAreaMode = 'page',
   workAreaStorageKey,
   workAreaSqueezeFloor,
+  onWorkAreaShownModeChange,
   pageHeader,
   endSidebarConfig,
   animateSidebars = false,
@@ -547,6 +550,7 @@ export function AppLayout({
                     page={pageColumn}
                     storageKey={workAreaStorageKey}
                     squeezeFloor={workAreaSqueezeFloor}
+                    onShownModeChange={onWorkAreaShownModeChange}
                   />
                 ) : (
                   pageColumn

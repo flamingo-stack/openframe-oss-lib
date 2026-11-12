@@ -1,6 +1,7 @@
 // Download settings
-pub const MAX_DOWNLOAD_RETRIES: u32 = 3;
-pub const DOWNLOAD_TIMEOUT_SECS: u64 = 300; // 5 minutes
+pub const DOWNLOAD_RETRY_BUDGET_SECS: u64 = 240; // all attempts of one download, below CLIENT_UPDATE_PENDING_TTL_SECS
+pub const DOWNLOAD_RETRY_INITIAL_DELAY_SECS: u64 = 5;
+pub const DOWNLOAD_RETRY_MAX_DELAY_SECS: u64 = 60;
 pub const MIN_BINARY_SIZE_BYTES: u64 = 1024 * 100; // 100 KB
 
 // HTTP client timeouts

@@ -57,10 +57,7 @@ public class ScriptService {
         timeoutValidator.validate(input.getDefaultTimeoutSeconds());
         privilegeValidator.validate(input.getPrivilegeLevel(), input.getSupportedPlatforms());
 
-        if (scriptRepository.existsByTenantIdAndNameAndStatusIn(tenantId, input.getName(), NAME_UNIQUE_STATUSES)) {
-            throw new ConflictException(
-                    "Script with name '" + input.getName() + "' already exists");
-        }
+        requireNameAvailable(input.getName());
 
         Script entity = scriptMapper.toEntity(tenantId, input);
         entity.setCreatedBy(createdBy);
@@ -70,6 +67,17 @@ public class ScriptService {
         log.info("Created script id={} name='{}' tenantId={} creationSource={} createdBy={}",
                 saved.getId(), saved.getName(), tenantId, creationSource, createdBy);
         return scriptMapper.toResponse(saved);
+    }
+
+    public void requireNameAvailable(String name) {
+        if (scriptRepository.existsByTenantIdAndNameAndStatusIn(
+                tenantIdProvider.getTenantId(), name, NAME_UNIQUE_STATUSES)) {
+            throw new ConflictException("Script with name '" + name + "' already exists");
+        }
+    }
+
+    public Script requireExisting(String id) {
+        return loadOrThrow(tenantIdProvider.getTenantId(), id);
     }
 
     public ScriptResponse get(String id) {

@@ -83,6 +83,10 @@
   --duration-slower: 750ms;
 
   /* Easing Functions */
+  /* Enter, exit and move: Material 3's emphasized curves, the same values as MOTION_EASING (src/utils/motion.ts). */
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-move: cubic-bezier(0.2, 0, 0, 1);
   --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
   --ease-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 

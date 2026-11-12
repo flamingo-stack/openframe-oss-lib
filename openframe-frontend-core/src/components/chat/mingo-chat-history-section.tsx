@@ -1,7 +1,7 @@
 'use client';
 
 import { useControllableState } from '@radix-ui/react-use-controllable-state';
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
@@ -540,11 +540,28 @@ interface SearchModalContentProps {
   children: ReactNode;
 }
 
+/** A chat row of the search's list that opens its chat (the draft row has no `data-chat-row`). */
+const CHAT_ROW_SELECTOR = 'button[data-chat-row]';
+
 function SearchModalContent({ initialValue, onSearchChange, onClose, children }: SearchModalContentProps) {
   const [value, setValue] = useState(initialValue ?? '');
   const debounced = useDebounce(value, 300);
   const lastSent = useRef(initialValue ?? '');
   const fieldRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // The row the arrow keys have reached, by its place in the list; -1: none yet. Kept with the
+  // term it was reached under: a new term (and so a new list) starts over.
+  const [highlight, setHighlight] = useState({ term: debounced, index: -1 });
+  const highlighted = highlight.term === debounced ? highlight.index : -1;
+  const rows = () => Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>(CHAT_ROW_SELECTOR) ?? []);
+  useEffect(() => {
+    rows().forEach((row, index) => {
+      if (index === highlighted) {
+        row.setAttribute('data-highlighted', '');
+        row.scrollIntoView?.({ block: 'nearest' });
+      } else row.removeAttribute('data-highlighted');
+    });
+  });
 
   const send = (term: string) => {
     if (term === lastSent.current) return;
@@ -570,12 +587,34 @@ function SearchModalContent({ initialValue, onSearchChange, onClose, children }:
     onClose();
   };
 
+  // The field keeps the focus: the arrow keys walk the chats under it, Enter opens the one
+  // reached — or, with none reached, the first, once the list shows the term typed (a term
+  // still waiting for its debounce is sent first, as before). Ahead of the field's own keys.
+  const onFieldKeyDown = (event: ReactKeyboardEvent) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
+    const list = rows();
+    if (event.key === 'Enter') {
+      const target = highlighted >= 0 ? list[highlighted] : value === lastSent.current ? list[0] : undefined;
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      target.click();
+      return;
+    }
+    if (list.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    const next = highlighted < 0 ? (step > 0 ? 0 : list.length - 1) : (highlighted + step + list.length) % list.length;
+    setHighlight({ term: debounced, index: next });
+  };
+
   return (
     <ModalV2 isOpen onClose={close} className="md:max-w-[600px]">
       <ModalV2Header>
         <ModalV2Title>Search chats</ModalV2Title>
       </ModalV2Header>
-      <div ref={fieldRef} role="search" aria-label="Search chats" className="w-full">
+      <div ref={fieldRef} role="search" aria-label="Search chats" className="w-full" onKeyDownCapture={onFieldKeyDown}>
         <SearchInput
           value={value}
           onChange={setValue}
@@ -584,7 +623,9 @@ function SearchModalContent({ initialValue, onSearchChange, onClose, children }:
           showDropdown={false}
         />
       </div>
-      <div className="max-h-[min(480px,55vh)] w-full overflow-y-auto">{children}</div>
+      <div ref={listRef} className="max-h-[min(480px,55vh)] w-full overflow-y-auto">
+        {children}
+      </div>
     </ModalV2>
   );
 }
@@ -673,9 +714,11 @@ function SectionRow({
         title={title}
         tabIndex={dialog ? undefined : -1}
         onClick={dialog ? () => onSelect?.(dialog.id) : undefined}
+        data-chat-row={dialog ? '' : undefined}
         className={cn(
           'transition-colors duration-150',
-          !active && 'hover:bg-ods-bg-hover',
+          // `data-highlighted`: the row the search's arrow keys have reached.
+          !active && 'hover:bg-ods-bg-hover data-[highlighted]:bg-ods-bg-hover',
           !dialog && 'cursor-default',
         )}
         // Held for the ⋯ even when empty, so a title never runs under it.

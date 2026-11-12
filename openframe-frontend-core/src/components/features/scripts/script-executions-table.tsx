@@ -5,6 +5,7 @@ import { type ColumnDef, DataTable, dataTableLoadingRows, type Row, useDataTable
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
+import { dataTableLayoutProps, type FeatureTableLayoutProps, hasSlotContent } from '../feature-table-layout';
 import {
   ExecutionDeviceCell,
   ExecutionInitiatorCell,
@@ -49,7 +50,7 @@ const loadingExecution = (id: string): ScriptExecutionTableRow => ({
   href: '',
 });
 
-export interface ScriptExecutionsTableProps {
+export interface ScriptExecutionsTableProps extends FeatureTableLayoutProps {
   rows: ScriptExecutionTableRow[];
   /**
    * The columns and their widths. Defaults to the product's
@@ -80,7 +81,7 @@ export interface ScriptExecutionsTableProps {
  */
 export function ScriptExecutionsTable({
   rows,
-  columns: layout = EXECUTIONS_TABLE_COLUMNS,
+  columns: columnLayout = EXECUTIONS_TABLE_COLUMNS,
   hideColumns,
   renderSubRow,
   compact = false,
@@ -89,6 +90,9 @@ export function ScriptExecutionsTable({
   showHeader: withHeader = true,
   rightSlot,
   skeletonRows,
+  layout = 'cards',
+  tableMaxHeight,
+  tableSettings,
 }: ScriptExecutionsTableProps) {
   // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header and the body's skeleton
   // rows alike.
@@ -123,7 +127,7 @@ export function ScriptExecutionsTable({
       [EXECUTION_COLUMNS.open.id]: row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} /> : null),
     };
     // No row menu here: its one action (copy the id) is the product's, so the actions column is left out.
-    return layout
+    return columnLayout
       .filter(column => renderers[column.id] && !hideColumns?.includes(column.id))
       .map(column => ({
         id: column.id,
@@ -132,7 +136,7 @@ export function ScriptExecutionsTable({
         enableSorting: false,
         meta: scriptsColumnMeta(column),
       }));
-  }, [layout, hideColumns]);
+  }, [columnLayout, hideColumns]);
 
   // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
   const loadingRows = useMemo(
@@ -150,8 +154,10 @@ export function ScriptExecutionsTable({
   const showHeader = withHeader && (loading || rows.length > 0);
 
   return (
-    <DataTable table={table}>
-      {showHeader && <DataTable.Header rightSlot={rightSlot} />}
+    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+      {/* The grid's results row sits above the table; the card header carries it in its right slot. */}
+      {showHeader && layout === 'grid' && hasSlotContent(rightSlot) && <DataTable.Meta>{rightSlot}</DataTable.Meta>}
+      {showHeader && <DataTable.Header rightSlot={rightSlot} loading={loading} />}
       <DataTable.Body
         loading={loading}
         loadingCells
