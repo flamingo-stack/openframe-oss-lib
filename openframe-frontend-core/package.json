@@ -352,6 +352,12 @@
       "require": "./dist/utils/video-bite-id.cjs",
       "default": "./dist/utils/video-bite-id.js"
     },
+    "./utils/youtube-poster": {
+      "types": "./dist/utils/youtube-poster.d.ts",
+      "import": "./dist/utils/youtube-poster.js",
+      "require": "./dist/utils/youtube-poster.cjs",
+      "default": "./dist/utils/youtube-poster.js"
+    },
     "./styles": {
       "types": "./src/styles/index.d.ts",
       "import": "./src/styles/index.css",
