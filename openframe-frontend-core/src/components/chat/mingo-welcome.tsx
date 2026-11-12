@@ -11,7 +11,6 @@ import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { MingoChatHistory } from './mingo-chat-history';
 import { MingoQuickActionWall } from './mingo-quick-action-wall';
-import { QuickActionChipButton } from './quick-action-chip';
 import type { DialogItem } from './types/component.types';
 
 // =============================================================================
@@ -24,7 +23,7 @@ export interface MingoWelcomePromo {
   description: ReactNode;
 }
 
-/** Extra quick-action chip rendered after the built-in "Start Guide Chat". */
+/** A quick action of Mingo's row, after its first tag "Start Guide Chat". */
 export interface MingoQuickAction {
   /** Stable React key. */
   id: string;
@@ -52,7 +51,7 @@ export interface MingoWelcomeProps {
   /** Where the dismissal is persisted. `'local'` (default) survives across
    *  sessions; `'session'` clears when the tab closes. */
   promoStorage?: 'local' | 'session';
-  /** Extra quick-action chips appended after the "Start Guide Chat" chip. */
+  /** The quick actions: the tags of the row, after its first tag "Start Guide Chat", and the rows of its "All" list. */
   quickActions?: ReadonlyArray<MingoQuickAction>;
   /** Returning-user variation: the user already has chats. Hides the
    *  "New to OpenFrame?" notification entirely and renders the "Start Guide
@@ -82,8 +81,8 @@ export interface MingoWelcomeProps {
    *  action — switches the host chat to Guide mode) and enables the default
    *  promo notification. When omitted, both are suppressed. */
   onStartGuideChat?: () => void;
-  /** The host is still reading the quick actions: the set draws its loading form in every slot, so the empty state
-   *  keeps its height when they land. */
+  /** The host is still reading the quick actions: the row draws its tags' loading form, so the empty state keeps
+   *  its height when they land. */
   quickActionsLoading?: boolean;
   /** Appended to the root element. */
   className?: string;
@@ -204,6 +203,23 @@ export function MingoWelcome({
   // renders. `dialogHistory` always wins — a returning user keeps the chips.
   const showPinnedRegion = !!dialogHistory || (!historyLoading && !loadError);
 
+  // "Start Guide Chat", the row's first tag: accent yellow for a new user, outline for a returning one.
+  const guideChatTag = useMemo<MingoQuickAction[]>(
+    () =>
+      onStartGuideChat
+        ? [
+            {
+              id: 'start-guide-chat',
+              label: 'Start Guide Chat',
+              icon: <CompassIcon size={16} />,
+              variant: hasExistingChats ? 'outline' : 'primary',
+              onClick: onStartGuideChat,
+            },
+          ]
+        : [],
+    [onStartGuideChat, hasExistingChats],
+  );
+
   return (
     <div
       className={cn(
@@ -307,27 +323,14 @@ export function MingoWelcome({
             </div>
           )}
 
-          {/* Quick actions. "Start Guide Chat" stays pinned above the set: it is the primary mode switch and must
-              never move out of reach. The rest are the static {@link QuickActionSet} (fixed slots, "More" for the
-              rest); a click puts the action's prompt into the composer. The standalone chip sits one
-              chip gap above the set, so it reads as its first row rather than a separate control. */}
-          {(onStartGuideChat || (quickActions && quickActions.length > 0) || quickActionsLoading) && (
-            <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xs)]">
-              {onStartGuideChat && (
-                <QuickActionChipButton
-                  label="Start Guide Chat"
-                  icon={<CompassIcon size={16} />}
-                  variant={hasExistingChats ? 'outline' : 'primary'}
-                  onSelect={onStartGuideChat}
-                  className="self-start"
-                />
-              )}
-              <MingoQuickActionWall
-                quickActions={quickActions ?? []}
-                loading={quickActionsLoading && !quickActions?.length}
-              />
-            </div>
-          )}
+          {/* Quick actions: the chat's one-line row. "Start Guide Chat" is its first tag, pinned before the actions:
+              it is the primary mode switch, so it is there with no action at all, and it is not an action, so the
+              row's "All" list leaves it out. A click on an action sends its prompt. */}
+          <MingoQuickActionWall
+            quickActions={quickActions ?? []}
+            leading={guideChatTag}
+            loading={quickActionsLoading && !quickActions?.length}
+          />
         </div>
       )}
     </div>

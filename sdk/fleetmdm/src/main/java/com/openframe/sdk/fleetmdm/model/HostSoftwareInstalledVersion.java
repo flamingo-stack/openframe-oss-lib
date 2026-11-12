@@ -28,4 +28,8 @@ public class HostSoftwareInstalledVersion {
     private String installScope;
     @JsonProperty("install_arch")
     private String installArch;
+
+    // the winget package id, on rows from the osquery winget_packages table only (fleetmdm#259)
+    @JsonProperty("winget_id")
+    private String wingetId;
 }
