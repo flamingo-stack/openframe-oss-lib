@@ -29,6 +29,7 @@ import static com.openframe.data.document.packagesearch.PackageManagerType.WINGE
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -83,6 +84,22 @@ class PackageManagerAvailabilityTest {
 
         // verifications
         assertThat(result).isTrue();
+    }
+
+    @Test
+    void requireSoftwareManageable_emptyReport_passes() {
+        // setup
+        Machine silent = machine("m-silent", Map.of());
+        stubMachines(Set.of("m-silent"), silent);
+        List<String> machineIds = List.of("m-silent");
+        List<PackageManagerType> managers = List.of(BREW);
+
+        // execution
+        Throwable execution = catchThrowable(
+                () -> availability.requireSoftwareManageable(machineIds, managers));
+
+        // verifications
+        assertThat(execution).isNull();
     }
 
     @ParameterizedTest
