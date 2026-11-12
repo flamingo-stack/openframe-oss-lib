@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.rmm.software.SoftwareAutoUpdatePolicyResponse;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
@@ -15,25 +16,36 @@ import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
+import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.service.rmm.software.SoftwareAutoUpdateService;
+import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.api.service.rmm.software.SoftwareInventoryService;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.security.authentication.AuthPrincipal;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.validation.annotation.Validated;
 
+import static com.openframe.graphql.relay.NodeType.SOFTWARE_BUNDLE;
 
 @DgsComponent
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
+@Validated
 public class SoftwareDataFetcher {
 
     private final SoftwareInventoryService softwareInventoryService;
+    private final SoftwareAutoUpdateService softwareAutoUpdateService;
+    private final SoftwareBundleService softwareBundleService;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public SoftwareResponse software(@InputArgument String id) {
@@ -109,6 +121,20 @@ public class SoftwareDataFetcher {
     public SoftwareOnDeviceFilters softwareDeviceFilters(@InputArgument String softwareId,
                                                          @InputArgument Object filter, @InputArgument String search) {
         return softwareInventoryService.getSoftwareDeviceFilters(softwareId, search);
+    }
+
+    @DgsQuery
+    public SoftwareAutoUpdatePolicyResponse softwareAutoUpdatePolicy(@InputArgument String softwareId) {
+        return softwareAutoUpdateService.getPolicy(softwareId);
+    }
+
+    @DgsMutation
+    public SoftwareResponse turnOnSoftwareAutoUpdate(@InputArgument @Valid TurnOnSoftwareAutoUpdateInput input) {
+        String bundleGlobalId = input.getBundleId();
+        String bundleId = relayIdCodec.decode(bundleGlobalId, SOFTWARE_BUNDLE);
+        input.setBundleId(bundleId);
+        String userId = getCurrentUserId();
+        return softwareBundleService.turnOnAutoUpdate(input, userId);
     }
 
     @DgsMutation

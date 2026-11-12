@@ -1,6 +1,7 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
@@ -15,6 +16,8 @@ import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.software.PackageUpdateMode;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
@@ -32,6 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -49,6 +53,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -58,6 +63,8 @@ import static org.mockito.Mockito.when;
 class SoftwareInventoryServiceFleetPagingTest {
 
     private static final String MACHINE_ID = "machine-1";
+    private static final PackageUpdateSettings WAIT = PackageUpdateSettings.builder()
+            .mode(PackageUpdateMode.WAIT).deadlineSeconds(604_800L).countdownSeconds(300).build();
 
     @Mock private FleetMdmClient fleet;
     @Mock private FleetDeviceCountEnricher deviceCountEnricher;
@@ -145,6 +152,54 @@ class SoftwareInventoryServiceFleetPagingTest {
         assertThat(result.getName()).isEqualTo("Chrome");
         verify(autoUpdateService).turnOff("42", "admin@x");
         verify(autoUpdateService, never()).titleFromPolicies(anyString());
+    }
+
+    @Test
+    void turnOnAutoUpdate_titleACatalogPackageManages_turnsOnWithThePackageThenReturnsTheTitle() {
+        // setup
+        PackageCatalogEntry chrome = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.WINGET).packageId("Google.Chrome").build();
+        when(fleet.getSoftwareTitle(42L)).thenReturn(fleetTitle("Chrome", 42L, 7));
+        doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setManagingPackage(chrome));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+        List<String> machineIds = List.of("m1", "m2");
+
+        // execution
+        SoftwareResponse result = service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x");
+
+        // verifications
+        assertThat(result.getName()).isEqualTo("Chrome");
+        InOrder order = inOrder(autoUpdateService);
+        order.verify(autoUpdateService).turnOn("42", chrome, machineIds, WAIT, "admin@x");
+        order.verify(autoUpdateService).applyToSoftware(List.of(result));
+    }
+
+    @Test
+    void turnOnAutoUpdate_titleNoPackageManages_badRequestNothingTurnedOn() {
+        // setup
+        when(fleet.getSoftwareTitle(42L)).thenReturn(fleetTitle("Adobe Acrobat", 42L, 7));
+        List<String> machineIds = List.of("m1");
+
+        // execution / verifications
+        assertThatThrownBy(() -> service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("No package manager manages Adobe Acrobat");
+        verify(autoUpdateService, never()).turnOn(anyString(), any(), anyList(), any(), anyString());
+    }
+
+    @Test
+    void turnOnAutoUpdate_notATitle_notFoundNothingTurnedOn() {
+        // setup
+        List<String> machineIds = List.of("m1");
+
+        // execution / verifications
+        assertThatThrownBy(() -> service.turnOnAutoUpdate("not-a-title", machineIds, WAIT, "admin@x"))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Software not found: not-a-title");
+        verify(autoUpdateService, never()).turnOn(anyString(), any(), anyList(), any(), anyString());
     }
 
     @Test

@@ -30,15 +30,50 @@ public class CustomPackageAutoUpdatePolicyRepositoryImpl implements CustomPackag
     }
 
     @Override
+    public void updateSettings(PackageAutoUpdatePolicy template, Collection<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return;
+        }
+        String tenantId = template.getTenantId();
+        String softwareId = template.getSoftwareId();
+        Criteria enabledOfPackage = enabledOf(tenantId, softwareId)
+                .and("packageManager").is(template.getPackageManager())
+                .and("packageName").is(template.getPackageName())
+                .and("machineId").in(machineIds);
+        Query query = Query.query(enabledOfPackage);
+        Update update = new Update()
+                .set("settings", template.getSettings())
+                .set("updatedBy", template.getUpdatedBy())
+                .set("updatedAt", Instant.now());
+        mongoTemplate.updateMulti(query, update, PackageAutoUpdatePolicy.class);
+    }
+
+    @Override
     public long disableBySoftwareId(String tenantId, String softwareId, String actor) {
-        Query enabled = Query.query(Criteria.where("tenantId").is(tenantId)
+        Criteria enabled = enabledOf(tenantId, softwareId);
+        return disable(enabled, actor);
+    }
+
+    @Override
+    public long disableBySoftwareIdAndMachineIdNotIn(String tenantId, String softwareId, Collection<String> machineIds,
+                                                     String actor) {
+        Criteria enabledElsewhere = enabledOf(tenantId, softwareId).and("machineId").nin(machineIds);
+        return disable(enabledElsewhere, actor);
+    }
+
+    private static Criteria enabledOf(String tenantId, String softwareId) {
+        return Criteria.where("tenantId").is(tenantId)
                 .and("softwareId").is(softwareId)
-                .and("enabled").is(true));
+                .and("enabled").is(true);
+    }
+
+    private long disable(Criteria enabled, String actor) {
+        Query query = Query.query(enabled);
         Update disable = new Update()
                 .set("enabled", false)
                 .set("updatedBy", actor)
                 .set("updatedAt", Instant.now());
-        return mongoTemplate.updateMulti(enabled, disable, PackageAutoUpdatePolicy.class).getModifiedCount();
+        return mongoTemplate.updateMulti(query, disable, PackageAutoUpdatePolicy.class).getModifiedCount();
     }
 
     private static Query key(PackageAutoUpdatePolicy template, String machineId) {

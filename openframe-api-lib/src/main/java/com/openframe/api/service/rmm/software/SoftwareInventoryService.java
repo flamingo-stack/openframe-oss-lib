@@ -30,6 +30,7 @@ import com.openframe.api.util.FleetSoftwareMapper;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.api.util.FleetVulnerabilityMapper;
 import com.openframe.data.document.rmm.software.FleetSource;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -168,13 +169,27 @@ public class SoftwareInventoryService {
     }
 
     public PackageCatalogEntry getManagingPackage(String softwareId) {
+        SoftwareResponse software = getManagedSoftware(softwareId);
+        return software.getManagingPackage();
+    }
+
+    private SoftwareResponse getManagedSoftware(String softwareId) {
         SoftwareResponse software = findById(softwareId)
                 .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
-        PackageCatalogEntry managingPackage = software.getManagingPackage();
-        if (managingPackage == null) {
+        if (software.getManagingPackage() == null) {
             throw new BadRequestException("No package manager manages " + software.getName());
         }
-        return managingPackage;
+        return software;
+    }
+
+    public SoftwareResponse turnOnAutoUpdate(String softwareId, List<String> machineIds, PackageUpdateSettings settings,
+                                             String actor) {
+        SoftwareResponse software = getManagedSoftware(softwareId);
+        PackageCatalogEntry managingPackage = software.getManagingPackage();
+        autoUpdateService.turnOn(softwareId, managingPackage, machineIds, settings, actor);
+        List<SoftwareResponse> rows = List.of(software);
+        applyStatuses(rows);
+        return software;
     }
 
     // Fleet lists a title only after its periodic host count, so a title just seen on a device can be unknown there

@@ -24,6 +24,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @SpringBootTest(classes = RmmIntegrationTestApplication.class)
 @Tag("integration")
@@ -111,6 +112,46 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(repository.findByTenantIdAndMachineIdAndSoftwareIdIn(TENANT, "m1", List.of("title-9")))
                 .singleElement().satisfies(p -> assertThat(p.isEnabled()).isTrue());
         assertThat(repository.disableBySoftwareId(TENANT, "title-7", "other@x")).isZero();   // idempotent
+    }
+
+    @Test
+    @DisplayName("updateSettings: the enabled policies of that Software and package on these devices get the settings, lastVersion stays")
+    void updateSettings_enabledPoliciesOfThePackage_getTheSettingsKeepLastVersion() {
+        PackageAutoUpdatePolicy chrome = template("google-chrome", "title-7", WAIT, "admin@x");
+        chrome.setLastVersion("151.0.7922.98");
+        repository.enable(chrome, List.of("m1", "m2", "m3"));
+        repository.enable(template("slack", "title-7", WAIT, "admin@x"), List.of("m1"));
+        String turnedOffId = byMachine("google-chrome").get("m3").getId();
+        repository.disable(turnedOffId, "151.0.7922.98", "admin@x", Instant.now());
+
+        repository.updateSettings(template("google-chrome", "title-7", FORCE, "other@x"), List.of("m1", "m3", "m9"));
+
+        assertThat(byMachine("google-chrome").values())
+                .extracting(PackageAutoUpdatePolicy::getMachineId, PackageAutoUpdatePolicy::isEnabled,
+                        PackageAutoUpdatePolicy::getSettings, PackageAutoUpdatePolicy::getUpdatedBy,
+                        PackageAutoUpdatePolicy::getLastVersion)
+                .containsExactlyInAnyOrder(
+                        tuple("m1", true, FORCE, "other@x", "151.0.7922.98"),
+                        tuple("m2", true, WAIT, "admin@x", "151.0.7922.98"),
+                        tuple("m3", false, WAIT, "admin@x", "151.0.7922.98"));
+        assertThat(byMachine("slack").values()).extracting(PackageAutoUpdatePolicy::getSettings).containsExactly(WAIT);
+    }
+
+    @Test
+    @DisplayName("disableBySoftwareIdAndMachineIdNotIn: turns off that Software's enabled policies on the other devices only")
+    void disableBySoftwareIdAndMachineIdNotIn_turnsOffTheOtherDevices() {
+        repository.enable(template("google-chrome", "title-7", WAIT, "admin@x"), List.of("m1", "m2", "m3"));
+        repository.enable(template("slack", "title-9", WAIT, "admin@x"), List.of("m3"));
+
+        long turnedOff = repository.disableBySoftwareIdAndMachineIdNotIn(TENANT, "title-7", List.of("m1", "m4"), "other@x");
+
+        assertThat(turnedOff).isEqualTo(2);
+        assertThat(byMachine("google-chrome").values())
+                .extracting(PackageAutoUpdatePolicy::getMachineId, PackageAutoUpdatePolicy::isEnabled,
+                        PackageAutoUpdatePolicy::getUpdatedBy)
+                .containsExactlyInAnyOrder(tuple("m1", true, "admin@x"), tuple("m2", false, "other@x"),
+                        tuple("m3", false, "other@x"));
+        assertThat(byMachine("slack").values()).extracting(PackageAutoUpdatePolicy::isEnabled).containsExactly(true);
     }
 
     @Test
