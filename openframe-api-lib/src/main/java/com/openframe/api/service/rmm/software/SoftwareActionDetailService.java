@@ -174,6 +174,7 @@ public class SoftwareActionDetailService {
                 row.setOrganizationId(m.getOrganizationId());
                 row.setOrganizationName(organizationNames.get(m.getOrganizationId()));
                 row.setDeviceStatus(m.getStatus());
+                row.setConnectivity(m.getTelemetryStatus());
                 row.setLastSeen(m.getLastSeen());
             }
         });

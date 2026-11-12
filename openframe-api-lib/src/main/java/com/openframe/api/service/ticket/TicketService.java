@@ -493,7 +493,7 @@ public class TicketService {
 
         Machine device = requireMachine(machineId);
         ticket.setDeviceId(device.getMachineId());
-        ticket.setDeviceHostname(device.getHostname());
+        ticket.setDeviceHostname(device.preferredName());
 
         if (device.getOrganizationId() != null) {
             Organization org = requireOrganization(device.getOrganizationId());
@@ -501,7 +501,7 @@ public class TicketService {
             ticket.setOrganizationName(org.getName());
         }
         log.debug("Auto-populated device {} and org {} for AGENT ticket",
-                device.getHostname(), ticket.getOrganizationName());
+                device.preferredName(), ticket.getOrganizationName());
     }
 
     private void populateAdminFields(Ticket ticket, CreateTicketInput input) {
@@ -517,7 +517,7 @@ public class TicketService {
         if (deviceId != null) {
             Machine device = requireMachine(deviceId);
             ticket.setDeviceId(device.getMachineId());
-            ticket.setDeviceHostname(device.getHostname());
+            ticket.setDeviceHostname(device.preferredName());
             if (resolvedOrgId == null) {
                 resolvedOrgId = device.getOrganizationId();
             } else if (!resolvedOrgId.equals(device.getOrganizationId())) {

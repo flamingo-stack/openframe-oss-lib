@@ -25,6 +25,7 @@ public class DeviceMapper extends BaseRestMapper {
                 .osUuid(machine.getOsUuid())
                 .agentVersion(machine.getAgentVersion())
                 .status(machine.getStatus())
+                .connectivity(machine.getTelemetryStatus())
                 .lastSeen(machine.getLastSeen())
                 .customerId(machine.getOrganizationId())
                 .serialNumber(machine.getSerialNumber())
@@ -98,6 +99,7 @@ public class DeviceMapper extends BaseRestMapper {
     public DeviceFilterResponse toDeviceFilterResponse(DeviceFilters filters) {
         return DeviceFilterResponse.builder()
                 .statuses(toDeviceFilterItems(filters.getStatuses()))
+                .connectivity(toDeviceFilterItems(filters.getConnectivity()))
                 .deviceTypes(toDeviceFilterItems(filters.getDeviceTypes()))
                 .osTypes(toDeviceFilterItems(filters.getOsTypes()))
                 .customerIds(toDeviceFilterItems(filters.getOrganizationIds()))

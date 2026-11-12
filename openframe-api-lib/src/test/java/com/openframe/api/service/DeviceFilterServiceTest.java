@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.openframe.data.document.device.TelemetryStatus.ONLINE;
 import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
 import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,7 +68,7 @@ class DeviceFilterServiceTest {
 
     @Test
     void filteredCountOnly_runsOneQueryAndSkipsEveryFacet() {
-        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(7);
 
         DeviceFilters result = service()
@@ -75,7 +76,7 @@ class DeviceFilterServiceTest {
                 .join();
 
         assertThat(result.getFilteredCount()).isEqualTo(7);
-        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verifyNoMoreInteractions(pinotDeviceRepository);
     }
 
@@ -96,9 +97,9 @@ class DeviceFilterServiceTest {
 
     @Test
     void dashboardCounterSelection_runsOnlyItsTwoQueries() {
-        when(pinotDeviceRepository.getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Map.of("ONLINE", 3));
-        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(3);
 
         DeviceFilters result = service()
@@ -109,46 +110,86 @@ class DeviceFilterServiceTest {
         assertThat(result.getStatuses()).hasSize(1);
         assertThat(result.getFilteredCount()).isEqualTo(3);
         verify(pinotDeviceRepository, never())
-                .getDeviceTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+                .getDeviceTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verify(pinotDeviceRepository, never())
-                .getOsTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+                .getOsTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verify(pinotDeviceRepository, never())
-                .getOrganizationFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+                .getOrganizationFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verify(pinotDeviceRepository, never())
-                .getTagKeyFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+                .getTagKeyFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void nullFacetSet_keepsTheOldAllFacetsBehaviour() {
         service().getDeviceFilters(DeviceFilterCriteria.builder().build(), null).join();
 
-        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getDeviceTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getOsTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getOrganizationFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getTagKeyFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getConnectivityFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getDeviceTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getOsTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getOrganizationFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getTagKeyFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void connectivityFacet_runsOnlyTheConnectivityQueryAndSelfLabelsIt() {
+        when(pinotDeviceRepository.getConnectivityFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Map.of("ONLINE", 2));
+
+        DeviceFilters result = service()
+                .getDeviceFilters(DeviceFilterCriteria.builder().build(), Set.of(DeviceFilterFacet.CONNECTIVITY))
+                .join();
+
+        assertThat(result.getConnectivity()).hasSize(1);
+        assertThat(result.getConnectivity().get(0).getValue()).isEqualTo("ONLINE");
+        assertThat(result.getConnectivity().get(0).getCount()).isEqualTo(2);
+        verify(pinotDeviceRepository).getConnectivityFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verifyNoMoreInteractions(pinotDeviceRepository);
+    }
+
+    @Test
+    void connectivityCriteria_mappedToEnumNamesForPinot() {
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> connectivity = ArgumentCaptor.forClass(List.class);
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(0);
+
+        service().getDeviceFilters(DeviceFilterCriteria.builder().connectivity(List.of(ONLINE)).build(),
+                Set.of(DeviceFilterFacet.FILTERED_COUNT)).join();
+
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), connectivity.capture(), any(), any(), any(), any(), any(), any(), any());
+        assertThat(connectivity.getValue()).containsExactly("ONLINE");
+    }
+
+    @Test
+    void unrequestedConnectivityFacet_isEmptyListNotNull() {
+        DeviceFilters result = service()
+                .getDeviceFilters(DeviceFilterCriteria.builder().build(), Set.of(DeviceFilterFacet.FILTERED_COUNT))
+                .join();
+
+        assertThat(result.getConnectivity()).isEmpty();
     }
 
     @Test
     void singleArgOverload_stillRequestsEveryFacet() {
         service().getDeviceFilters(DeviceFilterCriteria.builder().build()).join();
 
-        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void nullOsTypesCriteria_doesNotNpe_passesEmptyOsTypesToPinot() {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> osTypes = ArgumentCaptor.forClass(List.class);
-        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(0);
 
         service().getDeviceFilters(DeviceFilterCriteria.builder().build(),
                 Set.of(DeviceFilterFacet.FILTERED_COUNT)).join();
 
-        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), osTypes.capture(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), osTypes.capture(), any(), any(), any(), any(), any());
         assertThat(osTypes.getValue()).isEmpty();
     }
 
@@ -156,21 +197,21 @@ class DeviceFilterServiceTest {
     void osTypesCriteria_mappedToEnumNamesForPinot() {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> osTypes = ArgumentCaptor.forClass(List.class);
-        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(0);
 
         service().getDeviceFilters(DeviceFilterCriteria.builder().osTypes(List.of(MAC_OS, WINDOWS)).build(),
                 Set.of(DeviceFilterFacet.FILTERED_COUNT)).join();
 
-        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), osTypes.capture(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), osTypes.capture(), any(), any(), any(), any(), any());
         assertThat(osTypes.getValue()).containsExactly("MAC_OS", "WINDOWS");
     }
 
     @Test
     void directoryColumnsSelection_runsOnlyTheirTwoQueries() {
-        when(pinotDeviceRepository.getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Map.of("MICROSOFT_365", 4));
-        when(pinotDeviceRepository.getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Map.of("NONE", 9));
 
         DeviceFilters result = service()
@@ -184,8 +225,8 @@ class DeviceFilterServiceTest {
         assertThat(result.getUserLinks())
                 .extracting(DeviceFilterOption::getValue, DeviceFilterOption::getCount)
                 .containsExactly(tuple("NONE", 9));
-        verify(pinotDeviceRepository).getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verifyNoMoreInteractions(pinotDeviceRepository);
     }
 
@@ -205,7 +246,7 @@ class DeviceFilterServiceTest {
         ArgumentCaptor<List<String>> sources = ArgumentCaptor.forClass(List.class);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> links = ArgumentCaptor.forClass(List.class);
-        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(0);
         DeviceFilterCriteria criteria = DeviceFilterCriteria.builder()
                 .directorySources(List.of(DirectorySource.MICROSOFT_365))
@@ -214,7 +255,7 @@ class DeviceFilterServiceTest {
 
         service().getDeviceFilters(criteria, Set.of(DeviceFilterFacet.FILTERED_COUNT)).join();
 
-        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(),
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(),
                 sources.capture(), links.capture());
         assertThat(sources.getValue()).containsExactly("MICROSOFT_365");
         assertThat(links.getValue()).containsExactly("PRIMARY", "NONE");
@@ -226,12 +267,12 @@ class DeviceFilterServiceTest {
         ArgumentCaptor<List<String>> sources = ArgumentCaptor.forClass(List.class);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> links = ArgumentCaptor.forClass(List.class);
-        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(0);
 
         service().getDeviceFilters(DeviceFilterCriteria.builder().build(), Set.of(DeviceFilterFacet.FILTERED_COUNT)).join();
 
-        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(),
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(),
                 sources.capture(), links.capture());
         assertThat(sources.getValue()).isEmpty();
         assertThat(links.getValue()).isEmpty();
@@ -239,7 +280,7 @@ class DeviceFilterServiceTest {
 
     @Test
     void directoryFacetsDisabled_selectedDirectoryFacets_neverQueriedAndEmpty() {
-        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(pinotDeviceRepository.getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(5);
 
         DeviceFilters result = service(false)
@@ -250,7 +291,7 @@ class DeviceFilterServiceTest {
         assertThat(result.getDirectorySources()).isEmpty();
         assertThat(result.getUserLinks()).isEmpty();
         assertThat(result.getFilteredCount()).isEqualTo(5);
-        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
         verifyNoMoreInteractions(pinotDeviceRepository);
     }
 
@@ -258,14 +299,14 @@ class DeviceFilterServiceTest {
     void directoryFacetsDisabled_allFacets_runsEveryOtherQuery() {
         service(false).getDeviceFilters(DeviceFilterCriteria.builder().build()).join();
 
-        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getDeviceTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getOsTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getOrganizationFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getTagKeyFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository, never()).getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository, never()).getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getDeviceTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getOsTypeFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getOrganizationFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getTagKeyFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getFilteredDeviceCount(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository, never()).getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository, never()).getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -281,7 +322,7 @@ class DeviceFilterServiceTest {
 
         service(false).getDeviceFilters(criteria, Set.of(DeviceFilterFacet.STATUSES)).join();
 
-        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(),
+        verify(pinotDeviceRepository).getStatusFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(),
                 sources.capture(), links.capture());
         assertThat(sources.getValue()).containsExactly("MICROSOFT_365");
         assertThat(links.getValue()).containsExactly("SHARED");
@@ -291,7 +332,7 @@ class DeviceFilterServiceTest {
     void directoryFacetsEnabled_allFacets_queriesTheDirectoryFacetsToo() {
         service(true).getDeviceFilters(DeviceFilterCriteria.builder().build()).join();
 
-        verify(pinotDeviceRepository).getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
-        verify(pinotDeviceRepository).getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getDirectorySourceFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(pinotDeviceRepository).getUserLinkFilterOptions(anyString(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

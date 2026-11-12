@@ -12,10 +12,11 @@ import { Tag } from '../ui/tag';
 // Types
 // =============================================================================
 
-/** Accent tint for quick-action chip icons: a named brand token
- *  (`'pink'`/`'cyan'`) or ANY CSS color value coming from admin config
+/** Accent tint for quick-action chip icons: a named token (`'pink'`/`'cyan'`,
+ *  or `'grey'`: the shell's grey for icons on its panels, ODS v2 system
+ *  greys/grey) or ANY CSS color value coming from admin config
  *  (agent/persona `icon_props.color`). */
-export type QuickActionAccent = 'pink' | 'cyan' | (string & {});
+export type QuickActionAccent = 'pink' | 'cyan' | 'grey' | (string & {});
 
 /** THE built-in agent→accent pairs ({@link getAgentAccent} derives from it). */
 const AGENT_ACCENTS = { fae: 'pink', mingo: 'cyan' } as const;
@@ -65,7 +66,18 @@ export interface QuickActionIconSpec extends EntityIconValue {
 const ACCENT_CLASS: Record<string, string> = {
   pink: 'text-ods-flamingo-pink',
   cyan: 'text-ods-flamingo-cyan',
+  grey: 'text-ods-text-panel-secondary',
 };
+
+/**
+ * The tint an accent gives a glyph drawn in `currentColor`: a named token's text class, or an admin-configured CSS
+ * color as the glyph's `color`. Nothing for no accent: the glyph keeps the tag's text color.
+ */
+export function quickActionAccentTint(accent: QuickActionAccent | undefined): { className?: string; color?: string } {
+  if (!accent) return {};
+  const className = ACCENT_CLASS[accent];
+  return className ? { className } : { color: accent };
+}
 
 /** A spec is a plain data object, never a React element — so any non-element,
  *  non-array object is a spec; strings, elements, fragments, and ReactNode
@@ -86,9 +98,11 @@ export function renderQuickActionIcon(icon: ReactNode | QuickActionIconSpec | un
   // accent value is an admin-configured CSS color, delivered as the glyph's
   // DEFAULT `color` prop — an explicit per-action `props.color` (spread after)
   // still wins.
-  const accentClass = spec.accent ? ACCENT_CLASS[spec.accent] : undefined;
-  const props = spec.accent && !accentClass ? { color: spec.accent, ...(spec.props ?? {}) } : spec.props;
-  return <EntityIcon icon={{ name: spec.name, url: spec.url, props }} size={spec.size ?? 16} className={accentClass} />;
+  const tint = quickActionAccentTint(spec.accent);
+  const props = tint.color ? { color: tint.color, ...(spec.props ?? {}) } : spec.props;
+  return (
+    <EntityIcon icon={{ name: spec.name, url: spec.url, props }} size={spec.size ?? 16} className={tint.className} />
+  );
 }
 
 /**

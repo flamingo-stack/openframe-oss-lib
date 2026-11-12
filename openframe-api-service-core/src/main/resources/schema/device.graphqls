@@ -20,6 +20,7 @@ extend type Query {
 
 type DeviceFilters {
     statuses: [DeviceFilterOption!]!
+    connectivity: [DeviceFilterOption!]!
     deviceTypes: [DeviceFilterOption!]!
     osTypes: [DeviceFilterOption!]!
     organizationIds: [DeviceFilterOption!]!
@@ -45,6 +46,7 @@ type TagFilterOption {
 
 input DeviceFilterInput {
     statuses: [DeviceStatus!]
+    connectivity: [DeviceConnectivity!]
     deviceTypes: [DeviceType!]
     osTypes: [String!]
     organizationIds: [String!]
@@ -64,6 +66,8 @@ type Machine implements Node @key(fields: "machineId") @shareable {
     osUuid: String
     agentVersion: String
     status: DeviceStatus
+    """Whether the agent is talking to us right now, independent of the lifecycle status. Null until the first heartbeat."""
+    connectivity: DeviceConnectivity
     lastSeen: Instant
     organizationId: String
     organization: Organization
@@ -142,6 +146,12 @@ enum DeviceStatus {
     PENDING_DELETION,
     DELETED,
     ARCHIVED
+}
+
+"""Online right now or not; the devices sort field "connectivity" (DESC = online first) uses the same value."""
+enum DeviceConnectivity {
+    ONLINE
+    OFFLINE
 }
 
 enum DeviceType {

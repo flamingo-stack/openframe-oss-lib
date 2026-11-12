@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
+import static com.openframe.api.dto.device.DeviceFilterFacet.CONNECTIVITY;
 import static com.openframe.api.dto.device.DeviceFilterFacet.DEVICE_TYPES;
 import static com.openframe.api.dto.device.DeviceFilterFacet.DIRECTORY_SOURCES;
 import static com.openframe.api.dto.device.DeviceFilterFacet.FILTERED_COUNT;
@@ -88,6 +89,8 @@ public class DeviceFilterService {
         Set<DeviceFilterFacet> facets = queriedFacets(requestedFacets != null ? requestedFacets : DeviceFilterFacet.ALL);
         List<String> statuses = filters != null && filters.getStatuses() != null ?
                 filters.getStatuses().stream().map(Enum::name).toList() : emptyList();
+        List<String> connectivity = filters != null && filters.getConnectivity() != null ?
+                filters.getConnectivity().stream().map(Enum::name).toList() : emptyList();
         List<String> deviceTypes = filters != null && filters.getDeviceTypes() != null ?
                 filters.getDeviceTypes().stream().map(Enum::name).toList() : emptyList();
         List<String> osTypes = filters != null && filters.getOsTypes() != null ?
@@ -103,27 +106,30 @@ public class DeviceFilterService {
         String tenantId = tenantIdProvider.getTenantId();
 
         CompletableFuture<Map<String, Integer>> statusesFuture = facetQuery(facets, STATUSES, () ->
-                pinotDeviceRepository.getStatusFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+                pinotDeviceRepository.getStatusFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+        CompletableFuture<Map<String, Integer>> connectivityFuture = facetQuery(facets, CONNECTIVITY, () ->
+                pinotDeviceRepository.getConnectivityFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Map<String, Integer>> deviceTypesFuture = facetQuery(facets, DEVICE_TYPES, () ->
-                pinotDeviceRepository.getDeviceTypeFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+                pinotDeviceRepository.getDeviceTypeFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Map<String, Integer>> osTypesFuture = facetQuery(facets, OS_TYPES, () ->
-                pinotDeviceRepository.getOsTypeFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+                pinotDeviceRepository.getOsTypeFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Map<String, Integer>> organizationsFuture = facetQuery(facets, ORGANIZATION_IDS, () ->
-                pinotDeviceRepository.getOrganizationFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+                pinotDeviceRepository.getOrganizationFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Map<String, Integer>> tagKeysFuture = facetQuery(facets, TAG_KEYS, () ->
-                pinotDeviceRepository.getTagKeyFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+                pinotDeviceRepository.getTagKeyFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Map<String, Integer>> directorySourcesFuture = facetQuery(facets, DIRECTORY_SOURCES, () ->
-                pinotDeviceRepository.getDirectorySourceFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+                pinotDeviceRepository.getDirectorySourceFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Map<String, Integer>> userLinksFuture = facetQuery(facets, USER_LINKS, () ->
-                pinotDeviceRepository.getUserLinkFilterOptions(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+                pinotDeviceRepository.getUserLinkFilterOptions(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
         CompletableFuture<Integer> filteredCountFuture = facetQuery(facets, FILTERED_COUNT, () ->
-                pinotDeviceRepository.getFilteredDeviceCount(tenantId, statuses, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
+                pinotDeviceRepository.getFilteredDeviceCount(tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, directorySources, userLinks));
 
         return CompletableFuture.allOf(
-                        statusesFuture, deviceTypesFuture, osTypesFuture, organizationsFuture, tagKeysFuture,
+                        statusesFuture, connectivityFuture, deviceTypesFuture, osTypesFuture, organizationsFuture, tagKeysFuture,
                         directorySourcesFuture, userLinksFuture, filteredCountFuture)
                 .thenApply(v -> DeviceFilters.builder()
                         .statuses(optionMapper.selfLabeled(statusesFuture.join()))
+                        .connectivity(optionMapper.selfLabeled(connectivityFuture.join()))
                         .deviceTypes(optionMapper.selfLabeled(deviceTypesFuture.join()))
                         .osTypes(optionMapper.selfLabeled(osTypesFuture.join()))
                         .organizationIds(optionMapper.organizationLabeled(organizationsFuture.join()))
