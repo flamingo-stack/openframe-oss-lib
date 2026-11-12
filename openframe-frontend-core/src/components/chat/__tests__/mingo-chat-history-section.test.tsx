@@ -86,6 +86,13 @@ describe('MingoChatRail variant="section"', () => {
     expect(rows[0]).toHaveAttribute('aria-current', 'true');
   });
 
+  it("compact: a chat being started with no chat of today's yet has its Today label for screen readers only", () => {
+    useFixedClock();
+    render(<MingoChatRail variant="section" density="compact" dialogs={DIALOGS.slice(2)} draftTitle="New Chat" />);
+    const today = screen.getByRole('group', { name: 'Today' });
+    expect(within(today).getByText('Today')).toHaveClass('sr-only');
+  });
+
   it('shows the status glyphs, and the owner only on someone else’s chat', () => {
     const owner = { name: 'Roman Smith' };
     render(
@@ -227,6 +234,51 @@ describe('MingoChatRail variant="section"', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('MingoChatSearchModal: the arrow keys walk the results and Enter opens the one reached', () => {
+    const onSelectDialog = vi.fn();
+    render(
+      <MingoChatSearchModal
+        open
+        onOpenChange={vi.fn()}
+        onSearchChange={vi.fn()}
+        onSelectDialog={onSelectDialog}
+        dialogs={DIALOGS}
+      />,
+    );
+    const input = screen.getByPlaceholderText('Search for Chats');
+    const newest = () => within(screen.getByRole('dialog')).getByRole('button', { name: 'osquery check' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(newest()).toHaveAttribute('data-highlighted');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(newest()).not.toHaveAttribute('data-highlighted');
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(newest()).toHaveAttribute('data-highlighted');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSelectDialog).toHaveBeenCalledWith('a');
+  });
+
+  it('MingoChatSearchModal: Enter alone opens the first result once the list shows the term', () => {
+    const onSelectDialog = vi.fn();
+    const onSearchChange = vi.fn();
+    render(
+      <MingoChatSearchModal
+        open
+        onOpenChange={vi.fn()}
+        onSearchChange={onSearchChange}
+        onSelectDialog={onSelectDialog}
+        dialogs={DIALOGS}
+      />,
+    );
+    const input = screen.getByPlaceholderText('Search for Chats');
+    fireEvent.change(input, { target: { value: 'osq' } });
+    // The term waits for its debounce: the first Enter sends it, it opens nothing.
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSearchChange).toHaveBeenLastCalledWith('osq');
+    expect(onSelectDialog).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSelectDialog).toHaveBeenCalledWith('a');
+  });
+
   it('keeps its own search state without a host one', async () => {
     render(<MingoChatRail variant="section" dialogs={DIALOGS} onSearchChange={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Search chats' }));
@@ -267,6 +319,14 @@ describe('MingoChatRail variant="section"', () => {
     );
     expect(screen.getByRole('img', { name: 'Owner: Pavlo Shylo' })).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Owner: Roman Smith' })).not.toBeInTheDocument();
+  });
+
+  it('compact: an empty list says so in sentence case, centred in the room the section takes', () => {
+    render(<MingoChatRail variant="section" density="compact" dialogs={[]} />);
+    expect(screen.getByText('No current chats')).toHaveClass('text-shell-body');
+    expect(screen.getByText('Previous Mingo sessions will show here')).toHaveClass('text-h6');
+    expect(screen.getByRole('region', { name: 'Current chats' })).toHaveClass('flex-1');
+    expect(screen.queryByText('No Current Chats')).toBeNull();
   });
 
   it('switches the scope from the filter menu, and lights the filter while all chats show', () => {

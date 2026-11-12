@@ -46,6 +46,8 @@ jspm_packages/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 package-lock.json
+# The frontend package's lockfile IS committed: its CI, its release and every developer install the same tree (`npm ci`).
+!openframe-frontend-core/package-lock.json
 pnpm-lock.yaml
 
 *storybook.log

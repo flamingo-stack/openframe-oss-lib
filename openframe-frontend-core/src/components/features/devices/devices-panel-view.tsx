@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode, RefObject } from 'react';
+import { useStickyToolbar } from '../../../hooks/ui/use-sticky-toolbar';
 import { cn } from '../../../utils/cn';
 import { AlertTriangleIcon } from '../../icons-v2-generated';
 import {
@@ -12,6 +13,8 @@ import {
   type PageActionButton,
   PageLayout,
   TabSelector,
+  type DataTableLayout,
+  type DataTableSettings,
 } from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { DevicesFilterToolbar, type DevicesFilterToolbarProps } from './devices-filter-toolbar';
@@ -101,6 +104,15 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
   hideFilters?: string[];
   /** Adds the USER and SOURCES columns and funnels, for a tenant with directories. Default: neither. */
   directoryColumns?: boolean;
+  /**
+   * The table's layout: `grid` draws 48px one-line rows in one bordered block at every width (see `DevicesTableBody`).
+   * Named apart from the view mode, whose own `grid` is the tile view. Default `cards`.
+   */
+  tableLayout?: DataTableLayout;
+  /** Grid layout: the table's height; `'fill'` makes the table the scroll area (see `DevicesTableBody`). */
+  tableMaxHeight?: number | string;
+  /** Grid layout: the table's settings (the gear's menu of columns, the saved column layout). */
+  tableSettings?: DataTableSettings;
   /** Message shown when the list is empty. */
   emptyMessage?: string;
   /** Drawn instead of the toolbar and the list: the pristine, genuinely empty panel. */
@@ -153,6 +165,9 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   actionsColumn,
   hideColumns,
   hideFilters,
+  tableLayout,
+  tableMaxHeight,
+  tableSettings,
   directoryColumns = false,
   emptyMessage = 'No devices found. Try adjusting your search or filters.',
   emptyState,
@@ -166,14 +181,21 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   // One switch: a page's loading scope, or the host's request.
   const scoped = useLoadingScope();
   const loading = scoped || loadingGiven;
+  // The view measures its toolbar for the headers pinned under it, unless the host
+  // holds the toolbar's ref itself: then they keep the desktop toolbar's 96px.
+  const { toolbarRef, containerStyle } = useStickyToolbar();
+  const measured = toolbar.toolbarRef === undefined;
   const gridColumns =
     filterColumns ??
     getDeviceFilterColumns(deviceFilters, { directoryColumns }).filter(column => !hideFilters?.includes(column.key));
 
   const list = (
-    <>
+    // The table header and the grid's filters pin flush under the toolbar, whatever
+    // its height (the spacing tokens shrink it below the desktop step).
+    <div className="contents" style={measured ? containerStyle : undefined}>
       <DevicesFilterToolbar
         {...toolbar}
+        toolbarRef={measured ? toolbarRef : toolbar.toolbarRef}
         // `devices(search)` also matches the primary user's name once directories are in play (Figma 865:55733).
         searchPlaceholder={directoryColumns ? 'Search for Devices and Users' : undefined}
         isLoading={loading}
@@ -185,7 +207,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           loadingRegion={false}
           emptyMessage={loading ? '' : emptyMessage}
           skeletonRows={pageSize}
-          stickyHeaderOffset="top-[96px]"
+          stickyHeaderOffset="top-[var(--sticky-toolbar-h,96px)]"
           deviceFilters={deviceFilters}
           // Loading: the facets have not answered, which is not "this list has
           // no facets". Without it the empty options read as final and each
@@ -196,6 +218,9 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           onColumnFiltersChange={onColumnFiltersChange}
           actionsColumn={actionsColumn}
           hideColumns={hideColumns}
+          layout={tableLayout}
+          tableMaxHeight={tableMaxHeight}
+          tableSettings={tableSettings}
           directoryColumns={directoryColumns}
           disableColumnFilters={hideFilters}
           totalCount={loading ? undefined : totalCount}
@@ -234,7 +259,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           />
         </>
       )}
-    </>
+    </div>
   );
 
   return (

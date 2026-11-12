@@ -560,6 +560,20 @@ export interface EmbeddableChatProps {
    */
   threadHeaderActions?: ReadonlyArray<MingoChatHeaderAction>;
   /**
+   * How the header portalled into `threadContainer` looks: `'page'` (default) the page
+   * bar (title · owner · day); `'column'` a work-area chat column's header (Figma
+   * `chat/header`: the panel surface, the owner's avatar in a cell, 20px glyphs).
+   * Split layout only.
+   */
+  threadHeaderLook?: 'page' | 'column';
+  /**
+   * The portalled thread fades out at its end, into the composer under it, as a page
+   * fades under a floating dock (`ChatMessageList` `fadeEnd`). Split layout only.
+   */
+  threadFadeEnd?: boolean;
+  /** The composer's side inset (`ChatComposer` `inset`). Default `'always'`. */
+  composerInset?: 'always' | 'wide';
+  /**
    * The thread's column inside `threadContainer` — e.g. `mx-auto max-w-[760px]` to
    * centre it at the composer's width on a wide chat page; the header stays full
    * width. Omitted: the column fills the container (a narrow panel, a sheet).
@@ -650,6 +664,9 @@ const mentionTokenOf = (key: string, markerByType: Map<string, string>): string 
 
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
+
+/** The header over a new chat holding only the "What to ask Mingo?" answer. */
+const WHAT_TO_ASK_TITLE = 'What to ask Mingo?';
 
 /** One shared empty list, so "nothing staged" keeps a stable identity. */
 const NO_CONTEXT_ITEMS: ChatContextItem[] = [];
@@ -1155,6 +1172,9 @@ function EmbeddableChatInner({
   rail = 'auto',
   threadContainer,
   threadHeaderActions,
+  threadHeaderLook = 'page',
+  threadFadeEnd = false,
+  composerInset = 'always',
   threadContentClassName,
   showModel = true,
   onModelClick,
@@ -2349,8 +2369,11 @@ function EmbeddableChatInner({
    * assistant name; anywhere else a draft is a "New Chat".
    */
   const freshConversationTitle = isGuideEmpty ? (headerAssistantName ?? 'Mingo Guide') : 'New Chat';
+  // The chat's own header over a new chat that holds only "What to ask?" exchanges: it is that
+  // answer, not a chat the user started. The list's draft row keeps `freshConversationTitle`.
+  const draftHeaderTitle = isWhatToAskDraft ? WHAT_TO_ASK_TITLE : freshConversationTitle;
   const headerTitle = hasConversation
-    ? activeDialog?.title || freshConversationTitle
+    ? activeDialog?.title || draftHeaderTitle
     : isGuideEmpty
       ? freshConversationTitle
       : 'Current Chats';
@@ -2607,7 +2630,7 @@ function EmbeddableChatInner({
     ? composeOpen || hostOwnsList
       ? {
           showBack: !hostOwnsList,
-          title: freshConversationTitle,
+          title: draftHeaderTitle,
           subtitle: headerUserName,
           avatar: headerAvatar,
           backAriaLabel: 'Back to chats',
@@ -2698,7 +2721,7 @@ function EmbeddableChatInner({
         <MingoChatHeader
           // Over the archive the header is the archive's: the chat still open
           // underneath is not on screen, so neither its name nor its actions are.
-          title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+          title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : draftHeaderTitle}
           subtitle={archiveOpen ? undefined : headerPersonName}
           avatar={archiveOpen ? undefined : headerAvatar}
           // Wide: shows / hides the list beside the chat. Narrow: back to the
@@ -2783,6 +2806,8 @@ function EmbeddableChatInner({
               messages={messages}
               isLoading={messagesInitialLoading}
               fill={previewMode}
+              // The split layout's column: the thread fades out into the composer under it.
+              fadeEnd={splitMode && threadFadeEnd}
               // v2 thread: names without the colon, 24px
               // faces, 16px between messages (shared with fae v2).
               appearance={appearance}
@@ -2985,6 +3010,7 @@ function EmbeddableChatInner({
       previewText={composerPreviewText ?? undefined}
       safeAreaBottom={safeAreaBottom}
       edgeLight={composerEdgeLight}
+      inset={composerInset}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
       attachmentsCount={stagedAttachments.length}
       onAddFiles={addAttachmentFiles}
@@ -3217,7 +3243,7 @@ function EmbeddableChatInner({
                       <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
                         <div className="flex min-w-0 flex-col">
                           <p className="truncate leading-tight text-ods-text-primary text-h3">
-                            {headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+                            {headerShowBack || isGuideEmpty ? headerTitle : draftHeaderTitle}
                           </p>
                           {headerPersonName && (
                             <p className="truncate leading-tight text-ods-text-secondary text-h6">{headerPersonName}</p>
@@ -3408,8 +3434,10 @@ function EmbeddableChatInner({
   const pageHeader = (
     <MingoChatHeader
       variant="page"
+      look={threadHeaderLook === 'column' ? 'column' : 'default'}
+      avatar={threadHeaderLook === 'column' && !archiveOpen && hasConversation ? headerAvatar : undefined}
       // Over the archive the header is the archive's (see the v2 header).
-      title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+      title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : draftHeaderTitle}
       meta={archiveOpen || !hasConversation ? undefined : [headerPersonName, chatDayLabel(activeDialog?.timestamp)]}
       menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? mingoHeaderMenuItems : []}
       extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}
@@ -3431,7 +3459,9 @@ function EmbeddableChatInner({
     <div
       ref={setThreadBoundary}
       className={cn(
-        'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden',
+        // `overflow-clip`, not `hidden`: it clips the same, but is no scroll container, so the
+        // column header can stick (a squeezed work-area column scrolls sideways under it).
+        'flex h-full min-h-0 w-full min-w-0 flex-col overflow-clip',
         previewMode && 'pointer-events-none select-none',
       )}
     >
