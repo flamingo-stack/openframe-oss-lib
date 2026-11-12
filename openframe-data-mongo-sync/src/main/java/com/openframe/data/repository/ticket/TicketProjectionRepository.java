@@ -102,32 +102,32 @@ public class TicketProjectionRepository {
         return batchIds.getLast();
     }
 
-    public long updateDeviceHostname(String tenantId, String machineId, String hostname) {
-        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
+    public long updateDeviceHostname(String tenantId, String machineId, String deviceName) {
+        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, deviceName);
         Query query = new Query(ticketsToUpdate);
-        Update update = new Update().set(Fields.deviceHostname, hostname);
+        Update update = new Update().set(Fields.deviceHostname, deviceName);
         UpdateResult result = mongoOperations.updateMulti(query, update, Ticket.class);
         return result.getModifiedCount();
     }
 
-    public long countTicketsToUpdateDeviceHostname(String tenantId, String machineId, String hostname, int limit) {
-        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
+    public long countTicketsToUpdateDeviceHostname(String tenantId, String machineId, String deviceName, int limit) {
+        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, deviceName);
         Query query = new Query(ticketsToUpdate).limit(limit);
         query.withReadPreference(PRIMARY);
         return mongoOperations.count(query, Ticket.class);
     }
 
     // One batch in _id order after lastId (null for the first); returns its last _id, or null when none is left.
-    public String updateDeviceHostnameBatch(String tenantId, String machineId, String hostname, String lastId, int batchSize) {
-        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
+    public String updateDeviceHostnameBatch(String tenantId, String machineId, String deviceName, String lastId, int batchSize) {
+        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, deviceName);
         List<String> batchIds = findIdsAfter(ticketsToUpdate, lastId, batchSize);
         if (batchIds.isEmpty()) {
             return null;
         }
-        Criteria batchTickets = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname)
+        Criteria batchTickets = matchTicketsToUpdateDeviceHostname(tenantId, machineId, deviceName)
                 .and(Fields.id).in(batchIds);
         Query query = new Query(batchTickets);
-        Update update = new Update().set(Fields.deviceHostname, hostname);
+        Update update = new Update().set(Fields.deviceHostname, deviceName);
         mongoOperations.updateMulti(query, update, Ticket.class);
         return batchIds.getLast();
     }
@@ -161,10 +161,10 @@ public class TicketProjectionRepository {
                 .and(Fields.organizationName).ne(organizationName);
     }
 
-    private static Criteria matchTicketsToUpdateDeviceHostname(String tenantId, String machineId, String hostname) {
+    private static Criteria matchTicketsToUpdateDeviceHostname(String tenantId, String machineId, String deviceName) {
         return Criteria.where(Fields.tenantId).is(tenantId)
                 .and(Fields.deviceId).is(machineId)
-                .and(Fields.deviceHostname).ne(hostname);
+                .and(Fields.deviceHostname).ne(deviceName);
     }
 
     private static Criteria matchTicketsToUpdateAssignedName(String tenantId, String userId, String userName) {
