@@ -91,7 +91,7 @@ public class PackageAutoUpdateTrigger {
             return;
         }
         Script script = updateScript(tenantId, pkg.manager());
-        // a re-run of the previous order, still held by the engine, would replace this one on the agent
+        // the previous order or its retry, still held by the engine, would replace this one on the agent
         due.forEach(policy -> withdrawal.withdraw(policy, "a newer version is ordered"));
 
         String executionId = SoftwareExecutionId.forAutoUpdate(tenantId, pkg.manager(), pkg.name(), version);

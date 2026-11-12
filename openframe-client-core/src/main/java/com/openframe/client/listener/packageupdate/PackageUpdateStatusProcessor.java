@@ -38,7 +38,7 @@ public class PackageUpdateStatusProcessor {
     private final PackageUpdateExecutionRecorder executionRecorder;
     private final DeliveryDispatcher deliveryDispatcher;
     private final DeliveryTracker deliveryTracker;
-    private final PackageAutoUpdateTurnOff autoUpdateTurnOff;
+    private final PackageAutoUpdateRetry autoUpdateRetry;
 
     public void process(String machineId, PackageUpdateStatusMessage event) {
         Machine machine = machineRepository.findByMachineId(machineId).orElse(null);
@@ -68,7 +68,8 @@ public class PackageUpdateStatusProcessor {
         Instant deadlineBefore = state.getDeadlineAt();
         PackageUpdateDeviceStateReducer.apply(state, request, event);
         driveDeadlineForce(state, request, deadlineBefore, machineId);
-        autoUpdateTurnOff.turnOffIfPackageRemoved(state, request);
+        autoUpdateRetry.scheduleIfDue(state, request);
+        autoUpdateRetry.turnOffIfPackageRemoved(state, request);
         executionRecorder.record(request, machineId, event);
         deviceStateRepository.save(state);
         log.info("[package-update] status applied requestId={} machineId={} eventId={} state={} status={} "
@@ -100,6 +101,7 @@ public class PackageUpdateStatusProcessor {
 
         PackageUpdateRequest request = requestRepository.findByTenantIdAndRequestId(tenantId, requestId).orElse(null);
         PackageUpdateDeviceStateReducer.applyUndelivered(state, failure);
+        autoUpdateRetry.scheduleIfDue(state, request);
         executionRecorder.recordUndelivered(request, machineId, failure);
         deviceStateRepository.save(state);
         log.warn("[package-update] order not delivered requestId={} machineId={} reason={}", requestId, machineId, failure);

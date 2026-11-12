@@ -8,8 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-// Withdraws what the delivery engine still holds of a policy's last order: the order's row, which a re-run would send
-// again, and the deadline force scheduled for it. A row that already closed is left as it is.
+// Withdraws what the delivery engine still holds of a policy's last order: the order's row, where its retry waits
+// too, and the deadline force scheduled for it. A row that already closed is left as it is.
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor

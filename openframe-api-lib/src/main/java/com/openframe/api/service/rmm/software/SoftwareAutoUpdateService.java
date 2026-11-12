@@ -36,7 +36,7 @@ public class SoftwareAutoUpdateService {
     public void turnOff(String softwareId, String actor) {
         String tenantId = tenantIdProvider.getTenantId();
         long turnedOff = policyRepository.disableBySoftwareId(tenantId, softwareId, actor);
-        // read after the update: no policy can order anew from here on, so nothing withdrawn here comes back
+        // read after the update: from here on a failed device schedules no retry, so none can slip past this
         policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, List.of(softwareId))
                 .forEach(policy -> withdrawal.withdraw(policy, "auto-update turned off"));
         log.info("Auto-update turned off softwareId={} policies={} actor={}", softwareId, turnedOff, actor);

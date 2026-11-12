@@ -48,7 +48,7 @@ class PackageUpdateStatusProcessorTest {
     @Mock private PackageUpdateExecutionRecorder executionRecorder;
     @Mock private DeliveryDispatcher deliveryDispatcher;
     @Mock private DeliveryTracker deliveryTracker;
-    @Mock private PackageAutoUpdateTurnOff autoUpdateTurnOff;
+    @Mock private PackageAutoUpdateRetry autoUpdateRetry;
 
     @Captor private ArgumentCaptor<PackageUpdateDeliverySeed> seedCaptor;
 
@@ -350,6 +350,21 @@ class PackageUpdateStatusProcessorTest {
     }
 
     @Test
+    void failedStatus_retryDecidedBeforeTheStateIsSaved() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT));
+
+        InOrder order = inOrder(autoUpdateRetry, deviceStateRepository);
+        order.verify(autoUpdateRetry).scheduleIfDue(st, req);
+        order.verify(deviceStateRepository).save(st);
+    }
+
+    @Test
     void failedStatus_policyDecidedBeforeTheStateIsSaved() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
@@ -359,43 +374,28 @@ class PackageUpdateStatusProcessorTest {
 
         processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.NOT_INSTALLED));
 
-        InOrder order = inOrder(autoUpdateTurnOff, deviceStateRepository);
-        order.verify(autoUpdateTurnOff).turnOffIfPackageRemoved(st, req);
+        InOrder order = inOrder(autoUpdateRetry, deviceStateRepository);
+        order.verify(autoUpdateRetry).turnOffIfPackageRemoved(st, req);
         order.verify(deviceStateRepository).save(st);
     }
 
     @Test
-    void turningThePolicyOffFails_stateIsNotSaved_soTheRedeliveryDecidesAgain() {
+    void schedulingTheRetryFails_stateIsNotSaved_soTheRedeliveryDecidesAgain() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
         PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
         when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
         when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
-        doThrow(new IllegalStateException("mongo down")).when(autoUpdateTurnOff).turnOffIfPackageRemoved(st, req);
+        doThrow(new IllegalStateException("mongo down")).when(autoUpdateRetry).scheduleIfDue(st, req);
 
-        assertThatThrownBy(() -> processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.NOT_INSTALLED)))
+        assertThatThrownBy(() -> processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT)))
                 .isInstanceOf(IllegalStateException.class);
 
         verify(deviceStateRepository, never()).save(any());
     }
 
-    // a failure the device may pass on a second try is the engine's to re-run; the domain orders nothing on its own
     @Test
-    void failedStatus_nothingIsOrderedAgain() {
-        machineResolves();
-        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
-        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
-        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
-        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
-
-        processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT));
-
-        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
-        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
-    }
-
-    @Test
-    void undelivered_leavesThePolicyAndTheEngineAlone() {
+    void undelivered_retryDecidedBeforeTheStateIsSaved() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
         PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
@@ -404,8 +404,21 @@ class PackageUpdateStatusProcessorTest {
 
         processor.failUndelivered("m1", "req-1", DeliveryFailure.EXHAUSTED);
 
-        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
-        verifyNoInteractions(autoUpdateTurnOff, deliveryDispatcher, deliveryTracker);
+        InOrder order = inOrder(autoUpdateRetry, deviceStateRepository);
+        order.verify(autoUpdateRetry).scheduleIfDue(st, req);
+        order.verify(deviceStateRepository).save(st);
+    }
+
+    @Test
+    void undelivered_deviceAlreadyReported_noRetry() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.FAILED);
+        st.setLastEventId("e1");
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+
+        processor.failUndelivered("m1", "req-1", DeliveryFailure.EXHAUSTED);
+
+        verifyNoInteractions(autoUpdateRetry);
     }
 
     @Test

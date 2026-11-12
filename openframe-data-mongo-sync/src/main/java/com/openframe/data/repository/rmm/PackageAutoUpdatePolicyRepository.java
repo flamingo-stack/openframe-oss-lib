@@ -34,8 +34,12 @@ public interface PackageAutoUpdatePolicyRepository extends MongoRepository<Packa
     Optional<PackageAutoUpdatePolicy> findByTenantIdAndMachineIdAndPackageManagerAndPackageName(
             String tenantId, String machineId, PackageManagerType packageManager, String packageName);
 
-    // Writes only while the policy is still on and still at the version the caller read: a newer order (markOrdered)
-    // or a re-enable in between makes it match nothing, and the caller backs off.
+    // Both write only while the policy is still on and still at the version the caller read: a newer order
+    // (markOrdered) or a re-enable in between makes them match nothing, and the caller backs off.
+    @Query("{ '_id': ?0, 'enabled': true, 'lastVersion': ?1 }")
+    @Update("{ '$set': { 'requestId': ?2 } }")
+    long markRetryScheduled(String policyId, String lastVersion, String requestId);
+
     @Query("{ '_id': ?0, 'enabled': true, 'lastVersion': ?1 }")
     @Update("{ '$set': { 'enabled': false, 'updatedBy': ?2, 'updatedAt': ?3 } }")
     long disable(String policyId, String lastVersion, String actor, Instant at);

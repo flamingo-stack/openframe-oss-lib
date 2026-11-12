@@ -176,7 +176,7 @@ class PackageAutoUpdateTriggerTest {
     }
 
     @Test
-    @DisplayName("what the engine still holds of the previous order is withdrawn before the new one, so a re-run of it cannot replace the new order on the agent")
+    @DisplayName("what the engine still holds of the previous order is withdrawn before the new one, so a retry of it cannot replace the new order on the agent")
     void newVersion_withdrawsThePreviousOrderFirst() {
         PackageAutoUpdatePolicy previous = chrome("p1", "m1", "151", WAIT);
         previous.setRequestId("req-old");

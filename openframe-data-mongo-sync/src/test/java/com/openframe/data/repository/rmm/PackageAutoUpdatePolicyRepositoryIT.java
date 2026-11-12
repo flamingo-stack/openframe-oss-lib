@@ -137,24 +137,24 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("requestId: the last order's, found by device and package, replaced by the next order")
-    void requestId_setByTheOrder_replacedByTheNextOne() {
+    @DisplayName("requestId: named by a retry too, found by device and package, replaced by the next order")
+    void requestId_setByARetry_replacedByTheNextOrder() {
         PackageAutoUpdatePolicy chrome = template("google-chrome", null, WAIT, "admin@x");
         chrome.setLastVersion("151.0.7922.98");
         repository.enable(chrome, List.of("m1"));
         String id = byMachine("google-chrome").get("m1").getId();
 
-        repository.markOrdered(List.of(id), "152.0.7977.65", "req-1");
+        repository.markRetryScheduled(id, "151.0.7922.98", "req-1");
 
         assertThat(repository.findByTenantIdAndMachineIdAndPackageManagerAndPackageName(TENANT, "m1",
                 chrome.getPackageManager(), "google-chrome")).get()
                 .extracting(PackageAutoUpdatePolicy::getRequestId).isEqualTo("req-1");
 
-        repository.markOrdered(List.of(id), "153.0.0.1", "req-2");
+        repository.markOrdered(List.of(id), "152.0.7977.65", "req-2");
 
         PackageAutoUpdatePolicy ordered = byMachine("google-chrome").get("m1");
         assertThat(ordered.getRequestId()).isEqualTo("req-2");
-        assertThat(ordered.getLastVersion()).isEqualTo("153.0.0.1");
+        assertThat(ordered.getLastVersion()).isEqualTo("152.0.7977.65");
     }
 
     @Test
@@ -176,8 +176,8 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("disable: a policy ordered a newer version or already off since the read is left as it is")
-    void conditionalDisable_policyMovedOn_matchesNothing() {
+    @DisplayName("disable and markRetryScheduled: a policy ordered a newer version or already off since the read is left as it is")
+    void conditionalWrites_policyMovedOn_matchNothing() {
         PackageAutoUpdatePolicy chrome = template("google-chrome", "title-7", WAIT, "admin@x");
         chrome.setLastVersion("151.0.7922.98");
         repository.enable(chrome, List.of("m1", "m2"));
@@ -187,10 +187,13 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         repository.disable(m2, "151.0.7922.98", "admin@x", Instant.now());
 
         assertThat(repository.disable(m1, "151.0.7922.98", "package-auto-update", Instant.now())).isZero();
-        assertThat(repository.disable(m2, "151.0.7922.98", "package-auto-update", Instant.now())).isZero();
+        assertThat(repository.markRetryScheduled(m1, "151.0.7922.98", "req-old")).isZero();
+        assertThat(repository.markRetryScheduled(m2, "151.0.7922.98", "req-old")).isZero();
 
-        assertThat(byMachine("google-chrome").get("m1").isEnabled()).isTrue();
-        assertThat(byMachine("google-chrome").get("m2").getUpdatedBy()).isEqualTo("admin@x");
+        PackageAutoUpdatePolicy ordered = byMachine("google-chrome").get("m1");
+        assertThat(ordered.isEnabled()).isTrue();
+        assertThat(ordered.getRequestId()).isEqualTo("req-2");
+        assertThat(byMachine("google-chrome").get("m2").getRequestId()).isNull();
     }
 
     private Map<String, PackageAutoUpdatePolicy> byMachine(String packageName) {
