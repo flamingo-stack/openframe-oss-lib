@@ -84,6 +84,46 @@ describe('AccountPopover', () => {
     expect(menu).toHaveAttribute('data-side', 'right');
   });
 
+  it('keeps the avatar 8px in by default, and centres it alone with collapsedAlign="center"', () => {
+    const { rerender } = render(<AccountPopover collapsed name="Ada Lovelace" items={entries()} />);
+    const trigger = () => screen.getByRole('button', { name: 'Account: Ada Lovelace' });
+    // The name's column (the `flex-1` one) taken out of the row.
+    const nameHidden = () => /class="[^"]*\bflex-1\b[^"]*\bhidden\b/.test(document.body.innerHTML);
+    // Default: the name holds its place in the row (it fades with the width).
+    expect(trigger()).toHaveClass('pl-[var(--spacing-system-xsf)]');
+    expect(trigger()).not.toHaveClass('justify-center');
+    expect(nameHidden()).toBe(false);
+
+    rerender(<AccountPopover collapsed collapsedAlign="center" name="Ada Lovelace" items={entries()} />);
+    expect(trigger()).toHaveClass('justify-center', 'gap-0', 'px-0');
+    expect(nameHidden()).toBe(true);
+
+    // `avatarOnly` in the rail: the same 8px in, not a padless square.
+    rerender(<AccountPopover collapsed avatarOnly name="Ada Lovelace" items={entries()} />);
+    expect(trigger()).toHaveClass('pl-[var(--spacing-system-xsf)]');
+    expect(trigger()).not.toHaveClass('p-0');
+
+    // Expanded, `collapsedAlign` changes nothing.
+    rerender(<AccountPopover collapsedAlign="center" name="Ada Lovelace" items={entries()} />);
+    expect(screen.getByRole('button', { name: /Ada Lovelace/ })).not.toHaveClass('justify-center');
+    expect(nameHidden()).toBe(false);
+  });
+
+  it('is the avatar alone with avatarOnly at full width: named, its name and email in the menu header, opening upward', async () => {
+    render(<AccountPopover avatarOnly name="Ada Lovelace" email="ada@example.com" items={entries()} />);
+    const trigger = screen.getByRole('button', { name: 'Account: Ada Lovelace' });
+    expect(trigger).toHaveAttribute('title', 'Ada Lovelace');
+    // A square around the avatar, not the row's full width; the name's column taken out.
+    expect(trigger).toHaveClass('size-8', 'justify-center');
+    expect(trigger).not.toHaveClass('w-full');
+    expect(/class="[^"]*\bflex-1\b[^"]*\bhidden\b/.test(document.body.innerHTML)).toBe(true);
+
+    const menu = await openMenu(trigger);
+    expect(menu).toHaveTextContent('Ada Lovelace');
+    expect(menu).toHaveTextContent('ada@example.com');
+    expect(menu).toHaveAttribute('data-side', 'top');
+  });
+
   it("puts an item's unread count on its icon, and the unread dot on the avatar", async () => {
     const hasDot = () =>
       /class="[^"]*\bbg-ods-warning\b/.test(screen.getByRole('button', { name: /Ada Lovelace/ }).innerHTML);

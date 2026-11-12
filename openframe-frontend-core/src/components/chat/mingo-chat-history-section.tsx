@@ -1,13 +1,14 @@
 'use client';
 
 import { useControllableState } from '@radix-ui/react-use-controllable-state';
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils/cn';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
 import {
+  ChatBlankIcon,
   ChatsIcon,
   Ellipsis01Icon,
   Filter01Icon,
@@ -102,6 +103,7 @@ interface HistoryListProps extends Pick<
   /** Each row's ⋯ (Rename, Copy link, Compact, Archive); none in the search results. */
   menuFor?: (dialog: DialogItem) => ActionsMenuItem[];
   hasSearch: boolean;
+  density?: 'default' | 'compact';
 }
 
 /** The chats grouped by day, or what stands in for them: loading, empty, failed. */
@@ -122,6 +124,7 @@ function HistoryList({
   loadMore = 'scroll',
   menuFor,
   hasSearch,
+  density = 'default',
 }: HistoryListProps) {
   // The viewport root: whatever scrolls the list (the sidebar body, the search
   // modal) clips the sentinel, and the viewport sees nothing in a closed drawer
@@ -147,6 +150,14 @@ function HistoryList({
         title="No chats found"
         description="Try another search term"
       />
+    ) : density === 'compact' ? (
+      // The three-column shell (Figma 1409:305752): centred in the room the list leaves.
+      <ChatListEmptyState
+        density="compact"
+        icon={<ChatBlankIcon size={20} />}
+        title="No current chats"
+        description="Previous Mingo sessions will show here"
+      />
     ) : (
       <ChatListEmptyState
         icon={<ChatsIcon size={24} />}
@@ -159,16 +170,24 @@ function HistoryList({
   const groups = groupDialogsByDay(dialogs);
   // The chat being started is today's, on top.
   const draftInToday = !!draftTitle && groups[0]?.key === 'today';
+  const compact = density === 'compact';
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-xs)]">
+    <div className={cn('flex flex-col', compact ? 'gap-[var(--spacing-system-mf)]' : 'gap-[var(--spacing-system-xs)]')}>
       {draftTitle && !draftInToday && (
-        <DayGroup label="Today">
-          <SectionRow title={draftTitle} active />
+        // Today's, as the draft always is: under "Current chats" in compact, as the mapped today group.
+        <DayGroup label="Today" density={density} labelHidden={compact}>
+          <SectionRow title={draftTitle} active density={density} />
         </DayGroup>
       )}
       {groups.map((group, index) => (
-        <DayGroup key={group.key} label={group.label}>
-          {index === 0 && draftInToday && <SectionRow title={draftTitle} active />}
+        <DayGroup
+          key={group.key}
+          label={group.label}
+          density={density}
+          // Compact: today's chats sit right under the "Current chats" caption, which names them.
+          labelHidden={compact && group.key === 'today'}
+        >
+          {index === 0 && draftInToday && <SectionRow title={draftTitle} active density={density} />}
           {group.items.map(dialog => (
             <SectionRow
               key={dialog.id}
@@ -182,6 +201,7 @@ function HistoryList({
               ownerAvatarUrl={dialog.owner?.avatarUrl || undefined}
               onSelect={onSelect}
               menuItems={menuFor?.(dialog)}
+              density={density}
             />
           ))}
         </DayGroup>
@@ -246,6 +266,7 @@ export function MingoChatHistorySection({
   ownedByOther,
   currentUserId,
   className,
+  density = 'default',
 }: MingoChatListProps) {
   const captionId = useId();
   const visitor = useVisitorOs();
@@ -319,15 +340,45 @@ export function MingoChatHistorySection({
         ]
       : [];
 
+  // Compact (the three-column shell, Figma `nav/section-header`): the caption is
+  // "Current chats" over today's chats, its actions 16px search and ⋯, the scope
+  // folded into the ⋯ as its first group.
+  const compact = density === 'compact';
+  const iconSize = compact ? 16 : 20;
+  // The icon button kind sizes its glyph itself (24px from md): the compact
+  // caption's 16px glyphs (Figma `nav/section-header`) take it back.
+  const iconButtonClass = cn(ICON_BUTTON_CLASS, compact && 'size-4 md:size-4 [&_svg]:size-4 md:[&_svg]:size-4');
+  const moreGroups: Array<{ items: ActionsMenuItem[] }> = [];
+  if (compact && scopeMenu.length > 0) moreGroups.push({ items: scopeMenu });
+  if (moreMenu.length > 0) moreGroups.push({ items: moreMenu });
+
   return (
     <TooltipProvider delayDuration={300}>
       <section
         aria-labelledby={captionId}
-        className={cn('flex w-full min-w-0 flex-col gap-[var(--spacing-system-xs)]', className)}
+        className={cn(
+          'flex w-full min-w-0 flex-col',
+          // Compact: the section takes the sidebar's spare height, so an empty list centres in it.
+          compact ? 'flex-1 gap-[var(--spacing-system-xxs)]' : 'gap-[var(--spacing-system-xs)]',
+          className,
+        )}
       >
-        <div className="flex shrink-0 items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-xs)]">
-          <h2 id={captionId} className="min-w-0 flex-1 truncate text-ods-text-secondary text-h5">
-            Chat history
+        <div
+          className={cn(
+            'flex shrink-0 items-center',
+            compact
+              ? 'gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-xsf)]'
+              : 'gap-[var(--spacing-system-xs)] px-[var(--spacing-system-xs)]',
+          )}
+        >
+          <h2
+            id={captionId}
+            className={cn(
+              'min-w-0 flex-1 truncate text-h5',
+              compact ? 'text-ods-text-panel-secondary' : 'text-ods-text-secondary',
+            )}
+          >
+            {compact ? 'Current chats' : 'Chat history'}
           </h2>
           {onSearchChange && (
             <Tooltip>
@@ -338,15 +389,15 @@ export function MingoChatHistorySection({
                   aria-label="Search chats"
                   aria-keyshortcuts={shortcut ? (usesCommandKey(visitor.os) ? 'Meta+K' : 'Control+K') : undefined}
                   onClick={() => setSearchOpen(true)}
-                  className={ICON_BUTTON_CLASS}
+                  className={iconButtonClass}
                 >
-                  <SearchIcon size={20} />
+                  <SearchIcon size={iconSize} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">{shortcut ? `Search chats · ${shortcut}` : 'Search chats'}</TooltipContent>
             </Tooltip>
           )}
-          {scopeMenu.length > 0 && (
+          {!compact && scopeMenu.length > 0 && (
             <Tooltip>
               <ActionsMenuDropdown
                 triggerAriaLabel="Filter chats"
@@ -370,16 +421,16 @@ export function MingoChatHistorySection({
               </TooltipContent>
             </Tooltip>
           )}
-          {moreMenu.length > 0 && (
+          {moreGroups.length > 0 && (
             <Tooltip>
               <ActionsMenuDropdown
                 triggerAriaLabel="More"
-                groups={[{ items: moreMenu }]}
+                groups={moreGroups}
                 onCloseAutoFocus={e => e.preventDefault()}
                 customTrigger={
                   <TooltipTrigger asChild>
-                    <Button variant="transparent" size="icon" aria-label="More" className={ICON_BUTTON_CLASS}>
-                      <Ellipsis01Icon size={20} />
+                    <Button variant="transparent" size="icon" aria-label="More" className={iconButtonClass}>
+                      <Ellipsis01Icon size={iconSize} />
                     </Button>
                   </TooltipTrigger>
                 }
@@ -395,6 +446,7 @@ export function MingoChatHistorySection({
           draftTitle={draftTitle}
           onSelect={onSelectDialog}
           loadMore={loadMore}
+          density={density}
           menuFor={dialog =>
             chatDialogMenuItems({
               onCopyLink: onRequestCopyLink && (() => onRequestCopyLink(dialog)),
@@ -488,11 +540,28 @@ interface SearchModalContentProps {
   children: ReactNode;
 }
 
+/** A chat row of the search's list that opens its chat (the draft row has no `data-chat-row`). */
+const CHAT_ROW_SELECTOR = 'button[data-chat-row]';
+
 function SearchModalContent({ initialValue, onSearchChange, onClose, children }: SearchModalContentProps) {
   const [value, setValue] = useState(initialValue ?? '');
   const debounced = useDebounce(value, 300);
   const lastSent = useRef(initialValue ?? '');
   const fieldRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // The row the arrow keys have reached, by its place in the list; -1: none yet. Kept with the
+  // term it was reached under: a new term (and so a new list) starts over.
+  const [highlight, setHighlight] = useState({ term: debounced, index: -1 });
+  const highlighted = highlight.term === debounced ? highlight.index : -1;
+  const rows = () => Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>(CHAT_ROW_SELECTOR) ?? []);
+  useEffect(() => {
+    rows().forEach((row, index) => {
+      if (index === highlighted) {
+        row.setAttribute('data-highlighted', '');
+        row.scrollIntoView?.({ block: 'nearest' });
+      } else row.removeAttribute('data-highlighted');
+    });
+  });
 
   const send = (term: string) => {
     if (term === lastSent.current) return;
@@ -518,12 +587,34 @@ function SearchModalContent({ initialValue, onSearchChange, onClose, children }:
     onClose();
   };
 
+  // The field keeps the focus: the arrow keys walk the chats under it, Enter opens the one
+  // reached — or, with none reached, the first, once the list shows the term typed (a term
+  // still waiting for its debounce is sent first, as before). Ahead of the field's own keys.
+  const onFieldKeyDown = (event: ReactKeyboardEvent) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
+    const list = rows();
+    if (event.key === 'Enter') {
+      const target = highlighted >= 0 ? list[highlighted] : value === lastSent.current ? list[0] : undefined;
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      target.click();
+      return;
+    }
+    if (list.length === 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    const next = highlighted < 0 ? (step > 0 ? 0 : list.length - 1) : (highlighted + step + list.length) % list.length;
+    setHighlight({ term: debounced, index: next });
+  };
+
   return (
     <ModalV2 isOpen onClose={close} className="md:max-w-[600px]">
       <ModalV2Header>
         <ModalV2Title>Search chats</ModalV2Title>
       </ModalV2Header>
-      <div ref={fieldRef} role="search" aria-label="Search chats" className="w-full">
+      <div ref={fieldRef} role="search" aria-label="Search chats" className="w-full" onKeyDownCapture={onFieldKeyDown}>
         <SearchInput
           value={value}
           onChange={setValue}
@@ -532,23 +623,45 @@ function SearchModalContent({ initialValue, onSearchChange, onClose, children }:
           showDropdown={false}
         />
       </div>
-      <div className="max-h-[min(480px,55vh)] w-full overflow-y-auto">{children}</div>
+      <div ref={listRef} className="max-h-[min(480px,55vh)] w-full overflow-y-auto">
+        {children}
+      </div>
     </ModalV2>
   );
 }
 
-function DayGroup({ label, children }: { label: string; children: ReactNode }) {
+function DayGroup({
+  label,
+  children,
+  density = 'default',
+  labelHidden = false,
+}: {
+  label: string;
+  children: ReactNode;
+  density?: 'default' | 'compact';
+  /** The caption above already names the day: the label is for assistive tech only. */
+  labelHidden?: boolean;
+}) {
   const labelId = useId();
   return (
     // A day that arrives with a page (or replaces the placeholder) fades in rather than popping.
     <div
       role="group"
       aria-labelledby={labelId}
-      className="flex shrink-0 flex-col duration-300 animate-in fade-in motion-reduce:animate-none"
+      className={cn(
+        'flex shrink-0 flex-col duration-300 animate-in fade-in motion-reduce:animate-none',
+        density === 'compact' && 'gap-[var(--spacing-system-xxs)]',
+      )}
     >
       <p
         id={labelId}
-        className="px-[var(--spacing-system-xs)] py-[var(--spacing-system-xxs)] text-ods-text-secondary text-h6"
+        className={cn(
+          'px-[var(--spacing-system-xs)] py-[var(--spacing-system-xxs)]',
+          labelHidden && 'sr-only',
+          density === 'compact'
+            ? 'px-[var(--spacing-system-xsf)] py-0 text-ods-text-panel-secondary text-h5'
+            : 'text-ods-text-secondary text-h6',
+        )}
       >
         {label}
       </p>
@@ -568,6 +681,7 @@ interface SectionRowProps {
   ownerAvatarUrl?: string;
   onSelect?: (id: string) => void;
   menuItems?: ActionsMenuItem[];
+  density?: 'default' | 'compact';
 }
 
 /**
@@ -585,6 +699,7 @@ function SectionRow({
   ownerAvatarUrl,
   onSelect,
   menuItems = [],
+  density = 'default',
 }: SectionRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const hasMenu = menuItems.length > 0;
@@ -595,12 +710,15 @@ function SectionRow({
     <div className="group/row relative shrink-0 duration-300 animate-in fade-in motion-reduce:animate-none">
       <ChatListItem
         active={active}
+        size={density}
         title={title}
         tabIndex={dialog ? undefined : -1}
         onClick={dialog ? () => onSelect?.(dialog.id) : undefined}
+        data-chat-row={dialog ? '' : undefined}
         className={cn(
           'transition-colors duration-150',
-          !active && 'hover:bg-ods-bg-hover',
+          // `data-highlighted`: the row the search's arrow keys have reached.
+          !active && 'hover:bg-ods-bg-hover data-[highlighted]:bg-ods-bg-hover',
           !dialog && 'cursor-default',
         )}
         // Held for the ⋯ even when empty, so a title never runs under it.

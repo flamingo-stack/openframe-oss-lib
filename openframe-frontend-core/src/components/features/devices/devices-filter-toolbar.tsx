@@ -43,7 +43,10 @@ export interface DevicesFilterToolbarProps {
   /**
    * Attach to the pinned row so a caller can measure it, its height is what the
    * sticky table header parks below, and it CHANGES as the tag-chip row appears
-   * and collapses. See `useStickyToolbar`.
+   * and collapses. See `useStickyToolbar`. `DevicesPanelView` measures its toolbar itself
+   * unless a host passes this ref: that host then owns the measurement and publishes
+   * `--sticky-toolbar-h` itself (`useStickyToolbar`'s `containerStyle`), or the pinned
+   * headers keep the desktop toolbar's 96px.
    */
   toolbarRef?: Ref<HTMLDivElement>;
 }

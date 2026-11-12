@@ -133,7 +133,19 @@ export interface ChatListItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
   loading?: boolean;
   /** The row's place in its list: picks the loading title bar's width, so a page of loading rows reads like a list. */
   index?: number;
+  /**
+   * `'compact'`: the three-column shell's chat item — 32px, a 14px title, the
+   * selected chat on the shell's tint (ODS v2 `open colors/yellow sec`). Default:
+   * the 40px row with an 18px title.
+   */
+  size?: 'default' | 'compact';
 }
+
+/** The compact row's box and its selected tint (over the row kind's accent fill). */
+const COMPACT_ITEM_CLASS = cn(
+  'h-8 gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)] text-h6',
+  'data-[tone=accent]:data-[state=active]:bg-ods-accent-tint data-[tone=accent]:data-[state=active]:hover:bg-ods-accent-tint data-[tone=accent]:data-[state=active]:active:bg-ods-accent-tint',
+);
 
 /** A loading chat row's title widths, cycled by index: a believable spread, the same on every load. Shared by every
  *  chat list's loading rows. */
@@ -155,7 +167,18 @@ const CHAT_LIST_ITEM_CLASS = cn(BUTTON_KIND_CLASS.row, 'shrink-0');
  */
 const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
   (
-    { className, title, subtitle, leading, trailing, active, loading: loadingProp = false, index = 0, ...props },
+    {
+      className,
+      title,
+      subtitle,
+      leading,
+      trailing,
+      active,
+      loading: loadingProp = false,
+      index = 0,
+      size = 'default',
+      ...props
+    },
     ref,
   ) => {
     const loading = useLoadingScope() || loadingProp;
@@ -178,7 +201,11 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
               >
                 <span
                   ref={titleRef}
-                  className={cn('block min-w-0 truncate text-h4', active ? 'text-ods-accent' : 'text-ods-text-primary')}
+                  className={cn(
+                    'block min-w-0 truncate',
+                    size === 'compact' ? 'text-h6' : 'text-h4',
+                    active ? 'text-ods-accent' : 'text-ods-text-primary',
+                  )}
                 >
                   {title}
                 </span>
@@ -225,7 +252,7 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
         data-state={active ? 'active' : undefined}
         // The selected chat takes the accent's secondary fill, with no hover surface.
         data-tone="accent"
-        className={cn('shrink-0', className)}
+        className={cn('shrink-0', size === 'compact' && COMPACT_ITEM_CLASS, className)}
         {...props}
       >
         {content}

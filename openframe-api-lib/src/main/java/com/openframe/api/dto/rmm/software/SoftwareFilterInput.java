@@ -17,4 +17,5 @@ public class SoftwareFilterInput {
     private List<String> deviceTagIds;
 
     private List<SoftwareAutoUpdateStatus> autoUpdateStatuses;
+    private Boolean manageable;
 }
