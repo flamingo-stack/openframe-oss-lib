@@ -293,11 +293,13 @@ class PackageUpdateStatusProcessorTest {
 
         assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.COMPLETED);
         verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1:deadline"), eq("m1"), any());
+        verify(deliveryTracker, never()).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1"), eq("m1"), any());
         verifyNoInteractions(deliveryDispatcher);
     }
 
+    // the force's row takes the agent's result; the WAIT row would wait for one until its timeout
     @Test
-    void failedPastTheDeadline_forceAlreadyOut_leftAlone() {
+    void finishedPastTheDeadline_theForceDidIt_theWaitRowIsWithdrawn() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
         st.setDeadlineAt(Instant.now().minusSeconds(60));
@@ -308,6 +310,25 @@ class PackageUpdateStatusProcessorTest {
         processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT));
 
         assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
+        verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1"), eq("m1"), any());
+        verify(deliveryTracker, never()).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1:deadline"), eq("m1"), any());
+        verifyNoInteractions(deliveryDispatcher);
+    }
+
+    @Test
+    void stillWaitingPastTheDeadline_nothingIsWithdrawn() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(Instant.now().minusSeconds(60));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", waiting("e2", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.COUNTDOWN));
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.WAITING);
         verifyNoInteractions(deliveryDispatcher, deliveryTracker);
     }
 
