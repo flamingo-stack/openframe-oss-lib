@@ -179,6 +179,7 @@ public class DeviceService {
         String tenantId = tenantIdProvider.getTenantId();
         return DeviceFilters.builder()
                 .statuses(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.STATUS)))
+                .connectivity(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.CONNECTIVITY)))
                 .deviceTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.DEVICE_TYPE)))
                 .osTypes(deviceFilterOptionMapper.selfLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.OS_TYPE)))
                 .organizationIds(deviceFilterOptionMapper.organizationLabeled(machineRepository.facet(tenantId, filter, search, DeviceFacetDimension.ORGANIZATION_ID)))
@@ -271,6 +272,7 @@ public class DeviceService {
         List<OsType> filterOsTypes = null;
         if (filter != null) {
             builder.statuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .connectivity(filter.getConnectivity() != null ? filter.getConnectivity().stream().map(Enum::name).collect(Collectors.toList()) : null)
                     .deviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null)
                     .organizationIds(filter.getOrganizationIds())
                     .manageableByPackageManagers(filter.getManageableByPackageManagers())

@@ -1,5 +1,6 @@
 package com.openframe.data.repository.device.publishing;
 
+import com.openframe.data.document.device.MachineName;
 import com.openframe.publishing.api.spec.PublishedEvent;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,6 +18,9 @@ public class MachineEvent implements PublishedEvent {
     private String machineId;
     private String hostname;
     private String nickname;
-    // The customer the device belongs to now; a change hides and archives the previous customer's client chats.
     private String organizationId;
+
+    public String preferredName() {
+        return MachineName.preferred(nickname, hostname);
+    }
 }

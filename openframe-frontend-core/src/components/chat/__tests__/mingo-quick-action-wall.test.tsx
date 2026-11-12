@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PageTopicsProvider } from '../../../contexts/page-topics-context';
 import { MingoQuickActionWall, QuickActionSet } from '../mingo-quick-action-wall';
 import { MingoWelcome } from '../mingo-welcome';
+import { quickActionAccentTint } from '../quick-action-chip';
 import { QuickActionRow } from '../quick-action-row';
 
 const ACTIONS = [
@@ -82,6 +83,44 @@ describe('QuickActionRow', () => {
   it('never cuts a name: its tags do not shrink', () => {
     render(<QuickActionRow chips={chipsOf(3)} />);
     for (const tag of within(scroller()).getAllByRole('button')) expect(tag).toHaveClass('shrink-0');
+  });
+});
+
+describe('QuickActionRow accent', () => {
+  const allGlyph = () => within(allTag()).getByTestId('quick-action-row-all-glyph');
+
+  it("draws the All glyph in the tag's text colour with no accent", () => {
+    render(<QuickActionRow chips={chipsOf(2)} />);
+    expect(allGlyph().getAttribute('class')).toBe('');
+    expect(allGlyph().innerHTML).toContain('fill="currentColor"');
+  });
+
+  it("tints the All glyph with a named accent's text class (OpenFrame's grey)", () => {
+    render(<QuickActionRow chips={chipsOf(2)} accent="grey" />);
+    expect(allGlyph().classList.contains('text-ods-text-panel-secondary')).toBe(true);
+    expect(allGlyph().innerHTML).toContain('fill="currentColor"');
+  });
+
+  it('fills the All glyph with an admin-configured CSS colour', () => {
+    render(<QuickActionRow chips={chipsOf(2)} accent="#123456" />);
+    expect(allGlyph().innerHTML).toContain('fill="#123456"');
+  });
+
+  it.each([
+    [undefined, {}],
+    ['grey', { className: 'text-ods-text-panel-secondary' }],
+    ['cyan', { className: 'text-ods-flamingo-cyan' }],
+    ['#123456', { color: '#123456' }],
+  ] as const)('tints a glyph for accent %s', (accent, tint) => {
+    expect(quickActionAccentTint(accent)).toEqual(tint);
+  });
+
+  it("passes the accent through Mingo's wall and welcome", () => {
+    const { unmount } = render(<MingoQuickActionWall quickActions={ACTIONS} accent="grey" />);
+    expect(allGlyph().classList.contains('text-ods-text-panel-secondary')).toBe(true);
+    unmount();
+    render(<MingoWelcome quickActions={ACTIONS} quickActionAccent="grey" />);
+    expect(allGlyph().classList.contains('text-ods-text-panel-secondary')).toBe(true);
   });
 });
 

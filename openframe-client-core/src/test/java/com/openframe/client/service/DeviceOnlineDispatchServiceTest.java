@@ -4,6 +4,7 @@ import com.openframe.client.service.rmm.DeviceOnlineDispatchService;
 import com.openframe.client.service.rmm.ScheduleFireDispatcher;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
@@ -78,11 +79,48 @@ class DeviceOnlineDispatchServiceTest {
         DeviceFirstOnlineDispatch row = newRow(ROW_ID, MACHINE, SCHEDULE);
         Machine offline = onlineMachine(MACHINE);
         offline.setStatus(DeviceStatus.OFFLINE);
+        offline.setTelemetryStatus(TelemetryStatus.OFFLINE);
         when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
         stubTenant(TENANT, List.of(offline), List.of(schedule(SCHEDULE)));
 
         service.processDevicesBecameOnline();
 
+        verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
+        assertNothingDispatched();
+    }
+
+    @Test
+    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE → not fired, row stays NEW")
+    void statusOnlineTelemetryOffline_staysNew() {
+        // setup
+        DeviceFirstOnlineDispatch row = newRow(ROW_ID, MACHINE, SCHEDULE);
+        Machine staleStatus = onlineMachine(MACHINE);
+        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
+        stubTenant(TENANT, List.of(staleStatus), List.of(schedule(SCHEDULE)));
+
+        // execution
+        service.processDevicesBecameOnline();
+
+        // verifications
+        verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
+        assertNothingDispatched();
+    }
+
+    @Test
+    @DisplayName("D1: a PENDING device that is online is not dispatched, row stays NEW")
+    void pendingMachineOnline_staysNew() {
+        // setup
+        DeviceFirstOnlineDispatch row = newRow(ROW_ID, MACHINE, SCHEDULE);
+        Machine pending = onlineMachine(MACHINE);
+        pending.setStatus(DeviceStatus.PENDING);
+        when(dispatchRepository.findByStatus(eq(DeviceOnlineDispatchStatus.NEW), any(Pageable.class))).thenReturn(List.of(row));
+        stubTenant(TENANT, List.of(pending), List.of(schedule(SCHEDULE)));
+
+        // execution
+        service.processDevicesBecameOnline();
+
+        // verifications
         verify(fireDispatcher, never()).dispatch(any(), any(), any(Instant.class));
         assertNothingDispatched();
     }
@@ -263,6 +301,7 @@ class DeviceOnlineDispatchServiceTest {
         m.setTenantId(TENANT);
         m.setMachineId(machineId);
         m.setStatus(DeviceStatus.ONLINE);
+        m.setTelemetryStatus(TelemetryStatus.ONLINE);
         return m;
     }
 }

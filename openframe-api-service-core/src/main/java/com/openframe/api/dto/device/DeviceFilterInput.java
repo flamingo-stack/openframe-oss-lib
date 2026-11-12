@@ -2,6 +2,7 @@ package com.openframe.api.dto.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.rmm.script.OsType;
@@ -18,6 +19,7 @@ import java.util.List;
 @AllArgsConstructor
 public class DeviceFilterInput {
     private List<DeviceStatus> statuses;
+    private List<TelemetryStatus> connectivity;
     private List<DeviceType> deviceTypes;
     private List<OsType> osTypes;
     private List<String> organizationIds;

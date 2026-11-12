@@ -11,6 +11,7 @@ import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { MingoChatHistory } from './mingo-chat-history';
 import { MingoQuickActionWall } from './mingo-quick-action-wall';
+import type { QuickActionAccent } from './quick-action-chip';
 import type { DialogItem } from './types/component.types';
 
 // =============================================================================
@@ -84,6 +85,8 @@ export interface MingoWelcomeProps {
   /** The host is still reading the quick actions: the row draws its tags' loading form, so the empty state keeps
    *  its height when they land. */
   quickActionsLoading?: boolean;
+  /** The tint of the quick-action row's own glyph ("All"), see `QuickActionRowProps.accent`. */
+  quickActionAccent?: QuickActionAccent;
   /** Appended to the root element. */
   className?: string;
 }
@@ -137,6 +140,7 @@ export function MingoWelcome({
   onRetry,
   onStartGuideChat,
   quickActionsLoading = false,
+  quickActionAccent,
   className,
 }: MingoWelcomeProps) {
   // Greeting never weaves the user's name in — always the plain "Hey, I'm
@@ -330,6 +334,7 @@ export function MingoWelcome({
             quickActions={quickActions ?? []}
             leading={guideChatTag}
             loading={quickActionsLoading && !quickActions?.length}
+            accent={quickActionAccent}
           />
         </div>
       )}
