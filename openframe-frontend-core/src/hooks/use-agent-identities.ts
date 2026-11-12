@@ -2,8 +2,12 @@
 
 import { type Query, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { subscribeRegisteredAdapter } from '../utils/embed-auth-adapter-registry';
-import { answeredAfterRefresh, subscribeEmbedCredentialChange } from '../utils/embed-authed-fetch';
+import {
+  answeredAfterRefresh,
+  hasEmbedAuthAdapter,
+  isRetryableStatus,
+  subscribeEmbedCredentialSource,
+} from '../utils/embed-authed-fetch';
 import { contentFetch } from '../utils/embed-content-fetch';
 
 /** An icon as an agent's identity holds it: a library glyph name, an uploaded picture, or both unset. */
@@ -25,14 +29,19 @@ export type AgentIdentityIcons = Readonly<Record<string, AgentIdentityIcon | nul
 /** GET endpoint for the agents' public identities (the hub's path; embedders prefix their proxy). It answers `{ agents: [{ slug, icon }] }`. */
 export const AGENT_IDENTITIES_API_PATH = '/api/ai-agents';
 
-/** Why a read failed, by what can make the next one succeed (the rule is on `useAgentIdentities`). */
-type ReadFailure =
-  /** No answer at all, or the server's own failure (5xx): the same read can succeed a moment later. */
-  | 'transient'
-  /** A 401 that no refresh got past: only a new credential can lift it. */
-  | 'unauthorized'
-  /** Anything else: asked again, the answer is the same. */
-  | 'final';
+const agentIdentitiesKey = (endpoint: string) => ['agent-identities', endpoint] as const;
+
+/**
+ * Why a read failed, by what can make the next one succeed (which answer is which: `refusalOf`, and the rule
+ * on `useAgentIdentities`):
+ * - `transient`: the same read can succeed a moment later.
+ * - `unauthorized`: only a new credential, or the host registering its adapter, can lift it.
+ * - `final`: asked again, the answer is the same.
+ *
+ * The picture store sorts its failures by the same facts (`retryOnFor` in `use-authed-asset-src.ts`) and leaves a
+ * 5xx to the picture's next mount. Here one read serves the whole page and nothing remounts to ask it.
+ */
+type ReadFailure = 'transient' | 'unauthorized' | 'final';
 
 class AgentIdentitiesReadError extends Error {
   readonly failure: ReadFailure;
@@ -45,24 +54,38 @@ class AgentIdentitiesReadError extends Error {
 
 function failureOf(error: unknown): ReadFailure {
   // Whatever else is thrown is the host refusing to send (its adapter's `beforeRequest` / `onResponse`, the
-  // origin guard) or an answer that is not the identities: neither changes by asking again.
+  // origin guard) or an answer that is not the identities: neither changes by asking again. No error at all
+  // (the read answered, or none sent yet) has nothing to ask again either.
   return error instanceof AgentIdentitiesReadError ? error.failure : 'final';
 }
 
-function refusalOf(response: Response): ReadFailure {
-  if (response.status >= 500) return 'transient';
-  // A 401 to the retry `embedAuthedFetch` sent with a credential it had just refreshed is final: a newer one
-  // cannot lift it, and asking on every rotation would refresh, and so rotate, again.
-  return response.status === 401 && !answeredAfterRefresh(response) ? 'unauthorized' : 'final';
+function refusalOf(response: Response, unsigned: boolean): ReadFailure {
+  const { status } = response;
+  if (isRetryableStatus(status)) return 'transient';
+  if (status !== 401) return 'final';
+  // Left unsigned, and the host has registered its adapter since.
+  if (unsigned && hasEmbedAuthAdapter()) return 'transient';
+  // A 401 to the retry `embedAuthedFetch` sent with a credential it had just refreshed is final.
+  return answeredAfterRefresh(response) ? 'final' : 'unauthorized';
+}
+
+/**
+ * `fetch` and a body read reject with a TypeError when the answer never came or was cut short: offline, DNS, a
+ * dropped connection.
+ */
+function orTransient<T>(read: Promise<T>): Promise<T> {
+  return read.catch((error: unknown) => {
+    throw error instanceof TypeError ? new AgentIdentitiesReadError('transient', error.message) : error;
+  });
 }
 
 async function fetchAgentIdentities(endpoint: string, signal: AbortSignal): Promise<AgentIdentityIcons> {
-  const response = await contentFetch(endpoint, { signal }).catch((error: unknown) => {
-    // `fetch` rejects with a TypeError when the request got no answer at all: offline, DNS, a dropped connection.
-    throw error instanceof TypeError ? new AgentIdentitiesReadError('transient', error.message) : error;
-  });
-  if (!response.ok) throw new AgentIdentitiesReadError(refusalOf(response), response.status);
-  const body = (await response.json()) as { agents?: Array<{ slug?: string; icon?: AgentIdentityIcon | null }> } | null;
+  const unsigned = !hasEmbedAuthAdapter();
+  const response = await orTransient(contentFetch(endpoint, { signal }));
+  if (!response.ok) throw new AgentIdentitiesReadError(refusalOf(response, unsigned), response.status);
+  const body = (await orTransient(response.json())) as {
+    agents?: Array<{ slug?: string; icon?: AgentIdentityIcon | null }>;
+  } | null;
   const icons: Record<string, AgentIdentityIcon> = {};
   for (const agent of body?.agents ?? []) if (agent.slug && agent.icon) icons[agent.slug] = agent.icon;
   return icons;
@@ -88,27 +111,34 @@ function eventMayAsk(query: Query<AgentIdentityIcons>): boolean {
  * session is in place. A read sent before then is refused, and on such a host a
  * refused request starts a token refresh that can end the session being set up.
  * Nothing below sends a read while `enabled` is false, and an attempt waiting
- * on its timer is dropped when it turns false.
+ * on its timer is dropped when no caller of the endpoint has it true.
  *
  * The provider above the marks is mounted once for the page, so a read that
  * failed has to be asked again here: nothing remounts to ask it. What asks
  * again depends on what can change the answer:
- *   - No answer at all, or a 5xx: `TIMED_ATTEMPTS` more attempts on a timer,
- *     each after a longer wait (react-query holds them while the page is hidden
- *     or offline). After those: when the page is shown again, when the browser
- *     is back online, and when the host holds a new credential.
+ *   - No answer at all (or one cut short), a 5xx, a 408 or a 429:
+ *     `TIMED_ATTEMPTS` more attempts on a timer, each after a longer wait
+ *     (react-query holds them while the page is hidden or offline). After
+ *     those: when the page is shown again and when the browser is back online
+ *     (react-query's focus and online signals, which a host may wire to its
+ *     own), and when the host holds a new credential.
  *   - A 401 the adapter's refresh did not get past: ONLY when the host holds a
- *     new credential (`subscribeEmbedCredentialChange`, or an adapter registered
- *     after the read left unsigned). Never on a timer and never on an event that
- *     says nothing about the credential: each such attempt would start another
- *     refresh, which is what ends a sign-in in progress.
+ *     new credential (`subscribeEmbedCredentialSource`: the adapter reports
+ *     one, or an adapter is registered). Never on a timer and never on an event
+ *     that says nothing about the credential: each such attempt would start
+ *     another refresh, which is what ends a sign-in in progress. The one 401
+ *     that is timed is the answer to a read that left unsigned, before the
+ *     host registered its adapter: the next attempt is signed.
  *   - Anything else (a 401 to a credential just refreshed, another 4xx, the
  *     host refusing to send, an answer that is not the identities): not asked
  *     again until `enabled` turns false and true again. The answer would be the
  *     same, and a 401 asked again on every new credential would refresh, and so
  *     rotate the session, each time.
- * A read that gave up says so in the console, in production too: the marks are
- * then empty boxes with nothing else to show why.
+ *
+ * A caller that mounts later asks a failed read again whatever the failure:
+ * that is react-query's rule for a read with no answer yet.
+ * A read that gave up says so in the console, in production too: a mark whose
+ * identity is not held is then an empty box with nothing else to show why.
  */
 export function useAgentIdentities(
   endpoint: string = AGENT_IDENTITIES_API_PATH,
@@ -116,11 +146,11 @@ export function useAgentIdentities(
 ): AgentIdentityIcons | undefined {
   const queryClient = useQueryClient();
   const { data, error } = useQuery({
-    queryKey: ['agent-identities', endpoint],
+    queryKey: agentIdentitiesKey(endpoint),
     queryFn: ({ signal }) => fetchAgentIdentities(endpoint, signal),
     staleTime: Infinity,
     gcTime: Infinity,
-    retry: (failureCount, failure) => failureCount < TIMED_ATTEMPTS && failureOf(failure) === 'transient',
+    retry: (failureCount, thrown) => failureCount < TIMED_ATTEMPTS && failureOf(thrown) === 'transient',
     retryDelay: failureCount => FIRST_WAIT_MS * 3 ** failureCount,
     // Only identities that could not be read are stale (`staleTime`), so these never ask for ones already held.
     refetchOnWindowFocus: eventMayAsk,
@@ -129,35 +159,33 @@ export function useAgentIdentities(
   });
 
   useEffect(() => {
-    const filter = { queryKey: ['agent-identities', endpoint], exact: true };
+    const filter = { queryKey: agentIdentitiesKey(endpoint), exact: true };
+    // react-query keeps a timed attempt going while the query has a caller, held back or not. The read of another
+    // caller of this endpoint that is not held back is left alone.
+    const dropUnlessAsked = () => {
+      if (!queryClient.getQueryCache().find(filter)?.isActive()) void queryClient.cancelQueries(filter);
+    };
     if (!enabled) {
-      // react-query keeps a timed attempt going for a query that was disabled meanwhile.
-      void queryClient.cancelQueries(filter);
+      dropUnlessAsked();
       return undefined;
     }
-    const onCredentialChange = () => {
-      // A read in flight holds no error, so the credential its own refresh brought in asks nothing.
-      if (failureOf(queryClient.getQueryState(filter.queryKey)?.error) === 'final') return;
+    const detach = subscribeEmbedCredentialSource(() => {
+      const state = queryClient.getQueryState(filter.queryKey);
+      // A read in flight is left alone: the credential its own refresh brought in asks nothing.
+      if (state?.fetchStatus !== 'idle' || failureOf(state.error) === 'final') return;
       void queryClient.refetchQueries(filter);
-    };
-    let detachCredential = subscribeEmbedCredentialChange(onCredentialChange);
-    const detachAdapter = subscribeRegisteredAdapter(() => {
-      // `subscribeEmbedCredentialChange` binds to the adapter registered when it is called.
-      detachCredential();
-      detachCredential = subscribeEmbedCredentialChange(onCredentialChange);
-      onCredentialChange();
     });
     return () => {
-      detachCredential();
-      detachAdapter();
+      detach();
+      dropUnlessAsked();
     };
   }, [queryClient, endpoint, enabled]);
 
   useEffect(() => {
     if (!error) return;
     console.error(
-      `[AgentIdentity] the agents' identities could not be read from "${endpoint}", so every agent's mark is an ` +
-        'empty box. `useAgentIdentities` says what asks for them again.',
+      `[AgentIdentity] the agents' identities could not be read from "${endpoint}", so a mark whose identity ` +
+        'is not held is an empty box. `useAgentIdentities` says what asks for them again.',
       error,
     );
   }, [error, endpoint]);

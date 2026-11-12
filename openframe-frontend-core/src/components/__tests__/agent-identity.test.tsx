@@ -120,18 +120,19 @@ describe('with no copy from the host, the identities are read from the server', 
   const fetchMock = vi.fn<typeof fetch>();
   /** A page: one react-query client above everything it draws. */
   const page = (ui: ReactNode) => render(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
+  const answer = () =>
+    new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL, props: null } }] }));
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('asks once for every provider on the page, and draws the picture the answer holds', async () => {
-    fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL, props: null } }] })),
-    );
+    fetchMock.mockResolvedValue(answer());
     page(
       <div data-testid="marks">
         <AgentIdentityProvider>
@@ -158,7 +159,8 @@ describe('with no copy from the host, the identities are read from the server', 
   });
 
   it('keeps the mark an empty box when the identities cannot be read', async () => {
-    fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    fetchMock.mockResolvedValue(new Response('nope', { status: 404 }));
     page(
       <div data-testid="marks">
         <AgentIdentityProvider>
@@ -212,47 +214,29 @@ describe('with no copy from the host, the identities are read from the server', 
     );
     expect(html).toContain('<svg');
   });
-});
 
-describe('identities that could not be read are asked for again, with no remount', () => {
-  const fetchMock = vi.fn<typeof fetch>();
-  const answer = () =>
-    new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL, props: null } }] }));
-  /** Lets `ms` pass: the timers due in it fire, and what they settle is rendered. */
-  const pass = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
-
-  beforeEach(() => {
+  it('draws the marks, with no remount, after a read lost to a failure that passes (a 5xx)', async () => {
     vi.useFakeTimers();
-    fetchMock.mockReset();
-    vi.stubGlobal('fetch', fetchMock);
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-
-  it.each([
-    ['the server failing (5xx)', () => Promise.resolve(new Response('down', { status: 503 }))],
-    ['no answer at all (a network error)', () => Promise.reject(new TypeError('Failed to fetch'))],
-  ])('draws the marks after one read lost to %s', async (_, failure) => {
-    fetchMock.mockImplementationOnce(failure).mockImplementation(() => Promise.resolve(answer()));
-    render(
-      <QueryClientProvider client={new QueryClient()}>
+    try {
+      fetchMock
+        .mockResolvedValueOnce(new Response('down', { status: 503 }))
+        .mockImplementation(() => Promise.resolve(answer()));
+      page(
         <AgentIdentityProvider>
           <div data-testid="marks">
             <AgentMark agent="fae" className="size-6" />
           </div>
-        </AgentIdentityProvider>
-      </QueryClientProvider>,
-    );
-    await pass(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('marks').innerHTML).toBe('<span aria-hidden="true" class="size-6"></span>');
+        </AgentIdentityProvider>,
+      );
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('marks').innerHTML).toBe('<span aria-hidden="true" class="size-6"></span>');
 
-    await pass(60_000);
-    expect(screen.getByTestId('marks').innerHTML).toContain('fae.webp');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+      await act(() => vi.advanceTimersByTimeAsync(60_000));
+      expect(screen.getByTestId('marks').innerHTML).toContain('fae.webp');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

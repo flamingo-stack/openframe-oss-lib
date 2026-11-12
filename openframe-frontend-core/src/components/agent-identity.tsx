@@ -65,9 +65,10 @@ function ProvideFromServer({
  *     default `AGENT_IDENTITIES_API_PATH`; an embedder passes its proxy path).
  *
  * The library packages no picture of an agent. Until the answer lands and while
- * it cannot be read a mark's box is empty; a read that failed is asked again
- * with no remount (`useAgentIdentities` has the rule). With no provider at all
- * that is a mistake of the host, said once in the console outside production.
+ * it cannot be read a mark's box is empty; a read lost to a failure that can
+ * pass is asked again with no remount (`useAgentIdentities` has the rule).
+ * With no provider at all that is a mistake of the host, said once in the
+ * console outside production.
  */
 export function AgentIdentityProvider({
   icons,

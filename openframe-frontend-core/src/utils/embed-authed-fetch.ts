@@ -21,7 +21,11 @@
  */
 
 import { isPageOriginUrl, readAppOrigins, resolveAppOriginUrl } from './app-origins';
-import { readRegisteredAdapter, writeRegisteredAdapter } from './embed-auth-adapter-registry';
+import {
+  readRegisteredAdapter,
+  subscribeRegisteredAdapter,
+  writeRegisteredAdapter,
+} from './embed-auth-adapter-registry';
 import { applyProxyAuth } from './embed-proxy-auth-storage';
 
 // =============================================================================
@@ -209,6 +213,29 @@ export function subscribeEmbedCredentialChange(listener: () => void): () => void
   return getRegisteredAuthAdapter()?.subscribe?.(listener) ?? (() => {});
 }
 
+/** A status that says "not now" rather than "no": the server's own failure (5xx), a timeout (408), a rate limit (429). */
+export function isRetryableStatus(status: number): boolean {
+  return status >= 500 || status === 408 || status === 429;
+}
+
+/**
+ * `subscribeEmbedCredentialChange` for a surface that can mount before the host registers its
+ * adapter: it stays bound to whichever adapter is registered, and the listener also runs when one
+ * is registered, replaced or cleared, since that changes what a request is signed with.
+ */
+export function subscribeEmbedCredentialSource(listener: () => void): () => void {
+  let detachCredential = subscribeEmbedCredentialChange(listener);
+  const detachAdapter = subscribeRegisteredAdapter(() => {
+    detachCredential();
+    detachCredential = subscribeEmbedCredentialChange(listener);
+    listener();
+  });
+  return () => {
+    detachCredential();
+    detachAdapter();
+  };
+}
+
 /**
  * How the browser has to load an asset URL on this host. Native asset loads (`<img src>`, `<track src>`, CSS
  * `background-image`) can't carry custom headers, so where the host authenticates by HEADER (its adapter has a
@@ -225,7 +252,7 @@ export function subscribeEmbedCredentialChange(listener: () => void): () => void
  *   - `awaiting-credential`: it lives on a gateway the host sanctioned in `allowedOrigins`, which only the bearer
  *     opens, and the host, which declared header auth (`hasCredential`), has no credential yet. A native shell
  *     renders before its tokens arrive: a native load at that moment is a guaranteed 401, so the caller waits for
- *     `subscribeEmbedCredentialChange` instead.
+ *     `subscribeEmbedCredentialSource` instead.
  */
 export type AssetLoadMode = 'native' | 'bearer' | 'awaiting-credential';
 

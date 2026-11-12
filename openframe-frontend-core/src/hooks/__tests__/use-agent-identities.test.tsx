@@ -13,15 +13,28 @@ const fetchMock = vi.fn<typeof fetch>();
 const answer = () => Promise.resolve(new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: FAE }] })));
 const status = (code: number) => () => Promise.resolve(new Response('no', { status: code }));
 const noAnswer = () => Promise.reject(new TypeError('Failed to fetch'));
+/** The headers arrive and the connection drops before the body does. */
+const cutShort = () =>
+  Promise.resolve(Object.assign(new Response('{'), { json: () => Promise.reject(new TypeError('network error')) }));
+
+/** The next read stays in flight until the function this returns is given its answer. */
+function inFlight() {
+  let land: (response: Response) => void = () => undefined;
+  fetchMock.mockImplementationOnce(() => new Promise<Response>(resolve => (land = resolve)));
+  return (response: Response) => land(response);
+}
+
+const SIGNED_LATE = { Authorization: 'Bearer late' };
+/** The host registering its adapter after the read was mounted. */
+const registerLate = () => act(() => setEmbedAuthAdapter({ getHeaders: () => SIGNED_LATE }));
 
 /** Lets `ms` pass: the timers due in it fire, and what they settle is rendered. */
 const pass = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 /** Longer than every wait between timed attempts put together. */
 const LONG = 600_000;
 
-/** The hook on a page of its own; `rerender({ on })` is the host saying whether its session is in place. */
-function read(on = true) {
-  const client = new QueryClient();
+/** The hook on a page (`client`); `rerender({ on })` is the host saying whether its session is in place. */
+function read(on = true, client = new QueryClient()) {
   return renderHook(({ on: enabled }) => useAgentIdentities(AGENT_IDENTITIES_API_PATH, enabled), {
     initialProps: { on },
     wrapper: ({ children }: { children: ReactNode }) => (
@@ -70,10 +83,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('a read another attempt can get past (no answer, a 5xx) is asked again on a timer, a few times', () => {
+describe('a read another attempt can get past is asked again on a timer, a few times', () => {
   it.each([
     ['a 5xx', status(502)],
+    ['a 408', status(408)],
+    ['a 429', status(429)],
     ['no answer', noAnswer],
+    ['an answer cut short', cutShort],
   ])('reads the identities on the second attempt after %s', async (_, failure) => {
     fetchMock.mockImplementationOnce(failure).mockImplementation(answer);
     const { result } = read();
@@ -124,6 +140,40 @@ describe('a read another attempt can get past (no answer, a 5xx) is asked again 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.current).toEqual(IDENTITIES);
   });
+
+  it('keeps the waiting attempt of one caller when another, on the same endpoint, is held back', async () => {
+    fetchMock.mockImplementationOnce(status(503)).mockImplementation(answer);
+    const page = new QueryClient();
+    const { result } = read(true, page);
+    read(false, page);
+    await pass(2_001);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.current).toEqual(IDENTITIES);
+  });
+
+  it('drops a waiting attempt when the caller that asked leaves and the one that stays is held back', async () => {
+    fetchMock.mockImplementation(status(503));
+    const page = new QueryClient();
+    const asking = read(true, page);
+    read(false, page);
+    await pass(0);
+    asking.unmount();
+    await pass(LONG);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks again, signed, when the host registers its adapter while the unsigned read is in flight', async () => {
+    const land = inFlight();
+    fetchMock.mockImplementation(answer);
+    const { result } = read();
+    await pass(0);
+    registerLate();
+    land(new Response('no', { status: 401 }));
+    await pass(2_001);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject(SIGNED_LATE);
+    expect(result.current).toEqual(IDENTITIES);
+  });
 });
 
 describe('a refused read is never asked again on a timer', () => {
@@ -136,7 +186,7 @@ describe('a refused read is never asked again on a timer', () => {
     expect(consoleError).toHaveBeenCalledTimes(1);
   });
 
-  it('asks once when the host itself refuses to send', async () => {
+  it('sends nothing, and never asks again, when the host itself refuses to send', async () => {
     setEmbedAuthAdapter({
       beforeRequest: () => {
         throw new Error('update required');
@@ -183,7 +233,9 @@ describe('what asks again once the timed attempts are over', () => {
     expect(fetchMock).toHaveBeenCalledTimes(5);
     expect(result.current).toEqual(IDENTITIES);
   });
+});
 
+describe('a 401 no refresh got past is asked again for a new credential only, any other refusal when the read is turned off and on', () => {
   it.each([
     ['the page is shown again', shown],
     ['the browser is back online', reconnected],
@@ -208,14 +260,26 @@ describe('what asks again once the timed attempts are over', () => {
     expect(result.current).toEqual(IDENTITIES);
   });
 
+  it('asks a 401 again for the credential that follows a refresh that failed', async () => {
+    const host = adapterWithCredentialChanges(() => Promise.resolve(false));
+    fetchMock.mockImplementationOnce(status(401)).mockImplementation(answer);
+    const { result } = read();
+    await pass(LONG);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    host.rotate();
+    await pass(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.current).toEqual(IDENTITIES);
+  });
+
   it('asks a 401 again when the host registers its adapter after the read left unsigned', async () => {
     fetchMock.mockImplementationOnce(status(401)).mockImplementation(answer);
     const { result } = read();
     await pass(0);
-    act(() => setEmbedAuthAdapter({ getHeaders: () => ({ Authorization: 'Bearer late' }) }));
+    registerLate();
     await pass(0);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({ Authorization: 'Bearer late' });
+    expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject(SIGNED_LATE);
     expect(result.current).toEqual(IDENTITIES);
   });
 
@@ -231,7 +295,7 @@ describe('what asks again once the timed attempts are over', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it.each([403, 404])('keeps a %i whatever happens', async code => {
+  it.each([403, 404])('keeps a %i on a new credential, the page shown or the browser back online', async code => {
     const host = adapterWithCredentialChanges();
     fetchMock.mockImplementation(status(code));
     read();
@@ -243,10 +307,22 @@ describe('what asks again once the timed attempts are over', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('asks a 403 again once the host turns the read off and on', async () => {
+    fetchMock.mockImplementationOnce(status(403)).mockImplementation(answer);
+    const { result, rerender } = read();
+    await pass(0);
+    rerender({ on: false });
+    rerender({ on: true });
+    await pass(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.current).toEqual(IDENTITIES);
+  });
+});
+
+describe('a new credential asks nothing of a read that is in flight, answered or held back', () => {
   it('sends nothing for a new credential while a read is in flight or answered', async () => {
     const host = adapterWithCredentialChanges();
-    let land: (response: Response) => void = () => undefined;
-    fetchMock.mockImplementation(() => new Promise<Response>(resolve => (land = resolve)));
+    const land = inFlight();
     const { result } = read();
     await pass(0);
     host.rotate();
@@ -259,6 +335,26 @@ describe('what asks again once the timed attempts are over', () => {
     reconnected();
     await pass(LONG);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends nothing for a new credential while a read asked over identities already held is in flight', async () => {
+    const host = adapterWithCredentialChanges();
+    const page = new QueryClient();
+    fetchMock.mockImplementationOnce(answer).mockImplementationOnce(status(401));
+    read(true, page);
+    await pass(0);
+    // Something on the page asks for everything it holds again, and this read is refused.
+    await act(() => page.invalidateQueries());
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const land = inFlight();
+    host.rotate();
+    await pass(0);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    host.rotate();
+    await pass(0);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    land(await answer());
+    await pass(0);
   });
 
   it('sends nothing for a new credential while the host holds the read back', async () => {
