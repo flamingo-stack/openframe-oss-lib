@@ -2,8 +2,8 @@
  * DataTable, grid layout — `<DataTable layout="grid">`.
  *
  * One bordered block of 48px rows with column dividers, at every width. The action columns are pinned right; the
- * selection column and the first data column are pinned left from `lg` up, and scroll with the rest on a tablet and a
- * phone. The rest scrolls sideways with a gradient on each edge that has more content.
+ * selection column and the first data column are pinned left on a desktop with at least 720px of content, and scroll
+ * with the rest on a tablet, a phone and in a narrower content column. The rest scrolls sideways with a gradient on each edge that has more content.
  *
  * What a table needs before it switches from cards (column sizes, one-line cells, action columns, a storage key):
  * `docs/DATA_TABLE_GRID.md`.

@@ -69,8 +69,8 @@ export interface DataTableProps<T> {
   /**
    * `cards` (default): every row is its own card. `grid`: one bordered block of 48px rows with column dividers, pinned
    * columns and horizontal scroll, at every width. The action columns are pinned right everywhere; the first data
-   * column (and the checkbox column) is pinned left on a desktop (the window's `lg`), and scrolls with the rest on a
-   * tablet and a phone.
+   * column (and the checkbox column) is pinned left on a desktop with at least 720px of content (the window's `lg` and
+   * the content area's `md`), and scrolls with the rest on a tablet, a phone and in a narrower content column.
    */
   layout?: DataTableLayout;
   /**

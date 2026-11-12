@@ -167,8 +167,8 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   showHeader?: boolean;
   /**
    * The table's layout. `grid`: 48px one-line rows in one bordered block at every width, the action columns pinned
-   * right, the device column pinned left from `lg` up (it scrolls with the rest on a tablet and a phone). Default
-   * `cards`.
+   * right, the device column pinned left on a desktop with at least 720px of content (it scrolls with the rest on a
+   * tablet, a phone and in a narrower content column). Default `cards`.
    */
   layout?: DataTableLayout;
   /**
