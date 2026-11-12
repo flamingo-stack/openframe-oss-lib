@@ -12,7 +12,7 @@ export * from './use-image-edge-color';
 export * from './use-clipped-label-tooltip';
 export * from './use-is-truncated';
 export * from './use-isomorphic-layout-effect';
-export * from './use-keyboard-collision-padding';
+export * from './use-viewport-collision-padding';
 export * from './use-local-storage';
 export * from './use-marquee-engine';
 export * from './use-media-query';

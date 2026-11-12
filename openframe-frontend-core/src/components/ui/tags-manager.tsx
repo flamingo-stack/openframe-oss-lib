@@ -3,7 +3,7 @@
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
 import { type MouseEvent, useCallback, useRef, useState } from 'react';
-import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
+import { useViewportCollisionPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import {
   CheckIcon,
@@ -72,7 +72,7 @@ export function TagsManager({
 }: TagsManagerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const keyboardPadding = useKeyboardCollisionPadding();
+  const viewportPadding = useViewportCollisionPadding();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -265,8 +265,8 @@ export function TagsManager({
             align="start"
             // The anchor is the tag field that raises the software keyboard, so
             // this list is always positioned with the keyboard up — see
-            // useKeyboardCollisionPadding.
-            collisionPadding={{ bottom: keyboardPadding }}
+            // useViewportCollisionPadding.
+            collisionPadding={viewportPadding}
             onOpenAutoFocus={e => {
               e.preventDefault();
               inputRef.current?.focus();

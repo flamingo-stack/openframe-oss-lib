@@ -5,6 +5,7 @@ import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import { Check } from 'lucide-react';
 import React, { useCallback } from 'react';
 import Link from '../../embed-shims/next-link';
+import { useViewportCollisionPadding, withViewportPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { Chevron02RightIcon, Ellipsis01Icon } from '../icons-v2-generated';
 import { ActionsMenuHeaderContext } from './actions-menu-header-context';
@@ -207,6 +208,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
   // root menu (`DropdownMenuContent`). Read unconditionally — hooks first.
   const portalContainer = usePortalContainer();
   const collisionBoundary = useCollisionBoundary();
+  const viewportPadding = useViewportCollisionPadding();
   const { variant, keyboardMoved } = React.useContext(ActionsMenuRowContext);
   const skin = MENU_SKIN[variant];
   const activate = useCallback(() => {
@@ -343,7 +345,9 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
               // Confine flip/shift (and the available-height this menu sizes
               // itself by) to the owning surface — see `useCollisionBoundary`.
               collisionBoundary={collisionBoundary ?? undefined}
-              collisionPadding={collisionBoundary ? COLLISION_PADDING_PX : undefined}
+              collisionPadding={
+                collisionBoundary ? COLLISION_PADDING_PX : withViewportPadding(undefined, viewportPadding)
+              }
               hideWhenDetached
               className={cn(
                 'z-[1500] max-h-[var(--radix-popper-available-height)] min-w-[256px] overflow-y-auto rounded-md border p-0 shadow-xl',
