@@ -4,9 +4,11 @@ import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
+import com.openframe.data.model.audit.AuditConstants;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,7 +18,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
@@ -27,6 +31,7 @@ import java.util.Optional;
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -60,6 +65,14 @@ class AuthorizationServerBeansTest {
                 .authorizationGrantType(grant);
     }
 
+    private OAuth2Authorization.Builder signInAuthorization() {
+        RegisteredClient client = RegisteredClient.withId("rc-1").clientId("bff").redirectUri("https://app/cb")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).build();
+        return OAuth2Authorization.withRegisteredClient(client).id("sign-in-1")
+                .principalName("owner@acme.com")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE);
+    }
+
     @Test
     void shouldAddTenantUserAndEffectiveRolesToAccessToken() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
@@ -76,6 +89,42 @@ class AuthorizationServerBeansTest {
     }
 
     @Test
+    void tokenCustomizer_authorizationWithoutLoginSession_putsAuthorizationIdAsSid() {
+        when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
+        JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.REFRESH_TOKEN,
+                "owner@acme.com").authorization(signInAuthorization().build()).build();
+
+        config.tokenCustomizer(userService).customize(ctx);
+
+        assertThat(ctx.getClaims().build().getClaims()).containsEntry("sid", "sign-in-1");
+    }
+
+    @Test
+    void tokenCustomizer_noAuthorization_leavesSidOut() {
+        when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
+        JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.AUTHORIZATION_CODE,
+                "owner@acme.com").build();
+
+        config.tokenCustomizer(userService).customize(ctx);
+
+        assertThat(ctx.getClaims().build().getClaims()).doesNotContainKey("sid");
+    }
+
+    @Test
+    void tokenCustomizer_authorizationWithLoginSession_putsSessionHashAsSid() {
+        when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
+        OAuth2Authorization signIn = signInAuthorization()
+                .attribute(AuditConstants.SESSION_ATTRIBUTE, "session-hash")
+                .build();
+        JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.AUTHORIZATION_CODE,
+                "owner@acme.com").authorization(signIn).build();
+
+        config.tokenCustomizer(userService).customize(ctx);
+
+        assertThat(ctx.getClaims().build().getClaims()).containsEntry("sid", "session-hash");
+    }
+
+    @Test
     void shouldTouchLastLoginOnRefreshGrant() {
         when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
 
@@ -83,6 +132,19 @@ class AuthorizationServerBeansTest {
                 context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.REFRESH_TOKEN, "owner@acme.com").build());
 
         verify(userService).touchLastLogin("owner@acme.com", TENANT);
+    }
+
+    @Test
+    void tokenCustomizer_lastLoginUpdateFailsOnRefresh_stillAddsClaims() {
+        when(userService.findActiveByEmailAndTenant("owner@acme.com", TENANT)).thenReturn(Optional.of(owner));
+        doThrow(new DataAccessResourceFailureException("Mongo unreachable"))
+                .when(userService).touchLastLogin("owner@acme.com", TENANT);
+        JwtEncodingContext ctx = context(OAuth2TokenType.ACCESS_TOKEN, AuthorizationGrantType.REFRESH_TOKEN,
+                "owner@acme.com").build();
+
+        config.tokenCustomizer(userService).customize(ctx);
+
+        assertThat(ctx.getClaims().build().getClaims()).containsEntry("userId", "user-1");
     }
 
     @Test

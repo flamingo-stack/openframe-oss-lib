@@ -20,6 +20,7 @@ import com.openframe.authz.service.auth.strategy.SsoProviderRegistry;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserRole;
+import com.openframe.data.model.audit.AuditConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -43,6 +44,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.core.OAuth2Token;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
@@ -56,6 +58,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
 import java.util.Locale;
+import java.util.Objects;
 
 import com.openframe.authz.util.AuthUserPrincipals;
 
@@ -196,6 +199,12 @@ public class AuthorizationServerConfig {
 
                     claims.put("roles", UserRole.effective(user.getRoles()).stream()
                             .map(UserRole::name).toList());
+                    OAuth2Authorization authorization = context.getAuthorization();
+                    if (authorization != null) {
+                        claims.put(AuditConstants.SESSION_CLAIM, Objects.requireNonNullElse(
+                                authorization.getAttribute(AuditConstants.SESSION_ATTRIBUTE),
+                                authorization.getId()));
+                    }
                 });
             }
         };
