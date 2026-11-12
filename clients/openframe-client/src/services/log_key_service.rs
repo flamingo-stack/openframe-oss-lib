@@ -6,6 +6,7 @@ use tokio::sync::Notify;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 
+use crate::listener::command::RestartGate;
 use crate::services::backend_call_retry::{retry_until_settled, RetryTiming};
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::{AgentConfigurationService, InitialConfigurationService};
@@ -56,8 +57,17 @@ impl LogKeyService {
         self.connect_failed.notify_one();
     }
 
-    /// Runs once the device is registered: fetches the log key when the config lacks one, or again after the stream fails to connect, and returns once a key different from the saved one is saved, which the stream only uses after a client restart.
-    pub async fn run(&self) {
+    /// Runs once the device is registered and restarts the client once a new log key is saved, since the stream reads its key only at start.
+    pub fn start(self: Arc<Self>, restart_gate: RestartGate) {
+        tokio::spawn(async move {
+            self.run().await;
+            info!("Restarting the client to stream logs with the new log key");
+            restart_gate.drain_and_request().await;
+        });
+    }
+
+    /// Fetches the log key when the config lacks one, or again after the stream fails to connect, and returns once a key different from the saved one is saved.
+    async fn run(&self) {
         if self.is_key_missing() {
             info!("Log key missing in config, starting background fetch");
         } else {

@@ -754,13 +754,9 @@ impl Client {
         self.auth_processor.process().await?;
 
         // Needs the agent token, so only after authentication.
-        let log_key_service = self.log_key_service.clone();
-        let restart_gate = self.restart_gate.clone();
-        tokio::spawn(async move {
-            log_key_service.run().await;
-            info!("Restarting the client to stream logs with the new log key");
-            restart_gate.drain_and_request().await;
-        });
+        self.log_key_service
+            .clone()
+            .start(self.restart_gate.clone());
 
         self.token_refresh_run_manager.start();
 
