@@ -13,6 +13,8 @@ import {
   type PageActionButton,
   PageLayout,
   TabSelector,
+  type DataTableLayout,
+  type DataTableSettings,
 } from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { DevicesFilterToolbar, type DevicesFilterToolbarProps } from './devices-filter-toolbar';
@@ -102,6 +104,15 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
   hideFilters?: string[];
   /** Adds the USER and SOURCES columns and funnels, for a tenant with directories. Default: neither. */
   directoryColumns?: boolean;
+  /**
+   * The table's layout: `grid` draws 48px one-line rows in one bordered block at every width (see `DevicesTableBody`).
+   * Named apart from the view mode, whose own `grid` is the tile view. Default `cards`.
+   */
+  tableLayout?: DataTableLayout;
+  /** Grid layout: the table's height; `'fill'` makes the table the scroll area (see `DevicesTableBody`). */
+  tableMaxHeight?: number | string;
+  /** Grid layout: the table's settings (the gear's menu of columns, the saved column layout). */
+  tableSettings?: DataTableSettings;
   /** Message shown when the list is empty. */
   emptyMessage?: string;
   /** Drawn instead of the toolbar and the list: the pristine, genuinely empty panel. */
@@ -154,6 +165,9 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   actionsColumn,
   hideColumns,
   hideFilters,
+  tableLayout,
+  tableMaxHeight,
+  tableSettings,
   directoryColumns = false,
   emptyMessage = 'No devices found. Try adjusting your search or filters.',
   emptyState,
@@ -204,6 +218,9 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           onColumnFiltersChange={onColumnFiltersChange}
           actionsColumn={actionsColumn}
           hideColumns={hideColumns}
+          layout={tableLayout}
+          tableMaxHeight={tableMaxHeight}
+          tableSettings={tableSettings}
           directoryColumns={directoryColumns}
           disableColumnFilters={hideFilters}
           totalCount={loading ? undefined : totalCount}
