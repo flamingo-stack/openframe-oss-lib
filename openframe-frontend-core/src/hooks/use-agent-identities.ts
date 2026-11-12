@@ -35,13 +35,14 @@ const agentIdentitiesKey = (endpoint: string) => ['agent-identities', endpoint] 
  * Why a read failed, by what can make the next one succeed (which answer is which: `refusalOf`, and the rule
  * on `useAgentIdentities`):
  * - `transient`: the same read can succeed a moment later.
+ * - `stale`: a 401 to an attempt that left with less than the host holds now: the next one is sent with it.
  * - `unauthorized`: only a new credential, or the host registering its adapter, can lift it.
  * - `final`: asked again, the answer is the same.
  *
  * The picture store sorts its failures by the same facts (`retryOnFor` in `use-authed-asset-src.ts`) and leaves a
  * 5xx to the picture's next mount. Here one read serves the whole page and nothing remounts to ask it.
  */
-type ReadFailure = 'transient' | 'unauthorized' | 'final';
+type ReadFailure = 'transient' | 'stale' | 'unauthorized' | 'final';
 
 class AgentIdentitiesReadError extends Error {
   readonly failure: ReadFailure;
@@ -59,14 +60,37 @@ function failureOf(error: unknown): ReadFailure {
   return error instanceof AgentIdentitiesReadError ? error.failure : 'final';
 }
 
-function refusalOf(response: Response, unsigned: boolean): ReadFailure {
+/**
+ * How many times the host has reported a credential, or registered an adapter, to a mounted caller. An attempt
+ * notes it when it is sent, so its 401 can tell whether the host holds something the attempt did not carry.
+ */
+let credentialReports = 0;
+let reportedThisTurn = false;
+
+/** One report per event, however many callers hear it: a host tells them all in one synchronous turn. */
+function noteCredentialReport(): void {
+  if (reportedThisTurn) return;
+  reportedThisTurn = true;
+  credentialReports += 1;
+  queueMicrotask(() => {
+    reportedThisTurn = false;
+  });
+}
+
+/** What the host held when an attempt was sent. */
+interface Sent {
+  /** No adapter was registered: the request left unsigned. */
+  unsigned: boolean;
+  reports: number;
+}
+
+function refusalOf(response: Response, sent: Sent): ReadFailure {
   const { status } = response;
   if (isRetryableStatus(status)) return 'transient';
-  if (status !== 401) return 'final';
-  // Left unsigned, and the host has registered its adapter since.
-  if (unsigned && hasEmbedAuthAdapter()) return 'transient';
   // A 401 to the retry `embedAuthedFetch` sent with a credential it had just refreshed is final.
-  return answeredAfterRefresh(response) ? 'final' : 'unauthorized';
+  if (status !== 401 || answeredAfterRefresh(response)) return 'final';
+  const outgrown = (sent.unsigned && hasEmbedAuthAdapter()) || credentialReports !== sent.reports;
+  return outgrown ? 'stale' : 'unauthorized';
 }
 
 /**
@@ -80,9 +104,9 @@ function orTransient<T>(read: Promise<T>): Promise<T> {
 }
 
 async function fetchAgentIdentities(endpoint: string, signal: AbortSignal): Promise<AgentIdentityIcons> {
-  const unsigned = !hasEmbedAuthAdapter();
+  const sent: Sent = { unsigned: !hasEmbedAuthAdapter(), reports: credentialReports };
   const response = await orTransient(contentFetch(endpoint, { signal }));
-  if (!response.ok) throw new AgentIdentitiesReadError(refusalOf(response, unsigned), response.status);
+  if (!response.ok) throw new AgentIdentitiesReadError(refusalOf(response, sent), response.status);
   const body = (await orTransient(response.json())) as {
     agents?: Array<{ slug?: string; icon?: AgentIdentityIcon | null }>;
   } | null;
@@ -95,6 +119,12 @@ async function fetchAgentIdentities(endpoint: string, signal: AbortSignal): Prom
 const TIMED_ATTEMPTS = 3;
 /** The wait before the first of them, in ms; each later wait is three times the one before (2s, 6s, 18s). */
 const FIRST_WAIT_MS = 2_000;
+
+/** Whether another attempt, on a timer, may get past the failure. */
+function timed(error: unknown): boolean {
+  const failure = failureOf(error);
+  return failure === 'transient' || failure === 'stale';
+}
 
 /** Whether the page being shown again, or the browser coming back online, may ask again. */
 function eventMayAsk(query: Query<AgentIdentityIcons>): boolean {
@@ -127,8 +157,10 @@ function eventMayAsk(query: Query<AgentIdentityIcons>): boolean {
  *     one, or an adapter is registered). Never on a timer and never on an event
  *     that says nothing about the credential: each such attempt would start
  *     another refresh, which is what ends a sign-in in progress. The one 401
- *     that is timed is the answer to a read that left unsigned, before the
- *     host registered its adapter: the next attempt is signed.
+ *     that is timed is the answer to an attempt that left with less than the
+ *     host holds now (unsigned, before its adapter registered, or before a
+ *     credential it has reported since): the next attempt is sent with it.
+ *     Once those attempts are over it waits for a credential like any 401.
  *   - Anything else (a 401 to a credential just refreshed, another 4xx, the
  *     host refusing to send, an answer that is not the identities): not asked
  *     again until `enabled` turns false and true again. The answer would be the
@@ -150,7 +182,7 @@ export function useAgentIdentities(
     queryFn: ({ signal }) => fetchAgentIdentities(endpoint, signal),
     staleTime: Infinity,
     gcTime: Infinity,
-    retry: (failureCount, thrown) => failureCount < TIMED_ATTEMPTS && failureOf(thrown) === 'transient',
+    retry: (failureCount, thrown) => failureCount < TIMED_ATTEMPTS && timed(thrown),
     retryDelay: failureCount => FIRST_WAIT_MS * 3 ** failureCount,
     // Only identities that could not be read are stale (`staleTime`), so these never ask for ones already held.
     refetchOnWindowFocus: eventMayAsk,
@@ -170,14 +202,16 @@ export function useAgentIdentities(
       return undefined;
     }
     const detach = subscribeEmbedCredentialSource(() => {
+      noteCredentialReport();
       const state = queryClient.getQueryState(filter.queryKey);
-      // A read in flight is left alone: the credential its own refresh brought in asks nothing.
+      // A read in flight is left alone: if it is refused, the report above is what times its next attempt.
       if (state?.fetchStatus !== 'idle' || failureOf(state.error) === 'final') return;
       void queryClient.refetchQueries(filter);
     });
     return () => {
       detach();
-      dropUnlessAsked();
+      // After this commit's effects: react-query moves this caller's observer to a new endpoint in one of them.
+      queueMicrotask(dropUnlessAsked);
     };
   }, [queryClient, endpoint, enabled]);
 

@@ -33,32 +33,38 @@ const pass = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 /** Longer than every wait between timed attempts put together. */
 const LONG = 600_000;
 
+/** A page: one react-query client above every caller rendered on it. */
+function pageOf(client: QueryClient) {
+  return function Page({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
+}
+
 /** The hook on a page (`client`); `rerender({ on })` is the host saying whether its session is in place. */
 function read(on = true, client = new QueryClient()) {
   return renderHook(({ on: enabled }) => useAgentIdentities(AGENT_IDENTITIES_API_PATH, enabled), {
     initialProps: { on },
-    wrapper: ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={client}>{children}</QueryClientProvider>
-    ),
+    wrapper: pageOf(client),
   });
 }
 
-/** A host adapter that reports its credential changes; `rotate()` is the host holding a new one. */
-function adapterWithCredentialChanges(refresh?: () => Promise<boolean>) {
+/**
+ * A host adapter that reports its credential changes; `rotate()` is the host holding a new one. A `refresh` is
+ * handed `changed`, to report the credential it brought in.
+ */
+function adapterWithCredentialChanges(refresh?: (changed: () => void) => Promise<boolean>) {
   const listeners = new Set<() => void>();
+  const changed = () => {
+    for (const listener of [...listeners]) listener();
+  };
   setEmbedAuthAdapter({
-    refresh,
+    refresh: refresh && (() => refresh(changed)),
     subscribe: listener => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
   });
-  return {
-    rotate: () =>
-      act(() => {
-        for (const listener of [...listeners]) listener();
-      }),
-  };
+  return { rotate: () => act(changed) };
 }
 
 const shown = () => act(() => void window.dispatchEvent(new Event('visibilitychange')));
@@ -160,6 +166,21 @@ describe('a read another attempt can get past is asked again on a timer, a few t
     asking.unmount();
     await pass(LONG);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the attempts left for an endpoint its caller moved away from, when the one that stays is held back', async () => {
+    fetchMock.mockImplementation(url => (url === '/old' ? status(503)() : answer()));
+    const page = new QueryClient();
+    const moving = renderHook(({ endpoint }) => useAgentIdentities(endpoint), {
+      initialProps: { endpoint: '/old' },
+      wrapper: pageOf(page),
+    });
+    renderHook(() => useAgentIdentities('/old', false), { wrapper: pageOf(page) });
+    await pass(0);
+    moving.rerender({ endpoint: '/new' });
+    await pass(LONG);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/old')).toHaveLength(1);
+    expect(moving.result.current).toEqual(IDENTITIES);
   });
 
   it('asks again, signed, when the host registers its adapter while the unsigned read is in flight', async () => {
@@ -272,6 +293,76 @@ describe('a 401 no refresh got past is asked again for a new credential only, an
     expect(result.current).toEqual(IDENTITIES);
   });
 
+  it('asks a 401 again for a credential that arrived while the read was in flight', async () => {
+    const host = adapterWithCredentialChanges(() => Promise.resolve(false));
+    const land = inFlight();
+    fetchMock.mockImplementation(answer);
+    const { result } = read();
+    await pass(0);
+    host.rotate();
+    land(new Response('no', { status: 401 }));
+    await pass(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Timed: the attempt that follows carries the credential the refused one left before.
+    await pass(2_001);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.current).toEqual(IDENTITIES);
+  });
+
+  it('asks nothing more for a credential reported while the read waited for its timed attempt', async () => {
+    const host = adapterWithCredentialChanges(() => Promise.resolve(false));
+    fetchMock.mockImplementationOnce(status(503)).mockImplementation(status(401));
+    read();
+    await pass(0);
+    host.rotate();
+    await pass(LONG);
+    // The 503, and the timed attempt, which already carried the new credential.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks a refused read once for one new credential, however many callers hear of it', async () => {
+    const host = adapterWithCredentialChanges();
+    fetchMock.mockImplementation(status(401));
+    const page = new QueryClient();
+    read(true, page);
+    read(true, page);
+    await pass(0);
+    host.rotate();
+    await pass(LONG);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops after its timed attempts when the host reports a credential with every refresh that fails', async () => {
+    adapterWithCredentialChanges(changed => {
+      changed();
+      return Promise.resolve(false);
+    });
+    fetchMock.mockImplementation(status(401));
+    read();
+    await pass(LONG);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    shown();
+    reconnected();
+    await pass(LONG);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('asks again, signed, when the host swaps its adapter by clearing the old one first', async () => {
+    setEmbedAuthAdapter({ getHeaders: () => ({ Authorization: 'Bearer old' }) });
+    fetchMock.mockImplementation((_, init) =>
+      new Headers(init?.headers).get('Authorization') === SIGNED_LATE.Authorization ? answer() : status(401)(),
+    );
+    const { result } = read();
+    await pass(0);
+    act(() => {
+      setEmbedAuthAdapter(null);
+      setEmbedAuthAdapter({ getHeaders: () => SIGNED_LATE });
+    });
+    // The clear asks at once, unsigned; that attempt's 401 finds an adapter and is timed.
+    await pass(2_001);
+    expect(result.current).toEqual(IDENTITIES);
+  });
+
   it('asks a 401 again when the host registers its adapter after the read left unsigned', async () => {
     fetchMock.mockImplementationOnce(status(401)).mockImplementation(answer);
     const { result } = read();
@@ -319,7 +410,7 @@ describe('a 401 no refresh got past is asked again for a new credential only, an
   });
 });
 
-describe('a new credential asks nothing of a read that is in flight, answered or held back', () => {
+describe('a new credential sends nothing while a read is in flight, answered or held back', () => {
   it('sends nothing for a new credential while a read is in flight or answered', async () => {
     const host = adapterWithCredentialChanges();
     const land = inFlight();
@@ -355,6 +446,18 @@ describe('a new credential asks nothing of a read that is in flight, answered or
     expect(fetchMock).toHaveBeenCalledTimes(3);
     land(await answer());
     await pass(0);
+  });
+
+  it('asks nothing more for the credential its own refresh brought in, when the retry is refused too', async () => {
+    adapterWithCredentialChanges(changed => {
+      changed();
+      return Promise.resolve(true);
+    });
+    fetchMock.mockImplementation(status(401));
+    read();
+    await pass(LONG);
+    // The read, and the one retry the adapter sent with the refreshed credential.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('sends nothing for a new credential while the host holds the read back', async () => {
