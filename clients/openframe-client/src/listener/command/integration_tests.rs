@@ -10,13 +10,14 @@ use tokio::time::{timeout, Duration};
 
 use super::{
     Begin, ClientUpdateHandler, CommandContext, CommandHandler, CommandListener,
-    FeatureFlagsHandler, Outcome, PackageUpdateHandler, RestartGate,
+    FeatureFlagsHandler, Outcome, PackageUpdateHandler, RestartGate, ToolUpdateHandler,
 };
 use crate::clients::AuthClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
 use crate::models::{
     DeliveryRef, DeliveryResult, DeliveryResultMessage, FailReason, Feature, FeatureFlagsState,
-    OpenFrameClientUpdateMessage, PackageRef, PackageUpdateStatusMessage, UpdateStatus,
+    InstalledAgentMessage, InstalledAsset, InstalledTool, OpenFrameClientUpdateMessage, PackageRef,
+    PackageUpdateStatusMessage, ToolRecordState, UpdateStatus,
 };
 use crate::platform::{DirectoryManager, DmgExtractor};
 use crate::services::encryption_service::EncryptionService;
@@ -34,6 +35,7 @@ use crate::services::package_manager::{is_supported, ManagerId};
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::{LedgerState, ResultStore};
 use crate::services::shared_token_service::SharedTokenService;
+use crate::services::tool_agent_update_service::ToolAgentUpdateService;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_cleanup_service::UpdateCleanupService;
 use crate::services::update_handler_service::UpdateHandlerService;
@@ -341,6 +343,51 @@ impl Agent {
 
     fn persisted(&self) -> FeatureFlagsState {
         serde_json::from_slice(&std::fs::read(&self.flags_path).unwrap()).unwrap()
+    }
+
+    fn tool_update_service(&self) -> ToolAgentUpdateService {
+        let initial = InitialConfigurationService::new(self.directories.clone()).unwrap();
+        ToolAgentUpdateService::new(
+            GithubDownloadService::new(reqwest::Client::new(), DmgExtractor::new()),
+            InstalledToolsService::new(self.directories.clone()).unwrap(),
+            ToolKillService::new(),
+            self.tool_run_manager.clone(),
+            self.directories.clone(),
+            self.config.clone(),
+            InstalledAgentMessagePublisher::new(self.publisher.clone()),
+            ToolCommandParamsResolver::new(self.directories.clone(), initial, self.config.clone()),
+        )
+    }
+
+    async fn install_tool(&self, tool: InstalledTool) {
+        let binary = self
+            .directories
+            .get_tool_executable_path(&tool.tool_agent_id, None);
+        std::fs::create_dir_all(binary.parent().unwrap()).unwrap();
+        std::fs::write(&binary, b"agent").unwrap();
+        InstalledToolsService::new(self.directories.clone())
+            .unwrap()
+            .save(tool)
+            .await
+            .unwrap();
+    }
+
+    async fn installed_agents(&self) -> async_nats::Subscriber {
+        async_nats::jetstream::new(self.tester.clone())
+            .create_stream(async_nats::jetstream::stream::Config {
+                name: "INSTALLED_AGENTS".into(),
+                subjects: vec!["machine.*.installed-agent".into()],
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let reports = self
+            .tester
+            .subscribe(format!("machine.{MACHINE}.installed-agent"))
+            .await
+            .unwrap();
+        self.tester.flush().await.unwrap();
+        reports
     }
 }
 
@@ -1142,4 +1189,135 @@ async fn an_unsupported_package_update_is_refused_on_the_status_stream() {
         Some(FailReason::NotSupported)
     );
     assert!(orders.get("req-2").is_none());
+}
+
+fn installed_tool(
+    tool_agent_id: &str,
+    version: &str,
+    state: ToolRecordState,
+    assets: Vec<InstalledAsset>,
+) -> InstalledTool {
+    InstalledTool {
+        tool_agent_id: tool_agent_id.into(),
+        version: version.into(),
+        assets,
+        state,
+        ..Default::default()
+    }
+}
+
+fn tool_update(
+    dispatch_id: &str,
+    sequence: i64,
+    tool_agent_id: &str,
+    version: &str,
+) -> serde_json::Value {
+    json!({
+        "delivery": {
+            "type": "TOOL_UPDATE",
+            "targetId": tool_agent_id,
+            "dispatchId": dispatch_id,
+            "sequence": sequence,
+        },
+        "toolAgentId": tool_agent_id,
+        "version": version,
+        "downloadConfigurations": [],
+        "assets": null,
+    })
+}
+
+async fn next_report(reports: &mut async_nats::Subscriber) -> (String, String) {
+    let message = timeout(BOUND, reports.next())
+        .await
+        .expect("no installed-agent report")
+        .expect("installed-agent subscription ended");
+    let report: InstalledAgentMessage = serde_json::from_slice(&message.payload).unwrap();
+    (report.agent_type, report.version)
+}
+
+#[tokio::test]
+async fn every_installed_tool_and_asset_version_is_published() {
+    let Some((agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            "fleetmdm-agent",
+            "0.4.18",
+            ToolRecordState::Installed,
+            vec![InstalledAsset {
+                id: "osqueryd".into(),
+                version: "0.0.11".into(),
+                executable: true,
+            }],
+        ))
+        .await;
+    agent
+        .install_tool(installed_tool(
+            "meshcentral-agent",
+            "0.0.32",
+            ToolRecordState::Installing,
+            Vec::new(),
+        ))
+        .await;
+    let mut reports = agent.installed_agents().await;
+
+    agent
+        .tool_update_service()
+        .publish_installed_versions()
+        .await;
+
+    let mut heard = vec![
+        next_report(&mut reports).await,
+        next_report(&mut reports).await,
+    ];
+    heard.sort();
+    assert_eq!(
+        heard,
+        [
+            ("fleetmdm-agent".to_string(), "0.4.18".to_string()),
+            ("osqueryd".to_string(), "0.0.11".to_string()),
+        ]
+    );
+    let more = timeout(QUIET, reports.next()).await;
+    assert!(
+        more.is_err(),
+        "a tool still being installed was reported: {more:?}"
+    );
+}
+
+#[tokio::test]
+async fn an_update_to_the_installed_version_reports_it_again() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .install_tool(installed_tool(
+            "openframe-chat",
+            "1.6.10",
+            ToolRecordState::Installed,
+            Vec::new(),
+        ))
+        .await;
+    let mut reports = agent.installed_agents().await;
+    let handler = ToolUpdateHandler::new(
+        agent.tool_update_service(),
+        ToolOps::default(),
+        agent.tool_run_manager.client_update_pending(),
+    );
+    agent.launch_command(handler).await;
+
+    agent
+        .send_to(
+            ToolUpdateHandler::subject(MACHINE),
+            tool_update("t1", 1, "openframe-chat", "1.6.10"),
+        )
+        .await;
+
+    agent.expect("t1", DeliveryResult::Acked).await;
+    agent.expect("t1", DeliveryResult::Done).await;
+    assert_eq!(
+        next_report(&mut reports).await,
+        ("openframe-chat".to_string(), "1.6.10".to_string())
+    );
 }
