@@ -12,13 +12,11 @@ import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Erasure of a deleted tenant (CU-17tkuw62cvq) relies on compaction removing every superseded row: a threshold
- * of one invalid record and IN_MEMORY valid doc ids on logs (no snapshots there). Replicas must agree on valid docs
- * (Pinot 1.6+). No task cap: the single minion runs one task at a time, and a cap would shrink the nightly run.
- * Only task config changes: the controller reads it, so no Pinot server restart. The upsert config must stay.
- * The devices percent threshold is a property: today's 30% unless an env opts in, so Pinot 1.4.0 envs keep running as now.
- */
+// Erasure of a deleted tenant (CU-17tkuw62cvq) relies on compaction removing every superseded row: a threshold
+// of one invalid record and IN_MEMORY valid doc ids on logs (no snapshots there). Replicas must agree on valid docs
+// (Pinot 1.6+). No task cap: the single minion runs one task at a time, and a cap would shrink the nightly run.
+// Only task config changes: the controller reads it, so no Pinot server restart. The upsert config must stay.
+// The devices percent threshold is a property: today's 30% unless an env opts in, so Pinot 1.4.0 envs keep running as now.
 class PinotTableConfigTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
