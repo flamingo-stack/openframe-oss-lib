@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -211,5 +211,48 @@ describe('with no copy from the host, the identities are read from the server', 
       </AgentIdentityProvider>,
     );
     expect(html).toContain('<svg');
+  });
+});
+
+describe('identities that could not be read are asked for again, with no remount', () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  const answer = () =>
+    new Response(JSON.stringify({ agents: [{ slug: 'fae', icon: { name: null, url: FAE_URL, props: null } }] }));
+  /** Lets `ms` pass: the timers due in it fire, and what they settle is rendered. */
+  const pass = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['the server failing (5xx)', () => Promise.resolve(new Response('down', { status: 503 }))],
+    ['no answer at all (a network error)', () => Promise.reject(new TypeError('Failed to fetch'))],
+  ])('draws the marks after one read lost to %s', async (_, failure) => {
+    fetchMock.mockImplementationOnce(failure).mockImplementation(() => Promise.resolve(answer()));
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <AgentIdentityProvider>
+          <div data-testid="marks">
+            <AgentMark agent="fae" className="size-6" />
+          </div>
+        </AgentIdentityProvider>
+      </QueryClientProvider>,
+    );
+    await pass(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('marks').innerHTML).toBe('<span aria-hidden="true" class="size-6"></span>');
+
+    await pass(60_000);
+    expect(screen.getByTestId('marks').innerHTML).toContain('fae.webp');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
