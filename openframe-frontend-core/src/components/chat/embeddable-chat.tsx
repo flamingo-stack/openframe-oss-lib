@@ -1311,6 +1311,7 @@ function EmbeddableChatInner({
   // else: the composer that mounts takes it. Not where the pointer is a finger: focus there raises the on-screen
   // keyboard over the answer the user just asked for.
   const composerFocusOwedRef = useRef(false);
+  const settleComposerFocusRef = useRef<(() => void) | null>(null);
   const focusComposer = useCallback(() => {
     if (typeof window === 'undefined') return;
     if (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) return;
@@ -1321,12 +1322,16 @@ function EmbeddableChatInner({
     // settle its own debt. The next press or key does, wherever it lands.
     const settle = () => {
       composerFocusOwedRef.current = false;
+      settleComposerFocusRef.current = null;
       document.removeEventListener('pointerdown', settle, true);
       document.removeEventListener('keydown', settle, true);
     };
+    settleComposerFocusRef.current = settle;
     document.addEventListener('pointerdown', settle, true);
     document.addEventListener('keydown', settle, true);
   }, []);
+  // The debt ends with the chat: its listeners do not outlive it.
+  useEffect(() => () => settleComposerFocusRef.current?.(), []);
   const attachChatInput = useCallback((input: ChatInputRef | null) => {
     chatInputRef.current = input;
     if (input && composerFocusOwedRef.current) input.focus();

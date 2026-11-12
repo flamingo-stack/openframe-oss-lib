@@ -78,7 +78,7 @@ function renderChat({ onClick }: { onClick?: () => void } = {}) {
   const sendMessage = vi.fn((_text: string) => Promise.resolve());
   const handle = createRef<EmbeddableChatHandle>();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  const { unmount } = render(
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
         <EmbeddableChat
@@ -96,7 +96,7 @@ function renderChat({ onClick }: { onClick?: () => void } = {}) {
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,
   );
-  return { sendMessage, handle };
+  return { sendMessage, handle, unmount };
 }
 
 describe('EmbeddableChat quick actions', () => {
@@ -142,5 +142,16 @@ describe('EmbeddableChat quick actions', () => {
     handle.current?.focusComposer();
 
     expect(screen.getByRole('textbox')).toHaveFocus();
+  });
+
+  it('stops waiting for the next press or key when the chat goes away', () => {
+    const remove = vi.spyOn(document, 'removeEventListener');
+    const { handle, unmount } = renderChat();
+    handle.current?.focusComposer();
+
+    unmount();
+
+    expect(remove).toHaveBeenCalledWith('pointerdown', expect.any(Function), true);
+    expect(remove).toHaveBeenCalledWith('keydown', expect.any(Function), true);
   });
 });

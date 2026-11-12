@@ -55,7 +55,18 @@ export interface QuickActionRowProps {
  * A click on a tag, or on a row of the All list, calls the action's `onSelect` (the chat sends its prompt); its
  * `onHoverStart` / `onHoverEnd` fire from both too. With nothing to show the row is not drawn.
  */
-export function QuickActionRow({
+export function QuickActionRow(props: QuickActionRowProps) {
+  const loading = useLoadingScope() || !!props.loading;
+  if (!loading && props.chips.length === 0 && !props.leading?.length) return null;
+  return <QuickActionRowBody {...props} />;
+}
+
+/**
+ * The row once there is something to draw. Its own component, so the scroller is there from its first render: the
+ * fade's observers and the wheel listener attach to the element when they mount, and a row that had nothing to show
+ * at first (its actions arriving later, with no loading state before them) would otherwise never get them.
+ */
+function QuickActionRowBody({
   chips,
   leading = [],
   theme,
@@ -66,8 +77,6 @@ export function QuickActionRow({
   const loading = useLoadingScope() || loadingProp;
   const { scrollRef, fadeLeft, fadeRight, update } = useScrollFade<HTMLDivElement>('horizontal');
   useWheelSideways(scrollRef);
-
-  if (!loading && chips.length === 0 && leading.length === 0) return null;
 
   return (
     <div

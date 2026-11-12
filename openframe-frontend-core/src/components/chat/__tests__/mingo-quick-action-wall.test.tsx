@@ -143,6 +143,18 @@ describe('QuickActionRow mouse wheel', () => {
     render(<QuickActionRow chips={chipsOf(12)} />);
     expect(wheel({ deltaX: 120, deltaY: 10 }).defaultPrevented).toBe(false);
   });
+
+  it('scrolls and fades a row whose actions arrive after it mounted with none', () => {
+    rowWidths(1000, 300);
+    const { rerender } = render(<QuickActionRow chips={[]} />);
+    expect(screen.queryByTestId('quick-action-row-scroller')).toBeNull();
+
+    rerender(<QuickActionRow chips={chipsOf(12)} />);
+    expect(scroller()).toHaveAttribute('data-fade-right');
+    const event = wheel({ deltaY: 120 });
+    expect(scroller().scrollLeft).toBe(120);
+    expect(event.defaultPrevented).toBe(true);
+  });
 });
 
 describe('QuickActionRow All menu', () => {
