@@ -153,6 +153,9 @@ describe('EmbeddableChat - grouped source chip', () => {
       expect.stringContaining('macOS'),
     ]);
     expect(within(menu).getAllByTestId('source-group-row')).toHaveLength(2);
+    // The rows' icons keep the chip's 14px, over the menu item's own 16px.
+    expect(links[0].className).toContain('[&_svg]:size-3.5');
+    expect(links[0].className).not.toContain('[&_svg]:size-4');
   });
 
   it('closes on Escape', async () => {

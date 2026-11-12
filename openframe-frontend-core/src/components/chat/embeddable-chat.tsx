@@ -939,7 +939,10 @@ function SourceChip(props: {
                 className="flex items-center gap-[var(--spacing-system-xxs)]"
               >
                 {row.href ? (
-                  <DropdownMenuItem asChild className="min-w-0 flex-1 text-ods-text-secondary no-underline">
+                  <DropdownMenuItem
+                    asChild
+                    className="min-w-0 flex-1 text-ods-text-secondary no-underline [&_svg]:size-3.5"
+                  >
                     <NavLinkAnchorViaRuntime href={row.href} targetPlatform={row.targetPlatform} path={row.path}>
                       {row.icon}
                       <span className={rowLabelClass}>{row.label}</span>
@@ -947,7 +950,7 @@ function SourceChip(props: {
                   </DropdownMenuItem>
                 ) : (
                   // Nothing to open: the label only, out of the keyboard's way; its Ask still works.
-                  <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-ods-text-secondary text-h6 [&_svg]:size-4 [&_svg]:shrink-0">
+                  <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-ods-text-secondary text-h6 [&_svg]:size-3.5 [&_svg]:shrink-0">
                     {row.icon}
                     <span className={rowLabelClass}>{row.label}</span>
                   </span>
