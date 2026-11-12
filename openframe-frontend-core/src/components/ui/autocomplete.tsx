@@ -18,7 +18,7 @@ import {
   useState,
 } from 'react';
 import { MEASURE_LAYER_CLASS, useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags';
-import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
+import { useViewportCollisionPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
@@ -311,7 +311,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
 
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const keyboardPadding = useKeyboardCollisionPadding();
+  const viewportPadding = useViewportCollisionPadding();
   const containerRef = useRef<HTMLDivElement>(null);
   const hiddenTagsPopupRef = useRef<HTMLDivElement>(null);
 
@@ -738,8 +738,8 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
         align="start"
         // The anchor is the text field that raises the software keyboard, so
         // this list is always positioned with the keyboard up — see
-        // useKeyboardCollisionPadding.
-        collisionPadding={{ bottom: keyboardPadding }}
+        // useViewportCollisionPadding.
+        collisionPadding={viewportPadding}
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
