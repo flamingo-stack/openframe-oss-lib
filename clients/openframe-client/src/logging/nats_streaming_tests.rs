@@ -28,26 +28,17 @@ fn a_stored_log_key_wins_over_the_initial_key() {
 }
 
 #[test]
-fn only_the_gateway_401_counts_as_a_key_rejection() {
-    use async_nats::{ClientError, ConnectError, ConnectErrorKind, Event, ServerError};
-    let client_error = |kind, source: &str| {
-        Event::ClientError(ClientError::Other(
-            ConnectError::with_source(kind, std::io::Error::other(source.to_string())).to_string(),
-        ))
-    };
+fn only_a_401_on_the_handshake_counts_as_a_key_rejection() {
+    let rejected = |text: &str| is_key_rejection(&async_nats::ClientError::Other(text.into()));
 
-    assert!(is_key_rejection(&client_error(
-        ConnectErrorKind::AuthorizationViolation,
-        "HTTP error: 401 Unauthorized"
-    )));
-    assert!(!is_key_rejection(&client_error(
-        ConnectErrorKind::Io,
-        "connection refused"
-    )));
-    assert!(!is_key_rejection(&Event::ServerError(
-        ServerError::AuthorizationViolation
-    )));
-    assert!(!is_key_rejection(&Event::Disconnected));
+    assert!(rejected(
+        "authorization violation: expected HTTP 101 Switching Protocols, got status code 401"
+    ));
+    assert!(!rejected(
+        "authorization violation: nats: authorization violation"
+    ));
+    assert!(!rejected("IO error"));
+    assert!(!is_key_rejection(&async_nats::ClientError::MaxReconnects));
 }
 
 #[test]

@@ -97,10 +97,8 @@ impl NatsLogConnection {
                 delay
             })
             .event_callback(move |event| {
-                if is_key_rejection(&event) {
-                    log_key_service.key_rejected();
-                }
                 let tenant = tenant_domain.clone();
+                let log_key_service = log_key_service.clone();
                 async move {
                     match event {
                         async_nats::Event::Connected => {
@@ -114,6 +112,9 @@ impl NatsLogConnection {
                         }
                         async_nats::Event::ClientError(err) => {
                             error!("NATS logs: client error: {} (tenant={})", err, tenant);
+                            if is_key_rejection(&err) {
+                                log_key_service.key_rejected();
+                            }
                         }
                         _ => {}
                     }
@@ -403,14 +404,9 @@ fn choose_key(log_key: Option<String>, initial_key: Option<String>) -> Option<Lo
         .map(LogStreamKey::Initial)
 }
 
-/// The fork reports the gateway's WebSocket 401 as a client error that starts with its authorization-violation kind.
-fn is_key_rejection(event: &async_nats::Event) -> bool {
-    let rejected = async_nats::ConnectErrorKind::AuthorizationViolation.to_string();
-    matches!(
-        event,
-        async_nats::Event::ClientError(async_nats::ClientError::Other(message))
-            if message.starts_with(&rejected)
-    )
+// The fork reports the gateway's 401 on the WebSocket handshake as a client error carrying the status.
+fn is_key_rejection(err: &async_nats::ClientError) -> bool {
+    matches!(err, async_nats::ClientError::Other(text) if text.contains("status code 401"))
 }
 
 fn extract_tenant_domain(server_host: &str) -> String {
