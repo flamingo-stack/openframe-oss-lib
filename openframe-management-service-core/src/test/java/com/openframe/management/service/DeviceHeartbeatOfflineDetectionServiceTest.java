@@ -67,7 +67,7 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "MANAGED", "ONLINE", "PENDING_DELETION", "ARCHIVED"})
+    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "MANAGED", "PENDING_DELETION", "ARCHIVED"})
     void markStaleDevicesOffline_anyLifecycleStatus_statusNeverWritten(DeviceStatus status) {
         // setup
         Machine machine = machine(MACHINE_ID, status);

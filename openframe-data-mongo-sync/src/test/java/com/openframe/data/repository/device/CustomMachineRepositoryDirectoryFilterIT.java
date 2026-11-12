@@ -98,7 +98,7 @@ class CustomMachineRepositoryDirectoryFilterIT extends BaseMongoIntegrationTest 
         Machine machine = new Machine();
         machine.setMachineId(machineId);
         machine.setTenantId(TENANT);
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         machine.setHostname("host-" + machineId);
         machine.setDirectorySources(sources);
         machine.setDirectoryUserLink(link);

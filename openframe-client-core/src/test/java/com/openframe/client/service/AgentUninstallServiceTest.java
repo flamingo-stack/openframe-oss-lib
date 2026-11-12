@@ -107,7 +107,7 @@ class AgentUninstallServiceTest {
     @Test
     @DisplayName("a machine document removed between the read and the write publishes nothing")
     void machineGoneBeforeTheWrite_publishesNothing() {
-        machineIs(DeviceStatus.ONLINE);
+        machineIs(DeviceStatus.MANAGED);
         when(machineWriter.update(eq(MACHINE), any(MachineUpdate.class))).thenReturn(Optional.empty());
 
         service.uninstall(MACHINE, SECRET);

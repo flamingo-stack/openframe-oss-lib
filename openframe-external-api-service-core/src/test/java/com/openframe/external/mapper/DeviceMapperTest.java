@@ -51,7 +51,7 @@ class DeviceMapperTest {
         assertEquals("00:11:22:33:44:55", response.getMacAddress());
         assertEquals("os-uuid-1", response.getOsUuid());
         assertEquals("1.2.3", response.getAgentVersion());
-        assertEquals(DeviceStatus.ONLINE, response.getStatus());
+        assertEquals(DeviceStatus.MANAGED, response.getStatus());
         assertEquals(TelemetryStatus.OFFLINE, response.getConnectivity());
         assertEquals(LAST_SEEN, response.getLastSeen());
         assertEquals("SN-1", response.getSerialNumber());
@@ -173,7 +173,7 @@ class DeviceMapperTest {
     @Test
     void filterResponseRenamesOrganizationsToCustomersAndKeepsCounts() {
         DeviceFilterResponse response = mapper.toDeviceFilterResponse(DeviceFilters.builder()
-                .statuses(List.of(new DeviceFilterOption("ONLINE", "Online", 4), new DeviceFilterOption("OFFLINE", "Offline", 1)))
+                .statuses(List.of(new DeviceFilterOption("MANAGED", "Managed", 4), new DeviceFilterOption("PENDING", "Pending", 1)))
                 .connectivity(List.of(new DeviceFilterOption("ONLINE", "ONLINE", 3)))
                 .deviceTypes(List.of(new DeviceFilterOption("LAPTOP", "Laptop", 3)))
                 .osTypes(List.of(new DeviceFilterOption("WINDOWS", "Windows", 2)))
@@ -182,7 +182,7 @@ class DeviceMapperTest {
                 .filteredCount(5)
                 .build());
 
-        assertEquals(List.of(new DeviceFilterItem("ONLINE", "Online", 4), new DeviceFilterItem("OFFLINE", "Offline", 1)),
+        assertEquals(List.of(new DeviceFilterItem("MANAGED", "Managed", 4), new DeviceFilterItem("PENDING", "Pending", 1)),
                 response.getStatuses());
         assertEquals(List.of(new DeviceFilterItem("ONLINE", "ONLINE", 3)), response.getConnectivity());
         assertEquals(List.of(new DeviceFilterItem("LAPTOP", "Laptop", 3)), response.getDeviceTypes());
@@ -238,7 +238,7 @@ class DeviceMapperTest {
         machine.setMacAddress("00:11:22:33:44:55");
         machine.setOsUuid("os-uuid-1");
         machine.setAgentVersion("1.2.3");
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         machine.setTelemetryStatus(TelemetryStatus.OFFLINE);
         machine.setLastSeen(LAST_SEEN);
         machine.setOrganizationId("cust-1");

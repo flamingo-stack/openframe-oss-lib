@@ -39,47 +39,45 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
     @BeforeEach
     void seedInScrambledOrder() {
         mongoTemplate.dropCollection(Machine.class);
-        save("offline-1", TENANT, DeviceStatus.OFFLINE);
-        save("deleting-1", TENANT, DeviceStatus.PENDING_DELETION);
-        save("online-1", TENANT, DeviceStatus.ONLINE);
-        save("none-1", TENANT, null);
-        save("managed-1", TENANT, DeviceStatus.MANAGED);
         save("pending-1", TENANT, DeviceStatus.PENDING);
-        save("online-2", TENANT, DeviceStatus.ONLINE);
-        save("offline-2", TENANT, DeviceStatus.OFFLINE);
-        save("online-other-tenant", OTHER_TENANT, DeviceStatus.ONLINE);
+        save("deleting-1", TENANT, DeviceStatus.PENDING_DELETION);
+        save("managed-1", TENANT, DeviceStatus.MANAGED);
+        save("none-1", TENANT, null);
+        save("managed-2", TENANT, DeviceStatus.MANAGED);
+        save("pending-2", TENANT, DeviceStatus.PENDING);
+        save("managed-other-tenant", OTHER_TENANT, DeviceStatus.MANAGED);
     }
 
     @Test
-    @DisplayName("status ASC: devices without a status, then PENDING_DELETION, PENDING, OFFLINE, ONLINE, MANAGED")
+    @DisplayName("status ASC: devices without a status, then PENDING_DELETION, PENDING, MANAGED")
     void ascIsTheReverseOfTheDescOrder() {
         List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, null, 50, "status", "ASC");
 
         assertThat(machineIds(page)).containsExactly(
-                "none-1", "deleting-1", "pending-1", "offline-1", "offline-2", "online-1", "online-2", "managed-1");
+                "none-1", "deleting-1", "pending-1", "pending-2", "managed-1", "managed-2");
     }
 
     @Test
-    @DisplayName("status DESC: MANAGED, ONLINE, OFFLINE, PENDING, PENDING_DELETION, then devices without a status (what the frontends ask for)")
+    @DisplayName("status DESC: MANAGED, PENDING, PENDING_DELETION, then devices without a status (what the frontends ask for)")
     void descFollowsExplicitOrder() {
         List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, null, 50, "status", "DESC");
 
         assertThat(machineIds(page)).containsExactly(
-                "managed-1", "online-2", "online-1", "offline-2", "offline-1", "pending-1", "deleting-1", "none-1");
+                "managed-2", "managed-1", "pending-2", "pending-1", "deleting-1", "none-1");
     }
 
     @Test
     @DisplayName("status ASC paged by cursor: pages join without gaps or duplicates, even inside a status group")
     void ascCursorPagesWithoutGapsOrDuplicates() {
         assertThat(pageThrough("ASC", 3)).containsExactly(
-                "none-1", "deleting-1", "pending-1", "offline-1", "offline-2", "online-1", "online-2", "managed-1");
+                "none-1", "deleting-1", "pending-1", "pending-2", "managed-1", "managed-2");
     }
 
     @Test
     @DisplayName("status DESC paged by cursor: pages join without gaps or duplicates, even inside a status group")
     void descCursorPagesWithoutGapsOrDuplicates() {
         assertThat(pageThrough("DESC", 2)).containsExactly(
-                "managed-1", "online-2", "online-1", "offline-2", "offline-1", "pending-1", "deleting-1", "none-1");
+                "managed-2", "managed-1", "pending-2", "pending-1", "deleting-1", "none-1");
     }
 
     @Test
@@ -87,18 +85,18 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
     void statusSortStaysInsideTenant() {
         List<Machine> page = repository.findMachinesWithCursor(OTHER_TENANT, NO_FILTER, null, null, 50, "status", "ASC");
 
-        assertThat(machineIds(page)).containsExactly("online-other-tenant");
+        assertThat(machineIds(page)).containsExactly("managed-other-tenant");
     }
 
     @Test
     @DisplayName("status sort honours the status filter and search like every other sort")
     void statusSortRespectsFilterAndSearch() {
-        MachineQueryFilter onlyOffline = MachineQueryFilter.builder()
-                .statuses(List.of("OFFLINE")).build();
+        MachineQueryFilter onlyPending = MachineQueryFilter.builder()
+                .statuses(List.of("PENDING")).build();
 
-        List<Machine> page = repository.findMachinesWithCursor(TENANT, onlyOffline, "host-offline-2", null, 50, "status", "ASC");
+        List<Machine> page = repository.findMachinesWithCursor(TENANT, onlyPending, "host-pending-2", null, 50, "status", "ASC");
 
-        assertThat(machineIds(page)).containsExactly("offline-2");
+        assertThat(machineIds(page)).containsExactly("pending-2");
     }
 
     private List<String> pageThrough(String direction, int pageSize) {

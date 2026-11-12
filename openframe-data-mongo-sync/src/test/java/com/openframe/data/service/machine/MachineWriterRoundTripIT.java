@@ -62,7 +62,7 @@ class MachineWriterRoundTripIT extends BaseMongoIntegrationTest {
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setTenantId("tenant-1");
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         machine.setHostname("janes-mbp");
         mongoTemplate.save(machine);
     }

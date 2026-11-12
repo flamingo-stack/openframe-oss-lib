@@ -403,9 +403,9 @@ class DeliverySweepServiceTest {
         MachineDelivery corrupt = row(OTHER_MACHINE_ID, CORRUPT_JSON);
         stubDue(corrupt, delivery);
         Set<String> both = Set.of(OTHER_MACHINE_ID, MACHINE_ID);
-        when(machineOnlineStatus.statuses(both)).thenReturn(Map.of(OTHER_MACHINE_ID, DeviceStatus.ONLINE, MACHINE_ID, DeviceStatus.ONLINE));
+        when(machineOnlineStatus.statuses(both)).thenReturn(Map.of(OTHER_MACHINE_ID, DeviceStatus.MANAGED, MACHINE_ID, DeviceStatus.MANAGED));
         when(machineOnlineStatus.online(both)).thenReturn(both);
-        when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING));
+        when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.PENDING));
         stubSpec();
         when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
 
@@ -568,11 +568,11 @@ class DeliverySweepServiceTest {
     }
 
     private void stubMachineOnline() {
-        stubMachine(DeviceStatus.ONLINE, true);
+        stubMachine(DeviceStatus.MANAGED, true);
     }
 
     private void stubMachineNotOnline() {
-        stubMachine(DeviceStatus.OFFLINE, false);
+        stubMachine(DeviceStatus.MANAGED, false);
     }
 
     private void stubMachineGone() {
@@ -583,7 +583,7 @@ class DeliverySweepServiceTest {
         when(machineOnlineStatus.statuses(Set.of(MACHINE_ID))).thenReturn(Map.of(MACHINE_ID, status));
         when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(online ? Set.of(MACHINE_ID) : Set.of());
         lenient().doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
-        lenient().when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING));
+        lenient().when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.PENDING));
     }
 
     private void stubSpec() {

@@ -3,7 +3,6 @@ package com.openframe.test.tests;
 import com.openframe.test.api.CommandApi;
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.ScriptApi;
-import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.execution.ScriptExecution;
 import com.openframe.test.data.dto.script.BatchRunScriptInput;
@@ -53,7 +52,7 @@ public class ScriptsTest extends BaseTest {
 
     @BeforeAll
     public static void pickDevice() {
-        device = DeviceApi.getDevices(DeviceGenerator.osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE)).stream()
+        device = DeviceApi.getDevices(DeviceGenerator.osOnlineManagedDevicesFilter("WINDOWS")).stream()
                 .filter(d -> HOSTNAME.equals(d.getHostname()))
                 .findFirst()
                 .orElse(null);

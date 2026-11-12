@@ -3,22 +3,19 @@ package com.openframe.data.document.device;
 import java.util.EnumSet;
 import java.util.Set;
 
+/**
+ * Device lifecycle. Connectivity (online right now or not) is {@link TelemetryStatus} on
+ * {@code Machine.telemetryStatus}, never a lifecycle value.
+ */
 public enum DeviceStatus {
     PENDING,
     MANAGED,
     PENDING_DELETION,
     DELETED,
-    ARCHIVED,
-    // transitional until phase 3 of CU-86akb8vvf: ONLINE/OFFLINE are migrated to MANAGED, the rest are unused
-    ACTIVE,
-    INACTIVE,
-    MAINTENANCE,
-    DECOMMISSIONED,
-    ONLINE,
-    OFFLINE;
+    ARCHIVED;
 
-    // "managed device": ONLINE/OFFLINE stay until migration 031 has rewritten them to MANAGED
-    public static final Set<DeviceStatus> CONNECTED = EnumSet.of(MANAGED, ONLINE, OFFLINE);
+    // "managed device": the agent and every required tool have connected at least once
+    public static final Set<DeviceStatus> CONNECTED = EnumSet.of(MANAGED);
     // Heartbeats keep connectivity and lastSeen moving but never change these; an ARCHIVED device also stops taking
     // hostname, timezone and package-manager reports and only a reinstall brings it back, as PENDING.
     public static final Set<DeviceStatus> FROZEN = EnumSet.of(PENDING_DELETION, DELETED, ARCHIVED);

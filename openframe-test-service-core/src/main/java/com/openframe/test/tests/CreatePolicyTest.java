@@ -2,7 +2,6 @@ package com.openframe.test.tests;
 
 import com.openframe.test.api.DeviceApi;
 import com.openframe.test.api.MonitoringApi;
-import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.policy.CreatePolicyRequest;
 import com.openframe.test.data.dto.policy.Policy;
@@ -13,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static com.openframe.test.data.generator.DeviceGenerator.getFleetId;
-import static com.openframe.test.data.generator.DeviceGenerator.osAndStatusDevicesFilter;
+import static com.openframe.test.data.generator.DeviceGenerator.osOnlineManagedDevicesFilter;
 import static com.openframe.test.data.generator.MonitoringGenerator.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -46,7 +45,7 @@ public class CreatePolicyTest extends BaseTest {
         assertThat(policy.getDescription()).isEqualTo(createPolicyRequest.getDescription());
         assertThat(policy.getQuery()).isEqualTo(createPolicyRequest.getQuery());
 
-        List<Machine> devices = DeviceApi.getDevices(osAndStatusDevicesFilter("WINDOWS", DeviceStatus.ONLINE));
+        List<Machine> devices = DeviceApi.getDevices(osOnlineManagedDevicesFilter("WINDOWS"));
         assertThat(devices).as("Expect Windows device online").isNotEmpty();
         Machine device = DeviceApi.getDevice(devices.getFirst().getMachineId());
         assertThat(device.getToolConnections()).as("Device should have agents").isNotEmpty();

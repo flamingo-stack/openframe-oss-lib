@@ -11,8 +11,6 @@ import java.util.Map;
 
 import static com.openframe.data.document.device.DeviceStatus.DELETED;
 import static com.openframe.data.document.device.DeviceStatus.MANAGED;
-import static com.openframe.data.document.device.DeviceStatus.OFFLINE;
-import static com.openframe.data.document.device.DeviceStatus.ONLINE;
 
 @Slf4j
 @Repository
@@ -30,11 +28,10 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
 
     /**
      * Statuses considered "active" for the organization device counts facet
-     * ({@link #getOrganizationFilterOptions}). That facet counts only managed devices
-     * (ONLINE/OFFLINE until migration 031 rewrites them); every other facet and the filtered
-     * device count keep the default behaviour of excluding only DELETED devices.
+     * ({@link #getOrganizationFilterOptions}). That facet counts only MANAGED devices; every other
+     * facet and the filtered device count keep the default behaviour of excluding only DELETED devices.
      */
-    private static final List<String> ACTIVE_STATUSES = List.of(MANAGED.name(), ONLINE.name(), OFFLINE.name());
+    private static final List<String> ACTIVE_STATUSES = List.of(MANAGED.name());
 
     /**
      * Explicit upper bound for faceted GROUP BY queries. Without an explicit LIMIT,
@@ -127,7 +124,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
             List<String> tagKeyValues,
             List<String> directorySources,
             List<String> userLinks) {
-        // Organization device counts only include active devices (ONLINE / OFFLINE).
+        // Organization device counts only include MANAGED devices.
         return executeActiveFacetQuery(ORGANIZATION_ID, tenantId, statuses, connectivity, deviceTypes, osTypes, organizationIds, tagKeys,
                 tagKeyValues, directorySources, userLinks, ORGANIZATION_ID);
     }
@@ -227,7 +224,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     }
 
     /**
-     * Same as {@link #executeFacetQuery} but counts only active devices (status ONLINE or OFFLINE).
+     * Same as {@link #executeFacetQuery} but counts only MANAGED devices.
      * Used by the organization device counts facet.
      */
     private Map<String, Integer> executeActiveFacetQuery(String facetField,
@@ -287,7 +284,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
 
     /**
      * Applies the shared device filter set to a builder, restricting the counted universe to
-     * active devices (status ONLINE or OFFLINE) instead of the default exclude-only-DELETED rule.
+     * MANAGED devices instead of the default exclude-only-DELETED rule.
      * If {@code excludeField} matches a filter's field, that filter is skipped.
      */
     private void applyActiveDeviceFilters(PinotQueryBuilder queryBuilder,

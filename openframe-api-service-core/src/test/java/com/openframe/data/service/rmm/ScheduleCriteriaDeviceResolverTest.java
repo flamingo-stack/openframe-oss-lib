@@ -58,7 +58,7 @@ class ScheduleCriteriaDeviceResolverTest {
         verify(machineRepository).findMachineIdsByCriteria(eq(TENANT), filter.capture(), eq(List.of(WINDOWS)));
         assertThat(filter.getValue().getOrganizationIds()).containsExactly("org-1");
         assertThat(filter.getValue().getDeviceTypes()).containsExactly(DeviceType.DESKTOP.name());
-        assertThat(filter.getValue().getStatuses()).containsExactlyInAnyOrder("MANAGED", "ONLINE", "OFFLINE");
+        assertThat(filter.getValue().getStatuses()).containsExactly("MANAGED");
     }
 
     @Test
@@ -76,7 +76,7 @@ class ScheduleCriteriaDeviceResolverTest {
         assertThat(filterCaptor.getAllValues())
                 .extracting(MachineQueryFilter::getStatuses)
                 .allSatisfy(statuses -> assertThat(statuses)
-                        .containsExactlyInAnyOrder("MANAGED", "ONLINE", "OFFLINE")
+                        .containsExactly("MANAGED")
                         .doesNotContain("PENDING", "PENDING_DELETION", "DELETED", "ARCHIVED"));
     }
 
@@ -126,7 +126,7 @@ class ScheduleCriteriaDeviceResolverTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "ONLINE", "OFFLINE"}, mode = EnumSource.Mode.EXCLUDE)
+    @EnumSource(value = DeviceStatus.class, names = {"MANAGED"}, mode = EnumSource.Mode.EXCLUDE)
     @DisplayName("matches: a device outside the managed statuses never matches criteria, so nothing is armed for it")
     void matches_notManaged_false(DeviceStatus status) {
         ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build();

@@ -135,15 +135,10 @@ type MachinePackageManagers {
 }
 
 
+"""Device lifecycle. Online right now or not is `connectivity`, never a status value."""
 enum DeviceStatus {
     PENDING,
     MANAGED,
-    ACTIVE
-    INACTIVE
-    MAINTENANCE
-    DECOMMISSIONED,
-    ONLINE,
-    OFFLINE,
     PENDING_DELETION,
     DELETED,
     ARCHIVED

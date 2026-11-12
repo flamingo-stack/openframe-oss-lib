@@ -103,7 +103,7 @@ class MachineTimezoneServiceTest {
     private static Machine machine(String timezone) {
         Machine m = new Machine();
         m.setMachineId(MACHINE_ID);
-        m.setStatus(DeviceStatus.ONLINE);
+        m.setStatus(DeviceStatus.MANAGED);
         m.setTimezone(timezone);
         return m;
     }

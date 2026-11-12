@@ -106,15 +106,15 @@ class PackageUpdateEligibilityServiceTest {
     @Test
     void eligibleConnectedMachines_skipsDevicesThatAreNoLongerConnected() {
         flag(true, "1.2.0");
-        when(machineRepository.findByMachineIdIn(List.of("on", "off", "archived", "deleted", "old"))).thenReturn(List.of(
-                machine("on", "1.3.0", DeviceStatus.ONLINE),
-                machine("off", "1.3.0", DeviceStatus.OFFLINE),
+        when(machineRepository.findByMachineIdIn(List.of("on", "pending", "archived", "deleted", "old"))).thenReturn(List.of(
+                machine("on", "1.3.0", DeviceStatus.MANAGED),
+                machine("pending", "1.3.0", DeviceStatus.PENDING),
                 machine("archived", "1.3.0", DeviceStatus.ARCHIVED),
                 machine("deleted", "1.3.0", DeviceStatus.DELETED),
-                machine("old", "1.1.0", DeviceStatus.ONLINE)));   // connected, below floor
+                machine("old", "1.1.0", DeviceStatus.MANAGED)));   // connected, below floor
 
-        assertThat(service.eligibleConnectedMachines(UPDATE, List.of("on", "off", "archived", "deleted", "old")))
-                .containsExactlyInAnyOrder("on", "off");
+        assertThat(service.eligibleConnectedMachines(UPDATE, List.of("on", "pending", "archived", "deleted", "old")))
+                .containsExactly("on");
     }
 
     @Test

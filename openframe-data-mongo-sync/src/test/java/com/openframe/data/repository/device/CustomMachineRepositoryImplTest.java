@@ -89,10 +89,10 @@ class CustomMachineRepositoryImplTest {
     }
 
     @Test
-    @DisplayName("buildDeviceQuery: explicit non-DELETED status filter (e.g. [ONLINE]) still opts out of the default guard — caller's intent is authoritative")
+    @DisplayName("buildDeviceQuery: explicit non-DELETED status filter (e.g. [MANAGED]) still opts out of the default guard — caller's intent is authoritative")
     void explicitNonDeletedStatusFilterSkipsDefaultGuard() {
         MachineQueryFilter filter = new MachineQueryFilter();
-        filter.setStatuses(List.of("ONLINE"));
+        filter.setStatuses(List.of("MANAGED"));
 
         Document q = repo.buildDeviceQuery(filter, null).getQueryObject();
 
@@ -123,7 +123,7 @@ class CustomMachineRepositoryImplTest {
     @DisplayName("buildDeviceQuery: excludeStatuses survives STATUS-facet self-exclusion — a hidden status must not surface as a selectable filter option")
     void excludeStatusesAppliesEvenUnderStatusFacet() {
         MachineQueryFilter filter = new MachineQueryFilter();
-        filter.setStatuses(List.of("ONLINE"));
+        filter.setStatuses(List.of("MANAGED"));
         filter.setExcludeStatuses(List.of("DELETED", "ARCHIVED", "PENDING"));
 
         Document q = repo.buildDeviceQuery(filter, null, "status").getQueryObject();
@@ -136,7 +136,7 @@ class CustomMachineRepositoryImplTest {
 
     private static MachineQueryFilter allDimensionsFilter() {
         MachineQueryFilter filter = new MachineQueryFilter();
-        filter.setStatuses(List.of("ONLINE"));
+        filter.setStatuses(List.of("MANAGED"));
         filter.setDeviceTypes(List.of("WORKSTATION"));
         filter.setOsTypes(List.of(MAC_OS));
         filter.setOrganizationIds(List.of("org-1"));

@@ -172,7 +172,7 @@ class CustomMachineRepositoryDueForFleetHostFactsIT extends BaseMongoIntegration
         Machine machine = new Machine();
         machine.setMachineId(machineId);
         machine.setTenantId(TENANT_ID);
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         return machine;
     }
 }

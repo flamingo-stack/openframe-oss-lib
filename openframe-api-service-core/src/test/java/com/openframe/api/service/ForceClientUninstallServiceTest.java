@@ -49,7 +49,7 @@ class ForceClientUninstallServiceTest {
     void setUp() {
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         request = new ForceClientUninstallRequest();
         request.setMachineIds(List.of(MACHINE_ID));
         when(machineRepository.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));

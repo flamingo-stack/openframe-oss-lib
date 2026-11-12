@@ -136,17 +136,17 @@ class MachineWriterTest {
         Machine stored = new Machine();
         stored.setMachineId("m1");
         stored.setNickname("Old");
-        stored.setStatus(DeviceStatus.OFFLINE);
+        stored.setStatus(DeviceStatus.PENDING);
         storedDocumentIs(stored);
 
         MachineWriteResult result = writer
-                .update("m1", machineUpdate().set(NICKNAME, "New").set(STATUS, DeviceStatus.ONLINE))
+                .update("m1", machineUpdate().set(NICKNAME, "New").set(STATUS, DeviceStatus.MANAGED))
                 .orElseThrow();
 
         assertThat(result.before().getNickname()).isEqualTo("Old");
-        assertThat(result.before().getStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        assertThat(result.before().getStatus()).isEqualTo(DeviceStatus.PENDING);
         assertThat(result.after().getNickname()).isEqualTo("New");
-        assertThat(result.after().getStatus()).isEqualTo(DeviceStatus.ONLINE);
+        assertThat(result.after().getStatus()).isEqualTo(DeviceStatus.MANAGED);
         assertThat(result.after().getMachineId()).isEqualTo("m1");
         assertThat(result.before()).isNotSameAs(result.after());
         // One findAndModify, no follow-up read to obtain the post-image.
@@ -171,7 +171,7 @@ class MachineWriterTest {
 
         writer.update("m1",
                 Criteria.where("lastSeen").lt(eventTime),
-                machineUpdate().set(STATUS, DeviceStatus.ONLINE).set(LAST_SEEN, eventTime));
+                machineUpdate().set(STATUS, DeviceStatus.MANAGED).set(LAST_SEEN, eventTime));
 
         Document query = capturedQuery().getQueryObject();
         @SuppressWarnings("unchecked")
@@ -249,7 +249,7 @@ class MachineWriterTest {
         Machine stored = new Machine();
         storedDocumentIs(stored);
 
-        publishingWriter.update("m1", machineUpdate().set(STATUS, DeviceStatus.OFFLINE));
+        publishingWriter.update("m1", machineUpdate().set(STATUS, DeviceStatus.MANAGED));
 
         verifyNoInteractions(publisher);
         capturedUpdate();

@@ -223,14 +223,14 @@ class SoftwareActionDetailServiceTest {
         when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of(
                 leaf("m1", ExecutionStatus.SUCCESS)));
         Machine m1 = machine("m1", "m1-host", null);
-        m1.setStatus(DeviceStatus.OFFLINE);
+        m1.setStatus(DeviceStatus.PENDING);
         m1.setTelemetryStatus(TelemetryStatus.ONLINE);
         m1.setLastSeen(lastSeen);
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(m1));
 
         SoftwareActionDeviceResponse row = service.devices(EXEC, null, null, null, null).getFirst();
 
-        assertThat(row.getDeviceStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        assertThat(row.getDeviceStatus()).isEqualTo(DeviceStatus.PENDING);
         assertThat(row.getConnectivity()).isEqualTo(TelemetryStatus.ONLINE);
         assertThat(row.getLastSeen()).isEqualTo(lastSeen);
     }

@@ -178,7 +178,7 @@ class CustomMachineRepositorySearchTest {
     @Test
     void findMachines_noNameSelector_preservesCallerActiveStatusPolicy() {
         // setup
-        MachineQueryFilter filter = MachineQueryFilter.builder().statuses(List.of("ONLINE", "OFFLINE")).build();
+        MachineQueryFilter filter = MachineQueryFilter.builder().statuses(List.of("MANAGED", "PENDING")).build();
 
         // execution
         repository.findMachines(TENANT_ID, filter);
@@ -186,7 +186,7 @@ class CustomMachineRepositorySearchTest {
         // verifications
         Query query = machineQuery();
         Document status = clauseFor(query, "status");
-        assertThat(status).containsEntry("status", new Document("$in", List.of("ONLINE", "OFFLINE")));
+        assertThat(status).containsEntry("status", new Document("$in", List.of("MANAGED", "PENDING")));
         assertThat(clauses(query.getQueryObject())).noneMatch(clause -> clause.containsKey("hostname"));
     }
 

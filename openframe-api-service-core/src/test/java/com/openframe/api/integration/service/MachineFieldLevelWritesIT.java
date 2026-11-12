@@ -101,7 +101,7 @@ class MachineFieldLevelWritesIT {
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setTenantId("tenant-1");
-        machine.setStatus(DeviceStatus.ONLINE);
+        machine.setStatus(DeviceStatus.MANAGED);
         template.save(machine);
         interleavingMachines = mock(MachineRepository.class, delegatesTo(storedMachines));
         doAnswer(invocation -> {
