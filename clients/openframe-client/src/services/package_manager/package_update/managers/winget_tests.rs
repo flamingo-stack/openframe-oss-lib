@@ -186,12 +186,11 @@ fn a_console_user_who_cannot_elevate_fails_instead_of_retrying() {
             ..exited(85)
         };
 
-        assert!(
-            matches!(
-                interpret(&result),
-                UpgradeOutcome::Failed { exit_code: 85, .. }
-            ),
-            "{stderr}"
+        assert_eq!(
+            interpret(&result),
+            UpgradeOutcome::NotUpgradable(format!(
+                "the console user cannot run elevated: {stderr}"
+            ))
         );
     }
 }

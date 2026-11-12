@@ -44,6 +44,8 @@ const QUIET: Duration = Duration::from_millis(700);
 struct App {
     probe: ProbeState,
     running: bool,
+    /// A forced close leaves it running, as one in another user's session can.
+    survives_close: bool,
     upgrade: UpgradeOutcome,
     hold: Option<Arc<Notify>>,
 }
@@ -53,6 +55,7 @@ impl Default for App {
         Self {
             probe: ProbeState::Outdated,
             running: false,
+            survives_close: false,
             upgrade: UpgradeOutcome::Upgraded {
                 reboot_required: false,
             },
@@ -145,10 +148,15 @@ impl Machine for Fake {
             .filter(|name| pids.contains(&device.pid(name)))
             .cloned()
             .collect();
+        let mut survivors = Vec::new();
         for name in closed {
-            device.app(&name).running = false;
+            if device.app(&name).survives_close {
+                survivors.push(device.pid(&name));
+            } else {
+                device.app(&name).running = false;
+            }
         }
-        Vec::new()
+        survivors
     }
 
     async fn upgrade(&self, package: &PackageRef) -> UpgradeOutcome {
@@ -797,6 +805,100 @@ async fn a_retryable_failure_is_failed_and_the_engine_rerun_installs_again() {
         "a repeat of the failed dispatch gets its stored result"
     );
     assert_eq!(b.upgrades_of("alpha"), 2);
+}
+
+#[tokio::test]
+async fn a_forced_close_that_leaves_the_app_running_is_failed_and_its_rerun_installs() {
+    let Some(mut b) = Bench::start().await else {
+        return;
+    };
+    {
+        let mut device = b.device();
+        let app = device.app("alpha");
+        app.running = true;
+        app.survives_close = true;
+    }
+    b.send(Order::update_now("d1", 1, "req-1", "alpha").json())
+        .await;
+
+    b.expect("d1", DeliveryResult::Acked).await;
+    let failed = b.expect("d1", DeliveryResult::Failed).await;
+    assert!(
+        failed
+            .error
+            .as_deref()
+            .unwrap_or_default()
+            .starts_with("CLOSE_FAILED: "),
+        "{failed:?}"
+    );
+    let event = b.status("req-1", UpdateStatus::Failed).await;
+    assert_eq!(
+        event.failed.map(|failed| failed.reason),
+        Some(FailReason::CloseFailed)
+    );
+    assert_eq!(
+        b.upgrades_of("alpha"),
+        0,
+        "nothing installs over a running app"
+    );
+
+    b.device().app("alpha").survives_close = false;
+    b.send(Order::update_now("rerun", 1, "req-1", "alpha").json())
+        .await;
+
+    b.expect("rerun", DeliveryResult::Acked).await;
+    b.expect("rerun", DeliveryResult::Done).await;
+    assert_eq!(b.upgrades_of("alpha"), 1);
+}
+
+#[tokio::test]
+async fn files_still_in_use_after_a_forced_close_fail_the_dispatch() {
+    let Some(mut b) = Bench::start().await else {
+        return;
+    };
+    {
+        let mut device = b.device();
+        let app = device.app("alpha");
+        app.running = true;
+        app.upgrade = UpgradeOutcome::InUse("the package's files are in use".to_string());
+    }
+    b.send(Order::update_now("d1", 1, "req-1", "alpha").json())
+        .await;
+
+    b.expect("d1", DeliveryResult::Acked).await;
+    let failed = b.expect("d1", DeliveryResult::Failed).await;
+    assert_eq!(
+        failed.error.as_deref(),
+        Some("CLOSE_FAILED: the package's files are in use")
+    );
+    assert_eq!(b.upgrades_of("alpha"), 1);
+    assert!(b.orders().pending(MACHINE).is_empty());
+}
+
+#[tokio::test]
+async fn an_install_that_times_out_is_failed_for_a_rerun() {
+    let Some(mut b) = Bench::start().await else {
+        return;
+    };
+    b.device().app("alpha").upgrade = UpgradeOutcome::TimedOut;
+    b.send(Order::wait("d1", 1, "req-1", "alpha").json()).await;
+
+    b.expect("d1", DeliveryResult::Acked).await;
+    let failed = b.expect("d1", DeliveryResult::Failed).await;
+    assert!(
+        failed
+            .error
+            .as_deref()
+            .unwrap_or_default()
+            .starts_with("TIMEOUT: "),
+        "{failed:?}"
+    );
+    let event = b.status("req-1", UpdateStatus::Failed).await;
+    assert_eq!(
+        event.failed.map(|failed| failed.reason),
+        Some(FailReason::Timeout)
+    );
+    assert!(b.orders().pending(MACHINE).is_empty());
 }
 
 #[tokio::test]
