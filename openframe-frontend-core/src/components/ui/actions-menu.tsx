@@ -32,6 +32,11 @@ export interface ActionsMenuItemIconAction {
 export interface ActionsMenuItem {
   id: string;
   label: string;
+  /**
+   * Secondary text under the label: information about the item, not part of its name (e.g. "last poked 2h ago" on a
+   * Poke item). Drawn in the secondary colour, smaller than the label; never fold it into `label`.
+   */
+  description?: string;
   icon?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
@@ -284,14 +289,28 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
         </div>
       )}
 
-      <span
-        className={cn(
-          skin.label,
-          item.disabled ? 'text-ods-text-secondary' : item.danger ? 'text-ods-error' : 'text-ods-text-primary',
-        )}
-      >
-        {item.label}
-      </span>
+      {item.description ? (
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span
+            className={cn(
+              skin.label,
+              item.disabled ? 'text-ods-text-secondary' : item.danger ? 'text-ods-error' : 'text-ods-text-primary',
+            )}
+          >
+            {item.label}
+          </span>
+          <span className="text-ods-text-secondary text-h6">{item.description}</span>
+        </span>
+      ) : (
+        <span
+          className={cn(
+            skin.label,
+            item.disabled ? 'text-ods-text-secondary' : item.danger ? 'text-ods-error' : 'text-ods-text-primary',
+          )}
+        >
+          {item.label}
+        </span>
+      )}
 
       {item.type === 'radio' && item.checked && (
         <Check className="h-4 w-4 shrink-0 text-ods-accent md:h-6 md:w-6" strokeWidth={3} aria-hidden="true" />
