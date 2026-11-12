@@ -132,8 +132,12 @@ function disposeAnchorWatcher(w: AnchorWatcher | null): void {
   clearTimeout(w.timer);
 }
 
-/** How far the thread fades out at its end (`fadeEnd`). */
-export const CHAT_THREAD_FADE_PX = 48;
+/**
+ * How far the thread fades out at its end (`fadeEnd`), and so how far its content is padded past the last message.
+ * 30px: the last line ends above the fade and above the composer dock's own fade over the thread's end (which needs at
+ * least 15px of it), with the least empty space under the answer.
+ */
+export const CHAT_THREAD_FADE_PX = 30;
 
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
   (
