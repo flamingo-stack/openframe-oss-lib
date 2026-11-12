@@ -19,6 +19,7 @@ import { MoreActionsMenu } from '../../ui/more-actions-menu';
 import type { NoDataProps } from '../../ui/no-data';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
+import { dataTableLayoutProps, type FeatureTableLayoutProps, hasSlotContent } from '../feature-table-layout';
 import { OSTypeBadgeGroup } from '../os-type-badge-group';
 import type { PolicyTableRow } from './policy-table-row';
 
@@ -71,7 +72,7 @@ const NOTE_TONE_CLASS = {
   warning: 'text-ods-warning',
 } as const;
 
-export interface PoliciesTableProps {
+export interface PoliciesTableProps extends FeatureTableLayoutProps {
   rows: PolicyTableRow[];
   isLoading?: boolean;
   /** Show the OS Platform column (fleet-wide monitoring view). */
@@ -116,6 +117,9 @@ export function PoliciesTable({
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
+  layout = 'cards',
+  tableMaxHeight,
+  tableSettings,
 }: PoliciesTableProps) {
   // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header, the reserved columns and
   // the body's skeleton rows alike.
@@ -243,7 +247,9 @@ export function PoliciesTable({
   const showHeader = loading || rows.length > 0;
 
   return (
-    <DataTable table={table}>
+    <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+      {/* The grid's results row sits above the table; the card header carries it in its right slot. */}
+      {showHeader && layout === 'grid' && hasSlotContent(rightSlot) && <DataTable.Meta>{rightSlot}</DataTable.Meta>}
       {showHeader && (
         <DataTable.Header
           stickyHeader={stickyHeader}
@@ -251,6 +257,7 @@ export function PoliciesTable({
           rightSlot={rightSlot}
           sort={sortState}
           onSortChange={sortable ? handleSortChange : undefined}
+          loading={loading}
         />
       )}
       <DataTable.Body

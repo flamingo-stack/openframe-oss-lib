@@ -8,6 +8,9 @@ import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { InfoHint } from '../info-hint';
 import { useDataTableContext } from './data-table';
 import { DataTableColumnFilter } from './data-table-column-filter';
+import { useDataTableLayout } from './data-table-grid';
+import { DataTableGridHeader } from './data-table-grid-header';
+import { useGridStructure } from './data-table-grid-prefs';
 import type { TailwindBreakpoint } from './types';
 import { alignJustify, BREAKPOINT_ORDER, getHideAtVisibility } from './utils';
 
@@ -43,9 +46,50 @@ export interface DataTableHeaderProps {
    * toggle cycle (e.g. none → asc → desc → none) and the actual data sort.
    */
   onSortChange?: (columnId: string) => void;
+  /**
+   * Grid layout: the table is loading (pass what the body gets; a page's loading scope counts too). A loading table
+   * names no column: each data header cell draws a bar in its label's place and no control, because the columns a
+   * loading table draws, and their order, are not always the ones it loads with (a column behind a flag still being
+   * read, a layout the viewer saved). The card header does not use it.
+   */
+  loading?: boolean;
 }
 
-export function DataTableHeader({
+export function DataTableHeader(props: DataTableHeaderProps) {
+  const layout = useDataTableLayout();
+  if (layout === 'grid') return <DataTableGridHeaderSwitch {...props} />;
+  return <DataTableCardsHeader {...props} />;
+}
+
+/**
+ * A grid table's header: the grid header, at every width. `rightSlot` is a card-header slot: in the grid the results
+ * count goes in `<DataTable.Meta>` above the table.
+ */
+function DataTableGridHeaderSwitch({
+  className,
+  stickyHeader,
+  stickyHeaderOffset,
+  sort = null,
+  onSortChange,
+  loading,
+}: DataTableHeaderProps) {
+  const table = useDataTableContext();
+  const visibleColumns = table.getVisibleFlatColumns();
+  const layout = useGridStructure(visibleColumns);
+  return (
+    <DataTableGridHeader
+      layout={layout}
+      loading={loading}
+      className={className}
+      stickyHeader={stickyHeader}
+      stickyHeaderOffset={stickyHeaderOffset}
+      sort={sort}
+      onSortChange={onSortChange}
+    />
+  );
+}
+
+function DataTableCardsHeader({
   className,
   stickyHeader,
   stickyHeaderOffset,

@@ -88,7 +88,7 @@ class SoftwareInventoryServiceFleetPagingTest {
         when(fleet.listSoftwareTitles(request.capture())).thenReturn(titlesPage(45, true, chrome));
 
         // execution
-        PageResult<SoftwareResponse> result = service.listSoftware("chr", 2, 20, sort("devicesCount", SortDirection.DESC), true);
+        PageResult<SoftwareResponse> result = service.listSoftware("chr", 2, 20, sort("devicesCount", SortDirection.DESC), true, null);
 
         // verifications
         assertThat(request.getValue())
@@ -151,7 +151,7 @@ class SoftwareInventoryServiceFleetPagingTest {
         when(fleet.listSoftwareTitles(request.capture())).thenReturn(titlesPage(0, false));
 
         // execution
-        service.listSoftware(null, 0, 20, sort("cveCount", SortDirection.DESC), null);
+        service.listSoftware(null, 0, 20, sort("cveCount", SortDirection.DESC), null, null);
 
         // verifications
         assertThat(request.getValue().getOrderKey()).isNull();

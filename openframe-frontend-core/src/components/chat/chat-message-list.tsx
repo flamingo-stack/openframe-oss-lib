@@ -14,6 +14,7 @@ import { useStickToBottom } from 'use-stick-to-bottom';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon, Arrow02DownIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
+import { previewFadeMask } from '../ui/fade-preview';
 import { useLoadingScope } from '../ui/loading-scope';
 import { OverlayOpenRegistryProvider } from '../ui/overlay-open-registry';
 import { ChatAppearanceContext } from './chat-appearance-context';
@@ -131,6 +132,9 @@ function disposeAnchorWatcher(w: AnchorWatcher | null): void {
   clearTimeout(w.timer);
 }
 
+/** How far the thread fades out at its end (`fadeEnd`). */
+export const CHAT_THREAD_FADE_PX = 48;
+
 const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
   (
     {
@@ -148,6 +152,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       showAvatars = true,
       fullWidth = false,
       contentClassName,
+      fadeEnd = false,
       assistantType,
       approvalVariant,
       selfAuthorType,
@@ -1006,6 +1011,11 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                   className,
                 )}
                 {...props}
+                style={
+                  fadeEnd
+                    ? { ...props.style, ...previewFadeMask(`calc(100% - ${CHAT_THREAD_FADE_PX}px)`) }
+                    : props.style
+                }
               >
                 <div
                   ref={setContentRef}
@@ -1016,7 +1026,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     CHAT_MESSAGE_LIST_COLUMN_CLASS[fullWidth ? 'full' : 'narrow'],
                     contentClassName ?? CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS,
                   )}
-                  style={{ minHeight: '100%' }}
+                  style={fadeEnd ? { minHeight: '100%', paddingBottom: CHAT_THREAD_FADE_PX } : { minHeight: '100%' }}
                 >
                   {hasNextPage && <div ref={sentinelRef} className="h-px" />}
                   <div className="flex-1" />
