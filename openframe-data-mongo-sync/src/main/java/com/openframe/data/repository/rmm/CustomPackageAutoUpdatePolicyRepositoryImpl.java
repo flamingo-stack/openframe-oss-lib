@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
@@ -59,6 +60,16 @@ public class CustomPackageAutoUpdatePolicyRepositoryImpl implements CustomPackag
                                                      String actor) {
         Criteria enabledElsewhere = enabledOf(tenantId, softwareId).and("machineId").nin(machineIds);
         return disable(enabledElsewhere, actor);
+    }
+
+    @Override
+    public List<String> findSoftwareIds(String tenantId, boolean enabledOnly) {
+        Criteria linked = Criteria.where("tenantId").is(tenantId).and("softwareId").ne(null);
+        if (enabledOnly) {
+            linked.and("enabled").is(true);
+        }
+        Query query = Query.query(linked);
+        return mongoTemplate.findDistinct(query, "softwareId", PackageAutoUpdatePolicy.class, String.class);
     }
 
     private static Criteria enabledOf(String tenantId, String softwareId) {

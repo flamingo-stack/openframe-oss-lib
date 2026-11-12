@@ -237,6 +237,21 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(byMachine("google-chrome").get("m2").getRequestId()).isNull();
     }
 
+    @Test
+    @DisplayName("findSoftwareIds: each linked Software once, of the enabled policies only or of all; other tenants and unlinked policies left out")
+    void findSoftwareIds_enabledOnlyOrAll_distinctIdsOfTheTenant() {
+        repository.enable(template("google-chrome", "7", WAIT, "admin@x"), List.of("m1", "m2"));
+        repository.enable(template("slack", "9", WAIT, "admin@x"), List.of("m1"));
+        repository.enable(template("zoom", null, WAIT, "admin@x"), List.of("m1"));
+        repository.disableBySoftwareId(TENANT, "9", "admin@x");
+        PackageAutoUpdatePolicy foreign = template("firefox", "11", WAIT, "admin@x");
+        foreign.setTenantId("tenant-2");
+        repository.enable(foreign, List.of("m1"));
+
+        assertThat(repository.findSoftwareIds(TENANT, true)).containsExactly("7");
+        assertThat(repository.findSoftwareIds(TENANT, false)).containsExactlyInAnyOrder("7", "9");
+    }
+
     private Map<String, PackageAutoUpdatePolicy> byMachine(String packageName) {
         return repository.findAll().stream()
                 .filter(p -> packageName.equals(p.getPackageName()))

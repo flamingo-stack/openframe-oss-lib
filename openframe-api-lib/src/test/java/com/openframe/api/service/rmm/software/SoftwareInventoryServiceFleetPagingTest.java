@@ -1,10 +1,12 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
@@ -16,12 +18,16 @@ import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateSettings;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.FleetVulnerability;
@@ -78,6 +84,8 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private OrganizationRepository organizationRepository;
+    @Mock private SoftwareScheduleRepository softwareScheduleRepository;
+    @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
 
     private SoftwareInventoryService service;
 
@@ -85,7 +93,8 @@ class SoftwareInventoryServiceFleetPagingTest {
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
-                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
+                softwareScheduleRepository, softwareScheduleTargetResolver);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }
@@ -113,6 +122,27 @@ class SoftwareInventoryServiceFleetPagingTest {
         assertThat(result.hasPrevious()).isTrue();
         verifyNoInteractions(deviceCountEnricher);
         verify(autoUpdateService).applyToSoftware(result.items());   // AUTO-UPDATE for the page only
+    }
+
+    @Test
+    void listSoftware_catalogFilters_leftOutOfTheFleetPage() {
+        // setup
+        SoftwareTitle chrome = fleetTitle("Chrome", 42L, 31);
+        SoftwareTitle node = fleetTitle("node", 43L, 2);
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(titlesPage(2, false, chrome, node));
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setSources(List.of(SoftwareSource.BREW));
+        filter.setAutoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.ON));
+        filter.setOsTypes(List.of(OsType.MAC_OS));
+        filter.setManageable(true);
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getId).containsExactly("42", "43");
+        assertThat(result.filteredCount()).isEqualTo(2);
+        verify(autoUpdateService).applyToSoftware(result.items());
     }
 
     @Test

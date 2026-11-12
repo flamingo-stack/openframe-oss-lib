@@ -1,6 +1,8 @@
 package com.openframe.api.datafetcher.rmm;
 
 import com.netflix.graphql.dgs.DgsComponent;
+import com.netflix.graphql.dgs.DgsData;
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsMutation;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
@@ -19,9 +21,12 @@ import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.service.rmm.fleet.FleetSoftwareOs;
 import com.openframe.api.service.rmm.software.SoftwareAutoUpdateService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.api.service.rmm.software.SoftwareInventoryService;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.Valid;
@@ -63,9 +68,15 @@ public class SoftwareDataFetcher {
         Boolean vulnerable = filter != null && filter.getMinSeverity() != null
                 && filter.getMinSeverity() != SoftwareCveSeverity.NONE
                 ? Boolean.TRUE : null;
-        Boolean manageable = filter == null ? null : filter.getManageable();
         return PageCursors.toConnection(softwareInventoryService.listSoftware(
-                search, page, perPage, sort, vulnerable, manageable));
+                search, page, perPage, sort, vulnerable, filter));
+    }
+
+    @DgsData(parentType = "Software", field = "os")
+    public OsType softwareOs(DgsDataFetchingEnvironment dfe) {
+        SoftwareResponse software = dfe.getSource();
+        FleetSource fleetSource = software.getFleetSource();
+        return FleetSoftwareOs.of(fleetSource);
     }
 
     @DgsQuery

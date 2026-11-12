@@ -1,11 +1,20 @@
 package com.openframe.api.datafetcher.rmm;
 
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.software.SoftwareAutoUpdatePolicyResponse;
+import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
+import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
+import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.service.rmm.software.SoftwareAutoUpdateService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.api.service.rmm.software.SoftwareInventoryService;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +33,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,6 +63,53 @@ class SoftwareDataFetcherTest {
     @AfterEach
     void signOut() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void softwares_filter_passedToTheServiceWithTheVulnerableFlagOfItsSeverity() {
+        // setup
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setMinSeverity(SoftwareCveSeverity.HIGH);
+        filter.setSources(List.of(SoftwareSource.BREW));
+        filter.setOsTypes(List.of(OsType.MAC_OS));
+        SoftwareResponse node = SoftwareResponse.builder().id(SOFTWARE_ID).build();
+        PageResult<SoftwareResponse> page = new PageResult<>(List.of(node), false, false, 1, 0);
+        when(softwareInventoryService.listSoftware("no", 0, 20, null, true, filter)).thenReturn(page);
+
+        // execution
+        CountedGenericConnection<GenericEdge<SoftwareResponse>> result =
+                dataFetcher.softwares(filter, 20, null, null, null, "no", null);
+
+        // verifications
+        assertThat(result.getEdges()).extracting(GenericEdge::getNode).containsExactly(node);
+    }
+
+    @Test
+    void softwareOs_titleOfAWindowsTable_windows() {
+        // setup
+        SoftwareResponse software = SoftwareResponse.builder().fleetSource(FleetSource.PROGRAMS).build();
+        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
+        when(dfe.getSource()).thenReturn(software);
+
+        // execution
+        OsType result = dataFetcher.softwareOs(dfe);
+
+        // verifications
+        assertThat(result).isEqualTo(OsType.WINDOWS);
+    }
+
+    @Test
+    void softwareOs_titleWithoutFleetSource_null() {
+        // setup
+        SoftwareResponse software = SoftwareResponse.builder().build();
+        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
+        when(dfe.getSource()).thenReturn(software);
+
+        // execution
+        OsType result = dataFetcher.softwareOs(dfe);
+
+        // verifications
+        assertThat(result).isNull();
     }
 
     @Test

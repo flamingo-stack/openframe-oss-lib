@@ -23,12 +23,19 @@ import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
+import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
+import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
@@ -45,12 +52,16 @@ import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -94,9 +105,12 @@ class SoftwareInventoryServiceTest {
     @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private OrganizationRepository organizationRepository;
+    @Mock private SoftwareScheduleRepository softwareScheduleRepository;
+    @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
 
     @Captor private ArgumentCaptor<List<SoftwareResponse>> pageRowsCaptor;
     @Captor private ArgumentCaptor<Function<FleetSoftware, Stream<String>>> keysOfCaptor;
+    @Captor private ArgumentCaptor<Instant> nowCaptor;
 
     private SoftwareInventoryService service;
 
@@ -104,7 +118,8 @@ class SoftwareInventoryServiceTest {
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
-                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
+                softwareScheduleRepository, softwareScheduleTargetResolver);
         // Bypass @PostConstruct wireFleetClient — inject the mocked FleetMdmClient directly.
         ReflectionTestUtils.setField(service, "fleet", fleet);
     }
@@ -820,6 +835,186 @@ class SoftwareInventoryServiceTest {
         order.verify(catalogStatus).apply(anyList());
     }
 
+    @ParameterizedTest
+    @MethodSource("sourcesAndTheirTitles")
+    void listSoftware_sourcesFilter_keepsTheTitlesOfTheChosenSources(List<SoftwareSource> sources, List<String> expected) {
+        // setup
+        stubTitles(titleWithSource("git", "chocolatey_packages"), titleWithSource("node", "homebrew_packages"),
+                titleWithSource("7zip", "winget_packages"), titleWithSource("Google Chrome", "programs"),
+                titleWithSource("Contoso Tool", "programs"));
+        catalogMatchesWinget("Google Chrome");
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setSources(sources);
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactlyElementsOf(expected);
+    }
+
+    @ParameterizedTest
+    @MethodSource("autoUpdateStatusesAndTheirTitles")
+    void listSoftware_autoUpdateStatusesFilter_keepsTheTitlesWithTheChosenStatuses(
+            List<SoftwareAutoUpdateStatus> statuses, List<String> expected) {
+        // setup
+        stubTitles(titleWithSource("Google Chrome", "programs"), titleWithSource("Slack", "programs"),
+                titleWithSource("Contoso Tool", "programs"), titleWithSource("uBlock", "chrome_extensions"));
+        policiesSetAutoUpdate(Map.of("Google Chrome", SoftwareAutoUpdateStatus.ON));
+        catalogSetsAutoUpdate(Map.of("Slack", SoftwareAutoUpdateStatus.OFF, "Contoso Tool", SoftwareAutoUpdateStatus.NO_PACKAGE));
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setAutoUpdateStatuses(statuses);
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactlyElementsOf(expected);
+    }
+
+    @ParameterizedTest
+    @MethodSource("osTypesAndTheirTitles")
+    void listSoftware_osTypesFilter_keepsTheTitlesOfTheChosenSystems(List<OsType> osTypes, List<String> expected) {
+        // setup
+        stubTitles(titleWithSource("Google Chrome", "programs"), titleWithSource("node", "homebrew_packages"),
+                titleWithSource("uBlock", "chrome_extensions"));
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setOsTypes(osTypes);
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactlyElementsOf(expected);
+        verify(autoUpdateService).applyToSoftware(result.items());
+    }
+
+    @ParameterizedTest
+    @MethodSource("manageableWithOtherFiltersAndTheirTitles")
+    void listSoftware_manageableWithAnotherFilter_bothNarrow(SoftwareFilterInput filter, List<String> expected) {
+        // setup
+        stubTitles(titleWithSource("git", "chocolatey_packages"), titleWithSource("node", "homebrew_packages"),
+                titleWithSource("Google Chrome", "programs"), titleWithSource("Contoso Tool", "programs"));
+        catalogMatchesWinget("Google Chrome");
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactlyElementsOf(expected);
+    }
+
+    @Test
+    void listSoftware_sourcesFilterWithAPage_statusesSetOnEveryRowOnceAndTheTotalFollowsTheFilter() {
+        // setup
+        stubTitles(titleWithSource("node", "homebrew_packages"), titleWithSource("jq", "homebrew_packages"),
+                titleWithSource("Contoso Tool", "programs"));
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setSources(List.of(SoftwareSource.BREW));
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 1, null, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getName).containsExactly("node");
+        assertThat(result.filteredCount()).isEqualTo(2);
+        verify(autoUpdateService).applyToSoftware(pageRowsCaptor.capture());
+        assertThat(pageRowsCaptor.getValue()).hasSize(3);
+    }
+
+    @Test
+    void listDevicesForSoftware_updateScheduledForTheSoftware_devicesOfTheScheduleAreScheduledUpdate() {
+        // setup
+        stubDevices("homebrew_packages", device("m-1", "9.0"), device("m-2", "10.0"), device("m-3", "10.0"));
+        SoftwareSchedule update = schedule(SoftwareAction.UPDATE, scheduledPackage("42", "xz"));
+        stubUpcomingSchedules(update);
+        when(softwareScheduleTargetResolver.resolveMachineIds(update)).thenReturn(List.of("m-1", "m-2", "m-9"));
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(rows).extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getStatus)
+                .containsExactly(tuple("m-1", SoftwareOnDeviceStatus.SCHEDULED_UPDATE),
+                        tuple("m-2", SoftwareOnDeviceStatus.SCHEDULED_UPDATE),
+                        tuple("m-3", SoftwareOnDeviceStatus.UP_TO_DATE));
+    }
+
+    @Test
+    void listDevicesForSoftware_updateScheduledForTheManagingPackage_devicesOfTheScheduleAreScheduledUpdate() {
+        // setup
+        stubDevices("homebrew_packages", device("m-1", "9.0"), device("m-2", "10.0"));
+        PackageCatalogEntry xz = PackageCatalogEntry.builder().manager(PackageManagerType.BREW).packageId("xz").build();
+        catalogManagesWith(xz);
+        SoftwareSchedule update = schedule(SoftwareAction.UPDATE, scheduledPackage(null, "xz"));
+        stubUpcomingSchedules(update);
+        when(softwareScheduleTargetResolver.resolveMachineIds(update)).thenReturn(List.of("m-1"));
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(rows).extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getStatus)
+                .containsExactly(tuple("m-1", SoftwareOnDeviceStatus.SCHEDULED_UPDATE),
+                        tuple("m-2", SoftwareOnDeviceStatus.UP_TO_DATE));
+    }
+
+    @Test
+    void listDevicesForSoftware_schedulesOfOtherSoftwareOrInstall_statusesKeptWithoutResolvingTheirDevices() {
+        // setup
+        stubDevices("homebrew_packages", device("m-1", "9.0"), device("m-2", "10.0"));
+        PackageCatalogEntry xz = PackageCatalogEntry.builder().manager(PackageManagerType.BREW).packageId("xz").build();
+        catalogManagesWith(xz);
+        SoftwareSchedule install = schedule(SoftwareAction.INSTALL, scheduledPackage("42", "xz"));
+        SoftwareSchedule otherSoftware = schedule(SoftwareAction.UPDATE, scheduledPackage("43", "jq"));
+        SoftwareSchedule noPackages = SoftwareSchedule.builder().action(SoftwareAction.UPDATE).build();
+        stubUpcomingSchedules(install, otherSoftware, noPackages);
+
+        // execution
+        List<SoftwareOnDeviceResponse> rows = service.listDevicesForSoftware("42", null, null, 0, 50, null).items();
+
+        // verifications
+        assertThat(rows).extracting(SoftwareOnDeviceResponse::getStatus)
+                .containsExactly(SoftwareOnDeviceStatus.OUTDATED, SoftwareOnDeviceStatus.UP_TO_DATE);
+        verifyNoInteractions(softwareScheduleTargetResolver);
+    }
+
+    @Test
+    void listDevicesForSoftware_noScheduleStubbed_onlyActiveSchedulesWithARunAheadAreAsked() {
+        // setup
+        stubDevices("homebrew_packages", device("m-1", "9.0"));
+        Instant before = Instant.now();
+
+        // execution
+        service.listDevicesForSoftware("42", null, null, 0, 50, null);
+
+        // verifications
+        verify(softwareScheduleRepository).findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(
+                eq("t1"), eq(ScriptStatus.ACTIVE), nowCaptor.capture());
+        assertThat(nowCaptor.getValue()).isBetween(before, Instant.now());
+    }
+
+    @Test
+    void listDevicesForSoftware_scheduledUpdateStatusFilter_onlyDevicesOfTheScheduleAndTheFacetCountsThem() {
+        // setup
+        stubDevices("homebrew_packages", device("m-1", "9.0"), device("m-2", "9.0"), device("m-3", "10.0"));
+        SoftwareSchedule update = schedule(SoftwareAction.UPDATE, scheduledPackage("42", "xz"));
+        stubUpcomingSchedules(update);
+        when(softwareScheduleTargetResolver.resolveMachineIds(update)).thenReturn(List.of("m-1"));
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setStatuses(List.of(SoftwareOnDeviceStatus.SCHEDULED_UPDATE));
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", filter, null, 0, 50, null);
+        SoftwareOnDeviceFilters facets = service.getSoftwareDeviceFilters("42", null);
+
+        // verifications
+        assertThat(result.items()).extracting(row -> row.getDevice().getMachineId()).containsExactly("m-1");
+        assertThat(result.filteredCount()).isEqualTo(1);
+        assertThat(facets.getStatuses()).extracting(SoftwareFilterOption::getValue, SoftwareFilterOption::getCount)
+                .containsExactly(tuple("UP_TO_DATE", 1), tuple("OUTDATED", 1), tuple("SCHEDULED_UPDATE", 1));
+    }
+
     @Test
     @DisplayName("software detail: the policies set auto-update first, then the catalog fills the row")
     void findById_policiesThenCatalog() {
@@ -904,6 +1099,94 @@ class SoftwareInventoryServiceTest {
                     .forEach(row -> row.setSource(SoftwareSource.WINGET));
             return null;
         }).when(catalogStatus).apply(anyList());
+    }
+
+    private void catalogManagesWith(PackageCatalogEntry managingPackage) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setManagingPackage(managingPackage));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+    }
+
+    private void policiesSetAutoUpdate(Map<String, SoftwareAutoUpdateStatus> statusByName) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setAutoUpdate(statusByName.get(row.getName())));
+            return null;
+        }).when(autoUpdateService).applyToSoftware(anyList());
+    }
+
+    // as SoftwareCatalogStatus: a row the policies already set keeps its auto-update
+    private void catalogSetsAutoUpdate(Map<String, SoftwareAutoUpdateStatus> statusByName) {
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.stream().filter(row -> row.getAutoUpdate() == null)
+                    .forEach(row -> row.setAutoUpdate(statusByName.get(row.getName())));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+    }
+
+    private void stubTitles(SoftwareTitle... titles) {
+        SoftwareTitlesResponse response = new SoftwareTitlesResponse();
+        response.setSoftwareTitles(List.of(titles));
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(response);
+        simulateEnricherSetsCount(1);
+    }
+
+    private void stubUpcomingSchedules(SoftwareSchedule... schedules) {
+        when(softwareScheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(
+                eq("t1"), eq(ScriptStatus.ACTIVE), any(Instant.class))).thenReturn(List.of(schedules));
+    }
+
+    private static SoftwareSchedule schedule(SoftwareAction action, SoftwareSchedulePackage scheduledPackage) {
+        return SoftwareSchedule.builder().tenantId("t1").action(action).packages(List.of(scheduledPackage)).build();
+    }
+
+    private static SoftwareSchedulePackage scheduledPackage(String softwareId, String packageName) {
+        return SoftwareSchedulePackage.builder()
+                .packageManager(PackageManagerType.BREW).packageName(packageName).softwareId(softwareId).build();
+    }
+
+    private static Stream<Arguments> sourcesAndTheirTitles() {
+        return Stream.of(
+                Arguments.of(List.of(SoftwareSource.WINGET), List.of("7zip", "Google Chrome")),
+                Arguments.of(List.of(SoftwareSource.BREW), List.of("node")),
+                Arguments.of(List.of(SoftwareSource.CHOCOLATEY), List.of("git")),
+                Arguments.of(List.of(SoftwareSource.UNMANAGED), List.of("Contoso Tool")),
+                Arguments.of(List.of(SoftwareSource.BREW, SoftwareSource.UNMANAGED), List.of("node", "Contoso Tool")));
+    }
+
+    private static Stream<Arguments> autoUpdateStatusesAndTheirTitles() {
+        return Stream.of(
+                Arguments.of(List.of(SoftwareAutoUpdateStatus.ON), List.of("Google Chrome")),
+                Arguments.of(List.of(SoftwareAutoUpdateStatus.OFF), List.of("Slack")),
+                Arguments.of(List.of(SoftwareAutoUpdateStatus.NO_PACKAGE), List.of("Contoso Tool")),
+                Arguments.of(List.of(SoftwareAutoUpdateStatus.ON, SoftwareAutoUpdateStatus.NO_PACKAGE),
+                        List.of("Google Chrome", "Contoso Tool")));
+    }
+
+    private static Stream<Arguments> osTypesAndTheirTitles() {
+        return Stream.of(
+                Arguments.of(List.of(OsType.WINDOWS), List.of("Google Chrome")),
+                Arguments.of(List.of(OsType.MAC_OS), List.of("node")),
+                Arguments.of(List.of(OsType.WINDOWS, OsType.MAC_OS), List.of("Google Chrome", "node")));
+    }
+
+    private static Stream<Arguments> manageableWithOtherFiltersAndTheirTitles() {
+        SoftwareFilterInput manageableBrewOrUnmanaged = new SoftwareFilterInput();
+        manageableBrewOrUnmanaged.setManageable(true);
+        manageableBrewOrUnmanaged.setSources(List.of(SoftwareSource.BREW, SoftwareSource.UNMANAGED));
+        SoftwareFilterInput notManageableBrewOrUnmanaged = new SoftwareFilterInput();
+        notManageableBrewOrUnmanaged.setManageable(false);
+        notManageableBrewOrUnmanaged.setSources(List.of(SoftwareSource.BREW, SoftwareSource.UNMANAGED));
+        SoftwareFilterInput manageableOnWindows = new SoftwareFilterInput();
+        manageableOnWindows.setManageable(true);
+        manageableOnWindows.setOsTypes(List.of(OsType.WINDOWS));
+        return Stream.of(
+                Arguments.of(manageableBrewOrUnmanaged, List.of("node")),
+                Arguments.of(notManageableBrewOrUnmanaged, List.of("Contoso Tool")),
+                Arguments.of(manageableOnWindows, List.of("git", "Google Chrome")));
     }
 
     // what SoftwareCatalogStatus does for a title the catalog carries: its newest release becomes the latest version

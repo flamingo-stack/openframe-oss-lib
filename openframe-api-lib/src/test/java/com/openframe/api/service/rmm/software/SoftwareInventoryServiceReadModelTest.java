@@ -2,6 +2,7 @@ package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
@@ -14,13 +15,20 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
+import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
+import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.ScriptStatus;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,17 +37,21 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +72,8 @@ class SoftwareInventoryServiceReadModelTest {
     @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private OrganizationRepository organizationRepository;
+    @Mock private SoftwareScheduleRepository softwareScheduleRepository;
+    @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
 
     private SoftwareInventoryService service;
 
@@ -67,7 +81,8 @@ class SoftwareInventoryServiceReadModelTest {
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
-                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
+                softwareScheduleRepository, softwareScheduleTargetResolver);
         ReflectionTestUtils.setField(service, "softwareReadModel", true);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
     }
@@ -86,6 +101,20 @@ class SoftwareInventoryServiceReadModelTest {
         InOrder order = inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftware(anyList());
         order.verify(catalogStatus).apply(anyList());
+    }
+
+    private void stubUpcomingSchedules(SoftwareSchedule... schedules) {
+        when(softwareScheduleRepository.findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(
+                eq(TENANT), eq(ScriptStatus.ACTIVE), any(Instant.class))).thenReturn(List.of(schedules));
+    }
+
+    private static SoftwareSchedule schedule(SoftwareAction action, SoftwareSchedulePackage scheduledPackage) {
+        return SoftwareSchedule.builder().tenantId(TENANT).action(action).packages(List.of(scheduledPackage)).build();
+    }
+
+    private static SoftwareSchedulePackage scheduledPackage(String softwareId, String packageName) {
+        return SoftwareSchedulePackage.builder()
+                .packageManager(PackageManagerType.BREW).packageName(packageName).softwareId(softwareId).build();
     }
 
     private void catalogManagesWith(PackageCatalogEntry managingPackage) {
@@ -155,10 +184,74 @@ class SoftwareInventoryServiceReadModelTest {
     @Test
     void listSoftware_manageable_isTheReadModelsToNarrow() {
         PageResult<SoftwareResponse> page = new PageResult<>(List.of(row("1", SoftwareSource.BREW)), false, false, 1, 0);
-        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, null, 0, 20, null, null, true)).thenReturn(page);
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setManageable(true);
+        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, null, 0, 20, null, null, filter)).thenReturn(page);
 
-        assertThat(service.listSoftware(null, 0, 20, null, null, true).items()).hasSize(1);
+        assertThat(service.listSoftware(null, 0, 20, null, null, filter).items()).hasSize(1);
         verifyPoliciesThenCatalog();
+    }
+
+    @Test
+    void listSoftware_sourcesAutoUpdateAndOsFilter_narrowedByTheReadModelNotInMemory() {
+        // setup
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setSources(List.of(SoftwareSource.WINGET));
+        filter.setAutoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.ON));
+        filter.setOsTypes(List.of(OsType.WINDOWS));
+        PageResult<SoftwareResponse> page = new PageResult<>(List.of(row("1", SoftwareSource.BREW)), false, false, 1, 0);
+        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, null, 0, 20, null, null, filter)).thenReturn(page);
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getId).containsExactly("1");
+        verifyPoliciesThenCatalog();
+    }
+
+    @Test
+    void listDevicesForSoftware_updateScheduledForTheSoftware_devicesOfTheScheduleAreScheduledUpdate() {
+        // setup
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.BREW));
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "42", null, null))
+                .thenReturn(List.of(onDevice("m1"), onDevice("m2")));
+        SoftwareSchedule update = schedule(SoftwareAction.UPDATE, scheduledPackage("42", "xz"));
+        stubUpcomingSchedules(update);
+        when(softwareScheduleTargetResolver.resolveMachineIds(update)).thenReturn(List.of("m1"));
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", null, null, 0, 20, null);
+
+        // verifications
+        assertThat(result.items()).extracting(row -> row.getDevice().getMachineId(), SoftwareOnDeviceResponse::getStatus)
+                .containsExactly(tuple("m1", SoftwareOnDeviceStatus.SCHEDULED_UPDATE),
+                        tuple("m2", SoftwareOnDeviceStatus.UP_TO_DATE));
+    }
+
+    @Test
+    void listDevicesForSoftware_updateScheduledForTheManagingPackage_filterByScheduledUpdateKeepsItsDevices() {
+        // setup
+        PackageCatalogEntry xz = PackageCatalogEntry.builder().manager(PackageManagerType.BREW).packageId("xz").build();
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.BREW));
+        catalogManagesWith(xz);
+        when(tenantSoftwareReadModelQuery.devicesForSoftwareRows(TENANT, "42", null, null))
+                .thenReturn(List.of(onDevice("m1"), onDevice("m2")));
+        SoftwareSchedule update = schedule(SoftwareAction.UPDATE, scheduledPackage(null, "xz"));
+        SoftwareSchedule install = schedule(SoftwareAction.INSTALL, scheduledPackage(null, "xz"));
+        stubUpcomingSchedules(update, install);
+        when(softwareScheduleTargetResolver.resolveMachineIds(update)).thenReturn(List.of("m2"));
+        SoftwareOnDeviceFilterInput filter = new SoftwareOnDeviceFilterInput();
+        filter.setStatuses(List.of(SoftwareOnDeviceStatus.SCHEDULED_UPDATE));
+
+        // execution
+        PageResult<SoftwareOnDeviceResponse> result = service.listDevicesForSoftware("42", filter, null, 0, 20, null);
+
+        // verifications
+        assertThat(result.items()).extracting(row -> row.getDevice().getMachineId()).containsExactly("m2");
+        verify(softwareScheduleTargetResolver, never()).resolveMachineIds(install);
     }
 
     @Test
