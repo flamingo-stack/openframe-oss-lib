@@ -23,9 +23,11 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -193,6 +195,53 @@ class DeviceSoftwareHandlerTest {
 
         verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS);
         verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, 555L);
+    }
+
+    @Test
+    void handle_snapshotReads_reconcileEachHostOnce() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.isResolvable("101")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostResolver.resolve("101")).thenReturn(new FleetHostRef("t1", "m2"));
+
+        handler.handle(msg("r", null, row().put("host_id", 100).put("software_id", 1)), null);
+        handler.handle(msg("r", null, row().put("host_id", 100).put("software_id", 2)), null);
+        handler.handle(msg("r", null, row().put("host_id", 101).put("software_id", 1)), null);
+        handler.handle(msg("r", null, row().put("host_id", 100).put("software_id", 3)), null);
+
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(fleetHostSoftwareCache, times(1)).hostSoftware("t1", 101L, COMMIT_TS);
+        verify(fleetHostResolver, times(1)).resolve("100");
+        verify(projectionTrigger, times(2)).titlesChanged(eq("t1"), any());
+    }
+
+    @Test
+    void handle_snapshotReadThatFailed_isReconciledByTheNextRowOfTheHost() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS))
+                .thenThrow(new IllegalStateException("Fleet 503"))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> handler.handle(msg("r", null, row().put("host_id", 100)), null))
+                .isInstanceOf(IllegalStateException.class);
+        handler.handle(msg("r", null, row().put("host_id", 100)), null);
+
+        verify(fleetHostSoftwareCache, times(2)).hostSoftware("t1", 100L, COMMIT_TS);
+        verify(projectionTrigger).titlesChanged(eq("t1"), any());
+    }
+
+    @Test
+    void handle_changeEventsAfterASnapshotRead_alwaysReconcile() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msg("r", null, row().put("host_id", 100)), null);
+        handler.handle(msg("u", row().put("host_id", 100), row().put("host_id", 100)), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+        handler.handle(msg("d", row().put("host_id", 100), null), null);
+
+        verify(fleetHostSoftwareCache, times(4)).hostSoftware("t1", 100L, COMMIT_TS);
     }
 
     @Test
