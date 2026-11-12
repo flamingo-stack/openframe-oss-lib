@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useContentLgUp, useContentMdUp, useContentXlUp } from '../../../hooks/ui/use-content-breakpoint';
+import { DEVICE_CONNECTIVITY_FILTER_SECTION } from './device-statuses';
 import type { DeviceFilters } from './types';
 
 function isCompleteTag(tag: string): boolean {
@@ -94,6 +95,11 @@ export function useTagFilterModal({
 
   // Only a host that draws the directory columns has the USER and SOURCES groups: another's list params stay untouched
   const hasDirectoryGroups = useMemo(() => columns.some(column => column.key === 'user'), [columns]);
+  // Only a list with a connectivity facet has the CONNECTIVITY group (`DEVICE_CONNECTIVITY_FILTER_SECTION`).
+  const hasConnectivityGroup = useMemo(
+    () => columns.some(column => column.key === DEVICE_CONNECTIVITY_FILTER_SECTION && column.filterOptions?.length),
+    [columns],
+  );
 
   // Step 2: combine with buffered filters and flush (called second by FilterModal)
   const handleTagsChange = useCallback(
@@ -105,12 +111,13 @@ export function useTagFilterModal({
         organizationIds: cf.organization || [],
         // FilterModal drops a group with nothing ticked, so a missing group clears its param
         ...(hasDirectoryGroups && { userLinks: cf.user || [], directorySources: cf.sources || [] }),
+        ...(hasConnectivityGroup && { connectivity: cf[DEVICE_CONNECTIVITY_FILTER_SECTION] || [] }),
         tags: newTags.filter(isCompleteTag),
       });
       pendingFiltersRef.current = {};
       onApplied();
     },
-    [setParams, onApplied, hasDirectoryGroups],
+    [setParams, onApplied, hasDirectoryGroups, hasConnectivityGroup],
   );
 
   return {

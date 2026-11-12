@@ -5,8 +5,9 @@ import { useRouter } from '../../../embed-shims/next-navigation';
 import { LoadingRegion } from '../../loading/loading-region';
 import { DeviceCard } from '../../ui';
 import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
+import { deviceLifecycleTagProps } from './device-lifecycle-tag';
 import { getDeviceName } from './device-name';
-import { getDeviceOperatingSystem, getDeviceStatusConfig } from './device-status';
+import { getDeviceOperatingSystem } from './device-status';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDevicesViewConfig } from './devices-view-config';
 import type { DeviceRow } from './types';
@@ -82,7 +83,6 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
         <>
           <div className={DEVICES_GRID_CLASS}>
             {devices.map(device => {
-              const statusConfig = getDeviceStatusConfig(device.status);
               return (
                 <DeviceCard
                   key={device.id || device.machineId}
@@ -94,14 +94,8 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                     lastSeen: device.lastSeen,
                     operatingSystem: getDeviceOperatingSystem(device.osType),
                   }}
-                  statusTag={
-                    device.status
-                      ? {
-                          label: statusConfig.label,
-                          variant: statusConfig.variant,
-                        }
-                      : undefined
-                  }
+                  statusTag={device.status ? deviceLifecycleTagProps(device.status) : undefined}
+                  connectivity={device.connectivity ?? null}
                   onDeviceClick={() => handleDeviceClick(device)}
                   actions={
                     device.unreadNotificationCount

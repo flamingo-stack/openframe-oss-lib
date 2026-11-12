@@ -19,7 +19,10 @@ export interface DeviceRow extends DeviceNameSource {
   id: string;
   /** The agent's id. Empty when the agent is not connected. */
   machineId: string;
+  /** The lifecycle status: PENDING, MANAGED (legacy ONLINE / OFFLINE), PENDING_DELETION, ARCHIVED, DELETED. */
   status: string;
+  /** ONLINE / OFFLINE right now, apart from the lifecycle. Absent or null reads as OFFLINE. */
+  connectivity?: string | null;
   /** When the device was last seen, ISO. Two spellings, one per source. */
   last_seen?: string;
   lastSeen?: string;
@@ -66,6 +69,8 @@ export interface TagFilterOption {
 /** The facets behind the device filters, as the server counts them. */
 export interface DeviceFilters {
   statuses: DeviceFilterValue[];
+  /** ONLINE / OFFLINE counts; absent from a backend that has no connectivity facet. */
+  connectivity?: DeviceFilterValue[];
   deviceTypes: DeviceFilterValue[];
   osTypes: DeviceFilterValue[];
   organizationIds: DeviceFilterTag[];
@@ -80,6 +85,7 @@ export interface DeviceFilters {
 /** What narrows a device list, in the backend's field names. */
 export interface DeviceFilterInput {
   statuses?: string[];
+  connectivity?: string[];
   deviceTypes?: string[];
   osTypes?: string[];
   organizationIds?: string[];

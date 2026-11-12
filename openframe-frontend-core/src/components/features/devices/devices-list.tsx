@@ -11,6 +11,7 @@ import {
   type OnChangeFn,
 } from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
+import { DEVICE_CONNECTIVITY_FILTER_SECTION, joinStatusFilterValue, splitStatusFilterValue } from './device-statuses';
 import { DevicesFilterToolbar } from './devices-filter-toolbar';
 import { DevicesTableBody, getDeviceActionsColumn, getDeviceFilterColumns } from './devices-table-columns';
 import type { DeviceFilters, DeviceRow } from './types';
@@ -24,6 +25,8 @@ import { useTagFilterModal } from './use-tag-filter-modal';
 export interface DevicesListNarrowing {
   search: string;
   statuses: string[];
+  /** ONLINE / OFFLINE picks of the STATUS funnel's Connectivity group. Absent: none. */
+  connectivity?: string[];
   osTypes: string[];
   organizationIds: string[];
   /** Chips from the tag filter, `key:value`. A bare word from an old link stays visible and filters nothing. */
@@ -43,6 +46,7 @@ export function isNarrowed(narrowing: DevicesListNarrowing): boolean {
   return (
     narrowing.search.trim().length > 0 ||
     narrowing.statuses.length > 0 ||
+    (narrowing.connectivity?.length ?? 0) > 0 ||
     narrowing.osTypes.length > 0 ||
     narrowing.organizationIds.length > 0 ||
     narrowing.tags.length > 0
@@ -222,18 +226,21 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
   // field names. This pair is the only place that translation lives.
   const columnFilters = useMemo<ColumnFiltersState>(
     () => [
-      ...(narrowing.statuses.length ? [{ id: 'status', value: narrowing.statuses }] : []),
+      ...(narrowing.statuses.length || narrowing.connectivity?.length
+        ? [{ id: 'status', value: joinStatusFilterValue(narrowing.statuses, narrowing.connectivity) }]
+        : []),
       ...(narrowing.osTypes.length ? [{ id: 'os', value: narrowing.osTypes }] : []),
       ...(narrowing.organizationIds.length ? [{ id: 'organization', value: narrowing.organizationIds }] : []),
     ],
-    [narrowing.statuses, narrowing.osTypes, narrowing.organizationIds],
+    [narrowing.statuses, narrowing.connectivity, narrowing.osTypes, narrowing.organizationIds],
   );
 
   const onColumnFiltersChange = useCallback<OnChangeFn<ColumnFiltersState>>(
     updater => {
       const next = typeof updater === 'function' ? updater(columnFilters) : updater;
       const pick = (id: string) => (next.find(f => f.id === id)?.value as string[] | undefined) ?? [];
-      patch({ statuses: pick('status'), osTypes: pick('os'), organizationIds: pick('organization') });
+      const { statuses, connectivity } = splitStatusFilterValue(pick('status'));
+      patch({ statuses, connectivity, osTypes: pick('os'), organizationIds: pick('organization') });
     },
     [columnFilters, patch],
   );
@@ -244,6 +251,7 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
       const pick = (key: string) => (params[key] as string[] | undefined) ?? [];
       patch({
         statuses: pick('statuses'),
+        connectivity: pick('connectivity'),
         osTypes: pick('osTypes'),
         organizationIds: pick('organizationIds'),
         tags: pick('tags'),
@@ -272,8 +280,13 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
 
   // The modal reads the current selection back in column-keyed form.
   const tableFilters = useMemo(
-    () => ({ status: narrowing.statuses, os: narrowing.osTypes, organization: narrowing.organizationIds }),
-    [narrowing.statuses, narrowing.osTypes, narrowing.organizationIds],
+    () => ({
+      status: narrowing.statuses,
+      [DEVICE_CONNECTIVITY_FILTER_SECTION]: narrowing.connectivity ?? [],
+      os: narrowing.osTypes,
+      organization: narrowing.organizationIds,
+    }),
+    [narrowing.statuses, narrowing.connectivity, narrowing.osTypes, narrowing.organizationIds],
   );
 
   const handleTagRemove = useCallback(

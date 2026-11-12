@@ -20,11 +20,17 @@ import { DATA_TABLE_SKELETON_ROWS } from '../../../ui/data-table/utils';
 import { InertWhileLoading, useLoadingScope } from '../../../ui/loading-scope';
 import { dataTableLayoutProps } from '../../feature-table-layout';
 import { OSTypeBadge } from '../../os-type-badge';
+import { DeviceConnectivityIcon } from '../device-connectivity-icon';
 import { formatLastOnline } from '../device-last-online';
+import { DeviceLifecycleTag } from '../device-lifecycle-tag';
 import { getDeviceName } from '../device-name';
-import { getDeviceStatusConfig } from '../device-status';
-import { DEVICE_STATUS } from '../device-statuses';
-import { DeviceTypeTile } from '../device-type-tile';
+import {
+  DEVICE_CONNECTIVITY_FILTER_SECTION,
+  DEVICE_STATUS,
+  joinStatusFilterValue,
+  splitStatusFilterValue,
+  toUiDeviceStatus,
+} from '../device-statuses';
 import { DevicesFilterToolbar } from '../devices-filter-toolbar';
 import { getDeviceFilterColumns } from '../devices-table-columns';
 import { useDeviceImageUrl } from '../devices-view-config';
@@ -67,7 +73,7 @@ function DeviceCell({ device }: { device: DeviceRow }) {
   const loading = useLoadingScope();
   return (
     <div className="flex h-20 items-center gap-3">
-      <DeviceTypeTile type={device.type} />
+      <DeviceConnectivityIcon connectivity={device.connectivity} lastSeen={device.last_seen || device.lastSeen} />
       <div className="flex min-w-0 flex-col">
         <TruncateText>{getDeviceName(device)}</TruncateText>
         <TruncateText variant="h6" tone="secondary" loading={loading}>
@@ -81,8 +87,7 @@ function DeviceCell({ device }: { device: DeviceRow }) {
 /** The STATUS cell: the device's status as its tag; the tag's loading form while the device is read. */
 function StatusCell({ status }: { status: string | null | undefined }) {
   if (useLoadingScope()) return <Tag loading label="" className="w-min" />;
-  const config = getDeviceStatusConfig(status);
-  return <Tag label={config.label} variant={config.variant} className="w-min" />;
+  return <DeviceLifecycleTag status={status} className="w-min" />;
 }
 
 /** The add / remove control: static chrome, drawn real and inert while the device is read. */
@@ -303,11 +308,19 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   const matchesVisibleFilters = useCallback(
     (d: T) => {
       for (const f of columnFilters) {
-        const values = f.value as string[];
-        if (!values || values.length === 0) continue;
+        const raw = f.value as string[];
+        if (!raw || raw.length === 0) continue;
+        // The STATUS funnel also holds the Connectivity group's picks (`connectivity:ONLINE`).
+        const { statuses: values, connectivity } =
+          f.id === 'status' ? splitStatusFilterValue(raw) : { statuses: raw, connectivity: [] as string[] };
+        if (connectivity.length > 0 && !connectivity.includes((d.connectivity ?? 'OFFLINE').toUpperCase())) {
+          return false;
+        }
+        if (values.length === 0) continue;
         const cell =
           f.id === 'status'
-            ? d.status
+            ? // The UI value: MANAGED stands for the legacy ONLINE / OFFLINE too.
+              toUiDeviceStatus(d.status)
             : f.id === 'os'
               ? d.osType
               : f.id === 'organization'
@@ -364,12 +377,18 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   // without a network round-trip.
   const clientDeviceFilters = useMemo<DeviceFilters>(() => {
     const statusCounts = new Map<string, number>();
+    const connectivityCounts = new Map<string, number>();
     const osCounts = new Map<string, number>();
     const orgCounts = new Map<string, { label: string; count: number }>();
     const tagSeen = new Map<string, Map<string, number>>();
 
     for (const d of devices) {
-      if (d.status) statusCounts.set(d.status, (statusCounts.get(d.status) ?? 0) + 1);
+      if (d.status) {
+        const status = toUiDeviceStatus(d.status);
+        statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+      }
+      const connectivity = (d.connectivity ?? 'OFFLINE').toUpperCase();
+      connectivityCounts.set(connectivity, (connectivityCounts.get(connectivity) ?? 0) + 1);
       if (d.osType) osCounts.set(d.osType, (osCounts.get(d.osType) ?? 0) + 1);
       // Keyed by id, labelled by name, the mobile FilterModal writes the VALUE
       // into the same `organization` column filter the funnels above do.
@@ -394,6 +413,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
 
     return {
       statuses: Array.from(statusCounts, ([value, count]) => ({ value, count })),
+      connectivity: Array.from(connectivityCounts, ([value, count]) => ({ value, count })),
       deviceTypes: [],
       osTypes: Array.from(osCounts, ([value, count]) => ({ value, count })),
       organizationIds: Array.from(orgCounts, ([value, { label, count }]) => ({ value, label, count })),
@@ -440,6 +460,13 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     });
   }, [filterColumns]);
 
+  const connectivitySections = useMemo(() => {
+    const options = filterColumns.find(column => column.key === DEVICE_CONNECTIVITY_FILTER_SECTION)?.filterOptions;
+    return options && options.length > 0
+      ? [{ id: DEVICE_CONNECTIVITY_FILTER_SECTION, title: 'Connectivity', options }]
+      : undefined;
+  }, [filterColumns]);
+
   // The funnel's VALUE is the customer id, that is what a server-narrowed
   // consumer puts into `organizationIds`, and a name sent there matches nothing.
   // `getDeviceFilterColumns` keys these by id and labels them by name, and the
@@ -454,7 +481,9 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   const handleSetParams = useCallback(
     (params: Record<string, string[]>) => {
       setColumnFilters([
-        ...(params.statuses?.length ? [{ id: 'status', value: params.statuses }] : []),
+        ...(params.statuses?.length || params.connectivity?.length
+          ? [{ id: 'status', value: joinStatusFilterValue(params.statuses ?? [], params.connectivity ?? []) }]
+          : []),
         ...(params.osTypes?.length ? [{ id: 'os', value: params.osTypes }] : []),
         ...(params.organizationIds?.length ? [{ id: 'organization', value: params.organizationIds }] : []),
       ]);
@@ -484,7 +513,11 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   // Map column filters → `{ status, os, organization }` shape that FilterModal expects on mobile.
   const tableFilters = useMemo(
     () => ({
-      status: (columnFilters.find(f => f.id === 'status')?.value as string[]) ?? [],
+      status: splitStatusFilterValue(columnFilters.find(f => f.id === 'status')?.value as string[] | undefined)
+        .statuses,
+      [DEVICE_CONNECTIVITY_FILTER_SECTION]: splitStatusFilterValue(
+        columnFilters.find(f => f.id === 'status')?.value as string[] | undefined,
+      ).connectivity,
       os: (columnFilters.find(f => f.id === 'os')?.value as string[]) ?? [],
       organization: (columnFilters.find(f => f.id === 'organization')?.value as string[]) ?? [],
     }),
@@ -545,7 +578,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         enableSorting: false,
         meta: {
           width: 'w-auto shrink-0 content-md:w-[160px]',
-          filter: { options: statusFilterOptions },
+          filter: { options: statusFilterOptions, sections: connectivitySections },
         },
       },
       {
@@ -625,6 +658,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     ],
     [
       statusFilterOptions,
+      connectivitySections,
       orgFilterOptions,
       isDeviceDisabled,
       getDeviceKey,

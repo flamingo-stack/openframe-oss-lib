@@ -5,13 +5,14 @@ import { type MouseEvent, type ReactNode, useMemo, useState } from 'react';
 import { useChatRuntime } from '../../../contexts/chat-runtime-context';
 import { formatDate, formatTime } from '../../../utils/format-date';
 import { executeNewTabNavigation } from '../../chat/utils/execute-navigation';
-import { ArrowRightUpIcon, MonitorIcon } from '../../icons-v2-generated';
+import { ArrowRightUpIcon } from '../../icons-v2-generated';
 import { MediaSkeleton, TextLineSkeleton } from '../../loading/unified-skeleton';
 import {
   Button,
   type ColumnDef,
   type ColumnFiltersState,
   DataTable,
+  type DataTableFilterSection,
   type DataTableLayout,
   type DataTableSettings,
   EntityImage,
@@ -29,12 +30,17 @@ import {
 } from '../../ui';
 import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { OSTypeBadge } from '../os-type-badge';
+import { DeviceConnectivityIcon } from './device-connectivity-icon';
 import { directorySourceLabel, directoryUserLines, directoryUserLinkLabel } from './device-directory';
+import { DeviceLifecycleTag } from './device-lifecycle-tag';
 import { getDeviceName } from './device-name';
-import { getDeviceStatusConfig } from './device-status';
-import { DEFAULT_VISIBLE_STATUSES } from './device-statuses';
-import { renderDeviceTypeIcon } from './device-type-icon';
-import { DeviceTypeTile } from './device-type-tile';
+import { getDeviceConnectivityConfig, getDeviceLifecycleConfig } from './device-status';
+import {
+  DEFAULT_VISIBLE_STATUSES,
+  DEVICE_CONNECTIVITY_FILTER_SECTION,
+  DEVICE_CONNECTIVITY_VALUES,
+  mergeStatusFacets,
+} from './device-statuses';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDeviceImageUrl, useDevicesViewConfig } from './devices-view-config';
 import type { DeviceFilters, DeviceRow } from './types';
@@ -379,9 +385,12 @@ function DeviceNameGridCell({ device }: { device: DeviceRow }) {
         icon: loading ? (
           <MediaSkeleton.Icon size="sm" />
         ) : (
-          (renderDeviceTypeIcon(device.type ?? undefined, GRID_DEVICE_ICON_CLASS) ?? (
-            <MonitorIcon className={GRID_DEVICE_ICON_CLASS} />
-          ))
+          <DeviceConnectivityIcon
+            connectivity={device.connectivity}
+            lastSeen={device.last_seen ?? device.lastSeen}
+            size={20}
+            className={GRID_DEVICE_ICON_CLASS}
+          />
         ),
       }}
       text={getDeviceName(device)}
@@ -393,13 +402,10 @@ function DeviceNameGridCell({ device }: { device: DeviceRow }) {
 /** The status tag with when the device was last seen beside it. */
 function DeviceStatusGridCell({ device }: { device: DeviceRow }) {
   const loading = useLoadingScope();
-  const statusConfig = getDeviceStatusConfig(device.status);
   // While the row is read there is no "last seen" to print: the tag's own skeleton is the cell.
   const lastSeen =
     loading && !device.last_seen ? undefined : device.last_seen ? formatDateTime(device.last_seen) : 'Never';
-  return (
-    <DataTable.Cell tag={<Tag label={statusConfig.label} variant={statusConfig.variant} />} secondary={lastSeen} />
-  );
+  return <DataTable.Cell tag={<DeviceLifecycleTag status={device.status} />} secondary={lastSeen} />;
 }
 
 /** The customer's logo and name. */
@@ -448,15 +454,24 @@ export interface DeviceFilterOption {
 /** Status / OS / customer options, shared by the table headers and the grid row. */
 function buildDeviceFilterOptions(deviceFilters?: DeviceFilters | null): {
   status: DeviceFilterOption[];
+  connectivity: DeviceFilterOption[];
   os: DeviceFilterOption[];
   organization: DeviceFilterOption[];
   user: DeviceFilterOption[];
   sources: DeviceFilterOption[];
 } {
-  // Show only DEFAULT_VISIBLE_STATUSES (DELETED and legacy ARCHIVED live on /devices/archive)
-  const status = (deviceFilters?.statuses ?? [])
+  // Show only DEFAULT_VISIBLE_STATUSES (DELETED and legacy ARCHIVED live on /devices/archive). MANAGED, ONLINE and
+  // OFFLINE are one option, "Managed", with their counts summed: the UI value MANAGED stands for all three.
+  const status = mergeStatusFacets(deviceFilters?.statuses ?? [])
     .filter(s => (DEFAULT_VISIBLE_STATUSES as readonly string[]).includes(s.value))
-    .map(s => ({ id: s.value, label: getDeviceStatusConfig(s.value).label, value: s.value, count: s.count }));
+    .map(s => ({ id: s.value, label: getDeviceLifecycleConfig(s.value).label, value: s.value, count: s.count }));
+
+  // Online / Offline, in that order, from the connectivity facet (none from a backend without one).
+  const connectivityRows = deviceFilters?.connectivity ?? [];
+  const connectivity = DEVICE_CONNECTIVITY_VALUES.flatMap(value => {
+    const row = connectivityRows.find(r => r.value.toUpperCase() === value);
+    return row ? [{ id: value, label: getDeviceConnectivityConfig(value).label, value, count: row.count }] : [];
+  });
 
   const os = (deviceFilters?.osTypes ?? []).map(o => ({ id: o.value, label: o.value, value: o.value, count: o.count }));
 
@@ -483,7 +498,12 @@ function buildDeviceFilterOptions(deviceFilters?: DeviceFilters | null): {
     count: source.count,
   }));
 
-  return { status, os, organization, user, sources };
+  return { status, connectivity, os, organization, user, sources };
+}
+
+/** The STATUS funnel's extra group: Connectivity, when the backend counts it. */
+function connectivitySections(options: DeviceFilterOption[]): DataTableFilterSection[] | undefined {
+  return options.length > 0 ? [{ id: DEVICE_CONNECTIVITY_FILTER_SECTION, title: 'Connectivity', options }] : undefined;
 }
 
 /** The directory columns of a device list: the table and its filter window take the same ones. */
@@ -520,6 +540,17 @@ export function getDeviceFilterColumns(
         ]
       : []),
     { key: 'status', label: 'STATUS', filterable: true, filterOptions: options.status },
+    // Only from a backend that counts connectivity: an empty group would offer nothing to pick.
+    ...(options.connectivity.length > 0
+      ? [
+          {
+            key: DEVICE_CONNECTIVITY_FILTER_SECTION,
+            label: 'CONNECTIVITY',
+            filterable: true,
+            filterOptions: options.connectivity,
+          },
+        ]
+      : []),
     { key: 'os', label: 'OS', filterable: true, filterOptions: options.os },
     { key: 'organization', label: 'CUSTOMER', filterable: true, filterOptions: options.organization },
   ];
@@ -542,6 +573,7 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
 ): ColumnDef<T>[] {
   const {
     status: statusFilterOptions,
+    connectivity: connectivityFilterOptions,
     os: osFilterOptions,
     organization: orgFilterOptions,
     user: userFilterOptions,
@@ -589,8 +621,9 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
       cell: ({ row }: { row: Row<T> }) => {
         const device = row.original;
         return (
-          <div className="relative box-border flex h-20 w-full shrink-0 content-stretch items-center justify-start gap-4 py-0">
-            <DeviceTypeTile type={device.type} />
+          <div className="relative box-border flex h-20 w-full shrink-0 content-stretch items-center justify-start gap-[var(--spacing-system-xxs)] py-0">
+            {/* The device's icon says whether it is online right now (Figma 3324-6819). */}
+            <DeviceConnectivityIcon connectivity={device.connectivity} lastSeen={device.last_seen ?? device.lastSeen} />
             <div className="min-w-0 flex-1">
               <TruncateText>{getDeviceName(device)}</TruncateText>
             </div>
@@ -615,11 +648,10 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
       header: 'STATUS',
       cell: ({ row }: { row: Row<T> }) => {
         const device = row.original;
-        const statusConfig = getDeviceStatusConfig(device.status);
         return (
           <div className="flex shrink-0 flex-col items-start gap-1">
             <div className="inline-flex">
-              <Tag label={statusConfig.label} variant={statusConfig.variant} />
+              <DeviceLifecycleTag status={device.status} />
             </div>
             <DeviceLastSeen lastSeen={device.last_seen} />
           </div>
@@ -636,7 +668,11 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
         // options query resolves made every header on a tablet disappear on
         // reload, and reserving the funnel from the start keeps the label from
         // shifting when they arrive. The dropdown stays shut while it is empty.
-        filter: { options: statusFilterOptions, pending: filtersPending },
+        filter: {
+          options: statusFilterOptions,
+          sections: connectivitySections(connectivityFilterOptions),
+          pending: filtersPending,
+        },
       },
     },
     {
