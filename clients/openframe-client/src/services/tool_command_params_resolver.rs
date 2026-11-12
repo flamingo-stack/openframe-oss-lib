@@ -34,12 +34,21 @@ impl ToolCommandParamsResolver {
     }
 
     pub fn process(&self, tool_agent_id: &str, command_args: Vec<String>) -> Result<Vec<String>> {
-        let server_url = format!(
-            "https://{}",
-            self.initial_configuration_service.get_server_url()?
-        );
+        let uses = |placeholder: &str| command_args.iter().any(|arg| arg.contains(placeholder));
+        let server_url = if uses(Self::SERVER_URL_PLACEHOLDER) {
+            format!(
+                "https://{}",
+                self.initial_configuration_service.get_server_url()?
+            )
+        } else {
+            String::new()
+        };
         let token_path = self.build_token_path();
-        let machine_id = self.agent_configuration_service.get_machine_id()?;
+        let machine_id = if uses(Self::MACHINE_ID_PLACEHOLDER) {
+            self.agent_configuration_service.get_machine_id()?
+        } else {
+            String::new()
+        };
 
         Ok(command_args
             .into_iter()
