@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ColumnFiltersState } from '../../../ui';
+import type { FeatureTableLayoutProps } from '../../feature-table-layout';
 import type { DeviceFilters, DeviceRow } from '../types';
 
 export type SubTab = 'available' | 'selected';
@@ -63,7 +64,7 @@ export interface DeviceSelectorInfiniteScroll {
   skeletonRows: number;
 }
 
-export interface DeviceSelectorProps<T extends DeviceRow = DeviceRow> {
+export interface DeviceSelectorProps<T extends DeviceRow = DeviceRow> extends FeatureTableLayoutProps {
   /** Devices to display. Consumer controls fetching and pre-filtering. */
   devices: T[];
   /** Whether the device list is loading. */

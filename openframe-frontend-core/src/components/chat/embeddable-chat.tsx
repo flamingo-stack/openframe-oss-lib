@@ -101,7 +101,7 @@ import { MingoHistoryRail } from './mingo-history-rail';
 import { MINGO_ONBOARDING_SKELETON_ROWS, MingoOnboardingCard } from './mingo-onboarding-card';
 import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
-import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
+import { type QuickActionAccent, accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { SourceActionButton } from './source-action-button';
 import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
@@ -420,6 +420,13 @@ export interface EmbeddableChatProps {
    * slash-command list `children` are wired internally and not overridable.
    */
   guideWelcome?: Omit<GuideWelcomeProps, 'onQuickAction' | 'children'>;
+  /**
+   * The icon tint of the quick actions this chat reads itself (the Guide-mode ones, from the runtime's
+   * `emptyStateUrl`), for a host whose design fixes it. `'currentColor'` draws them in the tag's own text colour, as
+   * the row's "All" glyph is. Default: the colour set on the assistant's identity, else the built-in agent's
+   * (fae pink, mingo cyan). An action's own `iconProps.color` still wins.
+   */
+  quickActionAccent?: QuickActionAccent;
 
   /**
    * Entity-context picker config (Figma 31:28708 / 1:5699). When provided, the
@@ -1116,6 +1123,14 @@ export interface EmbeddableChatHandle {
    * `contextPicker`.
    */
   openContextPicker: () => void;
+  /**
+   * Puts the keyboard focus in the composer, and keeps it owed to the composer until the user's next press or key:
+   * a send that follows mounts the composer anew, and that one takes the focus. For a host that sends from a control
+   * of its own outside the chat (its quick actions over a docked composer): the control goes away with the send, and
+   * the user types the next message here. The chat's own quick actions do it themselves. Nothing where the pointer
+   * is a finger (it would raise the on-screen keyboard over the answer).
+   */
+  focusComposer: () => void;
 }
 
 export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableChatProps>(
@@ -1159,6 +1174,7 @@ function EmbeddableChatInner({
   mingoWelcome,
   historyPageSize,
   guideWelcome,
+  quickActionAccent,
   contextPicker,
   renderMention,
   renderContextItem,
@@ -1288,6 +1304,38 @@ function EmbeddableChatInner({
 
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null);
+
+  // The keyboard goes to the composer after a quick action (the chat's own, or a host's through `focusComposer`):
+  // the tag goes away with the send, and the next message is typed here. The send that follows mounts the composer
+  // anew (a new chat's thread takes the place of the welcome), so the focus is OWED until the user does something
+  // else: the composer that mounts takes it. Not where the pointer is a finger: focus there raises the on-screen
+  // keyboard over the answer the user just asked for.
+  const composerFocusOwedRef = useRef(false);
+  const settleComposerFocusRef = useRef<(() => void) | null>(null);
+  const focusComposer = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) return;
+    chatInputRef.current?.focus();
+    if (composerFocusOwedRef.current) return;
+    composerFocusOwedRef.current = true;
+    // Captured: the event that asked for the focus is already past the document's capture phase, so it does not
+    // settle its own debt. The next press or key does, wherever it lands.
+    const settle = () => {
+      composerFocusOwedRef.current = false;
+      settleComposerFocusRef.current = null;
+      document.removeEventListener('pointerdown', settle, true);
+      document.removeEventListener('keydown', settle, true);
+    };
+    settleComposerFocusRef.current = settle;
+    document.addEventListener('pointerdown', settle, true);
+    document.addEventListener('keydown', settle, true);
+  }, []);
+  // The debt ends with the chat: its listeners do not outlive it.
+  useEffect(() => () => settleComposerFocusRef.current?.(), []);
+  const attachChatInput = useCallback((input: ChatInputRef | null) => {
+    chatInputRef.current = input;
+    if (input && composerFocusOwedRef.current) input.focus();
+  }, []);
 
   // The slash-command registry (Guide onboarding cards) is loaded via
   // react-query below, after `activeMode` is resolved — gated on Guide mode and
@@ -1956,7 +2004,7 @@ function EmbeddableChatInner({
         // agent/persona (`icon_props.color`) wins; the built-in slug map
         // (fae→pink, mingo→cyan) is only the fallback for unconfigured
         // built-in agents.
-        accent: accentFromIdentityIcon(effectiveAssistantIcon) ?? getAgentAccent(activeAgentSlug),
+        accent: quickActionAccent ?? accentFromIdentityIcon(effectiveAssistantIcon) ?? getAgentAccent(activeAgentSlug),
       }));
     }
     return (effectiveSuggestedQueries ?? []).map((q, i) => ({
@@ -1964,7 +2012,7 @@ function EmbeddableChatInner({
       label: q,
       prompt: q,
     }));
-  }, [effectiveQuickActions, effectiveSuggestedQueries, effectiveAssistantIcon, activeAgentSlug]);
+  }, [effectiveQuickActions, effectiveSuggestedQueries, effectiveAssistantIcon, activeAgentSlug, quickActionAccent]);
 
   // Dialog-history concerns (archive page, read-only archived conversation,
   // rename/archive/unarchive modals) live in one hook so this component stays
@@ -2574,8 +2622,9 @@ function EmbeddableChatInner({
       openContextPicker: () => {
         if (contextPicker) openContextPicker();
       },
+      focusComposer,
     }),
-    [resetToNewChat, contextMaxItems, contextPicker, openContextPicker],
+    [resetToNewChat, contextMaxItems, contextPicker, openContextPicker, focusComposer],
   );
 
   // Desktop split header ⋯ menu (active, non-archived conversation only).
@@ -2893,6 +2942,7 @@ function EmbeddableChatInner({
               onClick: () => {
                 handleSend(action.prompt ?? action.label);
                 action.onClick?.();
+                focusComposer();
               },
             }))}
           />
@@ -2933,7 +2983,10 @@ function EmbeddableChatInner({
                 : (guideWelcome?.quickActions ?? guideSuggestedActions)
             }
             // A quick action sends its prompt at once.
-            onQuickAction={action => handleSend(action.prompt ?? action.label)}
+            onQuickAction={action => {
+              handleSend(action.prompt ?? action.label);
+              focusComposer();
+            }}
           >
             {/* Figma node 7363:205938 — single-column slash-command
                 list. No own scroll (GuideWelcome's region scrolls); the
@@ -2996,7 +3049,7 @@ function EmbeddableChatInner({
       key={composerKey}
       archived={isViewingArchived}
       lock={composerLock}
-      inputRef={chatInputRef}
+      inputRef={attachChatInput}
       onSend={handleSend}
       onStop={stopMessage}
       sending={chatLoading || hasInflightUploads}
