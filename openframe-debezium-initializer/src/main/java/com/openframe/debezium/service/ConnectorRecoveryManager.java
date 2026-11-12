@@ -122,13 +122,13 @@ public class ConnectorRecoveryManager {
             logFailureDetails(connectorName, status);
 
             if (isHistoryLost(status)) {
+                String failureTrace = status.getFirstFailureTrace();
                 log.error("{} Source history lost: name='{}' trace={}",
-                        DebeziumLog.PREFIX, connectorName, status.getFirstFailureTrace());
-                if (tryRecreate(connectorName, status.getFirstFailureTrace(), TRIGGER_HISTORY_LOST)) {
+                        DebeziumLog.PREFIX, connectorName, failureTrace);
+                if (tryRecreate(connectorName, failureTrace, TRIGGER_HISTORY_LOST)) {
                     return;
                 }
-                createAlert(connectorName, ConnectorAlertType.NON_RECOVERABLE_ERROR,
-                        status.getFirstFailureTrace(), 0);
+                createAlert(connectorName, ConnectorAlertType.NON_RECOVERABLE_ERROR, failureTrace, 0);
                 return;
             }
 
