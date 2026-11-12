@@ -15,4 +15,5 @@ public class SoftwareOnDeviceFilterInput {
     private List<DeviceStatus> deviceStatuses;
     private List<SoftwareSource> installedBy;
     private List<SoftwareAutoUpdateStatus> autoUpdateStatuses;
+    private Boolean manageable;
 }

@@ -424,7 +424,10 @@ fn tool_launches_asset(tool: &InstalledTool, asset_id: &str) -> bool {
 }
 
 /// Kills orphaned copies of the osqueryd asset the tool's commands launch; no-op for tools that don't use it.
-async fn reap_orphaned_helpers(tool: &InstalledTool, directory_manager: &DirectoryManager) {
+pub(crate) async fn reap_orphaned_helpers(
+    tool: &InstalledTool,
+    directory_manager: &DirectoryManager,
+) {
     if !tool_launches_asset(tool, OSQUERYD_ASSET_ID) {
         return;
     }

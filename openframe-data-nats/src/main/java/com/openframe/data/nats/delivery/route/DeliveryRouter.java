@@ -10,11 +10,15 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+
+import static java.util.stream.Collectors.toSet;
 
 // the one place a command leaves for the agent: the route is picked by the version the machine's client runs.
 // ObjectProvider: a service with no route on its classpath still boots, its commands then reach no one. Two routes
@@ -62,6 +66,20 @@ public class DeliveryRouter {
         return reachingRoute(type, agentVersion)
                 .map(route -> route.holdsForOfflineMachine(type))
                 .orElse(false);
+    }
+
+    // the machines among these that a route reaches for the type: the pick dispatch would make, for a caller that
+    // splits its targets between the engine and another path before it writes anything
+    public Set<String> reachable(DeliveryType type, Collection<String> machineIds) {
+        Map<String, String> agentVersionByMachine = agentVersions.findAll(machineIds);
+        return machineIds.stream()
+                .filter(machineId -> reachingRoute(type, agentVersionByMachine.getOrDefault(machineId, "")).isPresent())
+                .collect(toSet());
+    }
+
+    public boolean reaches(DeliveryType type, String machineId) {
+        String agentVersion = agentVersions.find(machineId).orElse("");
+        return reachingRoute(type, agentVersion).isPresent();
     }
 
     private Optional<DeliveryRoute> reachingRoute(DeliveryType type, String agentVersion) {

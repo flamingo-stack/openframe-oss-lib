@@ -1,5 +1,6 @@
 package com.openframe.data.nats.packageupdate;
 
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
@@ -12,11 +13,12 @@ import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
+import com.openframe.data.nats.delivery.route.DeliveryRouter;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
-import com.openframe.delivery.dispatch.DeliveryDispatcher;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,12 +28,19 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -40,13 +49,19 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PackageUpdateDispatchServiceTest {
 
-    @Mock private DeliveryDispatcher deliveryDispatcher;
+    @Mock private DeliveryRouter deliveryRouter;
     @Mock private PackageUpdateRequestRepository requestRepository;
     @Mock private PackageUpdateDeviceStateRepository deviceStateRepository;
     @Mock private ScriptExecutionRepository scriptExecutionRepository;
     @Mock private TenantIdProvider tenantIdProvider;
 
     @InjectMocks private PackageUpdateDispatchService service;
+
+    @BeforeEach
+    void everyMachineReachable() {
+        lenient().when(deliveryRouter.reachable(eq(DeliveryType.PACKAGE_UPDATE), anyCollection()))
+                .thenAnswer(invocation -> new HashSet<>(invocation.<Collection<String>>getArgument(1)));
+    }
 
     private static RunningExecutionRows rows(String executionId, PackageManagerType manager, String packageName,
                                              String... machineIds) {
@@ -66,12 +81,13 @@ class PackageUpdateDispatchServiceTest {
     void adminUpdateNow_winget_persistsRequestDeviceStatesAndOrdersPerMachine() {
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
 
-        service.dispatchAdminUpdateNow(rows("exec-1", PackageManagerType.WINGET, "Google.Chrome", "m1", "m2"), null);
+        String returned = service.dispatchAdminUpdateNow(rows("exec-1", PackageManagerType.WINGET, "Google.Chrome", "m1", "m2"), null);
 
         ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
         verify(requestRepository).save(req.capture());
         PackageUpdateRequest r = req.getValue();
         String requestId = r.getRequestId();
+        assertThat(returned).isEqualTo(requestId);
         assertThat(r.getTenantId()).isEqualTo("t1");
         assertThat(requestId).isNotBlank().isNotEqualTo("exec-1");    // own id per dispatch
         assertThat(r.getExecutionId()).isEqualTo("exec-1");
@@ -95,7 +111,7 @@ class PackageUpdateDispatchServiceTest {
                 });
 
         ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
-        verify(deliveryDispatcher, times(2)).dispatch(seed.capture());
+        verify(deliveryRouter, times(2)).dispatch(seed.capture());
         PackageUpdateDeliverySeed s1 = seed.getAllValues().get(0);
         assertThat(s1.getRequestId()).isEqualTo(requestId);
         assertThat(s1.getMode()).isEqualTo(PackageUpdateMode.WAIT);
@@ -138,7 +154,7 @@ class PackageUpdateDispatchServiceTest {
         assertThat(req.getValue().getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(req.getValue().getDeadlineSeconds()).isNull();
         ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
-        verify(deliveryDispatcher).dispatch(seed.capture());
+        verify(deliveryRouter).dispatch(seed.capture());
         assertThat(seed.getValue().getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(seed.getValue().getCountdownSeconds()).isEqualTo(120);
     }
@@ -156,7 +172,7 @@ class PackageUpdateDispatchServiceTest {
         assertThat(req.getValue().getSource()).isEqualTo(PackageUpdateSource.AUTO);
         assertThat(req.getValue().getDeadlineSeconds()).isEqualTo(604_800L);
         ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
-        verify(deliveryDispatcher).dispatch(seed.capture());
+        verify(deliveryRouter).dispatch(seed.capture());
         assertThat(seed.getValue().getSource().getKind()).isEqualTo(UpdateSource.Kind.AUTO);
     }
 
@@ -179,10 +195,10 @@ class PackageUpdateDispatchServiceTest {
 
         service.dispatchAdminUpdateNow(rows("exec-1", PackageManagerType.WINGET, "Google.Chrome", "m1", "m2"), null);
 
-        InOrder order = inOrder(scriptExecutionRepository, deliveryDispatcher);
+        InOrder order = inOrder(scriptExecutionRepository, deliveryRouter);
         ArgumentCaptor<RunningExecutionRows> leaves = ArgumentCaptor.forClass(RunningExecutionRows.class);
         order.verify(scriptExecutionRepository).saveQueued(leaves.capture());
-        order.verify(deliveryDispatcher, times(2)).dispatch(any(PackageUpdateDeliverySeed.class));
+        order.verify(deliveryRouter, times(2)).dispatch(any(PackageUpdateDeliverySeed.class));
 
         ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
         verify(requestRepository).save(req.capture());
@@ -204,7 +220,8 @@ class PackageUpdateDispatchServiceTest {
                 rows("exec-1", PackageManagerType.WINGET, "Google.Chrome", "m1"), null))
                 .isInstanceOf(DuplicateKeyException.class);
 
-        verifyNoInteractions(requestRepository, deviceStateRepository, deliveryDispatcher);
+        verifyNoInteractions(requestRepository, deviceStateRepository);
+        verify(deliveryRouter, never()).dispatch(any());
     }
 
     @Test
@@ -240,7 +257,7 @@ class PackageUpdateDispatchServiceTest {
         ArgumentCaptor<RunningExecutionRows> leaves = ArgumentCaptor.forClass(RunningExecutionRows.class);
         verify(scriptExecutionRepository).saveQueued(leaves.capture());
         assertThat(leaves.getValue().getMachineIds()).containsExactly("m1", "m2");
-        verify(deliveryDispatcher, times(2)).dispatch(any(PackageUpdateDeliverySeed.class));
+        verify(deliveryRouter, times(2)).dispatch(any(PackageUpdateDeliverySeed.class));
     }
 
     @Test
@@ -251,7 +268,7 @@ class PackageUpdateDispatchServiceTest {
                 PackageUpdateSource.AUTO, PackageUpdateMode.FORCE, 120, null);
 
         ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
-        verify(deliveryDispatcher).dispatch(seed.capture());
+        verify(deliveryRouter).dispatch(seed.capture());
         PackageUpdateDeliverySeed s = seed.getValue();
         assertThat(s.getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(s.getCountdownSeconds()).isEqualTo(120);
@@ -261,5 +278,20 @@ class PackageUpdateDispatchServiceTest {
         assertThat(s.getPackageRef().getKind()).isEqualTo(BrewPackageType.CASK);
         assertThat(s.getPackageRef().getName()).isEqualTo("postman");
         assertThat(s.getPackageRef().getId()).isNull();                      // brew: no winget id
+    }
+
+    // callers split their devices with PackageUpdateEligibilityService first; a state for a device no route reaches
+    // would stay SCHEDULED for good
+    @Test
+    void machineNoRouteReaches_refusedBeforeAnythingIsWritten() {
+        when(deliveryRouter.reachable(eq(DeliveryType.PACKAGE_UPDATE), anyCollection())).thenReturn(Set.of("m1"));
+
+        assertThatThrownBy(() -> service.dispatchAdminUpdateNow(
+                rows("exec-1", PackageManagerType.WINGET, "Google.Chrome", "m1", "m2"), null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("m2");
+
+        verifyNoInteractions(scriptExecutionRepository, requestRepository, deviceStateRepository);
+        verify(deliveryRouter, never()).dispatch(any());
     }
 }

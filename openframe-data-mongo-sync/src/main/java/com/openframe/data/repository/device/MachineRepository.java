@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.ReadPreference;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -19,6 +20,10 @@ import java.util.Optional;
 @Repository
 public interface MachineRepository extends MongoRepository<Machine, String>, CustomMachineRepository{
     Optional<Machine> findByMachineId(String machineId);
+
+    // primary on purpose: registration checks the machine milliseconds after it saved it
+    @ReadPreference("primary")
+    boolean existsByMachineId(String machineId);
 
     List<Machine> findByHostnameContainingIgnoreCase(String hostname);
 

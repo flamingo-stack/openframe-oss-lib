@@ -42,7 +42,7 @@ public class PackageManagerAvailability {
 
     public boolean isSoftwareManageable(Machine machine) {
         Map<PackageManagerType, PackageManagerState> reported = machine.getPackageManagers();
-        if (reported == null) {
+        if (isEmpty(reported)) {
             return true;
         }
         return enabledManagers().stream()

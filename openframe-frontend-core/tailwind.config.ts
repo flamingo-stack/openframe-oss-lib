@@ -222,6 +222,9 @@ const config: Config = {
           divider: 'var(--color-divider)',
           // The three-column shell's sidebars (ODS v2 backgrounds/panel).
           panel: 'var(--color-bg-panel)',
+          // A floating menu's ground and its hovered row (ODS v2 backgrounds/overlay).
+          menu: 'var(--color-bg-menu)',
+          'menu-hover': 'var(--color-bg-menu-hover)',
 
           // Borders
           border: {
