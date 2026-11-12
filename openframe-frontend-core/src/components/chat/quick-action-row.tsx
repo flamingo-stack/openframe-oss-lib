@@ -40,8 +40,9 @@ export interface QuickActionRowProps {
   leading?: ReadonlyArray<QuickActionChip>;
   /** Default theme for chips without their own (the agent's accent). */
   theme?: QuickActionThemeSpec;
-  /** The tint of the row's own glyph, the "All" tag's (OpenFrame: `'grey'`, as its chips' icons). Omitted, it keeps
-   *  the tag's text color. */
+  /** The tint of the row's own glyph, the "All" tag's (OpenFrame: `'grey'`, as its chips' icons). Omitted, All takes
+   *  the colour its chips' icons share (an agent's accent, an admin-configured colour), and the tag's text colour
+   *  when they share none. */
   accent?: QuickActionAccent;
   /** The actions are still read: the row draws its tags' loading form, at the row's own height. */
   loading?: boolean;
@@ -136,9 +137,33 @@ function QuickActionRowBody({
           )}
         </div>
       </div>
-      {!loading && chips.length > 0 && <AllQuickActions chips={chips} theme={theme} accent={accent} title={label} />}
+      {!loading && chips.length > 0 && (
+        <AllQuickActions chips={chips} theme={theme} accent={accent ?? sharedChipAccent(chips, theme)} title={label} />
+      )}
     </div>
   );
+}
+
+/**
+ * The accent the chips share, for the "All" glyph: per chip with an icon, its icon's accent, else its theme's (or the
+ * row's): what the host configured for the row (the client chat's assistant colour, an agent's identity colour, the
+ * agent's built-in pink or cyan). A single action's own icon fill (`props.color`) is that chip's alone and does not
+ * count. One accent across every chip with an icon: that accent. Different accents, none, or an icon the row cannot
+ * read (a rendered node), and All keeps the tag's text colour.
+ */
+export function sharedChipAccent(
+  chips: ReadonlyArray<QuickActionChip>,
+  theme?: QuickActionThemeSpec,
+): QuickActionAccent | undefined {
+  let shared: QuickActionAccent | undefined;
+  for (const chip of chips) {
+    if (chip.icon == null) continue;
+    if (!isQuickActionIconSpec(chip.icon)) return undefined;
+    const tint = chip.icon.accent ?? (chip.theme ?? theme)?.accent;
+    if (!tint || (shared !== undefined && tint !== shared)) return undefined;
+    shared = tint;
+  }
+  return shared;
 }
 
 /** A wheel's line, in px, for the browsers that report lines instead of pixels. */
