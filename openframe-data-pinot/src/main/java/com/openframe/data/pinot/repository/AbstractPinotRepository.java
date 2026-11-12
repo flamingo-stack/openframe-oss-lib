@@ -23,6 +23,9 @@ import java.util.stream.IntStream;
 @Slf4j
 public abstract class AbstractPinotRepository {
 
+    // What Pinot returns for a STRING column a row never had (e.g. a dimension added after the row was published).
+    private static final String PINOT_NULL = "null";
+
     protected final Connection pinotConnection;
 
     protected AbstractPinotRepository(Connection pinotConnection) {
@@ -65,7 +68,7 @@ public abstract class AbstractPinotRepository {
 
     /**
      * Convenience: execute a query with two columns (value, count) and return
-     * an ordered {@code Map<value, count>}. Null/empty keys are skipped.
+     * an ordered {@code Map<value, count>}. Null/empty keys and Pinot's "null" sentinel are skipped.
      */
     protected Map<String, Integer> executeKeyCountQuery(String query) {
         try {
@@ -76,7 +79,7 @@ public abstract class AbstractPinotRepository {
             Map<String, Integer> options = new LinkedHashMap<>();
             for (int i = 0; i < resultSet.getRowCount(); i++) {
                 String value = resultSet.getString(i, PinotQueryBuilder.FIRST_COLUMN_INDEX);
-                if (value != null && !value.isEmpty()) {
+                if (value != null && !value.isEmpty() && !PINOT_NULL.equals(value)) {
                     long count = resultSet.getLong(i, 1);
                     options.put(value, (int) count);
                 }

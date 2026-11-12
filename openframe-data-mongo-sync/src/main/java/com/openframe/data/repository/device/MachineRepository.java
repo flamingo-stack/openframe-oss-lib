@@ -54,11 +54,17 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
 
     List<Machine> findByMachineIdInAndStatusIn(Collection<String> machineIds, Collection<DeviceStatus> statuses);
 
+    List<Machine> findByMachineIdInAndStatusInAndTelemetryStatus(Collection<String> machineIds,
+                                                                 Collection<DeviceStatus> statuses,
+                                                                 TelemetryStatus telemetryStatus);
+
     List<Machine> findByStatusIn(Collection<DeviceStatus> statuses);
 
     List<Machine> findByStatusInAndIdGreaterThanOrderByIdAsc(Collection<DeviceStatus> statuses, String id, Limit limit);
 
     long countByStatusIn(Collection<DeviceStatus> statuses);
+
+    long countByStatusInAndTelemetryStatus(Collection<DeviceStatus> statuses, TelemetryStatus telemetryStatus);
 
     List<Machine> findByStatusInAndRegisteredAtBefore(Collection<DeviceStatus> statuses, Instant before);
 

@@ -48,6 +48,7 @@ public class DeviceQueries {
                     osUuid
                     agentVersion
                     status
+                    connectivity
                     lastSeen
                     organizationId
                     hostname
@@ -115,6 +116,7 @@ public class DeviceQueries {
                             ip
                             macAddress
                             status
+                            connectivity
                             type
                             osType
                             osVersion
@@ -147,6 +149,7 @@ public class DeviceQueries {
                             ip
                             macAddress
                             status
+                            connectivity
                             type
                             osType
                             osVersion
