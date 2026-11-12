@@ -10,7 +10,10 @@ import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
+import com.openframe.core.exception.BadRequestException;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -31,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -84,6 +88,14 @@ class SoftwareInventoryServiceReadModelTest {
         order.verify(catalogStatus).apply(anyList());
     }
 
+    private void catalogManagesWith(PackageCatalogEntry managingPackage) {
+        doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(r -> r.setManagingPackage(managingPackage));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+    }
+
     @Test
     void findById_unknown_isEmpty() {
         when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(false);
@@ -99,6 +111,35 @@ class SoftwareInventoryServiceReadModelTest {
 
         assertThat(service.findById("42")).get().extracting(SoftwareResponse::getId).isEqualTo("42");
         verifyPoliciesThenCatalog();
+    }
+
+    @Test
+    void getManagingPackage_titleACatalogPackageManages_returnsThePackage() {
+        PackageCatalogEntry xz = PackageCatalogEntry.builder().manager(PackageManagerType.BREW).packageId("xz").build();
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.BREW));
+        catalogManagesWith(xz);
+
+        assertThat(service.getManagingPackage("42")).isSameAs(xz);
+    }
+
+    @Test
+    void getManagingPackage_titleNoPackageManages_badRequestNamingTheTitle() {
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(true);
+        when(tenantSoftwareReadModelQuery.get(TENANT, "42")).thenReturn(row("42", SoftwareSource.UNMANAGED));
+
+        assertThatThrownBy(() -> service.getManagingPackage("42"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("No package manager manages app-42");
+    }
+
+    @Test
+    void getManagingPackage_unknownSoftware_notFound() {
+        when(tenantSoftwareReadModelQuery.exists(TENANT, "42")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.getManagingPackage("42"))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Software not found: 42");
     }
 
     @Test

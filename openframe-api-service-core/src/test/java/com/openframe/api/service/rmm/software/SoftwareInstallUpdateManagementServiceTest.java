@@ -10,6 +10,7 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
@@ -38,6 +39,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -64,6 +66,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Mock private PackageUpdateEligibilityService packageUpdateEligibility;
     @Mock private PackageUpdateDispatchService packageUpdateDispatchService;
     @Mock private DeviceService deviceService;
+    @Mock private SoftwareInventoryService softwareInventoryService;
 
     private SoftwareInstallUpdateManagementService service;
 
@@ -74,7 +77,8 @@ class SoftwareInstallUpdateManagementServiceTest {
         MachinePlatformResolver platformResolver =
                 new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
         service = new SoftwareInstallUpdateManagementService(registry, scriptService, softwareDispatchService,
-                platformResolver, packageUpdateEligibility, packageUpdateDispatchService, deviceService);
+                platformResolver, packageUpdateEligibility, packageUpdateDispatchService, deviceService,
+                new SoftwarePackageSelectionResolver(softwareInventoryService));
         // A real brew handler so we exercise real script-code + arg building.
         when(registry.handlerFor(PackageManagerType.BREW)).thenReturn(new BrewPackageManagerHandler());
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -231,6 +235,27 @@ class SoftwareInstallUpdateManagementServiceTest {
                 .isInstanceOf(BadRequestException.class);
 
         verifyNoInteractions(softwareDispatchService, packageUpdateDispatchService);
+    }
+
+    @Test
+    @DisplayName("update: a package given only by its Software is dispatched as the package that manages the title")
+    void update_softwareIdOnly_dispatchesTheManagingPackage() {
+        allMacTargets();
+        ScriptResponse updateScript = systemScript("brew-update-id");
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(PackageCatalogEntry.builder()
+                .manager(PackageManagerType.BREW).packageId("slack").brewType(BrewPackageType.CASK).build());
+        SoftwarePackageInput bySoftware = new SoftwarePackageInput();
+        bySoftware.setSoftwareId("title-7");
+
+        List<SoftwareDispatchResult> results = service.update(input(bySoftware), USER, ExecutionSource.PACKAGE_UPDATE);
+
+        verify(softwareDispatchService).dispatch(any(), eq(updateScript), eq(MACHINES),
+                eq(List.of("--cask", "slack")), eq(USER), eq(ExecutionSource.PACKAGE_UPDATE),
+                eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.UPDATE));
+        assertThat(results)
+                .extracting(SoftwareDispatchResult::getPackageManager, SoftwareDispatchResult::getPackageName)
+                .containsExactly(tuple(PackageManagerType.BREW, "slack"));
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {

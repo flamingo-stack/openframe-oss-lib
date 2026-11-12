@@ -53,6 +53,7 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import lombok.RequiredArgsConstructor;
@@ -164,6 +165,16 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> rows = List.of(row);
         applyStatuses(rows);
         return Optional.of(row);
+    }
+
+    public PackageCatalogEntry getManagingPackage(String softwareId) {
+        SoftwareResponse software = findById(softwareId)
+                .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
+        PackageCatalogEntry managingPackage = software.getManagingPackage();
+        if (managingPackage == null) {
+            throw new BadRequestException("No package manager manages " + software.getName());
+        }
+        return managingPackage;
     }
 
     // Fleet lists a title only after its periodic host count, so a title just seen on a device can be unknown there

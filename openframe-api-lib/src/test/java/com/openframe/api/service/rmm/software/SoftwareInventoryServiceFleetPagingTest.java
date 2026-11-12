@@ -12,6 +12,8 @@ import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
 import com.openframe.api.service.rmm.fleet.HostInventory;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -46,6 +48,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -178,6 +181,33 @@ class SoftwareInventoryServiceFleetPagingTest {
         // execution + verifications
         assertThat(service.findById("42")).map(SoftwareResponse::getDevicesCount).contains(7);
         verifyNoInteractions(deviceCountEnricher);
+    }
+
+    @Test
+    void getManagingPackage_titleACatalogPackageManages_returnsThePackage() {
+        // setup
+        PackageCatalogEntry chrome = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.WINGET).packageId("Google.Chrome").build();
+        when(fleet.getSoftwareTitle(42L)).thenReturn(fleetTitle("Chrome", 42L, 7));
+        doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setManagingPackage(chrome));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+
+        // execution
+        PackageCatalogEntry result = service.getManagingPackage("42");
+
+        // verifications
+        assertThat(result).isSameAs(chrome);
+    }
+
+    @Test
+    void getManagingPackage_notATitle_notFound() {
+        // execution / verifications
+        assertThatThrownBy(() -> service.getManagingPackage("not-a-title"))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Software not found: not-a-title");
     }
 
     @Test

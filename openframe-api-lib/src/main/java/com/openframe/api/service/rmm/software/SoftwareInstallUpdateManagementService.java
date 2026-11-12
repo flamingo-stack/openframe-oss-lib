@@ -41,6 +41,7 @@ public class SoftwareInstallUpdateManagementService {
     private final PackageUpdateEligibilityService packageUpdateEligibility;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
     private final DeviceService deviceService;
+    private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -52,13 +53,15 @@ public class SoftwareInstallUpdateManagementService {
 
     private List<SoftwareDispatchResult> dispatch(SoftwareAction action, SoftwareManagementInput input,
                                                   String initiatedBy, ExecutionSource source) {
+        List<SoftwarePackageInput> packages = input.getPackages();
+        softwarePackageSelectionResolver.resolve(packages);
         List<String> machineIds = input.getMachineIds();
         Map<String, OsType> osTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
         Set<String> orderMachines = packageUpdateEligibility.eligibleMachines(action, machineIds);
         Map<SoftwareScriptCode, ScriptResponse> scriptCache = new EnumMap<>(SoftwareScriptCode.class);
 
-        List<SoftwareDispatchResult> results = new ArrayList<>(input.getPackages().size());
-        for (SoftwarePackageInput pkg : input.getPackages()) {
+        List<SoftwareDispatchResult> results = new ArrayList<>(packages.size());
+        for (SoftwarePackageInput pkg : packages) {
             PackageManagerHandler handler = packageManagerRegistry.handlerFor(pkg.getPackageManager());
             SoftwareScriptCode code = handler.scriptCode(action);
             ScriptResponse script = scriptCache.computeIfAbsent(code, scriptService::getSoftwareScript);
@@ -107,7 +110,7 @@ public class SoftwareInstallUpdateManagementService {
         }
 
         log.info("Software {} dispatched: packages={}/{} machines={} initiatedBy={} source={}",
-                action, results.size(), input.getPackages().size(), machineIds.size(), initiatedBy, source);
+                action, results.size(), packages.size(), machineIds.size(), initiatedBy, source);
         return results;
     }
 }

@@ -61,6 +61,7 @@ public class SoftwareBundleService {
     private final MachinePlatformResolver machinePlatformResolver;
     private final TenantIdProvider tenantIdProvider;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
 
     @Value("${openframe.rmm.software.bundle.pending-ttl}")
     private Duration pendingTtl;
@@ -361,10 +362,11 @@ public class SoftwareBundleService {
         return entity;
     }
 
-    private static List<SoftwareBundlePackage> toDomainPackages(List<SoftwarePackageInput> packages) {
+    private List<SoftwareBundlePackage> toDomainPackages(List<SoftwarePackageInput> packages) {
         if (packages == null) {
             return List.of();
         }
+        softwarePackageSelectionResolver.resolve(packages);
         return packages.stream()
                 .map(p -> SoftwareBundlePackage.builder()
                         .packageManager(p.getPackageManager())

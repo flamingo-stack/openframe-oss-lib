@@ -40,6 +40,7 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import org.junit.jupiter.api.Test;
@@ -833,6 +834,37 @@ class SoftwareInventoryServiceTest {
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(autoUpdateService, catalogStatus);
         order.verify(autoUpdateService).applyToSoftware(argThat(rows -> rows.size() == 1));
         order.verify(catalogStatus).apply(argThat(rows -> rows.size() == 1 && "xz".equals(rows.get(0).getName())));
+    }
+
+    @Test
+    @DisplayName("managing package: the catalog package the statuses put on the title")
+    void getManagingPackage_titleACatalogPackageManages_returnsThePackage() {
+        PackageCatalogEntry xz = PackageCatalogEntry.builder().manager(PackageManagerType.BREW).packageId("xz").build();
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(42L);
+        title.setName("xz");
+        title.setSource("homebrew_packages");
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+        org.mockito.Mockito.doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setManagingPackage(xz));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+
+        assertThat(service.getManagingPackage("42")).isSameAs(xz);
+    }
+
+    @Test
+    @DisplayName("managing package: a title no package manager manages is a client error naming the title")
+    void getManagingPackage_titleNoPackageManages_badRequestNamingTheTitle() {
+        SoftwareTitle title = new SoftwareTitle();
+        title.setId(42L);
+        title.setName("Adobe Acrobat");
+        title.setSource("programs");
+        when(fleet.getSoftwareTitle(42L)).thenReturn(title);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> service.getManagingPackage("42"));
+        assertThat(ex.getMessage()).isEqualTo("No package manager manages Adobe Acrobat");
     }
 
     @Test

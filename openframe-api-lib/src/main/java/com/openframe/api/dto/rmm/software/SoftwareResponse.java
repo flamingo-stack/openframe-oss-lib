@@ -1,5 +1,6 @@
 package com.openframe.api.dto.rmm.software;
 
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
@@ -29,7 +30,7 @@ public class SoftwareResponse {
     private Boolean cpeMatched;
     private SoftwareAutoUpdateStatus autoUpdate;
     // not in the GraphQL schema: the osquery table Fleet took the row from, the keys a package manager matches the
-    // program by, and the match the read model stored for it
+    // program by, the match the read model stored for it, and the catalog package that manages the title
     private FleetSource fleetSource;
     private String upgradeCode;
     private String bundleIdentifier;
@@ -37,4 +38,5 @@ public class SoftwareResponse {
     private List<String> packageFamilyNames;
     private Boolean systemComponent;
     private SoftwarePackageMatch packageMatch;
+    private PackageCatalogEntry managingPackage;
 }

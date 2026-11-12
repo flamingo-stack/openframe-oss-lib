@@ -10,6 +10,7 @@ import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
@@ -43,6 +44,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -68,13 +70,15 @@ class SoftwareBundleServiceTest {
     @Mock private MachinePlatformResolver machinePlatformResolver;
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private PackageManagerAvailability packageManagerAvailability;
+    @Mock private SoftwareInventoryService softwareInventoryService;
 
     private SoftwareBundleService service;
 
     @BeforeEach
     void setUp() {
         service = new SoftwareBundleService(bundleRepository, onlineDispatchRepository, softwareScheduleService,
-                softwareActionResultRepository, machinePlatformResolver, tenantIdProvider, packageManagerAvailability);
+                softwareActionResultRepository, machinePlatformResolver, tenantIdProvider, packageManagerAvailability,
+                new SoftwarePackageSelectionResolver(softwareInventoryService));
         ReflectionTestUtils.setField(service, "pendingTtl", Duration.ofHours(1));
         ReflectionTestUtils.setField(service, "scheduleReconnectWindowSeconds", RECONNECT_WINDOW);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -278,6 +282,48 @@ class SoftwareBundleServiceTest {
         assertThat(created.getValue().getAutoUpdate()).isSameAs(autoUpdate);
         assertThat(created.getValue().getPackages()).singleElement()
                 .satisfies(p -> assertThat(p.getSoftwareId()).isEqualTo("title-7"));
+    }
+
+    @Test
+    @DisplayName("submit: a package given only by its Software is stored as the package that manages the title")
+    void submit_softwareIdOnly_storesTheManagingPackage() {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(machinePlatformResolver.osTypesByMachineId(any())).thenReturn(java.util.Map.of("m1", OsType.MAC_OS));
+        when(onlineDispatchRepository.findByTenantIdAndMachineIdAndBundleId(eq(TENANT), anyString(), eq(BUNDLE_ID)))
+                .thenReturn(Optional.empty());
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(PackageCatalogEntry.builder()
+                .manager(PackageManagerType.BREW).packageId("slack").brewType(BrewPackageType.CASK).build());
+        SoftwarePackageInput bySoftware = new SoftwarePackageInput();
+        bySoftware.setSoftwareId("title-7");
+        SubmitSoftwareBundleInput input = submitInput(bySoftware);
+        input.setAction(SoftwareAction.UPDATE);
+
+        service.submit(input, USER);
+
+        ArgumentCaptor<SoftwareBundle> saved = ArgumentCaptor.forClass(SoftwareBundle.class);
+        verify(bundleRepository).save(saved.capture());
+        assertThat(saved.getValue().getPackages())
+                .extracting(SoftwareBundlePackage::getPackageManager, SoftwareBundlePackage::getPackageName,
+                        SoftwareBundlePackage::getBrewPackageType, SoftwareBundlePackage::getSoftwareId)
+                .containsExactly(tuple(PackageManagerType.BREW, "slack", BrewPackageType.CASK, "title-7"));
+    }
+
+    @Test
+    @DisplayName("submit: a Software no package manager manages is rejected before anything is saved")
+    void submit_softwareNoPackageManages_rejectedNothingSaved() {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(softwareInventoryService.getManagingPackage("title-7"))
+                .thenThrow(new BadRequestException("No package manager manages Adobe Acrobat"));
+        SoftwarePackageInput bySoftware = new SoftwarePackageInput();
+        bySoftware.setSoftwareId("title-7");
+
+        assertThatThrownBy(() -> service.submit(submitInput(bySoftware), USER))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("No package manager manages Adobe Acrobat");
+        verify(bundleRepository, never()).save(any());
+        verifyNoInteractions(onlineDispatchRepository, softwareActionResultRepository, softwareScheduleService);
     }
 
     private static PackageUpdateSettingsInput settingsInput(PackageUpdateMode mode, Long deadlineSeconds, int countdownSeconds) {

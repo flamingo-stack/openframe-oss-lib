@@ -95,6 +95,7 @@ public class SoftwareCatalogStatus {
         PackageCatalogEntry entry = token == null ? null : brewPackages.get(token);
         String latest = entry == null ? null : brewVersionOf(entry);
         applyLatest(row, latest);
+        row.setManagingPackage(entry);
         if (row.getAutoUpdate() == null) {
             row.setAutoUpdate(entry != null ? SoftwareAutoUpdateStatus.OFF : SoftwareAutoUpdateStatus.NO_PACKAGE);
         }
@@ -108,6 +109,7 @@ public class SoftwareCatalogStatus {
         if (match.isMatched()) {
             SoftwareSource source = SOURCE_BY_MANAGER.get(entry.getManager());
             row.setSource(source);
+            row.setManagingPackage(entry);
         }
         if (row.getAutoUpdate() != null) {
             return;

@@ -518,8 +518,9 @@ input SoftwareManagementInput {
 
 """One package chosen from the catalog, identified exactly as package search returns it."""
 input SoftwarePackageInput {
-    packageManager: PackageManagerType!
-    packageName: String!
+    "Omit packageManager and packageName together to let the server pick the package that manages softwareId."
+    packageManager: PackageManagerType
+    packageName: String
     "Brew-only sub-type (CASK/FORMULA). Required for brew (enforced server-side), ignored by managers that do not distinguish."
     brewPackageType: BrewPackageType
     version: String

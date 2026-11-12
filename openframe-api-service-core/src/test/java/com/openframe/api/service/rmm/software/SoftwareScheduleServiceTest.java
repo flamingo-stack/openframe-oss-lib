@@ -11,12 +11,14 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
+import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.SoftwareAction;
@@ -36,6 +38,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -58,6 +61,7 @@ class SoftwareScheduleServiceTest {
     private SoftwareScheduleTargetResolver targetResolver;
     private TenantIdProvider tenantIdProvider;
     private PackageManagerAvailability packageManagerAvailability;
+    private SoftwareInventoryService softwareInventoryService;
     private SoftwareScheduleService service;
 
     private CreateSoftwareScheduleInput createInput;
@@ -69,8 +73,9 @@ class SoftwareScheduleServiceTest {
         targetResolver = mock(SoftwareScheduleTargetResolver.class);
         tenantIdProvider = mock(TenantIdProvider.class);
         packageManagerAvailability = mock(PackageManagerAvailability.class);
+        softwareInventoryService = mock(SoftwareInventoryService.class);
         service = new SoftwareScheduleService(scheduleRepository, assignedRepository, targetResolver, tenantIdProvider,
-                packageManagerAvailability);
+                packageManagerAvailability, new SoftwarePackageSelectionResolver(softwareInventoryService));
 
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Saves are identity so assertions can read back what the service built.
@@ -355,6 +360,69 @@ class SoftwareScheduleServiceTest {
         assertThat(existing.getUpdateSettings().getCountdownSeconds()).isEqualTo(300);
         assertThat(existing.getAutoUpdate().isEnabled()).isFalse();
         assertThat(response.getUpdateSettings()).isEqualTo(existing.getUpdateSettings());
+    }
+
+    @Test
+    @DisplayName("create: a package given only by its Software is stored as the package that manages the title")
+    void createSoftwareIdOnlyStoresTheManagingPackage() {
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(wingetChrome());
+        createInput.setAction(SoftwareAction.UPDATE);
+        createInput.setPackages(List.of(bySoftware("title-7")));
+
+        service.create(createInput, ACTOR);
+
+        ArgumentCaptor<SoftwareSchedule> captor = ArgumentCaptor.forClass(SoftwareSchedule.class);
+        verify(scheduleRepository).save(captor.capture());
+        assertThat(captor.getValue().getPackages())
+                .extracting(SoftwareSchedulePackage::getPackageManager, SoftwareSchedulePackage::getPackageName,
+                        SoftwareSchedulePackage::getBrewPackageType, SoftwareSchedulePackage::getSoftwareId)
+                .containsExactly(tuple(PackageManagerType.WINGET, "Google.Chrome", null, "title-7"));
+        verify(packageManagerAvailability)
+                .requireSoftwareManageable(List.of("m1", "m2"), List.of(PackageManagerType.WINGET));
+    }
+
+    @Test
+    @DisplayName("update: a package given only by its Software is stored as the package that manages the title")
+    void updateSoftwareIdOnlyStoresTheManagingPackage() {
+        SoftwareSchedule existing = existingActive();
+        when(scheduleRepository.findByTenantIdAndId(TENANT_ID, SCHEDULE_ID)).thenReturn(Optional.of(existing));
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(wingetChrome());
+        UpdateSoftwareScheduleInput input = new UpdateSoftwareScheduleInput();
+        input.setId(SCHEDULE_ID);
+        input.setName("Nightly Slack");
+        input.setAction(SoftwareAction.UPDATE);
+        input.setPackages(List.of(bySoftware("title-7")));
+        input.setStartAt(Instant.parse("2026-09-16T03:30:00Z"));
+
+        service.update(input, ACTOR);
+
+        assertThat(existing.getPackages())
+                .extracting(SoftwareSchedulePackage::getPackageManager, SoftwareSchedulePackage::getPackageName,
+                        SoftwareSchedulePackage::getBrewPackageType, SoftwareSchedulePackage::getSoftwareId)
+                .containsExactly(tuple(PackageManagerType.WINGET, "Google.Chrome", null, "title-7"));
+    }
+
+    @Test
+    @DisplayName("create: a Software no package manager manages is rejected before anything is saved")
+    void createSoftwareNoPackageManagesRejected() {
+        when(softwareInventoryService.getManagingPackage("title-7"))
+                .thenThrow(new BadRequestException("No package manager manages Adobe Acrobat"));
+        createInput.setPackages(List.of(bySoftware("title-7")));
+
+        assertThatThrownBy(() -> service.create(createInput, ACTOR))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("No package manager manages Adobe Acrobat");
+        verify(scheduleRepository, never()).save(any(SoftwareSchedule.class));
+    }
+
+    private static SoftwareSchedulePackageInput bySoftware(String softwareId) {
+        SoftwareSchedulePackageInput p = new SoftwareSchedulePackageInput();
+        p.setSoftwareId(softwareId);
+        return p;
+    }
+
+    private static PackageCatalogEntry wingetChrome() {
+        return PackageCatalogEntry.builder().manager(PackageManagerType.WINGET).packageId("Google.Chrome").build();
     }
 
     private static PackageUpdateSettingsInput settingsInput(PackageUpdateMode mode, Long deadlineSeconds, int countdownSeconds) {

@@ -127,8 +127,9 @@ type SoftwareSchedulePackage {
 }
 
 input SoftwareSchedulePackageInput {
-    packageManager: PackageManagerType!
-    packageName: String!
+    "Omit packageManager and packageName together to let the server pick the package that manages softwareId."
+    packageManager: PackageManagerType
+    packageName: String
     "Brew-only sub-type (CASK/FORMULA). Required for brew (enforced server-side), ignored by other managers."
     brewPackageType: BrewPackageType
     "The Software (Fleet title) this package updates, as on SoftwarePackageInput."
