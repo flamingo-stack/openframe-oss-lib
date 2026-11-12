@@ -105,6 +105,42 @@ class MySqlGapBackfillIT {
                         tuple("teams", 10), tuple("teams", 11));
     }
 
+    // Same filters as the Fleet connector spec: host_software has no timestamp, Fleet stamps host_updates in the same transaction.
+    @Test
+    void readOnlyIncrementalSnapshot_softwareTables_onlyHostsChangedInGapReplayed() throws SQLException {
+        // setup
+        execute("INSERT INTO " + database + ".host_updates (host_id, software_updated_at) VALUES "
+                + "(1, UTC_TIMESTAMP() - INTERVAL 10 MINUTE), (2, UTC_TIMESTAMP() - INTERVAL 2 HOUR)");
+        execute("INSERT INTO " + database + ".host_software (host_id, software_id) VALUES (1, 100), (1, 101), (2, 200)");
+        execute("INSERT INTO " + database + ".host_software_windows_details (host_id, software_id, updated_at) VALUES "
+                + "(1, 100, UTC_TIMESTAMP() - INTERVAL 10 MINUTE), (2, 200, UTC_TIMESTAMP() - INTERVAL 2 HOUR)");
+        debeziumService.createConnector(connectorName, config);
+        awaitRunning();
+        Map<String, String> backfill = Map.of(
+                database + ".activity_past", "created_at >= {from}",
+                database + ".host_software", "host_id IN (SELECT host_id FROM `" + database + "`.`host_updates` WHERE software_updated_at >= {from})",
+                database + ".host_software_windows_details", "updated_at >= {from}");
+        Instant gapFrom = Instant.now().minus(Duration.ofMinutes(30));
+        List<SnapshotCondition> conditions = dialect.gapConditions(config, backfill, gapFrom);
+        Map<String, Object> hostSideConfig = hostSideConfig();
+        GapRecoveryProperties signalProperties = new GapRecoveryProperties();
+        signalProperties.setBackfillExpiry(Duration.ofHours(2));
+        SnapshotSignalPublisher publisher = new SnapshotSignalPublisher(objectMapper, signalProperties, new SignalKafkaClients());
+
+        // execution
+        publisher.publishIncrementalSnapshot(hostSideConfig, conditions);
+
+        // verifications
+        List<JsonNode> replayed = awaitRecords(3);
+        assertThat(replayed)
+                .extracting(record -> record.path("source").path("table").asText(),
+                        record -> record.path("after").path("host_id").asInt(),
+                        record -> record.path("after").path("software_id").asInt())
+                .containsExactlyInAnyOrder(
+                        tuple("host_software", 1, 100), tuple("host_software", 1, 101),
+                        tuple("host_software_windows_details", 1, 100));
+    }
+
     private Map<String, Object> connectorConfig() {
         Map<String, Object> connector = new HashMap<>();
         connector.put("connector.class", "io.debezium.connector.mysql.MySqlConnector");
@@ -114,7 +150,8 @@ class MySqlGapBackfillIT {
         connector.put("database.password", "root");
         connector.put("database.server.id", String.valueOf(Math.abs(topicPrefix.hashCode() % 100000) + 1000));
         connector.put("database.include.list", database);
-        connector.put("table.include.list", database + ".activity_past," + database + ".teams");
+        connector.put("table.include.list", database + ".activity_past," + database + ".teams,"
+                + database + ".host_software," + database + ".host_software_windows_details");
         connector.put("topic.prefix", topicPrefix);
         connector.put("snapshot.mode", "no_data");
         connector.put("read.only", "true");
@@ -141,6 +178,11 @@ class MySqlGapBackfillIT {
         execute("CREATE DATABASE " + database);
         execute("CREATE TABLE " + database + ".activity_past (id INT PRIMARY KEY, created_at TIMESTAMP(6) NOT NULL)");
         execute("CREATE TABLE " + database + ".teams (id INT PRIMARY KEY, name VARCHAR(64) NOT NULL)");
+        execute("CREATE TABLE " + database + ".host_updates (host_id INT UNSIGNED PRIMARY KEY, software_updated_at TIMESTAMP NULL)");
+        execute("CREATE TABLE " + database + ".host_software (host_id INT UNSIGNED NOT NULL, software_id BIGINT UNSIGNED NOT NULL, "
+                + "last_opened_at TIMESTAMP NULL, PRIMARY KEY (host_id, software_id))");
+        execute("CREATE TABLE " + database + ".host_software_windows_details (host_id INT UNSIGNED NOT NULL, software_id BIGINT UNSIGNED NOT NULL, "
+                + "updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), PRIMARY KEY (host_id, software_id))");
     }
 
     private void execute(String sql) throws SQLException {
