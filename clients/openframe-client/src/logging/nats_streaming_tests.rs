@@ -28,6 +28,29 @@ fn a_stored_log_key_wins_over_the_initial_key() {
 }
 
 #[test]
+fn only_the_gateway_401_counts_as_a_key_rejection() {
+    use async_nats::{ClientError, ConnectError, ConnectErrorKind, Event, ServerError};
+    let client_error = |kind, source: &str| {
+        Event::ClientError(ClientError::Other(
+            ConnectError::with_source(kind, std::io::Error::other(source.to_string())).to_string(),
+        ))
+    };
+
+    assert!(is_key_rejection(&client_error(
+        ConnectErrorKind::AuthorizationViolation,
+        "HTTP error: 401 Unauthorized"
+    )));
+    assert!(!is_key_rejection(&client_error(
+        ConnectErrorKind::Io,
+        "connection refused"
+    )));
+    assert!(!is_key_rejection(&Event::ServerError(
+        ServerError::AuthorizationViolation
+    )));
+    assert!(!is_key_rejection(&Event::Disconnected));
+}
+
+#[test]
 fn tenant_domain_drops_the_api_prefix() {
     assert_eq!(
         extract_tenant_domain("api.acme.openframe.ai"),
