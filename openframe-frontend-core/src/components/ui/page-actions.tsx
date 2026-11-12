@@ -107,12 +107,13 @@ function menuRowIcon(action: PageActionButton): React.ReactNode {
 function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuItem[] {
   if (action.submenu && action.submenu.length > 0) {
     // When a split-button action collapses into the merged mobile "..." menu,
-    // its chevron disappears and its children become sibling rows. Prefix
-    // each child with the parent label.
+    // its chevron disappears and its children become sibling rows. Each child
+    // keeps its own label; the parent action is its secondary text (before any
+    // description of its own), never packed into the label.
     if (!action.label) return action.submenu;
     return action.submenu.map(item => ({
       ...item,
-      label: `${action.label} (${item.label})`,
+      description: item.description ? `${action.label} · ${item.description}` : action.label,
     }));
   }
 
