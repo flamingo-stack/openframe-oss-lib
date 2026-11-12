@@ -14,11 +14,6 @@ import com.openframe.data.repository.notification.impl.CustomNotificationReposit
 import com.openframe.notification.readstate.NotificationReadStateService;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.cassandra.autoconfigure.CassandraAutoConfiguration;
-import org.springframework.boot.data.cassandra.autoconfigure.DataCassandraAutoConfiguration;
-import org.springframework.boot.data.cassandra.autoconfigure.DataCassandraReactiveAutoConfiguration;
-import org.springframework.boot.data.cassandra.autoconfigure.DataCassandraReactiveRepositoriesAutoConfiguration;
-import org.springframework.boot.data.cassandra.autoconfigure.DataCassandraRepositoriesAutoConfiguration;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration;
 import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
@@ -35,11 +30,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
         SecurityAutoConfiguration.class,
         ServletWebSecurityAutoConfiguration.class,
         UserDetailsServiceAutoConfiguration.class,
-        CassandraAutoConfiguration.class,
-        DataCassandraAutoConfiguration.class,
-        DataCassandraReactiveAutoConfiguration.class,
-        DataCassandraRepositoriesAutoConfiguration.class,
-        DataCassandraReactiveRepositoriesAutoConfiguration.class,
         KafkaAutoConfiguration.class,
         DataRedisAutoConfiguration.class,
         DataRedisRepositoriesAutoConfiguration.class

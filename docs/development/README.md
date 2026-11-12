@@ -64,7 +64,7 @@ cd clients/openframe-client && cargo build --release
 | API (GraphQL) | Netflix DGS 9.0.3 |
 | Gateway | Spring Cloud Gateway (WebFlux + Netty) |
 | Messaging | NATS, Kafka, Kafka Streams |
-| Database | MongoDB, Redis, Apache Cassandra, Apache Pinot |
+| Database | MongoDB, Redis, Loki, Apache Pinot |
 | Testing | JUnit 5, Testcontainers 1.21.4, Mockito |
 | Frontend | React, TypeScript, Tailwind CSS, Storybook |
 | Agent | Rust (stable), Tokio async runtime |

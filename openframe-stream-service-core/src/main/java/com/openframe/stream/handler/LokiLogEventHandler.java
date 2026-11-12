@@ -12,7 +12,7 @@ import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.RetryContext;
 import org.springframework.retry.RetryListener;
@@ -25,7 +25,7 @@ import java.util.Map;
 
 @Slf4j
 @Component
-@ConditionalOnExpression("'${openframe.tool-events.store:}' matches '(?i)loki|both'")
+@ConditionalOnProperty(name = "openframe.tool-events.store", havingValue = "loki")
 public class LokiLogEventHandler extends DebeziumMessageHandler<LokiLogEvent, DeserializedDebeziumMessage> {
 
     private static final int ATTEMPTS = 6;

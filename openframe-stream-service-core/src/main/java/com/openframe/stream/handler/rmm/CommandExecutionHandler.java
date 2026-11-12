@@ -24,8 +24,7 @@ import java.time.Instant;
  * stdout/stderr/exitCode/etc. in place — the source for {@code getBatchResults}.
  *
  * <p>Registered for {@link Destination#MONGO_COMMAND_HISTORY}, routed only for batch
- * commands (a {@code CommandExecution} row exists). Runs ALONGSIDE the Cassandra
- * {@code command_results} write (double-write). Unlike the script handler the row is
+ * commands (a {@code CommandExecution} row exists). Unlike the script handler the row is
  * looked up by {@code (machineId, executionId)} without tenantId, mirroring
  * {@code CommandResultDeserializer} — the command pipeline runs pre-tenant-enrichment.
  */

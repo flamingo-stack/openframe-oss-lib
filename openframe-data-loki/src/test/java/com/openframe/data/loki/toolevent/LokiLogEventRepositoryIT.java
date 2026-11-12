@@ -111,7 +111,7 @@ class LokiLogEventRepositoryIT {
                 "organizationId":"org-7","organizationName":"Acme"}""".formatted(MOMENT.toEpochMilli());
 
         lokiClient.push(
-                Map.of("job", "tool-events", "tenant_id", "tenant-history", "tool_type", "RMM", "origin", "cassandra"),
+                Map.of("job", "tool-events", "tenant_id", "tenant-history", "tool_type", "RMM", "origin", "backfill"),
                 MOMENT.toEpochMilli() * 1_000_000, lineTheCopyScriptWrites,
                 Map.of("tool_event_id", "evt-1"));
 
@@ -206,7 +206,7 @@ class LokiLogEventRepositoryIT {
         LokiLogEvent event = eventWithLineOf("tenant-split-copied", 1_000_000);
         String line = repository.toLine(event);
         Map<String, String> copyLabels = Map.of("job", "tool-events", "tenant_id", "tenant-split-copied", "tool_type", "RMM",
-                "origin", "cassandra");
+                "origin", "backfill");
         lokiClient.push(copyLabels, MOMENT.toEpochMilli() * 1_000_000, line.substring(0, 262_144), partMetadata(0, 4));
         lokiClient.push(copyLabels, MOMENT.toEpochMilli() * 1_000_000 + 1, line.substring(262_144, 524_288), partMetadata(1, 4));
         lokiClient.push(copyLabels, MOMENT.toEpochMilli() * 1_000_000 + 2, line.substring(524_288, 786_432), partMetadata(2, 4));
