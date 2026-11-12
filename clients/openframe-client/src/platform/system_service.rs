@@ -900,51 +900,10 @@ async fn kill_processes_by_exe_path_windows(exe_path: &std::path::Path) -> usize
 
 #[cfg(target_os = "windows")]
 async fn remove_service_windows(service_name: &str) -> Result<()> {
-    use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
-    use windows_service::service::{ServiceAccess, ServiceType};
-
     if service_missing_timed(service_name).await? {
         return Ok(());
     }
-    let name = service_name.to_string();
-    let config = match scm_call_timed(
-        service_name,
-        "config query",
-        SCM_QUERY_TIMEOUT_SECS,
-        move || open_service_windows(&name, ServiceAccess::QUERY_CONFIG)?.query_config(),
-    )
-    .await?
-    {
-        Ok(config) => config,
-        Err(windows_service::Error::Winapi(e))
-            if e.raw_os_error() == Some(ERROR_SERVICE_DOES_NOT_EXIST as i32) =>
-        {
-            return Ok(());
-        }
-        Err(e) => {
-            return Err(e)
-                .with_context(|| format!("Could not read the config of service {}", service_name))
-        }
-    };
-    let exe = parse_exe_from_image_path(&config.executable_path.to_string_lossy());
-    let exe_label = exe
-        .as_deref()
-        .map_or_else(|| "unknown".to_string(), |p| p.display().to_string());
-    let hosted_by_svchost = exe
-        .as_deref()
-        .and_then(|p| p.file_name())
-        .is_some_and(|n| n.eq_ignore_ascii_case("svchost.exe"));
-    if !config.service_type.contains(ServiceType::OWN_PROCESS) || hosted_by_svchost {
-        return Err(anyhow::anyhow!(
-            "Refusing to delete service {} ({}): it does not run in its own executable",
-            service_name,
-            exe_label
-        ));
-    }
-    warn!(
-        "Removing existing service {} (executable {})",
-        service_name, exe_label
-    );
+    warn!("Removing existing service {}", service_name);
     if let Err(e) = stop_service_windows(service_name, false).await {
         warn!(
             "Failed to stop service {} before delete: {e:#}",
