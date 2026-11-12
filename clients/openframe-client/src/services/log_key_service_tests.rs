@@ -53,7 +53,7 @@ async fn finished(handle: JoinHandle<()>) {
 }
 
 #[tokio::test]
-async fn present_key_makes_no_call_until_rejected_and_drops_the_initial_key() {
+async fn present_key_makes_no_call_until_the_stream_fails_and_drops_the_initial_key() {
     let server = mock_server_with_body(&[200], r#"{"key":"fresh"}"#).await;
     let fx = fixture(server.url.clone(), "existing").await;
 
@@ -115,12 +115,12 @@ async fn an_empty_key_is_not_saved() {
 }
 
 #[tokio::test]
-async fn a_rejected_key_is_replaced_by_the_one_the_server_holds() {
+async fn a_failing_stream_picks_up_the_key_the_server_holds() {
     let server = mock_server_with_body(&[200], r#"{"key":"rotated"}"#).await;
     let fx = fixture(server.url.clone(), "existing").await;
 
     let handle = spawn_run(&fx);
-    fx.service.key_rejected();
+    fx.service.connect_failed();
     finished(handle).await;
 
     assert_eq!(server.requests().len(), 1);
@@ -133,12 +133,12 @@ async fn the_saved_key_coming_back_needs_no_restart() {
     let fx = fixture(server.url.clone(), "existing").await;
 
     let handle = spawn_run(&fx);
-    fx.service.key_rejected();
+    fx.service.connect_failed();
     wait_until(|| server.requests().len() == 1).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert_eq!(server.requests().len(), 1);
 
-    fx.service.key_rejected();
+    fx.service.connect_failed();
     wait_until(|| server.requests().len() == 2).await;
 
     assert!(!handle.is_finished());
@@ -160,7 +160,7 @@ async fn nothing_is_fetched_while_the_tenant_is_suspended() {
     assert!(fx.deactivation.is_suspended());
 
     let handle = spawn_run(&fx);
-    fx.service.key_rejected();
+    fx.service.connect_failed();
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert!(server.requests().is_empty());
 

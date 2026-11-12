@@ -27,22 +27,8 @@ fn a_stored_log_key_wins_over_the_initial_key() {
     assert_eq!(choose_key(None, None), None);
 }
 
-#[test]
-fn only_a_401_on_the_handshake_counts_as_a_key_rejection() {
-    let rejected = |text: &str| is_key_rejection(&async_nats::ClientError::Other(text.into()));
-
-    assert!(rejected(
-        "authorization violation: expected HTTP 101 Switching Protocols, got status code 401"
-    ));
-    assert!(!rejected(
-        "authorization violation: nats: authorization violation"
-    ));
-    assert!(!rejected("IO error"));
-    assert!(!is_key_rejection(&async_nats::ClientError::MaxReconnects));
-}
-
 #[tokio::test]
-async fn a_401_on_the_websocket_handshake_reaches_the_event_callback_as_a_key_rejection() {
+async fn a_401_on_the_websocket_handshake_reaches_the_event_callback_as_a_client_error() {
     let server = crate::test_support::mock_server_with_body(&[401], "").await;
     let (tx, mut rx) = mpsc::unbounded_channel();
     let _client = async_nats::ConnectOptions::new()
@@ -59,11 +45,10 @@ async fn a_401_on_the_websocket_handshake_reaches_the_event_callback_as_a_key_re
         .await
         .unwrap();
 
-    let err = tokio::time::timeout(Duration::from_secs(10), rx.recv())
+    tokio::time::timeout(Duration::from_secs(10), rx.recv())
         .await
         .expect("a client error within the deadline")
         .unwrap();
-    assert!(is_key_rejection(&err), "{err}");
 }
 
 #[test]

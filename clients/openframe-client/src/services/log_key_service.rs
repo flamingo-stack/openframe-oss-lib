@@ -21,7 +21,7 @@ struct LogKeyResponse {
     key: String,
 }
 
-/// Fetches the per-tenant logs-stream key, with the agent token, when the config lacks one or the logs gateway rejects it.
+/// Fetches the per-tenant logs-stream key, with the agent token, when the config lacks one or the logs stream cannot connect.
 pub struct LogKeyService {
     http_client: Client,
     base_url: String,
@@ -29,7 +29,7 @@ pub struct LogKeyService {
     agent_config_service: AgentConfigurationService,
     deactivation: Arc<DeactivationService>,
     timing: RetryTiming,
-    rejected: Notify,
+    connect_failed: Notify,
 }
 
 impl LogKeyService {
@@ -47,22 +47,22 @@ impl LogKeyService {
             agent_config_service,
             deactivation,
             timing: RETRY_TIMING,
-            rejected: Notify::new(),
+            connect_failed: Notify::new(),
         }
     }
 
-    /// Called by the logs stream when the gateway rejects the key it presented.
-    pub fn key_rejected(&self) {
-        self.rejected.notify_one();
+    /// Called by the logs stream when a connection attempt fails; a rejected key is one cause.
+    pub fn connect_failed(&self) {
+        self.connect_failed.notify_one();
     }
 
-    /// Runs once the device is registered: fetches the log key when the config lacks one, or again after a rejection, and returns once a key different from the saved one is saved, which the stream only uses after a client restart.
+    /// Runs once the device is registered: fetches the log key when the config lacks one, or again after the stream fails to connect, and returns once a key different from the saved one is saved, which the stream only uses after a client restart.
     pub async fn run(&self) {
         if self.is_key_missing() {
             info!("Log key missing in config, starting background fetch");
         } else {
             self.drop_initial_key();
-            self.rejected.notified().await;
+            self.connect_failed.notified().await;
         }
         loop {
             let key = retry_until_settled(&self.deactivation, self.timing, "fetch log key", || {
@@ -71,11 +71,11 @@ impl LogKeyService {
             .await;
             match self.store_if_changed(key) {
                 Ok(true) => return,
-                Ok(false) => warn!("Logs gateway rejected the log key the server still returns"),
+                Ok(false) => info!("Server still returns the saved log key"),
                 Err(e) => error!("Failed to save log key: {:#}", e),
             }
             sleep(self.timing.max).await;
-            self.rejected.notified().await;
+            self.connect_failed.notified().await;
         }
     }
 

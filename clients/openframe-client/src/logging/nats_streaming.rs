@@ -112,9 +112,7 @@ impl NatsLogConnection {
                         }
                         async_nats::Event::ClientError(err) => {
                             error!("NATS logs: client error: {} (tenant={})", err, tenant);
-                            if is_key_rejection(&err) {
-                                log_key_service.key_rejected();
-                            }
+                            log_key_service.connect_failed();
                         }
                         _ => {}
                     }
@@ -402,11 +400,6 @@ fn choose_key(log_key: Option<String>, initial_key: Option<String>) -> Option<Lo
     initial_key
         .filter(|key| !key.is_empty())
         .map(LogStreamKey::Initial)
-}
-
-// The fork reports the gateway's 401 on the WebSocket handshake as a client error carrying the status.
-fn is_key_rejection(err: &async_nats::ClientError) -> bool {
-    matches!(err, async_nats::ClientError::Other(text) if text.contains("status code 401"))
 }
 
 fn extract_tenant_domain(server_host: &str) -> String {
