@@ -10,6 +10,7 @@ class FleetSourceTest {
     void of_knownTable_itsSource() {
         assertThat(FleetSource.of("programs")).isEqualTo(FleetSource.PROGRAMS);
         assertThat(FleetSource.of("homebrew_packages")).isEqualTo(FleetSource.HOMEBREW_PACKAGES);
+        assertThat(FleetSource.of("winget_packages")).isEqualTo(FleetSource.WINGET_PACKAGES);
     }
 
     @Test

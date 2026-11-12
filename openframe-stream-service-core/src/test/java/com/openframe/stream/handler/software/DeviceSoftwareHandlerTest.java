@@ -225,6 +225,24 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getPackageFamilyNames()).isEmpty();
         assertThat(saved.getInstallerTypes()).containsExactly("exe", "msi");
         assertThat(saved.getSystemComponent()).isFalse();
+        assertThat(saved.getWingetId()).isNull();
+    }
+
+    @Test
+    void handle_reconcile_keepsTheWingetIdOfAWingetPackage() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        HostSoftwareTitle sevenZip = title(43L, "7-Zip", "winget_packages", "24.08");
+        sevenZip.getInstalledVersions().get(0).setWingetId("7zip.7zip");
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L, COMMIT_TS)).thenReturn(List.of(sevenZip));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 43L))
+                .thenReturn(Optional.empty());
+
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
+        verify(deviceSoftwareRepository).save(captor.capture());
+        assertThat(captor.getValue().getWingetId()).isEqualTo("7zip.7zip");
     }
 
     @Test
