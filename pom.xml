@@ -47,6 +47,7 @@
         <async-http-client.version>3.0.14</async-http-client.version>
         <lz4-java.version>1.8.1</lz4-java.version>
         <kafka-lz4-java.version>1.12.0</kafka-lz4-java.version>
+        <snappy-java.version>1.1.10.9</snappy-java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
@@ -317,11 +318,16 @@
                 <artifactId>lz4-java</artifactId>
                 <version>${lz4-java.version}</version>
             </dependency>
-            <!-- Transitive of kafka-clients, pinned past a HIGH CVE in the version it brings -->
+            <!-- Transitives of kafka-clients, pinned past HIGH CVEs in the versions it brings -->
             <dependency>
                 <groupId>at.yawk.lz4</groupId>
                 <artifactId>lz4-java</artifactId>
                 <version>${kafka-lz4-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.xerial.snappy</groupId>
+                <artifactId>snappy-java</artifactId>
+                <version>${snappy-java.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.nats</groupId>
