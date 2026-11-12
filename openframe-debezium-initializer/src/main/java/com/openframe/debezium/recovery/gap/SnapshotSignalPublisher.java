@@ -85,9 +85,11 @@ public class SnapshotSignalPublisher {
     }
 
     private static void createTopic(Admin admin, String topic, Map<String, String> topicConfig) {
-        NewTopic signalTopic = new NewTopic(topic, Optional.of(SIGNAL_PARTITIONS), Optional.empty())
-                .configs(topicConfig);
-        KafkaFuture<Void> creation = admin.createTopics(List.of(signalTopic)).all();
+        Optional<Integer> partitions = Optional.of(SIGNAL_PARTITIONS);
+        Optional<Short> replicationFactor = Optional.empty();
+        NewTopic signalTopic = new NewTopic(topic, partitions, replicationFactor).configs(topicConfig);
+        List<NewTopic> topics = List.of(signalTopic);
+        KafkaFuture<Void> creation = admin.createTopics(topics).all();
         try {
             await(creation, "create signal topic " + topic);
             log.info("Signal topic '{}' created", topic);
@@ -109,7 +111,8 @@ public class SnapshotSignalPublisher {
         List<AlterConfigOp> operations = new ArrayList<>();
         topicConfig.forEach((key, value) -> {
             ConfigEntry entry = new ConfigEntry(key, value);
-            operations.add(new AlterConfigOp(entry, AlterConfigOp.OpType.SET));
+            AlterConfigOp operation = new AlterConfigOp(entry, AlterConfigOp.OpType.SET);
+            operations.add(operation);
         });
         return operations;
     }

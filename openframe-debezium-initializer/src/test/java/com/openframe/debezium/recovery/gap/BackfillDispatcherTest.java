@@ -184,6 +184,26 @@ class BackfillDispatcherTest {
         verify(debeziumService, never()).listConnectors();
     }
 
+    @Test
+    void dispatchPending_noCollectionsToBackfill_markedExpiredWithoutSignal() {
+        // setup
+        stubPendingAndConnectors();
+        stubRunningWithSpec();
+        when(signalPublisher.hasSignalChannel(CONFIG)).thenReturn(true);
+        when(sourceDialects.dialectFor(CONFIG)).thenReturn(sourceDialect);
+        when(sourceDialect.gapConditions(CONFIG, Map.of("fleet.activity_past", "created_at >= {from}"), GAP_FROM))
+                .thenReturn(List.of());
+
+        // execution
+        dispatcher.dispatchPending();
+
+        // verifications
+        verify(signalPublisher, never()).publishIncrementalSnapshot(any(), any());
+        verify(backfillRepository).save(backfillCaptor.capture());
+        assertThat(backfillCaptor.getValue().getStatus()).isEqualTo(ConnectorBackfillStatus.EXPIRED);
+        verify(gapAlerts).raise(BASE + "_v4", GAP_FROM, "No data collections to backfill");
+    }
+
     private void stubPendingAndConnectors() {
         when(backfillRepository.findByStatus(ConnectorBackfillStatus.PENDING)).thenReturn(List.of(backfill));
         when(debeziumService.listConnectors()).thenReturn(List.of(BASE + "_v4", CURRENT));

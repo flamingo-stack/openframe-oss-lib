@@ -16,13 +16,19 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "openframe.debezium.recovery.gap.enabled", havingValue = "true")
 public class ConnectorRecreator {
+
+    private static final Set<ConnectorBackfillStatus> UNFINISHED_BACKFILL = Set.of(
+            ConnectorBackfillStatus.PENDING, ConnectorBackfillStatus.SENT);
 
     private final DebeziumService debeziumService;
     private final SourceDialects sourceDialects;
@@ -132,8 +138,8 @@ public class ConnectorRecreator {
     }
 
     private void discard(String connectorName) {
-        debeziumService.deleteConnector(connectorName);
-        if (debeziumService.getConnectorConfig(connectorName) != null) {
+        boolean deleted = debeziumService.deleteConnector(connectorName);
+        if (!deleted) {
             log.error("{} Connector left STOPPED or without its backfill, delete it by hand: name='{}'",
                     DebeziumLog.PREFIX, connectorName);
         }
@@ -151,7 +157,8 @@ public class ConnectorRecreator {
     }
 
     private void scheduleBackfill(RecreationRequest request, Map<String, Object> config) {
-        Instant gapFrom = gapFrom(request.getLastKnownOffsets(), config);
+        Instant offsetsGapFrom = gapFrom(request.getLastKnownOffsets(), config);
+        Instant gapFrom = earliestUnfinishedGapFrom(request.getBaseName(), offsetsGapFrom);
         if (!sourceDialects.supports(config)) {
             gapAlerts.raise(request.getNewName(), gapFrom, "No source dialect for the connector class");
             return;
@@ -175,6 +182,19 @@ public class ConnectorRecreator {
         SourceDialect dialect = sourceDialects.dialectFor(config);
         Instant lastSourceTime = dialect.sourceTime(offsets);
         return lastSourceTime.minus(properties.getMargin());
+    }
+
+    // A previous version's incremental snapshot keeps its progress in that version's offsets, which are not carried
+    // over here, so its window must be read again.
+    private Instant earliestUnfinishedGapFrom(String baseName, Instant gapFrom) {
+        Instant createdAfter = Instant.now().minus(properties.getBackfillExpiry());
+        List<ConnectorBackfill> unfinished =
+                backfillRepository.findByBaseNameAndStatusInAndCreatedAtAfter(baseName, UNFINISHED_BACKFILL, createdAfter);
+        return unfinished.stream()
+                .map(ConnectorBackfill::getGapFrom)
+                .filter(previous -> previous != null && previous.isBefore(gapFrom))
+                .min(Comparator.naturalOrder())
+                .orElse(gapFrom);
     }
 
     private boolean hasSourceTime(ConnectorOffsets offsets, Map<String, Object> config) {

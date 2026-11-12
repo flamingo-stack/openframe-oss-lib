@@ -21,7 +21,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -227,13 +226,36 @@ class ConnectorRecoveryManagerGapRecoveryTest {
         healthy.setTasks(List.of());
         when(debeziumService.getConnectorStatus(FAILED)).thenReturn(healthy);
         when(alertRepository.findByConnectorNameAndErrorTypeInAndResolvedFalse(FAILED, RECOVERY_ALERT_TYPES))
-                .thenReturn(Optional.empty());
+                .thenReturn(List.of());
 
         // execution
         manager.checkAndRecover(FAILED);
 
         // verifications
         verify(alertRepository, never()).save(any(ConnectorAlert.class));
+    }
+
+    @Test
+    void checkAndRecover_healthyWithTwoOpenRecoveryAlerts_bothResolved() {
+        // setup
+        ConnectorStatus healthy = new ConnectorStatus();
+        ConnectorStatus.Connector connector = new ConnectorStatus.Connector();
+        connector.setState("RUNNING");
+        healthy.setConnector(connector);
+        healthy.setTasks(List.of());
+        ConnectorAlert first = ConnectorAlert.builder().connectorName(FAILED).resolved(false).build();
+        ConnectorAlert second = ConnectorAlert.builder().connectorName(FAILED).resolved(false).build();
+        when(debeziumService.getConnectorStatus(FAILED)).thenReturn(healthy);
+        when(alertRepository.findByConnectorNameAndErrorTypeInAndResolvedFalse(FAILED, RECOVERY_ALERT_TYPES))
+                .thenReturn(List.of(first, second));
+
+        // execution
+        manager.checkAndRecover(FAILED);
+
+        // verifications
+        verify(alertRepository).save(first);
+        verify(alertRepository).save(second);
+        assertThat(List.of(first, second)).allMatch(ConnectorAlert::isResolved);
     }
 
     private void stubNonRecoverableRecreation() {

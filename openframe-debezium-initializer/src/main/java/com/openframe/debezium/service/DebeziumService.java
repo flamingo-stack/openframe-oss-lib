@@ -215,8 +215,8 @@ public class DebeziumService {
             createConnector(newName, recreationConfig(config));
             return;
         }
-        stopConnector(currentName);
         try {
+            stopConnector(currentName);
             ConnectorOffsets offsets = recreator.lastKnownOffsets(baseName, currentName);
             RecreationRequest request = RecreationRequest.builder()
                     .baseName(baseName)
@@ -236,7 +236,8 @@ public class DebeziumService {
         try {
             resumeConnector(connectorName);
         } catch (Exception e) {
-            log.error("{} Failed to resume connector '{}' after an aborted recreate", DebeziumLog.PREFIX, connectorName, e);
+            log.error("{} Connector left STOPPED after an aborted recreate, resume it by hand: name='{}'",
+                    DebeziumLog.PREFIX, connectorName, e);
         }
     }
 
@@ -261,7 +262,7 @@ public class DebeziumService {
         return out;
     }
 
-    // With gap recovery every recreated version runs no_data, so the spec's snapshot mode only governs the first one.
+    // With gap recovery a recreated version may run no_data instead of the spec's full-snapshot mode.
     private boolean isIgnoredInCompare(String key) {
         return ConnectorSpecs.KEY_NAME.equals(key)
                 || isGapRecoveryEnabled() && ConnectorSpecs.KEY_SNAPSHOT_MODE.equals(key);
@@ -282,20 +283,22 @@ public class DebeziumService {
      */
     public void createConnector(String effectiveName, Map<String, Object> config) {
         Map<String, Object> payload = ConnectorSpecs.connectorPayload(effectiveName, config);
-        ResponseEntity<String> response =
-                restTemplate.postForEntity(connectorsBaseUrl, jsonEntity(payload), String.class);
+        HttpEntity<Object> request = jsonEntity(payload);
+        ResponseEntity<String> response = restTemplate.postForEntity(connectorsBaseUrl, request, String.class);
         log.info("Connector '{}' created. Response: {}", effectiveName, response.getStatusCode());
     }
 
     public void createStoppedConnector(String effectiveName, Map<String, Object> config) {
         Map<String, Object> payload = ConnectorSpecs.stoppedConnectorPayload(effectiveName, config);
-        restTemplate.postForEntity(connectorsBaseUrl, jsonEntity(payload), String.class);
+        HttpEntity<Object> request = jsonEntity(payload);
+        restTemplate.postForEntity(connectorsBaseUrl, request, String.class);
         log.info("Connector '{}' created in STOPPED state", effectiveName);
     }
 
     public ConnectorOffsets getConnectorOffsets(String connectorName) {
         try {
-            ConnectorOffsets offsets = restTemplate.getForObject(offsetsUrl(connectorName), ConnectorOffsets.class);
+            String url = offsetsUrl(connectorName);
+            ConnectorOffsets offsets = restTemplate.getForObject(url, ConnectorOffsets.class);
             return offsets != null ? offsets : ConnectorOffsets.empty();
         } catch (Exception e) {
             log.warn("Failed to read offsets for connector '{}'", connectorName, e);
@@ -304,33 +307,39 @@ public class DebeziumService {
     }
 
     public void alterConnectorOffsets(String connectorName, ConnectorOffsets offsets) {
-        restTemplate.patchForObject(offsetsUrl(connectorName), jsonEntity(offsets), String.class);
+        String url = offsetsUrl(connectorName);
+        HttpEntity<Object> request = jsonEntity(offsets);
+        restTemplate.patchForObject(url, request, String.class);
         log.info("Connector '{}' offsets altered", connectorName);
     }
 
     public void stopConnector(String connectorName) {
         String url = connectorUrl(connectorName) + PATH_STOP;
-        restTemplate.put(url, jsonEntity(null));
+        HttpEntity<Object> request = jsonEntity(null);
+        restTemplate.put(url, request);
         log.info("Connector '{}' stopped", connectorName);
     }
 
     public void resumeConnector(String connectorName) {
         String url = connectorUrl(connectorName) + PATH_RESUME;
-        restTemplate.put(url, jsonEntity(null));
+        HttpEntity<Object> request = jsonEntity(null);
+        restTemplate.put(url, request);
         log.info("Connector '{}' resumed", connectorName);
     }
 
-    /**
-     * DELETE /connectors/{name}. Tolerates 404 (already gone).
-     */
-    public void deleteConnector(String name) {
+    // True once the connector is gone (deleted or already absent); false when the delete may not have applied.
+    public boolean deleteConnector(String name) {
         try {
-            restTemplate.delete(connectorUrl(name));
+            String url = connectorUrl(name);
+            restTemplate.delete(url);
             log.info("Connector '{}' deleted", name);
+            return true;
         } catch (HttpClientErrorException.NotFound e) {
             log.info("Connector '{}' already absent, nothing to delete", name);
+            return true;
         } catch (Exception e) {
             log.error("Failed to delete connector '{}'", name, e);
+            return false;
         }
     }
 

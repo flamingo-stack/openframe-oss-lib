@@ -5,6 +5,9 @@ import com.openframe.debezium.naming.VersionedConnectorNameStrategy;
 import com.openframe.debezium.recovery.gap.ConnectorRecreator;
 import com.openframe.debezium.recovery.gap.GapRecoveryProperties;
 import com.openframe.debezium.recovery.gap.RecreationRequest;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -25,8 +29,10 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.ExpectedCount.never;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -281,6 +287,147 @@ class DebeziumServiceGapRecoveryTest {
 
         // verifications
         assertThat(requestCaptor.getValue().getBaseName()).isEqualTo(BASE);
+    }
+
+    @Test
+    void createOrUpdate_whenNeededSpecDriftsWithGapRecovery_snapshotModeKept() {
+        // setup
+        DebeziumService service = service(gapProperties(), null);
+        expectRunningV1();
+        server.expect(requestTo(BASE_URL + "/connectors"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.name").value(V2))
+                .andExpect(jsonPath("$.config['snapshot.mode']").value("when_needed"))
+                .andRespond(withStatus(HttpStatus.CREATED));
+        server.expect(requestTo(BASE_URL + "/connectors/" + V1)).andExpect(method(HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.NO_CONTENT));
+        Object[] specs = specs(Map.of(
+                "connector.class", "io.debezium.connector.mongodb.MongoDbConnector",
+                "snapshot.mode", "when_needed",
+                "capture.target", "events_outbox"));
+
+        // execution
+        service.createOrUpdateDebeziumConnector(specs);
+
+        // verifications
+        assertThat(service.isGapRecoveryEnabled()).isTrue();
+    }
+
+    @Test
+    void createOrUpdate_specWithoutSnapshotModeDriftsWithGapRecovery_recreatedNoData() {
+        // setup
+        DebeziumService service = service(gapProperties(), null);
+        expectRunningV1();
+        server.expect(requestTo(BASE_URL + "/connectors"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.config['snapshot.mode']").value("no_data"))
+                .andRespond(withStatus(HttpStatus.CREATED));
+        server.expect(requestTo(BASE_URL + "/connectors/" + V1)).andExpect(method(HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.NO_CONTENT));
+        Object[] specs = specs(Map.of("connector.class", "io.debezium.connector.mongodb.MongoDbConnector", "tasks.max", "2"));
+
+        // execution
+        service.createOrUpdateDebeziumConnector(specs);
+
+        // verifications
+        assertThat(service.isGapRecoveryEnabled()).isTrue();
+    }
+
+    @Test
+    void createOrUpdate_driftStopFails_oldResumedAndNothingRecreated() {
+        // setup
+        DebeziumService service = service(gapProperties(), connectorRecreator);
+        expectRunningV1();
+        server.expect(requestTo(BASE_URL + "/connectors/" + V1 + "/stop")).andExpect(method(HttpMethod.PUT))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+        server.expect(requestTo(BASE_URL + "/connectors/" + V1 + "/resume")).andExpect(method(HttpMethod.PUT))
+                .andRespond(withStatus(HttpStatus.ACCEPTED));
+        server.expect(never(), requestTo(BASE_URL + "/connectors/" + V1));
+        Object[] specs = specs(Map.of("connector.class", "io.debezium.connector.mongodb.MongoDbConnector", "tasks.max", "2"));
+
+        // execution
+        service.createOrUpdateDebeziumConnector(specs);
+
+        // verifications
+        verifyNoInteractions(connectorRecreator);
+    }
+
+    @Test
+    void createOrUpdate_driftRecreateAndResumeFail_leftStoppedLogged() {
+        // setup
+        DebeziumService service = service(gapProperties(), connectorRecreator);
+        ListAppender<ILoggingEvent> logs = captureLogs();
+        ConnectorOffsets offsets = ConnectorOffsets.empty();
+        expectRunningV1();
+        server.expect(requestTo(BASE_URL + "/connectors/" + V1 + "/stop")).andExpect(method(HttpMethod.PUT))
+                .andRespond(withStatus(HttpStatus.ACCEPTED));
+        server.expect(requestTo(BASE_URL + "/connectors/" + V1 + "/resume")).andExpect(method(HttpMethod.PUT))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+        when(connectorRecreator.lastKnownOffsets(BASE, V1)).thenReturn(offsets);
+        doThrow(new IllegalStateException("connect down")).when(connectorRecreator).recreate(any(RecreationRequest.class));
+        Object[] specs = specs(Map.of("connector.class", "io.debezium.connector.mongodb.MongoDbConnector", "tasks.max", "2"));
+
+        // execution
+        service.createOrUpdateDebeziumConnector(specs);
+
+        // verifications
+        serviceLogger().detachAppender(logs);
+        assertThat(logs.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .anyMatch(message -> message.contains("[DEBEZIUM] Connector left STOPPED") && message.contains(V1));
+    }
+
+    @Test
+    void deleteConnector_deleted_true() {
+        // setup
+        DebeziumService service = service(gapProperties(), null);
+        server.expect(requestTo(BASE_URL + "/connectors/" + V2)).andExpect(method(HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.NO_CONTENT));
+
+        // execution
+        boolean deleted = service.deleteConnector(V2);
+
+        // verifications
+        assertThat(deleted).isTrue();
+    }
+
+    @Test
+    void deleteConnector_alreadyAbsent_true() {
+        // setup
+        DebeziumService service = service(gapProperties(), null);
+        server.expect(requestTo(BASE_URL + "/connectors/" + V2)).andExpect(method(HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        // execution
+        boolean deleted = service.deleteConnector(V2);
+
+        // verifications
+        assertThat(deleted).isTrue();
+    }
+
+    @Test
+    void deleteConnector_connectFails_false() {
+        // setup
+        DebeziumService service = service(gapProperties(), null);
+        server.expect(requestTo(BASE_URL + "/connectors/" + V2)).andExpect(method(HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        // execution
+        boolean deleted = service.deleteConnector(V2);
+
+        // verifications
+        assertThat(deleted).isFalse();
+    }
+
+    private static ListAppender<ILoggingEvent> captureLogs() {
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        serviceLogger().addAppender(logs);
+        return logs;
+    }
+
+    private static Logger serviceLogger() {
+        return (Logger) LoggerFactory.getLogger(DebeziumService.class);
     }
 
     private DebeziumService service(GapRecoveryProperties properties, ConnectorRecreator recreator) {

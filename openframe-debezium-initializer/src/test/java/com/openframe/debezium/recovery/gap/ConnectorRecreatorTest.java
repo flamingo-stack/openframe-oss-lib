@@ -29,6 +29,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -50,6 +51,9 @@ class ConnectorRecreatorTest {
     private static final Duration MARGIN = Duration.ofMinutes(5);
     private static final Duration FALLBACK_LOOKBACK = Duration.ofHours(12);
     private static final Duration CHECKPOINT_MAX_AGE = Duration.ofDays(7);
+    private static final Duration BACKFILL_EXPIRY = Duration.ofDays(1);
+    private static final Set<ConnectorBackfillStatus> UNFINISHED =
+            Set.of(ConnectorBackfillStatus.PENDING, ConnectorBackfillStatus.SENT);
     private static final Map<String, Object> CONFIG =
             Map.of("connector.class", "io.debezium.connector.mongodb.MongoDbConnector", "snapshot.mode", "no_data");
     private static final Map<String, Object> SPEC = Map.of("name", BASE, "config", CONFIG);
@@ -75,6 +79,7 @@ class ConnectorRecreatorTest {
         properties.setMargin(MARGIN);
         properties.setFallbackLookback(FALLBACK_LOOKBACK);
         properties.setCheckpointMaxAge(CHECKPOINT_MAX_AGE);
+        properties.setBackfillExpiry(BACKFILL_EXPIRY);
         recreator = new ConnectorRecreator(debeziumService, sourceDialects, checkpointRepository, backfillRepository, properties, gapAlerts);
         Map<String, Object> entry = Map.of("partition", Map.of("server_id", "shared.meshcentral"), "offset", Map.of("sec", 1L));
         offsets = new ConnectorOffsets(List.of(entry));
@@ -131,7 +136,7 @@ class ConnectorRecreatorTest {
         when(sourceDialect.hasSourceTime(offsets)).thenReturn(true);
         when(sourceDialect.sourceTime(offsets)).thenReturn(LAST_SOURCE_TIME);
         doThrow(new IllegalStateException("mongo down")).when(backfillRepository).save(any(ConnectorBackfill.class));
-        when(debeziumService.getConnectorConfig(NEW_NAME)).thenReturn(null);
+        when(debeziumService.deleteConnector(NEW_NAME)).thenReturn(true);
         RecreationRequest request = request(offsets, true);
 
         // execution
@@ -151,7 +156,7 @@ class ConnectorRecreatorTest {
         when(debeziumService.recreationConfig(CONFIG)).thenReturn(CONFIG);
         when(sourceDialects.supports(CONFIG)).thenReturn(false);
         doThrow(new HttpClientErrorException(HttpStatus.CONFLICT)).when(debeziumService).resumeConnector(NEW_NAME);
-        when(debeziumService.getConnectorConfig(NEW_NAME)).thenReturn(CONFIG);
+        when(debeziumService.deleteConnector(NEW_NAME)).thenReturn(false);
         RecreationRequest request = request(offsets, false);
 
         // execution
@@ -198,6 +203,47 @@ class ConnectorRecreatorTest {
                 .extracting(ConnectorBackfill::getBaseName, ConnectorBackfill::getConnectorName,
                         ConnectorBackfill::getGapFrom, ConnectorBackfill::getStatus)
                 .containsExactly(BASE, NEW_NAME, LAST_SOURCE_TIME.minus(MARGIN), ConnectorBackfillStatus.PENDING);
+    }
+
+    @Test
+    void recreate_previousVersionBackfillUnfinished_gapStartsAtItsWindow() {
+        // setup
+        stubDialect();
+        when(sourceDialect.hasSourceTime(offsets)).thenReturn(true);
+        when(sourceDialect.sourceTime(offsets)).thenReturn(LAST_SOURCE_TIME);
+        Instant previousGapFrom = LAST_SOURCE_TIME.minus(Duration.ofHours(3));
+        ConnectorBackfill previous = ConnectorBackfill.builder().baseName(BASE).gapFrom(previousGapFrom).build();
+        when(backfillRepository.findByBaseNameAndStatusInAndCreatedAtAfter(eq(BASE), eq(UNFINISHED), instantCaptor.capture()))
+                .thenReturn(List.of(previous));
+        RecreationRequest request = request(offsets, true);
+
+        // execution
+        recreator.recreate(request);
+
+        // verifications
+        verify(backfillRepository).save(backfillCaptor.capture());
+        assertThat(backfillCaptor.getValue().getGapFrom()).isEqualTo(previousGapFrom);
+        assertThat(instantCaptor.getValue()).isCloseTo(Instant.now().minus(BACKFILL_EXPIRY), within(1, ChronoUnit.MINUTES));
+    }
+
+    @Test
+    void recreate_previousVersionBackfillLaterThanOffsets_gapFromOffsetsKept() {
+        // setup
+        stubDialect();
+        when(sourceDialect.hasSourceTime(offsets)).thenReturn(true);
+        when(sourceDialect.sourceTime(offsets)).thenReturn(LAST_SOURCE_TIME);
+        ConnectorBackfill later = ConnectorBackfill.builder().baseName(BASE).gapFrom(LAST_SOURCE_TIME).build();
+        ConnectorBackfill withoutGap = ConnectorBackfill.builder().baseName(BASE).build();
+        when(backfillRepository.findByBaseNameAndStatusInAndCreatedAtAfter(eq(BASE), eq(UNFINISHED), any(Instant.class)))
+                .thenReturn(List.of(later, withoutGap));
+        RecreationRequest request = request(offsets, true);
+
+        // execution
+        recreator.recreate(request);
+
+        // verifications
+        verify(backfillRepository).save(backfillCaptor.capture());
+        assertThat(backfillCaptor.getValue().getGapFrom()).isEqualTo(LAST_SOURCE_TIME.minus(MARGIN));
     }
 
     @Test
