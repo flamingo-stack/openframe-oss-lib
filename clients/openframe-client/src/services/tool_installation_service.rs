@@ -676,7 +676,7 @@ impl ToolInstallationService {
                 service_name: svc, ..
             } = &installation
             {
-                crate::platform::system_service::remove_service(svc, None)
+                crate::platform::system_service::remove_service(svc)
                     .await
                     .with_context(|| {
                         format!(

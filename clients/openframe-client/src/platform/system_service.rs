@@ -389,17 +389,14 @@ pub async fn service_clear_for_install(service_name: &str) -> bool {
     }
 }
 
-pub async fn remove_service(
-    service_name: &str,
-    only_under: Option<&std::path::Path>,
-) -> Result<()> {
+pub async fn remove_service(service_name: &str) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
-        remove_service_windows(service_name, only_under).await
+        remove_service_windows(service_name).await
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (service_name, only_under);
+        let _ = service_name;
         Ok(())
     }
 }
@@ -902,10 +899,7 @@ async fn kill_processes_by_exe_path_windows(exe_path: &std::path::Path) -> usize
 }
 
 #[cfg(target_os = "windows")]
-async fn remove_service_windows(
-    service_name: &str,
-    only_under: Option<&std::path::Path>,
-) -> Result<()> {
+async fn remove_service_windows(service_name: &str) -> Result<()> {
     use winapi::shared::winerror::ERROR_SERVICE_DOES_NOT_EXIST;
     use windows_service::service::{ServiceAccess, ServiceType};
 
@@ -936,20 +930,6 @@ async fn remove_service_windows(
     let exe_label = exe
         .as_deref()
         .map_or_else(|| "unknown".to_string(), |p| p.display().to_string());
-    if let Some(dir) = only_under {
-        if !exe
-            .as_deref()
-            .is_some_and(|exe| crate::platform::lock_recovery::path_under(exe, dir))
-        {
-            info!(
-                "Leaving service {} in place: its executable {} is not under {}",
-                service_name,
-                exe_label,
-                dir.display()
-            );
-            return Ok(());
-        }
-    }
     let hosted_by_svchost = exe
         .as_deref()
         .and_then(|p| p.file_name())

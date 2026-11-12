@@ -133,10 +133,7 @@ impl ToolUninstallService {
             let result = self.uninstall_tool(&tool).await;
 
             if let Installation::Service { service_name, .. } = &tool.installation {
-                let tool_folder = self.directory_manager.get_tool_folder(&tool.tool_agent_id);
-                if let Err(e) =
-                    system_service::remove_service(service_name, Some(&tool_folder)).await
-                {
+                if let Err(e) = system_service::remove_service(service_name).await {
                     warn!(
                         "Failed to remove leftover service {} of tool {}: {:#}",
                         service_name, tool.tool_agent_id, e
