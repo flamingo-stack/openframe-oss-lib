@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MOBILE_SIDE_PANEL_SWIPE_CLOSE_PX, MobileSidePanel } from '../mobile-side-panel';
 
 function renderPanel({ open = true, side }: { open?: boolean; side?: 'left' | 'right' } = {}) {
@@ -87,5 +87,35 @@ describe('MobileSidePanel', () => {
     expect(panel.className.split(' ')).toContain('right-0');
     swipe(panel, [100, 300], [100 + MOBILE_SIDE_PANEL_SWIPE_CLOSE_PX + 10, 300]);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  describe('when the window is md or wider (the panel hidden by CSS)', () => {
+    const original = window.matchMedia;
+    afterEach(() => {
+      window.matchMedia = original;
+    });
+
+    it('locks no scroll and traps no focus, even while open', () => {
+      window.matchMedia = (query: string) =>
+        ({
+          matches: true,
+          media: query,
+          onchange: null,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList;
+      const { onClose, panel } = renderPanel();
+      expect(document.documentElement.style.overflow).not.toBe('hidden');
+      fireEvent.keyDown(panel, { key: 'Escape' });
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  it('locks the page scroll while open on a phone', () => {
+    renderPanel();
+    expect(document.documentElement.style.overflow).toBe('hidden');
   });
 });

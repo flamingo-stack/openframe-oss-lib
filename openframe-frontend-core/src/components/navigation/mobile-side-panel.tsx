@@ -3,6 +3,7 @@
 import { usePreventScroll } from '@react-aria/overlays';
 import { type ReactNode, type TouchEvent, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks/ui/use-focus-trap';
+import { useMdUp } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils';
 import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer';
 import { PortalContainerContext } from '../ui/portal-container';
@@ -44,8 +45,12 @@ export function MobileSidePanel({ open, onClose, label, side = 'left', children 
   const dragRef = useRef(0);
   const touchRef = useRef<{ x: number; y: number; swiping: boolean | null } | null>(null);
 
-  usePreventScroll({ isDisabled: !open });
-  useFocusTrap(panelRef, open, { onEscape: onClose });
+  // The panel is drawn on a phone only (`md:hidden`). A host may leave it open when the window widens past `md` (a
+  // tablet turned to landscape): hidden, it must not keep the page's scroll locked or the focus held.
+  const mdUp = useMdUp();
+  const active = open && mdUp !== true;
+  usePreventScroll({ isDisabled: !active });
+  useFocusTrap(panelRef, active, { onEscape: onClose });
 
   const fromRight = side === 'right';
   // Positive travel moves the panel towards its own edge (left for a left panel).

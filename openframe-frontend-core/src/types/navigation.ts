@@ -302,6 +302,11 @@ export interface NavigationSidebarConfig {
    */
   overlay?: boolean | 'drawer';
   /**
+   * The drawer's width in px while `overlay` is `'drawer'` and it is open. The drawer floats over the content, so the
+   * room the desktop width keeps for the content does not apply to it. Default: the expanded width, as the overlay.
+   */
+  drawerWidth?: number;
+  /**
    * The desktop form from md up, not only from lg: no tablet form between md and lg (the
    * rail it starts on, the overlay it opens, the scrim). The sidebar stays in the flow
    * with the desktop preference (`collapsed`, the stored one), so it collapses only when
