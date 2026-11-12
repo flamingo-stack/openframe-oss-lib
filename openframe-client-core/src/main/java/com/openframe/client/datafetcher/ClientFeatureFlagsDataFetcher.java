@@ -25,6 +25,8 @@ public class ClientFeatureFlagsDataFetcher {
     }
 
     private ClientFeatureFlagResponse toResponse(String name, ClientFeatureFlag flag) {
-        return new ClientFeatureFlagResponse(name, flag.isEnabled(), flag.getMinVersion());
+        boolean enabled = flag.isEnabled();
+        String minVersion = flag.getMinVersion();
+        return new ClientFeatureFlagResponse(name, enabled, minVersion);
     }
 }
