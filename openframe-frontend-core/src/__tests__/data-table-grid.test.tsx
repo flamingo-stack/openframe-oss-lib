@@ -258,21 +258,28 @@ describe('DataTable grid layout', () => {
     expect(screen.getAllByRole('checkbox', { name: 'Select row' })).toHaveLength(ITEMS.length);
   });
 
-  it('pins the action columns at every width, and the left block from the window’s lg up only', () => {
+  it('pins the action columns at every width, and the left block on a desktop with room for it only', () => {
     const { container } = render(<Grid />);
     const [row] = gridBodyMarkup(container).split('group/gridrow').slice(1);
     const cells = [...(row ?? '').matchAll(/class="([^"]*\bh-12\b[^"]*)"/g)].map(match => match[1] ?? '');
     // select, name, owner, more.
     expect(cells).toHaveLength(4);
     const pin = (cell: string | undefined) =>
-      /(^| )sticky( |$)/.test(cell ?? '') ? 'always' : /(^| )lg:sticky( |$)/.test(cell ?? '') ? 'lg' : 'none';
-    expect(cells.map(pin)).toEqual(['lg', 'lg', 'none', 'always']);
+      /(^| )sticky( |$)/.test(cell ?? '')
+        ? 'always'
+        : /(^| )lg:content-md:sticky( |$)/.test(cell ?? '')
+          ? 'desktop with room'
+          : 'none';
+    expect(cells.map(pin)).toEqual(['desktop with room', 'desktop with room', 'none', 'always']);
+    // Never by the window alone (a desktop's narrow content column lays out as a phone's and must not pin), and never
+    // by the content area alone (a tablet's page is 720px of content too).
+    for (const cell of cells) expect(cell).not.toMatch(/(^| )(lg|content-md|content-lg):(sticky|z-\[1\])( |$)/);
     // The left gradient starts at the pinned block's edge only where the block is pinned.
     const root = openingTag(container, 'data-grid-root');
     expect(root).toContain('[--dt-pin-l:0px]');
-    // The window's `lg`, not the content area's: a desktop keeps the pin in a narrow content column.
-    expect(root).toMatch(/ lg:\[--dt-pin-l:var\(--dt-pin-l-wide\)\]/);
-    expect(root).not.toContain('content-lg:');
+    // The same two conditions as the cells: the window's `lg` and the content area's `md`.
+    expect(root).toMatch(/ lg:content-md:\[--dt-pin-l:var\(--dt-pin-l-wide\)\]/);
+    expect(root).not.toMatch(/ lg:\[--dt-pin-l:|content-lg:/);
   });
 
   it('leaves a cards table untouched: no grid form at all', () => {

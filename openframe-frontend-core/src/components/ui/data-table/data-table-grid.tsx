@@ -58,7 +58,7 @@ export interface GridLayout {
   columns: GridColumn[];
   /**
    * Summed width of the columns pinned to each side, in px: where the horizontal gradients start. The left block is
-   * pinned from `lg` up only (see `GRID_LEFT_PIN_CLASS`).
+   * pinned on a desktop with room for it only (see `GRID_LEFT_PIN_CLASS`).
    */
   pinnedLeft: number;
   pinnedRight: number;
@@ -206,18 +206,24 @@ export function buildGridLayout<T>(
 }
 
 /**
- * The left block (the checkbox column and the first data column) is pinned on a desktop: from the WINDOW's `lg` step
- * (1280px). On a tablet and a phone it scrolls with the other columns; the action columns are pinned right at every
- * width. The rule is about the device, so it follows the window and not the content area: in a three-column shell the
- * page's own width on a desktop is a tablet's (about 900px in a 1440px window), and the column stays pinned there.
+ * The left block (the checkbox column and the first data column) is pinned on a desktop with room for it: the WINDOW
+ * is at its `lg` step (1280px) AND the content area is at its `md` step (720px). Two conditions, because they say
+ * different things:
+ * - the window says which device it is. A tablet and a phone never pin the block, whatever the content's width, so
+ *   the content area's `lg` cannot be the rule: in a three-column shell a desktop's page column is a tablet's width
+ *   (about 900px in a 1440px window), and the column stays pinned there.
+ * - the content area says whether there is room. Under 720px of content a desktop page lays out as a phone's (the
+ *   mobile type scale, the compact page actions), and a pinned column would leave the others almost no width.
+ * Outside a content area `content-md` falls back to the window's `md`, which `lg` already implies. The action columns
+ * are pinned right at every width.
  */
-const GRID_LEFT_PIN_CLASS = 'lg:sticky lg:z-[1]';
+const GRID_LEFT_PIN_CLASS = 'lg:content-md:sticky lg:content-md:z-[1]';
 
 /**
- * On the grid's root: the left gradient starts at the pinned-left block's edge where that block is pinned (from `lg`),
- * and at the viewport's own edge where it is not.
+ * On the grid's root: the left gradient starts at the pinned-left block's edge where that block is pinned (the rule
+ * of `GRID_LEFT_PIN_CLASS`), and at the viewport's own edge where it is not.
  */
-export const GRID_ROOT_CLASS = '[--dt-pin-l:0px] lg:[--dt-pin-l:var(--dt-pin-l-wide)]';
+export const GRID_ROOT_CLASS = '[--dt-pin-l:0px] lg:content-md:[--dt-pin-l:var(--dt-pin-l-wide)]';
 
 /** One grid row, header or body: as wide as its columns, never narrower than the viewport. */
 export const GRID_ROW_CLASS = 'flex w-max min-w-full';
@@ -275,7 +281,8 @@ export const GRID_PIN_RIGHT_VAR = 'var(--dt-pin-r)';
  */
 export function gridGeometryVars(layout: GridLayout, resizingColumnId: string | null): CSSProperties {
   const vars: Record<string, string> = {
-    // Read through `--dt-pin-l`, which the root's class sets to this from `lg` up and to 0 below (`GRID_ROOT_CLASS`).
+    // Read through `--dt-pin-l`, which the root's class sets to this where the left block is pinned and to 0 where it
+    // is not (`GRID_ROOT_CLASS`).
     '--dt-pin-l-wide': `${layout.pinnedLeft}px`,
     '--dt-pin-r': `${layout.pinnedRight}px`,
   };
