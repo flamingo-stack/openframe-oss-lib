@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DataTable } from '../components/ui/data-table';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
+import { SearchableSelect } from '../components/ui/searchable-select';
 
 /**
  * A row with `rowHref` IS a link, so a control inside it (an Edit button) must
@@ -90,4 +91,72 @@ describe('DataTable row link: controls inside it', () => {
     render(<Table onEdit={vi.fn()} stopPropagation={false} />);
     expect(screen.getByRole('link', { name: /Doc/ })).toHaveAttribute('href', '/docs/1');
   });
+});
+
+/**
+ * The row cancels its link for a control's click, but only AFTER the control's own handlers ran: a handler that
+ * reads `defaultPrevented` must see the click as it came. Radix composes every trigger's handler that way
+ * (`composeEventHandlers` skips its own toggle on a cancelled event), so a cancel in the capture phase left every
+ * popover trigger in a row link dead: the tickets table's assign picker opened nothing.
+ */
+function PickerTable({
+  layout,
+  stopPropagation,
+  onSeen,
+}: {
+  layout: 'cards' | 'grid';
+  stopPropagation: boolean;
+  onSeen: (prevented: boolean) => void;
+}) {
+  const columns = [
+    columnHelper.accessor('name', { id: 'name', header: 'Name' }),
+    columnHelper.display({
+      id: 'assignee',
+      header: '',
+      cell: () => (
+        <div data-no-row-click onClick={stopPropagation ? e => e.stopPropagation() : undefined}>
+          <SearchableSelect
+            options={[{ value: 'u1', label: 'Alice' }]}
+            value={null}
+            onValueChange={() => {}}
+            searchPlaceholder="Search users..."
+            trigger={
+              <button type="button" onClick={e => onSeen(e.defaultPrevented)}>
+                Assign user
+              </button>
+            }
+          />
+        </div>
+      ),
+    }),
+  ];
+  const table = useDataTable({ data: [{ id: '1', name: 'Doc' }], columns });
+  return (
+    <DataTable table={table} layout={layout}>
+      <DataTable.Body<Row> rowHref={row => `/docs/${row.id}`} />
+    </DataTable>
+  );
+}
+
+describe('DataTable row link: a popover trigger inside it', () => {
+  it.each([
+    ['cards', false],
+    ['cards', true],
+    ['grid', false],
+    ['grid', true],
+  ] as const)(
+    'opens its popover and does not follow the link (%s layout, stopPropagation: %s)',
+    (layout, stopPropagation) => {
+      const seen: boolean[] = [];
+      render(
+        <PickerTable layout={layout} stopPropagation={stopPropagation} onSeen={prevented => seen.push(prevented)} />,
+      );
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      fireEvent(screen.getByRole('button', { name: 'Assign user' }), event);
+
+      expect(seen).toEqual([false]);
+      expect(screen.getByPlaceholderText('Search users...')).toBeInTheDocument();
+      expect(event.defaultPrevented).toBe(true);
+    },
+  );
 });

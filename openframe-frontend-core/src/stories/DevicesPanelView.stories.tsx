@@ -80,7 +80,7 @@ export const WithHeaderSlot: Story = {
 
 /**
  * The table in the grid layout: 48px one-line rows in one bordered block at every width, the action columns pinned
- * right, the device column pinned left from `lg` up.
+ * right, the device column pinned left on a desktop with at least 720px of content.
  */
 export const TableGridLayout: Story = {
   args: { tableLayout: 'grid', tableMaxHeight: 'fill', tableSettings: { storageKey: 'storybook-devices' } },

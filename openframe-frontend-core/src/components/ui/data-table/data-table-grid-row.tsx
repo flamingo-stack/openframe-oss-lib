@@ -9,13 +9,11 @@ import { isOwnClick } from '../../../utils/own-click';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { loadingItemProps, useLoadingScope } from '../loading-scope';
 import { GRID_ROW_CLASS, gridCellClass, gridCellStyle, type GridColumn, type GridLayout } from './data-table-grid';
-
-/** A control inside a row link whose click is its own: it never follows the row's link. */
-const ROW_LINK_CONTROL_SELECTOR = 'button, [role="button"]';
+import { cancelAfterReactHandlers, isRowLinkControlClick } from './row-link-click';
 /**
- * The selection cell. Its checkbox toggles on the click's way DOWN the tree like any control, but the row link's
- * navigation is cancelled on the way UP (by the cell itself): the checkbox skips its own toggle when the click arrives
- * already default-prevented, so the row's capture-phase cancel must leave it alone.
+ * The selection cell. Its checkbox skips its toggle on a click that arrives already cancelled, so the cell cancels the
+ * row link's navigation itself, on the click's way UP, after the checkbox has toggled; the row's capture handler leaves
+ * the cell to it.
  */
 const GRID_SELECT_SELECTOR = '[data-grid-select]';
 
@@ -90,22 +88,23 @@ function DataTableGridRowImpl<T>({
         if (isLinkMode) event.preventDefault();
         return;
       }
+      // A button's click in a row link is the button's: here, on the way up, its own handlers have run.
+      if (isLinkMode && isRowLinkControlClick(event.target, containerRef.current)) {
+        event.preventDefault();
+        return;
+      }
       onClick?.(row.original);
     },
     [onClick, row.original, isLinkMode],
   );
 
-  // Link mode, CAPTURE phase: a click on a control inside the row link runs the control and never follows the link,
-  // even when the control stops the click from bubbling. See `DataTableRow` for the full reasoning; the one
-  // difference here is the selection cell (`GRID_SELECT_SELECTOR`).
+  // Link mode: a click on a control inside the row link runs the control and never follows the link, even when the
+  // control stops the click from bubbling. See `DataTableRow` for the full reasoning; the one difference here is the
+  // selection cell (`GRID_SELECT_SELECTOR`).
   const preventControlNavigation = useCallback((event: React.MouseEvent) => {
-    const container = containerRef.current;
     const target = event.target;
-    if (!(target instanceof Element) || !container?.contains(target)) return;
-    if (target.closest(GRID_SELECT_SELECTOR)) return;
-    const nestedLink = target.closest('a');
-    if (nestedLink && nestedLink !== container && container.contains(nestedLink)) return;
-    if (!isOwnClick(target, container) || target.closest(ROW_LINK_CONTROL_SELECTOR)) event.preventDefault();
+    if (target instanceof Element && target.closest(GRID_SELECT_SELECTOR)) return;
+    if (isRowLinkControlClick(target, containerRef.current)) cancelAfterReactHandlers(event);
   }, []);
 
   const cellsById = new Map<string, Cell<T, unknown>>(row.getVisibleCells().map(cell => [cell.column.id, cell]));

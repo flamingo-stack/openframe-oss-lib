@@ -3,8 +3,9 @@
 `<DataTable layout="grid">` draws one bordered table of 48px one-line rows, with pinned columns, column resize and
 (with `settings`) a gear menu whose column layout is kept in the browser. It is the table at every width: a grid
 table has no card form. The action columns are pinned right everywhere; the checkbox column and the first data column
-are pinned left on a desktop (the window's `lg` step, 1280px), and scroll with the other columns on a tablet and a phone. A table's
-`cell` renderers stay for the hosts that still ask for cards.
+are pinned left on a desktop with room for them (the window's `lg` step, 1280px, and at least 720px of content: the
+content area's `md` step), and scroll with the other columns on a tablet, on a phone and in a desktop's narrow content
+column. A table's `cell` renderers stay for the hosts that still ask for cards.
 
 The layout is opt-in. A table that does not ask for it renders its card rows exactly as before.
 
