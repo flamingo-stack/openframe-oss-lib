@@ -4,7 +4,7 @@ import { usePageTopicStamp } from '../../contexts/page-topics-context';
 import { cn } from '../../utils/cn';
 import { PageTopicLabel } from '../page-topic-label';
 import type { MingoQuickAction } from './mingo-welcome';
-import type { QuickActionChip, QuickActionThemeSpec } from './quick-action-chip';
+import type { QuickActionAccent, QuickActionChip, QuickActionThemeSpec } from './quick-action-chip';
 import { QuickActionRow } from './quick-action-row';
 
 export interface QuickActionSetProps {
@@ -14,6 +14,8 @@ export interface QuickActionSetProps {
   leading?: ReadonlyArray<QuickActionChip>;
   /** Default theme for chips without their own (the agent's accent). */
   theme?: QuickActionThemeSpec;
+  /** See `QuickActionRowProps.accent`. */
+  accent?: QuickActionAccent;
   /** The actions are still read: the row draws its tags' loading form. */
   loading?: boolean;
   /** The group's accessible name. */
@@ -37,6 +39,7 @@ export function QuickActionSet({
   chips,
   leading,
   theme,
+  accent,
   loading = false,
   label = 'Quick actions',
   showTopic: showTopicProp,
@@ -44,7 +47,9 @@ export function QuickActionSet({
 }: QuickActionSetProps) {
   const topicStamp = usePageTopicStamp();
   const showTopic = showTopicProp ?? topicStamp;
-  const row = <QuickActionRow chips={chips} leading={leading} theme={theme} loading={loading} label={label} />;
+  const row = (
+    <QuickActionRow chips={chips} leading={leading} theme={theme} accent={accent} loading={loading} label={label} />
+  );
   if (!showTopic) return <div className={cn('shrink-0', className)}>{row}</div>;
   return (
     <div className={cn('flex shrink-0 flex-col gap-[var(--spacing-system-xxs)]', className)}>
@@ -64,6 +69,8 @@ export interface MingoQuickActionWallProps {
    * it (a composer under it, a greeting centred above) does not move when the actions land.
    */
   loading?: boolean;
+  /** The tint of the row's own glyph ("All"), see `QuickActionRowProps.accent`. */
+  accent?: QuickActionAccent;
   /** See {@link QuickActionSetProps.showTopic}. */
   showTopic?: boolean;
   className?: string;
@@ -85,6 +92,7 @@ export function MingoQuickActionWall({
   quickActions,
   leading = [],
   loading = false,
+  accent,
   showTopic,
   className,
 }: MingoQuickActionWallProps) {
@@ -94,6 +102,7 @@ export function MingoQuickActionWall({
       chips={quickActions.map(toChip)}
       leading={leading.map(toChip)}
       loading={loading}
+      accent={accent}
       showTopic={showTopic}
       className={className}
     />
