@@ -67,6 +67,10 @@ public class BackfillDispatcher {
         Map<String, String> backfillFilters = ConnectorSpecs.backfillOf(spec);
         List<SnapshotCondition> conditions = sourceDialects.dialectFor(config)
                 .gapConditions(config, backfillFilters, backfill.getGapFrom());
+        if (conditions.isEmpty()) {
+            markExpired(backfill, "No data collections to backfill");
+            return;
+        }
         signalPublisher.publishIncrementalSnapshot(config, conditions);
         markSent(backfill, connectorName);
     }

@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -30,6 +31,8 @@ public final class ConnectorSpecs {
     private static final String KEY_INITIAL_STATE = "initial_state";
     private static final String STATE_STOPPED = "STOPPED";
     private static final String SNAPSHOT_MODE_NO_DATA = "no_data";
+    // Modes that re-read every row on a new version; when_needed only snapshots when the offsets are unusable.
+    private static final Set<String> FULL_SNAPSHOT_MODES = Set.of("initial", "always");
 
     private ConnectorSpecs() {
     }
@@ -75,7 +78,10 @@ public final class ConnectorSpecs {
 
     public static Map<String, Object> withoutInitialSnapshot(Map<String, Object> config) {
         Map<String, Object> copy = config == null ? new HashMap<>() : new HashMap<>(config);
-        copy.put(KEY_SNAPSHOT_MODE, SNAPSHOT_MODE_NO_DATA);
+        String snapshotMode = stringOf(copy, KEY_SNAPSHOT_MODE);
+        if (snapshotMode.isEmpty() || FULL_SNAPSHOT_MODES.contains(snapshotMode)) {
+            copy.put(KEY_SNAPSHOT_MODE, SNAPSHOT_MODE_NO_DATA);
+        }
         return copy;
     }
 

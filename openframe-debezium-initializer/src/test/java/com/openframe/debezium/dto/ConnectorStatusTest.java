@@ -66,4 +66,26 @@ class ConnectorStatusTest {
         task.setState(state);
         return task;
     }
+
+    @Test
+    void isStopped_byConnectorState_onlyStoppedConnector() {
+        // setup
+        ConnectorStatus stopped = statusOf("STOPPED");
+        ConnectorStatus paused = statusOf("PAUSED");
+        ConnectorStatus withoutConnector = new ConnectorStatus();
+
+        // execution
+        List<Boolean> results = List.of(stopped.isStopped(), paused.isStopped(), withoutConnector.isStopped());
+
+        // verifications
+        assertThat(results).containsExactly(true, false, false);
+    }
+
+    private static ConnectorStatus statusOf(String connectorState) {
+        ConnectorStatus.Connector connector = new ConnectorStatus.Connector();
+        connector.setState(connectorState);
+        ConnectorStatus status = new ConnectorStatus();
+        status.setConnector(connector);
+        return status;
+    }
 }

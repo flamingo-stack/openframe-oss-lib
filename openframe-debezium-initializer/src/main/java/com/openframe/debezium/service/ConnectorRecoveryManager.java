@@ -350,7 +350,7 @@ public class ConnectorRecoveryManager {
             return;
         }
         try {
-            if (connectorAlertRepository.findByConnectorNameAndErrorTypeInAndResolvedFalse(connectorName, RECOVERY_ALERT_TYPES).isPresent()) {
+            if (connectorAlertRepository.existsByConnectorNameAndErrorTypeInAndResolvedFalse(connectorName, RECOVERY_ALERT_TYPES)) {
                 log.debug("Active alert already exists for connector '{}'", connectorName);
                 return;
             }
@@ -375,7 +375,7 @@ public class ConnectorRecoveryManager {
         }
         try {
             connectorAlertRepository.findByConnectorNameAndErrorTypeInAndResolvedFalse(connectorName, RECOVERY_ALERT_TYPES)
-                    .ifPresent(alert -> {
+                    .forEach(alert -> {
                         alert.setResolved(true);
                         alert.setResolvedAt(Instant.now());
                         connectorAlertRepository.save(alert);
