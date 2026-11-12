@@ -89,11 +89,15 @@ public class ConnectorRecreator {
     }
 
     private boolean canHandOver(RecreationRequest request, Map<String, Object> config) {
-        if (request.isDiscardOffsets() || request.getLastKnownOffsets().isEmpty()) return false;
+        if (hasNoOffsetsToCarry(request)) return false;
         if (offsetsBelongTo(request.getLastKnownOffsets(), config)) return true;
         log.warn("{} Offsets belong to another topic.prefix, recreating without them: base='{}' new='{}'",
                 DebeziumLog.PREFIX, request.getBaseName(), request.getNewName());
         return false;
+    }
+
+    private static boolean hasNoOffsetsToCarry(RecreationRequest request) {
+        return request.isDiscardOffsets() || request.getLastKnownOffsets().isEmpty();
     }
 
     private boolean offsetsBelongTo(ConnectorOffsets offsets, Map<String, Object> config) {
@@ -163,12 +167,15 @@ public class ConnectorRecreator {
             gapAlerts.raise(request.getNewName(), gapFrom, "No source dialect for the connector class");
             return;
         }
+        String baseName = request.getBaseName();
+        String newName = request.getNewName();
+        Instant createdAt = Instant.now();
         ConnectorBackfill backfill = ConnectorBackfill.builder()
-                .baseName(request.getBaseName())
-                .connectorName(request.getNewName())
+                .baseName(baseName)
+                .connectorName(newName)
                 .gapFrom(gapFrom)
                 .status(ConnectorBackfillStatus.PENDING)
-                .createdAt(Instant.now())
+                .createdAt(createdAt)
                 .build();
         backfillRepository.save(backfill);
         log.warn("{} Backfill scheduled: base='{}' new='{}' gap_from={}",

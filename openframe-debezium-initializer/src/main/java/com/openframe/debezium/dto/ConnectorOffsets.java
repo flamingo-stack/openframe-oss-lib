@@ -3,16 +3,16 @@ package com.openframe.debezium.dto;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Builder;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-@Getter
-@Setter
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -21,6 +21,7 @@ public class ConnectorOffsets {
     private static final String KEY_OFFSET = "offset";
     private static final String KEY_PARTITION = "partition";
 
+    @Builder.Default
     private List<Map<String, Object>> offsets = new ArrayList<>();
 
     public static ConnectorOffsets empty() {

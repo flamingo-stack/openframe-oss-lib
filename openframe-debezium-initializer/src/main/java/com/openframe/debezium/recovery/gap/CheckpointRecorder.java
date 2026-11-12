@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -55,11 +56,14 @@ public class CheckpointRecorder {
         if (!status.isRunning()) return;
         ConnectorOffsets offsets = debeziumService.getConnectorOffsets(connectorName);
         if (offsets.isEmpty()) return;
+        String baseName = nameStrategy.extractBaseName(connectorName);
+        List<Map<String, Object>> offsetEntries = offsets.getOffsets();
+        Instant capturedAt = Instant.now();
         ConnectorCheckpoint checkpoint = ConnectorCheckpoint.builder()
-                .baseName(nameStrategy.extractBaseName(connectorName))
+                .baseName(baseName)
                 .connectorName(connectorName)
-                .offsets(offsets.getOffsets())
-                .capturedAt(Instant.now())
+                .offsets(offsetEntries)
+                .capturedAt(capturedAt)
                 .build();
         checkpointRepository.save(checkpoint);
     }
