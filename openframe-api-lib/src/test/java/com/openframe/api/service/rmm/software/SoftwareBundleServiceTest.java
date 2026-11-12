@@ -338,6 +338,7 @@ class SoftwareBundleServiceTest {
     @DisplayName("turnOnAutoUpdate: the bundle's devices and the settings go to the Software, the bundle is COMPLETED, no update runs")
     void turnOnAutoUpdate_pendingBundleWithDevices_turnsOnForItsDevicesAndCompletesTheBundle() {
         SoftwareBundle draft = pending(null, null, List.of("m1", "m2"));
+        draft.setExpireAt(Instant.now().plusSeconds(3600));
         when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
         when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(WINGET_CHROME);
         when(machinePlatformResolver.osTypesByMachineId(List.of("m1", "m2")))
@@ -354,6 +355,7 @@ class SoftwareBundleServiceTest {
         SoftwareBundle completed = saved.getValue();
         assertThat(completed.getStatus()).isEqualTo(SoftwareBundleStatus.COMPLETED);
         assertThat(completed.getCompletedAt()).isNotNull();
+        assertThat(completed.getUpdatedAt()).isEqualTo(completed.getCompletedAt());
         assertThat(completed.getExpireAt()).isNull();
         verifyNoInteractions(onlineDispatchRepository, softwareActionResultRepository, softwareScheduleService);
     }

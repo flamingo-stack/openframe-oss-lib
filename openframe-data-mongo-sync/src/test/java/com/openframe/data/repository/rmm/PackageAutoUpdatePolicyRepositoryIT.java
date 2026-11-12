@@ -138,19 +138,26 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("disableBySoftwareIdAndMachineIdNotIn: turns off that Software's enabled policies on the other devices only")
-    void disableBySoftwareIdAndMachineIdNotIn_turnsOffTheOtherDevices() {
+    @DisplayName("disableOthersOfSoftware: of that Software's enabled policies only the template's package on these devices stays on")
+    void disableOthersOfSoftware_keepsTheTemplatesPackageOnTheseDevices() {
         repository.enable(template("google-chrome", "title-7", WAIT, "admin@x"), List.of("m1", "m2", "m3"));
+        repository.enable(template("google-chrome@beta", "title-7", WAIT, "admin@x"), List.of("m1"));
+        PackageAutoUpdatePolicy otherManager = template("google-chrome", "title-7", WAIT, "admin@x");
+        otherManager.setPackageManager(PackageManagerType.WINGET);
+        repository.enable(otherManager, List.of("m4"));
         repository.enable(template("slack", "title-9", WAIT, "admin@x"), List.of("m3"));
 
-        long turnedOff = repository.disableBySoftwareIdAndMachineIdNotIn(TENANT, "title-7", List.of("m1", "m4"), "other@x");
+        long turnedOff = repository.disableOthersOfSoftware(
+                template("google-chrome", "title-7", WAIT, "other@x"), List.of("m1", "m4"));
 
-        assertThat(turnedOff).isEqualTo(2);
+        assertThat(turnedOff).isEqualTo(4);
         assertThat(byMachine("google-chrome").values())
                 .extracting(PackageAutoUpdatePolicy::getMachineId, PackageAutoUpdatePolicy::isEnabled,
                         PackageAutoUpdatePolicy::getUpdatedBy)
                 .containsExactlyInAnyOrder(tuple("m1", true, "admin@x"), tuple("m2", false, "other@x"),
-                        tuple("m3", false, "other@x"));
+                        tuple("m3", false, "other@x"), tuple("m4", false, "other@x"));
+        assertThat(byMachine("google-chrome@beta").values())
+                .extracting(PackageAutoUpdatePolicy::isEnabled).containsExactly(false);
         assertThat(byMachine("slack").values()).extracting(PackageAutoUpdatePolicy::isEnabled).containsExactly(true);
     }
 
@@ -238,8 +245,8 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("findSoftwareIds: each linked Software once, of the enabled policies only or of all; other tenants and unlinked policies left out")
-    void findSoftwareIds_enabledOnlyOrAll_distinctIdsOfTheTenant() {
+    @DisplayName("findSoftwareIds, findEnabledSoftwareIds: each linked Software once; other tenants and unlinked policies left out")
+    void findSoftwareIds_allOrEnabledOnly_distinctIdsOfTheTenant() {
         repository.enable(template("google-chrome", "7", WAIT, "admin@x"), List.of("m1", "m2"));
         repository.enable(template("slack", "9", WAIT, "admin@x"), List.of("m1"));
         repository.enable(template("zoom", null, WAIT, "admin@x"), List.of("m1"));
@@ -248,8 +255,8 @@ class PackageAutoUpdatePolicyRepositoryIT extends BaseMongoIntegrationTest {
         foreign.setTenantId("tenant-2");
         repository.enable(foreign, List.of("m1"));
 
-        assertThat(repository.findSoftwareIds(TENANT, true)).containsExactly("7");
-        assertThat(repository.findSoftwareIds(TENANT, false)).containsExactlyInAnyOrder("7", "9");
+        assertThat(repository.findEnabledSoftwareIds(TENANT)).containsExactly("7");
+        assertThat(repository.findSoftwareIds(TENANT)).containsExactlyInAnyOrder("7", "9");
     }
 
     private Map<String, PackageAutoUpdatePolicy> byMachine(String packageName) {

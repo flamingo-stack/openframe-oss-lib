@@ -240,9 +240,29 @@ class SoftwareAutoUpdateServiceTest {
 
         InOrder order = inOrder(policyRepository, withdrawal);
         order.verify(policyRepository)
-                .disableBySoftwareIdAndMachineIdNotIn(TENANT, "chrome", List.of("m1", "m2"), "admin@x");
+                .disableOthersOfSoftware(any(PackageAutoUpdatePolicy.class), eq(List.of("m1", "m2")));
         order.verify(withdrawal).withdraw(outside, "auto-update turned off");
         verify(withdrawal, never()).withdraw(eq(selected), any());
+    }
+
+    @Test
+    void turnOn_selectedDeviceOnForAnotherPackage_onlyTheManagingPackageStaysOn() {
+        PackageAutoUpdatePolicy otherPackage = chromePolicy("m1", false);
+        otherPackage.setPackageName("Google.Chrome.EXE");
+        PackageAutoUpdatePolicy managing = chromePolicy("m1", true);
+        when(policyRepository.findByTenantIdAndSoftwareIdIn(TENANT, List.of("chrome")))
+                .thenReturn(List.of(otherPackage, managing));
+
+        service.turnOn("chrome", CHROME, List.of("m1"), WAIT, "admin@x");
+
+        verify(policyRepository).disableOthersOfSoftware(templateCaptor.capture(), eq(List.of("m1")));
+        assertThat(templateCaptor.getValue())
+                .extracting(PackageAutoUpdatePolicy::getTenantId, PackageAutoUpdatePolicy::getSoftwareId,
+                        PackageAutoUpdatePolicy::getPackageManager, PackageAutoUpdatePolicy::getPackageName,
+                        PackageAutoUpdatePolicy::getUpdatedBy)
+                .containsExactly(TENANT, "chrome", PackageManagerType.WINGET, "Google.Chrome", "admin@x");
+        verify(withdrawal).withdraw(otherPackage, "auto-update turned off");
+        verify(withdrawal, never()).withdraw(eq(managing), any());
     }
 
     @Test

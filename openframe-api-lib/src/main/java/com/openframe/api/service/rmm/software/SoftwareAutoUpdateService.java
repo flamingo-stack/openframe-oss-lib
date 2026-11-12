@@ -92,11 +92,10 @@ public class SoftwareAutoUpdateService {
         // a kept device keeps its lastVersion: it may not have been ordered the current version yet
         policyRepository.updateSettings(template, kept);
         addPolicies(template, added);
-        long turnedOff = policyRepository.disableBySoftwareIdAndMachineIdNotIn(tenantId, softwareId, machineIds, actor);
-        Set<String> selected = Set.copyOf(machineIds);
+        long turnedOff = policyRepository.disableOthersOfSoftware(template, machineIds);
         // read after the update, as in turnOff
         policyRepository.findByTenantIdAndSoftwareIdIn(tenantId, softwareIds).stream()
-                .filter(policy -> !selected.contains(policy.getMachineId()))
+                .filter(policy -> !policy.isEnabled())
                 .forEach(this::withdrawTurnedOff);
         log.info("Auto-update turned on softwareId={} package={}/{} kept={} added={} turnedOff={} actor={}",
                 softwareId, packageManager, packageName, kept.size(), added.size(), turnedOff, actor);

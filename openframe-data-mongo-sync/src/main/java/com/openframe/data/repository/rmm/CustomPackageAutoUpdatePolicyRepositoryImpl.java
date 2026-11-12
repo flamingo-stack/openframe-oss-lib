@@ -56,19 +56,34 @@ public class CustomPackageAutoUpdatePolicyRepositoryImpl implements CustomPackag
     }
 
     @Override
-    public long disableBySoftwareIdAndMachineIdNotIn(String tenantId, String softwareId, Collection<String> machineIds,
-                                                     String actor) {
-        Criteria enabledElsewhere = enabledOf(tenantId, softwareId).and("machineId").nin(machineIds);
-        return disable(enabledElsewhere, actor);
+    public long disableOthersOfSoftware(PackageAutoUpdatePolicy template, Collection<String> machineIds) {
+        String actor = template.getUpdatedBy();
+        Criteria otherMachine = Criteria.where("machineId").nin(machineIds);
+        Criteria otherManager = Criteria.where("packageManager").ne(template.getPackageManager());
+        Criteria otherPackage = Criteria.where("packageName").ne(template.getPackageName());
+        Criteria enabledOthers = enabledOf(template.getTenantId(), template.getSoftwareId())
+                .orOperator(otherMachine, otherManager, otherPackage);
+        return disable(enabledOthers, actor);
     }
 
     @Override
-    public List<String> findSoftwareIds(String tenantId, boolean enabledOnly) {
-        Criteria linked = Criteria.where("tenantId").is(tenantId).and("softwareId").ne(null);
-        if (enabledOnly) {
-            linked.and("enabled").is(true);
-        }
-        Query query = Query.query(linked);
+    public List<String> findSoftwareIds(String tenantId) {
+        Criteria linked = linkedTo(tenantId);
+        return softwareIds(linked);
+    }
+
+    @Override
+    public List<String> findEnabledSoftwareIds(String tenantId) {
+        Criteria enabled = linkedTo(tenantId).and("enabled").is(true);
+        return softwareIds(enabled);
+    }
+
+    private static Criteria linkedTo(String tenantId) {
+        return Criteria.where("tenantId").is(tenantId).and("softwareId").ne(null);
+    }
+
+    private List<String> softwareIds(Criteria policies) {
+        Query query = Query.query(policies);
         return mongoTemplate.findDistinct(query, "softwareId", PackageAutoUpdatePolicy.class, String.class);
     }
 

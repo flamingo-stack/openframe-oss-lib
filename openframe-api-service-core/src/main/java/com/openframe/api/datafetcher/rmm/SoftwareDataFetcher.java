@@ -19,6 +19,7 @@ import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
+import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareOs;
@@ -68,8 +69,9 @@ public class SoftwareDataFetcher {
         Boolean vulnerable = filter != null && filter.getMinSeverity() != null
                 && filter.getMinSeverity() != SoftwareCveSeverity.NONE
                 ? Boolean.TRUE : null;
-        return PageCursors.toConnection(softwareInventoryService.listSoftware(
-                search, page, perPage, sort, vulnerable, filter));
+        PageResult<SoftwareResponse> softwarePage = softwareInventoryService.listSoftware(
+                search, page, perPage, sort, vulnerable, filter);
+        return PageCursors.toConnection(softwarePage);
     }
 
     @DgsData(parentType = "Software", field = "os")

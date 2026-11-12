@@ -335,8 +335,8 @@ class TenantSoftwareReadModelQueryTest {
     void listSoftware_autoUpdateStatusesFilter_titleIdsOfThePoliciesReachTheQuery() {
         // setup
         when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
-        when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT, true)).thenReturn(List.of("7"));
-        when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT, false)).thenReturn(List.of("7", "9", "not-a-title"));
+        when(packageAutoUpdatePolicyRepository.findEnabledSoftwareIds(TENANT)).thenReturn(List.of("7"));
+        when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT)).thenReturn(List.of("7", "9", "not-a-title"));
         List<SoftwareAutoUpdateStatus> statuses = List.of(SoftwareAutoUpdateStatus.ON, SoftwareAutoUpdateStatus.OFF);
         SoftwareFilterInput filter = new SoftwareFilterInput();
         filter.setAutoUpdateStatuses(statuses);
@@ -354,8 +354,8 @@ class TenantSoftwareReadModelQueryTest {
     void listSoftware_everyFilterWithManageable_allReachTheQuery() {
         // setup
         when(softwareRepository.findTitles(any(SoftwareTitleQuery.class), any(Pageable.class))).thenReturn(Page.empty());
-        when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT, true)).thenReturn(List.of());
-        when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT, false)).thenReturn(List.of("9"));
+        when(packageAutoUpdatePolicyRepository.findEnabledSoftwareIds(TENANT)).thenReturn(List.of());
+        when(packageAutoUpdatePolicyRepository.findSoftwareIds(TENANT)).thenReturn(List.of("9"));
         List<SoftwareAutoUpdateStatus> statuses = List.of(SoftwareAutoUpdateStatus.NO_PACKAGE);
         SoftwareFilterInput filter = new SoftwareFilterInput();
         filter.setManageable(false);

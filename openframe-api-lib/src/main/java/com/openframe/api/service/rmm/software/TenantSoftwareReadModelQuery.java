@@ -261,16 +261,18 @@ public class TenantSoftwareReadModelQuery {
         if (isEmpty(autoUpdateStatuses)) {
             return;
         }
-        Set<Long> enabledPolicyTitleIds = policyTitleIds(tenantId, true);
-        Set<Long> policyTitleIds = policyTitleIds(tenantId, false);
+        List<String> enabledSoftwareIds = packageAutoUpdatePolicyRepository.findEnabledSoftwareIds(tenantId);
+        List<String> softwareIds = packageAutoUpdatePolicyRepository.findSoftwareIds(tenantId);
+        Set<Long> enabledPolicyTitleIds = titleIds(enabledSoftwareIds);
+        Set<Long> policyTitleIds = titleIds(softwareIds);
         titles.autoUpdateStatuses(autoUpdateStatuses)
                 .enabledPolicyTitleIds(enabledPolicyTitleIds)
                 .policyTitleIds(policyTitleIds);
     }
 
     // a policy names the Software by its id as text; the read model keys a title by the same id as a number
-    private Set<Long> policyTitleIds(String tenantId, boolean enabledOnly) {
-        return packageAutoUpdatePolicyRepository.findSoftwareIds(tenantId, enabledOnly).stream()
+    private static Set<Long> titleIds(List<String> softwareIds) {
+        return softwareIds.stream()
                 .map(TenantSoftwareReadModelQuery::parseLong)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
