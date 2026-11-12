@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { useViewportCollisionPadding } from '../use-viewport-collision-padding';
+import { useViewportCollisionPadding, withViewportPadding } from '../use-viewport-collision-padding';
 
 const root = document.documentElement;
 
@@ -39,6 +39,17 @@ describe('useViewportCollisionPadding', () => {
       await Promise.resolve();
     });
     expect(result.current.top).toBe(59);
+  });
+
+  it('keeps a popper own padding and raises only the sides the shell covers', () => {
+    expect(withViewportPadding(16, { top: 47, bottom: 0 })).toEqual({ top: 47, right: 16, bottom: 16, left: 16 });
+    expect(withViewportPadding({ top: 60 }, { top: 47, bottom: 300 })).toEqual({
+      top: 60,
+      right: 0,
+      bottom: 300,
+      left: 0,
+    });
+    expect(withViewportPadding(undefined, { top: 0, bottom: 0 })).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
   });
 
   it('hands every popper the same object until a value changes', () => {

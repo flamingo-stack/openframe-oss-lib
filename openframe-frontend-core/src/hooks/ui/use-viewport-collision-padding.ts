@@ -116,6 +116,27 @@ function subscribe(onStoreChange: () => void): () => void {
   };
 }
 
+type Side = 'top' | 'right' | 'bottom' | 'left';
+export type CollisionPadding = number | Partial<Record<Side, number>>;
+
+/**
+ * A popper's own `collisionPadding` with the viewport's added, side by side, whichever is larger. Only for a popper
+ * that collides against the viewport: a published collision boundary (a panel inside the app shell) already ends
+ * below the status bar and above the keyboard.
+ */
+export function withViewportPadding(
+  own: CollisionPadding | undefined,
+  viewport: ViewportCollisionPadding,
+): Partial<Record<Side, number>> {
+  const side = (name: Side) => (typeof own === 'number' ? own : (own?.[name] ?? 0));
+  return {
+    top: Math.max(side('top'), viewport.top),
+    right: side('right'),
+    bottom: Math.max(side('bottom'), viewport.bottom),
+    left: side('left'),
+  };
+}
+
 export function useViewportCollisionPadding(): ViewportCollisionPadding {
   return useSyncExternalStore(
     subscribe,
