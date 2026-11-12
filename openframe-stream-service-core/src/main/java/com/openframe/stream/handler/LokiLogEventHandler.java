@@ -25,7 +25,8 @@ import java.util.Map;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "openframe.tool-events.store", havingValue = "loki")
+// On by default: a missing key must not silently stop the event detail writes; only another value turns it off.
+@ConditionalOnProperty(name = "openframe.tool-events.store", havingValue = "loki", matchIfMissing = true)
 public class LokiLogEventHandler extends DebeziumMessageHandler<LokiLogEvent, DeserializedDebeziumMessage> {
 
     private static final int ATTEMPTS = 6;
