@@ -61,7 +61,7 @@ import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
-import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { TextHold } from '../ui/layout-hold';
 import { LoadingItems, loadingItemProps } from '../ui/loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container';
@@ -876,13 +876,14 @@ function SourceChip(props: {
   const icon = <Icon className="h-3.5 w-3.5" />;
   const chipClass = chatChipClass({ tone: 'secondary' });
 
-  // Grouped source — hover/click reveals a dropdown with Open + Ask per row.
+  // Grouped source: a click opens a menu with Open + Ask per row. The menu is the shared `DropdownMenu`, portalled
+  // out of the thread: drawn inside it, it faded with the thread's end and sat under the composer dock.
   if (src.items && src.items.length > 0) {
     // A server-grouped chip answers to one number; a client-built one answers
     // to every number its rows were cited by.
     const itemIndices = src.items.flatMap(item => (item.index === undefined ? [] : [item.index]));
     const rowLabels = groupedRowLabels(src.items);
-    const dropdownItems: HoverDropdownItem[] = src.items.map((item, i) => {
+    const rows = src.items.map((item, i) => {
       const itemCta = resolveSourceRowCTA(
         {
           sourceRepo: src.sourceRepo,
@@ -896,52 +897,75 @@ function SourceChip(props: {
         sourceRowCtxFromRuntime(runtime),
       );
       const ItemIcon = itemCta.icon;
-      // Read out of the CTA before the `onClick` closure below is built: a
-      // property narrowing does not survive into a callback (the property
-      // could in principle be reassigned before it fires), so capturing the
-      // value is what keeps the handler assertion-free.
+      // Read out of the CTA before the `onSelect` closure below is built: a
+      // property narrowing does not survive into a callback.
       const itemChatRef = itemCta.chatRef;
       return {
+        key: `${item.id}-${i}`,
         label: rowLabels[i],
-        icon: <ItemIcon className="h-3.5 w-3.5" />,
+        icon: <ItemIcon />,
         href: itemCta.href ?? undefined,
-        targetPlatform: itemCta.targetPlatform,
+        targetPlatform: itemCta.targetPlatform ?? null,
         path: item.path ?? null,
-        secondaryAction:
+        ask:
           onDiscuss && itemCta.askable && itemChatRef
-            ? {
-                icon: <MessageSquare />,
-                label: `Ask about ${item.name}`,
-                onClick: () => onDiscuss(itemChatRef),
-              }
+            ? { label: `Ask about ${item.name}`, run: () => onDiscuss(itemChatRef) }
             : undefined,
       };
     });
 
     const groupIndices = itemIndices.length > 0 ? formatCitationIndices(itemIndices) : `${src.index}`;
+    const rowLabelClass = 'min-w-0 flex-1 truncate';
 
     return (
       <span className="inline-flex" {...marks}>
-        <HoverDropdown
-          items={dropdownItems}
-          renderAnchor={({ href, targetPlatform, path, className, children }) => (
-            <NavLinkAnchorViaRuntime
-              href={href}
-              targetPlatform={targetPlatform ?? null}
-              path={path}
-              className={className}
-            >
-              {children}
-            </NavLinkAnchorViaRuntime>
-          )}
-        >
-          <span className={`${chipClass} cursor-pointer`}>
+        {/* Not modal: the thread keeps scrolling under an open menu, and the menu leaves with its chip. */}
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger className={`${chipClass} cursor-pointer`}>
             {icon}
             <span className="max-w-[160px] truncate">
               [{groupIndices}] {src.name}
             </span>
-          </span>
-        </HoverDropdown>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            className="max-h-[min(420px,var(--radix-dropdown-menu-content-available-height))] min-w-[220px] max-w-[340px] overflow-y-auto"
+          >
+            {rows.map(row => (
+              <div
+                key={row.key}
+                data-testid="source-group-row"
+                className="flex items-center gap-[var(--spacing-system-xxs)]"
+              >
+                {row.href ? (
+                  <DropdownMenuItem asChild className="min-w-0 flex-1 text-ods-text-secondary no-underline">
+                    <NavLinkAnchorViaRuntime href={row.href} targetPlatform={row.targetPlatform} path={row.path}>
+                      {row.icon}
+                      <span className={rowLabelClass}>{row.label}</span>
+                    </NavLinkAnchorViaRuntime>
+                  </DropdownMenuItem>
+                ) : (
+                  // Nothing to open: the label only, out of the keyboard's way; its Ask still works.
+                  <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-ods-text-secondary text-h6 [&_svg]:size-4 [&_svg]:shrink-0">
+                    {row.icon}
+                    <span className={rowLabelClass}>{row.label}</span>
+                  </span>
+                )}
+                {row.ask && (
+                  <DropdownMenuItem
+                    aria-label={row.ask.label}
+                    title={row.ask.label}
+                    onSelect={row.ask.run}
+                    className="shrink-0 px-1.5 text-ods-text-secondary"
+                  >
+                    <MessageSquare />
+                  </DropdownMenuItem>
+                )}
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </span>
     );
   }
