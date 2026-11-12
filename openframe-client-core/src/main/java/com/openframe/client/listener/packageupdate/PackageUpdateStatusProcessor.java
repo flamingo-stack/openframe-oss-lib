@@ -121,12 +121,20 @@ public class PackageUpdateStatusProcessor {
                     requestId, machineId, deadlineAt);
             return;
         }
-        if (isTerminal(state) && Instant.now().isBefore(deadlineAt)) {
+        if (!isTerminal(state)) {
+            return;
+        }
+        if (Instant.now().isBefore(deadlineAt)) {
             deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, PackageUpdateDeliverySeed.deadlineTargetId(requestId),
                     machineId, "update finished before its deadline");
             log.info("[package-update] deadline force withdrawn requestId={} machineId={} status={}",
                     requestId, machineId, state.getStatus());
+            return;
         }
+        // the force's own row takes the agent's result; the WAIT row would wait for one until its timeout
+        deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, requestId, machineId, "finished by the deadline force");
+        log.info("[package-update] wait order withdrawn, the deadline force finished it requestId={} machineId={} status={}",
+                requestId, machineId, state.getStatus());
     }
 
     private PackageUpdateDeviceState newState(String tenantId, String requestId, String machineId) {

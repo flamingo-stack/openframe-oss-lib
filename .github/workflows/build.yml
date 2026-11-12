@@ -66,7 +66,7 @@ jobs:
           URL="https://maven.pkg.github.com/${{ github.repository }}/${{ env.REPOSITORY }}/maven-metadata.xml"
           OLD_VERSION=$(curl -sf -H "Authorization: token $GITHUB_TOKEN" "$URL" |
                         grep -oP '<version>\K[0-9]+\.[0-9]+\.[0-9]+(?=</version>)' | sort -V | tail -1)
-          echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}-SNAPSHOT" >> $GITHUB_ENV
+          echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}-SNAPSHOT" >> "$GITHUB_ENV"
 
       - name: Build and Publish ${{ env.NEW_VERSION }}
         id: build
@@ -102,17 +102,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # No lockfile is committed (.gitignore), so the cache keys on package.json.
+          # The committed lockfile is what every install reads, so the cache keys on it.
           cache: npm
-          cache-dependency-path: openframe-frontend-core/package.json
+          cache-dependency-path: openframe-frontend-core/package-lock.json
 
-      # Bundled npm intermittently throws "Cannot read properties of null (reading 'edgesOut')" without a lockfile.
+      # The npm version the lockfile is maintained with.
       - name: Upgrade npm
         run: npm install -g npm@11.9.0
 
-      # `install`, not `ci`: `ci` needs a lockfile.
+      # Exactly the committed lockfile, as every developer's checkout has it; fails when package.json and the lockfile disagree.
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       # ~1s; a broken eslint config makes every lint result below meaningless.
       # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:config-smoke in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u

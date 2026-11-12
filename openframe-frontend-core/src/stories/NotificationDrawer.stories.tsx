@@ -282,6 +282,45 @@ export const TwoLineTitleInNarrowHost: Story = {
 };
 
 /**
+ * `presentation="row"`: the lockscreen approval in one line, for a surface too small for a tile (the homepage
+ * hero's scene). The agent's label names its mark; once approved the buttons become the status and the title stays put.
+ */
+export const ApprovalRow: Story = {
+  render: () => {
+    const approval = (resolution: 'APPROVED' | null): Notification => ({
+      id: `row-${resolution ?? 'pending'}`,
+      type: 'Fae asks',
+      icon: <UserPlusIcon size={16} />,
+      title: 'Install Figma for Jen?',
+      createdAt: Date.now(),
+      read: true,
+      meta: {
+        notificationType: MINGO_APPROVAL_REQUEST_TYPE,
+        approvalRequestId: `req-row-${resolution ?? 'pending'}`,
+        resolution,
+        toolCalls: [{ toolName: 'install', toolTitle: 'Install Figma', requiresApproval: true }],
+      },
+    });
+    return (
+      <div className="flex flex-col items-start gap-2">
+        <ApprovalRequestNotificationTile
+          notification={approval(null)}
+          presentation="row"
+          onApprove={() => {}}
+          onReject={() => {}}
+        />
+        <ApprovalRequestNotificationTile
+          notification={approval('APPROVED')}
+          presentation="row"
+          onApprove={() => {}}
+          onReject={() => {}}
+        />
+      </div>
+    );
+  },
+};
+
+/**
  * The new header fields: `severity` colors the type label and icon slot
  * (INFO grey, WARNING amber, DANGER red) and overrides `variant`; `imageUrl`
  * wins over `icon`, which wins over the dot fallback.

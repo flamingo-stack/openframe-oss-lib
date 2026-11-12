@@ -57,6 +57,8 @@ export default defineConfig([
       // APIs beyond crypto.randomUUID). Its own entry so the hub's Mux
       // pipeline DALs import `./utils/video-bite-id` without the barrel.
       'utils/video-bite-id': 'src/utils/video-bite-id.ts',
+      // A YouTube video's poster address — server-safe, so the hub's structured data states the same image the player draws.
+      'utils/youtube-poster': 'src/utils/youtube-poster.ts',
       // Zod schema — server-safe (no React, no browser APIs). Used by
       // BOTH the lib's `<ContactForm>` for validation AND the hub's
       // server-side /api/contact + admin routes for payload validation.

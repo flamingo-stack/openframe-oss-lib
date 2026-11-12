@@ -48,9 +48,9 @@ export interface GuideWelcomeProps {
    *  `subtitle` is present. A loading scope draws the skeleton too. */
   subtitleLoading?: boolean;
   /** Quick-action chips — caller-provided; there are no built-in defaults, so
-   *  the set is omitted entirely unless the host supplies actions. The first
-   *  ones fill the set's slots and the rest open from its "More" slot; a click
-   *  hands the action to `onQuickAction` (the chat sends its `prompt`). */
+   *  the row is omitted entirely unless the host supplies actions. They are the
+   *  tags of the one-line row and the rows of its "All" list; a click hands the
+   *  action to `onQuickAction` (the chat sends its `prompt`). */
   quickActions?: ReadonlyArray<GuideQuickAction>;
   /** The host is still reading the chips (e.g. the quick actions of the page's
    *  topic): with none to show yet the wall draws its own loading form. A
@@ -108,7 +108,7 @@ export function GuideWelcome({
   // ONE switch for the greeting (read data): a loading scope, or the host still fetching it with none to show yet.
   const inLoadingScope = useLoadingScope();
   const subtitleIsLoading = inLoadingScope || (subtitleLoading && !subtitle);
-  // The same switch for the chips (read data): the wall draws its loading form while there are none to show yet.
+  // The same switch for the chips (read data): the row draws its loading form while there are none to show yet.
   const chipsAreLoading = inLoadingScope || (quickActionsLoading && quickActions.length === 0);
 
   // Map to the shared {@link QuickActionChip} shape the chat's {@link QuickActionSet} draws (the set Mingo's empty
@@ -187,9 +187,9 @@ export function GuideWelcome({
         <ScrollFadeOverlay edge="bottom" visible={fadeBottom} className="h-12" />
       </div>
 
-      {/* The quick actions, pinned above the composer: the static {@link QuickActionSet} (fixed slots, its height
-          set by the width alone, "More" for the rest). A click hands the action to `onQuickAction`. The set prints
-          the page's topic over itself. */}
+      {/* The quick actions, pinned above the composer: the {@link QuickActionSet} (one line of tags that scrolls
+          sideways, "All" at its right). A click hands the action to `onQuickAction`. The set prints the page's topic
+          over itself. */}
       {(quickActions.length > 0 || chipsAreLoading) && (
         <QuickActionSet chips={chipItems} loading={chipsAreLoading} showTopic={showTopicProp} />
       )}

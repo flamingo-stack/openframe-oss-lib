@@ -2,10 +2,12 @@
 
 import type { FC, ReactNode, RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../utils/cn';
 import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
 import { Button } from '../ui';
+import { usePortalContainer } from '../ui/portal-container';
 
 // Types for filter configuration
 export interface FilterOption {
@@ -56,6 +58,13 @@ export interface FiltersDropdownProps {
    * @default true
    */
   responsive?: boolean;
+  /**
+   * Draw the panel in a portal, `fixed` under the trigger, instead of `absolute` inside this component's box. For a
+   * trigger that sits in a clipping box (a grid table's header is its own `overflow: hidden` viewport), where an
+   * in-flow panel would be cut off. The panel follows the trigger while the page or the table scrolls.
+   * @default false
+   */
+  floating?: boolean;
 }
 
 // Custom checkbox component
@@ -85,6 +94,29 @@ const FilterCheckbox: FC<{
   );
 };
 
+/** A floating panel's distance below its trigger and from the window's edges, in px. */
+const FLOATING_GAP = 8;
+const FLOATING_WIDTH = 320;
+
+/** Where a floating panel goes: under its trigger, hung from the edge its placement names, kept inside the window. */
+function floatingPanelPosition(
+  panelWidth: number,
+  trigger: Element | null,
+  placement: 'bottom-start' | 'bottom-end' | 'bottom',
+): { left: string; top: string } | null {
+  if (!trigger) return null;
+  const rect = trigger.getBoundingClientRect();
+  const width = panelWidth || FLOATING_WIDTH;
+  const wanted =
+    placement === 'bottom-end'
+      ? rect.right - width
+      : placement === 'bottom'
+        ? (rect.left + rect.right) / 2 - width / 2
+        : rect.left;
+  const max = Math.max(FLOATING_GAP, window.innerWidth - width - FLOATING_GAP);
+  return { left: `${Math.min(Math.max(wanted, FLOATING_GAP), max)}px`, top: `${rect.bottom + FLOATING_GAP}px` };
+}
+
 // Animation timings (ms). Must stay in sync with the `duration-200` Tailwind
 // class on the dropdown panel below.
 const ANIMATION_MS = 200;
@@ -100,7 +132,9 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
   currentFilters,
   placement = 'bottom-start',
   responsive = true,
+  floating = false,
 }) => {
+  const portalContainer = usePortalContainer();
   const [isOpen, setIsOpen] = useState(false);
   // `shouldRender` controls mount/unmount.
   // `isVisible` controls the open/closed *visual* state and drives the CSS transition.
@@ -221,11 +255,22 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
     const dropdown = dropdownRef.current;
     if (!dropdown) return;
     if (!isMobile) {
+      if (floating) {
+        // Floating: `fixed` in a portal, placed from the trigger's rect on every commit.
+        const position = floatingPanelPosition(dropdown.offsetWidth, triggerRef.current, placement);
+        if (position) {
+          dropdown.style.left = position.left;
+          dropdown.style.top = position.top;
+        }
+        return;
+      }
       // Desktop is `absolute` + placement classes — an inline top from a
       // previous mobile layout would fight them.
       dropdown.style.top = '';
+      dropdown.style.left = '';
       return;
     }
+    dropdown.style.left = '';
     const trigger = triggerRef.current;
     dropdown.style.top = `${trigger ? trigger.getBoundingClientRect().bottom + window.scrollY + 8 : 0}px`;
   });
@@ -276,6 +321,8 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       // Check if click is outside the entire component container
+      // A floating panel is portalled out of the container: a click inside it is not outside.
+      if (dropdownRef.current?.contains(event.target as Node)) return;
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
@@ -293,6 +340,25 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
+
+  // A floating panel is `fixed`: it follows its trigger while anything scrolls or the window resizes.
+  useEffect(() => {
+    if (!isOpen || !floating || isMobile) return undefined;
+    const reposition = () => {
+      const dropdown = dropdownRef.current;
+      const position = dropdown && floatingPanelPosition(dropdown.offsetWidth, triggerRef.current, placement);
+      if (dropdown && position) {
+        dropdown.style.left = position.left;
+        dropdown.style.top = position.top;
+      }
+    };
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [isOpen, floating, isMobile, placement]);
 
   // Handle escape key
   useEffect(() => {
@@ -380,6 +446,11 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
     return desktopClasses[actualPlacement];
   };
 
+  const isFloating = floating && !isMobile;
+  // Floating: the panel leaves this component's box (and whatever clips it) for the active portal container.
+  const renderPanel = (panel: ReactNode) =>
+    isFloating ? createPortal(panel, portalContainer ?? document.body) : panel;
+
   return (
     <div ref={containerRef} className={cn('relative inline-block', className)}>
       {/* Trigger */}
@@ -404,101 +475,111 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
       )}
 
       {/* Dropdown Panel — kept mounted briefly on close to play exit transition. */}
-      {shouldRender && (
-        <div
-          ref={dropdownRef}
-          className={cn(
-            'z-50 origin-top',
-            // CSS transitions (not @keyframes) so mid-animation interruption
-            // interpolates smoothly from the current computed value.
-            'transition-[opacity,transform] duration-200 ease-out',
-            'will-change-[opacity,transform]',
-            isVisible ? 'translate-y-0 scale-100 opacity-100' : 'pointer-events-none -translate-y-2 scale-95 opacity-0',
-            isMobile ? 'fixed left-4 right-4 mx-auto max-w-[320px]' : 'absolute w-[320px]',
-            getDropdownPositionClasses(),
-            dropdownClassName,
-          )}
-          // No `style` here: the mobile `top` is a DOM measurement and is owned
-          // by the layout effect above.
-        >
-          <div className="flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-bg p-4 shadow-xl">
-            <div className="max-h-[250px] min-h-0 flex-1 overflow-y-auto">
-              {sections.map((section, sectionIndex) => {
-                const sectionSelection = selectedFilters[section.id] || [];
-                const allSelected = section.options.every(opt => sectionSelection.includes(opt.id));
+      {shouldRender &&
+        renderPanel(
+          <div
+            ref={dropdownRef}
+            className={cn(
+              'z-50 origin-top',
+              // CSS transitions (not @keyframes) so mid-animation interruption
+              // interpolates smoothly from the current computed value.
+              'transition-[opacity,transform] duration-200 ease-out',
+              'will-change-[opacity,transform]',
+              isVisible
+                ? 'translate-y-0 scale-100 opacity-100'
+                : 'pointer-events-none -translate-y-2 scale-95 opacity-0',
+              isMobile
+                ? 'fixed left-4 right-4 mx-auto max-w-[320px]'
+                : isFloating
+                  ? 'fixed w-[320px]'
+                  : 'absolute w-[320px]',
+              !isFloating && getDropdownPositionClasses(),
+              dropdownClassName,
+            )}
+            // No `style` here: the mobile `top` is a DOM measurement and is owned
+            // by the layout effect above.
+          >
+            <div className="flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-bg p-4 shadow-xl">
+              <div className="max-h-[250px] min-h-0 flex-1 overflow-y-auto">
+                {sections.map((section, sectionIndex) => {
+                  const sectionSelection = selectedFilters[section.id] || [];
+                  const allSelected = section.options.every(opt => sectionSelection.includes(opt.id));
 
-                return (
-                  <div key={section.id} className={cn('space-y-2', sectionIndex > 0 && 'mt-4')}>
-                    {/* Section Header — sticky so title + Select All stay visible while options scroll. */}
-                    <div className="sticky top-0 z-10 flex items-center justify-between bg-ods-bg pb-2">
-                      <h3 className="text-ods-text-secondary text-h5">{section.title}</h3>
-                      {section.allowSelectAll && section.type === 'checkbox' && (
-                        <Button
-                          variant="link"
-                          size="compact"
-                          noPaddingX
-                          data-tone="neutral"
-                          onClick={() => handleSelectAll(section.id, section)}
-                        >
-                          {allSelected ? 'Deselect All' : 'Select All'}
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Options Container */}
-                    <div className="divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-ods-bg">
-                      {section.options.map((option, index) => {
-                        // Handle separator type
-                        if (option.type === 'separator') {
-                          return (
-                            <div key={`${section.id}-separator-${index}`} className="my-1 border-t border-ods-border" />
-                          );
-                        }
-
-                        const isSelected = sectionSelection.includes(option.id);
-
-                        return (
+                  return (
+                    <div key={section.id} className={cn('space-y-2', sectionIndex > 0 && 'mt-4')}>
+                      {/* Section Header — sticky so title + Select All stay visible while options scroll. */}
+                      <div className="sticky top-0 z-10 flex items-center justify-between bg-ods-bg pb-2">
+                        <h3 className="text-ods-text-secondary text-h5">{section.title}</h3>
+                        {section.allowSelectAll && section.type === 'checkbox' && (
                           <Button
-                            variant="row"
-                            type="button"
-                            key={`${section.id}-${option.id}-${index}`}
-                            onClick={() => handleToggleOption(section.id, option.id, section.type)}
-                            data-state={isSelected ? 'active' : undefined}
-                            // A checked option sits on the raised surface; the hover still shows over it.
-                            data-tone="surface"
+                            variant="link"
+                            size="compact"
+                            noPaddingX
+                            data-tone="neutral"
+                            onClick={() => handleSelectAll(section.id, section)}
                           >
-                            <FilterCheckbox checked={isSelected} />
-                            <span
-                              className="min-w-0 flex-1 truncate text-ods-text-primary text-h4"
-                              title={option.label}
-                            >
-                              {option.label}
-                            </span>
-                            {option.count !== undefined && (
-                              <span className="shrink-0 text-ods-text-secondary text-h6">
-                                {option.count.toLocaleString()}
-                              </span>
-                            )}
+                            {allSelected ? 'Deselect All' : 'Select All'}
                           </Button>
-                        );
-                      })}
+                        )}
+                      </div>
+
+                      {/* Options Container */}
+                      <div className="divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-ods-bg">
+                        {section.options.map((option, index) => {
+                          // Handle separator type
+                          if (option.type === 'separator') {
+                            return (
+                              <div
+                                key={`${section.id}-separator-${index}`}
+                                className="my-1 border-t border-ods-border"
+                              />
+                            );
+                          }
+
+                          const isSelected = sectionSelection.includes(option.id);
+
+                          return (
+                            <Button
+                              variant="row"
+                              type="button"
+                              key={`${section.id}-${option.id}-${index}`}
+                              onClick={() => handleToggleOption(section.id, option.id, section.type)}
+                              data-state={isSelected ? 'active' : undefined}
+                              // A checked option sits on the raised surface; the hover still shows over it.
+                              data-tone="surface"
+                            >
+                              <FilterCheckbox checked={isSelected} />
+                              <span
+                                className="min-w-0 flex-1 truncate text-ods-text-primary text-h4"
+                                title={option.label}
+                              >
+                                {option.label}
+                              </span>
+                              {option.count !== undefined && (
+                                <span className="shrink-0 text-ods-text-secondary text-h6">
+                                  {option.count.toLocaleString()}
+                                </span>
+                              )}
+                            </Button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+              {/* Action Buttons */}
+              <div className="mt-4 flex shrink-0 gap-3">
+                <Button variant="outline" onClick={handleReset} size="default">
+                  Reset
+                </Button>
+                <Button variant="accent" onClick={handleApply} size="default">
+                  Apply
+                </Button>
+              </div>
             </div>
-            {/* Action Buttons */}
-            <div className="mt-4 flex shrink-0 gap-3">
-              <Button variant="outline" onClick={handleReset} size="default">
-                Reset
-              </Button>
-              <Button variant="accent" onClick={handleApply} size="default">
-                Apply
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+        )}
     </div>
   );
 };

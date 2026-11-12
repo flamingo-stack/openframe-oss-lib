@@ -74,4 +74,8 @@ public class Machine implements TenantScoped {
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
     @Version
     private Long version;
+
+    public String preferredName() {
+        return MachineName.preferred(nickname, hostname);
+    }
 }

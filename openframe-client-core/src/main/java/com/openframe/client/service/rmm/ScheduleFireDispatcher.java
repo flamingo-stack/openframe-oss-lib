@@ -1,8 +1,8 @@
 package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
@@ -107,7 +107,7 @@ public class ScheduleFireDispatcher {
 
     private Set<String> onlineTargets(String tenantId, List<String> targets) {
         return machineRepository.findByTenantIdAndMachineIdIn(tenantId, new HashSet<>(targets)).stream()
-                .filter(machine -> machine.getStatus() == DeviceStatus.ONLINE)
+                .filter(machine -> machine.getTelemetryStatus() == TelemetryStatus.ONLINE)
                 .map(Machine::getMachineId)
                 .collect(Collectors.toSet());
     }

@@ -3,6 +3,7 @@
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { type ComponentPropsWithoutRef, type ComponentRef, type ElementRef, forwardRef, type ReactNode } from 'react';
+import { useViewportCollisionPadding, withViewportPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
@@ -120,20 +121,23 @@ SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayNam
 const SelectContent = forwardRef<
   ComponentRef<typeof SelectPrimitive.Content>,
   ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = 'popper', ...props }, ref) => {
+>(({ className, children, position = 'popper', collisionPadding, ...props }, ref) => {
   const container = usePortalContainer();
+  const viewportPadding = useViewportCollisionPadding();
   return (
     <SelectPrimitive.Portal container={container ?? undefined}>
       <SelectPrimitive.Content
         ref={ref}
         className={cn(
-          'relative z-[9999] max-h-96 overflow-hidden rounded-[4px] border border-ods-border bg-ods-card text-ods-text-primary',
+          'relative z-[9999] max-h-[min(24rem,var(--radix-select-content-available-height,24rem))] overflow-hidden rounded-[4px] border border-ods-border bg-ods-card text-ods-text-primary',
           'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
-          position === 'popper' &&
-            'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
           className,
         )}
         position={position}
+        // The gap as an offset Radix knows, not a translate: a translated list passed the collision padding by it.
+        sideOffset={position === 'popper' ? 4 : undefined}
+        // The mobile shell's status bar and keyboard are the viewport's edges (useViewportCollisionPadding).
+        collisionPadding={withViewportPadding(collisionPadding, viewportPadding)}
         style={{
           width: 'var(--radix-select-trigger-width)',
           minWidth: 'var(--radix-select-trigger-width)',

@@ -77,3 +77,21 @@ export const WithHeaderSlot: Story = {
     headerSlot: <h2 className="pb-[var(--spacing-system-l)] text-ods-text-primary text-h2">Every device, one list</h2>,
   },
 };
+
+/**
+ * The table in the grid layout: 48px one-line rows in one bordered block at every width, the action columns pinned
+ * right, the device column pinned left on a desktop with at least 720px of content.
+ */
+export const TableGridLayout: Story = {
+  args: { tableLayout: 'grid', tableMaxHeight: 'fill', tableSettings: { storageKey: 'storybook-devices' } },
+  render: function Render(args) {
+    const [viewMode, setViewMode] = useState<DevicesViewMode>(args.viewMode);
+    return <DevicesPanelView {...args} viewMode={viewMode} onViewModeChange={setViewMode} />;
+  },
+};
+
+/** The grid layout with the directory columns: more columns than fit, so the table scrolls sideways. */
+export const TableGridLayoutWithDirectory: Story = { args: { tableLayout: 'grid', directoryColumns: true } };
+
+/** The grid layout while the request has not answered. */
+export const TableGridLayoutLoading: Story = { args: { tableLayout: 'grid', loading: true, devices: [] } };

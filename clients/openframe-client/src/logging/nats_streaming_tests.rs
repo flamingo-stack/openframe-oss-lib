@@ -27,6 +27,30 @@ fn a_stored_log_key_wins_over_the_initial_key() {
     assert_eq!(choose_key(None, None), None);
 }
 
+#[tokio::test]
+async fn a_401_on_the_websocket_handshake_reaches_the_event_callback_as_a_client_error() {
+    let server = crate::test_support::mock_server_with_body(&[401], "").await;
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let _client = async_nats::ConnectOptions::new()
+        .retry_on_initial_connect()
+        .event_callback(move |event| {
+            let tx = tx.clone();
+            async move {
+                if let async_nats::Event::ClientError(err) = event {
+                    let _ = tx.send(err);
+                }
+            }
+        })
+        .connect(server.url.replace("http://", "ws://").as_str())
+        .await
+        .unwrap();
+
+    tokio::time::timeout(Duration::from_secs(10), rx.recv())
+        .await
+        .expect("a client error within the deadline")
+        .unwrap();
+}
+
 #[test]
 fn tenant_domain_drops_the_api_prefix() {
     assert_eq!(

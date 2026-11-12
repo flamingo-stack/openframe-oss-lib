@@ -7,7 +7,11 @@ export { notificationCategoryIcon } from './notification-category-icon';
 export type { NotificationTileProps } from './notification-tile';
 export { NotificationPopups } from './notification-popups';
 export type { NotificationPopupsProps, NotificationPopupsPosition } from './notification-popups';
-export { ApprovalRequestNotificationTile } from './approval-request-notification-tile';
+export {
+  APPROVAL_ROW_CLASS,
+  ApprovalRequestNotificationTile,
+  ApprovalRequestRowSkeleton,
+} from './approval-request-notification-tile';
 export type { ApprovalRequestNotificationTileProps } from './approval-request-notification-tile';
 export {
   approvalMetaToBatchData,

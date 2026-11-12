@@ -87,7 +87,7 @@ public class KnowledgeBaseTagService {
     @Transactional
     public void addTagToItem(String itemId, String tagId) {
         log.info("Adding tag {} to KB item {}", tagId, itemId);
-        requireExistingTag(tagId);
+        requireTagAttachment(itemId, tagId);
         if (tagAssignmentRepository.findByEntityIdAndTagIdAndEntityType(itemId, tagId, ENTITY_TYPE).isPresent()) {
             return;
         }
@@ -104,6 +104,14 @@ public class KnowledgeBaseTagService {
             return;
         }
         tagIds.forEach(this::requireExistingTag);
+    }
+
+    public void requireTagAttachment(String itemId, String tagId) {
+        requireExistingTag(tagId);
+        if (!itemRepository.existsById(itemId)) {
+            throw new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND,
+                    "Knowledge base item not found: " + itemId);
+        }
     }
 
     private void requireExistingTag(String tagId) {

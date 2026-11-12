@@ -27,6 +27,7 @@ import java.util.Set;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
+import static org.springframework.util.StringUtils.hasText;
 
 @Service
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
@@ -158,7 +159,7 @@ public class SoftwareCatalogStatus {
     }
 
     private static String versionOf(PackageCatalogEntry entry) {
-        return entry.getVersion();
+        return hasText(entry.getDisplayVersion()) ? entry.getDisplayVersion() : entry.getVersion();
     }
 
     // a cask version may end in a build after a comma (3.3.3,5004) that the app does not report, or be "latest"

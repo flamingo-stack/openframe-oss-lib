@@ -4,6 +4,7 @@ import com.openframe.client.service.rmm.SoftwareDeviceLocalScheduleService;
 import com.openframe.client.service.rmm.SoftwareScheduleFireDispatcher;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceLocalTimeDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
@@ -91,6 +92,25 @@ class SoftwareDeviceLocalScheduleServiceTest {
         assertThat(sentinel.getValue().getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.MISSED);
     }
 
+    @Test
+    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE past the window is MISSED, not fired")
+    void statusOnlineTelemetryOffline_pastWindow_missed() {
+        // setup
+        Instant now = Instant.now();
+        Machine staleStatus = machine("m-1", DeviceStatus.ONLINE, "UTC");
+        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        given(deviceLocalSchedule(now.minusSeconds(3000)), staleStatus);
+
+        // execution
+        service.runDueDeviceLocalSchedules(now);
+
+        // verifications
+        verify(fireDispatcher, never()).dispatch(any(), anyList(), any());
+        ArgumentCaptor<ScheduleLocalMachineTimeDispatch> sentinel = ArgumentCaptor.forClass(ScheduleLocalMachineTimeDispatch.class);
+        verify(dispatchRepository).save(sentinel.capture());
+        assertThat(sentinel.getValue().getStatus()).isEqualTo(ScheduleDeviceLocalTimeDispatchStatus.MISSED);
+    }
+
     private void given(SoftwareSchedule schedule, Machine machine) {
         when(scheduleRepository.findByStatusAndTriggerAndTimeReference(
                 ScriptStatus.ACTIVE, ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL))
@@ -113,6 +133,7 @@ class SoftwareDeviceLocalScheduleServiceTest {
         Machine m = new Machine();
         m.setMachineId(machineId);
         m.setStatus(status);
+        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
         m.setTimezone(timezone);
         return m;
     }

@@ -13,6 +13,8 @@ import com.openframe.api.service.processor.DeviceStatusProcessor;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
+import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
@@ -196,6 +198,46 @@ class DeviceServiceTest {
         service().queryDevices(filter, CursorPaginationCriteria.builder().limit(10).build(), null, null);
 
         assertThat(capturedFilter().getOsTypes()).containsExactly(MAC_OS);
+    }
+
+    @Test
+    @DisplayName("queryDevices: the connectivity filter reaches the repo as telemetry status names")
+    void queryDevices_connectivityFilter_mappedToNames() {
+        // setup
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder().connectivity(List.of(TelemetryStatus.ONLINE)).build();
+
+        // execution
+        service().queryDevices(filter, CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        // verifications
+        assertThat(capturedFilter().getConnectivity()).containsExactly("ONLINE");
+    }
+
+    @Test
+    @DisplayName("queryDevices: no connectivity filter → no connectivity constraint")
+    void queryDevices_noConnectivityFilter_nullConnectivity() {
+        // setup
+        DeviceFilterCriteria filter = DeviceFilterCriteria.builder().osTypes(List.of(MAC_OS)).build();
+
+        // execution
+        service().queryDevices(filter, CursorPaginationCriteria.builder().limit(10).build(), null, null);
+
+        // verifications
+        assertThat(capturedFilter().getConnectivity()).isNull();
+    }
+
+    @Test
+    @DisplayName("getAvailableDeviceFilters: the connectivity facet is computed once from Mongo next to status")
+    void getAvailableDeviceFilters_computesConnectivityFacet() {
+        // setup
+        DeviceService s = service();
+
+        // execution
+        s.getAvailableDeviceFilters(List.of(MAC_OS), null, null);
+
+        // verifications
+        verify(machineRepository).facet(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(), eq(DeviceFacetDimension.CONNECTIVITY));
+        verify(machineRepository).facet(eq(TENANT_ID), any(MachineQueryFilter.class), isNull(), eq(DeviceFacetDimension.STATUS));
     }
 
     @Test

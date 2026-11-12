@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.ReadPreference;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -19,6 +20,10 @@ import java.util.Optional;
 @Repository
 public interface MachineRepository extends MongoRepository<Machine, String>, CustomMachineRepository{
     Optional<Machine> findByMachineId(String machineId);
+
+    // primary on purpose: registration checks the machine milliseconds after it saved it
+    @ReadPreference("primary")
+    boolean existsByMachineId(String machineId);
 
     List<Machine> findByHostnameContainingIgnoreCase(String hostname);
 
@@ -49,11 +54,17 @@ public interface MachineRepository extends MongoRepository<Machine, String>, Cus
 
     List<Machine> findByMachineIdInAndStatusIn(Collection<String> machineIds, Collection<DeviceStatus> statuses);
 
+    List<Machine> findByMachineIdInAndStatusInAndTelemetryStatus(Collection<String> machineIds,
+                                                                 Collection<DeviceStatus> statuses,
+                                                                 TelemetryStatus telemetryStatus);
+
     List<Machine> findByStatusIn(Collection<DeviceStatus> statuses);
 
     List<Machine> findByStatusInAndIdGreaterThanOrderByIdAsc(Collection<DeviceStatus> statuses, String id, Limit limit);
 
     long countByStatusIn(Collection<DeviceStatus> statuses);
+
+    long countByStatusInAndTelemetryStatus(Collection<DeviceStatus> statuses, TelemetryStatus telemetryStatus);
 
     List<Machine> findByStatusInAndRegisteredAtBefore(Collection<DeviceStatus> statuses, Instant before);
 

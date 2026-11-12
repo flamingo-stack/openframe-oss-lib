@@ -1,5 +1,6 @@
 package com.openframe.test.data.generator;
 
+import com.openframe.test.data.dto.device.DeviceConnectivity;
 import com.openframe.test.data.dto.device.DeviceFilterInput;
 import com.openframe.test.data.dto.device.DeviceStatus;
 import com.openframe.test.data.dto.device.Machine;
@@ -10,11 +11,17 @@ import java.util.List;
 public class DeviceGenerator {
 
     public static DeviceFilterInput onlineDevicesFilter() {
-        return statusDevicesFilter(DeviceStatus.ONLINE);
+        return connectivityDevicesFilter(DeviceConnectivity.ONLINE);
     }
 
     public static DeviceFilterInput offlineDevicesFilter() {
-        return statusDevicesFilter(DeviceStatus.OFFLINE);
+        return connectivityDevicesFilter(DeviceConnectivity.OFFLINE);
+    }
+
+    private static DeviceFilterInput connectivityDevicesFilter(DeviceConnectivity connectivity) {
+        return DeviceFilterInput.builder()
+                .connectivity(List.of(connectivity))
+                .build();
     }
 
     public static DeviceFilterInput archivedDevicesFilter() {

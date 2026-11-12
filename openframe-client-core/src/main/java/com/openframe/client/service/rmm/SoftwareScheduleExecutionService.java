@@ -1,7 +1,7 @@
 package com.openframe.client.service.rmm;
 
-import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
@@ -78,7 +78,7 @@ public class SoftwareScheduleExecutionService {
         List<String> offline = new ArrayList<>();
         for (String machineId : targets) {
             Machine machine = machinesById.get(machineId);
-            if (machine != null && machine.getStatus() == DeviceStatus.ONLINE) {
+            if (machine != null && machine.getTelemetryStatus() == TelemetryStatus.ONLINE) {
                 online.add(machineId);
             } else {
                 offline.add(machineId);

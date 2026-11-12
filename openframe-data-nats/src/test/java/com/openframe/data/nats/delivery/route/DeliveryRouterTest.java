@@ -17,7 +17,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -243,5 +246,50 @@ class DeliveryRouterTest {
 
         // verifications
         assertThat(held).isFalse();
+    }
+
+    @Test
+    void reachable_theMachinesWhoseVersionARouteAdmits_oneVersionLookupForAll() {
+        // setup
+        List<String> asked = List.of("new", "old", "unknown");
+        when(agentVersions.findAll(asked)).thenReturn(Map.of("new", "1.6.0", "old", "1.5.0"));
+        when(engine.canReach(DeliveryType.CLIENT_FEATURE_FLAGS, "1.6.0")).thenReturn(true);
+        when(engine.canReach(DeliveryType.CLIENT_FEATURE_FLAGS, "1.5.0")).thenReturn(false);
+        when(engine.canReach(DeliveryType.CLIENT_FEATURE_FLAGS, "")).thenReturn(false);
+
+        // execution
+        Set<String> reachable = router.reachable(DeliveryType.CLIENT_FEATURE_FLAGS, asked);
+
+        // verifications
+        assertThat(reachable).containsExactly("new");
+        verify(agentVersions, never()).find(any());
+        verify(metrics, never()).recordUnreachable(any(), any());   // a probe, not a dispatch
+    }
+
+    @Test
+    void reaches_theRouteAnswersForThatMachinesVersion() {
+        // setup
+        when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.of("1.6.0"));
+        when(engine.canReach(DeliveryType.CLIENT_FEATURE_FLAGS, "1.6.0")).thenReturn(true);
+
+        // execution
+        boolean reaches = router.reaches(DeliveryType.CLIENT_FEATURE_FLAGS, MACHINE_ID);
+
+        // verifications
+        assertThat(reaches).isTrue();
+        verify(metrics, never()).recordUnreachable(any(), any());
+    }
+
+    @Test
+    void reaches_versionUnknown_askedWithAnEmptyVersion() {
+        // setup
+        when(agentVersions.find(MACHINE_ID)).thenReturn(Optional.empty());
+        when(engine.canReach(DeliveryType.CLIENT_FEATURE_FLAGS, "")).thenReturn(false);
+
+        // execution
+        boolean reaches = router.reaches(DeliveryType.CLIENT_FEATURE_FLAGS, MACHINE_ID);
+
+        // verifications
+        assertThat(reaches).isFalse();
     }
 }

@@ -2,7 +2,7 @@
 
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { type ReactNode, useId, useMemo, useState } from 'react';
-import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
+import { useViewportCollisionPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { CheckIcon, SearchIcon } from '../icons-v2-generated';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
@@ -151,7 +151,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
 
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const keyboardPadding = useKeyboardCollisionPadding();
+  const viewportPadding = useViewportCollisionPadding();
   const portalContainer = usePortalContainer();
 
   // Clear the query on close, while rendering rather than from an effect: the
@@ -256,9 +256,9 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
           align={align}
           sideOffset={6}
           // The search field below raises the software keyboard the moment this
-          // opens — see useKeyboardCollisionPadding for why neither the collision
+          // opens — see useViewportCollisionPadding for why neither the collision
           // viewport nor the available height knows about it otherwise.
-          collisionPadding={{ bottom: keyboardPadding }}
+          collisionPadding={viewportPadding}
           className={cn(
             'z-50 min-w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-md border border-ods-border bg-ods-card shadow-lg',
             'flex max-h-[var(--radix-popper-available-height)] flex-col',

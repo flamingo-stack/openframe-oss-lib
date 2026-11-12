@@ -1,6 +1,6 @@
 use crate::config::update_config::ALLOW_DOWNGRADE;
 use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
-use crate::models::{Installation, InstalledAsset, ToolRecordState};
+use crate::models::{Installation, InstalledAsset, InstalledTool, ToolRecordState};
 use crate::platform::{
     binary_writer, clear_aside_binary, detect_actual_installation, needs_migration, run_migration,
     run_update, system_service, DirectoryManager, ToolUpdaterDeps,
@@ -184,6 +184,7 @@ impl ToolAgentUpdateService {
                 "Tool {} and all assets already at target versions, nothing to update",
                 tool_agent_id
             );
+            self.publish_tool_versions(&installed_tool).await;
             return Ok(());
         }
 
@@ -507,6 +508,34 @@ impl ToolAgentUpdateService {
             Err(e) => {
                 warn!(id = %id, error = %e, "Failed to get machine_id");
             }
+        }
+    }
+
+    pub async fn publish_installed_versions(&self) {
+        let tools = match self.installed_tools_service.get_all().await {
+            Ok(tools) => tools,
+            Err(e) => {
+                warn!(
+                    "Failed to read installed tools, their versions are not published: {:#}",
+                    e
+                );
+                return;
+            }
+        };
+        for tool in tools
+            .iter()
+            .filter(|tool| tool.state == ToolRecordState::Installed)
+        {
+            self.publish_tool_versions(tool).await;
+        }
+    }
+
+    async fn publish_tool_versions(&self, tool: &InstalledTool) {
+        self.publish_installed_agent_message(&tool.tool_agent_id, &tool.version)
+            .await;
+        for asset in &tool.assets {
+            self.publish_installed_agent_message(&asset.id, &asset.version)
+                .await;
         }
     }
 

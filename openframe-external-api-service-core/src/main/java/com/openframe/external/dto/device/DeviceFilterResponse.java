@@ -18,6 +18,9 @@ public class DeviceFilterResponse {
     @Schema(description = "Available device statuses with counts")
     private List<DeviceFilterItem> statuses;
 
+    @Schema(description = "Available connectivity values (ONLINE, OFFLINE) with counts")
+    private List<DeviceFilterItem> connectivity;
+
     @Schema(description = "Available device types with counts")
     private List<DeviceFilterItem> deviceTypes;
 

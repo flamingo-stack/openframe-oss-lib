@@ -123,6 +123,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftware.setPackageFamilyNames(valuesOf(title, HostSoftwareInstalledVersion::getPackageFamilyName));
             deviceSoftware.setInstallerTypes(valuesOf(title, HostSoftwareInstalledVersion::getInstallerType));
             deviceSoftware.setSystemComponent(systemComponentOf(title));
+            deviceSoftware.setWingetId(firstOf(title, HostSoftwareInstalledVersion::getWingetId));
             deviceSoftware.setVulnerabilities(vulnerabilities);
             deviceSoftware.setUpdatedAt(now);
             if (newRow) {

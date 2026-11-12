@@ -2,7 +2,7 @@
 
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { useState, useMemo } from 'react';
-import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
+import { useViewportCollisionPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { CheckIcon, PlusIcon, SearchIcon, TrashIcon } from '../icons-v2-generated';
 import { Button } from './button';
@@ -61,7 +61,7 @@ export function TagSelectDropdown({
 }: TagSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const keyboardPadding = useKeyboardCollisionPadding();
+  const viewportPadding = useViewportCollisionPadding();
   const portalContainer = usePortalContainer();
 
   // Clear the query on close, while rendering rather than from an effect: the
@@ -117,8 +117,8 @@ export function TagSelectDropdown({
           align={align}
           sideOffset={6}
           // The search field below raises the software keyboard the moment this
-          // opens — see useKeyboardCollisionPadding.
-          collisionPadding={{ bottom: keyboardPadding }}
+          // opens — see useViewportCollisionPadding.
+          collisionPadding={viewportPadding}
           className={cn(
             'z-50 w-72 overflow-hidden rounded-[6px] border border-ods-border bg-ods-card shadow-lg',
             'flex max-h-[var(--radix-popper-available-height)] flex-col',

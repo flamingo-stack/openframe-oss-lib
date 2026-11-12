@@ -2,6 +2,7 @@
 
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { useEffect, useRef, useState } from 'react';
+import { useViewportCollisionPadding, withViewportPadding } from '../../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../../utils/cn';
 import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon';
 import {
@@ -66,6 +67,8 @@ export function TimeTrackerHeaderButton({
   });
   const layoutContainer = useAppLayoutDrawerContainer();
   const portalContainer = usePortalContainer();
+  // The panel holds fields: the keyboard and the status bar bound it in the mobile shell (useViewportCollisionPadding).
+  const collisionPadding = withViewportPadding(8, useViewportCollisionPadding());
   const coordination = useAppLayoutDrawerCoordination();
 
   const isOpen = ctx?.isOpen ?? false;
@@ -182,7 +185,7 @@ export function TimeTrackerHeaderButton({
           side={popoverSide}
           align={popoverAlign ?? (compact ? 'start' : 'end')}
           sideOffset={8}
-          collisionPadding={8}
+          collisionPadding={collisionPadding}
           className={cn(
             'z-[1300] w-[460px] max-w-[calc(100vw-1rem)] outline-none',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',

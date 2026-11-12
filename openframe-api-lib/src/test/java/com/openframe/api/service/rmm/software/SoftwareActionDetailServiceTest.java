@@ -3,6 +3,7 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareActionDeviceResponse;
 import com.openframe.data.document.device.DeviceStatus;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
@@ -223,12 +224,14 @@ class SoftwareActionDetailServiceTest {
                 leaf("m1", ExecutionStatus.SUCCESS)));
         Machine m1 = machine("m1", "m1-host", null);
         m1.setStatus(DeviceStatus.OFFLINE);
+        m1.setTelemetryStatus(TelemetryStatus.ONLINE);
         m1.setLastSeen(lastSeen);
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(m1));
 
         SoftwareActionDeviceResponse row = service.devices(EXEC, null, null, null, null).getFirst();
 
         assertThat(row.getDeviceStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        assertThat(row.getConnectivity()).isEqualTo(TelemetryStatus.ONLINE);
         assertThat(row.getLastSeen()).isEqualTo(lastSeen);
     }
 

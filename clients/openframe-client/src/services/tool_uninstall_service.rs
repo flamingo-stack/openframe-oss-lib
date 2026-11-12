@@ -3,6 +3,7 @@ use crate::models::{Installation, InstalledTool};
 use crate::platform::file_lock::log_file_lock_info;
 #[cfg(target_os = "macos")]
 use crate::platform::remove_app_bundle;
+use crate::platform::system_service;
 use crate::platform::DirectoryManager;
 use crate::services::InstalledToolsService;
 use crate::services::ToolCommandParamsResolver;
@@ -129,7 +130,18 @@ impl ToolUninstallService {
         for tool in installed_tools {
             info!("Processing uninstallation for tool: {}", tool.tool_agent_id);
 
-            if let Err(e) = self.uninstall_tool(&tool).await {
+            let result = self.uninstall_tool(&tool).await;
+
+            if let Installation::Service { service_name, .. } = &tool.installation {
+                if let Err(e) = system_service::remove_service(service_name).await {
+                    warn!(
+                        "Failed to remove leftover service {} of tool {}: {:#}",
+                        service_name, tool.tool_agent_id, e
+                    );
+                }
+            }
+
+            if let Err(e) = result {
                 warn!(
                     "Failed to uninstall tool {} (continuing with remaining tools): {:#}",
                     tool.tool_agent_id, e

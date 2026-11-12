@@ -53,12 +53,14 @@ export interface FadePreviewProps {
   /**
    * Collapse to the first N ITEMS of a list instead of a length: the single child
    * is the list, its children are the items, and the collapsed height is
-   * MEASURED to the bottom of item N (at every width). Implies `fixedHeight`, so
+   * MEASURED to the bottom of item N plus the list's bottom border and padding
+   * (at every width). Implies `fixedHeight`, so
    * the block keeps that height loading or loaded, and "Show N more" counts the
    * items past N unless `hiddenCount` says otherwise. Until the list holds N
    * items, `collapsedHeight` (or the height last measured) is kept. The first
    * paint (before any measure) is held for N up to 12; add rows to
-   * `UNMEASURED_ITEMS_CLASSES` for a longer preview.
+   * `UNMEASURED_ITEMS_CLASSES` for a longer preview. While collapsed, the items
+   * past N are `inert`: out of the tab order and the accessibility tree.
    */
   visibleItems?: number;
   /**
@@ -121,6 +123,19 @@ const UNMEASURED_ITEMS_CLASSES: Record<number, string> = {
 export const FADE_PREVIEW_MAX_UNMEASURED_ITEMS = 12;
 
 const cssLength = (value: number | string) => (typeof value === 'number' ? `${value}px` : value);
+
+/**
+ * Item mode's collapsed height: down to item N, plus the list's own bottom border and padding, so a list of exactly N
+ * items (a bordered card) shows whole, and a longer one is cut at the same height. `null` until it holds N items.
+ */
+function measureItems(el: HTMLElement, visible: number): number | null {
+  const list = el.firstElementChild;
+  const last = list && list.children.length >= visible ? list.children[visible - 1] : undefined;
+  if (!list || !last) return null;
+  const style = getComputedStyle(list);
+  const inset = (parseFloat(style.borderBottomWidth) || 0) + (parseFloat(style.paddingBottom) || 0);
+  return Math.round(last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop + inset);
+}
 
 export function FadePreview({
   hiddenCount = 0,
@@ -190,11 +205,12 @@ export function FadePreview({
       const items = el.firstElementChild?.children;
       const count = items?.length ?? 0;
       if (count !== itemCount) setItemCount(count);
-      const last = count >= visible ? items?.[visible - 1] : undefined;
-      if (last) {
-        const next = Math.round(last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop);
-        if (next !== itemsHeight) setItemsHeight(next);
-      }
+      const next = measureItems(el, visible);
+      if (next != null && next !== itemsHeight) setItemsHeight(next);
+      // The items past N are out of sight while collapsed: out of the tab order too, or focusing
+      // one scrolls the clipped box and leaves it scrolled.
+      for (let i = 0; i < count; i++) items?.[i]?.toggleAttribute('inert', !expanded && i >= visible);
+      if (!expanded) el.scrollTop = 0;
     }
     // Fill mode: the parent decides the height (CSS), only overflow is read.
     if (!fill) el.style.height = expanded ? `${el.scrollHeight}px` : cssLength(collapsed);
@@ -212,10 +228,8 @@ export function FadePreview({
       if (expanded) return;
       setOverflows(el.scrollHeight > el.clientHeight + 1);
       // Item mode: the items re-wrap at a new width, so their height is re-read.
-      const items = itemMode ? el.firstElementChild?.children : undefined;
-      const last = items && items.length >= visible ? items[visible - 1] : undefined;
-      if (last)
-        setItemsHeight(Math.round(last.getBoundingClientRect().bottom - el.getBoundingClientRect().top + el.scrollTop));
+      const next = itemMode ? measureItems(el, visible) : null;
+      if (next != null) setItemsHeight(next);
     });
     observer.observe(el);
     if (itemMode && el.firstElementChild) observer.observe(el.firstElementChild);

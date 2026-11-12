@@ -1,6 +1,14 @@
 'use client';
 
-import { type HTMLAttributes, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type HTMLAttributes,
+  type ReactNode,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { cn } from '../../utils/cn';
 
 export type ScrollFadeAxis = 'vertical' | 'horizontal' | 'both';
@@ -67,6 +75,27 @@ export function useScrollFade<T extends HTMLElement = HTMLDivElement>(axis: Scro
     fadeRight: fade.right,
     update,
   };
+}
+
+/** The ODS "scroll gradient": how far an edge fade reaches into the scroller, in px. */
+export const SCROLL_FADE_PX = 40;
+
+/**
+ * An edge fade drawn as a MASK on the scroller itself: the content fades out towards an edge it continues past, so
+ * the fade needs no colour of the surface under it and reads right on any ground (a gradient, a menu, a light theme).
+ * `start` / `end` are `useScrollFade`'s answers for the axis (left / right, or top / bottom). No style when neither
+ * edge fades. Use it where the surface's colour is not known to the scroller; `ScrollFadeOverlay` paints one instead.
+ */
+export function scrollFadeMask(
+  axis: 'horizontal' | 'vertical',
+  start: boolean,
+  end: boolean,
+  size: number = SCROLL_FADE_PX,
+): CSSProperties | undefined {
+  if (!start && !end) return undefined;
+  const direction = axis === 'horizontal' ? 'to right' : 'to bottom';
+  const mask = `linear-gradient(${direction}, ${start ? 'transparent' : 'black'} 0, black ${size}px, black calc(100% - ${size}px), ${end ? 'transparent' : 'black'} 100%)`;
+  return { maskImage: mask, WebkitMaskImage: mask };
 }
 
 export type ScrollFadeEdge = 'top' | 'bottom' | 'left' | 'right';

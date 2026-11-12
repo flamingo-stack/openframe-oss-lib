@@ -152,6 +152,34 @@ public class KnowledgeBaseService {
         return tagsOf(articleIds);
     }
 
+    public void validateParentIsFolder(String parentId) {
+        if (parentId == null) {
+            return;
+        }
+        KnowledgeBaseItem parent = repository.findById(parentId)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Parent folder not found: " + parentId));
+        if (parent.getType() != KnowledgeBaseItemType.FOLDER) {
+            throw new ConflictException(ErrorCode.CONFLICT, "Parent must be a folder: " + parentId);
+        }
+    }
+
+    public void requireArchivedItem(String id) {
+        KnowledgeBaseItem item = getById(id);
+        requireArchived(item, id);
+    }
+
+    public void requireDeleteItem(String id, FolderChildrenAction action, String moveTargetFolderId) {
+        KnowledgeBaseItem item = getById(id);
+        if (hasFolderChildren(item, id)) {
+            requireFolderChildrenDestination(action, moveTargetFolderId);
+        }
+    }
+
+    public KnowledgeBaseItem getById(String id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Knowledge base item not found: " + id));
+    }
+
     private List<Tag> tagsOf(List<String> articleIds) {
         return articleIds.isEmpty()
                 ? List.of()
@@ -215,10 +243,7 @@ public class KnowledgeBaseService {
         List<KnowledgeBaseItem> children = repository.findByParentId(id);
 
         if (!children.isEmpty()) {
-            if (action == null) {
-                throw new ValidationException(
-                        "Folder has children — childrenAction (MOVE or ARCHIVE) is required.");
-            }
+            requireChildrenAction(action);
             switch (action) {
                 case MOVE -> moveChildren(children, moveTargetFolderId, id);
                 case ARCHIVE -> archiveSubtree(id);
@@ -379,9 +404,7 @@ public class KnowledgeBaseService {
         if (item.getType() != KnowledgeBaseItemType.ARTICLE) {
             throw new ConflictException(ErrorCode.CONFLICT, "Only articles can be unarchived.");
         }
-        if (item.getStatus() != KnowledgeBaseArticleStatus.ARCHIVED) {
-            throw new ConflictException(ErrorCode.CONFLICT, "Item is not archived: " + id);
-        }
+        requireArchived(item, id);
         validateParentIsFolder(parentId);
         item.setParentId(parentId);
         item.setStatus(KnowledgeBaseArticleStatus.PUBLISHED);
@@ -575,17 +598,6 @@ public class KnowledgeBaseService {
         }
     }
 
-    private void validateParentIsFolder(String parentId) {
-        if (parentId == null) {
-            return;
-        }
-        KnowledgeBaseItem parent = repository.findById(parentId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Parent folder not found: " + parentId));
-        if (parent.getType() != KnowledgeBaseItemType.FOLDER) {
-            throw new ConflictException(ErrorCode.CONFLICT, "Parent must be a folder: " + parentId);
-        }
-    }
-
     private boolean isDescendantOf(String candidateId, String ancestorId) {
         String currentId = candidateId;
         while (currentId != null) {
@@ -632,9 +644,27 @@ public class KnowledgeBaseService {
         return assignedIds.stream().filter(tagged::contains).toList();
     }
 
-    private KnowledgeBaseItem getById(String id) {
-        return repository.findById(id)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Knowledge base item not found: " + id));
+    private void requireFolderChildrenDestination(FolderChildrenAction action, String moveTargetFolderId) {
+        requireChildrenAction(action);
+        if (action == FolderChildrenAction.MOVE) {
+            Optional.ofNullable(moveTargetFolderId).ifPresent(this::getById);
+        }
+    }
+
+    private static void requireChildrenAction(FolderChildrenAction action) {
+        if (action == null) {
+            throw new ValidationException("Folder has children — childrenAction (MOVE or ARCHIVE) is required.");
+        }
+    }
+
+    private boolean hasFolderChildren(KnowledgeBaseItem item, String id) {
+        return item.getType() == KnowledgeBaseItemType.FOLDER && !repository.findByParentId(id).isEmpty();
+    }
+
+    private static void requireArchived(KnowledgeBaseItem item, String id) {
+        if (item.getStatus() != KnowledgeBaseArticleStatus.ARCHIVED) {
+            throw new ConflictException(ErrorCode.CONFLICT, "Item is not archived: " + id);
+        }
     }
 
     private void addTags(String articleId, List<String> tagIds) {

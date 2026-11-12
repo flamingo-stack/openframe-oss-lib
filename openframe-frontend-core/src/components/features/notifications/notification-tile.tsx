@@ -112,6 +112,39 @@ type LoadedNotificationTileProps = NotificationTileOptions & {
   onComplete?: (id: string) => void;
 };
 
+/**
+ * A notification's mark, the ONE rule every look of a tile uses: its image (which wins over the icon), else its icon,
+ * else a dot. A blocked or broken image (ad-blockers routinely kill external avatars) falls back to the icon or dot
+ * instead of a broken-image glyph.
+ */
+export function NotificationMark({
+  imageUrl,
+  icon,
+  dotClassName,
+}: {
+  imageUrl?: string;
+  icon?: ReactNode;
+  /** The dot's colour, a background class. */
+  dotClassName: string;
+}) {
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const image = imageUrl && imageUrl !== failedImageUrl ? imageUrl : undefined;
+  if (image) {
+    return (
+      <Image
+        src={image}
+        alt=""
+        onError={() => setFailedImageUrl(image)}
+        className="size-4 rounded-[2px] object-cover"
+        width={IMAGE_FIXED_PX.icon}
+        height={IMAGE_FIXED_PX.icon}
+        unoptimized
+      />
+    );
+  }
+  return <>{icon ?? <span className={cn('size-1.5 rounded-full', dotClassName)} />}</>;
+}
+
 /** A notification as a tile; ONE switch: in a loading scope (or `loading`) its own loading form. */
 export function NotificationTile(props: NotificationTileProps) {
   if (useLoadingScope() || props.loading) {
@@ -159,11 +192,6 @@ function LoadedNotificationTile({
   // Unknown severity strings (backend data can outrun the union) degrade to `variant`.
   const accentVariant = (severity ? variantBySeverity[severity] : undefined) ?? variant;
 
-  // A blocked/broken image (ad-blockers routinely kill external avatars) falls
-  // through to the icon/category/dot chain instead of a broken-image glyph.
-  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
-  const image = imageUrl && imageUrl !== failedImageUrl ? imageUrl : undefined;
-
   // Gate on the Date, not the number: NaN, Infinity AND finite-but-out-of-range
   // epochs (e.g. nanoseconds) all make toISOString() throw.
   const createdAtDate = new Date(createdAt);
@@ -203,19 +231,7 @@ function LoadedNotificationTile({
         {/* Header: icon/image + type label (both severity-colored) + time + dismiss/complete control. */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
           <span className={cn(TILE_ICON_BOX_CLASS, typeColorByVariant[accentVariant])}>
-            {image ? (
-              <Image
-                src={image}
-                alt=""
-                onError={() => setFailedImageUrl(image)}
-                className="size-4 rounded-[2px] object-cover"
-                width={IMAGE_FIXED_PX.icon}
-                height={IMAGE_FIXED_PX.icon}
-                unoptimized
-              />
-            ) : (
-              (icon ?? <span className={cn('size-1.5 rounded-full', dotColorByVariant[accentVariant])} />)
-            )}
+            <NotificationMark imageUrl={imageUrl} icon={icon} dotClassName={dotColorByVariant[accentVariant]} />
           </span>
 
           {type ? (

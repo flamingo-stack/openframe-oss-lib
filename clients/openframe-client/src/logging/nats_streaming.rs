@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use async_nats::jetstream;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
 use tracing::{debug, error, info};
@@ -8,7 +9,7 @@ use tracing::{debug, error, info};
 use crate::platform::DirectoryManager;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::{
-    AgentConfigurationService, InitialConfigurationService, InstalledToolsService,
+    AgentConfigurationService, InitialConfigurationService, InstalledToolsService, LogKeyService,
     MachineIdService, MACHINE_ID_HEADER,
 };
 
@@ -52,6 +53,7 @@ pub struct NatsLogConnection {
     tenant_domain: String,
     key: LogStreamKey,
     machine_id: String,
+    log_key_service: Arc<LogKeyService>,
 }
 
 impl NatsLogConnection {
@@ -60,6 +62,7 @@ impl NatsLogConnection {
         tenant_domain: String,
         key: LogStreamKey,
         machine_id: String,
+        log_key_service: Arc<LogKeyService>,
     ) -> Self {
         Self {
             jetstream: None,
@@ -67,6 +70,7 @@ impl NatsLogConnection {
             tenant_domain,
             key,
             machine_id,
+            log_key_service,
         }
     }
 
@@ -80,6 +84,7 @@ impl NatsLogConnection {
         );
 
         let tenant_domain = self.tenant_domain.clone();
+        let log_key_service = self.log_key_service.clone();
         let (key_header, key_value) = self.key.header();
         let client = async_nats::ConnectOptions::new()
             .custom_header("x-tenant-domain", &self.tenant_domain)
@@ -93,6 +98,7 @@ impl NatsLogConnection {
             })
             .event_callback(move |event| {
                 let tenant = tenant_domain.clone();
+                let log_key_service = log_key_service.clone();
                 async move {
                     match event {
                         async_nats::Event::Connected => {
@@ -106,6 +112,7 @@ impl NatsLogConnection {
                         }
                         async_nats::Event::ClientError(err) => {
                             error!("NATS logs: client error: {} (tenant={})", err, tenant);
+                            log_key_service.connect_failed();
                         }
                         _ => {}
                     }
@@ -153,6 +160,7 @@ pub struct LogStreamingRunManager {
     installed_tools_service: InstalledToolsService,
     directory_manager: DirectoryManager,
     machine_id: String,
+    log_key_service: Arc<LogKeyService>,
 }
 
 impl LogStreamingRunManager {
@@ -161,6 +169,7 @@ impl LogStreamingRunManager {
         agent_config_service: &AgentConfigurationService,
         installed_tools_service: &InstalledToolsService,
         directory_manager: &DirectoryManager,
+        log_key_service: &Arc<LogKeyService>,
     ) -> Result<Self> {
         let server_host = initial_config_service.get_server_url()?;
         let tenant_domain = extract_tenant_domain(&server_host);
@@ -185,6 +194,7 @@ impl LogStreamingRunManager {
             installed_tools_service: installed_tools_service.clone(),
             directory_manager: directory_manager.clone(),
             machine_id,
+            log_key_service: log_key_service.clone(),
         })
     }
 
@@ -197,6 +207,7 @@ impl LogStreamingRunManager {
                 self.tenant_domain.clone(),
                 key,
                 self.machine_id.clone(),
+                self.log_key_service.clone(),
             );
 
             loop {

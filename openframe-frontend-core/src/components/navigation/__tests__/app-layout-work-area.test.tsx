@@ -227,6 +227,66 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     vi.unstubAllGlobals();
   });
 
+  it('holds the split in a row too narrow for two min widths: the chat keeps 360px, the page squeezes', () => {
+    rowWidth(620);
+    const shown = vi.fn();
+    render(
+      <AppLayoutWorkArea
+        mode="split"
+        chat={<Column name="chat" />}
+        page={<Column name="page" />}
+        squeezeFloor={0.3}
+        onShownModeChange={shown}
+      />,
+    );
+    expect(chatColumn()).toHaveStyle({ width: '360px' });
+    expect(screen.getByText('chat: full at 360')).toBeInTheDocument();
+    expect(screen.getByText('page: squeezed at 360')).toBeInTheDocument();
+    expect(shown).toHaveBeenLastCalledWith('split');
+  });
+
+  it('keeps the chat at 360px in a narrow row whatever share a wider row stored', () => {
+    window.localStorage.setItem('test.narrow', JSON.stringify({ share: 0.3 }));
+    rowWidth(620);
+    render(
+      <AppLayoutWorkArea
+        mode="split"
+        chat={<Column name="chat" />}
+        page={<Column name="page" />}
+        squeezeFloor={0.3}
+        storageKey="test.narrow"
+      />,
+    );
+    expect(chatColumn()).toHaveStyle({ width: '360px' });
+  });
+
+  it('follows the divider in a narrow row once it is moved, and a double click returns the chat to 360px', () => {
+    rowWidth(620);
+    render(squeezable());
+    fireEvent.keyDown(divider(), { key: 'Home' });
+    expect(chatColumn()).toHaveStyle({ width: '108px' });
+    expect(screen.getByText('chat: squeezed at 360')).toBeInTheDocument();
+    fireEvent.doubleClick(divider());
+    expect(chatColumn()).toHaveStyle({ width: '360px' });
+  });
+
+  it('shows the page alone, and says so, only below two floors', () => {
+    rowWidth(200);
+    const shown = vi.fn();
+    render(
+      <AppLayoutWorkArea
+        mode="split"
+        chat={<Column name="chat" />}
+        page={<Column name="page" />}
+        squeezeFloor={0.3}
+        onShownModeChange={shown}
+      />,
+    );
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+    expect(chatColumn()).toHaveAttribute('inert');
+    expect(shown).toHaveBeenLastCalledWith('page');
+  });
+
   it('without squeezeFloor no column is ever squeezed', () => {
     rowWidth(1000);
     render(<AppLayoutWorkArea mode="split" chat={<Column name="chat" />} page={<Column name="page" />} />);

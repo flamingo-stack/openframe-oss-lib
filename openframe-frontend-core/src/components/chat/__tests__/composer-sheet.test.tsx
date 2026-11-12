@@ -184,6 +184,14 @@ describe('ChatContextMemoryBar leading', () => {
     expect(screen.getByText('1 recently viewed item in context')).toBeInTheDocument();
   });
 
+  it('has a short count for a narrow strip, never a bare number: the strip itself picks the form', () => {
+    render(<ChatContextMemoryBar items={[{ type: 'DEVICE', id: 'd-1', label: 'MacBook' }]} />);
+    const long = screen.getByText('1 recently viewed item in context');
+    const short = screen.getByText('1 item in context');
+    expect(long).toHaveClass('hidden', '@[15rem]:inline');
+    expect(short).toHaveClass('@[15rem]:hidden');
+  });
+
   it('still renders nothing with neither', () => {
     const { container } = render(<ChatContextMemoryBar items={[]} />);
     expect(container).toBeEmptyDOMElement();

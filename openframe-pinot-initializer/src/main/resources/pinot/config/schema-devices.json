@@ -18,6 +18,11 @@
       "singleValueField": true
     },
     {
+      "name": "connectivity",
+      "dataType": "STRING",
+      "singleValueField": true
+    },
+    {
       "name": "deviceType",
       "dataType": "STRING",
       "singleValueField": true

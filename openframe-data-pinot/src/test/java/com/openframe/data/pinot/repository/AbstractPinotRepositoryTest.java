@@ -131,6 +131,21 @@ class AbstractPinotRepositoryTest {
             assertEquals(1, result.size());
             assertEquals(100, result.get("ACTIVE"));
         }
+
+        @Test
+        @DisplayName("skips Pinot's \"null\" sentinel for rows that never had the column")
+        void skipsPinotNullSentinel() {
+            when(pinotConnection.execute(anyString())).thenReturn(resultSetGroup);
+            when(resultSetGroup.getResultSet(0)).thenReturn(resultSet);
+            when(resultSet.getRowCount()).thenReturn(2);
+            when(resultSet.getString(0, 0)).thenReturn("ONLINE");
+            when(resultSet.getLong(0, 1)).thenReturn(4L);
+            when(resultSet.getString(1, 0)).thenReturn("null");  // skipped
+
+            Map<String, Integer> result = repository.doExecuteKeyCountQuery("SELECT connectivity FROM t");
+
+            assertEquals(Map.of("ONLINE", 4), result);
+        }
     }
 
     @Nested

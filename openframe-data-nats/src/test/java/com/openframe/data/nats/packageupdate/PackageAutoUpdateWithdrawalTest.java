@@ -11,23 +11,26 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @ExtendWith(MockitoExtension.class)
-class PackageAutoUpdateRetryWithdrawalTest {
+class PackageAutoUpdateWithdrawalTest {
 
     @Mock private DeliveryTracker deliveryTracker;
 
-    @InjectMocks private PackageAutoUpdateRetryWithdrawal withdrawal;
+    @InjectMocks private PackageAutoUpdateWithdrawal withdrawal;
 
     @Test
-    void policyNamesARetry_itsRowIsCancelled() {
-        withdrawal.withdraw(PackageAutoUpdatePolicy.builder().machineId("m1").retryRequestId("req-1").build(), "turned off");
+    void policyNamesAnOrder_itsRowAndItsDeadlineForceAreCancelled() {
+        withdrawal.withdraw(PackageAutoUpdatePolicy.builder().machineId("m1").requestId("req-1").build(), "turned off");
 
         verify(deliveryTracker).cancel(DeliveryType.PACKAGE_UPDATE, "req-1", "m1", "turned off");
+        verify(deliveryTracker).cancel(DeliveryType.PACKAGE_UPDATE, "req-1:deadline", "m1", "turned off");
+        verifyNoMoreInteractions(deliveryTracker);
     }
 
     @Test
-    void policyNamesNoRetry_nothingIsCancelled() {
+    void policyNeverOrdered_nothingIsCancelled() {
         withdrawal.withdraw(PackageAutoUpdatePolicy.builder().machineId("m1").build(), "turned off");
 
         verifyNoInteractions(deliveryTracker);

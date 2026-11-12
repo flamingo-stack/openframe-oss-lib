@@ -33,6 +33,8 @@ describe('PageActions bottom bar over the composer dock', () => {
     // The layout hydrated first and measured the dock: the page hydrates under a context that already holds it.
     await act(async () => {
       hydrateRoot(container, page(135));
+      // Let React finish the hydration's passive effects before the console is read.
+      await Promise.resolve();
     });
 
     const mismatch = errors.mock.calls.some(call => String(call[0]).includes('hydrated but some attributes'));

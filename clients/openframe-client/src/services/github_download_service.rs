@@ -1,5 +1,6 @@
 use crate::config::update_config::{
-    DOWNLOAD_TIMEOUT_SECS, MAX_DOWNLOAD_RETRIES, MIN_BINARY_SIZE_BYTES,
+    DOWNLOAD_RETRY_BUDGET_SECS, DOWNLOAD_RETRY_INITIAL_DELAY_SECS, DOWNLOAD_RETRY_MAX_DELAY_SECS,
+    MIN_BINARY_SIZE_BYTES,
 };
 use crate::models::download_configuration::DownloadConfiguration;
 use crate::platform::binary_writer;
@@ -10,7 +11,7 @@ use std::io::Cursor;
 use std::path::Path;
 #[cfg(target_os = "macos")]
 use std::path::{Component, PathBuf};
-use tokio::time::Duration;
+use tokio::time::{Duration, Instant};
 use tracing::{info, warn};
 
 /// `Path::join` with an absolute entry replaces the base, and `..` is resolved by the OS.
@@ -33,6 +34,10 @@ fn safe_join(target_dir: &Path, entry_path: &Path) -> Result<PathBuf> {
 #[cfg(all(test, target_os = "macos"))]
 #[path = "github_download_service_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "github_download_service_retry_tests.rs"]
+mod retry_tests;
 
 #[derive(Clone)]
 pub struct GithubDownloadService {
@@ -107,91 +112,48 @@ impl GithubDownloadService {
         Ok(binary_bytes)
     }
 
-    /// Download with retry logic and timeout. Falls back to jsDelivr CDN on HTTP 429 (rate limit).
+    /// Download with a growing pause between attempts until the retry budget runs out.
+    /// No status, 5xx, 403, 408 and 429 are retried; any other status fails at once.
     async fn download_with_retry(&self, url: &str) -> Result<Bytes> {
-        let mut last_error = None;
+        let deadline = Instant::now() + Duration::from_secs(DOWNLOAD_RETRY_BUDGET_SECS);
+        let mut delay = Duration::from_secs(DOWNLOAD_RETRY_INITIAL_DELAY_SECS);
+        let mut attempt = 0;
 
-        for attempt in 1..=MAX_DOWNLOAD_RETRIES {
-            info!(
-                "Download attempt {}/{} for: {}",
-                attempt, MAX_DOWNLOAD_RETRIES, url
-            );
+        loop {
+            attempt += 1;
+            info!("Download attempt {} for: {}", attempt, url);
 
-            match tokio::time::timeout(
-                Duration::from_secs(DOWNLOAD_TIMEOUT_SECS),
-                self.download(url),
-            )
-            .await
-            {
+            let error = match tokio::time::timeout_at(deadline, self.download(url)).await {
                 Ok(Ok(bytes)) => {
                     info!("Download successful on attempt {}", attempt);
                     return Ok(bytes);
                 }
-                Ok(Err(e)) => {
-                    if e.to_string().contains("429") {
-                        warn!("GitHub rate limit (429) detected on attempt {}", attempt);
-                        warn!("Attempting fallback to jsDelivr CDN...");
+                Ok(Err(e)) => e,
+                Err(_) => anyhow!(
+                    "Download timeout after {} seconds",
+                    DOWNLOAD_RETRY_BUDGET_SECS
+                ),
+            };
 
-                        let cdn_url = self.github_to_cdn_url(url);
-                        info!("CDN URL: {}", cdn_url);
-
-                        match tokio::time::timeout(
-                            Duration::from_secs(DOWNLOAD_TIMEOUT_SECS),
-                            self.download(&cdn_url),
-                        )
-                        .await
-                        {
-                            Ok(Ok(bytes)) => {
-                                info!("Successfully downloaded from jsDelivr CDN");
-                                return Ok(bytes);
-                            }
-                            Ok(Err(cdn_err)) => {
-                                warn!("CDN fallback also failed: {:#}", cdn_err);
-                                return Err(anyhow!(
-                                    "GitHub rate limit (429) and CDN fallback failed. GitHub: {:#}, CDN: {:#}",
-                                    e, cdn_err
-                                ));
-                            }
-                            Err(_) => {
-                                warn!("CDN fallback timed out");
-                                return Err(anyhow!(
-                                    "GitHub rate limit (429) and CDN fallback timed out"
-                                ));
-                            }
-                        }
-                    }
-
-                    warn!("Download attempt {} failed: {:#}", attempt, e);
-                    last_error = Some(e);
-                }
-                Err(_) => {
-                    let timeout_err =
-                        anyhow!("Download timeout after {} seconds", DOWNLOAD_TIMEOUT_SECS);
-                    warn!("Download attempt {} timed out", attempt);
-                    last_error = Some(timeout_err);
-                }
+            let status = error
+                .downcast_ref::<reqwest::Error>()
+                .and_then(|e| e.status());
+            if status.is_some_and(|s| !(s.is_server_error() || s == 403 || s == 408 || s == 429)) {
+                return Err(error);
+            }
+            if Instant::now() + delay >= deadline {
+                return Err(error.context(format!("Download failed after {} attempts", attempt)));
             }
 
-            // Wait before retry (except on last attempt)
-            if attempt < MAX_DOWNLOAD_RETRIES {
-                let delay_secs = attempt * 2; // 2, 4, 6 seconds
-                info!("Retrying in {} seconds...", delay_secs);
-                tokio::time::sleep(Duration::from_secs(delay_secs as u64)).await;
-            }
+            warn!(
+                "Download attempt {} failed, retrying in {} seconds: {:#}",
+                attempt,
+                delay.as_secs(),
+                error
+            );
+            tokio::time::sleep(delay).await;
+            delay = (delay * 2).min(Duration::from_secs(DOWNLOAD_RETRY_MAX_DELAY_SECS));
         }
-
-        Err(last_error
-            .unwrap_or_else(|| anyhow!("Download failed after {} attempts", MAX_DOWNLOAD_RETRIES)))
-    }
-
-    /// Convert GitHub release URL to jsDelivr CDN URL
-    /// Example:
-    ///   GitHub:   https://github.com/owner/repo/releases/download/v1.0/file.zip
-    ///   jsDelivr: https://cdn.jsdelivr.net/gh/owner/repo@v1.0/file.zip
-    fn github_to_cdn_url(&self, github_url: &str) -> String {
-        github_url
-            .replace("github.com/", "cdn.jsdelivr.net/gh/")
-            .replace("/releases/download/", "@")
     }
 
     /// Downloads file from URL and returns bytes
@@ -201,15 +163,8 @@ impl GithubDownloadService {
             .get(url)
             .send()
             .await
-            .context("Failed to send download request")?;
-
-        if !response.status().is_success() {
-            return Err(anyhow!(
-                "Download failed with status: {} - URL: {}",
-                response.status(),
-                url
-            ));
-        }
+            .context("Failed to send download request")?
+            .error_for_status()?;
 
         let bytes = response
             .bytes()

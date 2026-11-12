@@ -2,10 +2,12 @@
 import './types';
 import { DataTableRoot } from './data-table';
 import { DataTableBody } from './data-table-body';
+import { DataTableCell } from './data-table-cell';
 import { DataTableCursorFooter } from './data-table-cursor-footer';
 import { DataTableEmpty } from './data-table-empty';
 import { DataTableHeader } from './data-table-header';
 import { DataTableInfiniteFooter } from './data-table-infinite-footer';
+import { DataTableMeta } from './data-table-meta';
 import { DataTableRow } from './data-table-row';
 import { DataTableRowCount } from './data-table-row-count';
 
@@ -26,10 +28,12 @@ export const DataTable = Object.assign(DataTableRoot, {
   Header: DataTableHeader,
   Body: DataTableBody,
   Row: DataTableRow,
+  Cell: DataTableCell,
   Empty: DataTableEmpty,
   InfiniteFooter: DataTableInfiniteFooter,
   CursorFooter: DataTableCursorFooter,
   RowCount: DataTableRowCount,
+  Meta: DataTableMeta,
 });
 
 // Also export each piece by name for consumers that prefer named imports.
@@ -38,10 +42,12 @@ export {
   DataTableHeader,
   DataTableBody,
   DataTableRow,
+  DataTableCell,
   DataTableEmpty,
   DataTableInfiniteFooter,
   DataTableCursorFooter,
   DataTableRowCount,
+  DataTableMeta,
 };
 
 export { useDataTableContext } from './data-table';
@@ -61,10 +67,22 @@ export { DATA_TABLE_HEADER_LABEL_CLASS } from './data-table-header';
 export type { DataTableHeaderProps, DataTableSortState } from './data-table-header';
 export type { DataTableBodyProps } from './data-table-body';
 export type { DataTableRowProps } from './data-table-row';
+export type { DataTableCellLeading, DataTableCellProps } from './data-table-cell';
 export type { DataTableEmptyProps } from './data-table-empty';
 export type { DataTableInfiniteFooterProps } from './data-table-infinite-footer';
 export type { DataTableCursorFooterProps } from './data-table-cursor-footer';
 export type { DataTableRowCountProps } from './data-table-row-count';
+export type { DataTableMetaProps } from './data-table-meta';
+export type { DataTableLayout } from './data-table-grid';
+export {
+  actionColumn,
+  selectionColumn,
+  GRID_ACTION_COLUMN_SIZE,
+  GRID_UTILITY_COLUMN_SIZE,
+} from './data-table-grid-columns';
+export { GRID_MIN_WIDTH } from './data-table-grid-resize';
+export { gridPrefsStorageKey } from './data-table-grid-prefs';
+export type { DataTableSettings } from './data-table-grid-prefs';
 export type { UseDataTableOptions } from './use-data-table';
 
 // Re-export commonly needed TanStack Table primitives so consumers don't need

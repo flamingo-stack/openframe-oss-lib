@@ -87,7 +87,7 @@ public class InstalledAgentService {
     }
 
     private void validateMachineExists(String machineId) {
-        if (machineRepository.findByMachineId(machineId).isEmpty()) {
+        if (!machineRepository.existsByMachineId(machineId)) {
             throw new MachineNotFoundException("Machine not found: " + machineId);
         }
     }

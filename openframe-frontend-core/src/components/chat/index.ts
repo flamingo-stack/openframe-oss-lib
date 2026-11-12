@@ -24,6 +24,8 @@ export * from './slash-command-suggestions';
 export * from './chat-message-enhanced';
 export * from './chat-message-list';
 export * from './chat-message-row';
+// What the user said, as a bubble: for a surface that draws a user's line outside a thread (the hero's scene).
+export { CHAT_MESSAGE_USER_BUBBLE_CLASS } from './chat-message-layout';
 export * from './chat-turn';
 export { CHAT_MESSAGE_LIST_SKELETON_MESSAGES } from './chat-message-skeleton';
 
@@ -33,6 +35,7 @@ export * from './assistant-ask-prompts';
 export * from './quick-action-marquee';
 export * from './quick-action-wall';
 export * from './mingo-quick-action-wall';
+export * from './quick-action-row';
 export * from './mingo-edge-light';
 export * from './chat-ticket-list';
 export * from './chat-typing-indicator';

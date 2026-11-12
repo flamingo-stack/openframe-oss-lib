@@ -18,13 +18,24 @@ const TAG_FRAME_CLASS = 'inline-flex items-center justify-center rounded-md';
  * `large` is the Figma "Feature Item" chip (48px, h3 bold body label) used by chip groups acting as tabs
  * (OpenFrame categories). `sentence`: a sentence, not a label: body type in the case it was written in (a question
  * a visitor can ask), on the same chip surface. One line, always: a longer sentence clips and shows whole in the
- * label's tooltip.
+ * label's tooltip. `compact` is the tag as the design system draws it today (Figma `tag`, node 650:4300): 28px, a 16px
+ * icon, the same mono-uppercase label. The chat's quick actions row uses it; the other tags keep `default` until they
+ * are moved over.
  */
 export const TAG_SIZE_CLASS = {
   default: 'h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
+  compact: 'h-7 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
   large: 'h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] font-bold text-h3',
   sentence: 'h-9 gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h6',
 } as const;
+
+/** The box a tag's icon sits in, per size. */
+const TAG_ICON_BOX_CLASS: Record<keyof typeof TAG_SIZE_CLASS, string> = {
+  default: 'size-5',
+  compact: 'size-4',
+  large: 'size-6',
+  sentence: 'size-5',
+};
 
 const tagVariants = cva([TAG_FRAME_CLASS, 'transition-colors duration-150'], {
   variants: {
@@ -172,7 +183,7 @@ function Tag({
       {...props}
     >
       {icon && (
-        <span className={cn('flex shrink-0 items-center justify-center', size === 'large' ? 'size-6' : 'size-5')}>
+        <span className={cn('flex shrink-0 items-center justify-center', TAG_ICON_BOX_CLASS[size ?? 'default'])}>
           {icon}
         </span>
       )}

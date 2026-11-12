@@ -1,7 +1,7 @@
 package com.openframe.client.service.rmm;
 
-import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceLocalTimeDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
@@ -94,7 +94,7 @@ public class SoftwareDeviceLocalScheduleService {
                 continue;
             }
             ScheduleLocalMachineTimeDispatch sentinel = sentinelByMachine.get(machineId);
-            if (machine.getStatus() == DeviceStatus.ONLINE) {
+            if (machine.getTelemetryStatus() == TelemetryStatus.ONLINE) {
                 evaluateOnline(schedule, machine, startWallClock, repeat, now, sentinel, window);
             } else {
                 evaluateOffline(schedule, machine, startWallClock, repeat, now, sentinel, window);

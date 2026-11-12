@@ -101,6 +101,11 @@ public class TagService {
                 .toList();
     }
 
+    public Tag requireTag(String tagId) {
+        return tagRepository.findById(tagId)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId));
+    }
+
     private int normalizeLimit(Integer limit) {
         if (limit == null || limit < 1) return DEFAULT_LIMIT;
         return Math.min(limit, MAX_LIMIT);
@@ -264,8 +269,7 @@ public class TagService {
     public Tag updateTag(String tagId, String key, String description, String color) {
         log.info("Updating tag: {}", tagId);
 
-        Tag tag = tagRepository.findById(tagId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId));
+        Tag tag = requireTag(tagId);
 
         if (key != null) {
             TagEntityType entityType = tag.getEntityType();

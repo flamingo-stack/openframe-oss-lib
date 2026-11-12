@@ -135,8 +135,16 @@ export function ChatContextMemoryBar({
     >
       {leading}
       {hasItems ? (
-        <p className="min-w-0 flex-1 truncate text-ods-text-secondary text-h6">
-          {items.length} recently viewed {items.length === 1 ? 'item' : 'items'} in context
+        // Its own container: in a narrow strip (a narrow chat column, a long `leading` beside it)
+        // the count reads "N items in context" rather than being cut down to a bare number, and it
+        // keeps the room that short form needs.
+        <p className="min-w-32 flex-1 truncate text-ods-text-secondary text-h6 @container">
+          <span className="hidden @[15rem]:inline">
+            {items.length} recently viewed {items.length === 1 ? 'item' : 'items'} in context
+          </span>
+          <span className="@[15rem]:hidden">
+            {items.length} {items.length === 1 ? 'item' : 'items'} in context
+          </span>
         </p>
       ) : null}
 

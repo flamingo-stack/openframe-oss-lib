@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.api.dto.device.DeviceFilterFacet.CONNECTIVITY;
 import static com.openframe.api.dto.device.DeviceFilterFacet.DEVICE_TYPES;
 import static com.openframe.api.dto.device.DeviceFilterFacet.DIRECTORY_SOURCES;
 import static com.openframe.api.dto.device.DeviceFilterFacet.FILTERED_COUNT;
@@ -64,6 +65,7 @@ class DeviceFiltersSelectionSetTest {
             type Query { deviceFilters: DeviceFilters }
             type DeviceFilters {
                 statuses: [DeviceFilterOption]
+                connectivity: [DeviceFilterOption]
                 deviceTypes: [DeviceFilterOption]
                 osTypes: [DeviceFilterOption]
                 organizationIds: [DeviceFilterOption]
@@ -139,6 +141,7 @@ class DeviceFiltersSelectionSetTest {
         assertThat(facetsFor("""
                 { deviceFilters {
                     statuses { value count }
+                    connectivity { value count }
                     deviceTypes { value count }
                     osTypes { value count }
                     organizationIds { value count }
@@ -147,7 +150,7 @@ class DeviceFiltersSelectionSetTest {
                     userLinks { value count }
                     filteredCount
                 } }"""))
-                .containsExactlyInAnyOrder(STATUSES, DEVICE_TYPES, OS_TYPES, ORGANIZATION_IDS, TAG_KEYS,
+                .containsExactlyInAnyOrder(STATUSES, CONNECTIVITY, DEVICE_TYPES, OS_TYPES, ORGANIZATION_IDS, TAG_KEYS,
                         DIRECTORY_SOURCES, USER_LINKS, FILTERED_COUNT);
     }
 

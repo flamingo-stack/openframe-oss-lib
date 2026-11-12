@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { FadePreview } from './fade-preview';
 import { LoadingItems, loadingItemProps, useLoadingScope } from './loading-scope';
 
 /**
@@ -84,8 +85,14 @@ export interface StackedRowsPanelProps {
    *  loading scope does the same while `rows` is empty. */
   loading?: boolean;
   /** How many rows the loading form draws: the list's page size, limit or declared typical constant. Default
-   *  `skeleton.rows`, else 3. */
+   *  `previewRows`, else `skeleton.rows`, else 3. */
   loadingRows?: number;
+  /**
+   * Show this many rows and fade the rest out under a "Show N more" toggle (`FadePreview`'s item mode). The card
+   * keeps the height of that many rows loading and loaded, a shorter list included, so its loading form (drawing
+   * `previewRows` rows unless `loadingRows` says otherwise) and the loaded card take the same space.
+   */
+  previewRows?: number;
 }
 
 /** Rows a loading panel draws when its caller names no count. */
@@ -280,6 +287,7 @@ export function StackedRowsPanel({
   listItems = false,
   loading: loadingProp = false,
   loadingRows,
+  previewRows,
 }: StackedRowsPanelProps) {
   // ONE switch: while the host reads the rows (`loading`), or in a page's loading state with no rows yet, the panel
   // draws its rows' loading form in the same frame; rows it is given in a scope are the page's own copy and draw as
@@ -290,7 +298,7 @@ export function StackedRowsPanel({
   const shape: PanelRowLoadingShape = { columns: skeleton?.columns ?? 1, labels: skeleton?.labels ?? true };
   const card = loading ? (
     <div className={CARD_CLASS} aria-hidden>
-      <LoadingItems count={loadingRows ?? skeleton?.rows ?? STACKED_ROWS_SKELETON_COUNT}>
+      <LoadingItems count={loadingRows ?? previewRows ?? skeleton?.rows ?? STACKED_ROWS_SKELETON_COUNT}>
         {() => <PanelRowView loading={shape} {...marker} />}
       </LoadingItems>
     </div>
@@ -301,5 +309,13 @@ export function StackedRowsPanel({
       ))}
     </div>
   );
-  return <PanelFrame title={title} className={className} card={card} />;
+  // The same FadePreview in both forms, so the height it measured on the loading rows holds the loaded card.
+  const shown = previewRows ? (
+    <FadePreview visibleItems={previewRows} resetKey={loading ? -1 : rows.length}>
+      {card}
+    </FadePreview>
+  ) : (
+    card
+  );
+  return <PanelFrame title={title} className={className} card={shown} />;
 }

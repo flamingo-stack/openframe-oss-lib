@@ -12,10 +12,11 @@ import { Tag } from '../ui/tag';
 // Types
 // =============================================================================
 
-/** Accent tint for quick-action chip icons: a named brand token
- *  (`'pink'`/`'cyan'`) or ANY CSS color value coming from admin config
+/** Accent tint for quick-action chip icons: a named token (`'pink'`/`'cyan'`,
+ *  or `'grey'`: the shell's grey for icons on its panels, ODS v2 system
+ *  greys/grey) or ANY CSS color value coming from admin config
  *  (agent/persona `icon_props.color`). */
-export type QuickActionAccent = 'pink' | 'cyan' | (string & {});
+export type QuickActionAccent = 'pink' | 'cyan' | 'grey' | (string & {});
 
 /** THE built-in agent→accent pairs ({@link getAgentAccent} derives from it). */
 const AGENT_ACCENTS = { fae: 'pink', mingo: 'cyan' } as const;
@@ -65,7 +66,18 @@ export interface QuickActionIconSpec extends EntityIconValue {
 const ACCENT_CLASS: Record<string, string> = {
   pink: 'text-ods-flamingo-pink',
   cyan: 'text-ods-flamingo-cyan',
+  grey: 'text-ods-text-panel-secondary',
 };
+
+/**
+ * The tint an accent gives a glyph drawn in `currentColor`: a named token's text class, or an admin-configured CSS
+ * color as the glyph's `color`. Nothing for no accent: the glyph keeps the tag's text color.
+ */
+export function quickActionAccentTint(accent: QuickActionAccent | undefined): { className?: string; color?: string } {
+  if (!accent) return {};
+  const className = ACCENT_CLASS[accent];
+  return className ? { className } : { color: accent };
+}
 
 /** A spec is a plain data object, never a React element — so any non-element,
  *  non-array object is a spec; strings, elements, fragments, and ReactNode
@@ -86,9 +98,11 @@ export function renderQuickActionIcon(icon: ReactNode | QuickActionIconSpec | un
   // accent value is an admin-configured CSS color, delivered as the glyph's
   // DEFAULT `color` prop — an explicit per-action `props.color` (spread after)
   // still wins.
-  const accentClass = spec.accent ? ACCENT_CLASS[spec.accent] : undefined;
-  const props = spec.accent && !accentClass ? { color: spec.accent, ...(spec.props ?? {}) } : spec.props;
-  return <EntityIcon icon={{ name: spec.name, url: spec.url, props }} size={spec.size ?? 16} className={accentClass} />;
+  const tint = quickActionAccentTint(spec.accent);
+  const props = tint.color ? { color: tint.color, ...(spec.props ?? {}) } : spec.props;
+  return (
+    <EntityIcon icon={{ name: spec.name, url: spec.url, props }} size={spec.size ?? 16} className={tint.className} />
+  );
 }
 
 /**
@@ -172,8 +186,9 @@ export interface QuickActionChipButtonProps {
    *  (fae pink / mingo cyan) instead of the fixed pink. */
   selectedAccent?: QuickActionAccent;
   /** Chip scale, forwarded to `Tag` — `'large'` is the Figma "Feature Item"
-   *  48px chip (h3 bold label, 24px icon box). Default `'default'` (32px). */
-  size?: 'default' | 'large';
+   *  48px chip (h3 bold label, 24px icon box); `'compact'` is the 28px tag the
+   *  chat's quick actions row draws. Default `'default'` (32px). */
+  size?: 'default' | 'large' | 'compact';
   onSelect?: () => void;
   /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt. */
   onHoverStart?: () => void;
@@ -188,10 +203,6 @@ export interface QuickActionChipButtonProps {
   loading?: boolean;
   /** While loading, the label placeholder's width in `ch` (see {@link QuickActionChipSkeletonProps.labelCh}). */
   labelCh?: number;
-  /** The chip fills its slot: full width and a FIXED two-line height, the label in sentence type as it was
-   *  written (not the uppercase label type), wrapping to at most two lines. The quick-action set's fixed grid draws
-   *  its chips this way, so a long name never changes the slot's size. */
-  fill?: boolean;
   /** The list's markers (`data-loading-item`), forwarded in both forms. */
   [marker: `data-${string}`]: unknown;
 }
@@ -209,24 +220,12 @@ interface QuickActionChipSkeletonProps {
   /** Reserve the leading lozenge affix slot. */
   lozenge?: boolean;
   /** Chip scale — MUST match the loaded chips' `size` or the swap jumps. */
-  size?: 'default' | 'large';
+  size?: 'default' | 'large' | 'compact';
   /** `'question'`: the placeholder of a `variant="question"` chip (its height and padding). */
   variant?: 'outline' | 'question';
-  /** The loaded chip fills its slot ({@link QuickActionChipButtonProps.fill}): so does its placeholder. */
-  fill?: boolean;
   className?: string;
   /** The list's markers (`data-loading-item`), forwarded like the loaded chip's. */
   [marker: `data-${string}`]: unknown;
-}
-
-/** A chip that fills its slot: the tag spans the slot at a fixed two-line height, its content at the leading edge.
- *  Prompts read better in sentence case and whole than uppercase and cut (NN/g, "glanceable fonts"; AWS Cloudscape,
- *  support prompts), so a filled chip uses the sentence type and wraps instead of clipping on one line. */
-const FILL_TAG_CLASS = 'h-14 w-full min-w-0 justify-start text-left';
-
-/** A filled chip's label: at most two lines, broken anywhere a long word needs it. */
-function fillLabel(label: ReactNode): ReactNode {
-  return <span className="line-clamp-2 whitespace-normal [overflow-wrap:anywhere]">{label}</span>;
 }
 
 /**
@@ -243,7 +242,6 @@ function QuickActionChipSkeleton({
   lozenge = false,
   size = 'default',
   variant = 'outline',
-  fill = false,
   className,
   ...props
 }: QuickActionChipSkeletonProps) {
@@ -252,8 +250,8 @@ function QuickActionChipSkeleton({
     <Tag
       {...loadingItemProps(props)}
       variant="outline"
-      size={question || fill ? 'sentence' : size}
-      className={cn(question && 'max-w-full', fill && FILL_TAG_CLASS, className)}
+      size={question ? 'sentence' : size}
+      className={cn(question && 'max-w-full', className)}
       icon={
         icon && !question ? (
           <UnifiedSkeleton as="span" aria-hidden className={size === 'large' ? 'block size-5' : 'block size-4'} />
@@ -304,7 +302,6 @@ export function QuickActionChipButton({
   className,
   loading: loadingProp = false,
   labelCh,
-  fill = false,
   ...props
 }: QuickActionChipButtonProps) {
   // ONE switch: in a page's loading state, or while the host reads the label, the chip is its skeleton (same box).
@@ -319,8 +316,7 @@ export function QuickActionChipButton({
         lozenge={!!lozenge}
         size={size}
         variant={variant === 'question' ? 'question' : 'outline'}
-        fill={fill}
-        className={cn(fill && 'w-full', className)}
+        className={className}
       />
     );
   // The theme's accent only fills the gap — an icon spec's own accent
@@ -328,8 +324,7 @@ export function QuickActionChipButton({
   const themedIcon = theme && isQuickActionIconSpec(icon) && !icon.accent ? { ...icon, accent: theme.accent } : icon;
   const resolvedLozenge = lozenge === true ? theme?.lozenge : lozenge === false ? undefined : lozenge;
   const resolvedIcon = renderQuickActionIcon(themedIcon);
-  const composedLabel = composeChipLabel(label, resolvedLozenge);
-  const resolvedLabel = fill ? fillLabel(composedLabel) : composedLabel;
+  const resolvedLabel = composeChipLabel(label, resolvedLozenge);
   const question = variant === 'question';
   const tagVariant = selected
     ? selectedAccent === 'cyan'
@@ -338,7 +333,7 @@ export function QuickActionChipButton({
     : question
       ? 'outline'
       : variant;
-  const tagSize = question || fill ? 'sentence' : size;
+  const tagSize = question ? 'sentence' : size;
   if (!interactive) {
     return (
       <Tag
@@ -347,7 +342,7 @@ export function QuickActionChipButton({
         size={tagSize}
         icon={resolvedIcon}
         label={resolvedLabel}
-        className={cn(fill && FILL_TAG_CLASS, className)}
+        className={className}
       />
     );
   }
@@ -364,7 +359,9 @@ export function QuickActionChipButton({
       aria-pressed={selected || undefined}
       className={cn(
         // A question may be longer than a narrow column: it shrinks and clips there, read from its start.
-        fill ? 'w-full min-w-0' : question ? 'w-auto min-w-0 max-w-full' : 'w-auto shrink-0',
+        question ? 'w-auto min-w-0 max-w-full' : 'w-auto shrink-0',
+        // The row's tag is exactly the tag's height: as a block, the button adds the line's descender under it.
+        size === 'compact' && 'flex',
         className,
       )}
     >
@@ -373,7 +370,7 @@ export function QuickActionChipButton({
         size={tagSize}
         icon={resolvedIcon}
         label={resolvedLabel}
-        className={fill ? FILL_TAG_CLASS : question ? 'max-w-full' : undefined}
+        className={question ? 'max-w-full' : undefined}
       />
     </Button>
   );
@@ -430,7 +427,7 @@ export function QuickActionChipFromData({
   defaultTheme,
   defaultLozenge,
   interactive = true,
-  fill,
+  size,
   className,
   ...props
 }: {
@@ -438,8 +435,8 @@ export function QuickActionChipFromData({
   defaultTheme?: QuickActionThemeSpec;
   defaultLozenge?: boolean;
   interactive?: boolean;
-  /** See {@link QuickActionChipButtonProps.fill}. */
-  fill?: boolean;
+  /** See {@link QuickActionChipButtonProps.size}. */
+  size?: QuickActionChipButtonProps['size'];
   className?: string;
   /** The list's markers (`data-loading-item`), forwarded to the chip. */
   [marker: `data-${string}`]: unknown;
@@ -458,7 +455,7 @@ export function QuickActionChipFromData({
       onHoverStart={chip.onHoverStart}
       onHoverEnd={chip.onHoverEnd}
       interactive={interactive}
-      fill={fill}
+      size={size}
       className={className}
     />
   );

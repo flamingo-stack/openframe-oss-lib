@@ -145,6 +145,10 @@ public class ScheduleScriptDeviceService {
         log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
     }
 
+    public void requireExistingDevices(Collection<String> machineIds) {
+        requireExistingDevices(tenantIdProvider.getTenantId(), new LinkedHashSet<>(machineIds));
+    }
+
     private void armDeviceOnline(String tenantId, ScheduleScript schedule, Collection<String> machineIds) {
         if (schedule.getTrigger() != ScheduleScriptTrigger.DEVICE_ONLINE || machineIds.isEmpty()) {
             return;
@@ -332,17 +336,7 @@ public class ScheduleScriptDeviceService {
         if (machineIds.isEmpty()) {
             return;
         }
-        List<Machine> machines = machineRepository.findByTenantIdAndMachineIdIn(tenantId, machineIds);
-
-        Set<String> resolved = machines.stream()
-                .map(Machine::getMachineId)
-                .filter(java.util.Objects::nonNull)
-                .collect(java.util.stream.Collectors.toSet());
-        List<String> unknown = machineIds.stream().filter(id -> !resolved.contains(id)).toList();
-        if (!unknown.isEmpty()) {
-            throw new BadRequestException(
-                    "Unknown or inaccessible device(s) for this tenant: " + unknown);
-        }
+        List<Machine> machines = requireExistingDevices(tenantId, machineIds);
 
         List<String> nonDispatchable = machines.stream()
                 .filter(m -> !DeviceStatus.CONNECTED.contains(m.getStatus()))
@@ -370,6 +364,22 @@ public class ScheduleScriptDeviceService {
             throw new BadRequestException(
                     "Devices do not match the schedule's platform(s) " + allowed + ": " + incompatible);
         }
+    }
+
+    private List<Machine> requireExistingDevices(String tenantId, Set<String> machineIds) {
+        if (machineIds.isEmpty()) {
+            return List.of();
+        }
+        List<Machine> machines = machineRepository.findByTenantIdAndMachineIdIn(tenantId, machineIds);
+        Set<String> resolved = machines.stream()
+                .map(Machine::getMachineId)
+                .filter(java.util.Objects::nonNull)
+                .collect(toSet());
+        List<String> unknown = machineIds.stream().filter(id -> !resolved.contains(id)).toList();
+        if (!unknown.isEmpty()) {
+            throw new BadRequestException("Unknown or inaccessible device(s) for this tenant: " + unknown);
+        }
+        return machines;
     }
 
     private ScheduleScript requireVisibleSchedule(String tenantId, String scheduleId) {

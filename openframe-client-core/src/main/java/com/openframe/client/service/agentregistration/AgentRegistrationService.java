@@ -85,9 +85,26 @@ public class AgentRegistrationService {
         createOAuthClient(machineId, clientId, clientSecret);
         Machine machine = createMachine(machineId, request, resolvedOrganizationId);
 
-        postProcessMachine(machine, request);
+        try {
+            postProcessMachine(machine, request);
+        } catch (RuntimeException e) {
+            discardFailedRegistration(machineId);
+            throw e;
+        }
 
         return new AgentRegistrationResponse(machineId, clientId, clientSecret);
+    }
+
+    // The agent never received this machine id and registers again under a new one, so the device would stay PENDING
+    // forever. A write, not a read-then-write: a read this soon after the insert can miss the machine on a secondary
+    private void discardFailedRegistration(String machineId) {
+        try {
+            machineWriter.update(machineId, machineUpdate().set(STATUS, DeviceStatus.DELETED));
+            installedAgentService.disconnectAll(machineId);
+            log.warn("Registration failed after the machine was saved, machine {} marked DELETED", machineId);
+        } catch (RuntimeException e) {
+            log.error("Failed to discard machine {} of a failed registration", machineId, e);
+        }
     }
 
     private String buildClientId(String machineId) {

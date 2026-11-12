@@ -18,6 +18,7 @@ import java.util.Set;
 public enum DeviceFilterFacet {
 
     STATUSES("statuses"),
+    CONNECTIVITY("connectivity"),
     DEVICE_TYPES("deviceTypes"),
     OS_TYPES("osTypes"),
     ORGANIZATION_IDS("organizationIds"),

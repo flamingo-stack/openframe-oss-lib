@@ -1,5 +1,6 @@
+import { fireEvent, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FADE_PREVIEW_MAX_UNMEASURED_ITEMS, FadePreview } from '../fade-preview';
 
 const list = (count: number) => (
@@ -38,5 +39,50 @@ describe('FadePreview counted mode in the server markup', () => {
 
   it('adds no clamp when nothing is hidden', () => {
     expect(renderToString(<FadePreview hiddenCount={0}>{list(4)}</FadePreview>)).not.toContain('max-height');
+  });
+});
+
+describe('FadePreview item mode measure', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("holds item N's bottom plus the list's bottom border, so a bordered list of exactly N items shows whole", () => {
+    // Each item is 50px tall, stacked from the top of the box.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const index = this.dataset.index === undefined ? -1 : Number(this.dataset.index);
+      return { top: index < 0 ? 0 : index * 50, bottom: index < 0 ? 0 : (index + 1) * 50 } as DOMRect;
+    });
+    render(
+      <FadePreview visibleItems={2}>
+        <div data-testid="list" style={{ borderBottom: '1px solid', paddingBottom: '2px' }}>
+          {[0, 1].map(i => (
+            <div key={i} data-index={i}>
+              row {i}
+            </div>
+          ))}
+        </div>
+      </FadePreview>,
+    );
+    expect(screen.getByTestId('list').parentElement).toHaveStyle({ height: '103px' });
+  });
+});
+
+describe('FadePreview item mode while collapsed', () => {
+  it('keeps the items past N out of the tab order until the reader expands', () => {
+    render(
+      <FadePreview visibleItems={2}>
+        <ul>
+          {[0, 1, 2, 3].map(i => (
+            <li key={i}>
+              <a href={`#${i}`}>item {i}</a>
+            </li>
+          ))}
+        </ul>
+      </FadePreview>,
+    );
+    const inert = () => screen.getAllByRole('listitem', { hidden: true }).map(li => li.hasAttribute('inert'));
+    expect(inert()).toEqual([false, false, true, true]);
+
+    fireEvent.click(screen.getByRole('button', { hidden: true }));
+    expect(inert()).toEqual([false, false, false, false]);
   });
 });

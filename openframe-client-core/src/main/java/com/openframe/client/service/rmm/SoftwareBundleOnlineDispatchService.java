@@ -2,6 +2,7 @@ package com.openframe.client.service.rmm;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.software.SoftwareBundle;
 import com.openframe.data.document.rmm.software.SoftwareBundleOnlineDispatch;
@@ -82,7 +83,7 @@ public class SoftwareBundleOnlineDispatchService {
         for (SoftwareBundleOnlineDispatch row : tenantRows) {
             try {
                 Machine machine = machinesById.get(row.getMachineId());
-                if (machine == null || machine.getStatus() != DeviceStatus.ONLINE) {
+                if (!isDispatchable(machine)) {
                     continue;
                 }
 
@@ -104,5 +105,12 @@ public class SoftwareBundleOnlineDispatchService {
             }
         }
         return changed;
+    }
+
+    // D1: dispatch needs a managed device (status in CONNECTED) that is online right now (telemetryStatus).
+    private static boolean isDispatchable(Machine machine) {
+        return machine != null
+                && DeviceStatus.CONNECTED.contains(machine.getStatus())
+                && machine.getTelemetryStatus() == TelemetryStatus.ONLINE;
     }
 }

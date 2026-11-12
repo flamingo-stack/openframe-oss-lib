@@ -48,8 +48,7 @@ public class TicketNoteService {
     public TicketNote updateNote(AuthPrincipal principal, @NotBlank String noteId, @NotBlank String content) {
         validateAdminAccess(principal);
         log.info("Updating note {} by: {}", noteId, principal.getDisplayName());
-        TicketNote note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.TICKET_NOTE_NOT_FOUND, "Note not found: " + noteId));
+        TicketNote note = requireNote(noteId);
         if (!note.getAuthorId().equals(principal.getId())) {
             throw new ForbiddenException(ErrorCode.OPERATION_NOT_ALLOWED, "Only the author can update this note");
         }
@@ -61,8 +60,7 @@ public class TicketNoteService {
     public void deleteNote(AuthPrincipal principal, @NotBlank String noteId) {
         validateAdminAccess(principal);
         log.info("Deleting note {} by: {}", noteId, principal.getDisplayName());
-        TicketNote note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.TICKET_NOTE_NOT_FOUND, "Note not found: " + noteId));
+        TicketNote note = requireNote(noteId);
         if (!note.getAuthorId().equals(principal.getId())) {
             throw new ForbiddenException(ErrorCode.OPERATION_NOT_ALLOWED, "Only the author can delete this note");
         }
@@ -78,6 +76,11 @@ public class TicketNoteService {
         return ticketIds.stream()
                 .map(ticketId -> notesByTicketId.getOrDefault(ticketId, List.of()))
                 .toList();
+    }
+
+    public TicketNote requireNote(String noteId) {
+        return noteRepository.findById(noteId)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.TICKET_NOTE_NOT_FOUND, "Note not found: " + noteId));
     }
 
     private void validateTicketExists(String ticketId) {

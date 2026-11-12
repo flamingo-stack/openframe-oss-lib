@@ -34,6 +34,7 @@ import com.openframe.api.service.TagService;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.installedagents.InstalledAgent;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
@@ -204,6 +205,12 @@ public class DeviceDataFetcher {
         
         return dataLoader.load(organizationId)
                 .thenApply(org -> org != null && org.getStatus() == OrganizationStatus.ACTIVE ? org : null);
+    }
+
+    @DgsData(parentType = "Machine", field = "connectivity")
+    public TelemetryStatus connectivity(DgsDataFetchingEnvironment dfe) {
+        Machine machine = dfe.getSource();
+        return machine.getTelemetryStatus();
     }
 
     @DgsData(parentType = "Machine")

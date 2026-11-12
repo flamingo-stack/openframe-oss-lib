@@ -49,7 +49,7 @@ impl RestartGate {
         Some(admitted)
     }
 
-    pub(super) async fn drain_and_request(&self) {
+    pub(crate) async fn drain_and_request(&self) {
         self.closing.set();
         let deadline = Instant::now() + Duration::from_secs(SELF_RESTART_IDLE_WAIT_SECS);
         info!("Restart scheduled: no new commands are taken, waiting for running ones to finish");

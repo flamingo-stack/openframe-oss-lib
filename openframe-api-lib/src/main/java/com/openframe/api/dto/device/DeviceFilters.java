@@ -13,6 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class DeviceFilters {
     private List<DeviceFilterOption> statuses;
+    private List<DeviceFilterOption> connectivity;
     private List<DeviceFilterOption> deviceTypes;
     private List<DeviceFilterOption> osTypes;
     private List<DeviceFilterOption> organizationIds;

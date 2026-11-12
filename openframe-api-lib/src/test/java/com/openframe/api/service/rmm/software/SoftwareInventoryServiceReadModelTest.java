@@ -104,9 +104,19 @@ class SoftwareInventoryServiceReadModelTest {
     @Test
     void listSoftware_appliesThePoliciesThenTheCatalogToThePage() {
         PageResult<SoftwareResponse> page = new PageResult<>(List.of(row("1", SoftwareSource.BREW)), false, false, 1, 0);
-        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, "x", 0, 20, null, null)).thenReturn(page);
+        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, "x", 0, 20, null, null, null)).thenReturn(page);
 
-        assertThat(service.listSoftware("x", 0, 20, null, null).items()).hasSize(1);
+        assertThat(service.listSoftware("x", 0, 20, null, null, null).items()).hasSize(1);
+        verifyPoliciesThenCatalog();
+    }
+
+    // the read model narrows by the stored match in Mongo; the rows that come back still get the statuses
+    @Test
+    void listSoftware_manageable_isTheReadModelsToNarrow() {
+        PageResult<SoftwareResponse> page = new PageResult<>(List.of(row("1", SoftwareSource.BREW)), false, false, 1, 0);
+        when(tenantSoftwareReadModelQuery.listSoftware(TENANT, null, 0, 20, null, null, true)).thenReturn(page);
+
+        assertThat(service.listSoftware(null, 0, 20, null, null, true).items()).hasSize(1);
         verifyPoliciesThenCatalog();
     }
 
