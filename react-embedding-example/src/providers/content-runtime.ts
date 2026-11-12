@@ -127,5 +127,7 @@ export function buildEndpointsRuntime(): EndpointsRuntime {
     contactUrl: EP.contact,
     storageViewBaseUrl: EP.storageView,
     faqsUrl: EP.faqs,
+    // The YouTube player draws the sharpest poster each video has (else hqdefault).
+    youtubePosterBaseUrl: EP.youtubePoster,
   }
 }
