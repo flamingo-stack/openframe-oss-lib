@@ -11,9 +11,9 @@ import { loadingItemProps, useLoadingScope } from '../loading-scope';
 import { GRID_ROW_CLASS, gridCellClass, gridCellStyle, type GridColumn, type GridLayout } from './data-table-grid';
 import { cancelAfterReactHandlers, isRowLinkControlClick } from './row-link-click';
 /**
- * The selection cell. Its checkbox toggles on the click's way DOWN the tree like any control, but the row link's
- * navigation is cancelled on the way UP (by the cell itself): the checkbox skips its own toggle when the click arrives
- * already default-prevented, so the row's capture-phase cancel must leave it alone.
+ * The selection cell. Its checkbox skips its toggle on a click that arrives already cancelled, so the cell cancels the
+ * row link's navigation itself, on the click's way UP, after the checkbox has toggled; the row's capture handler leaves
+ * the cell to it.
  */
 const GRID_SELECT_SELECTOR = '[data-grid-select]';
 
