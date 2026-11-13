@@ -23,4 +23,18 @@ public interface RedirectTargetResolver {
     default boolean isAllowedRedirectUri(String uri) {
         return false;
     }
+
+    /**
+     * Whether the login callback may append a devTicket to this target. The ticket buys the user's
+     * tokens, so only an exact allow-listed URI or a same-site path may carry it.
+     */
+    default boolean canReceiveDevTicket(String target) {
+        return target != null && (isSafeRelativePath(target) || isAllowedRedirectUri(target));
+    }
+
+    /** A path on this site: one leading slash, never {@code //host} or {@code /\host}. */
+    static boolean isSafeRelativePath(String url) {
+        return url != null && url.startsWith("/")
+                && (url.length() == 1 || (url.charAt(1) != '/' && url.charAt(1) != '\\'));
+    }
 }
