@@ -6,7 +6,7 @@ import { useChatRuntime } from '../../../contexts/chat-runtime-context';
 import { formatDate, formatTime } from '../../../utils/format-date';
 import { executeNewTabNavigation } from '../../chat/utils/execute-navigation';
 import { ArrowRightUpIcon } from '../../icons-v2-generated';
-import { MediaSkeleton, TextLineSkeleton } from '../../loading/unified-skeleton';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import {
   Button,
   type ColumnDef,
@@ -376,15 +376,12 @@ const GRID_DEVICE_ICON_CLASS = 'size-5';
 
 /** The device's type icon, its name, and its unread mark at the end of the line. */
 function DeviceNameGridCell({ device }: { device: DeviceRow }) {
-  const loading = useLoadingScope();
   const unread = (device.unreadNotificationCount ?? 0) > 0;
   return (
     <DataTable.Cell
       leading={{
         type: 'icon',
-        icon: loading ? (
-          <MediaSkeleton.Icon size="sm" />
-        ) : (
+        icon: (
           <DeviceConnectivityIcon
             connectivity={device.connectivity}
             lastSeen={device.last_seen ?? device.lastSeen}
