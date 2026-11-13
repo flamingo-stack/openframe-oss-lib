@@ -17,9 +17,14 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
+import com.openframe.data.document.rmm.software.SoftwareActionResult;
+import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
@@ -67,6 +72,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Mock private PackageUpdateDispatchService packageUpdateDispatchService;
     @Mock private DeviceService deviceService;
     @Mock private SoftwareInventoryService softwareInventoryService;
+    @Mock private SoftwareActionResultRepository softwareActionResultRepository;
 
     private SoftwareInstallUpdateManagementService service;
 
@@ -78,7 +84,8 @@ class SoftwareInstallUpdateManagementServiceTest {
                 new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
         service = new SoftwareInstallUpdateManagementService(registry, scriptService, softwareDispatchService,
                 platformResolver, packageUpdateEligibility, packageUpdateDispatchService, deviceService,
-                new SoftwarePackageSelectionResolver(softwareInventoryService));
+                new SoftwarePackageSelectionResolver(softwareInventoryService), softwareActionResultRepository,
+                tenantIdProvider);
         // A real brew handler so we exercise real script-code + arg building.
         when(registry.handlerFor(PackageManagerType.BREW)).thenReturn(new BrewPackageManagerHandler());
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -219,6 +226,21 @@ class SoftwareInstallUpdateManagementServiceTest {
         assertThat(rows.getPackageName()).isEqualTo("slack");
         assertThat(rows.getSoftwareAction()).isEqualTo(SoftwareAction.UPDATE);
         verify(deviceService).verifyDispatchable(List.of("m1"));   // the script path checks m2 itself
+
+        ArgumentCaptor<SoftwareActionResult> action = ArgumentCaptor.forClass(SoftwareActionResult.class);
+        verify(softwareActionResultRepository).save(action.capture());
+        SoftwareActionResult row = action.getValue();
+        assertThat(row.getId()).isEqualTo(rows.getExecutionId());
+        assertThat(row.getExecutionId()).isEqualTo(rows.getExecutionId());
+        assertThat(row.getTenantId()).isEqualTo(TENANT);
+        assertThat(row.getKind()).isEqualTo(SoftwareActionKind.UPDATE);
+        assertThat(row.getPackageName()).isEqualTo("slack");
+        assertThat(row.getStatus()).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
+        assertThat(row.getMode()).isEqualTo(SoftwareBundleMode.NOW);
+        assertThat(row.getMachineIds()).containsExactly("m1", "m2");
+        assertThat(row.getTotalMachineCount()).isEqualTo(2);
+        assertThat(row.getInitiatedBy()).isEqualTo(USER);
+        assertThat(row.getDispatchedAt()).isNotNull();
     }
 
     @Test
@@ -234,7 +256,7 @@ class SoftwareInstallUpdateManagementServiceTest {
                         input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER, ExecutionSource.MANUAL))
                 .isInstanceOf(BadRequestException.class);
 
-        verifyNoInteractions(softwareDispatchService, packageUpdateDispatchService);
+        verifyNoInteractions(softwareDispatchService, packageUpdateDispatchService, softwareActionResultRepository);
     }
 
     @Test

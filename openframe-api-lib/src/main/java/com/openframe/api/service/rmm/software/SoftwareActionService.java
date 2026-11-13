@@ -9,6 +9,8 @@ import com.openframe.api.mapper.ScriptFilterOptionMapper;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.data.document.rmm.filter.SoftwareActionQueryFilter;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
 import com.openframe.data.document.rmm.script.ScriptStatus;
@@ -25,8 +27,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -40,6 +44,9 @@ import java.util.Optional;
 public class SoftwareActionService {
 
     private static final int DEFAULT_PER_PAGE = 25;
+
+    // UTC-12 is the last zone a wall-clock time comes in
+    private static final Duration LATEST_ZONE_LAG = Duration.ofHours(12);
 
     private static final Map<String, String> SORT_FIELD = Map.of(
             "status", "status",
@@ -138,8 +145,15 @@ public class SoftwareActionService {
     }
 
     private List<SoftwareActionResponse> scheduledRows(String tenantId, SoftwareActionFilterInput filter, String search) {
-        List<SoftwareSchedule> upcoming = scheduleRepository
-                .findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(tenantId, ScriptStatus.ACTIVE, Instant.now());
+        Instant now = Instant.now();
+        List<SoftwareSchedule> upcoming = new ArrayList<>(scheduleRepository
+                .findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(tenantId, ScriptStatus.ACTIVE, now));
+        scheduleRepository
+                .findByTenantIdAndStatusAndTriggerAndTimeReference(tenantId, ScriptStatus.ACTIVE,
+                        ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)
+                .stream()
+                .filter(schedule -> aheadAtDeviceTime(schedule, now))
+                .forEach(upcoming::add);
         List<SoftwareActionResponse> rows = new ArrayList<>();
         for (SoftwareSchedule schedule : upcoming) {
             if (schedule.getPackages() == null) {
@@ -161,13 +175,40 @@ public class SoftwareActionService {
                         .status(SoftwareActionStatus.SCHEDULED)
                         .totalMachineCount(deviceCount)
                         .respondedMachineCount(0)
-                        .scheduledAt(schedule.getNextRunAt())
+                        .scheduledAt(nextRun(schedule, now))
+                        .timeReference(schedule.getTimeReference())
                         .initiatedBy(schedule.getCreatedBy())
                         .scheduleId(schedule.getId())
                         .build());
             }
         }
+        rows.sort(Comparator.comparing(SoftwareActionResponse::getScheduledAt));
         return rows;
+    }
+
+    // a device-time schedule keeps no nextRunAt: its one-off run is ahead until the time passed in the last time zone
+    private static boolean aheadAtDeviceTime(SoftwareSchedule schedule, Instant now) {
+        Instant startAt = schedule.getStartAt();
+        if (startAt == null) {
+            return false;
+        }
+        Instant lastZoneRun = startAt.plus(LATEST_ZONE_LAG);
+        return schedule.getRepeat() != null || now.isBefore(lastZoneRun);
+    }
+
+    // device time: the wall clock of the next run, written without a zone like the schedule's startAt
+    private static Instant nextRun(SoftwareSchedule schedule, Instant now) {
+        Instant nextRunAt = schedule.getNextRunAt();
+        if (nextRunAt != null) {
+            return nextRunAt;
+        }
+        Instant startAt = schedule.getStartAt();
+        Long repeat = schedule.getRepeat();
+        if (repeat == null || !startAt.isBefore(now)) {
+            return startAt;
+        }
+        long runsPassed = Duration.between(startAt, now).getSeconds() / repeat;
+        return startAt.plusSeconds((runsPassed + 1) * repeat);
     }
 
     private static boolean scheduledMatchesFilter(SoftwareActionFilterInput filter, String search,
