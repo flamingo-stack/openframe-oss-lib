@@ -1,25 +1,61 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`server-history hydration (materializes through the reducer) > rebuilds messages + send counter from the transcript 1`] = `
+exports[`server-history hydration (materializes through the reducer) > rebuilds the thread from the transcript 1`] = `
 [
   {
-    "content": "open a ticket for the broken printer",
-    "id": "hydrated-1",
+    "id": "h-1",
+    "metadata": {
+      "createdAt": "2026-07-19T09:00:00.000Z",
+      "seq": 1,
+    },
+    "parts": [
+      {
+        "text": "open a ticket for the broken printer",
+        "type": "text",
+      },
+    ],
     "role": "user",
   },
   {
-    "content": "✅ Approved — ticket created: [card://ticket:77]",
-    "id": "hydrated-2",
+    "id": "h-2",
+    "metadata": {
+      "createdAt": "2026-07-19T09:00:12.000Z",
+      "seq": 2,
+    },
+    "parts": [
+      {
+        "text": "✅ Approved — ticket created: [77](record://ticket/77)",
+        "type": "text",
+      },
+    ],
     "role": "assistant",
   },
   {
-    "content": "what is the pricing?",
-    "id": "hydrated-3",
+    "id": "h-3",
+    "metadata": {
+      "createdAt": "2026-07-19T09:01:40.000Z",
+      "seq": 3,
+    },
+    "parts": [
+      {
+        "text": "what is the pricing?",
+        "type": "text",
+      },
+    ],
     "role": "user",
   },
   {
-    "content": "Pricing starts at $99/month per site.",
-    "id": "hydrated-4",
+    "id": "h-4",
+    "metadata": {
+      "createdAt": "2026-07-19T09:01:45.000Z",
+      "seq": 4,
+    },
+    "parts": [
+      {
+        "text": "Pricing starts at $99/month per site.",
+        "type": "text",
+      },
+    ],
     "role": "assistant",
   },
 ]

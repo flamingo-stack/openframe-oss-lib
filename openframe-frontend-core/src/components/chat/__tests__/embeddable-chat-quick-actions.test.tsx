@@ -16,12 +16,12 @@ vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
 import { createRef } from 'react';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -67,8 +67,7 @@ function emptyState(sendMessage: (text: string) => Promise<void>): UnifiedChatSt
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    actions: {},
     dialogTokenUsage: null,
     connectionState: 'connected',
   };
@@ -81,18 +80,19 @@ function renderChat({ onClick }: { onClick?: () => void } = {}) {
   const { unmount } = render(
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
-        <EmbeddableChat
-          ref={handle}
-          shell="inline"
-          appearance="v2"
-          defaultOpen
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={emptyState(sendMessage)}
-          mingoWelcome={{
-            quickActions: [{ id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick }],
-          }}
-        />
+        <ChatEngineProvider engine={emptyState(sendMessage)}>
+          <EmbeddableChat
+            ref={handle}
+            shell="inline"
+            appearance="v2"
+            defaultOpen
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+            mingoWelcome={{
+              quickActions: [{ id: 'qa-1', label: 'Patching', prompt: PROMPT, onClick }],
+            }}
+          />
+        </ChatEngineProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,
   );

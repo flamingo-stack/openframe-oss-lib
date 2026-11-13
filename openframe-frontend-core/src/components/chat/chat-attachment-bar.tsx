@@ -31,57 +31,22 @@ import { useEffect, useMemo, useRef } from 'react';
  *     force camera-only mode and disable file picking.
  */
 
+import {
+  ANTHROPIC_SUPPORTED_IMAGE_MIME,
+  CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER,
+  CHAT_ATTACHMENT_MIME_TYPES,
+} from '../../chat-protocol/attachment';
 import { cn } from '../../utils/cn';
 import { formatFileSize } from '../../utils/format';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
-import { ANTHROPIC_SUPPORTED_IMAGE_MIME } from './utils/chat-attachment-markdown';
+import type { StagedAttachment } from './hooks/use-chat-attachments';
 
 /** Chip strip / chip density. `compact` shrinks the thumbnail, padding, text
  *  and max-width for narrow surfaces (e.g. the ticket-drawer reply composer);
  *  `default` is the global Ask-AI chat sizing. */
 export type ChatAttachmentSize = 'default' | 'compact';
-
-// ===========================================================================
-// CONSTANTS & TYPES — inlined from hub `lib/config/chat-attachment-config.ts`
-// ===========================================================================
-
-/** Hand-curated chat-attachment allow-list. Intentionally excludes
- *  `image/svg+xml` for XSS safety. */
-export const CHAT_ATTACHMENT_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'video/mp4',
-  'video/webm',
-  'video/quicktime',
-] as const;
-
-/** Client-side cap on `addFiles` (the upload hook rejects 6+ files in a
- *  single selection). Server-side is per-IP-rate-limit; this is a UX
- *  hint more than a security boundary. */
-export const CHAT_ATTACHMENT_CONCURRENT_UPLOADS_PER_USER = 5;
-
-type Status = 'sniffing' | 'uploading' | 'ready' | 'error';
-
-/** Staged-attachment shape consumed by the chip strip. Mirrors the hub
- *  `StagedAttachment` produced by `useChatAttachments`. */
-export interface StagedAttachment {
-  /** Stable client-side id; survives across re-renders. */
-  id: string;
-  file: File;
-  status: Status;
-  /** Set when `status === 'ready'`. Server-issued. */
-  storagePath?: string;
-  /** Set when `status === 'ready'`. Server-issued HMAC view token. */
-  viewToken?: string;
-  /** 0-100 during 'uploading'. */
-  progress: number;
-  /** Set when `status === 'error'`. */
-  errorMessage?: string;
-}
 
 // ===========================================================================
 // `+` ADD BUTTON — inline in the bottom-controls row (below input)

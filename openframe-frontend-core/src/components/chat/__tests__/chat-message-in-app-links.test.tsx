@@ -68,7 +68,7 @@ function renderAnswer(text: string) {
     <ChatRuntimeContext.Provider value={runtime}>
       <ChatMessageEnhanced
         NavLinkAnchor={NavLinkAnchorViaRuntime}
-        content={[{ text, type: 'text' }]}
+        parts={[{ text, type: 'text' }]}
         renderEntityCard={() => null}
         role="assistant"
       />
@@ -145,7 +145,7 @@ describe('ChatMessageEnhanced — in-app screen links', () => {
     render(
       <ChatMessageEnhanced
         NavLinkAnchor={HostAnchor}
-        content={[{ text: ANSWER, type: 'text' }]}
+        parts={[{ text: ANSWER, type: 'text' }]}
         renderEntityCard={() => null}
         role="assistant"
       />,

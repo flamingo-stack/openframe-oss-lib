@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
-import { ApprovalRequestMessage } from '@flamingo-stack/openframe-frontend-core/components/chat'
+import { ApprovalBatchMessage } from '@flamingo-stack/openframe-frontend-core/components/chat'
 import {
   Button,
   Card,
@@ -33,7 +33,7 @@ import { EP } from '../config/endpoints'
  *   - ANY write tool generically (create_ticket, create_clickup_task, …)
  *     → pending_approval card → confirm_proposal approve/reject
  *
- * The approval card IS the chat's own `ApprovalRequestMessage` — the MCP
+ * The approval card IS the chat's own `ApprovalBatchMessage` (a proposal is a batch of one) — the MCP
  * `pending_approval` payload is the chat's card payload by construction
  * (`buildApprovalCardPayload`), and rendering it through the same
  * component is the parity this page exists to demonstrate.
@@ -210,11 +210,13 @@ export function McpPlaygroundPage() {
       setAnswer(result.text)
       const s = result.structured as {
         conversationId?: string
-        citations?: unknown[]
+        parts?: Array<{ type: string }>
         pendingApprovals?: PendingApproval[]
       } | null
       if (s?.conversationId) setConversationId(s.conversationId)
-      setCitationCount(s?.citations?.length ?? 0)
+      setCitationCount(
+        s?.parts?.filter(part => part.type === 'source-url' || part.type === 'source-document').length ?? 0,
+      )
       if (s?.pendingApprovals?.length) {
         setPending(prev => [
           ...prev,
@@ -468,13 +470,22 @@ export function McpPlaygroundPage() {
                       the chat's card payload by construction, so the same
                       component renders it (in-flight double-click protection
                       included). */}
-                  <ApprovalRequestMessage
+                  <ApprovalBatchMessage
                     data={{
-                      requestId: p.proposalId,
-                      command: p.title ?? p.toolName ?? 'Proposed action',
-                      fields: p.fields,
-                      explanation: p.explanation ?? undefined,
+                      approvalRequestId: p.proposalId,
+                      approvalType: '',
+                      toolCalls: [
+                        {
+                          toolExecutionRequestId: p.proposalId,
+                          toolName: p.toolName ?? 'proposal',
+                          toolTitle: p.title ?? p.toolName ?? 'Proposed action',
+                          requiresApproval: true,
+                          toolCallArguments: Object.fromEntries((p.fields ?? []).map(field => [field.label, field.value])),
+                          ...(p.explanation ? { toolExplanation: p.explanation } : {}),
+                        },
+                      ],
                     }}
+                    showExecutionStatus={false}
                     status={decided?.status ?? 'pending'}
                     onApprove={() => decide(p, 'approve')}
                     onReject={() => decide(p, 'reject')}

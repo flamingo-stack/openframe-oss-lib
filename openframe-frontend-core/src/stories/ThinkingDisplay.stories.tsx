@@ -4,9 +4,9 @@ import type React from 'react';
 import { ThinkingDisplay } from '../components/chat/thinking-display';
 
 /**
- * Collapsible "Thought" block for `thinking` message segments — muted
+ * Collapsible "Thought" block for `reasoning` parts — muted
  * markdown inside a bordered card, one line collapsed, expandable via the
- * chevron. While the segment is still streaming the label reads "Thinking"
+ * chevron. While the part is still streaming the label reads "Thinking"
  * and the collapse transition is disabled.
  */
 
@@ -37,7 +37,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Renders a `thinking` message segment — collapsed single-line 'Thought' card that expands to the full muted-markdown reasoning. Streaming state shows 'Thinking' with a dots loader.",
+          "Renders a `reasoning` part — collapsed single-line 'Thought' card that expands to the full muted-markdown reasoning. Streaming state shows 'Thinking' with a dots loader.",
       },
     },
   },

@@ -626,6 +626,24 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
     return () => document.removeEventListener('scroll', onScroll, { capture: true });
   }, [open, setOpen]);
 
+  // Escape closes this menu and nothing else; the next one is the surface's (APG, "Menu Button"). Radix's own answer
+  // reaches a dialog only when the two share a copy of its layer stack: where a host's tree holds two (the hub's), the
+  // dialog's listener runs first, on the document, and closes the chat's panel with the menu inside it. So the menu hears
+  // the key first, before the document does.
+  const closedByEscape = React.useRef(false);
+  React.useEffect(() => {
+    if (!open || loading) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      closedByEscape.current = true;
+      setOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
+  }, [open, loading, setOpen]);
+
   const handleItemClick = useCallback(
     (item: ActionsMenuItem) => {
       onItemClick?.(item);
@@ -681,7 +699,14 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
           const current = rows.indexOf(document.activeElement as HTMLElement);
           rows[move(Math.max(current, 0), rows.length)]?.focus();
         }}
-        onCloseAutoFocus={onCloseAutoFocus}
+        // Closed by its key, focus goes back to the button whatever the host asks after a pointer: it is the keyboard's
+        // way on, and in a panel that closes on Escape it is what lets the panel hear the next one. A trigger inside a
+        // Tooltip shows its tooltip on that focus, as on any focus, for a mouse user too (the history section's two): there
+        // the next Escape closes the tooltip and the one after it the panel. Decided to keep as ordinary keyboard behaviour.
+        onCloseAutoFocus={event => {
+          if (closedByEscape.current) closedByEscape.current = false;
+          else onCloseAutoFocus?.(event);
+        }}
         className={cn('overflow-visible border-0 bg-transparent p-0 shadow-none', contentClassName)}
       >
         <ActionsMenuRowContext.Provider value={rowContext}>
