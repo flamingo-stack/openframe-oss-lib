@@ -232,6 +232,30 @@ class DeviceSoftwareHandlerTest {
     }
 
     @Test
+    void handle_snapshotReadsOfAnUnresolvedHost_lookUpTheHostOnce() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(false);
+
+        handler.handle(msg("r", null, row().put("host_id", 100).put("software_id", 1)), null);
+        handler.handle(msg("r", null, row().put("host_id", 100).put("software_id", 2)), null);
+        handler.handle(msg("r", null, row().put("host_id", 100).put("software_id", 3)), null);
+
+        verify(fleetHostResolver, times(1)).isResolvable("100");
+        verifyNoInteractions(fleetHostSoftwareCache, deviceSoftwareRepository, projectionTrigger);
+    }
+
+    @Test
+    void handle_changeEventOfAHostUnresolvedInTheSnapshot_isResolvedAgain() {
+        when(fleetHostResolver.isResolvable("100")).thenReturn(false, true);
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+
+        handler.handle(msg("r", null, row().put("host_id", 100)), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        verify(fleetHostResolver, times(2)).isResolvable("100");
+        verify(fleetHostSoftwareCache).hostSoftware("t1", 100L, COMMIT_TS);
+    }
+
+    @Test
     void handle_changeEventsAfterASnapshotRead_alwaysReconcile() {
         when(fleetHostResolver.isResolvable("100")).thenReturn(true);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));

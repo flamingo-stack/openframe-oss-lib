@@ -40,6 +40,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     static final Duration SNAPSHOT_HOST_WINDOW = Duration.ofHours(24);
+    static final Duration SNAPSHOT_UNRESOLVED_HOST_WINDOW = Duration.ofMinutes(5);
 
     private final FleetHostResolver fleetHostResolver;
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
@@ -48,6 +49,9 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
 
     private final Cache<Long, Boolean> snapshotReconciledHosts = Caffeine.newBuilder()
             .expireAfterWrite(SNAPSHOT_HOST_WINDOW)
+            .build();
+    private final Cache<Long, Boolean> snapshotUnresolvedHosts = Caffeine.newBuilder()
+            .expireAfterWrite(SNAPSHOT_UNRESOLVED_HOST_WINDOW)
             .build();
 
     @Override
@@ -75,11 +79,15 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             return;
         }
         boolean snapshotRead = isSnapshotRead(payload.getOperation());
-        if (snapshotRead && snapshotReconciledHosts.getIfPresent(hostId) != null) {
+        if (snapshotRead && (snapshotReconciledHosts.getIfPresent(hostId) != null
+                || snapshotUnresolvedHosts.getIfPresent(hostId) != null)) {
             return;
         }
         String fleetHostId = String.valueOf(hostId);
         if (!fleetHostResolver.isResolvable(fleetHostId)) {
+            if (snapshotRead) {
+                snapshotUnresolvedHosts.put(hostId, Boolean.TRUE);
+            }
             log.debug("[software-cdc] host_software for unresolved Fleet host {} — skipping", hostId);
             return;
         }
