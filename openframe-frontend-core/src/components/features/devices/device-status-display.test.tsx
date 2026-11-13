@@ -123,6 +123,15 @@ describe('getDeviceFilterColumns in the legacy display', () => {
     expect(splitStatusFilterValue([online?.value ?? ''])).toEqual({ statuses: [], connectivity: ['ONLINE'] });
   });
 
+  it('keeps MANAGED where the backend counts no connectivity, so managed devices can still be picked', () => {
+    const noConnectivity = getDeviceFilterColumns({ ...FACETS, connectivity: undefined }, { statusDisplay: 'legacy' });
+    expect(noConnectivity.find(column => column.key === 'status')?.filterOptions?.map(option => option.label)).toEqual([
+      'MANAGED',
+      'PENDING',
+      'PENDING DELETION',
+    ]);
+  });
+
   it('is the lifecycle STATUS and its Connectivity group by default', () => {
     const lifecycle = getDeviceFilterColumns(FACETS);
     expect(lifecycle.find(column => column.key === 'status')?.filterOptions?.map(option => option.label)).toEqual([

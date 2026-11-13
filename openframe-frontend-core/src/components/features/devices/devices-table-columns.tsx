@@ -564,6 +564,8 @@ function buildDeviceFilterOptions(
 
   // The legacy display (`DeviceStatusDisplay`) has no Connectivity group: ONLINE and OFFLINE are STATUS options again,
   // in place of MANAGED, and still filter on connectivity (`connectivity:ONLINE`, split out where the query is built).
+  // A backend with no connectivity facet has nothing to split MANAGED by: MANAGED stays, or managed devices could not
+  // be picked at all.
   if (statusDisplay === 'legacy') {
     const legacyStatus = [
       ...connectivity.map(option => {
@@ -571,7 +573,7 @@ function buildDeviceFilterOptions(
         return { ...option, id: value, value, label: getDeviceStatusConfig(option.value).label };
       }),
       ...status
-        .filter(option => option.value !== DEVICE_STATUS.MANAGED)
+        .filter(option => connectivity.length === 0 || option.value !== DEVICE_STATUS.MANAGED)
         .map(option => ({ ...option, label: getDeviceStatusConfig(option.value).label })),
     ];
     return { ...buildOtherFilterOptions(deviceFilters), status: legacyStatus, connectivity: [] };
