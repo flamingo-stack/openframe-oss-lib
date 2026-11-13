@@ -63,6 +63,14 @@ class DefaultRedirectTargetResolverTest {
         assertThat(resolve("https://oss.example.com:8443")).isEqualTo("/");
     }
 
+    @Test
+    void shouldTreatExplicitDefaultPortAsSameOrigin() {
+        ServerHttpRequest defaultPort = MockServerHttpRequest.get("https://oss.example.com/oauth/callback").build();
+
+        assertThat(resolver.resolve("acme", "u1", "https://oss.example.com:443/devices", defaultPort).block())
+                .isEqualTo("/devices");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"https://oss.example.com/devices", "https://oss.example.com:9443/devices",
             "http://oss.example.com:8443/devices", "https://other.example.com:8443/devices"})
