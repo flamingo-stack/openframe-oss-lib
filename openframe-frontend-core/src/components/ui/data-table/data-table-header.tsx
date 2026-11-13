@@ -268,6 +268,7 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
     <DataTableColumnFilter
       column={column}
       options={filter.options}
+      extraSections={filter.sections}
       placement={filter.placement}
       pending={filter.pending}
       label={resolveHeaderLabel(header)}

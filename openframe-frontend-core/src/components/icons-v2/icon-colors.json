@@ -89,6 +89,12 @@
   "design/shape-circle-dash-classic": {
     "color": "var(--color-text-primary)"
   },
+  "devices/device-offline": {
+    "secondaryColor": "var(--color-border)"
+  },
+  "devices/device-online": {
+    "secondaryColor": "var(--color-success)"
+  },
   "documents/folder-shield-classic": {
     "color": "var(--color-text-primary)"
   },

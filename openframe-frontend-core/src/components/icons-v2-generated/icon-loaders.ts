@@ -639,6 +639,8 @@ export const ICON_LOADERS: Readonly<Record<string, () => Promise<IconModule>>> =
   DegreeFahrenheitIcon: () => import('./signs-and-symbols/degree-fahrenheit-icon').then(module => ({ default: module.DegreeFahrenheitIcon })),
   DeleteIcon: () => import('./communication/delete-icon').then(module => ({ default: module.DeleteIcon })),
   DenoIcon: () => import('./brand-logos/deno-icon').then(module => ({ default: module.DenoIcon })),
+  DeviceOfflineIcon: () => import('./devices/device-offline-icon').then(module => ({ default: module.DeviceOfflineIcon })),
+  DeviceOnlineIcon: () => import('./devices/device-online-icon').then(module => ({ default: module.DeviceOnlineIcon })),
   DialpadIcon: () => import('./communication/dialpad-icon').then(module => ({ default: module.DialpadIcon })),
   DiamondGemIcon: () => import('./shopping/diamond-gem-icon').then(module => ({ default: module.DiamondGemIcon })),
   Dice1Icon: () => import('./number/dice-1-icon').then(module => ({ default: module.Dice1Icon })),

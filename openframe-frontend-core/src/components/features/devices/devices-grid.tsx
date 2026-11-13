@@ -5,8 +5,10 @@ import { useRouter } from '../../../embed-shims/next-navigation';
 import { LoadingRegion } from '../../loading/loading-region';
 import { DeviceCard } from '../../ui';
 import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
+import { deviceLifecycleTagProps } from './device-lifecycle-tag';
 import { getDeviceName } from './device-name';
-import { getDeviceOperatingSystem, getDeviceStatusConfig } from './device-status';
+import { getDeviceOperatingSystem } from './device-status';
+import { useDeviceStatusDisplay } from './device-status-display';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDevicesViewConfig } from './devices-view-config';
 import type { DeviceRow } from './types';
@@ -61,6 +63,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   const isLoading = useLoadingScope() || isLoadingProp;
   const router = useRouter();
   const { getDeviceHref } = useDevicesViewConfig();
+  const display = useDeviceStatusDisplay();
 
   const handleDeviceClick = (device: T) => {
     const href = device.machineId || device.id ? getDeviceHref?.(device) : undefined;
@@ -82,7 +85,6 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
         <>
           <div className={DEVICES_GRID_CLASS}>
             {devices.map(device => {
-              const statusConfig = getDeviceStatusConfig(device.status);
               return (
                 <DeviceCard
                   key={device.id || device.machineId}
@@ -96,12 +98,10 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                   }}
                   statusTag={
                     device.status
-                      ? {
-                          label: statusConfig.label,
-                          variant: statusConfig.variant,
-                        }
+                      ? deviceLifecycleTagProps(device.status, { connectivity: device.connectivity ?? null, display })
                       : undefined
                   }
+                  connectivity={device.connectivity ?? null}
                   onDeviceClick={() => handleDeviceClick(device)}
                   actions={
                     device.unreadNotificationCount

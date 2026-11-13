@@ -43,19 +43,19 @@ export const DEMO_DEVICES = {
 } as const;
 
 /**
- * The fleet the Devices screen lists, in its order: each device with its kind, its status and how long ago it was
- * seen. The fixture builds its rows from it, and the screen's loading state counts its rows from it, so the two
- * always draw the same number of rows.
+ * The fleet the Devices screen lists, in its order: each device with its kind, whether it is online now and how long
+ * ago it was seen (every one is MANAGED). The fixture builds its rows from it, and the screen's loading state counts
+ * its rows from it, so the two always draw the same number of rows.
  */
 export const DEMO_FLEET = [
-  { device: DEMO_DEVICES.frontDesk, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 2 },
-  { device: DEMO_DEVICES.reception, type: 'desktop', status: 'OFFLINE', lastSeenMinutesAgo: 190 },
-  { device: DEMO_DEVICES.mayaAir, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 1 },
-  { device: DEMO_DEVICES.buildServer, type: 'server', status: 'ONLINE', lastSeenMinutesAgo: 1 },
-  { device: DEMO_DEVICES.leoThinkPad, type: 'laptop', status: 'OFFLINE', lastSeenMinutesAgo: 64 },
-  { device: DEMO_DEVICES.samT14, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 3 },
-  { device: DEMO_DEVICES.jenSurface, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 6 },
-  { device: DEMO_DEVICES.priyaXps, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 2 },
+  { device: DEMO_DEVICES.frontDesk, type: 'laptop', connectivity: 'ONLINE', lastSeenMinutesAgo: 2 },
+  { device: DEMO_DEVICES.reception, type: 'desktop', connectivity: 'OFFLINE', lastSeenMinutesAgo: 190 },
+  { device: DEMO_DEVICES.mayaAir, type: 'laptop', connectivity: 'ONLINE', lastSeenMinutesAgo: 1 },
+  { device: DEMO_DEVICES.buildServer, type: 'server', connectivity: 'ONLINE', lastSeenMinutesAgo: 1 },
+  { device: DEMO_DEVICES.leoThinkPad, type: 'laptop', connectivity: 'OFFLINE', lastSeenMinutesAgo: 64 },
+  { device: DEMO_DEVICES.samT14, type: 'laptop', connectivity: 'ONLINE', lastSeenMinutesAgo: 3 },
+  { device: DEMO_DEVICES.jenSurface, type: 'laptop', connectivity: 'ONLINE', lastSeenMinutesAgo: 6 },
+  { device: DEMO_DEVICES.priyaXps, type: 'laptop', connectivity: 'ONLINE', lastSeenMinutesAgo: 2 },
 ] as const;
 
 /** The OS the Devices screen's search answers, and how many fleet devices run it (the rows the search shows). */

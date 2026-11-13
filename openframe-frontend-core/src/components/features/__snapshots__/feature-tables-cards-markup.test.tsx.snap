@@ -605,10 +605,15 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loaded' 1`
                     class="flex h-20 items-center gap-3"
                   >
                     <span
-                      class="flex size-8 shrink-0 items-center justify-center rounded-[6px] border border-ods-border bg-ods-card"
+                      aria-label="Online. Never seen"
+                      class="inline-flex shrink-0 text-ods-text-secondary"
+                      data-connectivity="online"
+                      data-state="closed"
+                      role="img"
                     >
                       <svg
-                        class="size-4 text-ods-text-secondary"
+                        aria-hidden="true"
+                        class=""
                         fill="none"
                         height="24"
                         viewBox="0 0 24 24"
@@ -616,11 +621,15 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loaded' 1`
                         xmlns="http://www.w3.org/2000/svg"
                       >
                         <path
-                          d="M10.876 17a1.125 1.125 0 0 1 2.25 0v2.875h2.873l.116.006a1.125 1.125 0 0 1 0 2.239l-.115.005H8a1.125 1.125 0 0 1 0-2.25h2.876z"
+                          d="M23 5A4 4 0 1 1 15 5 4 4 0 0 1 23 5"
+                          fill="var(--color-success)"
+                        />
+                        <path
+                          d="M10.876 17a1.125 1.125 0 0 1 2.25 0v2.875H16l.115.006a1.125 1.125 0 0 1 0 2.239l-.115.005H8a1.125 1.125 0 0 1 0-2.25h2.876z"
                           fill="currentColor"
                         />
                         <path
-                          d="M20.875 6c0-1.036-.84-1.875-1.875-1.875H5c-1.036 0-1.875.84-1.875 1.875v8c0 1.035.84 1.874 1.875 1.874h14a1.875 1.875 0 0 0 1.875-1.875zm2.25 8A4.125 4.125 0 0 1 19 18.124H5a4.125 4.125 0 0 1-4.125-4.126V6A4.125 4.125 0 0 1 5 1.875h14A4.125 4.125 0 0 1 23.125 6z"
+                          d="M.853 14V6a4.15 4.15 0 0 1 4.15-4.15h5.959a1.15 1.15 0 0 1 0 2.3h-5.96A1.85 1.85 0 0 0 3.154 6v8a1.85 1.85 0 0 0 1.85 1.85H19A1.85 1.85 0 0 0 20.85 14v-.998a1.15 1.15 0 0 1 2.3 0V14A4.15 4.15 0 0 1 19 18.15H5.003A4.15 4.15 0 0 1 .853 14"
                           fill="currentColor"
                         />
                       </svg>
@@ -684,12 +693,33 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loaded' 1`
                     class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-success-secondary text-ods-success hover:bg-ods-success-secondary-hover active:bg-ods-success-secondary-active w-min"
                   >
                     <span
+                      class="flex shrink-0 items-center justify-center size-5"
+                    >
+                      <svg
+                        class=""
+                        fill="none"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M20.875 12a8.875 8.875 0 1 0-17.75 0 8.875 8.875 0 0 0 17.75 0m2.25 0c0 6.144-4.98 11.124-11.124 11.125S.875 18.145.875 12 5.856.875 12.001.875c6.143 0 11.124 4.981 11.124 11.126Z"
+                          fill="currentColor"
+                        />
+                        <path
+                          d="M15.705 8.205a1.125 1.125 0 1 1 1.59 1.59l-6 6c-.439.44-1.151.44-1.59 0l-3-3-.078-.085a1.125 1.125 0 0 1 1.583-1.583l.085.078 2.205 2.204z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </span>
+                    <span
                       class="min-w-0 max-w-full"
                     >
                       <span
                         class="block truncate"
                       >
-                        ONLINE
+                        MANAGED
                       </span>
                     </span>
                   </div>
@@ -752,10 +782,15 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loaded' 1`
                     class="flex h-20 items-center gap-3"
                   >
                     <span
-                      class="flex size-8 shrink-0 items-center justify-center rounded-[6px] border border-ods-border bg-ods-card"
+                      aria-label="Offline. Never seen"
+                      class="inline-flex shrink-0 text-ods-text-secondary"
+                      data-connectivity="offline"
+                      data-state="closed"
+                      role="img"
                     >
                       <svg
-                        class="size-4 text-ods-text-secondary"
+                        aria-hidden="true"
+                        class=""
                         fill="none"
                         height="24"
                         viewBox="0 0 24 24"
@@ -763,11 +798,15 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loaded' 1`
                         xmlns="http://www.w3.org/2000/svg"
                       >
                         <path
-                          d="M19.875 17V7c0-1.036-.84-1.875-1.875-1.875H6c-1.036 0-1.875.84-1.875 1.875v10a1.125 1.125 0 0 1-2.25 0V7A4.125 4.125 0 0 1 6 2.875h12A4.125 4.125 0 0 1 22.125 7v10a1.125 1.125 0 0 1-2.25 0"
+                          d="M23 5A4 4 0 1 1 15 5 4 4 0 0 1 23 5"
+                          fill="var(--color-border)"
+                        />
+                        <path
+                          d="M10.876 17a1.125 1.125 0 0 1 2.25 0v2.875H16l.115.006a1.125 1.125 0 0 1 0 2.239l-.115.005H8a1.125 1.125 0 0 1 0-2.25h2.876z"
                           fill="currentColor"
                         />
                         <path
-                          d="M3.132 18.125c.065.977.875 1.75 1.868 1.75h14c.993 0 1.804-.773 1.869-1.75h-5.403l-.378.378a2.13 2.13 0 0 1-1.503.622h-3.17c-.494 0-.97-.172-1.347-.481l-.157-.141-.376-.378zM23.124 18A4.125 4.125 0 0 1 19 22.125H5A4.125 4.125 0 0 1 .875 18c0-1.173.952-2.125 2.125-2.125h5.586c.493 0 .968.172 1.346.482l.157.14.376.378h3.07l.377-.377.155-.141c.378-.31.854-.482 1.347-.482H21c1.174 0 2.125.952 2.125 2.125Z"
+                          d="M.853 14V6a4.15 4.15 0 0 1 4.15-4.15h5.959a1.15 1.15 0 0 1 0 2.3h-5.96A1.85 1.85 0 0 0 3.154 6v8a1.85 1.85 0 0 0 1.85 1.85H19A1.85 1.85 0 0 0 20.85 14v-.998a1.15 1.15 0 0 1 2.3 0V14A4.15 4.15 0 0 1 19 18.15H5.003A4.15 4.15 0 0 1 .853 14"
                           fill="currentColor"
                         />
                       </svg>
@@ -828,15 +867,36 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loaded' 1`
                   class="flex flex-col overflow-hidden justify-start text-left w-auto shrink-0 content-md:w-[160px]"
                 >
                   <div
-                    class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-error-secondary text-ods-error hover:bg-ods-error-secondary-hover active:bg-ods-error-secondary-active w-min"
+                    class="inline-flex items-center justify-center rounded-md transition-colors duration-150 h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5 bg-ods-success-secondary text-ods-success hover:bg-ods-success-secondary-hover active:bg-ods-success-secondary-active w-min"
                   >
+                    <span
+                      class="flex shrink-0 items-center justify-center size-5"
+                    >
+                      <svg
+                        class=""
+                        fill="none"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        width="16"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M20.875 12a8.875 8.875 0 1 0-17.75 0 8.875 8.875 0 0 0 17.75 0m2.25 0c0 6.144-4.98 11.124-11.124 11.125S.875 18.145.875 12 5.856.875 12.001.875c6.143 0 11.124 4.981 11.124 11.126Z"
+                          fill="currentColor"
+                        />
+                        <path
+                          d="M15.705 8.205a1.125 1.125 0 1 1 1.59 1.59l-6 6c-.439.44-1.151.44-1.59 0l-3-3-.078-.085a1.125 1.125 0 0 1 1.583-1.583l.085.078 2.205 2.204z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </span>
                     <span
                       class="min-w-0 max-w-full"
                     >
                       <span
                         class="block truncate"
                       >
-                        OFFLINE
+                        MANAGED
                       </span>
                     </span>
                   </div>
@@ -1218,14 +1278,10 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loading' 1
                   <div
                     class="flex h-20 items-center gap-3"
                   >
-                    <span
-                      class="flex size-8 shrink-0 items-center justify-center rounded-[6px] border border-ods-border bg-ods-card"
-                    >
-                      <div
-                        aria-hidden="true"
-                        class="ods-skeleton animate-pulse motion-reduce:animate-none bg-ods-skeleton [&_.ods-skeleton]:animate-none rounded-md h-4 w-4"
-                      />
-                    </span>
+                    <div
+                      aria-hidden="true"
+                      class="ods-skeleton animate-pulse motion-reduce:animate-none bg-ods-skeleton [&_.ods-skeleton]:animate-none rounded-md h-4 w-4 shrink-0"
+                    />
                     <div
                       class="flex min-w-0 flex-col"
                     >
@@ -1392,14 +1448,10 @@ exports[`feature tables, card layout (the default) > 'DeviceSelector, loading' 1
                   <div
                     class="flex h-20 items-center gap-3"
                   >
-                    <span
-                      class="flex size-8 shrink-0 items-center justify-center rounded-[6px] border border-ods-border bg-ods-card"
-                    >
-                      <div
-                        aria-hidden="true"
-                        class="ods-skeleton animate-pulse motion-reduce:animate-none bg-ods-skeleton [&_.ods-skeleton]:animate-none rounded-md h-4 w-4"
-                      />
-                    </span>
+                    <div
+                      aria-hidden="true"
+                      class="ods-skeleton animate-pulse motion-reduce:animate-none bg-ods-skeleton [&_.ods-skeleton]:animate-none rounded-md h-4 w-4 shrink-0"
+                    />
                     <div
                       class="flex min-w-0 flex-col"
                     >

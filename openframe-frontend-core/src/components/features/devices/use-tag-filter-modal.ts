@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useContentLgUp, useContentMdUp, useContentXlUp } from '../../../hooks/ui/use-content-breakpoint';
+import { useDeviceStatusDisplay } from './device-status-display';
+import { DEVICE_CONNECTIVITY_FILTER_SECTION, splitStatusFilterValue } from './device-statuses';
 import type { DeviceFilters } from './types';
 
 function isCompleteTag(tag: string): boolean {
@@ -94,23 +96,34 @@ export function useTagFilterModal({
 
   // Only a host that draws the directory columns has the USER and SOURCES groups: another's list params stay untouched
   const hasDirectoryGroups = useMemo(() => columns.some(column => column.key === 'user'), [columns]);
+  // Only a list with a connectivity facet has the CONNECTIVITY group (`DEVICE_CONNECTIVITY_FILTER_SECTION`).
+  const hasConnectivityGroup = useMemo(
+    () => columns.some(column => column.key === DEVICE_CONNECTIVITY_FILTER_SECTION && column.filterOptions?.length),
+    [columns],
+  );
+
+  // The legacy status display offers Online / Offline inside STATUS (`connectivity:ONLINE`): they go to `connectivity`.
+  const legacyStatus = useDeviceStatusDisplay() === 'legacy';
 
   // Step 2: combine with buffered filters and flush (called second by FilterModal)
   const handleTagsChange = useCallback(
     (newTags: string[]) => {
       const cf = pendingFiltersRef.current;
+      const status = splitStatusFilterValue(cf.status);
       setParams({
-        statuses: cf.status || [],
+        statuses: status.statuses,
         osTypes: cf.os || [],
         organizationIds: cf.organization || [],
         // FilterModal drops a group with nothing ticked, so a missing group clears its param
         ...(hasDirectoryGroups && { userLinks: cf.user || [], directorySources: cf.sources || [] }),
+        ...(hasConnectivityGroup && { connectivity: cf[DEVICE_CONNECTIVITY_FILTER_SECTION] || [] }),
+        ...(legacyStatus && { connectivity: status.connectivity }),
         tags: newTags.filter(isCompleteTag),
       });
       pendingFiltersRef.current = {};
       onApplied();
     },
-    [setParams, onApplied, hasDirectoryGroups],
+    [setParams, onApplied, hasDirectoryGroups, hasConnectivityGroup, legacyStatus],
   );
 
   return {

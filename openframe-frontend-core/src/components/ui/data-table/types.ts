@@ -22,6 +22,36 @@ export interface DataTableFilterOption {
   count?: number;
 }
 
+/** An extra group in a column's filter dropdown: see `meta.filter.sections`. */
+export interface DataTableFilterSection {
+  id: string;
+  title: string;
+  options: DataTableFilterOption[];
+}
+
+/** A section option as the column's filter value holds it: `<section id>:<value>`. */
+export function filterSectionValue(sectionId: string, value: string): string {
+  return `${sectionId}:${value}`;
+}
+
+/**
+ * A column's filter value split back into the column's own values and each section's, by the `<section id>:`
+ * prefix of `filterSectionValue`. Values with no known prefix are the column's own.
+ */
+export function splitFilterSectionValues(
+  values: readonly string[] | undefined,
+  sectionIds: readonly string[],
+): { own: string[]; sections: Record<string, string[]> } {
+  const sections: Record<string, string[]> = Object.fromEntries(sectionIds.map(id => [id, [] as string[]]));
+  const own: string[] = [];
+  for (const value of values ?? []) {
+    const id = sectionIds.find(sectionId => value.startsWith(`${sectionId}:`));
+    if (id) sections[id].push(value.slice(id.length + 1));
+    else own.push(value);
+  }
+  return { own, sections };
+}
+
 /**
  * The options a filter UI has selected, per column: the option ids `FiltersDropdown` emits, keyed by column id. What
  * `FilterModal` and `ListPageLayout`'s mobile filters take and hand back.
@@ -56,6 +86,12 @@ declare module '@tanstack/react-table' {
      */
     filter?: {
       options: DataTableFilterOption[];
+      /**
+       * More groups in the same dropdown, under their own titles (the devices STATUS funnel's "Connectivity").
+       * They share the column's filter value: a picked option of a section is stored as `<section id>:<value>`
+       * (`filterSectionValue`), so the host splits them back out with `splitFilterSectionValues`.
+       */
+      sections?: DataTableFilterSection[];
       placement?: 'bottom-start' | 'bottom-end' | 'bottom';
       /** Options are in flight — draw the funnel, inert, instead of hiding it. */
       pending?: boolean;

@@ -23,24 +23,46 @@ export type {
   SubTab,
 } from './device-selector/device-selector.types';
 export { EMPTY_NARROWING, narrowingToFilter } from './device-selector/narrowing';
+export { DeviceConnectivityIcon, type DeviceConnectivityIconProps } from './device-connectivity-icon';
+export { DeviceLifecycleTag, type DeviceLifecycleTagProps, deviceLifecycleTagProps } from './device-lifecycle-tag';
+export { type DeviceStatusDisplay, DeviceStatusDisplayProvider, useDeviceStatusDisplay } from './device-status-display';
 export {
   type DeviceCardStatus,
+  type DeviceConnectivityConfig,
+  type DeviceLifecycleConfig,
+  type DeviceLifecycleIcon,
   type DeviceStatusConfig,
   type DeviceStatusVariant,
+  getDeviceConnectivityConfig,
+  getDeviceLifecycleConfig,
   getDeviceOperatingSystem,
   getDeviceStatusConfig,
+  getLegacyDeviceStatusConfig,
 } from './device-status';
 export {
   DEFAULT_DASHBOARD_STATUSES,
   DEFAULT_DEVICES_LIST_STATUSES,
   DEFAULT_VISIBLE_STATUSES,
   type DefaultVisibleStatus,
+  DEVICE_CONNECTIVITY,
+  DEVICE_CONNECTIVITY_FILTER_SECTION,
+  DEVICE_CONNECTIVITY_VALUES,
   DEVICE_ENRICHMENT_FILTER,
   DEVICE_ENRICHMENT_STATUSES,
   DEVICE_STATUS,
+  type DeviceConnectivity,
+  deviceStatusFilterGroups,
   type DeviceStatus,
+  expandDeviceStatuses,
   HIDDEN_DEVICE_STATUSES,
   type HiddenDeviceStatus,
+  isDeviceConnected,
+  isManagedStatus,
+  joinStatusFilterValue,
+  MANAGED_STATUSES,
+  mergeStatusFacets,
+  splitStatusFilterValue,
+  toUiDeviceStatus,
 } from './device-statuses';
 export { DeviceTagsFilterButton } from './device-tags-filter-button';
 export { renderDeviceTypeIcon } from './device-type-icon';
