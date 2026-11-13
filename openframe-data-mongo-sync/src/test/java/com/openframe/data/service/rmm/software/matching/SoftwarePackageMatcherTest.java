@@ -46,6 +46,21 @@ class SoftwarePackageMatcherTest {
     }
 
     @Test
+    void match_brewPrograms_matchedByTheBrewMatcher() {
+        // setup
+        InstalledProgram wget = program("wget", FleetSource.HOMEBREW_PACKAGES);
+        PackageMatch match = PackageMatch.noPackage();
+        when(wingetMatcher.getManager()).thenReturn(PackageManagerType.BREW);
+        when(wingetMatcher.match(List.of(wget))).thenReturn(List.of(match));
+
+        // execution
+        Map<InstalledProgram, PackageMatch> matches = matcher(wingetMatcher).match(List.of(wget));
+
+        // verifications
+        assertThat(matches).containsEntry(wget, match);
+    }
+
+    @Test
     void match_programsNoMatcherTakes_leftOut() {
         // setup
         when(wingetMatcher.getManager()).thenReturn(PackageManagerType.WINGET);

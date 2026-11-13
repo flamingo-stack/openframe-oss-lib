@@ -1,5 +1,6 @@
 package com.openframe.data.repository.rmm.software;
 
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.PackageMatchState;
 import com.openframe.data.document.rmm.software.Software;
@@ -25,6 +26,7 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
 
     private static final String SOURCE = "source";
     private static final String MATCH_STATE = "packageMatch.state";
+    private static final String MATCH_MANAGER = "packageMatch.manager";
     private static final String TITLE_ID = "softwareTitleId";
     private static final String BREW_SOURCE = FleetSource.HOMEBREW_PACKAGES.getFleetName();
 
@@ -87,7 +89,8 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
         Criteria installed = Criteria.where(SOURCE).in(titles.getInstallerSources());
         chosen.add(installed);
         if (titles.isMatchedChosen()) {
-            Criteria matched = Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED);
+            Criteria matched = Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED)
+                    .and(MATCH_MANAGER).is(PackageManagerType.WINGET);
             chosen.add(matched);
         }
         if (titles.isUnmanagedChosen()) {
@@ -104,7 +107,7 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
         return new Criteria().orOperator(chosen);
     }
 
-    // a brew title the brew catalog lacks shows NO_PACKAGE on its row and is OFF here: the read model does not store it
+    // a brew title projected before brew titles were matched has no match state yet and stays OFF until its next sync
     private static Criteria autoUpdate(SoftwareAutoUpdateStatus status, SoftwareTitleQuery titles) {
         return switch (status) {
             case ON -> Criteria.where(TITLE_ID).in(titles.getEnabledPolicyTitleIds());
@@ -112,7 +115,7 @@ public class CustomSoftwareRepositoryImpl implements CustomSoftwareRepository {
                     Criteria.where(TITLE_ID).in(titles.getPolicyTitleIds()).nin(titles.getEnabledPolicyTitleIds()),
                     withoutPolicy(titles).orOperator(
                             Criteria.where(MATCH_STATE).is(PackageMatchState.MATCHED),
-                            Criteria.where(SOURCE).is(BREW_SOURCE)));
+                            Criteria.where(SOURCE).is(BREW_SOURCE).and(MATCH_STATE).ne(PackageMatchState.NO_PACKAGE)));
             case NO_PACKAGE -> withoutPolicy(titles).and(MATCH_STATE).is(PackageMatchState.NO_PACKAGE);
             case NEEDS_ADOPTION -> Criteria.where(TITLE_ID).in(List.of());
         };

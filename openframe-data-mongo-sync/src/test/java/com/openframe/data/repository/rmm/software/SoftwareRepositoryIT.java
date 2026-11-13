@@ -147,6 +147,28 @@ class SoftwareRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(names(manageableOff)).containsExactlyInAnyOrder("Google Chrome", "node");
     }
 
+    @Test
+    @DisplayName("brew titles: one the brew catalog lacks is NO_PACKAGE and not OFF; a matched one is OFF and is not a winget title")
+    void findTitles_brewTitles_followTheirStoredMatch() {
+        repository.saveAll(List.of(
+                title(TENANT, 8L, "tapped-tool", "homebrew_packages", brewMatch(PackageMatchState.NO_PACKAGE), 1, 0),
+                title(TENANT, 9L, "wget", "homebrew_packages", brewMatch(PackageMatchState.MATCHED), 1, 0)));
+        SoftwareTitleQuery noPackage = titles().autoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.NO_PACKAGE))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).build();
+        SoftwareTitleQuery off = titles().autoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.OFF))
+                .enabledPolicyTitleIds(Set.of()).policyTitleIds(Set.of()).build();
+        SoftwareTitleQuery winget = titles().installerSources(Set.of("winget_packages")).matchedChosen(true).build();
+
+        assertThat(names(noPackage)).containsExactlyInAnyOrder("Contoso Tool", "tapped-tool");
+        assertThat(names(off)).containsExactlyInAnyOrder("Google Chrome", "node", "wget");
+        assertThat(names(winget)).containsExactly("Google Chrome");
+    }
+
+    private static SoftwarePackageMatch brewMatch(PackageMatchState state) {
+        PackageManagerType manager = state == PackageMatchState.MATCHED ? PackageManagerType.BREW : null;
+        return SoftwarePackageMatch.builder().state(state).manager(manager).build();
+    }
+
     private static SoftwareTitleQuery autoUpdate(SoftwareAutoUpdateStatus... statuses) {
         return titles().autoUpdateStatuses(List.of(statuses))
                 .enabledPolicyTitleIds(Set.of(2L)).policyTitleIds(Set.of(2L, 4L)).build();
