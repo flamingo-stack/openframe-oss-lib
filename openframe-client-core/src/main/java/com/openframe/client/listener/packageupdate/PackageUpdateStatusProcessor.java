@@ -73,12 +73,13 @@ public class PackageUpdateStatusProcessor {
         executionRecorder.record(request, machineId, event);
         deviceStateRepository.save(state);
         log.info("[package-update] status applied requestId={} machineId={} eventId={} state={} status={} "
-                        + "waitingReason={} waitingPhase={} closesAt={} doneResult={} rebootRequired={} relaunched={} "
+                        + "waitingReason={} waitingPhase={} closesAt={} postponedUntil={} doneResult={} "
+                        + "rebootRequired={} relaunched={} "
                         + "failedReason={} exitCode={} failedMessage={} deadlineAt={}",
                 requestId, machineId, event.getEventId(), state.getState(), state.getStatus(),
-                state.getWaitingReason(), state.getWaitingPhase(), state.getClosesAt(), state.getDoneResult(),
-                state.getRebootRequired(), state.getRelaunched(), state.getFailedReason(), state.getExitCode(),
-                state.getFailedMessage(), state.getDeadlineAt());
+                state.getWaitingReason(), state.getWaitingPhase(), state.getClosesAt(), state.getPostponedUntil(),
+                state.getDoneResult(), state.getRebootRequired(), state.getRelaunched(), state.getFailedReason(),
+                state.getExitCode(), state.getFailedMessage(), state.getDeadlineAt());
 
         rollUp(tenantId, requestId, request);
     }
