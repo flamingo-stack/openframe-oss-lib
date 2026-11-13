@@ -10,32 +10,25 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { isSourcePart, textOfParts, type ChatMessage } from '../../../../chat-protocol/chat-message';
 import type { HistoricalMessage } from '../../types';
 import { processHistoricalMessages } from '../process-historical-messages';
 
 const SOURCE = {
-  index: 1,
-  name: 'Install the OpenFrame Agent on Windows',
-  path: 'onboarding-guides/install-the-openframe-agent-on-windows',
-  documentType: 'onboarding_guide',
-  id: '88dd40cc',
-  sourceRepo: 'onboarding-guides',
+  sourceId: 'record://onboarding_guide/88dd40cc',
+  url: 'https://www.flamingo.run/onboarding-guides/install-the-openframe-agent-on-windows',
+  title: 'Install the OpenFrame Agent on Windows',
 };
 
+const SOURCE_PART = { type: 'source-url', ...SOURCE };
+
 /** The metadata row, as the backend persists it. */
-const metadataRow = (id: string, createdAt: string): HistoricalMessage => ({
+const metadataRow = (id: string, createdAt: string, sources: unknown[] = [SOURCE]): HistoricalMessage => ({
   id,
   chatType: 'ADMIN_AI_CHAT',
   createdAt,
   owner: { type: 'ASSISTANT' },
-  messageData: [
-    {
-      type: 'ATTACHMENTS',
-      sources: [SOURCE],
-      videos: [],
-      cards: [{ ref: '[card://onboarding_guide:88dd40cc]', entityType: 'onboarding_guide', entityId: '88dd40cc' }],
-    },
-  ],
+  parts: [{ type: 'ATTACHMENTS', sources }],
 });
 
 const answerRow = (id: string, createdAt: string, text: string): HistoricalMessage => ({
@@ -43,7 +36,7 @@ const answerRow = (id: string, createdAt: string, text: string): HistoricalMessa
   chatType: 'ADMIN_AI_CHAT',
   createdAt,
   owner: { type: 'ASSISTANT' },
-  messageData: [{ type: 'TEXT', text }],
+  parts: [{ type: 'TEXT', text }],
 });
 
 const userRow = (id: string, createdAt: string): HistoricalMessage => ({
@@ -51,44 +44,23 @@ const userRow = (id: string, createdAt: string): HistoricalMessage => ({
   chatType: 'ADMIN_AI_CHAT',
   createdAt,
   owner: { type: 'ADMIN' },
-  messageData: [{ type: 'TEXT', text: 'How do I install the agent?' }],
+  parts: [{ type: 'TEXT', text: 'How do I install the agent?' }],
 });
+
+const sourcesOf = (message: ChatMessage) => message.parts.filter(isSourcePart);
 
 describe('processHistoricalMessages — source metadata', () => {
   it('attaches a metadata row to the answer it precedes', () => {
     const { messages } = processHistoricalMessages([
       userRow('u1', '2026-08-26T09:00:00Z'),
       metadataRow('m1', '2026-08-26T09:00:01Z'),
-      answerRow('a1', '2026-08-26T09:00:02Z', 'Use this guide [1].'),
+      answerRow('a1', '2026-08-26T09:00:02Z', 'Use this guide.'),
     ]);
 
     const answer = messages[messages.length - 1];
     expect(answer.role).toBe('assistant');
-    expect(answer.sources).toEqual([SOURCE]);
-    expect(answer.refs).toEqual([
-      {
-        type: 'onboarding_guide',
-        id: '88dd40cc',
-        // Enriched off the matching source — the card row carries no title.
-        title: SOURCE.name,
-        url: null,
-        sourceRepo: 'onboarding-guides',
-        metadata: { path: SOURCE.path },
-      },
-    ]);
-  });
-
-  it('still replays the GUIDE envelope the row used to arrive in', () => {
-    const { messages } = processHistoricalMessages([
-      userRow('u1', '2026-08-26T09:00:00Z'),
-      {
-        ...metadataRow('m1', '2026-08-26T09:00:01Z'),
-        messageData: [{ type: 'GUIDE', payload: { sources: [SOURCE] } }],
-      },
-      answerRow('a1', '2026-08-26T09:00:02Z', 'Use this guide [1].'),
-    ]);
-
-    expect(messages[messages.length - 1].sources).toEqual([SOURCE]);
+    expect(sourcesOf(answer)).toEqual([SOURCE_PART]);
+    expect(textOfParts(answer.parts)).toBe('Use this guide.');
   });
 
   it('does not render a metadata-only row as its own empty bubble', () => {
@@ -101,25 +73,35 @@ describe('processHistoricalMessages — source metadata', () => {
     expect(messages.filter(m => m.role === 'assistant')).toHaveLength(1);
   });
 
-  it('keeps each answer’s metadata on its own answer', () => {
-    // The reason this is per-message at all: two turns, two different sets.
-    const secondSource = { ...SOURCE, index: 1, name: 'Configure Your Tenant Settings', id: 'other' };
+  it('a metadata row with no answer after it draws nothing', () => {
     const { messages } = processHistoricalMessages([
       userRow('u1', '2026-08-26T09:00:00Z'),
       metadataRow('m1', '2026-08-26T09:00:01Z'),
-      answerRow('a1', '2026-08-26T09:00:02Z', 'First answer [1].'),
+    ]);
+
+    expect(messages.map(m => m.role)).toEqual(['user']);
+  });
+
+  it('keeps each answer’s metadata on its own answer', () => {
+    // The reason this is per-message at all: two turns, two different sets.
+    const second = {
+      sourceId: 'record://onboarding_guide/other',
+      url: 'https://www.flamingo.run/onboarding-guides/configure',
+      title: 'Configure Your Tenant Settings',
+    };
+    const { messages } = processHistoricalMessages([
+      userRow('u1', '2026-08-26T09:00:00Z'),
+      metadataRow('m1', '2026-08-26T09:00:01Z'),
+      answerRow('a1', '2026-08-26T09:00:02Z', 'First answer.'),
       userRow('u2', '2026-08-26T09:01:00Z'),
-      {
-        ...metadataRow('m2', '2026-08-26T09:01:01Z'),
-        messageData: [{ type: 'ATTACHMENTS', sources: [secondSource], videos: [], cards: [] }],
-      },
-      answerRow('a2', '2026-08-26T09:01:02Z', 'Second answer [1].'),
+      metadataRow('m2', '2026-08-26T09:01:01Z', [second]),
+      answerRow('a2', '2026-08-26T09:01:02Z', 'Second answer.'),
     ]);
 
     const answers = messages.filter(m => m.role === 'assistant');
     expect(answers).toHaveLength(2);
-    expect(answers[0].sources?.[0].name).toBe(SOURCE.name);
-    expect(answers[1].sources?.[0].name).toBe(secondSource.name);
+    expect(sourcesOf(answers[0])).toEqual([SOURCE_PART]);
+    expect(sourcesOf(answers[1])).toEqual([{ type: 'source-url', ...second }]);
   });
 
   it('leaves an answer with no metadata untouched', () => {
@@ -128,25 +110,19 @@ describe('processHistoricalMessages — source metadata', () => {
       answerRow('a1', '2026-08-26T09:00:02Z', 'Plain answer.'),
     ]);
 
-    const answer = messages[messages.length - 1];
-    expect(answer).not.toHaveProperty('sources');
-    expect(answer).not.toHaveProperty('refs');
+    expect(sourcesOf(messages[messages.length - 1])).toEqual([]);
   });
 
-  it('unions metadata from several tool calls in one turn', () => {
+  it('unions metadata from several tool calls in one turn, each source once', () => {
+    const second = { sourceId: 'record://faq/2', url: 'https://www.flamingo.run/faqs', title: 'Second tool result' };
     const { messages } = processHistoricalMessages([
       userRow('u1', '2026-08-26T09:00:00Z'),
       metadataRow('m1', '2026-08-26T09:00:01Z'),
-      {
-        ...metadataRow('m2', '2026-08-26T09:00:02Z'),
-        messageData: [
-          { type: 'ATTACHMENTS', sources: [{ index: 2, name: 'Second tool result' }], videos: [], cards: [] },
-        ],
-      },
-      answerRow('a1', '2026-08-26T09:00:03Z', 'Both [1] and [2].'),
+      metadataRow('m2', '2026-08-26T09:00:02Z', [SOURCE, second]),
+      answerRow('a1', '2026-08-26T09:00:03Z', 'Both.'),
     ]);
 
     const answer = messages[messages.length - 1];
-    expect(answer.sources?.map(source => source.index)).toEqual([1, 2]);
+    expect(sourcesOf(answer).map(source => source.sourceId)).toEqual([SOURCE.sourceId, second.sourceId]);
   });
 });

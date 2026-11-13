@@ -26,7 +26,6 @@ export type OwnerType = (typeof OWNER_TYPE)[keyof typeof OWNER_TYPE];
 export const MESSAGE_ROLE = {
   USER: 'user',
   ASSISTANT: 'assistant',
-  ERROR: 'error',
   SYSTEM: 'system',
 } as const;
 
@@ -63,6 +62,14 @@ export const APPROVAL_STATUS = {
 } as const;
 
 export type ChatApprovalStatus = (typeof APPROVAL_STATUS)[keyof typeof APPROVAL_STATUS];
+
+/**
+ * Where an approval's tool part stands: the answer it got, `approving`, approved here and the server has said nothing yet,
+ * `failed`, approved and then refused or failed (an expired proposal, a tool that errored), so that nothing can read as
+ * approved, or `unknown`, approved and then cut off before anything said how it ended. Each is a fact about a part and
+ * nobody answers it, so no status map holds it.
+ */
+export type ChatApprovalPartStatus = ChatApprovalStatus | 'approving' | 'failed' | 'unknown';
 
 // ========== Approval Block Variant Definitions ==========
 
@@ -115,7 +122,10 @@ export interface MessageOwner {
   type: OwnerType;
   machineId?: string;
   userId?: string;
+  /** An assistant row's model id, its label and its provider. */
   model?: string;
+  modelName?: string;
+  providerName?: string;
   user?: {
     id: string;
     firstName?: string;
@@ -126,41 +136,6 @@ export interface MessageOwner {
     image?: { imageUrl?: string | null } | null;
   };
 }
-
-// ========== Content-shape helpers ==========
-
-import type { MessageContent, MessageSegment } from './message.types';
-
-/** Helper function to check if content is structured (segment array). */
-export function isStructuredContent(content: MessageContent): content is MessageSegment[] {
-  return Array.isArray(content);
-}
-
-/** Normalize either a string or segment array into a uniform segment array. */
-export function normalizeContent(content: MessageContent): MessageSegment[] {
-  if (typeof content === 'string') {
-    return content ? [{ type: 'text', text: content }] : [];
-  }
-  return content;
-}
-
-// ========== SSE event data shapes (wire shapes) ==========
-
-export interface TextEventData {
-  type: 'TEXT';
-  text: string;
-}
-
-export interface ToolExecutionEventData {
-  type: 'EXECUTING_TOOL' | 'EXECUTED_TOOL';
-  integratedToolType: string;
-  toolFunction: string;
-  parameters?: Record<string, unknown>;
-  result?: string;
-  success?: boolean;
-}
-
-export type SSEEventData = TextEventData | ToolExecutionEventData;
 
 // ========== Quick-action chip shape ==========
 

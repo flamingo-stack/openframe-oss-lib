@@ -1,103 +1,137 @@
 /**
- * Where an inline chat card goes when clicked: THE one decision, pure.
+ * Where a record goes when clicked: THE one decision, pure, for every surface that shows a record (its card, its chip in
+ * a sentence, a citation, a row of the sources strip, a search result).
  *
- * A card and the source chip for the same row must land on the same page. The
- * chip always has its row (`externalUrl`, `path`); a card may arrive as a bare
- * `[card://type:id]` marker and learn the rest only when its row loads. So the
- * card asks the chip's resolver (`resolveSourceRowCTA`) with everything known
- * at that moment, the marker's fields first and the fetched row's `path` when
- * the marker had none, and falls back to the fetched row's own destination
- * (`pickFetchedCardHref`) only when that resolver has nothing to route.
- *
- * `ChatCardLoader` calls this once per render; nothing else decides a card's
- * href. No React, no DOM.
+ * Every surface must land on the same page. The server answers every record's url: on its source part (`chatRef.url`)
+ * or on the row the card fetched (`item.url`). The surface asks the row resolver (`resolveSourceRowCTA`) with it, the
+ * host's composer decides where that type lives, and a relative href is a route of the host's own (`hostRoute`), which
+ * the click router keeps on the host in every mode, embed included. `resolveRecordDestination` adds the new-tab
+ * decision (`navLinkTarget`) the anchor renders with; `RecordAnchor` (entity-cards/dispatch.tsx) opens it through
+ * `RecordNavWrap`. No React, no DOM.
  */
 
-import type { ComposeContentUrl } from '../../../utils/content-href';
+import type { ChatRuntime } from '../../../contexts/chat-runtime-context';
+import { platformOfUrl } from '../../../platform-domains';
 import type { ChatRef } from '../chat-ref.types';
-import { safeHref } from './compact-card-classes';
-import { pickFetchedCardHref, readFetchedCardPath, resolveFetchedCardHref } from './resolve-fetched-card-href';
-import { resolveSourceRowCTA, type SourceRowContext } from './source-row-cta';
-
-/** Which rule produced the destination (for tests and debugging). */
-export type CardDestinationSource = 'row' | 'hostOverride' | 'item' | 'composed' | 'none';
+import { navLinkTarget } from './nav-anchor-props';
+import { isRelativeHref } from './new-tab-rel';
+import {
+  resolveSourceRowCTA,
+  type SourceRowContext,
+  type SourceRowCTA,
+  type SourceRowInput,
+  sourceRowCtxFromRuntime,
+} from './source-row-cta';
 
 export interface CardDestination {
   url: string | null;
   targetPlatform: string | null;
-  /** Doc-tree path, from the ref or the fetched row. The click router uses it for in-app doc navigation. */
+  /** Doc-tree path, from the ref. The click router uses it for in-app doc navigation. */
   path: string | null;
-  source: CardDestinationSource;
+  /**
+   * The url is a route of the host's own. The server's url is always absolute, so a relative href the composer made of it
+   * can only be a route the host claimed.
+   */
+  hostRoute: boolean;
 }
 
-/** The routing fields of a card registry entry, generic over the row type the entry reads. */
-export interface CardDestinationEntry<Item> {
-  contentRefType?: string;
-  fallbackHref?: (item: Item) => string | null;
-  noComposedHref?: boolean;
-}
-
-export interface CardDestinationInput<Item = unknown> {
-  /** The ref the card was mounted with: a full ref, or a bare marker (`url: null`, no metadata). */
+export interface CardDestinationInput {
+  /** The ref the card was mounted with: described by a source part, or a bare record (`url: null`). */
   chatRef: ChatRef;
   /** The row the card fetched; undefined while loading and for ref-only types. */
-  item?: Item;
-  /** The registry entry's routing fields. */
-  entry?: CardDestinationEntry<Item> | null;
-  /** `sourceRowCtxFromRuntime(runtime, surface)`, the same context a source chip is resolved with. */
+  item?: unknown;
+  /** `sourceRowCtxFromRuntime(runtime)`, the same context a source chip is resolved with. */
   ctx: SourceRowContext;
-  /** The host's content-href seam (`runtime.composeContentUrl`). */
-  composeContentUrl?: ComposeContentUrl;
-  /** Embed-mode origin prefix (`resolveHrefForRuntime`), applied to a row-resolved href. */
-  resolveHref?: (href: string) => string;
 }
 
-export function resolveCardDestination<Item = unknown>({
-  chatRef,
-  item,
-  entry,
-  ctx,
-  composeContentUrl,
-  resolveHref = href => href,
-}: CardDestinationInput<Item>): CardDestination {
-  const refPath = typeof chatRef.metadata?.path === 'string' && chatRef.metadata.path ? chatRef.metadata.path : null;
-  const path = refPath ?? (item ? readFetchedCardPath(item) : null);
+/** The url the fetched row answers (the one rule on the server), or null. */
+function readFetchedCardUrl(item: unknown): string | null {
+  if (!item || typeof item !== 'object') return null;
+  const { url } = item as { url?: unknown };
+  return typeof url === 'string' && url ? url : null;
+}
 
-  // 1. The chip's resolver, with the row as far as it is known.
-  const cta = resolveSourceRowCTA(
-    {
-      sourceRepo: chatRef.sourceRepo,
-      documentType: chatRef.type,
-      id: chatRef.id,
-      title: chatRef.title,
-      externalUrl: chatRef.url,
-      targetPlatform: chatRef.targetPlatform,
-      path,
-    },
-    ctx,
-  );
-  const rowUrl = cta.href ? resolveHref(cta.href) : (chatRef.url ?? null);
-  const rowPlatform = cta.targetPlatform ?? chatRef.targetPlatform ?? null;
-  if (rowUrl) return { url: rowUrl, targetPlatform: rowPlatform, path, source: 'row' };
-
-  // 2. The fetched row's own destination: an explicit host override, else the
-  //    registry's `fallbackHref`, else the host seam's composed href.
-  if (entry?.contentRefType && item) {
-    const choice = pickFetchedCardHref({
-      composed: resolveFetchedCardHref({
-        contentRefType: entry.contentRefType,
-        id: chatRef.id,
-        item,
-        composeContentUrl,
-      }),
-      itemHref: entry.fallbackHref?.(item) ?? null,
-      allowComposed: !entry.noComposedHref,
-    });
-    const url = choice ? (safeHref(choice.href) ?? null) : null;
-    if (choice && url) {
-      // The `item` branch carries no platform of its own: keep the ref's.
-      return { url, targetPlatform: choice.targetPlatform ?? rowPlatform, path, source: choice.source };
-    }
+/**
+ * Human title of a fetched row: `title`, else `name`, else null.
+ *
+ * A bare record ref carries no title of its own. Everything downstream that prints or sends the title (the "Ask Mingo"
+ * prompt, host renderers falling back to `ref.title`) would otherwise say `86ad3qvv5`. Once the row loads, this is the
+ * real title.
+ */
+export function readFetchedCardTitle(item: unknown): string | null {
+  if (!item || typeof item !== 'object') return null;
+  for (const key of ['title', 'name'] as const) {
+    const value = (item as Record<string, unknown>)[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
   }
-  return { url: null, targetPlatform: rowPlatform, path, source: 'none' };
+  return null;
+}
+
+/** The row a card's ref and its fetched row describe, in the words the row resolver reads. */
+export function recordRowOf({ chatRef, item }: Pick<CardDestinationInput, 'chatRef' | 'item'>): SourceRowInput {
+  const url = chatRef.url ?? readFetchedCardUrl(item);
+  const path = typeof chatRef.metadata?.path === 'string' && chatRef.metadata.path ? chatRef.metadata.path : null;
+  return {
+    documentType: chatRef.type,
+    id: chatRef.id,
+    title: chatRef.title,
+    externalUrl: url,
+    targetPlatform: platformOfUrl(url),
+    path,
+  };
+}
+
+function destinationOf(
+  row: SourceRowInput,
+  ctx: SourceRowContext,
+): { cta: SourceRowCTA; destination: CardDestination } {
+  const cta = resolveSourceRowCTA(row, ctx);
+  const path = row.path ?? null;
+  if (!cta.href) return { cta, destination: { url: null, targetPlatform: null, path, hostRoute: false } };
+  return {
+    cta,
+    destination: { url: cta.href, targetPlatform: cta.targetPlatform, path, hostRoute: isRelativeHref(cta.href) },
+  };
+}
+
+/** Where the card opens: the row resolver over the url the server answers. No url is no link. */
+export function resolveCardDestination({ chatRef, item, ctx }: CardDestinationInput): CardDestination {
+  return destinationOf(recordRowOf({ chatRef, item }), ctx).destination;
+}
+
+/** Where a record opens, and in which tab: what `RecordAnchor` renders, and the row's CTA (its icon, its Ask ref). */
+export interface RecordDestination extends CardDestination {
+  /** The new-tab decision, the one the anchor's `target` and the click router share (`navLinkTarget`). */
+  isNewTab: boolean;
+  cta: SourceRowCTA;
+}
+
+/**
+ * Where a record opens in this chat: THE resolver of every surface (card, record chip, citation, source row, search
+ * result), over the host's composer, with the new-tab decision made once with the same `hostRoute` the click router
+ * gets.
+ */
+export function resolveRecordDestination(row: SourceRowInput, runtime: ChatRuntime): RecordDestination {
+  const { cta, destination } = destinationOf(row, sourceRowCtxFromRuntime(runtime));
+  const isNewTab = destination.url
+    ? navLinkTarget(runtime, destination.url, destination.targetPlatform, { hostRoute: destination.hostRoute }).isNewTab
+    : false;
+  return { ...destination, isNewTab, cta };
+}
+
+/** What a record's anchor opens: a destination that has a url. */
+export interface RecordLinkTarget {
+  url: string;
+  targetPlatform: string | null;
+  path: string | null;
+  hostRoute: boolean;
+  isNewTab: boolean;
+}
+
+/** The anchor's target of a destination, or null when it opens nothing. */
+export function recordLinkTargetOf(
+  destination: Omit<RecordLinkTarget, 'url'> & { url: string | null },
+): RecordLinkTarget | null {
+  const { url, targetPlatform, path, hostRoute, isNewTab } = destination;
+  return url ? { url, targetPlatform, path, hostRoute, isNewTab } : null;
 }

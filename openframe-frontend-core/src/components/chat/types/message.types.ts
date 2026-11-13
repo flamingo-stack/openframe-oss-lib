@@ -1,12 +1,11 @@
 /**
- * Message-related types
- * Contains all message structures, segments, and content types
+ * Message-related types. The message itself is `ChatMessage` (`chat-protocol/chat-message`), one shape in memory, on the
+ * wire and in a stored row. What is here: the Mingo wire's vocabulary, what a persisted Mingo row holds, and the shapes a
+ * card draws.
  */
 
 import type { ApprovalLevel } from '../../../types/permissions';
-import type { ChatRef } from '../chat-ref.types';
-import type { QuickActionIconSpec } from '../quick-action-chip';
-import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from './chat.types';
+import type { MessageOwner } from './chat.types';
 
 // ========== Message Type Definitions ==========
 
@@ -14,13 +13,12 @@ export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
   ASK: 'ASK',
-  /** Per-answer attachments (cited documents, videos, entity cards).
-   *
-   *  `ATTACHMENTS` carries `sources` / `videos` / `cards` on the record itself.
-   *  `GUIDE` is the envelope it replaced — the same arrays under `payload` —
-   *  and stays only until every backend ships `ATTACHMENTS`. */
+  /** The records an answer was given: `sources` on the entry, what becomes its source parts. */
   ATTACHMENTS: 'ATTACHMENTS',
-  GUIDE: 'GUIDE',
+  /** The records the answer shows as cards, chosen by the model's `show_records`
+   *  tool call and checked by the server: a part of the message of its own, drawn
+   *  where the call was made. A record named in the text is a chip, never a card. */
+  RECORD_CARDS: 'RECORD_CARDS',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
@@ -45,8 +43,8 @@ export type MessageType = (typeof MESSAGE_TYPE)[keyof typeof MESSAGE_TYPE];
 
 // ========== Scroll Anchor (per-message render hint) ==========
 
-/** Per-message viewport-positioning hint sent on the per-turn metadata
- *  leading frame at the START of every assistant response. The chat
+/** Per-message viewport-positioning hint sent on the per-turn
+ *  `message-metadata` chunk at the START of every assistant response. The chat
  *  message-list reads it to override the default `use-stick-to-bottom`
  *  tail behaviour for a single message. Field is OPTIONAL — when omitted
  *  (or set to `'bottom'`) the chat tails as today. Only `'top'` opts in
@@ -59,11 +57,11 @@ export type ScrollAnchor = (typeof SCROLL_ANCHOR)[keyof typeof SCROLL_ANCHOR];
 // ========== Policy Review Types ==========
 
 /** One guardrail rule the command review matched (ai-agent `PolicyReviewRule`). */
-export interface PolicyReviewRuleData {
+export type PolicyReviewRuleData = {
   code: string;
   /** The rule's name when it matched; the history keeps the name it had then. */
   label: string;
-}
+};
 
 /**
  * Why the security policy gave a tool call its approval level (ai-agent `PolicyReview`). Sent only while
@@ -71,7 +69,7 @@ export interface PolicyReviewRuleData {
  * strings: the backend is narrowing `decision` (`SOFT_DENY` / `HARD_DENY` become `DENY`), and a value
  * this build does not know must not drop the review. Normalized by `chat-protocol/policy-review`.
  */
-export interface PolicyReviewData {
+export type PolicyReviewData = {
   /** `CLASSIFIER` (the AI review) or `REGEX`. */
   source?: string;
   /** `POLICY`, `FALLBACK` (no rule of the policy matched), or a deny by a matched guardrail rule. */
@@ -84,7 +82,7 @@ export interface PolicyReviewData {
   matchedRules: PolicyReviewRuleData[];
   /** The review's one-line reason; absent from a regex review. */
   reason?: string;
-}
+};
 
 // ========== Tool Execution Types ==========
 
@@ -97,7 +95,7 @@ export interface ToolExecutionData {
   /**
    * Backend-issued human-readable explanation of what the tool is doing and why
    * (mirrors `PendingToolCallData.toolExplanation`). Only sent on `EXECUTING_TOOL`;
-   * the accumulator restores it onto the merged `EXECUTED_TOOL` segment.
+   * the row keeps it through its `EXECUTED_TOOL`.
    */
   toolExplanation?: string;
   /** The security policy's review of this call. Only sent on `EXECUTING_TOOL`, restored onto `EXECUTED_TOOL` like
@@ -114,29 +112,10 @@ export interface ToolExecutionData {
   statusLabel?: string;
   /**
    * Backend-issued id (matches `PendingToolCallData.toolExecutionRequestId`).
-   * When present, lets the accumulator merge this execution event into the
-   * matching approval batch row instead of emitting a standalone segment.
+   * When present, this run lands on the matching approval batch row instead of
+   * a row of its own.
    */
   toolExecutionRequestId?: string;
-}
-
-/**
- * Snapshot of an in-flight tool kept between the `EXECUTING_TOOL` and
- * `EXECUTED_TOOL` events. The backend only sends `toolTitle` on
- * `EXECUTING_TOOL`; carrying this state lets the accumulator restore it onto
- * the merged `EXECUTED_TOOL` segment instead of falling back to the raw
- * `toolFunction`.
- */
-export interface ExecutingToolState {
-  integratedToolType: string;
-  toolFunction: string;
-  /** Mirrors {@link ToolExecutionData.toolTitle}; absent on `EXECUTED_TOOL`. */
-  toolTitle?: string;
-  /** Mirrors {@link ToolExecutionData.toolExplanation}; absent on `EXECUTED_TOOL`. */
-  toolExplanation?: string;
-  /** Mirrors {@link ToolExecutionData.policyReview}; absent on `EXECUTED_TOOL`. */
-  policyReview?: PolicyReviewData;
-  parameters?: Record<string, unknown>;
 }
 
 // ========== Approval Request Types ==========
@@ -148,22 +127,6 @@ export interface ApprovalRequestField {
   /** Free-text value. Wraps and line-breaks are preserved
    *  (`whitespace-pre-wrap`). */
   value: string;
-}
-
-export interface ApprovalRequestData {
-  command: string;
-  /** Structured field list — preferred over `explanation`. When set,
-   *  the approval card renders a vertical label/value stack with
-   *  proper spacing. Falls back to `explanation` (a single paragraph)
-   *  when omitted. Keep BOTH when you want hosts on older lib
-   *  versions to still see the prose; new hosts should send only
-   *  `fields`. */
-  fields?: ApprovalRequestField[];
-  explanation?: string;
-  icon?: ReactNode;
-  requestId?: string;
-  approvalRequestId?: string;
-  approvalType?: string;
 }
 
 export interface ApprovalResultData {
@@ -217,7 +180,7 @@ export type TicketEventKind = (typeof TICKET_EVENT_KIND)[keyof typeof TICKET_EVE
 
 /** Ticket lifecycle receipt (`TICKET_EVENT`) — the ticket was resolved,
  *  reopened, etc. Same field names live (NATS chunk) and persisted
- *  (GraphQL `TicketEventData` inside `messageData`), so ONE mapper covers
+ *  (GraphQL `TicketEventData` among a message's `parts`), so ONE mapper covers
  *  both paths. All actor fields are optional: the event stays renderable
  *  when the backend can't attribute it. */
 export interface TicketEventData {
@@ -260,6 +223,10 @@ export interface ApprovalBatchExecutionState {
   status: 'executing' | 'done';
   result?: string;
   success?: boolean;
+  /** Nothing said how the row ended: no cross and no check, and `result` says so. */
+  outcomeUnknown?: boolean;
+  /** The server refused the answer sent for this row, and `result` is its sentence to a person, not a tool's raw output. */
+  refused?: boolean;
 }
 
 export interface ApprovalBatchData {
@@ -275,183 +242,35 @@ export interface ApprovalBatchData {
   executions?: Record<string, ApprovalBatchExecutionState>;
 }
 
-/** Approve/reject handler stamped onto approval segments. MAY resolve a
- *  boolean success flag — `false` means the confirm FAILED (expired
- *  proposal, network error); batch approve-all loops use it to tick the
- *  row's failure cross. `void` (legacy transports) is treated as
- *  success. Single source of truth for this signature — component
- *  props, accumulator callbacks, and adapters all reference it. */
+/** What a card's button calls. MAY resolve a boolean success flag: `false` means the confirm FAILED (expired proposal,
+ *  network error). `void` is treated as success. */
 export type ApprovalResolutionHandler = (requestId?: string) => void | boolean | Promise<void | boolean>;
 
-// ========== Message Segment Types ==========
-
-export type TextSegment = {
-  type: 'text';
-  text: string;
-};
-
-export type ThinkingSegment = {
-  type: 'thinking';
-  text: string;
-};
-
-/** One reading the assistant offers in an `ask` card. `label` is BOTH the row's
- *  headline and the exact text sent back when the row is picked — the backend's
- *  guide classifier resolves the user's next message against the labels it
- *  offered, so the reply must be the label verbatim. `description` is a short
- *  clarifying line rendered under it. */
+/** One reading the assistant offers in an ask card. `label` is BOTH the row's headline and the exact text sent back when
+ *  the row is picked: the backend's guide classifier resolves the user's next message against the labels it offered, so
+ *  the reply must be the label verbatim. `description` is a short clarifying line rendered under it. */
 export type AskOptionData = {
   label: string;
   description?: string;
 };
 
-/** Clarification card — the assistant asking WHICH reading of an ambiguous
- *  question it should answer, rendered as a heading plus a list of clickable
- *  options instead of prose bullets. NATS-only (the `ASK` chunk); the intro
- *  sentence riding the same chunk becomes an ordinary `text` segment in front
- *  of the card, so it goes through the normal markdown body pipeline. Unlike
- *  the three delta streams an ask arrives whole — it is never coalesced. */
-export type AskSegment = {
-  type: 'ask';
-  question: string;
-  options: AskOptionData[];
-};
-
-export type ToolExecutionSegment = {
-  type: 'tool_execution';
-  data: ToolExecutionData;
-};
-
-export type ApprovalRequestSegment = {
-  type: 'approval_request';
-  data: ApprovalRequestData & { approvalType?: string };
-  status?: ChatApprovalStatus;
-  /** Display name of the user who resolved the request; baked into the client
-   *  variant's full-text status pill ("Approved by {name}"). */
-  resolvedByName?: string | null;
-  onApprove?: ApprovalResolutionHandler;
-  onReject?: ApprovalResolutionHandler;
-};
-
-export type ApprovalBatchSegment = {
-  type: 'approval_batch';
-  data: ApprovalBatchData;
-  status?: ChatApprovalStatus;
-  /** Display name of the user who resolved the request; set when the batch is resolved (null/absent for system actions). */
-  resolvedByName?: string | null;
-  onApprove?: ApprovalResolutionHandler;
-  onReject?: ApprovalResolutionHandler;
-};
-
 /**
- * Ticket-escalation offer block. Visually the client approval card (same
- * Figma component), but a SEPARATE segment type on purpose: it resolves
- * through the ticket-escalation GraphQL mutations rather than the tool
- * approval endpoint, and hosts that hide pending tool approvals from the
- * thread must still render this one inline.
- *
- * `cancelled` is the wire's SUPERSEDED — the client typed over the offer.
+ * What a message's controls do. Parts are data and hold no callbacks, so a message's buttons reach these at render time:
+ * a stable object from each adapter, compared by reference in the message's memo. Each one is optional: a thread with no
+ * way to act draws its cards read-only.
  */
-export type EscalationOfferSegment = {
-  type: 'escalation_offer';
-  data: EscalationOfferData;
-  status?: ChatApprovalStatus;
-  resolvedByName?: string | null;
-  onApprove?: ApprovalResolutionHandler;
-  onReject?: ApprovalResolutionHandler;
-};
-
-/**
- * The conversation was handed off to a human technician. Decoded from the
- * `TICKET_ESCALATED` block, so it appears for every escalation path the
- * backend emits it for — including the inactivity auto-escalation, which
- * raises no offer and therefore has no offer state to infer from.
- */
-export type TicketEscalatedSegment = {
-  type: 'ticket_escalated';
-  data: TicketEscalatedData;
-};
-
-/**
- * Ticket lifecycle receipt (resolved / reopened / an unknown future kind).
- * Arrives as a standalone `TICKET_EVENT` chunk outside MESSAGE_START/END —
- * same delivery shape as `ticket_escalated`.
- *
- * `streamSeq` is the chunk's JetStream sequence, kept ON the segment because
- * it is the event's only stable identity: the accumulator upserts on it so a
- * redelivered chunk (catch-up over hydrated history) replaces rather than
- * stacks a second card, while two genuinely distinct events of the same kind
- * (resolve → reopen → resolve) keep distinct sequences and both render.
- */
-export type TicketEventSegment = {
-  type: 'ticket_event';
-  data: TicketEventData;
-  streamSeq?: number;
-  /** When THIS event happened (history: the persisted row's `createdAt`;
-   *  live: chunk arrival). Kept beside `streamSeq`, not in `data`: the
-   *  upsert's payload-equality fallback must keep matching a redelivered
-   *  chunk to its hydrated twin, and their times come from different clocks.
-   *  Without it the card inherits the surrounding assistant bubble's
-   *  timestamp — the FIRST row of the whole turn, so every lifecycle card
-   *  reads the same stale time. */
-  occurredAt?: Date;
-};
-
-export type ErrorSegment = {
-  type: 'error';
-  title: string;
-  details?: string;
-};
-
-export type ContextCompactionSegment = {
-  type: 'context_compaction';
-  status: 'started' | 'completed';
-  summary?: string;
-};
-
-/** One prompt a `suggestions` block offers: the chip shows `label`, and
- *  picking it hands `prompt` (absent: the label) to be sent. `icon` is a
- *  quick-action icon (a spec or a node). */
-export type SuggestionPrompt = {
-  label: string;
-  prompt?: string;
-  icon?: ReactNode | QuickActionIconSpec;
-};
-
-/** A titled row of prompts in a `suggestions` block (e.g. "Diagnose"). */
-export type SuggestionGroup = {
-  label: string;
-  prompts: SuggestionPrompt[];
-};
-
-/**
- * Prompts the assistant offers as chips, grouped under captions, with an
- * optional line under them. Never on the wire: a host builds it locally (the
- * "What to ask?" answer, see `useWhatToAsk`). Picking a chip calls `onPick`;
- * without one, inside an `EmbeddableChat` the prompt is sent in its open chat.
- */
-export type SuggestionsSegment = {
-  type: 'suggestions';
-  groups: SuggestionGroup[];
-  note?: string;
-  onPick?: (prompt: string) => void;
-};
-
-export type MessageSegment =
-  | TextSegment
-  | ThinkingSegment
-  | AskSegment
-  | ToolExecutionSegment
-  | ApprovalRequestSegment
-  | ApprovalBatchSegment
-  | EscalationOfferSegment
-  | TicketEscalatedSegment
-  | TicketEventSegment
-  | ErrorSegment
-  | ContextCompactionSegment
-  | SuggestionsSegment;
-
-export type MessageContent = string | MessageSegment[];
+export interface ChatMessageActions {
+  /** Approve a pending approval, by its `approval.id` or its batch's id. Resolves `false` when it failed. */
+  approve?: (id: string) => void | boolean | Promise<void | boolean>;
+  /** Reject a pending approval, by its `approval.id` or its batch's id. */
+  reject?: (id: string, reason?: string) => void | boolean | Promise<void | boolean>;
+  approveEscalation?: (id: string) => void | Promise<void>;
+  rejectEscalation?: (id: string) => void | Promise<void>;
+  /** Send a suggestion chip's prompt. */
+  pickSuggestion?: (prompt: string) => void;
+  /** Send an ask card's option, by its label verbatim: the backend resolves the reply against the labels it offered. */
+  selectAsk?: (label: string) => void;
+}
 
 // ========== Message Data Types (from GraphQL/API) ==========
 
@@ -473,77 +292,27 @@ export interface ThinkingMessageData extends MessageDataBase {
   text?: string;
 }
 
-/**
- * A document cited by an assistant answer, rendered as a chip under it.
- *
- * Lives here, beside `Message`, because BOTH transports produce it now: the SSE
- * adapter reads it off the per-turn metadata frame, and the NATS path decodes it
- * out of an `ATTACHMENTS` chunk. It used to be declared inside
- * `use-sse-chat-adapter`, which made "a Guide answer's citations" structurally a
- * property of one transport — `use-sse-chat-adapter` still re-exports the name
- * so existing imports keep working.
- */
-export interface ChatSource {
-  /** 1-based citation number. `[1]` in the answer text refers to this. */
-  index: number;
-  name: string;
-  path: string;
-  documentType: string;
-  externalUrl?: string;
-  /** Platform that owns the destination at `externalUrl`. */
-  targetPlatform?: string | null;
-  /** Primary-key value for single-row chips. */
-  id?: string;
-  /** Per-row items for grouped chips. */
-  items?: Array<{
-    /** The row's own citation number. Present when the group was built
-     *  client-side from flat sources (`groupSourcesByTable`), so `[N]` in the
-     *  answer still resolves to a row; absent on a server-grouped chip, whose
-     *  rows share the group's one number. */
-    index?: number;
-    id: string;
-    documentType: string;
-    name: string;
-    externalUrl?: string;
-    targetPlatform?: string | null;
-    /** In-app doc-tree path for markdown / data-room-doc rows so the
-     *  grouped chip's anchor can trigger an in-page doc-tree swap via
-     *  `executeNavigation` (parity with single-row chips + cards). */
-    path?: string | null;
-  }>;
-  /** RagTableConfig.id for this source. */
-  sourceRepo?: string;
-  /** Optional display label override returned by the chat API. */
-  label?: string;
-}
-
-/** Persisted attachments row (GraphQL `AttachmentsData`). The arrays are the
- *  SAME ones the live chunk carries, so history and realtime share one decoder
- *  (`attachmentsEvent`) and cannot drift apart. Left untyped: it is unvalidated
- *  wire data, and the decoder is what turns it into `ChatSource[]` / `ChatRef[]`. */
+/** Persisted attachments row (GraphQL `AttachmentsData`): the same array the live chunk carries, so history and realtime
+ *  share one decoder. Left untyped: it is unvalidated wire data, and `createMingoDecoder` turns it into source parts. */
 export interface AttachmentsMessageData extends MessageDataBase {
   type: 'ATTACHMENTS';
   sources?: unknown;
-  videos?: unknown;
-  cards?: unknown;
 }
 
-/** The envelope `ATTACHMENTS` replaced: the same arrays under `payload`. */
-export interface SourceMetadataMessageData extends MessageDataBase {
-  type: 'GUIDE';
-  payload?: unknown;
+/** Persisted `RECORD_CARDS` row (GraphQL `RecordCardsData`); the live chunk has the same shape. */
+export interface RecordCardsMessageData extends MessageDataBase {
+  type: 'RECORD_CARDS';
+  records?: unknown;
 }
 
-/** Persisted `ASK` row (GraphQL `AskData`). `text` is the intro sentence, which
- *  history replays as a text segment ahead of the card — same split the live
- *  `ASK` chunk carries. */
+/** Persisted `ASK` row (GraphQL `AskData`). `text` is the intro sentence, ordinary answer text ahead of the card: the
+ *  split the live `ASK` chunk carries. */
 export interface AskMessageData extends MessageDataBase {
   type: 'ASK';
   text?: string;
   question?: string;
-  /** WIRE shape — `label` is optional here because the backend can (and does)
-   *  ship label-less rows; `normalizeAskOptions` drops them, which is what
-   *  turns this into the card's `AskOptionData[]`. */
+  /** WIRE shape: `label` is optional here because the backend can (and does) ship label-less rows; the decoder drops
+   *  them, which is what turns this into the card's `AskOptionData[]`. */
   options?: Array<{ label?: string; description?: string }>;
 }
 
@@ -615,9 +384,8 @@ export interface TicketEscalatedMessageData extends MessageDataBase {
   text?: string;
 }
 
-/** Persisted ticket lifecycle row — same field names as the live chunk
- *  (see `TicketEventData`), decoded by the SAME mapper on replay. Fields are
- *  wire-shaped (`| null`): every one is a nullable GraphQL scalar. */
+/** Persisted ticket lifecycle row: the same field names as the live chunk (see `TicketEventData`), decoded by the same
+ *  mapper. Fields are wire-shaped (`| null`): every one is a nullable GraphQL scalar. */
 export interface TicketEventMessageData extends MessageDataBase {
   type: 'TICKET_EVENT';
   kind?: string | null;
@@ -655,10 +423,8 @@ export interface SystemMessageData extends MessageDataBase {
 }
 
 /**
- * Human-technician takeover row. A REALTIME-only concept: the history
- * processors have no branch for it, so a persisted `DIRECT_MESSAGE` row
- * contributes nothing on reload (pinned by the golden characterization test).
- * Declared here so the wire shape is nameable without `any`.
+ * Human-technician takeover row. A REALTIME-only concept: a persisted `DIRECT_MESSAGE` row contributes nothing on reload
+ * (`processHistoricalMessages` pins it). Declared here so the wire shape is nameable without `any`.
  */
 export interface DirectMessageData extends MessageDataBase {
   type: 'DIRECT_MESSAGE';
@@ -679,7 +445,7 @@ export type MessageData =
   | ThinkingMessageData
   | AskMessageData
   | AttachmentsMessageData
-  | SourceMetadataMessageData
+  | RecordCardsMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
   | ApprovalRequestMessageData
@@ -702,105 +468,11 @@ export interface HistoricalMessage {
   chatType?: string;
   createdAt: string;
   owner?: MessageOwner;
-  messageData?: MessageData | MessageData[];
-  /** Persisted stream sequence of this row's last chunk (the backend's
-   *  `lastChunkStreamSeq`). Passed through to the processed message's
-   *  `streamSeq` so `mergeHistoryWithRealtime` can decide coverage per-role
-   *  (a synthetic is covered only by a persisted row of its OWN role reaching
-   *  its seq). Optional — absent for rows the backend doesn't stamp (e.g. user
-   *  MESSAGE_REQUEST rows), which then don't participate in seq coverage. */
+  /** What the row holds, one entry per part, as the backend's `Message.parts` answers it. */
+  parts?: MessageData[];
+  /** Persisted stream sequence of this row's last chunk (the backend's `lastChunkStreamSeq`). Passed through to the
+   *  message's `metadata.streamSeq` so `mergeHistoryWithRealtime` can decide coverage per-role (a synthetic is covered
+   *  only by a persisted row of its OWN role reaching its seq). Optional: absent for rows the backend doesn't stamp (e.g.
+   *  user MESSAGE_REQUEST rows), which then don't participate in seq coverage. */
   lastChunkStreamSeq?: number | null;
-}
-
-// ========== Processed Message Types ==========
-
-export interface ProcessedMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'error'; // Limited to display roles
-  content: MessageContent;
-  name?: string;
-  assistantType?: AssistantType;
-  authorType?: AuthorType;
-  timestamp: Date;
-  avatar?: string;
-  /** Persisted last-chunk stream sequence carried through from
-   *  `HistoricalMessage.lastChunkStreamSeq` (for assistant turns: the MAX
-   *  across the grouped rows). Hosts stamp it onto the rendered message's
-   *  `streamSeq` so the history/realtime merge can do per-role seq coverage.
-   *  Absent when the source row(s) carried no seq. */
-  streamSeq?: number;
-  /** Documents this answer cited — see `Message.sources`, the same field.
-   *  Replayed from the turn's persisted `ATTACHMENTS` row, so a reloaded
-   *  answer carries the citations the live one did. */
-  sources?: ChatSource[];
-  /** Entity references this answer's metadata described — see `Message.refs`. */
-  refs?: ChatRef[];
-}
-
-// ========== Base Message Interface ==========
-
-import type { ReactNode } from 'react';
-import type { ChatContextItem } from './context-item.types';
-
-export interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'error'; // Limited to display roles
-  content: MessageContent;
-  name?: string;
-  assistantType?: AssistantType;
-  authorType?: AuthorType;
-  timestamp?: Date;
-  avatar?: string | null;
-  /** Highest CONTENT chunk streamSeq that composed this message. Stamped on
-   *  realtime synthetics so `mergeHistoryWithRealtime` can decide history
-   *  coverage per-message (see `MergeableChatMessage.streamSeq`). */
-  streamSeq?: number;
-  /** Entity-context items attached to this (user) message via the composer's
-   *  context picker. When present the message bubble renders the context
-   *  chips beneath its text (Figma node 31:28709). Optional — omitted for
-   *  assistant messages and turns sent without context. */
-  contextItems?: ChatContextItem[];
-  /** Per-message viewport-positioning hint. OPTIONAL — when omitted (the
-   *  default for every LLM Q&A / browse / search / find / Discuss path)
-   *  the chat tails as today via `use-stick-to-bottom`. Only `'top'` opts
-   *  in to the alternative top-anchor behaviour (display-action answers
-   *  whose body is a long article). The server is the sole decision-
-   *  maker — set on the metadata leading frame. */
-  scrollAnchor?: ScrollAnchor;
-  /** When true the message is part of the API conversation history (sent
-   *  to the LLM so it has context) but is NOT rendered in the chat UI.
-   *
-   *  Used for "synthetic continuation" turns: when the user clicks Approve
-   *  on a tool proposal, the host auto-fires a follow-up `sendMessage`
-   *  with `hidden: true` carrying a directive like "the user just
-   *  approved <tool>; ask follow-up questions per protocol". The LLM's
-   *  response IS rendered (as a normal assistant message); only the
-   *  trigger prompt is suppressed so the chat reads naturally:
-   *
-   *    user: "open a ticket"
-   *    assistant: preamble + approval card
-   *    [user clicks Approve]
-   *    assistant: "Now to triage faster, can you share..."   ← auto-fires
-   *
-   *  Without this flag the trigger prompt would surface as a confusing
-   *  bubble like "(continue per protocol)" between the approval card
-   *  and the AI's follow-up. */
-  hidden?: boolean;
-  /**
-   * Documents this answer cited, rendered as chips beneath it.
-   *
-   * Per MESSAGE, not per conversation: an answer's citations belong to the
-   * answer, and a thread can hold several answers that each cited something
-   * different. Ordering is a rendering concern — see `splitCitedSources`.
-   */
-  sources?: ChatSource[];
-  /**
-   * Entity references this answer's metadata described — videos and cards.
-   *
-   * Presence here does NOT mean "render it": only the `[card://type:id]`
-   * markers actually written into the answer text are rendered, and these
-   * supply the data those markers expand with. The metadata frame routinely
-   * describes more than the model chose to cite.
-   */
-  refs?: ChatRef[];
 }

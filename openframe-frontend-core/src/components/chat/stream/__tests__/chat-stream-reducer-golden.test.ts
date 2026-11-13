@@ -1,106 +1,63 @@
 /**
- * GOLDEN CHARACTERIZATION TESTS — the NATS kernel of
- * `createChatStreamReducer`, driven through `decodeNatsChunk`.
+ * GOLDEN CHARACTERIZATION: what a wire says, and what the thread holds after it, through the one decoder and the reducer.
  *
- * Originally written against the `useRealtimeChunkProcessor` compat hook
- * (Phase 0 of the chat unification). That wrapper was deleted once every
- * consumer moved to the reducer; the behavioral spec it pinned is far too
- * valuable to lose, so the suite was RETARGETED at the reducer itself. The
- * recorded snapshots are byte-identical to the wrapper-era ones — the only
- * thing that changed is who dispatches the effects.
- *
- * `dispatch()` below replicates the deleted wrapper's effect→callback
- * forwarding verbatim (including the `segments-after-approval-result`
- * conditional), so the logs remain a 1:1 record of the legacy
- * `RealtimeChunkCallbacks` contract. Do NOT "fix" behaviors captured here.
+ * Each case feeds Mingo chunks the way the adapter does and records the reducer's state. The snapshots are the spec of the
+ * thread (parts, order, phase, known statuses, usage). Ids a run mints and clock times are normalised, so a snapshot differs
+ * only when behaviour does. Do NOT "fix" behaviours captured here without reading the diff.
  */
 
 import { describe, it, expect } from 'vitest';
-import { decodeNatsChunk } from '../../../../chat-protocol/nats-decoder';
-import type { ChatApprovalStatus, RealtimeChunkCallbacks } from '../../types';
-import { createChatStreamReducer, type ChatStreamReducer, type InitializeExtras } from '../chat-stream-reducer';
+import type { ChatMessage } from '../../../../chat-protocol/chat-message';
+import { createMingoDecoder } from '../../../../chat-protocol/message-decoder';
+import { createChatStreamReducer, type ChatStreamReducer, type ChatStreamReducerOptions } from '../chat-stream-reducer';
 
-type EventLog = Array<Record<string, unknown>>;
-
-/** Build a full callback set that records every invocation into `log`. */
-function makeRecordingCallbacks(log: EventLog): RealtimeChunkCallbacks {
-  return {
-    onStreamStart: () => log.push({ event: 'onStreamStart' }),
-    onStreamEnd: () => log.push({ event: 'onStreamEnd' }),
-    onMetadata: metadata => log.push({ event: 'onMetadata', metadata }),
-    onSegmentsUpdate: (segments, metadata) => log.push({ event: 'onSegmentsUpdate', segments, metadata }),
-    onError: (error, details) => log.push({ event: 'onError', error, details }),
-    onUserMessage: (text, metadata) => log.push({ event: 'onUserMessage', text, metadata }),
-    onTokenUsage: data => log.push({ event: 'onTokenUsage', data }),
-    onDirectMessage: (text, metadata) => log.push({ event: 'onDirectMessage', text, metadata }),
-    onSystemMessage: (text, metadata) => log.push({ event: 'onSystemMessage', text, metadata }),
-    // Block bodies, not concise ones: `log.push` returns a number, so a
-    // concise arrow is `() => number` and does not satisfy the declared
-    // `(requestId?: string) => void | Promise<void>`. A block body returns
-    // `void`, which satisfies it without needing `async`.
-    onApprove: () => {
-      log.push({ event: 'onApprove' });
-    },
-    onReject: () => {
-      log.push({ event: 'onReject' });
-    },
-    onEscalatedApproval: (requestId, data) => log.push({ event: 'onEscalatedApproval', requestId, data }),
-    onEscalatedApprovalResult: (requestId, approved, data) =>
-      log.push({ event: 'onEscalatedApprovalResult', requestId, approved, data }),
-    onApprovalResolved: (requestId, status, approvalType, resolvedByName) =>
-      log.push({ event: 'onApprovalResolved', requestId, status, approvalType, resolvedByName }),
-    onToolExecuted: segment => log.push({ event: 'onToolExecuted', segment }),
-    onAgentBusy: () => log.push({ event: 'onAgentBusy' }),
-    onDialogClosed: () => log.push({ event: 'onDialogClosed' }),
-  };
-}
-
-interface SetupOptions {
-  callbacks?: RealtimeChunkCallbacks;
-  batchApprovalsEnabled?: boolean;
-  displayApprovalTypes?: string[];
-  approvalStatuses?: Record<string, ChatApprovalStatus>;
-  isDirectMode?: boolean;
-  initialState?: InitializeExtras;
-}
-
-function setup(options: SetupOptions = {}) {
-  const log: EventLog = [];
-  const callbacks = options.callbacks ?? makeRecordingCallbacks(log);
-
-  const reducer: ChatStreamReducer = createChatStreamReducer({
-    transport: 'nats',
-    batchApprovalsEnabled: options.batchApprovalsEnabled,
-    displayApprovalTypes: options.displayApprovalTypes,
-    approvalStatuses: options.approvalStatuses,
-    isDirectMode: options.isDirectMode,
-    crossMessageToolRouting: !!callbacks.onToolExecuted,
-    callbacks: {
-      onApprove: id => callbacks.onApprove?.(id),
-      onReject: id => callbacks.onReject?.(id),
-    },
-    onEffect: ({ name, args }) => {
-      const cbs = callbacks as Record<string, ((...a: unknown[]) => void) | undefined>;
-      // Legacy conditional: the cumulative post-APPROVAL_RESULT emit fires
-      // only when the consumer did NOT wire onApprovalResolved.
-      if (name === 'segments-after-approval-result') {
-        if (!cbs.onApprovalResolved) cbs.onSegmentsUpdate?.(...args);
-        return;
-      }
-      cbs[name]?.(...args);
-    },
-  });
-
-  // The wrapper initialized from `initialState` in a mount effect.
-  if (options.initialState) reducer.initializeWithState(null, options.initialState);
-
+function setup(options: ChatStreamReducerOptions = {}) {
+  const reducer: ChatStreamReducer = createChatStreamReducer(options);
+  let decoder = createMingoDecoder();
   const feed = (chunks: unknown[]) => {
-    for (const chunk of chunks) {
-      const event = decodeNatsChunk(chunk);
-      if (event) reducer.apply(event);
-    }
+    for (const chunk of chunks) reducer.apply(decoder.decode(chunk));
   };
-  return { log, reducer, feed };
+  const reset = () => {
+    reducer.reset();
+    decoder = createMingoDecoder();
+  };
+  return { reducer, feed, reset };
+}
+
+/** Replace what a run mints: message and wire ids, and the time a row was first seen. */
+function thread(reducer: ChatStreamReducer): unknown {
+  const { messages, streamingPhase, dialogTokenUsage, liveModel, approvalStatuses } = reducer.state;
+  const names = new Map<string, string>();
+  const named = (id: string): string => {
+    if (!/\d{13}|[a-z0-9]{8,}$/.test(id) || /^(stream|compaction)-\d{1,6}$/.test(id)) return id;
+    const known = names.get(id);
+    if (known) return known;
+    const name = `<id-${names.size + 1}>`;
+    names.set(id, name);
+    return name;
+  };
+  const stable = (message: ChatMessage): ChatMessage => ({
+    ...message,
+    id: named(message.id),
+    ...(message.metadata
+      ? {
+          metadata: {
+            ...message.metadata,
+            ...(message.metadata.createdAt ? { createdAt: '<time>' } : {}),
+          },
+        }
+      : {}),
+  });
+  const body = JSON.stringify({
+    messages: messages.map(stable),
+    streamingPhase,
+    dialogTokenUsage,
+    liveModel,
+    approvalStatuses,
+  })
+    // A time inside a part (an execution's, a card's): the clock's, never the wire's.
+    .replace(/"(startedAt|finishedAt|createdAt)":"\d{4}-\d{2}-\d{2}T[^"]+"/g, '"$1":"<time>"');
+  return JSON.parse(body);
 }
 
 const EXECUTING = {
@@ -120,9 +77,9 @@ const EXECUTED = {
   toolExecutionRequestId: 'exec-1',
 };
 
-describe('chat stream reducer — legacy chunk-processor golden event logs', () => {
+describe('chat stream reducer — what the thread holds after a wire', () => {
   it('normal turn: start → metadata → text ×3 → token usage → end', () => {
-    const { log, feed } = setup();
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       {
@@ -144,26 +101,26 @@ describe('chat stream reducer — legacy chunk-processor golden event logs', () 
       },
       { type: 'MESSAGE_END' },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('streamSeq on content chunks is threaded into onSegmentsUpdate metadata', () => {
-    const { log, feed } = setup();
+  it('streamSeq on content chunks reaches the message it built', () => {
+    const { reducer, feed } = setup();
     feed([{ type: 'MESSAGE_START' }, { type: 'TEXT', text: 'seq-stamped', streamSeq: 7 }, { type: 'MESSAGE_END' }]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('cold start (no MESSAGE_START ever): text emits CUMULATIVE segments (no append flag)', () => {
-    const { log, feed } = setup();
+  it('cold start (no MESSAGE_START ever): text opens the first message', () => {
+    const { reducer, feed } = setup();
     feed([
       { type: 'TEXT', text: 'cold ' },
       { type: 'TEXT', text: 'start' },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('post-MESSAGE_END continuation: text/thinking emit DELTA segments with append:true', () => {
-    const { log, feed } = setup();
+  it('post-MESSAGE_END continuation: text and thinking extend the finished message', () => {
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       { type: 'TEXT', text: 'in-stream' },
@@ -171,19 +128,21 @@ describe('chat stream reducer — legacy chunk-processor golden event logs', () 
       { type: 'TEXT', text: 'post-end text' },
       { type: 'THINKING', text: 'post-end thinking' },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('tool execution OUTSIDE a message window: onAgentBusy + cross-message onToolExecuted (accumulator skipped)', () => {
-    const { log, feed } = setup();
+  it('tool execution OUTSIDE a message window: the agent is busy, and the result lands on the row', () => {
+    const { reducer, feed } = setup();
     // No MESSAGE_START — approved commands execute between the approval
     // bubble's MESSAGE_END and the continuation stream.
-    feed([EXECUTING, EXECUTED]);
-    expect(log).toMatchSnapshot();
+    feed([EXECUTING]);
+    expect(reducer.state.streamingPhase).toBe('thinking');
+    feed([EXECUTED]);
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('tool execution IN-stream: accumulator-driven segment updates, onToolExecuted NOT fired', () => {
-    const { log, feed } = setup();
+  it('tool execution IN-stream: a row in the message, then its result', () => {
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       { type: 'TEXT', text: 'Running now. ' },
@@ -191,19 +150,26 @@ describe('chat stream reducer — legacy chunk-processor golden event logs', () 
       EXECUTED,
       { type: 'MESSAGE_END' },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('approval request (displayed) → approval result: in-message flip + onApprovalResolved', () => {
-    const { log, feed } = setup();
+  it('approval request → approval result: the card flips where it stands, with who resolved it', () => {
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       {
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'req-1',
         approvalType: 'CLIENT',
-        command: 'systemctl restart nats',
-        explanation: 'Restart the broker',
+        toolCalls: [
+          {
+            toolExecutionRequestId: 'req-1',
+            toolName: 'run_command',
+            toolTitle: 'systemctl restart nats',
+            toolExplanation: 'Restart the broker',
+            requiresApproval: true,
+          },
+        ],
       },
       { type: 'MESSAGE_END' },
       {
@@ -214,23 +180,20 @@ describe('chat stream reducer — legacy chunk-processor golden event logs', () 
         displayName: 'Jane Admin',
       },
     ]);
-    // CHARACTERIZATION: because onApprovalResolved IS wired, the result
-    // does NOT emit onSegmentsUpdate — only the cross-message callback.
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('approval result WITHOUT onApprovalResolved wired: emits cumulative onSegmentsUpdate instead', () => {
-    const log: EventLog = [];
-    const callbacks = makeRecordingCallbacks(log);
-    delete callbacks.onApprovalResolved;
-    const { feed } = setup({ callbacks });
+  it('a rejected approval is denied, inside the open turn', () => {
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       {
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'req-1',
         approvalType: 'CLIENT',
-        command: 'reboot',
+        toolCalls: [
+          { toolExecutionRequestId: 'req-1', toolName: 'run_command', toolTitle: 'reboot', requiresApproval: true },
+        ],
       },
       {
         type: 'APPROVAL_RESULT',
@@ -239,20 +202,30 @@ describe('chat stream reducer — legacy chunk-processor golden event logs', () 
         approvalType: 'CLIENT',
       },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('escalated approval (type not displayed) → onEscalatedApproval, then result appends resolved card', () => {
-    const { log, feed, reducer } = setup(); // displayApprovalTypes defaults to ['CLIENT']
+  it('an approval of a tier this side does not answer stays in the message, with its tier', () => {
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       {
         type: 'APPROVAL_REQUEST',
         approvalRequestId: 'req-adm',
         approvalType: 'ADMIN',
-        command: 'drop database prod',
+        toolCalls: [
+          {
+            toolExecutionRequestId: 'req-adm',
+            toolName: 'run_command',
+            toolTitle: 'drop database prod',
+            requiresApproval: true,
+          },
+        ],
       },
       { type: 'MESSAGE_END' },
+    ]);
+    const pending = thread(reducer);
+    feed([
       {
         type: 'APPROVAL_RESULT',
         approvalRequestId: 'req-adm',
@@ -260,14 +233,11 @@ describe('chat stream reducer — legacy chunk-processor golden event logs', () 
         approvalType: 'ADMIN',
       },
     ]);
-    expect({
-      log,
-      pendingAfter: Array.from(reducer.getPendingEscalated().entries()),
-    }).toMatchSnapshot();
+    expect({ pending, resolved: thread(reducer) }).toMatchSnapshot();
   });
 
-  it('batch approval (batchApprovalsEnabled default ON): one batch segment, executions merge into it', () => {
-    const { log, feed } = setup();
+  it('batch approval: one row per tool on one batch, executions merge into them', () => {
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       {
@@ -312,42 +282,11 @@ describe('chat stream reducer — legacy chunk-processor golden event logs', () 
       },
       { type: 'MESSAGE_END' },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('batch approval with batchApprovalsEnabled:false unfolds into legacy cards (requiresApproval only)', () => {
-    const { log, feed } = setup({ batchApprovalsEnabled: false });
-    feed([
-      { type: 'MESSAGE_START' },
-      {
-        type: 'APPROVAL_REQUEST',
-        approvalRequestId: 'batch-1',
-        approvalType: 'CLIENT',
-        toolCalls: [
-          {
-            toolExecutionRequestId: 'exec-a',
-            toolName: 'create_ticket',
-            toolTitle: 'Create ticket',
-            requiresApproval: true,
-            toolCallArguments: { subject: 'Printer down' },
-          },
-          {
-            toolExecutionRequestId: 'exec-b',
-            toolName: 'read_kb',
-            requiresApproval: false,
-          },
-        ],
-      },
-      { type: 'MESSAGE_END' },
-    ]);
-    expect(log).toMatchSnapshot();
-  });
-
-  it('CHARACTERIZATION duplicate/out-of-order: redelivered EXECUTING after EXECUTED in-stream appends a NEW executing segment (no dedup)', () => {
-    // The reducer does no duplicate suppression for standalone tool
-    // segments — dedup only exists inside approval batches (no-downgrade
-    // rule). Recording actual behavior, see unification plan.
-    const { log, feed } = setup();
+  it('duplicate / out-of-order: a redelivered EXECUTING after EXECUTED neither adds a row nor downgrades the result', () => {
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       EXECUTING,
@@ -355,22 +294,22 @@ describe('chat stream reducer — legacy chunk-processor golden event logs', () 
       EXECUTING, // redelivered
       { type: 'MESSAGE_END' },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('error chunk: segment append + onError with JSON-extracted message', () => {
-    const { log, feed } = setup();
+  it('error chunks: drawn in the message, with the message a JSON detail names', () => {
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       { type: 'TEXT', text: 'partial' },
       { type: 'ERROR', error: 'Agent crashed', details: '{"error":{"message":"boom"}}' },
       { type: 'ERROR', error: 'Plain details', details: 'not-json' },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
   it('user echo / system / direct-message / dialog-closed routing', () => {
-    const { log, feed } = setup();
+    const { reducer, feed } = setup();
     feed([
       {
         type: 'MESSAGE_REQUEST',
@@ -392,61 +331,57 @@ describe('chat stream reducer — legacy chunk-processor golden event logs', () 
       },
       { type: 'DIALOG_CLOSED' },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
   it('direct-mode barrier: after a DIRECT_MESSAGE, AI chunks are dropped with a one-shot teardown', () => {
-    const { log, feed } = setup();
+    const { reducer, feed } = setup();
     feed([
       { type: 'MESSAGE_START' },
       { type: 'TEXT', text: 'ai text before takeover' },
       { type: 'DIRECT_MESSAGE', text: 'Human takeover', ownerType: 'ADMIN' },
-      // AI chunks now dropped; first one triggers the teardown (onStreamEnd).
+      // AI chunks now dropped; the first one tears the turn down.
       { type: 'TEXT', text: 'dropped ai text' },
       { type: 'TEXT', text: 'also dropped' },
       // Allowlisted chunks still flow.
       { type: 'SYSTEM', text: 'still visible' },
       { type: 'DIRECT_MESSAGE', text: 'second human message' },
     ]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('context compaction outside a stream emits append+isCompacting metadata; inside a stream it is cumulative', () => {
-    const { log, feed } = setup();
+  it('context compaction, outside a stream and inside one', () => {
+    const { reducer, feed, reset } = setup();
     feed([
       // standalone (no open stream)
       { type: 'CONTEXT_COMPACTION_START' },
       { type: 'CONTEXT_COMPACTION_END', text: 'Summarized 12 messages' },
     ]);
-    const standaloneLog = [...log];
-    log.length = 0;
+    const standalone = thread(reducer);
+    reset();
     feed([
       { type: 'MESSAGE_START' },
       { type: 'CONTEXT_COMPACTION_START' },
       { type: 'CONTEXT_COMPACTION_END', text: 'Mid-stream summary' },
       { type: 'MESSAGE_END' },
     ]);
-    expect({ standalone: standaloneLog, inStream: log }).toMatchSnapshot();
+    expect({ standalone, inStream: thread(reducer) }).toMatchSnapshot();
   });
 
-  it('reset() clears accumulator + stream flags so the next dialog cold-starts cumulative', () => {
-    const { log, feed, reducer } = setup();
+  it('reset() clears everything so the next dialog cold-starts', () => {
+    const { reducer, feed, reset } = setup();
     feed([{ type: 'MESSAGE_START' }, { type: 'TEXT', text: 'dialog one' }, { type: 'MESSAGE_END' }]);
-    reducer.reset();
-    log.length = 0;
+    reset();
     feed([{ type: 'TEXT', text: 'dialog two cold start' }]);
-    expect(log).toMatchSnapshot();
+    expect(thread(reducer)).toMatchSnapshot();
   });
 
-  it('initialState resume: continuation chunks after resume take the post-stream append path', () => {
-    const { log } = setup({
-      initialState: {
-        existingSegments: [{ type: 'text', text: 'restored partial ' }],
-        escalatedApprovals: new Map([['req-esc', { command: 'escalated cmd', approvalType: 'ADMIN' }]]),
-      },
-    });
-    // initializeWithState replays escalated approvals via onEscalatedApproval
-    // and marks hasEverStreamed=true.
-    expect(log).toMatchSnapshot();
+  it('a restored partial message: continuation chunks extend it', () => {
+    const { reducer, feed } = setup();
+    reducer.initializeWithState([
+      { id: 'restored', role: 'assistant', parts: [{ type: 'text', text: 'restored partial ' }] },
+    ]);
+    feed([{ type: 'TEXT', text: 'and the rest' }]);
+    expect(thread(reducer)).toMatchSnapshot();
   });
 });

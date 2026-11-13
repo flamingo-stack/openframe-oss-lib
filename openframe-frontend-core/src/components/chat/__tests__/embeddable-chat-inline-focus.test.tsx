@@ -16,12 +16,12 @@ vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
 
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat, type EmbeddableChatProps } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -34,7 +34,14 @@ const runtime: ChatRuntime = {
 const noop = () => {};
 const asyncNoop = async () => {};
 const state: UnifiedChatState = {
-  messages: [{ id: 'm-1', role: 'user', content: 'hello', timestamp: new Date(0) }],
+  messages: [
+    {
+      id: 'm-1',
+      role: 'user',
+      metadata: { createdAt: new Date(0).toISOString() },
+      parts: [{ type: 'text', text: 'hello' }],
+    },
+  ],
   isLoading: false,
   streamingPhase: 'idle',
   sendMessage: () => Promise.resolve(),
@@ -64,8 +71,7 @@ const state: UnifiedChatState = {
   loadMoreDialogs: asyncNoop,
   hasMoreMessages: false,
   loadMoreMessages: asyncNoop,
-  approveRequest: asyncNoop,
-  rejectRequest: asyncNoop,
+  actions: {},
   dialogTokenUsage: null,
   connectionState: 'connected',
 };
@@ -75,14 +81,15 @@ function renderChat(shell: EmbeddableChatProps['shell']) {
   return render(
     <QueryClientProvider client={client}>
       <ChatRuntimeContext.Provider value={runtime}>
-        <EmbeddableChat
-          shell={shell}
-          appearance="v2"
-          defaultOpen
-          defaultActiveMode="mingo"
-          showInternalTrigger={false}
-          mingoState={state}
-        />
+        <ChatEngineProvider engine={state}>
+          <EmbeddableChat
+            shell={shell}
+            appearance="v2"
+            defaultOpen
+            defaultActiveMode="mingo"
+            showInternalTrigger={false}
+          />
+        </ChatEngineProvider>
       </ChatRuntimeContext.Provider>
     </QueryClientProvider>,
   );

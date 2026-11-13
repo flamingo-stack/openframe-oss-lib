@@ -2,10 +2,12 @@
 
 /**
  * useUnifiedChat — the single public entry point for the unified chat
- * surface. Dispatches between the SSE/Guide and NATS/Mingo transport
- * adapters based on the active mode. Always calls both underlying
- * hooks (React rules of hooks) but only one is "live": the inactive
- * one stays idle (no streams, no subscriptions) while preserving its
+ * surface. Both modes run the one chat engine (`useChatEngine`): Guide over
+ * the hub's stream transport (`useSseChatAdapter`), Mingo over a live tail,
+ * or the engine a host provided above (`ChatEngineProvider`), which then
+ * stands for the Mingo mode and this hook runs no second one. Always calls
+ * both underlying hooks (React rules of hooks) but only one is "live": the
+ * inactive one stays idle (no streams, no subscriptions) while preserving its
  * local message buffer so a mode-flip restores the user to exactly
  * where they left off.
  *
@@ -19,11 +21,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EMPTY_DIALOG_CAPABILITIES } from '../types/unified-chat-state.types';
-import type { ChatDialogCapabilities, UnifiedChatState } from '../types/unified-chat-state.types';
-import { useNatsChatAdapter, type UseNatsChatAdapterConfig } from './use-nats-chat-adapter';
+import { useChatEngineContext } from '../engine/chat-engine-context';
+import { natsWsLiveTail } from '../engine/chat-transport';
+import { useChatEngine, type UseChatEngineConfig } from '../engine/use-chat-engine';
+import type { UnifiedChatState } from '../types/unified-chat-state.types';
 import { useSseChatAdapter, type UseSseChatAdapterOptions } from './use-sse-chat-adapter';
-import { useStableShallow } from './use-stable-shallow';
 
 // =============================================================================
 // Modes
@@ -49,41 +51,16 @@ export interface UseUnifiedChatModes {
   guide?: UseSseChatAdapterOptions;
 
   /**
-   * Mingo mode (NATS → openframe). All wiring is explicit: dialog id,
-   * NATS URL builder, publish callback, optional catchup fetcher.
-   * See `UseNatsChatAdapterConfig` for the field-by-field contract.
+   * Mingo mode: the chat engine over the host's transport and history
+   * (`UseChatEngineConfig`). A callback config for the plain NATS WebSocket
+   * is `natsWsEngineConfig(config)`.
    */
-  mingo?: UseNatsChatAdapterConfig;
+  mingo?: UseChatEngineConfig;
 }
 
 export interface UseUnifiedChatOptions {
   modes: UseUnifiedChatModes;
   activeMode: ChatMode;
-
-  /**
-   * Pre-built Mingo-mode state, supplied by the host instead of letting
-   * the internal `useNatsChatAdapter` own it. When provided AND the active
-   * mode is `'mingo'`, this object is used verbatim as the active state and
-   * the internal NATS adapter stays idle (the host should also omit
-   * `modes.mingo` so no live subscription is opened here).
-   *
-   * This is the seam that lets a host keep chat data/streaming in its own
-   * store + cache (so it survives the panel unmounting) rather than in this
-   * hook's local React state. Guide mode is unaffected.
-   */
-  mingoStateOverride?: UnifiedChatState;
-
-  /**
-   * Conversation-list capabilities for a `mingoStateOverride`. A host that
-   * builds the whole state in its own store has no adapter to report them, so
-   * it declares them alongside the state it injects.
-   *
-   * Supplying the override AT ALL declares that its panel owns a conversation
-   * list — an override with no capabilities still resolves to an empty object,
-   * never `undefined`, so such a host keeps its list surface exactly as before.
-   * Ignored unless the override is the active state.
-   */
-  injectedDialogCapabilities?: ChatDialogCapabilities;
 }
 
 // =============================================================================
@@ -92,15 +69,17 @@ export interface UseUnifiedChatOptions {
 
 const EMPTY_SSE_OPTIONS: UseSseChatAdapterOptions = {};
 
-function createDisabledNatsConfig(): UseNatsChatAdapterConfig {
+function createDisabledEngineConfig(): UseChatEngineConfig {
   return {
     dialogId: null,
-    getNatsWsUrl: () => null,
-    publishUserMessage: () => {
-      throw new Error(
-        '[useUnifiedChat] publishUserMessage invoked but mingo mode is not configured. ' +
-          'Pass `modes.mingo` to enable Mingo agent transport.',
-      );
+    transport: {
+      useLiveTail: natsWsLiveTail({ getNatsWsUrl: () => null }),
+      publish: () => {
+        throw new Error(
+          '[useUnifiedChat] a message was sent but mingo mode is not configured. ' +
+            'Pass `modes.mingo` to enable the Mingo transport.',
+        );
+      },
     },
   };
 }
@@ -110,46 +89,28 @@ function createDisabledNatsConfig(): UseNatsChatAdapterConfig {
 // =============================================================================
 
 export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState {
-  const { modes, activeMode, mingoStateOverride, injectedDialogCapabilities } = options;
+  const { modes, activeMode } = options;
+  // The engine a host runs once for its session: it is the Mingo mode, and none is run here beside it.
+  const hostEngine = useChatEngineContext();
 
-  // The mingo config object identity matters — `useNatsChatAdapter`
-  // wires its `dialogId`/url/publish into deps. Stabilise the disabled
-  // fallback so a guide-only consumer doesn't churn NATS hook state
-  // every render.
-  // Built once by `useState`'s lazy initialiser — that is exactly the
-  // create-on-first-render shape, without a ref filled during render.
-  const [disabledNatsConfig] = useState<UseNatsChatAdapterConfig>(createDisabledNatsConfig);
+  // The disabled fallback is built once, so a guide-only consumer doesn't churn the engine's state every render.
+  const [disabledEngineConfig] = useState<UseChatEngineConfig>(createDisabledEngineConfig);
 
   // Each adapter receives the user's config OR the disabled fallback,
   // plus an `active` flag that gates its live network work. Both
   // hooks are always called — only one is doing real work.
   const sseActive = activeMode === 'guide' && modes.guide !== undefined;
-  const natsActive = activeMode === 'mingo' && modes.mingo !== undefined;
+  const natsActive = activeMode === 'mingo' && modes.mingo !== undefined && hostEngine === null;
 
   const sseState = useSseChatAdapter(modes.guide ?? EMPTY_SSE_OPTIONS, {
     active: sseActive,
   });
-  const natsState = useNatsChatAdapter(modes.mingo ?? disabledNatsConfig, { active: natsActive });
+  const natsState = useChatEngine(modes.mingo ?? disabledEngineConfig, { active: natsActive });
 
-  // Host-injected Mingo state wins when present: the internal `natsState`
-  // still runs (rules of hooks) but is idle (no `modes.mingo` → not active),
-  // and we hand the host's store-backed state straight through as active.
-  const activeState = activeMode === 'guide' ? sseState : (mingoStateOverride ?? natsState);
-  // The ONE place the injected state's capabilities are defaulted, because this
-  // is the ONE place that decides which state won. `EmbeddableChat` therefore
-  // reads a single resolved `dialogCapabilities` and never re-derives it from
-  // the mode.
-  const activeStateIsInjected = activeState === mingoStateOverride;
-  // Latched: hosts write the companion prop inline, and a fresh object each
-  // render would invalidate the state memo below (and every memo a consumer
-  // hangs off its identity) forever.
-  const stableInjected = useStableShallow(injectedDialogCapabilities);
-  const dialogCapabilities = activeStateIsInjected
-    ? (activeState.dialogCapabilities ?? stableInjected ?? EMPTY_DIALOG_CAPABILITIES)
-    : activeState.dialogCapabilities;
+  const activeState = activeMode === 'guide' ? sseState : (hostEngine ?? natsState);
+  const { dialogCapabilities } = activeState;
 
-  // Live ref to the active state. The injected `mingoState` (and the SSE/NATS
-  // adapters) hand back a NEW state object on EVERY streaming chunk
+  // Live ref to the active state. The engines hand back a NEW state object on EVERY streaming chunk
   // (`messages`/`streamingPhase`/`tokenUsage` change), so binding the forwards
   // below to `[activeState]` would recreate them each chunk. That churn
   // cascades into consumers' memo deps — most visibly `renderEntityCard` in
@@ -195,7 +156,10 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
   // identity does. We don't recreate per-call to avoid spurious child
   // re-renders downstream.
   const selectDialog = useCallback((id: string | null) => activeStateRef.current.selectDialog(id), []);
-  const startNewDialog = useCallback(() => activeStateRef.current.startNewDialog(), []);
+  const startNewDialog = useCallback<UnifiedChatState['startNewDialog']>(
+    start => activeStateRef.current.startNewDialog(start),
+    [],
+  );
   const deleteDialog = useCallback((id: string) => activeStateRef.current.deleteDialog(id), []);
   const renameDialog = useCallback((id: string, title: string) => activeStateRef.current.renameDialog(id, title), []);
   const archiveDialog = useCallback((id: string) => activeStateRef.current.archiveDialog(id), []);
@@ -203,17 +167,15 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
   const setDialogScope = useCallback((scope: 'my' | 'all') => activeStateRef.current.setDialogScope?.(scope), []);
   const reloadDialogs = useCallback(() => activeStateRef.current.reloadDialogs(), []);
   const loadMoreMessages = useCallback(() => activeStateRef.current.loadMoreMessages(), []);
-  const approveRequest = useCallback((requestId: string) => activeStateRef.current.approveRequest(requestId), []);
-  const rejectRequest = useCallback(
-    (requestId: string, reason?: string) => activeStateRef.current.rejectRequest(requestId, reason),
-    [],
-  );
 
   return useMemo<UnifiedChatState>(
     () => ({
       messages: activeState.messages,
+      actions: activeState.actions,
+      displayApprovalTypes: activeState.displayApprovalTypes,
       isLoading: activeState.isLoading,
       streamingPhase: activeState.streamingPhase,
+      writingMessageId: activeState.writingMessageId,
       sendMessage,
       stopMessage,
       clearMessages,
@@ -224,6 +186,7 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       currentContextWindowMaxTokens: activeState.currentContextWindowMaxTokens,
       currentInputTokens: activeState.currentInputTokens,
       currentOutputTokens: activeState.currentOutputTokens,
+      currentContextTokens: activeState.currentContextTokens,
       currentCacheHitRatePct: activeState.currentCacheHitRatePct,
       currentUsageBreakdown: activeState.currentUsageBreakdown,
       // Dialog management (forwarded from active adapter)
@@ -249,9 +212,6 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       loadMoreMessages,
       // THE conversation-list signal — resolved once, above.
       dialogCapabilities,
-      // Approvals
-      approveRequest,
-      rejectRequest,
       // Token usage + connection
       dialogTokenUsage: activeState.dialogTokenUsage,
       connectionState: activeState.connectionState,
@@ -273,8 +233,6 @@ export function useUnifiedChat(options: UseUnifiedChatOptions): UnifiedChatState
       setDialogScope,
       reloadDialogs,
       loadMoreMessages,
-      approveRequest,
-      rejectRequest,
     ],
   );
 }
