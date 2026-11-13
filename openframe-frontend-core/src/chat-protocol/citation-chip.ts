@@ -1,6 +1,7 @@
 /**
- * The `[N]` citation chip grammar: ONE definition for the server that writes chips into an answer and the clients
- * that read them (the strip of cited sources) or hide them (beside cards).
+ * The `[N]` citation chip grammar: a model may type a number into its text, and nothing stores one. A citation is
+ * structured data on a text part (`./chat-message`), and its number is drawn from reading order (`./citations`). This is
+ * what the server's stream removes.
  *
  * A chip names a retrieved source by its number: `[1]`, a comma list in one bracket (`[2, 3]`), or a run of them
  * (`[1][2]`). A run counts as citations only when it stands apart from a word: whitespace or the start before it,
@@ -12,17 +13,14 @@
 /** One bracket: a number of one or two digits, or a comma list of them. */
 const CHIP = '\\[\\d{1,2}(?:\\s*,\\s*\\d{1,2})*\\]';
 
-/** A run of chips standing apart from a word; group 1 is the whitespace (or nothing) before it. */
-function chipRunScanner(): RegExp {
-  return new RegExp(`(^|\\s)(?:${CHIP})+(?=[\\s.,;:!?)\\]]|$)`, 'g');
-}
+/** A run of chips, and what may follow it: the grammar, for a reader that walks a text as it arrives. */
+export const CITATION_CHIP_RUN = `(?:${CHIP})+`;
+export const CITATION_CHIP_FOLLOW = '[\\s.,;:!?)\\]]';
 
-/** The chips for these source numbers: `[1][3]`, each number once, in ascending order. */
-export function formatCitationChips(numbers: Iterable<number>): string {
-  return [...new Set(numbers)]
-    .sort((a, b) => a - b)
-    .map(n => `[${n}]`)
-    .join('');
+/** A run of chips standing apart from a word; group 1 is the whitespace (or nothing) before it. A fresh global
+ *  pattern per call, for a reader that finds the runs a text holds without rebuilding the grammar. */
+export function citationChipRunScanner(): RegExp {
+  return new RegExp(`(^|\\s)${CITATION_CHIP_RUN}(?=${CITATION_CHIP_FOLLOW}|$)`, 'g');
 }
 
 /**
@@ -30,17 +28,7 @@ export function formatCitationChips(numbers: Iterable<number>): string {
  * "the command." and "the guide [3] covers it" reads "the guide covers it"; a line break before a run stays.
  */
 export function stripCitationChips(text: string): string {
-  return text.replace(chipRunScanner(), (_run: string, lead: string) => (lead === ' ' || lead === '\t' ? '' : lead));
-}
-
-/** The source numbers a text cites, in the order it first cites them, each once. */
-export function citedSourceNumbers(text: string): number[] {
-  const numbers: number[] = [];
-  for (const run of text.matchAll(chipRunScanner())) {
-    for (const digits of run[0].matchAll(/\d+/g)) {
-      const n = Number.parseInt(digits[0], 10);
-      if (!numbers.includes(n)) numbers.push(n);
-    }
-  }
-  return numbers;
+  return text.replace(citationChipRunScanner(), (_run: string, lead: string) =>
+    lead === ' ' || lead === '\t' ? '' : lead,
+  );
 }

@@ -122,6 +122,15 @@ export const Pending: Story = {
   },
 };
 
+/** Approved here, and the server has said nothing yet: a live dot, inert buttons, grey loader on the row, no check. */
+export const Approving: Story = {
+  args: {
+    data: executingData,
+    status: 'approving',
+    answerPending: true,
+  },
+};
+
 /** Pending, escalated by Mingo: a guardrail rule raised the call above the policy. The band says why before the row
  *  is opened, and Approve takes the warning colour. Open the row for the policy's level and the operations. */
 export const PendingEscalated: Story = {
@@ -188,6 +197,7 @@ export const AllStates: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <ApprovalBatchMessage data={makeData()} status="pending" onApprove={() => {}} onReject={() => {}} />
+      <ApprovalBatchMessage data={executingData} status="approving" answerPending />
       <ApprovalBatchMessage
         data={makeData(undefined, escalatedReview)}
         status="pending"

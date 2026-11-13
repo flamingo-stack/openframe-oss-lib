@@ -10,10 +10,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { decodeNatsChunk } from '../../../chat-protocol/nats-decoder';
-import { chatProgressFrame } from '../../../chat-protocol/progress';
 import { ToolExecutionDisplay } from '../tool-execution-display';
 import type { ToolExecutionData } from '../types/message.types';
+import { progressExecutionDataOf } from '../utils/tool-part-display';
 
 /**
  * The `EXECUTING_TOOL` shape the backend sends for a remote read-only tool: a
@@ -65,9 +64,8 @@ describe('ToolExecutionDisplay', () => {
   });
 
   it("draws a hub turn's closed stage as the one-line row Mingo's tool rows use, not a card", () => {
-    const event = decodeNatsChunk(chatProgressFrame({ stage: 'searching', count: 16 }, 'done', 't1'));
-    if (event?.type !== 'tool-execution') throw new Error('not a tool-execution event');
-    render(<ToolExecutionDisplay message={event.data} assistantType="mingo" />);
+    const row = { id: 't1:searching', stage: 'searching', count: 16, state: 'done' } as const;
+    render(<ToolExecutionDisplay message={progressExecutionDataOf(row)} assistantType="mingo" />);
     expect(screen.getByText('Searching 16 sources')).toBeTruthy();
     // The card layout writes its state as a "Done" line; the one-line row shows only the check mark.
     expect(screen.queryByText('Done')).toBeNull();

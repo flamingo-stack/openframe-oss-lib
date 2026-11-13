@@ -3,7 +3,7 @@
 import { forwardRef, type HTMLAttributes } from 'react';
 import { InfoCircleIcon } from '../icons-v2-generated';
 import { AiAssistantInfo } from './ai-assistant-info';
-import type { TicketEscalatedSegment } from './types/message.types';
+import type { TicketEscalatedData } from './types/message.types';
 
 const TITLE = 'Handed Off to a Technician';
 
@@ -11,7 +11,7 @@ const TITLE = 'Handed Off to a Technician';
 const DEFAULT_BODY = 'A technician will reply when available.';
 
 export interface TicketEscalatedMessageProps extends HTMLAttributes<HTMLDivElement> {
-  data: TicketEscalatedSegment['data'];
+  data: TicketEscalatedData;
   /** Timestamp of the message row this block came in on. */
   timestamp?: Date;
 }

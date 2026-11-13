@@ -24,11 +24,6 @@ describe('mapTicketActionError — non-TicketActionFailure inputs', () => {
     expect(result.code).toBe('UNKNOWN');
     expect(result.message).toMatch(/something went wrong/i);
   });
-
-  // (Removed: SSE decoder error mapping was deleted when the form path
-  // moved from propose → confirm-tool SSE to single-POST JSON via
-  // /api/chat/agent/ticket-action. No SSE is read on this path, so
-  // there's no protocol-leak message to friendlify.)
 });
 
 describe('mapTicketActionError — TicketActionFailure code branches', () => {

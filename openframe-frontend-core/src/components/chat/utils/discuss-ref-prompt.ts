@@ -25,7 +25,7 @@ import { sanitizeTitleForChat } from './slash-dispatch-utils';
 export interface DiscussPromptRef {
   /** documentType, e.g. `'roadmap_item'`. */
   type: string;
-  /** Primary key — the id from the `[card://type:id]` marker. */
+  /** Primary key — the id from the record link (`record://type/id`). */
   id: string;
   /** Display title. May be the bare id on a synthetic ref (Mingo). */
   title?: string | null;
@@ -46,7 +46,7 @@ export interface BuildDiscussPromptOptions {
  *
  * Falls back to `this item` when the ref has no usable title, matching the
  * long-standing SSE behavior. A title that is just the id (the synthetic ref a
- * Mingo `[card://…]` marker produces before its row loads) is treated as
+ * Mingo record link produces before its row loads) is treated as
  * missing, so the prompt never degrades to `Tell me more about 86ad3qvv5`.
  */
 export function buildDiscussPrompt(reference: DiscussPromptRef, options: BuildDiscussPromptOptions = {}): string {

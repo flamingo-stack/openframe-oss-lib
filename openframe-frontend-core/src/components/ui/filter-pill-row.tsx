@@ -160,7 +160,12 @@ function FilterPillRowSkeleton({
     <FilterPillRowFrame label={label} inert>
       {options
         ? options.map(option => (
-            <FilterPill key={option.value} label={option.label} count={option.count === undefined ? undefined : null} selected={false} />
+            <FilterPill
+              key={option.value}
+              label={option.label}
+              count={option.count === undefined ? undefined : null}
+              selected={false}
+            />
           ))
         : Array.from({ length: pills }, (_, i) => <InteractiveSkeleton.Button key={i} size={FILTER_PILL_SIZE} />)}
       {count && (

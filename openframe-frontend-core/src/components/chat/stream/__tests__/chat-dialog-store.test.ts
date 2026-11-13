@@ -1,15 +1,16 @@
 /**
- * Phase-3 tests — `createChatDialogStore` cross-side projection.
+ * `createChatDialogStore` cross-side projection.
  *
  * Exactly two operations fan out across sides of the same dialogId:
- * approval-resolution by requestId and tool-execution merge by execId.
+ * approval-resolution by its id and a tool's run merged by its call id.
  * The projection is recomputed from state (never re-injected into the other
  * side's seq stream), so per-side seq gates stay untouched and replays are
  * idempotent with full referential stability on untouched messages.
  */
 
 import { describe, it, expect } from 'vitest';
-import type { ChatStreamEvent } from '../../../../chat-protocol/events';
+import { approvalStatusOf, isToolPart, textOfParts, type ChatMessage } from '../../../../chat-protocol/chat-message';
+import type { ChatStreamEntry, UiChunk } from '../../../../chat-protocol/ui-chunks';
 import { createChatDialogStore, DEFAULT_MAX_REDUCERS, MAX_PENDING_RETAIN_KEYS } from '../chat-dialog-store';
 import type { EvictedReducerState } from '../chat-dialog-store';
 
@@ -21,40 +22,69 @@ const last = <T>(xs: readonly T[] | undefined): T | undefined => (xs === undefin
 
 const DIALOG = 'dlg-1';
 
-const batchApproval = (seq?: number): ChatStreamEvent => ({
-  type: 'approval-request',
-  requestId: 'req-1',
-  approvalType: 'CLIENT',
-  toolCalls: [
+const entry = (seq: number, ...chunks: UiChunk[]): ChatStreamEntry => ({ seq, chunks });
+const start = (seq: number): ChatStreamEntry => entry(seq, { type: 'start', messageId: `stream-${seq}` });
+const end = (seq: number): ChatStreamEntry => entry(seq, { type: 'finish', finishReason: 'stop' });
+const text = (delta: string, seq: number): ChatStreamEntry => entry(seq, { type: 'text-delta', id: 't1', delta });
+const participant = (seq: number, data: Record<string, unknown>): ChatStreamEntry =>
+  entry(seq, {
+    type: 'data-chat-participant',
+    transient: true,
+    data: { kind: 'message-request', text: '', ...data },
+  });
+
+/** A batched card: its row asks, on the request's batch. */
+const batchApproval = (seq: number): ChatStreamEntry =>
+  entry(
+    seq,
+    { type: 'tool-input-available', toolCallId: 'exec-1', toolName: 'run_command', input: null },
     {
-      toolExecutionRequestId: 'exec-1',
-      toolName: 'run_command',
-      requiresApproval: true,
-      approvalType: 'CLIENT',
-      toolCallArguments: null,
+      type: 'tool-approval-request',
+      approvalId: 'exec-1',
+      toolCallId: 'exec-1',
+      approvalDescriptor: { batchId: 'req-1', approvalType: 'CLIENT' },
     },
-  ],
-  ...(seq != null ? { seq } : {}),
+  );
+
+const approved = (seq: number, resolvedByName?: string): ChatStreamEntry =>
+  entry(seq, {
+    type: 'tool-approval-response',
+    approvalId: 'req-1',
+    approved: true,
+    ...(resolvedByName ? { toolMetadata: { resolvedByName } } : {}),
+  });
+
+const executed = (seq: number): ChatStreamEntry =>
+  entry(seq, { type: 'tool-output-available', toolCallId: 'exec-1', output: 'ok' });
+
+const textOf = (state: { messages: readonly ChatMessage[] }): string => textOfParts(last(state.messages)?.parts ?? []);
+const assistantSaying = (id: string, said: string): ChatMessage => ({
+  id,
+  role: 'assistant',
+  parts: [{ type: 'text', text: said }],
 });
 
 function seedBothSides(store: ReturnType<typeof createChatDialogStore>) {
   // Side A (client view) and side B (technician mirror) both saw the turn
   // with the approval card — each through its OWN seq stream.
   for (const side of ['main', 'observer'] as const) {
-    store.apply(DIALOG, side, { type: 'turn-start', seq: 1 });
-    store.apply(DIALOG, side, { type: 'text-delta', text: 'needs approval', seq: 2 });
+    store.apply(DIALOG, side, start(1));
+    store.apply(DIALOG, side, text('needs approval', 2));
     store.apply(DIALOG, side, batchApproval(3));
-    store.apply(DIALOG, side, { type: 'turn-end', seq: 4 });
+    store.apply(DIALOG, side, end(4));
   }
 }
 
+const rowOf = (state: { messages: readonly ChatMessage[] }) =>
+  state.messages.flatMap(message => message.parts).find(isToolPart);
+
 describe('createChatDialogStore — cross-side projection', () => {
-  it('(a) a same-id TEXT event on one side does NOT touch the other side', () => {
+  it('(a) a same-id TEXT chunk on one side does NOT touch the other side', () => {
     const store = createChatDialogStore();
     seedBothSides(store);
     const bBefore = store.getSnapshot(DIALOG, 'observer');
 
-    store.apply(DIALOG, 'main', { type: 'text-delta', text: 'main-only continuation', seq: 5 });
+    store.apply(DIALOG, 'main', text('main-only continuation', 5));
 
     expect(store.getSnapshot(DIALOG, 'observer')).toBe(bBefore);
     const aTrailing = last(store.getSnapshot(DIALOG, 'main').messages);
@@ -66,95 +96,63 @@ describe('createChatDialogStore — cross-side projection', () => {
     const store = createChatDialogStore();
     seedBothSides(store);
 
-    store.apply(DIALOG, 'main', {
-      type: 'approval-resolved',
-      requestId: 'req-1',
-      status: 'approved',
-      approvalType: 'CLIENT',
-      resolvedByName: 'Alice Client',
-      seq: 5,
-    });
+    store.apply(DIALOG, 'main', approved(5, 'Alice Client'));
 
     for (const side of ['main', 'observer'] as const) {
-      const messages = store.getSnapshot(DIALOG, side).messages;
-      const card = messages.flatMap(m => m.segments ?? []).find(s => s.type === 'approval_batch');
-      expect(card).toBeDefined();
-      expect((card as { status?: string }).status).toBe('approved');
-      expect((card as { resolvedByName?: string | null }).resolvedByName).toBe('Alice Client');
+      const state = store.getSnapshot(DIALOG, side);
+      const card = rowOf(state);
+      expect(card && approvalStatusOf(card)).toBe('approved');
+      expect(card?.toolMetadata?.resolvedByName).toBe('Alice Client');
       // Status map mirrored on both sides so future replays render resolved.
-      expect(store.getSnapshot(DIALOG, side).approvalStatuses['req-1']).toBe('approved');
+      expect(state.approvalStatuses['req-1']).toBe('approved');
     }
   });
 
   it('(b2) tool execution on side A merges into side B batch card WITHOUT appending', () => {
     const store = createChatDialogStore();
     seedBothSides(store);
-    store.apply(DIALOG, 'main', {
-      type: 'approval-resolved',
-      requestId: 'req-1',
-      status: 'approved',
-      seq: 5,
-    });
+    store.apply(DIALOG, 'main', approved(5));
 
-    store.apply(DIALOG, 'main', {
-      type: 'tool-execution',
-      data: {
-        type: 'EXECUTED_TOOL',
-        integratedToolType: 'SHELL',
-        toolFunction: 'run_command',
-        result: 'ok',
-        success: true,
-        toolExecutionRequestId: 'exec-1',
-      },
-      seq: 6,
-    });
+    store.apply(DIALOG, 'main', executed(6));
 
     const b = store.getSnapshot(DIALOG, 'observer');
-    const bSegments = b.messages.flatMap(m => m.segments ?? []);
-    const batch = bSegments.find(s => s.type === 'approval_batch');
-    expect((batch as { data: { executions?: Record<string, unknown> } }).data.executions).toEqual({
-      'exec-1': { status: 'done', result: 'ok', success: true },
-    });
+    expect(rowOf(b)).toMatchObject({ toolCallId: 'exec-1', state: 'output-available', output: 'ok' });
     // Merge-only projection: no standalone tool card appeared on side B.
-    expect(bSegments.filter(s => s.type === 'tool_execution')).toHaveLength(0);
+    expect(b.messages.flatMap(m => m.parts).filter(isToolPart)).toHaveLength(1);
   });
 
-  it('(c) replaying side A events after the projection: no double-application + Object.is stability on side B untouched messages', () => {
+  it('(b3) a tool side B never held is not grown on it', () => {
+    const store = createChatDialogStore();
+    seedBothSides(store);
+    const bBefore = store.getSnapshot(DIALOG, 'observer').messages;
+
+    store.apply(
+      DIALOG,
+      'main',
+      entry(5, { type: 'tool-input-available', toolCallId: 'exec-other', toolName: 'x', input: {} }),
+    );
+
+    expect(store.getSnapshot(DIALOG, 'observer').messages).toBe(bBefore);
+  });
+
+  it('(c) replaying side A chunks after the projection: no double-application + Object.is stability on side B untouched messages', () => {
     const store = createChatDialogStore();
     seedBothSides(store);
 
-    const resolve: ChatStreamEvent = {
-      type: 'approval-resolved',
-      requestId: 'req-1',
-      status: 'approved',
-      approvalType: 'CLIENT',
-      resolvedByName: 'Alice Client',
-      seq: 5,
-    };
-    const executedEvent: ChatStreamEvent = {
-      type: 'tool-execution',
-      data: {
-        type: 'EXECUTED_TOOL',
-        integratedToolType: 'SHELL',
-        toolFunction: 'run_command',
-        result: 'ok',
-        success: true,
-        toolExecutionRequestId: 'exec-1',
-      },
-      seq: 6,
-    };
+    const resolve = approved(5, 'Alice Client');
+    const executedEntry = executed(6);
     store.apply(DIALOG, 'main', resolve);
-    store.apply(DIALOG, 'main', executedEvent);
+    store.apply(DIALOG, 'main', executedEntry);
 
     const aState = store.getSnapshot(DIALOG, 'main');
     const bState = store.getSnapshot(DIALOG, 'observer');
     const bMessages = bState.messages;
 
-    // Replay side A's events (reconnect back-fill). Side A drops them via
+    // Replay side A's chunks (reconnect back-fill). Side A drops them via
     // its seq gate; the recomputed projection over side B is a value-level
     // no-op → identical references end-to-end.
     store.apply(DIALOG, 'main', resolve);
-    store.apply(DIALOG, 'main', executedEvent);
+    store.apply(DIALOG, 'main', executedEntry);
 
     expect(store.getSnapshot(DIALOG, 'main')).toBe(aState);
     const bAfter = store.getSnapshot(DIALOG, 'observer');
@@ -170,23 +168,14 @@ describe('createChatDialogStore — cross-side projection', () => {
     seedBothSides(store);
 
     // Side A resolves at a HIGH seq…
-    store.apply(DIALOG, 'main', {
-      type: 'approval-resolved',
-      requestId: 'req-1',
-      status: 'approved',
-      seq: 100,
-    });
+    store.apply(DIALOG, 'main', approved(100));
     // …side B's own stream continues at ITS low seq — must still apply.
-    store.apply(DIALOG, 'observer', { type: 'text-delta', text: ' b-continues', seq: 5 });
-    const bTrailing = last(store.getSnapshot(DIALOG, 'observer').messages);
-    const texts = (bTrailing?.segments ?? []).filter(s => s.type === 'text') as Array<{
-      text: string;
-    }>;
-    expect(last(texts)?.text).toContain('b-continues');
+    store.apply(DIALOG, 'observer', text(' b-continues', 5));
+    expect(textOf(store.getSnapshot(DIALOG, 'observer'))).toContain('b-continues');
   });
 
   /**
-   * The projection reaches the sides that EXIST when the event lands — it is a
+   * The projection reaches the sides that EXIST when the chunk lands — it is a
    * fan-out over the live reducer map, not a durable log. A side materialized
    * later (panel opened after the fact, or its key LRU-evicted and recreated)
    * therefore starts from history + the parked status map, NOT from replayed
@@ -202,14 +191,9 @@ describe('createChatDialogStore — cross-side projection', () => {
   it('(d) a side materialized AFTER the projection does not receive it retroactively', () => {
     const store = createChatDialogStore();
     // ONLY side A exists when the resolution arrives.
-    store.apply(DIALOG, 'main', { type: 'turn-start', seq: 1 });
+    store.apply(DIALOG, 'main', start(1));
     store.apply(DIALOG, 'main', batchApproval(2));
-    store.apply(DIALOG, 'main', {
-      type: 'approval-resolved',
-      requestId: 'req-1',
-      status: 'approved',
-      seq: 3,
-    });
+    store.apply(DIALOG, 'main', approved(3));
 
     // The projection created NO reducer for the absent side.
     expect(store.getSnapshot(DIALOG, 'observer').messages).toHaveLength(0);
@@ -218,7 +202,7 @@ describe('createChatDialogStore — cross-side projection', () => {
     // Side B opens now and replays its own history: it must learn the
     // resolution from the host (parked / persisted statuses), not from the
     // projection that already fired.
-    store.apply(DIALOG, 'observer', { type: 'turn-start', seq: 1 });
+    store.apply(DIALOG, 'observer', start(1));
     store.apply(DIALOG, 'observer', batchApproval(2));
     expect(store.getSnapshot(DIALOG, 'observer').approvalStatuses).toEqual({});
 
@@ -245,13 +229,13 @@ describe('createChatDialogStore — snapshot purity + reducer lifecycle', () => 
 
     // Behavioral proof that no entries were inserted: a real reducer created
     // BEFORE far more phantom reads than the LRU cap survives untouched.
-    store.apply('real', 'main', { type: 'turn-start', seq: 1 });
-    store.apply('real', 'main', { type: 'text-delta', text: 'kept', seq: 2 });
+    store.apply('real', 'main', start(1));
+    store.apply('real', 'main', text('kept', 2));
     for (let i = 0; i < DEFAULT_MAX_REDUCERS * 3; i += 1) {
       store.getSnapshot(`phantom-${i}`);
     }
     const kept = store.getSnapshot('real', 'main');
-    expect(last(last(kept.messages)?.segments)).toEqual({ type: 'text', text: 'kept' });
+    expect(textOf(kept)).toBe('kept');
   });
 
   it('evicts least-recently-used reducers past the cap, keeping the recently-applied ones', () => {
@@ -264,10 +248,7 @@ describe('createChatDialogStore — snapshot purity + reducer lifecycle', () => 
     // d1 is the LRU → evicted; its snapshot falls back to EMPTY_STATE.
     expect(store.getSnapshot('d1', 'main').messages).toEqual([]);
     for (const id of ['d2', 'd3']) {
-      expect(last(last(store.getSnapshot(id, 'main').messages)?.segments)).toEqual({
-        type: 'text',
-        text: id,
-      });
+      expect(textOf(store.getSnapshot(id, 'main'))).toBe(id);
     }
   });
 
@@ -276,8 +257,8 @@ describe('createChatDialogStore — snapshot purity + reducer lifecycle', () => 
     finishedTurn(store, 'd1', 'd1');
     finishedTurn(store, 'd2', 'd2');
     // Touch d1 so d2 becomes the least-recently-used…
-    store.apply('d1', 'main', { type: 'text-delta', text: '!', seq: 5 });
-    store.apply('d1', 'main', { type: 'turn-end', seq: 6 });
+    store.apply('d1', 'main', text('!', 5));
+    store.apply('d1', 'main', end(6));
     // …then a third dialog evicts d2, not d1.
     finishedTurn(store, 'd3', 'd3');
 
@@ -288,10 +269,10 @@ describe('createChatDialogStore — snapshot purity + reducer lifecycle', () => 
 });
 
 /** One complete (idle-at-the-end) turn — the only shape the LRU may evict. */
-function finishedTurn(store: ReturnType<typeof createChatDialogStore>, dialogId: string, text: string): void {
-  store.apply(dialogId, 'main', { type: 'turn-start', seq: 1 });
-  store.apply(dialogId, 'main', { type: 'text-delta', text, seq: 2 });
-  store.apply(dialogId, 'main', { type: 'turn-end', seq: 3 });
+function finishedTurn(store: ReturnType<typeof createChatDialogStore>, dialogId: string, said: string): void {
+  store.apply(dialogId, 'main', start(1));
+  store.apply(dialogId, 'main', text(said, 2));
+  store.apply(dialogId, 'main', end(3));
 }
 
 describe('createChatDialogStore — eviction safety', () => {
@@ -299,8 +280,8 @@ describe('createChatDialogStore — eviction safety', () => {
     const store = createChatDialogStore({ maxReducers: 1 });
 
     // A live turn on `live`: no turn-end, so the phase is still streaming.
-    store.apply('live', 'main', { type: 'turn-start', seq: 1 });
-    store.apply('live', 'main', { type: 'text-delta', text: 'half a sen', seq: 2 });
+    store.apply('live', 'main', start(1));
+    store.apply('live', 'main', text('half a sen', 2));
     expect(store.getSnapshot('live', 'main').streamingPhase).not.toBe('idle');
 
     // Ten other dialogs churn through the cap of 1.
@@ -313,7 +294,7 @@ describe('createChatDialogStore — eviction safety', () => {
     expect(live.streamingPhase).not.toBe('idle');
 
     // …and once the turn finishes it becomes evictable again.
-    store.apply('live', 'main', { type: 'turn-end', seq: 3 });
+    store.apply('live', 'main', end(3));
     for (let i = 0; i < 10; i += 1) finishedTurn(store, `later-${i}`, 'x');
     expect(store.getSnapshot('live', 'main').messages).toEqual([]);
   });
@@ -324,10 +305,7 @@ describe('createChatDialogStore — eviction safety', () => {
     const release = store.retain('pinned', 'main');
 
     for (let i = 0; i < 10; i += 1) finishedTurn(store, `noise-${i}`, 'x');
-    expect(last(last(store.getSnapshot('pinned', 'main').messages)?.segments)).toEqual({
-      type: 'text',
-      text: 'pinned-text',
-    });
+    expect(textOf(store.getSnapshot('pinned', 'main'))).toBe('pinned-text');
 
     release();
     for (let i = 0; i < 10; i += 1) finishedTurn(store, `more-${i}`, 'x');
@@ -403,7 +381,7 @@ describe('createChatDialogStore — eviction safety', () => {
     });
     expect(recreated.state.approvalStatuses).toEqual({ 'req-1': 'approved' });
     // The restored seq gate drops an already-applied replay.
-    recreated.apply({ type: 'text-delta', text: 'replayed', seq: 2 });
+    recreated.apply(text('replayed', 2));
     expect(recreated.state.messages).toEqual([]);
   });
 
@@ -420,19 +398,15 @@ describe('createChatDialogStore — eviction safety', () => {
       const parked: EvictedReducerState[] = [];
       const store = createChatDialogStore({
         maxReducers: 1,
-        defaultCreateOptions: () => ({
-          transport: 'nats',
-          ownEchoIncludesAdmin: true,
-          selfUserId: 'me',
-        }),
+        defaultCreateOptions: () => ({ ownEchoIncludesAdmin: true, selfUserId: 'me' }),
         onEvict: (_dialogId, _side, state) => parked.push(state),
       });
       // A send made DURING a turn: the turn ends (phase → idle, so the key is
       // evictable) while the send's echo is still in flight.
-      store.apply('first', 'main', { type: 'turn-start', seq: 1 });
+      store.apply('first', 'main', start(1));
       now += 1;
       store.mutate('first', 'main', r => r.pushOptimisticSend('hello world'));
-      store.apply('first', 'main', { type: 'turn-end', seq: 2 });
+      store.apply('first', 'main', end(2));
 
       store.getReducer('second', 'main');
       expect(parked).toHaveLength(1);
@@ -443,14 +417,7 @@ describe('createChatDialogStore — eviction safety', () => {
         pendingEchoes: parked[0].pendingEchoes,
         lastAppliedSeq: parked[0].lastAppliedSeq,
       });
-      recreated.apply({
-        type: 'participant',
-        kind: 'message-request',
-        text: 'hello world',
-        ownerType: 'ADMIN',
-        userId: 'me',
-        seq: 3,
-      });
+      recreated.apply(participant(3, { text: 'hello world', ownerType: 'ADMIN', userId: 'me' }));
       expect(recreated.state.messages.filter(m => m.role === 'user')).toHaveLength(1);
     } finally {
       Date.now = realNow;
@@ -542,9 +509,7 @@ describe('createChatDialogStore — eviction safety', () => {
     store.retain('pinned', 'main');
 
     const reducer = store.getReducer('fresh', 'main');
-    reducer.setMessages([
-      { id: 'm1', role: 'assistant', content: 'hello', segments: [{ type: 'text', text: 'hello' }] },
-    ]);
+    reducer.setMessages([assistantSaying('m1', 'hello')]);
 
     // The just-created reducer must still be the store's — not a detached
     // instance whose key resolves to EMPTY_STATE.
@@ -556,8 +521,8 @@ describe('createChatDialogStore — eviction safety', () => {
 
   /**
    * REGRESSION (round 10): the round-3 guard protected only the ONE key
-   * `getReducer` was inserting. `useChatStreamReducer` calls `getReducer`
-   * during RENDER and `retain()` in an EFFECT, so React renders every panel of
+   * `getReducer` was inserting. A host may call `getReducer`
+   * during RENDER and `retain()` in an EFFECT, and React renders every panel of
    * a commit before ANY retain lands — mounting `maxReducers + 1` panels with
    * distinct dialogIds in one commit let render #(cap+1) evict the key render
    * #1 had just created. Panel #1 kept its reducer object, but `getSnapshot`
@@ -574,16 +539,14 @@ describe('createChatDialogStore — eviction safety', () => {
     // One React commit: N renders, each a `getReducer`, ZERO retains yet.
     const reducers = Array.from({ length: max + 3 }, (_, i) => store.getReducer(`panel-${i}`, 'main'));
     reducers.forEach((r, i) => {
-      r.setMessages([
-        { id: `m-${i}`, role: 'assistant', content: `thread ${i}`, segments: [{ type: 'text', text: `thread ${i}` }] },
-      ]);
+      r.setMessages([assistantSaying(`m-${i}`, `thread ${i}`)]);
     });
 
     // Nothing was dropped, and every panel still sees its OWN thread.
     expect(evicted).toEqual([]);
     reducers.forEach((r, i) => {
       expect(store.getReducer(`panel-${i}`, 'main')).toBe(r);
-      expect(last(store.getSnapshot(`panel-${i}`, 'main').messages)?.content).toBe(`thread ${i}`);
+      expect(textOf(store.getSnapshot(`panel-${i}`, 'main'))).toBe(`thread ${i}`);
     });
 
     // The effects that follow the commit pin what is still mounted.
@@ -637,14 +600,7 @@ describe('createChatDialogStore — eviction safety', () => {
 
     const early = Array.from({ length: max }, (_, i) => store.getReducer(`panel-${i}`, 'main'));
     early.forEach((r, i) => {
-      r.setMessages([
-        {
-          id: `m-${i}`,
-          role: 'assistant',
-          content: `thread ${i}`,
-          segments: [{ type: 'text', text: `thread ${i}` }],
-        },
-      ]);
+      r.setMessages([assistantSaying(`m-${i}`, `thread ${i}`)]);
     });
 
     // React yields mid-render; the microtask queue drains before it resumes.
@@ -659,7 +615,7 @@ describe('createChatDialogStore — eviction safety', () => {
     expect(evicted).toEqual([]);
     early.forEach((r, i) => {
       expect(store.getReducer(`panel-${i}`, 'main')).toBe(r);
-      expect(last(store.getSnapshot(`panel-${i}`, 'main').messages)?.content).toBe(`thread ${i}`);
+      expect(textOf(store.getSnapshot(`panel-${i}`, 'main'))).toBe(`thread ${i}`);
     });
 
     // The effects that follow the commit pin what is still mounted.
@@ -676,9 +632,7 @@ describe('createChatDialogStore — eviction safety', () => {
    *  make the key evictable again inside the same task — no timer involved. */
   it('drops the pending-retain protection at the first retain(), not on a timer', () => {
     const store = createChatDialogStore({ maxReducers: 1 });
-    store
-      .getReducer('a', 'main')
-      .setMessages([{ id: 'm1', role: 'assistant', content: 'a-text', segments: [{ type: 'text', text: 'a-text' }] }]);
+    store.getReducer('a', 'main').setMessages([assistantSaying('m1', 'a-text')]);
 
     // The effect lands, then the panel unmounts — all in the same task.
     store.retain('a', 'main')();
@@ -710,8 +664,8 @@ describe('createChatDialogStore — eviction safety', () => {
     );
   });
 
-  /** Event-phase creations are NOT group-protected: nobody holds those
-   *  instances past the call, so a burst of events across many dialogs must
+  /** Chunk-phase creations are NOT group-protected: nobody holds those
+   *  instances past the call, so a burst of chunks across many dialogs must
    *  still evict down to the cap inside the same task. */
   it('apply()-created keys still evict synchronously within one task', () => {
     const store = createChatDialogStore({ maxReducers: 1 });
@@ -728,20 +682,14 @@ describe('createChatDialogStore — eviction safety', () => {
    *  instance. */
   it('reducers first created by apply() use the store-level defaultCreateOptions', () => {
     const store = createChatDialogStore({
-      defaultCreateOptions: () => ({ transport: 'nats', ownEchoIncludesAdmin: true }),
+      defaultCreateOptions: () => ({ ownEchoIncludesAdmin: true }),
     });
-    // First touch is an EVENT, not a render.
-    store.apply('d1', 'main', { type: 'participant', kind: 'system', text: 'joined', seq: 1 });
+    // First touch is a CHUNK, not a render.
+    store.apply('d1', 'main', participant(1, { kind: 'system', text: 'joined' }));
     store.mutate('d1', 'main', r => r.pushOptimisticSend('ok'));
-    store.apply('d1', 'main', {
-      type: 'participant',
-      kind: 'message-request',
-      text: 'ok',
-      ownerType: 'ADMIN',
-      seq: 2,
-    });
+    store.apply('d1', 'main', participant(2, { text: 'ok', ownerType: 'ADMIN' }));
     // ownEchoIncludesAdmin was honoured → the ADMIN echo was consumed.
-    expect(store.getSnapshot('d1', 'main').messages.filter(m => m.content === 'ok')).toHaveLength(1);
+    expect(store.getSnapshot('d1', 'main').messages.filter(m => textOfParts(m.parts) === 'ok')).toHaveLength(1);
   });
 
   it('remove() notifies only when something was actually deleted', () => {
@@ -791,5 +739,55 @@ describe('createChatDialogStore — eviction safety', () => {
     releaseB();
     for (let i = 0; i < 5; i += 1) finishedTurn(store, `last-${i}`, 'x');
     expect(store.getSnapshot('d1', 'main').messages).toEqual([]);
+  });
+});
+
+describe('createChatDialogStore: a tool that reports on its own row', () => {
+  const rejectedResult = (seq: number): ChatStreamEntry =>
+    entry(
+      seq,
+      { type: 'tool-approval-response', approvalId: 'req-1', approved: false },
+      { type: 'tool-output-denied', toolCallId: 'req-1' },
+    );
+  const refusedReport = (seq: number): ChatStreamEntry =>
+    entry(
+      seq,
+      { type: 'tool-approval-response', approvalId: 'exec-1', approved: true },
+      { type: 'tool-output-error', toolCallId: 'exec-1', errorText: 'Rejected by user' },
+    );
+
+  it('is no answer on either side: a rejected batch stays rejected, and no status names its row', () => {
+    const store = createChatDialogStore();
+    seedBothSides(store);
+
+    store.apply(DIALOG, 'main', rejectedResult(5));
+    store.apply(DIALOG, 'main', refusedReport(6));
+
+    for (const side of ['main', 'observer'] as const) {
+      const state = store.getSnapshot(DIALOG, side);
+      expect(state.approvalStatuses).toEqual({ 'req-1': 'rejected' });
+      const card = rowOf(state);
+      expect(card && approvalStatusOf(card)).toBe('rejected');
+      expect(card?.state).toBe('output-denied');
+    }
+  });
+
+  it('still moves the row on the other side when it runs', () => {
+    const store = createChatDialogStore();
+    seedBothSides(store);
+
+    store.apply(
+      DIALOG,
+      'main',
+      entry(
+        5,
+        { type: 'tool-approval-response', approvalId: 'exec-1', approved: true },
+        { type: 'tool-input-available', toolCallId: 'exec-1', toolName: 'run_command', input: {} },
+      ),
+    );
+
+    const observer = store.getSnapshot(DIALOG, 'observer');
+    expect(rowOf(observer)?.state).toBe('approval-responded');
+    expect(observer.approvalStatuses).toEqual({});
   });
 });

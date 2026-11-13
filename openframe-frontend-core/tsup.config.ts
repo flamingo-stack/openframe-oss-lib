@@ -112,11 +112,11 @@ export default defineConfig([
       // subpath so the hub's `lib/config/doc-sources.ts` can import without
       // crossing the "use client" boundary on the components/docs barrel.
       'types/doc-source': 'src/types/doc-source.ts',
-      // Chat wire-protocol SSOT — SSE frame shapes + encoders + the
-      // timer-free frame decoder + NATS chunk decoder. Server-safe (no
-      // React, TextEncoder/TextDecoder only) so the hub's stream ROUTE
-      // imports the emit side from the same module the client hooks
-      // decode with — emitter and parser can't drift.
+      // Chat wire-protocol SSOT — the chat message, the UI message stream's
+      // chunks and writer, and the one decoder. Server-safe (no React,
+      // TextEncoder/TextDecoder only) so the hub's stream ROUTE writes with
+      // the same module the client hooks read with — writer and reader
+      // can't drift.
       'chat-protocol/index': 'src/chat-protocol/index.ts',
     },
     format: ['cjs'],

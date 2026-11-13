@@ -43,6 +43,9 @@ export interface OnboardingGuide {
   highlight_video_source: string | null;
   video_bites: unknown[];
 
+  /** Where the guide opens, as the server answers it (absolute). */
+  url?: string | null;
+
   // Images
   featured_image: string | null;
   og_image_url: string | null;

@@ -73,10 +73,10 @@ export const TRUST_CENTER_CACHE_SECONDS = 300;
 /** CDN freshness of a document file served through the hub (`…/documents/{id}`): a file changes rarely. */
 export const TRUST_CENTER_DOCUMENT_CACHE_SECONDS = 3600;
 
-/** The single chat card id (`[card://trust_center:main]`). */
+/** The single chat card id (`record://trust_center/main`). */
 export const TRUST_CENTER_CARD_ID = 'main';
 
-/** Chat `documentType` of the trust-center card (`[card://trust_center:main]`). */
+/** Chat `documentType` of the trust-center card (`record://trust_center/main`). */
 export const TRUST_CENTER_DOCUMENT_TYPE = 'trust_center';
 
 /** Default public page route (the hub's `/trust-center`). The chat card links here

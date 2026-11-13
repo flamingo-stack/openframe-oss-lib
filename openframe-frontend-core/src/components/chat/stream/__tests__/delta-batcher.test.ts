@@ -8,12 +8,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { ChatStreamEvent } from '../../../../chat-protocol/events';
-import { createDeltaBatcher, type DeltaEvent } from '../delta-batcher';
+import type { ChatStreamEntry } from '../../../../chat-protocol/ui-chunks';
+import { createDeltaBatcher, type DeltaEntry } from '../delta-batcher';
 
-const text = (t: string, extra: Partial<ChatStreamEvent> = {}): ChatStreamEvent =>
-  ({ type: 'text-delta', text: t, ...extra }) as ChatStreamEvent;
-const thinking = (t: string): ChatStreamEvent => ({ type: 'thinking-delta', text: t });
+const text = (delta: string, { seq, id = 't1' }: { seq?: number; id?: string } = {}): ChatStreamEntry => ({
+  ...(seq != null ? { seq } : {}),
+  chunks: [{ type: 'text-delta', id, delta }],
+});
+const reasoning = (delta: string): ChatStreamEntry => ({ chunks: [{ type: 'reasoning-delta', id: 'r1', delta }] });
+const FINISH: ChatStreamEntry = { chunks: [{ type: 'finish', finishReason: 'stop' }] };
+const said = (entry: DeltaEntry): string => entry.chunks[0].delta;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -27,8 +31,8 @@ afterEach(() => {
 });
 
 describe('createDeltaBatcher', () => {
-  it('coalesces a burst of consecutive text-deltas into ONE apply', () => {
-    const applied: DeltaEvent[] = [];
+  it('coalesces a burst of consecutive text deltas into ONE apply', () => {
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e) });
 
     for (let i = 0; i < 60; i += 1) b.push(text(`${i} `));
@@ -37,31 +41,31 @@ describe('createDeltaBatcher', () => {
 
     b.flush();
     expect(applied).toHaveLength(1);
-    expect(applied[0].text).toBe(Array.from({ length: 60 }, (_, i) => `${i} `).join(''));
+    expect(said(applied[0])).toBe(Array.from({ length: 60 }, (_, i) => `${i} `).join(''));
   });
 
-  it('does NOT coalesce across delta types, or across a differing `leading` flag', () => {
-    const applied: DeltaEvent[] = [];
+  it('does NOT coalesce across delta types, or across wire ids', () => {
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e) });
 
     b.push(text('a'));
-    b.push(thinking('t1'));
-    b.push(thinking('t2'));
-    b.push(text('b', { leading: true }));
-    b.push(text('c', { leading: true }));
+    b.push(reasoning('t1'));
+    b.push(reasoning('t2'));
+    b.push(text('b', { id: 't2' }));
+    b.push(text('c', { id: 't2' }));
     b.push(text('d'));
     b.flush();
 
-    expect(applied.map(e => [e.type, e.text])).toEqual([
+    expect(applied.map(e => [e.chunks[0].type, said(e)])).toEqual([
       ['text-delta', 'a'],
-      ['thinking-delta', 't1t2'],
+      ['reasoning-delta', 't1t2'],
       ['text-delta', 'bc'],
       ['text-delta', 'd'],
     ]);
   });
 
-  it('carries the LATEST seq onto the coalesced event', () => {
-    const applied: DeltaEvent[] = [];
+  it('carries the LATEST seq onto the coalesced entry', () => {
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e) });
     b.push(text('a', { seq: 1 }));
     b.push(text('b', { seq: 2 }));
@@ -79,7 +83,7 @@ describe('createDeltaBatcher', () => {
    * gate. It is pushed as its OWN entry so the gate can do its job.
    */
   it('does NOT coalesce a delta whose seq does not advance past the tail', () => {
-    const applied: DeltaEvent[] = [];
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e) });
     b.push(text('a', { seq: 1 }));
     b.push(text('b', { seq: 2 }));
@@ -88,7 +92,7 @@ describe('createDeltaBatcher', () => {
     b.push(text('a', { seq: 1 }));
     expect(b.pendingCount).toBe(3);
     b.flush();
-    expect(applied.map(e => [e.seq, e.text])).toEqual([
+    expect(applied.map(e => [e.seq, said(e)])).toEqual([
       [2, 'ab'],
       [2, 'b'],
       [1, 'a'],
@@ -102,51 +106,62 @@ describe('createDeltaBatcher', () => {
    * batch's position past the reducer's gate.
    */
   it('does NOT coalesce a seq-bearing delta onto a seq-LESS tail', () => {
-    const applied: DeltaEvent[] = [];
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e) });
     b.push(text('a'));
     b.push(text('b', { seq: 2 }));
     expect(b.pendingCount).toBe(2);
     b.flush();
-    expect(applied.map(e => [e.seq, e.text])).toEqual([
+    expect(applied.map(e => [e.seq, said(e)])).toEqual([
       [undefined, 'a'],
       [2, 'b'],
     ]);
   });
 
   it('does NOT coalesce a seq-less delta onto a seq-BEARING tail', () => {
-    const applied: DeltaEvent[] = [];
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e) });
     b.push(text('a', { seq: 1 }));
     b.push(text('b'));
     expect(b.pendingCount).toBe(2);
     b.flush();
-    expect(applied.map(e => [e.seq, e.text])).toEqual([
+    expect(applied.map(e => [e.seq, said(e)])).toEqual([
       [1, 'a'],
       [undefined, 'b'],
     ]);
   });
 
-  it('never mutates the caller-supplied event objects', () => {
+  it('never mutates the caller-supplied entries', () => {
     const b = createDeltaBatcher({ applyOne: () => {} });
     const first = text('a');
     b.push(first);
     b.push(text('b'));
     b.flush();
-    expect((first as DeltaEvent).text).toBe('a');
+    expect(first).toEqual(text('a'));
   });
 
-  it('returns false for non-delta events and leaves them unqueued', () => {
-    const applied: DeltaEvent[] = [];
+  it('returns false for anything but a delta and leaves it unqueued', () => {
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e) });
     expect(b.push(text('a'))).toBe(true);
-    expect(b.push({ type: 'turn-end' })).toBe(false);
+    expect(b.push(FINISH)).toBe(false);
     expect(b.pendingCount).toBe(1);
     expect(applied).toHaveLength(0);
   });
 
+  it('an entry of several chunks is not a delta: its chunks stay together', () => {
+    const b = createDeltaBatcher({ applyOne: () => {} });
+    const entry: ChatStreamEntry = {
+      chunks: [
+        { type: 'text-delta', id: 't1', delta: 'a' },
+        { type: 'text-delta', id: 't1', delta: 'b' },
+      ],
+    };
+    expect(b.push(entry)).toBe(false);
+  });
+
   it('flushes on the timer fallback when rAF is unavailable', () => {
-    const applied: DeltaEvent[] = [];
+    const applied: DeltaEntry[] = [];
     const flushes: number[] = [];
     const b = createDeltaBatcher({
       applyOne: e => applied.push(e),
@@ -158,17 +173,17 @@ describe('createDeltaBatcher', () => {
     expect(applied).toHaveLength(0);
 
     vi.advanceTimersByTime(50);
-    expect(applied.map(e => e.text)).toEqual(['ab']);
+    expect(applied.map(said)).toEqual(['ab']);
     expect(flushes).toEqual([1]);
 
     // Timer is one-shot per batch: a later delta arms a fresh one.
     b.push(text('c'));
     vi.advanceTimersByTime(50);
-    expect(applied.map(e => e.text)).toEqual(['ab', 'c']);
+    expect(applied.map(said)).toEqual(['ab', 'c']);
   });
 
   it('honours a custom fallbackMs', () => {
-    const applied: DeltaEvent[] = [];
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e), fallbackMs: 200 });
     b.push(text('a'));
     vi.advanceTimersByTime(199);
@@ -180,7 +195,7 @@ describe('createDeltaBatcher', () => {
   it('flushes the pending batch against the PREVIOUS key when the key changes', () => {
     const applied: Array<[string, string]> = [];
     const b = createDeltaBatcher<string>({
-      applyOne: (e, key) => applied.push([key ?? '<none>', e.text]),
+      applyOne: (e, key) => applied.push([key ?? '<none>', said(e)]),
     });
 
     b.push(text('for-a1'), 'A');
@@ -196,22 +211,22 @@ describe('createDeltaBatcher', () => {
     ]);
   });
 
-  it('flushes on key change even for a NON-delta event', () => {
+  it('flushes on key change even for an entry that is not a delta', () => {
     const applied: Array<[string, string]> = [];
     const b = createDeltaBatcher<string>({
-      applyOne: (e, key) => applied.push([key ?? '<none>', e.text]),
+      applyOne: (e, key) => applied.push([key ?? '<none>', said(e)]),
     });
     b.push(text('a'), 'A');
-    expect(b.push({ type: 'turn-end' }, 'B')).toBe(false);
+    expect(b.push(FINISH, 'B')).toBe(false);
     expect(applied).toEqual([['A', 'a']]);
   });
 
   it('dispose() flushes the tail and cancels the pending timer', () => {
-    const applied: DeltaEvent[] = [];
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e) });
     b.push(text('tail'));
     b.dispose();
-    expect(applied.map(e => e.text)).toEqual(['tail']);
+    expect(applied.map(said)).toEqual(['tail']);
     vi.advanceTimersByTime(1000);
     expect(applied).toHaveLength(1);
   });
@@ -238,7 +253,7 @@ describe('createDeltaBatcher — rAF path', () => {
     vi.stubGlobal('requestAnimationFrame', raf);
     vi.stubGlobal('cancelAnimationFrame', cancel);
 
-    const applied: DeltaEvent[] = [];
+    const applied: DeltaEntry[] = [];
     const b = createDeltaBatcher({ applyOne: e => applied.push(e) });
     b.push(text('a'));
     const rafCb = raf.mock.calls[0]?.[0];
@@ -246,7 +261,7 @@ describe('createDeltaBatcher — rAF path', () => {
 
     b.flush();
     expect(cancel).toHaveBeenCalledWith(7);
-    expect(applied.map(e => e.text)).toEqual(['a']);
+    expect(applied.map(said)).toEqual(['a']);
 
     // A late rAF callback for the already-flushed batch is harmless.
     if (!rafCb) throw new Error('the batcher never scheduled a rAF callback to replay');

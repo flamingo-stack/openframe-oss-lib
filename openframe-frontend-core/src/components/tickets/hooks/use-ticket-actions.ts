@@ -4,9 +4,9 @@
  * All 5 ticket write actions funnel through one helper:
  * `executeTicketAction()`, which POSTs to `/api/chat/agent/ticket-action`
  * — a single-roundtrip endpoint that runs the SAME `ChatToolHandler.execute`
- * the chat agent's `confirm-tool` route uses (same ACL re-bind, same audit
+ * the chat's approval runs (same ACL re-bind, same audit
  * row, same HubSpot REST call). The only difference is REST shape: the
- * chat path needs `propose → confirm-tool` because the LLM emits a
+ * chat path needs propose → approve because the LLM emits a
  * `tool_use` the user must approve in a proposal card. The /tickets form
  * has no approval step (the user already clicked "Open ticket" / "Send"),
  * so the two-step is pure overhead — we collapse to one POST + JSON.
@@ -31,10 +31,10 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChatAttachment } from '../../../chat-protocol/attachment';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { randomId } from '../../../utils/random-id';
-import type { ChatAttachment } from '../../chat/utils/chat-attachment-markdown';
 import { useOptionalTicketLive } from '../ticket-live-provider';
 import {
   type MappedTicketActionError,

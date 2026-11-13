@@ -226,7 +226,7 @@ export function getSourceLabel(tableId: string): string {
  *
  * Mirrors the canonical lookup the hub registers via
  * `lib/config/rag-table-config.ts:tableIdForDocumentType()` — same vocabulary
- * the LLM emits inside `[card://<type>:<id>]` markers, same tableIds the
+ * the LLM emits inside record links (`record://<type>/<id>`), same tableIds the
  * retrieval layer routes by, and same set of keys covered by
  * `SOURCE_ICON_NAMES` / `SOURCE_LABELS_BY_TABLE` above.
  *

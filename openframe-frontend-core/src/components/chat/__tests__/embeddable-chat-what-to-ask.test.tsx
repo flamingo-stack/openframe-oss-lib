@@ -17,15 +17,16 @@ vi.mock('../../../utils/embed-authed-fetch', async importOriginal => ({
   embedAuthedFetch: vi.fn(() => new Promise(() => {})),
 }));
 
+import type { ChatMessage } from '../../../chat-protocol/chat-message';
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
 import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
+import { ChatEngineProvider } from '../engine/chat-engine-context';
 import type { WhatToAskContent } from '../hooks/use-what-to-ask';
-import type { UnifiedChatMessage, UnifiedChatState } from '../types/unified-chat-state.types';
+import type { UnifiedChatState } from '../types/unified-chat-state.types';
 
 const runtime: ChatRuntime = {
   endpoints: {
     chatStreamUrl: '/api/docs/chat',
-    approvalToolUrl: '/api/chat/agent/confirm-tool',
     commandsUrl: '/api/docs/commands',
     buildListUrl: () => null,
     attachmentUploadUrl: '/api/storage/generate-upload-url',
@@ -42,13 +43,20 @@ const WHAT_TO_ASK: WhatToAskContent = {
   note: 'A note under the chips.',
 };
 
-const HELLO: UnifiedChatMessage = { id: 'm-1', role: 'user', content: 'hello', timestamp: new Date(0) };
+const HELLO: ChatMessage = {
+  id: 'm-1',
+  role: 'user',
+  metadata: { createdAt: new Date(0).toISOString() },
+  parts: [{ type: 'text', text: 'hello' }],
+};
 
 /** A host that owns the dialogs; a send from a new chat creates `d-new`. */
 function Host({
   initialDialogId = null,
   onReset,
   onSend,
+  onAdapterSend,
+  locked = false,
   openChat = [HELLO],
   busy = false,
   whatToAsk = WHAT_TO_ASK,
@@ -58,8 +66,12 @@ function Host({
   initialDialogId?: string | null;
   onReset?: () => void;
   onSend?: (text: string) => void;
+  /** The adapter's own `actions`: nothing in the panel may reach past the panel's send to them. */
+  onAdapterSend?: (text: string) => void;
+  /** The chat cannot take a message. */
+  locked?: boolean;
   /** What the open chat `d-1` holds. */
-  openChat?: UnifiedChatMessage[];
+  openChat?: ChatMessage[];
   /** A turn is running in the open chat. */
   busy?: boolean;
   whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
@@ -68,8 +80,11 @@ function Host({
   handleRef?: Ref<EmbeddableChatHandle>;
 }) {
   const [activeDialogId, setActiveDialogId] = useState<string | null>(initialDialogId);
-  const [sent, setSent] = useState<UnifiedChatMessage[]>([]);
+  const [sent, setSent] = useState<ChatMessage[]>([]);
   const noop = () => {};
+  const adapterSend = (text: string) => {
+    onAdapterSend?.(text);
+  };
   const asyncNoop = async () => {};
   const state: UnifiedChatState = {
     messages: activeDialogId === 'd-1' ? openChat : activeDialogId === 'd-new' ? sent : [],
@@ -77,7 +92,7 @@ function Host({
     streamingPhase: 'idle',
     sendMessage: text => {
       onSend?.(text);
-      setSent([{ id: 'sent', role: 'user', content: text, timestamp: new Date() }]);
+      setSent([{ id: 'sent', role: 'user', parts: [{ type: 'text', text: text }] }]);
       setActiveDialogId(current => current ?? 'd-new');
       return Promise.resolve();
     },
@@ -107,28 +122,34 @@ function Host({
     loadMoreDialogs: asyncNoop,
     hasMoreMessages: false,
     loadMoreMessages: asyncNoop,
-    approveRequest: asyncNoop,
-    rejectRequest: asyncNoop,
+    // What every real adapter hands the thread: a send that knows nothing of the panel's exchange or its lock.
+    actions: {
+      selectAsk: adapterSend,
+      pickSuggestion: adapterSend,
+    },
     dialogTokenUsage: null,
     connectionState: 'connected',
+    dialogCapabilities: {
+      canRename: true,
+      fetchArchivedDialogs: () => Promise.resolve({ dialogs: [], nextCursor: null }),
+    },
   };
   return (
-    <EmbeddableChat
-      ref={handleRef}
-      shell="inline"
-      appearance="v2"
-      defaultOpen
-      defaultActiveMode="mingo"
-      showInternalTrigger={false}
-      mingoState={state}
-      mingoDialogCapabilities={{
-        canRename: true,
-        fetchArchivedDialogs: () => Promise.resolve({ dialogs: [], nextCursor: null }),
-      }}
-      whatToAsk={whatToAsk}
-      onWhatToAsk={onWhatToAsk}
-      chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
-    />
+    <ChatEngineProvider engine={state}>
+      <EmbeddableChat
+        ref={handleRef}
+        shell="inline"
+        appearance="v2"
+        defaultOpen
+        defaultActiveMode="mingo"
+        showInternalTrigger={false}
+
+        composerLock={locked ? { placeholder: 'Out of balance' } : null}
+        whatToAsk={whatToAsk}
+        onWhatToAsk={onWhatToAsk}
+        chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
+      />
+    </ChatEngineProvider>
   );
 }
 
@@ -226,6 +247,30 @@ describe('EmbeddableChat - whatToAsk', () => {
     // The send went out and made its dialog (it is in the list now).
     expect((await screen.findAllByText('Sent')).length).toBeGreaterThan(0);
     expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
+  });
+
+  it('a picked prompt goes through the panel, not past it to the adapter', () => {
+    const onSend = vi.fn();
+    const onAdapterSend = vi.fn();
+    renderHost({ onSend, onAdapterSend });
+
+    fireEvent.click(whatToAsk());
+    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
+
+    expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
+    expect(onAdapterSend).not.toHaveBeenCalled();
+  });
+
+  it('a picked prompt does not go out while the chat cannot take a message', () => {
+    const onSend = vi.fn();
+    const onAdapterSend = vi.fn();
+    renderHost({ onSend, onAdapterSend, locked: true });
+
+    fireEvent.click(whatToAsk());
+    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(onAdapterSend).not.toHaveBeenCalled();
   });
 
   it('opens a new chat from the archive list, not into the chat open before it', async () => {
