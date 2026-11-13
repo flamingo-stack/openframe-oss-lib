@@ -2341,6 +2341,7 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, held, extras }: 
   if (isLoading) {
     return finish(
       fetchEntry.skeleton?.() ?? null,
+      // loading-standard-ok(OPTIONAL_MARK): `entry.disclosure` is the card registry's, not a read field, and the loaded card draws the same button
       entry.disclosure ? <ChatCardDisclosureButton kind={entry.disclosure} loading /> : undefined,
       true,
     );
