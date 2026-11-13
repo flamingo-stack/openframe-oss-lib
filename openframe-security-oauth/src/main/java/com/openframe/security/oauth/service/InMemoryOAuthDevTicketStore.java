@@ -44,7 +44,8 @@ public class InMemoryOAuthDevTicketStore implements OAuthDevTicketStore {
 
     @Override
     public Mono<TokenResponse> consumeTicket(String ticketId) {
-        return Mono.justOrEmpty(store.remove(ticketId))
+        Ticket removed = store.remove(ticketId);
+        return Mono.justOrEmpty(removed)
                 .filter(ticket -> !ticket.isExpiredAt(clock.instant()))
                 .map(Ticket::tokens);
     }

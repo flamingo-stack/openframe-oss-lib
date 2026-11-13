@@ -371,11 +371,15 @@ public class OAuthBffController {
     }
 
     private Mono<String> computeTargetWithOptionalDevTicketReactive(String baseTarget, boolean includeDevTicket, TokenResponse tokens) {
-        if (!includeDevTicket || !redirectTargetResolver.canReceiveDevTicket(baseTarget)) {
+        if (!mayAppendDevTicket(includeDevTicket, baseTarget)) {
             return Mono.just(baseTarget);
         }
         return devTicketStore.createTicket(tokens)
                 .map(ticket -> baseTarget + (baseTarget.contains("?") ? "&" : "?") + "devTicket=" + ticket);
+    }
+
+    private boolean mayAppendDevTicket(boolean includeDevTicket, String target) {
+        return includeDevTicket && redirectTargetResolver.canReceiveDevTicket(target);
     }
 
     private ResponseEntity<Void> buildFound(String target, String stateToClear) {
