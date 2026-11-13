@@ -744,6 +744,7 @@ impl Client {
             &self.agent_configuration_service,
             &self.installed_tools_service,
             &self.directory_manager,
+            &self.log_key_service,
         )?
         .start()
         .await?;
@@ -753,7 +754,9 @@ impl Client {
         self.auth_processor.process().await?;
 
         // Needs the agent token, so only after authentication.
-        self.log_key_service.clone().start();
+        self.log_key_service
+            .clone()
+            .start(self.restart_gate.clone());
 
         self.token_refresh_run_manager.start();
 

@@ -1,4 +1,7 @@
 {
+  "brand-logos/alpaca": {
+    "color": "var(--social-alpaca)"
+  },
   "brand-logos/bash": {
     "color": "var(--color-text-primary)"
   },
@@ -42,6 +45,9 @@
     "color": "var(--color-text-primary)"
   },
   "brand-logos/openai": {
+    "color": "var(--color-text-primary)"
+  },
+  "brand-logos/plaid": {
     "color": "var(--color-text-primary)"
   },
   "brand-logos/quickbooks": {

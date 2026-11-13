@@ -2,10 +2,11 @@ use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::Deserialize;
 use std::sync::Arc;
-use tokio::task::JoinHandle;
-use tokio::time::Duration;
+use tokio::sync::Notify;
+use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 
+use crate::listener::command::RestartGate;
 use crate::services::backend_call_retry::{retry_until_settled, RetryTiming};
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::{AgentConfigurationService, InitialConfigurationService};
@@ -21,7 +22,7 @@ struct LogKeyResponse {
     key: String,
 }
 
-/// Fetches the per-tenant logs-stream key, with the agent token, for devices whose install command carried none.
+/// Fetches the per-tenant logs-stream key, with the agent token, when the config lacks one or the logs stream cannot connect.
 pub struct LogKeyService {
     http_client: Client,
     base_url: String,
@@ -29,6 +30,7 @@ pub struct LogKeyService {
     agent_config_service: AgentConfigurationService,
     deactivation: Arc<DeactivationService>,
     timing: RetryTiming,
+    connect_failed: Notify,
 }
 
 impl LogKeyService {
@@ -46,27 +48,45 @@ impl LogKeyService {
             agent_config_service,
             deactivation,
             timing: RETRY_TIMING,
+            connect_failed: Notify::new(),
         }
     }
 
-    /// Runs once the device is registered: fetches the log key in the background when the config lacks one (older install command or client).
-    pub fn start(self: Arc<Self>) -> Option<JoinHandle<()>> {
-        if !self.is_key_missing() {
+    /// Called by the logs stream when a connection attempt fails; a rejected key is one cause.
+    pub fn connect_failed(&self) {
+        self.connect_failed.notify_one();
+    }
+
+    /// Runs once the device is registered and restarts the client once a new log key is saved, since the stream reads its key only at start.
+    pub fn start(self: Arc<Self>, restart_gate: RestartGate) {
+        tokio::spawn(async move {
+            self.run().await;
+            info!("Restarting the client to stream logs with the new log key");
+            restart_gate.drain_and_request().await;
+        });
+    }
+
+    /// Fetches the log key when the config lacks one, or again after the stream fails to connect, and returns once a key different from the saved one is saved.
+    async fn run(&self) {
+        if self.is_key_missing() {
+            info!("Log key missing in config, starting background fetch");
+        } else {
             self.drop_initial_key();
-            return None;
+            self.connect_failed.notified().await;
         }
-
-        info!("Log key missing in config, starting background fetch");
-
-        Some(tokio::spawn(async move {
+        loop {
             let key = retry_until_settled(&self.deactivation, self.timing, "fetch log key", || {
                 self.fetch_log_key()
             })
             .await;
-            if let Err(e) = self.store(key) {
-                error!("Failed to save log key: {:#}", e);
+            match self.store_if_changed(key) {
+                Ok(true) => return,
+                Ok(false) => info!("Server still returns the saved log key"),
+                Err(e) => error!("Failed to save log key: {:#}", e),
             }
-        }))
+            sleep(self.timing.max).await;
+            self.connect_failed.notified().await;
+        }
     }
 
     fn is_key_missing(&self) -> bool {
@@ -76,11 +96,14 @@ impl LogKeyService {
             .unwrap_or(false)
     }
 
-    fn store(&self, key: String) -> Result<()> {
+    fn store_if_changed(&self, key: String) -> Result<bool> {
+        if self.initial_config_service.get_log_key()? == key {
+            return Ok(false);
+        }
         self.initial_config_service.save_log_key(key)?;
         info!("Log key saved");
         self.drop_initial_key();
-        Ok(())
+        Ok(true)
     }
 
     // A registered device holding a log key has no use for the enrollment key; stop keeping it on disk.

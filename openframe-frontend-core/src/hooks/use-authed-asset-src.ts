@@ -1,13 +1,12 @@
 'use client';
 
 import { useEffect, useSyncExternalStore } from 'react';
-import { subscribeRegisteredAdapter } from '../utils/embed-auth-adapter-registry';
 import {
   answeredAfterRefresh,
   assetLoadMode,
   embedAuthedFetch,
   resolveAssetUrl,
-  subscribeEmbedCredentialChange,
+  subscribeEmbedCredentialSource,
 } from '../utils/embed-authed-fetch';
 import { useIsomorphicLayoutEffect } from './ui/use-isomorphic-layout-effect';
 
@@ -30,7 +29,7 @@ import { useIsomorphicLayoutEffect } from './ui/use-isomorphic-layout-effect';
  *
  *   - A shell renders before its tokens arrive. A gateway URL is then `pending`
  *     (nothing is drawn, nothing is requested) and is fetched as soon as the
- *     adapter reports a credential (`subscribeEmbedCredentialChange`), a new
+ *     adapter reports a credential (`subscribeEmbedCredentialSource`), a new
  *     adapter registers, or a consumer renders and finds one. It used to be
  *     handed to a native `<img>` at that first render, which got a 401 and was
  *     never asked again.
@@ -214,17 +213,10 @@ function onOnline(): void {
 
 /** Listen for what can make a waiting or failed entry loadable: a new adapter, a new credential, the network. */
 function attachSources(): () => void {
-  let detachCredential = subscribeEmbedCredentialChange(onCredentialChange);
-  const detachAdapter = subscribeRegisteredAdapter(() => {
-    // `subscribeEmbedCredentialChange` binds to the adapter registered when it is called.
-    detachCredential();
-    detachCredential = subscribeEmbedCredentialChange(onCredentialChange);
-    onCredentialChange();
-  });
+  const detachCredential = subscribeEmbedCredentialSource(onCredentialChange);
   window.addEventListener('online', onOnline);
   return () => {
     detachCredential();
-    detachAdapter();
     window.removeEventListener('online', onOnline);
   };
 }

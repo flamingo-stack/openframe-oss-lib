@@ -13,9 +13,11 @@ import { Tag } from '../ui/tag';
 import {
   QuickActionChipButton,
   QuickActionChipFromData,
+  type QuickActionAccent,
   type QuickActionChip,
   type QuickActionThemeSpec,
   isQuickActionIconSpec,
+  quickActionAccentTint,
   renderQuickActionIcon,
 } from './quick-action-chip';
 import { WALL_SKELETON_LABEL_CH } from './quick-action-wall';
@@ -38,6 +40,10 @@ export interface QuickActionRowProps {
   leading?: ReadonlyArray<QuickActionChip>;
   /** Default theme for chips without their own (the agent's accent). */
   theme?: QuickActionThemeSpec;
+  /** The tint of the row's own glyph, the "All" tag's (OpenFrame: `'grey'`, as its chips' icons). Omitted, All takes
+   *  the colour its chips' icons share (an agent's accent, an admin-configured colour), and the tag's text colour
+   *  when they share none. */
+  accent?: QuickActionAccent;
   /** The actions are still read: the row draws its tags' loading form, at the row's own height. */
   loading?: boolean;
   /** The group's accessible name. */
@@ -70,6 +76,7 @@ function QuickActionRowBody({
   chips,
   leading = [],
   theme,
+  accent,
   loading: loadingProp = false,
   label = 'Quick actions',
   className,
@@ -130,9 +137,33 @@ function QuickActionRowBody({
           )}
         </div>
       </div>
-      {!loading && chips.length > 0 && <AllQuickActions chips={chips} theme={theme} title={label} />}
+      {!loading && chips.length > 0 && (
+        <AllQuickActions chips={chips} theme={theme} accent={accent ?? sharedChipAccent(chips, theme)} title={label} />
+      )}
     </div>
   );
+}
+
+/**
+ * The accent the chips share, for the "All" glyph: per chip with an icon, its icon's accent, else its theme's (or the
+ * row's): what the host configured for the row (the client chat's assistant colour, an agent's identity colour, the
+ * agent's built-in pink or cyan). A single action's own icon fill (`props.color`) is that chip's alone and does not
+ * count. One accent across every chip with an icon: that accent. Different accents, none, or an icon the row cannot
+ * read (a rendered node), and All keeps the tag's text colour.
+ */
+export function sharedChipAccent(
+  chips: ReadonlyArray<QuickActionChip>,
+  theme?: QuickActionThemeSpec,
+): QuickActionAccent | undefined {
+  let shared: QuickActionAccent | undefined;
+  for (const chip of chips) {
+    if (chip.icon == null) continue;
+    if (!isQuickActionIconSpec(chip.icon)) return undefined;
+    const tint = chip.icon.accent ?? (chip.theme ?? theme)?.accent;
+    if (!tint || (shared !== undefined && tint !== shared)) return undefined;
+    shared = tint;
+  }
+  return shared;
 }
 
 /** A wheel's line, in px, for the browsers that report lines instead of pixels. */
@@ -168,27 +199,37 @@ function useWheelSideways(scrollRef: RefObject<HTMLDivElement | null>) {
  * the menu's trigger and the sheet's both set) it holds the pressed look, also under the pointer. The row's loading
  * form does not draw it (there is nothing to list yet): `data-loading-optional` says so.
  */
-const AllTag = forwardRef<HTMLButtonElement, ComponentPropsWithoutRef<typeof Button>>(function AllTagImpl(props, ref) {
-  return (
-    <Button
-      ref={ref}
-      variant="card"
-      type="button"
-      aria-label="All quick actions"
-      data-loading-optional
-      {...props}
-      className="group/all flex w-auto shrink-0"
-    >
-      <Tag
-        variant="outline"
-        size="compact"
-        icon={<GridDotsBlankIcon size={16} />}
-        label="All"
-        className="group-aria-expanded/all:border-ods-border-hover group-aria-expanded/all:bg-ods-bg-active"
-      />
-    </Button>
-  );
-});
+const AllTag = forwardRef<HTMLButtonElement, ComponentPropsWithoutRef<typeof Button> & { accent?: QuickActionAccent }>(
+  function AllTagImpl({ accent, ...props }, ref) {
+    const tint = quickActionAccentTint(accent);
+    return (
+      <Button
+        ref={ref}
+        variant="card"
+        type="button"
+        aria-label="All quick actions"
+        data-loading-optional
+        {...props}
+        className="group/all flex w-auto shrink-0"
+      >
+        <Tag
+          variant="outline"
+          size="compact"
+          icon={
+            <GridDotsBlankIcon
+              size={16}
+              className={tint.className}
+              color={tint.color}
+              data-testid="quick-action-row-all-glyph"
+            />
+          }
+          label="All"
+          className="group-aria-expanded/all:border-ods-border-hover group-aria-expanded/all:bg-ods-bg-active"
+        />
+      </Button>
+    );
+  },
+);
 
 /**
  * "All": the tag pinned at the row's right, and the list of every action it opens (the ones in the row too, so nobody
@@ -198,10 +239,12 @@ const AllTag = forwardRef<HTMLButtonElement, ComponentPropsWithoutRef<typeof But
 function AllQuickActions({
   chips,
   theme,
+  accent: tagAccent,
   title,
 }: {
   chips: ReadonlyArray<QuickActionChip>;
   theme?: QuickActionThemeSpec;
+  accent?: QuickActionAccent;
   title: string;
 }) {
   // Before the media query answers (the first render, the server) the list is the menu.
@@ -252,6 +295,7 @@ function AllQuickActions({
     return (
       <>
         <AllTag
+          accent={tagAccent}
           aria-haspopup="dialog"
           aria-expanded={sheetOpen}
           onClick={() => {
@@ -308,7 +352,7 @@ function AllQuickActions({
         setOpenedAs(open ? 'menu' : null);
       }}
       className={ALL_MENU_CLASS}
-      customTrigger={<AllTag />}
+      customTrigger={<AllTag accent={tagAccent} />}
     />
   );
 }

@@ -1,9 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PageTopicsProvider } from '../../../contexts/page-topics-context';
+import { GuideWelcome } from '../guide-welcome';
 import { MingoQuickActionWall, QuickActionSet } from '../mingo-quick-action-wall';
 import { MingoWelcome } from '../mingo-welcome';
-import { QuickActionRow } from '../quick-action-row';
+import { quickActionAccentTint } from '../quick-action-chip';
+import { QuickActionRow, sharedChipAccent } from '../quick-action-row';
 
 const ACTIONS = [
   { id: 'qa-1', label: 'Patching', prompt: 'Check my fleet for pending patches.', onClick: vi.fn() },
@@ -82,6 +84,116 @@ describe('QuickActionRow', () => {
   it('never cuts a name: its tags do not shrink', () => {
     render(<QuickActionRow chips={chipsOf(3)} />);
     for (const tag of within(scroller()).getAllByRole('button')) expect(tag).toHaveClass('shrink-0');
+  });
+});
+
+describe('QuickActionRow accent', () => {
+  const allGlyph = () => within(allTag()).getByTestId('quick-action-row-all-glyph');
+
+  it("draws the All glyph in the tag's text colour with no accent", () => {
+    render(<QuickActionRow chips={chipsOf(2)} />);
+    expect(allGlyph().getAttribute('class')).toBe('');
+    expect(allGlyph().innerHTML).toContain('fill="currentColor"');
+  });
+
+  it("tints the All glyph with a named accent's text class (OpenFrame's grey)", () => {
+    render(<QuickActionRow chips={chipsOf(2)} accent="grey" />);
+    expect(allGlyph().classList.contains('text-ods-text-panel-secondary')).toBe(true);
+    expect(allGlyph().innerHTML).toContain('fill="currentColor"');
+  });
+
+  it('fills the All glyph with an admin-configured CSS colour', () => {
+    render(<QuickActionRow chips={chipsOf(2)} accent="#123456" />);
+    expect(allGlyph().innerHTML).toContain('fill="#123456"');
+  });
+
+  it.each([
+    [undefined, {}],
+    ['grey', { className: 'text-ods-text-panel-secondary' }],
+    ['cyan', { className: 'text-ods-flamingo-cyan' }],
+    ['#123456', { color: '#123456' }],
+  ] as const)('tints a glyph for accent %s', (accent, tint) => {
+    expect(quickActionAccentTint(accent)).toEqual(tint);
+  });
+
+  it("passes the accent through Mingo's wall and welcome", () => {
+    const { unmount } = render(<MingoQuickActionWall quickActions={ACTIONS} accent="grey" />);
+    expect(allGlyph().classList.contains('text-ods-text-panel-secondary')).toBe(true);
+    unmount();
+    render(<MingoWelcome quickActions={ACTIONS} quickActionAccent="grey" />);
+    expect(allGlyph().classList.contains('text-ods-text-panel-secondary')).toBe(true);
+  });
+});
+
+describe('QuickActionRow All follows the accent its chips share', () => {
+  const allGlyph = () => within(allTag()).getByTestId('quick-action-row-all-glyph');
+  const iconChips = (accents: ReadonlyArray<string | undefined>, props?: Record<string, unknown>) =>
+    accents.map((accent, i) => ({
+      id: `c-${i}`,
+      label: `Action ${i}`,
+      icon: { name: 'shield', accent, props },
+      onSelect: vi.fn(),
+    }));
+
+  // The client chat: every chip carries the assistant's configured colour, or Fae pink.
+  it("takes a named accent every chip shares (the client chat's Fae pink)", () => {
+    render(<QuickActionRow chips={iconChips(['pink', 'pink', 'pink'])} />);
+    expect(allGlyph().classList.contains('text-ods-flamingo-pink')).toBe(true);
+  });
+
+  it('takes an admin-configured CSS colour every chip shares', () => {
+    render(<QuickActionRow chips={iconChips(['#ff7a00', '#ff7a00'])} />);
+    expect(allGlyph().innerHTML).toContain('fill="#ff7a00"');
+  });
+
+  it('takes the row theme when the chips carry no accent of their own', () => {
+    render(<QuickActionRow chips={iconChips([undefined, undefined])} theme={{ accent: 'cyan' }} />);
+    expect(allGlyph().classList.contains('text-ods-flamingo-cyan')).toBe(true);
+  });
+
+  it('keeps the shared accent when one action fills its own icon (props.color is that chip alone)', () => {
+    const chips = [...iconChips(['pink']), { ...iconChips(['pink'], { color: '#00ff00' })[0], id: 'own' }];
+    render(<QuickActionRow chips={chips} />);
+    expect(allGlyph().classList.contains('text-ods-flamingo-pink')).toBe(true);
+  });
+
+  it("keeps the tag's text colour when the chips' accents differ", () => {
+    render(<QuickActionRow chips={iconChips(['pink', 'cyan'])} />);
+    expect(allGlyph().getAttribute('class')).toBe('');
+  });
+
+  it('an explicit accent wins over the shared one (OpenFrame stays grey)', () => {
+    render(<QuickActionRow chips={iconChips(['pink', 'pink'])} accent="grey" />);
+    expect(allGlyph().classList.contains('text-ods-text-panel-secondary')).toBe(true);
+    expect(allGlyph().classList.contains('text-ods-flamingo-pink')).toBe(false);
+  });
+
+  it.each([
+    ['no chip has an icon', [{ id: 'a', label: 'A' }], undefined],
+    ['a rendered icon it cannot read', [{ id: 'a', label: 'A', icon: <svg /> }], undefined],
+    [
+      'chips without an icon among them',
+      [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B', icon: { name: 'x', accent: 'pink' } },
+      ],
+      'pink',
+    ],
+  ] as const)('sharedChipAccent with %s', (_name, chips, expected) => {
+    expect(sharedChipAccent(chips)).toBe(expected);
+  });
+
+  // The hub and every Guide-mode chat: the chips take the action's accent, else the identity colour, else cyan.
+  it("follows Guide mode's chip accent (cyan by default, an identity colour when configured)", () => {
+    const actions = [
+      { id: 'g1', label: 'Pricing', iconName: 'shield' },
+      { id: 'g2', label: 'Setup', iconName: 'code' },
+    ];
+    const { unmount } = render(<GuideWelcome quickActions={actions} />);
+    expect(allGlyph().classList.contains('text-ods-flamingo-cyan')).toBe(true);
+    unmount();
+    render(<GuideWelcome quickActions={actions} icon={{ name: 'mingo', props: { color: '#7c3aed' } }} />);
+    expect(allGlyph().innerHTML).toContain('fill="#7c3aed"');
   });
 });
 

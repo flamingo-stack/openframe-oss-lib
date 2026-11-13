@@ -83,6 +83,7 @@ import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/tr
 import type { LoadedProductReleaseCardProps } from '../../shared/product-release/product-release-card';
 import { ProductReleaseCard } from '../../shared/product-release/product-release-card';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { ExternalMediaNotice } from '../../ui/markdown/external-media-notice';
 import { tagVariantForBadgeColor } from '../../ui/tag';
 import { VendorIcon } from '../../vendor-icon';
@@ -2065,10 +2066,14 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
   // `contentRefType` is empty so the hook returns `isLoading=false` and
   // `item=undefined`, which we ignore.
   const fetchEntry = entry && entry.contentRefType ? entry : null;
-  const { item, isLoading, isError, isFetched } = useChatCardItem<ChatCardItem>(
+  // In a loading scope (the host itself still being read) the card draws its loading form and reads nothing: the
+  // record it will show is not known yet, so its id may be empty.
+  const inLoadingScope = useLoadingScope();
+  const { item, isLoading: fetching, isError, isFetched } = useChatCardItem<ChatCardItem>(
     fetchEntry?.contentRefType ?? '',
-    fetchEntry ? chatRef.id : '',
+    fetchEntry && !inLoadingScope ? chatRef.id : '',
   );
+  const isLoading = inLoadingScope || fetching;
   if (!entry) return null;
 
   // THE card's destination, decided in one place (`resolveCardDestination`):

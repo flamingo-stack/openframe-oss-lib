@@ -443,6 +443,57 @@ class AgentRegistrationServiceTest {
         assertEquals("old-user", savedMachine.getUserId());
     }
 
+    @Test
+    void registerAgent_WhenPostProcessingFails_MarksTheMachineDeletedAndRethrows() {
+        stubNewMachineRegistration();
+        IllegalStateException failure = new IllegalStateException("post-processing failed");
+        doThrow(failure).when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        assertSame(failure, thrown);
+        Machine discarded = writtenOver(new Machine());
+        assertEquals(DeviceStatus.DELETED, discarded.getStatus());
+        verify(installedAgentService).disconnectAll(MACHINE_ID);
+    }
+
+    @Test
+    void registerAgent_RetryAfterAFailedAttempt_LeavesOneLiveDevice() {
+        when(machineIdGenerator.generate()).thenReturn("failed-machine-id", MACHINE_ID);
+        when(agentSecretGenerator.generate()).thenReturn(CLIENT_SECRET);
+        when(organizationIdResolver.resolve(any())).thenReturn(ORGANIZATION_ID);
+        when(machineRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+        doThrow(new IllegalStateException("installed agent failed"))
+                .doNothing()
+                .when(installedAgentService).addInstalledAgent(any(), any(), any(), eq(false));
+
+        assertThrows(IllegalStateException.class, () -> agentRegistrationService.register(INITIAL_KEY, request));
+        AgentRegistrationResponse response = agentRegistrationService.register(INITIAL_KEY, request);
+
+        assertEquals(MACHINE_ID, response.getMachineId());
+        ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
+        verify(machineWriter).update(eq("failed-machine-id"), update.capture());
+        Machine discarded = new Machine();
+        update.getValue().applyTo(discarded);
+        assertEquals(DeviceStatus.DELETED, discarded.getStatus());
+        verify(machineWriter, never()).update(eq(MACHINE_ID), any(MachineUpdate.class));
+    }
+
+    @Test
+    void registerAgent_WhenTheDiscardItselfFails_StillThrowsTheOriginalError() {
+        stubNewMachineRegistration();
+        IllegalStateException failure = new IllegalStateException("post-processing failed");
+        doThrow(failure).when(agentRegistrationProcessor).postProcessAgentRegistration(any(), any());
+        when(machineWriter.update(eq(MACHINE_ID), any(MachineUpdate.class)))
+                .thenThrow(new IllegalStateException("mongo is down"));
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> agentRegistrationService.register(INITIAL_KEY, request));
+
+        assertSame(failure, thrown);
+    }
+
     private void stubNewMachineRegistration() {
         when(machineIdGenerator.generate()).thenReturn(MACHINE_ID);
         when(oauthClientRepository.existsByMachineId(MACHINE_ID)).thenReturn(false);

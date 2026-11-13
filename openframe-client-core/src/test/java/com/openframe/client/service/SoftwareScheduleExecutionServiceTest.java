@@ -5,6 +5,7 @@ import com.openframe.client.service.rmm.SoftwareScheduleExecutionService;
 import com.openframe.client.service.rmm.SoftwareScheduleFireDispatcher;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleOfflineBehavior;
 import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
@@ -133,6 +134,29 @@ class SoftwareScheduleExecutionServiceTest {
     }
 
     @Test
+    @DisplayName("online is decided by telemetryStatus: status ONLINE with telemetry OFFLINE goes to the offline branch")
+    void runDue_statusOnlineTelemetryOffline_treatedAsOffline() {
+        // setup
+        SoftwareSchedule schedule = SoftwareSchedule.builder()
+                .id("ss-1").tenantId(TENANT).status(ScriptStatus.ACTIVE)
+                .repeat(null).nextRunAt(Instant.now().minusSeconds(30))
+                .offlineBehavior(ScheduleOfflineBehavior.SKIP)
+                .build();
+        due(schedule);
+        Machine staleStatus = machine("m-stale", DeviceStatus.ONLINE);
+        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        when(targetResolver.resolveMachineIds(schedule)).thenReturn(List.of("m-stale"));
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(staleStatus));
+
+        // execution
+        service.runDueSchedules();
+
+        // verifications
+        verify(fireDispatcher, never()).dispatch(any(), any(), any());
+        verify(onlineDispatchRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("no due schedules → nothing fired or saved")
     void runDue_noneDue_noop() {
         when(scheduleRepository.findByStatusAndNextRunAtLessThanEqual(eq(ScriptStatus.ACTIVE), any()))
@@ -153,6 +177,7 @@ class SoftwareScheduleExecutionServiceTest {
         Machine m = new Machine();
         m.setMachineId(machineId);
         m.setStatus(status);
+        m.setTelemetryStatus(status == DeviceStatus.ONLINE ? TelemetryStatus.ONLINE : TelemetryStatus.OFFLINE);
         return m;
     }
 }
