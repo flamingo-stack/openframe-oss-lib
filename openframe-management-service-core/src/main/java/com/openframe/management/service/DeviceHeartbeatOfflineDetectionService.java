@@ -1,5 +1,6 @@
 package com.openframe.management.service;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.MachineRepository;
@@ -15,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static com.openframe.data.service.machine.MachineFields.LAST_SEEN;
+import static com.openframe.data.service.machine.MachineFields.STATUS;
 import static com.openframe.data.service.machine.MachineFields.TELEMETRY_STATUS;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
@@ -25,6 +27,9 @@ public class DeviceHeartbeatOfflineDetectionService {
 
     private final MachineRepository machineRepository;
     private final MachineWriter machineWriter;
+
+    @Value("${openframe.features.devices.managed-status.enabled:false}")
+    private final boolean managedStatusEnabled;
 
     @Value("${openframe.device.heartbeat.offline-threshold-seconds:130}")
     private long offlineThresholdSeconds;
@@ -45,10 +50,15 @@ public class DeviceHeartbeatOfflineDetectionService {
 
     // Field-level, one machine at a time: a whole-document save would overwrite what other writers set since the
     // read. The guard re-checks the read in Mongo, so no write conflicts: a heartbeat that arrived meanwhile is never
-    // overwritten, and the lifecycle status is never touched here
+    // overwritten. With the managed-status flag on the lifecycle status is never touched here; with it off an ONLINE
+    // status goes OFFLINE with the connectivity, guarded on still being ONLINE so an uninstall since the read is kept
     private boolean markDeviceAsOffline(Machine machine, Instant threshold) {
         MachineUpdate update = machineUpdate().set(TELEMETRY_STATUS, TelemetryStatus.OFFLINE);
         Criteria guard = stillSilentSince(threshold).and(TELEMETRY_STATUS.path()).is(TelemetryStatus.ONLINE);
+        if (!managedStatusEnabled && machine.getStatus() == DeviceStatus.ONLINE) {
+            update.set(STATUS, DeviceStatus.OFFLINE);
+            guard.and(STATUS.path()).is(DeviceStatus.ONLINE);
+        }
         String machineId = machine.getMachineId();
         boolean marked = machineWriter.update(machineId, guard, update).isPresent();
         log.info("Marking device {} as OFFLINE (status={}, lastSeen={}, marked={})",
