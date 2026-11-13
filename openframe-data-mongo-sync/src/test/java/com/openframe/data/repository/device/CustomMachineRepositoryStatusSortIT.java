@@ -43,6 +43,7 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
         save("deleting-1", TENANT, DeviceStatus.PENDING_DELETION);
         save("online-1", TENANT, DeviceStatus.ONLINE);
         save("none-1", TENANT, null);
+        save("managed-1", TENANT, DeviceStatus.MANAGED);
         save("pending-1", TENANT, DeviceStatus.PENDING);
         save("online-2", TENANT, DeviceStatus.ONLINE);
         save("offline-2", TENANT, DeviceStatus.OFFLINE);
@@ -50,35 +51,35 @@ class CustomMachineRepositoryStatusSortIT extends BaseMongoIntegrationTest {
     }
 
     @Test
-    @DisplayName("status ASC: devices without a status, then PENDING_DELETION, PENDING, OFFLINE, ONLINE")
+    @DisplayName("status ASC: devices without a status, then PENDING_DELETION, PENDING, OFFLINE, ONLINE, MANAGED")
     void ascIsTheReverseOfTheDescOrder() {
         List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, null, 50, "status", "ASC");
 
         assertThat(machineIds(page)).containsExactly(
-                "none-1", "deleting-1", "pending-1", "offline-1", "offline-2", "online-1", "online-2");
+                "none-1", "deleting-1", "pending-1", "offline-1", "offline-2", "online-1", "online-2", "managed-1");
     }
 
     @Test
-    @DisplayName("status DESC: ONLINE, OFFLINE, PENDING, PENDING_DELETION, then devices without a status (what the frontends ask for)")
+    @DisplayName("status DESC: MANAGED, ONLINE, OFFLINE, PENDING, PENDING_DELETION, then devices without a status (what the frontends ask for)")
     void descFollowsExplicitOrder() {
         List<Machine> page = repository.findMachinesWithCursor(TENANT, NO_FILTER, null, null, 50, "status", "DESC");
 
         assertThat(machineIds(page)).containsExactly(
-                "online-2", "online-1", "offline-2", "offline-1", "pending-1", "deleting-1", "none-1");
+                "managed-1", "online-2", "online-1", "offline-2", "offline-1", "pending-1", "deleting-1", "none-1");
     }
 
     @Test
     @DisplayName("status ASC paged by cursor: pages join without gaps or duplicates, even inside a status group")
     void ascCursorPagesWithoutGapsOrDuplicates() {
         assertThat(pageThrough("ASC", 3)).containsExactly(
-                "none-1", "deleting-1", "pending-1", "offline-1", "offline-2", "online-1", "online-2");
+                "none-1", "deleting-1", "pending-1", "offline-1", "offline-2", "online-1", "online-2", "managed-1");
     }
 
     @Test
     @DisplayName("status DESC paged by cursor: pages join without gaps or duplicates, even inside a status group")
     void descCursorPagesWithoutGapsOrDuplicates() {
         assertThat(pageThrough("DESC", 2)).containsExactly(
-                "online-2", "online-1", "offline-2", "offline-1", "pending-1", "deleting-1", "none-1");
+                "managed-1", "online-2", "online-1", "offline-2", "offline-1", "pending-1", "deleting-1", "none-1");
     }
 
     @Test

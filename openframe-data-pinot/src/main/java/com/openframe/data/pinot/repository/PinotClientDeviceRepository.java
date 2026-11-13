@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.openframe.data.document.device.DeviceStatus.DELETED;
+import static com.openframe.data.document.device.DeviceStatus.MANAGED;
 import static com.openframe.data.document.device.DeviceStatus.OFFLINE;
 import static com.openframe.data.document.device.DeviceStatus.ONLINE;
 
@@ -29,11 +30,11 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
 
     /**
      * Statuses considered "active" for the organization device counts facet
-     * ({@link #getOrganizationFilterOptions}). That facet counts only ONLINE and OFFLINE
-     * devices; every other facet and the filtered device count keep the default behaviour
-     * of excluding only DELETED devices.
+     * ({@link #getOrganizationFilterOptions}). That facet counts only managed devices
+     * (ONLINE/OFFLINE until migration 031 rewrites them); every other facet and the filtered
+     * device count keep the default behaviour of excluding only DELETED devices.
      */
-    private static final List<String> ACTIVE_STATUSES = List.of(ONLINE.name(), OFFLINE.name());
+    private static final List<String> ACTIVE_STATUSES = List.of(MANAGED.name(), ONLINE.name(), OFFLINE.name());
 
     /**
      * Explicit upper bound for faceted GROUP BY queries. Without an explicit LIMIT,

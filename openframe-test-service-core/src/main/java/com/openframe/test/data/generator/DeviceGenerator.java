@@ -50,6 +50,7 @@ public class DeviceGenerator {
 
     public static DeviceFilterInput listedStatusesDevicesFilter() {
         return statusDevicesFilter(
+                DeviceStatus.MANAGED,
                 DeviceStatus.ONLINE,
                 DeviceStatus.OFFLINE,
                 DeviceStatus.ACTIVE,
@@ -61,6 +62,7 @@ public class DeviceGenerator {
 
     public static DeviceFilterInput statDevicesFilter() {
         return statusDevicesFilter(
+                DeviceStatus.MANAGED,
                 DeviceStatus.ONLINE,
                 DeviceStatus.OFFLINE,
                 DeviceStatus.ACTIVE,
