@@ -10,12 +10,17 @@ final class FleetRowFields {
 
     // Debezium's op code for a deleted row ("c" create, "u" update, "r" snapshot read)
     private static final String DELETE_OPERATION = "d";
+    private static final String SNAPSHOT_READ_OPERATION = "r";
 
     private FleetRowFields() {
     }
 
     static boolean isDelete(String op) {
         return DELETE_OPERATION.equals(op);
+    }
+
+    static boolean isSnapshotRead(String op) {
+        return SNAPSHOT_READ_OPERATION.equals(op);
     }
 
     static boolean isGlobalStats(JsonNode row) {

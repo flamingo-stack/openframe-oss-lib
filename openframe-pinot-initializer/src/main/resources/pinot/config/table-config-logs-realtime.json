@@ -127,6 +127,18 @@
     "mode": "FULL",
     "hashFunction": "MD5"
   },
+  "task": {
+    "taskTypeConfigsMap": {
+      "UpsertCompactionTask": {
+        "bufferTimePeriod": "4h",
+        "invalidRecordsThresholdCount": "1",
+        "invalidRecordsThresholdPercent": "0",
+        "validDocIdsType": "IN_MEMORY",
+        "validDocIdsConsensusMode": "EQUAL",
+        "validDocIdsValidationMode": "STRICT"
+      }
+    }
+  },
   "tenants": {
     "broker": "DefaultTenant",
     "server": "DefaultTenant"

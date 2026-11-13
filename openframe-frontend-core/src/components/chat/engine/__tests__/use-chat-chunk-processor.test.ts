@@ -10,7 +10,9 @@ import { createChatDialogStore } from '../../stream/chat-dialog-store';
 import { createChatThreadStore } from '../chat-thread-store';
 import { useChatChunkProcessor, type ChatChunkObservers } from '../use-chat-chunk-processor';
 
-function setup(options: { ownDirectOwnerType?: string; otherDisplayName?: string } = {}) {
+function setup(
+  options: { ownDirectOwnerType?: string; otherDisplayName?: string; ownUserId?: () => string | undefined } = {},
+) {
   const store = createChatThreadStore<string>();
   const observers: Required<ChatChunkObservers> = {
     onTokenUsage: vi.fn(),
@@ -108,6 +110,41 @@ describe('a chat a person writes into', () => {
 
     expect(thread().map(message => message.metadata?.author?.name)).toEqual(['Technician', 'Ann']);
     expect(observers.onOtherDirectMessage).toHaveBeenCalledTimes(2);
+  });
+
+  // The backend's direct messages name no author (`userId`): two technicians in one chat are both ADMIN, so a nameless
+  // ADMIN message is the viewer's only when it answers a send of theirs.
+  it("a colleague's nameless message is a row and does not close the viewer's turn", () => {
+    const { feed, thread, observers } = setup({ ownDirectOwnerType: 'ADMIN', ownUserId: () => 'tech-a' });
+    feed({ type: 'DIRECT_MESSAGE', text: 'I will take it', ownerType: 'ADMIN', displayName: 'Bob', streamSeq: 1 });
+
+    expect(thread().map(message => message.metadata?.author?.name)).toEqual(['Bob']);
+    expect(observers.onOwnDirectEcho).not.toHaveBeenCalled();
+    expect(observers.onOtherDirectMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("a nameless message answering the viewer's send is its echo, once", () => {
+    const { store, feed, thread, observers } = setup({ ownDirectOwnerType: 'ADMIN', ownUserId: () => 'tech-a' });
+    store.pushOptimisticSend('d', 'On it');
+    feed({ type: 'DIRECT_MESSAGE', text: 'On it', ownerType: 'ADMIN', streamSeq: 1 });
+    // The same words from a colleague right after: the viewer's send is spent, so this one is theirs.
+    feed({ type: 'DIRECT_MESSAGE', text: 'On it', ownerType: 'ADMIN', displayName: 'Bob', streamSeq: 2 });
+
+    expect(thread().filter(message => message.role === 'user')).toHaveLength(2);
+    expect(observers.onOwnDirectEcho).toHaveBeenCalledTimes(1);
+    expect(observers.onOwnDirectEcho).toHaveBeenCalledWith(1);
+    expect(observers.onOtherDirectMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('a message naming the viewer is their echo, one naming another technician is not', () => {
+    const { feed, thread, observers } = setup({ ownDirectOwnerType: 'ADMIN', ownUserId: () => 'tech-a' });
+    feed({ type: 'DIRECT_MESSAGE', text: 'Mine', ownerType: 'ADMIN', userId: 'tech-a', streamSeq: 1 });
+    feed({ type: 'DIRECT_MESSAGE', text: 'Theirs', ownerType: 'ADMIN', userId: 'tech-b', streamSeq: 2 });
+
+    expect(thread().map(message => message.parts.map(part => ('text' in part ? part.text : '')).join(''))).toEqual([
+      'Theirs',
+    ]);
+    expect(observers.onOwnDirectEcho).toHaveBeenCalledWith(1);
   });
 
   it('without the rules, a direct message is drawn as it came', () => {

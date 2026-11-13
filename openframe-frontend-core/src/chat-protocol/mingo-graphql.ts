@@ -84,7 +84,7 @@ export const MINGO_MESSAGES_QUERY = `
                 description
               }
             }
-            ... on AttachmentsData {
+            ... on RecordData {
               sources {
                 type
                 sourceId

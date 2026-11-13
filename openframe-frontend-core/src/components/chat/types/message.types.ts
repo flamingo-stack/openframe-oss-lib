@@ -292,7 +292,7 @@ export interface ThinkingMessageData extends MessageDataBase {
   text?: string;
 }
 
-/** Persisted attachments row (GraphQL `AttachmentsData`): the same array the live chunk carries, so history and realtime
+/** Persisted attachments row (GraphQL `RecordData`): the same array the live chunk carries, so history and realtime
  *  share one decoder. Left untyped: it is unvalidated wire data, and `createMingoDecoder` turns it into source parts. */
 export interface AttachmentsMessageData extends MessageDataBase {
   type: 'ATTACHMENTS';

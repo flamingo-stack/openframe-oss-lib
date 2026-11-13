@@ -66,6 +66,20 @@ describe('extractRecordLinks', () => {
   });
 });
 
+describe('extractRecordLinks on a text it read before', () => {
+  // A message renders several readers of its links and a streamed answer renders on every chunk: one parse per text.
+  it('answers the same, and what a caller does with one answer never reaches the next', () => {
+    const text = 'Patch [Mac](record://device/m-1) and [Script](record://script/s-1).';
+    const first = extractRecordLinks(text);
+    first[0].label = 'changed';
+    first.pop();
+    expect(extractRecordLinks(text)).toEqual([
+      expect.objectContaining({ type: 'device', id: 'm-1', label: 'Mac' }),
+      expect.objectContaining({ type: 'script', id: 's-1', label: 'Script' }),
+    ]);
+  });
+});
+
 describe('unlinkUnknownRecords', () => {
   const allowed = (r: { type: string; id: string }) => r.type === 'script' && r.id === ID;
 

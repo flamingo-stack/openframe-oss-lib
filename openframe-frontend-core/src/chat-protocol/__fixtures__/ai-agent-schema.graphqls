@@ -1,0 +1,1681 @@
+# The ai-agent's GraphQL schema as it serves it: openframe-saas-ai-agent src/main/resources/schema/*.graphqls of
+# flamingo-stack/openframe-saas-tenant#4418 (9e9a42a50), then openframe-saas-web-common's schema/*.graphqls of
+# flamingo-stack/openframe-saas-lib#1157 (75d9cd85), which the ai-agent loads from its classpath. Verbatim (a federation
+# subgraph). The chat documents this lib sends are validated against it in mingo-graphql.test.ts: refresh it when the
+# ai-agent schema changes.
+
+extend type Query {
+    """
+    Client (Fae) AI logic config. Tenant-wide for admin callers; a client-chat (AGENT) caller gets
+    its device organization's effective config (override → tenant default) when per-organization
+    AI settings are enabled. When nothing is configured yet, falls back to a synthetic default
+    built from the tenant's active model configuration (what the chat runtime actually uses);
+    id == null marks that fallback as not persisted.
+    """
+    clientAiConfig: AgentAiConfig
+
+    """
+    Admin (Mingo) AI logic config (tenant-wide). When not configured yet, falls back to a synthetic
+    default built from the tenant's active model configuration (what the chat runtime actually
+    uses); id == null marks that fallback as not persisted.
+    """
+    adminAiConfig: AgentAiConfig
+
+    """
+    Client assistant view. Client-chat (AGENT) callers: a null organizationId resolves the calling
+    device's organization (its override, falling back to the tenant-wide default). Other callers: a
+    null organizationId returns the tenant-wide default, a set organizationId returns that org's
+    override (null when the org has no override).
+    """
+    clientView(organizationId: ID): ClientView
+}
+
+extend type Mutation {
+    "Updates the client (Fae) assistant's AI logic config (tenant-wide)."
+    updateClientAiConfig(input: AgentAiConfigInput!): AgentAiConfigPayload!
+
+    "Updates the admin (Mingo) assistant's AI logic config (tenant-wide)."
+    updateAdminAiConfig(input: AgentAiConfigInput!): AgentAiConfigPayload!
+
+    """
+    Creates or updates the client assistant view. organizationId omitted/null targets the
+    tenant-wide default; a set organizationId targets that organization's override.
+    """
+    updateClientView(organizationId: ID, input: ClientViewInput!): ClientViewPayload!
+
+    """
+    Removes the per-organization view override so the organization falls back to the tenant-default
+    view, and returns that default (or null if none is configured).
+    """
+    resetClientView(organizationId: ID!): ClientViewPayload!
+}
+
+"AI logic settings for one agent, tenant-wide (no per-organization override)."
+type AgentAiConfig {
+    "Null on the synthetic default returned before the tenant first saves the config."
+    id: ID
+    agentType: AgentType!
+
+    llmProvider: AIProvider!
+    providerModel: String!
+
+    answerStyle: AnswerStyle
+    customPrompt: String
+    quickActions: [QuickAction!]
+    "True while quick actions are the uncustomized default (frontend inherits the MPH defaults); false once the user has configured them (the stored list is honoured as-is, even when empty). Null on legacy records."
+    quickActionsIsDefault: Boolean
+
+    "Null on the synthetic default returned before the tenant first saves the config."
+    createdAt: Instant
+    updatedAt: Instant
+}
+
+"Client assistant view customization. organizationId = null is the tenant-wide default."
+type ClientView {
+    id: ID!
+    organizationId: ID
+
+    assistantName: String!
+    assistantAvatar: Image
+
+    applicationTheme: ApplicationTheme!
+    accentColor: String!
+
+    createdAt: Instant!
+    updatedAt: Instant
+}
+
+enum ApplicationTheme {
+    DARK
+    LIGHT
+    SYSTEM
+}
+
+enum AnswerStyle {
+    SHORT
+    STANDARD
+    DETAILED
+    CUSTOM
+}
+
+enum AIProvider {
+    ANTHROPIC
+    OPENAI
+    GOOGLE_GEMINI
+}
+
+type QuickAction {
+    id: ID!
+    name: String!
+    instructions: String!
+    iconName: String
+    iconUrl: String
+    iconProps: JSON
+}
+
+"AI logic input. The target agent (CLIENT/ADMIN) is set by the mutation, not this input."
+input AgentAiConfigInput {
+    llmProvider: AIProvider
+    providerModel: String
+    answerStyle: AnswerStyle
+    customPrompt: String
+    quickActions: [QuickActionInput!]
+    "Set false when the user configures quick actions (so their list, even if empty, is honoured); true to reset to the inherited MPH defaults. If omitted, sending a quickActions list implies false."
+    quickActionsIsDefault: Boolean
+}
+
+input ClientViewInput {
+    assistantName: String
+    applicationTheme: ApplicationTheme
+    accentColor: String
+}
+
+input QuickActionInput {
+    id: ID
+    name: String!
+    instructions: String!
+    iconName: String
+}
+
+type AgentAiConfigPayload {
+    aiConfig: AgentAiConfig
+    userErrors: [ChatUserError!]!
+}
+
+type ClientViewPayload {
+    view: ClientView
+    userErrors: [ChatUserError!]!
+}
+
+extend type Query {
+    "Tenant-wide model + provider key (legacy AIModelConfig): the fallback when an agent has no model of its own. Same as REST GET /api/v1/ai-configuration."
+    tenantAiModelConfig: TenantAiModelConfig!
+}
+
+extend type Mutation {
+    "Saves the tenant model config and refreshes the runtime chat models. Same as REST POST /api/v1/ai-configuration."
+    saveTenantAiModelConfig(input: TenantAiModelConfigInput!): TenantAiModelConfigPayload!
+    "Calls the provider once with these settings, without saving. Same as REST POST /api/v1/ai-configuration/test. A failed call is result.success=false, not an error."
+    testTenantAiModelConfig(input: TenantAiModelConfigInput!): AiConnectionTestPayload!
+}
+
+"Not a Node: a singleton whose id is null until it is first saved."
+type TenantAiModelConfig {
+    id: ID
+    provider: AIProvider
+    modelName: String!
+    displayName: String
+    isActive: Boolean
+    hasApiKey: Boolean
+    createdAt: Instant
+    updatedAt: Instant
+}
+
+input TenantAiModelConfigInput {
+    provider: AIProvider!
+    modelName: String!
+    "The tenant's own provider key. Omitted or blank: no tenant key is stored (a previously saved one is dropped) and the platform key is used. Never returned."
+    apiKey: String
+}
+
+type TenantAiModelConfigPayload {
+    config: TenantAiModelConfig
+    userErrors: [ChatUserError!]!
+}
+
+type AiConnectionTestResult {
+    success: Boolean!
+    message: String
+    provider: String
+    model: String
+    testResponse: String
+}
+
+type AiConnectionTestPayload {
+    result: AiConnectionTestResult
+    userErrors: [ChatUserError!]!
+}
+
+extend type Query {
+    "Every model the tenant may pick, grouped by provider in config order. Same as REST GET /api/v1/ai-configuration/supported-models."
+    supportedAiModels: [SupportedAiModelGroup!]!
+}
+
+type SupportedAiModelGroup {
+    provider: AIProvider!
+    models: [SupportedAiModel!]!
+}
+
+type SupportedAiModel {
+    modelName: String!
+    displayName: String
+    provider: AIProvider
+    reasoningEffort: String
+    contextWindow: Int
+    tokenBudget: Int
+    "Per-agent overrides of tokenBudget; empty when the model has none (then use tokenBudget)."
+    tokenBudgetByAgentType: [AgentTokenBudget!]
+}
+
+type AgentTokenBudget {
+    agentType: AgentType!
+    tokenBudget: Int!
+}
+extend type Query {
+    """
+    Available answer styles for the AI assistant selector, per agent.
+    Source of truth is config (ai.client-answer-styles / ai.admin-answer-styles); populated on dev only
+    for now. `agentType` selects the catalog (omitted/null = CLIENT). Returns enabled styles, ordered.
+    `AnswerStyle` / `AgentType` enums are defined in ai-settings.graphqls / dialog.graphqls.
+    """
+    answerStyles(agentType: AgentType): [AnswerStyleOption!]!
+}
+
+type AnswerStyleOption {
+    key: AnswerStyle!
+    label: String!
+    description: String
+    order: Int
+}
+extend type Mutation {
+    "Creates an empty dialog. Same as REST POST /api/v1/dialogs. Subscribe to NATS chat.<dialog.dialogId>.* for the stream. dialog is null when the caller cannot read it."
+    createDialog(input: CreateDialogInput!): DialogPayload!
+    "Sets the dialog status (admin tokens only). Same as REST PATCH /api/v1/dialogs/{id}/status. To archive, prefer archiveDialog: it also clears the dialog's notifications. dialog is null when the caller cannot read it."
+    updateDialogStatus(input: UpdateDialogStatusInput!): DialogPayload!
+    "Switches AI/DIRECT mode (admin tokens only). Same as REST PATCH /api/v1/dialogs/{id}/mode. dialog is null when the caller cannot read it."
+    updateDialogMode(input: UpdateDialogModeInput!): DialogPayload!
+    renameDialog(input: RenameDialogInput!): DialogPayload!
+    archiveDialog(input: DialogIdInput!): DialogPayload!
+    unarchiveDialog(input: DialogIdInput!): DialogPayload!
+    "Zeroes the caller's side of the unread message counter. Clients reset the client side, technicians the shared admin side."
+    markDialogMessagesRead(input: DialogIdInput!): DialogPayload!
+    "Stops the running AI reply (cancels through Redis, any replica). Same as REST POST /api/v1/dialogs/{id}/stop. Without a running reply: userError ILLEGAL_STATE. The stream winds down asynchronously, so dialog.streamState may still read STREAMING. dialog is null when the caller cannot read it."
+    stopDialogGeneration(input: StopDialogGenerationInput!): DialogPayload!
+    "Compacts the dialog's AI context; the result arrives on the NATS chat stream. Same as REST POST /api/v1/dialogs/{id}/compact. userError DIALOG_LOCKED while the AI runs, NOTHING_TO_COMPACT when there is nothing to summarize. dialog is null when the caller cannot read it."
+    compactDialog(input: DialogIdInput!): DialogPayload!
+    "Creates or updates the dialog rating; GOOD/OKAY also resolve the dialog. Same as REST POST /api/v1/dialogs/{id}/rating. Read the result from dialog.rating. dialog is null when the caller cannot read it."
+    rateDialog(input: RateDialogInput!): DialogPayload!
+}
+
+input DialogIdInput {
+    id: ID!
+}
+
+input RenameDialogInput {
+    id: ID!
+    title: String!
+}
+
+input UpdateDialogStatusInput {
+    id: ID!
+    status: DialogStatus!
+}
+
+input UpdateDialogModeInput {
+    id: ID!
+    mode: DialogMode!
+}
+
+input StopDialogGenerationInput {
+    id: ID!
+    chatType: ChatType!
+}
+
+input RateDialogInput {
+    id: ID!
+    rating: RatingLevel!
+}
+
+enum RatingLevel {
+    SKIP
+    BAD
+    OKAY
+    GOOD
+}
+
+"Why an ADMIN dialog was opened. Set at creation, read-only afterwards."
+enum DialogIntent {
+    CREATE_SCRIPT
+    CREATE_SCRIPT_SCHEDULE
+    CREATE_POLICY
+    CREATE_TICKET
+    CREATE_KB_ARTICLE
+}
+
+"agentType defaults to CLIENT; mode is honoured for admin callers only; ticketId/insightId take a raw or global id."
+input CreateDialogInput {
+    agentType: AgentType
+    ticketId: ID
+    insightId: ID
+    mode: DialogMode
+    "ADMIN dialogs in AI mode only. Mingo opens the dialog with a canned greeting for this intent."
+    intent: DialogIntent
+}
+
+type DialogPayload {
+    dialog: Dialog
+    userErrors: [ChatUserError!]!
+}
+
+extend type Query {
+    "sort.field: lastActivityAt (time of the last message), createdAt, statusUpdatedAt, status or agentType; the cursor follows the chosen sort."
+    dialogs(
+        filter: DialogFilterInput
+        first: Int
+        after: String
+        search: String
+        sort: SortInput
+    ): DialogConnection!
+
+    dialog(id: ID!): Dialog
+
+    "An earlier Mingo chat owned by the current technician; null if unavailable."
+    conversationMemoryChatReference(id: ID!): ConversationMemoryChatReference
+
+    resumableDialog: Dialog
+
+    dialogStatistics: DialogStatistics!
+}
+
+type ConversationMemoryChatReference {
+    id: ID!
+    title: String
+}
+
+input DialogFilterInput {
+    statuses: [DialogStatus!]
+    agentTypes: [AgentType!]
+    scope: ChatScope
+    "Only the chats started from this insight."
+    insightId: ID
+    "true: only chats waiting on an approval (see pendingApproval); false: only chats that are not; null: no filter."
+    hasPendingApproval: Boolean
+}
+
+enum ChatScope {
+    MY
+    ALL
+}
+
+type Dialog implements Node @key(fields: "id") {
+    id: ID!
+    "Raw database id of the dialog: subscribe to NATS chat.<dialogId>.* and match the dialogId in notifications and push. Use id for GraphQL."
+    dialogId: String!
+    "The assistant this dialog talks to (CLIENT = Fae, ADMIN = Mingo)."
+    agentType: AgentType
+    title: String
+    status: DialogStatus!
+    currentMode: DialogMode!
+    owner: DialogOwner!
+
+    "How many notifications about this dialog the caller has not read. Batched across the page."
+    unreadNotificationCount: Int!
+
+    "How many client-chat messages the caller's side has not read. One counter per side: the client's, and one shared by all technicians. Assistant replies count for the client."
+    unreadMessageCount: Int!
+
+    # The dialog's linked ticket (1:1); lets a live client resolve its ticket without the reverse ticket->dialog lookup
+    ticketId: ID
+
+    # The insight this chat was started from (many chats per insight)
+    insightId: ID
+
+    "The intent the dialog was created with; null for ordinary dialogs."
+    intent: DialogIntent
+
+    # Metadata
+    createdAt: Instant!
+    statusUpdatedAt: Instant
+    "Time of the last message; createdAt while the dialog has none. Sort the list by it with sort.field = \"lastActivityAt\"."
+    lastActivityAt: Instant!
+    resolvedAt: Instant
+    aiResolutionSuggestedAt: Instant
+
+    # Rating (only for completed dialogs, resolved via DataLoader)
+    rating: DialogRating
+
+    # Token usage from the last AI message per chat type
+    tokenUsage: [DialogTokenUsage]
+
+    streamState: DialogStreamState!
+
+    pendingApproval: PendingApproval
+}
+
+enum DialogStreamState {
+    IDLE
+    STREAMING
+}
+
+type DialogTokenUsage {
+    chatType: ChatType
+    inputTokensSize: Int
+    outputTokensSize: Int
+    totalTokensSize: Int
+    contextSize: Int
+}
+
+interface DialogOwner {
+    type: DialogOwnerEnum!
+}
+
+type ClientDialogOwner implements DialogOwner {
+    type: DialogOwnerEnum!
+    machineId: String!
+    machine: Machine!
+}
+
+type AdminDialogOwner implements DialogOwner {
+    type: DialogOwnerEnum!
+    userId: String!
+    user: User
+}
+
+enum DialogOwnerEnum {
+    CLIENT
+    ADMIN
+}
+
+enum DialogStatus {
+    ACTIVE
+    ACTION_REQUIRED
+    ON_HOLD
+    RESOLVED
+    ARCHIVED
+}
+
+enum AgentType {
+    CLIENT
+    ADMIN
+}
+
+type DialogRating {
+    id: ID!
+    dialogId: ID!
+    rating: String!
+    createdAt: Instant!
+}
+
+type DialogConnection {
+    edges: [DialogEdge!]!
+    pageInfo: PageInfo!
+    "Number of dialogs matching the filter and search, across all pages."
+    filteredCount: Int!
+}
+
+type DialogEdge {
+    cursor: String!
+    node: Dialog!
+}
+
+type DialogStatistics {
+    totalCount: Int!
+    statusCounts: [StatusCount!]!
+    averageResolutionTimeFormatted: String!
+    averageRating: Float!
+}
+
+type StatusCount {
+    status: DialogStatus!
+    count: Int!
+}
+extend type Query {
+    "Every tenant guardrail policy: the TEMPLATE presets and the tenant's CUSTOM policy. Same as REST GET /api/v1/policies."
+    guardrailPolicies: [GuardrailPolicy!]!
+    "One policy by raw or global id; null when it does not exist (REST answers 404). Same as REST GET /api/v1/policies/{id}."
+    guardrailPolicy(id: ID!): GuardrailPolicy
+}
+
+"A tenant-wide guardrail policy: a TEMPLATE preset or the tenant's single CUSTOM policy. The active one is the tenant default."
+type GuardrailPolicy implements Node @key(fields: "id") {
+    id: ID!
+    "Raw database id: equals OrganizationGuardrails.sourceTemplate and GuardrailPolicy.sourceTemplate. Use id for GraphQL."
+    policyId: String!
+    displayName: String
+    description: String
+    type: GuardrailPolicyType!
+    isActive: Boolean!
+    customOverridesCount: Int!
+    "Raw id of the TEMPLATE a CUSTOM policy was built from; null for templates."
+    sourceTemplate: String
+    rules: [GuardrailRule!]!
+    customOverrides: [GuardrailOverride!]!
+}
+
+enum GuardrailPolicyType {
+    TEMPLATE
+    CUSTOM
+}
+
+extend type Mutation {
+    "Creates or replaces the tenant's CUSTOM policy from a TEMPLATE plus per-rule overrides, and activates it. Same as REST PUT /api/v1/policies/custom."
+    saveCustomGuardrailPolicy(input: SaveCustomGuardrailPolicyInput!): GuardrailPolicyPayload!
+    "Makes a policy the tenant default. Same as REST POST /api/v1/policies/{id}/activate."
+    activateGuardrailPolicy(input: GuardrailPolicyIdInput!): GuardrailPolicyPayload!
+}
+
+input SaveCustomGuardrailPolicyInput {
+    "Raw or global id of the base TEMPLATE policy."
+    templateId: ID!
+    "Duplicate naturalKeys: the last one wins (like the REST JSON object)."
+    overrides: [GuardrailOverrideInput!]
+}
+
+input GuardrailPolicyIdInput {
+    id: ID!
+}
+
+type GuardrailPolicyPayload {
+    policy: GuardrailPolicy
+    userErrors: [ChatUserError!]!
+}
+extend type Query {
+    currentMachine: Machine
+}
+extend type Query {
+    messages(
+        dialogId: ID!
+        chatType: ChatType
+        first: Int
+        after: String
+        sort: SortInput
+    ): MessageConnection!
+}
+
+extend type Mutation {
+    "Sends a message. AI processing runs for ADMIN_AI_CHAT and for dialogs in AI mode. Same as REST POST /api/v1/messages. The AI reply streams over NATS chat.<dialogId>.*, not in this response. message is null when the caller cannot read it."
+    sendMessage(input: SendMessageInput!): MessagePayload!
+    "Approves or rejects a pending tool approval. Same as REST POST /api/v1/approval-requests/{id}/approve. id is the raw approval request id (PendingApproval.id, approvalRequestId in NATS/notifications). Returns the approval's dialog. dialog is null when the caller cannot read it."
+    resolveApprovalRequest(input: ResolveApprovalRequestInput!): DialogPayload!
+}
+
+"Context ids take the raw or the global id of the item type (DEVICE: Machine, TICKET: Ticket, ...)."
+input SendMessageInput {
+    dialogId: ID!
+    content: String!
+    chatType: ChatType!
+    contextItems: [ContextItemInput!]
+    currentView: ContextItemInput
+    recentViews: [ContextItemInput!]
+    "The list page open when the message was sent, so \"these\" means the rows matching its filters."
+    currentList: ListViewInput
+    "The page open when the message was sent: its kind and the name the user sees. currentList and currentView add the list or the entity on it."
+    currentPage: PageViewInput
+}
+
+input PageViewInput {
+    kind: PageKind!
+    "The page name as shown to the user, e.g. \"Devices\", \"Scheduled\", \"Settings\"."
+    title: String!
+    "The sub-view, if any: the Settings tab id from the URL (ai-settings, api-keys, ...)."
+    section: String
+}
+
+enum PageKind {
+    HOME
+    LIST
+    ENTITY
+    CHAT_ARCHIVE
+    NEEDS_APPROVAL
+    SETTINGS
+    OTHER
+}
+
+input ListViewInput {
+    module: ListModule!
+    "The list's active filters, in the keys and values its own list query takes; AND across fields. Unknown keys are passed to Mingo as-is."
+    filters: [ListFilterInput!]
+    "The list's search text, if any."
+    search: String
+}
+
+input ListFilterInput {
+    field: String!
+    "One or more values; OR within the field."
+    values: [String!]!
+}
+
+enum ListModule {
+    DEVICES
+    CUSTOMERS
+    TICKETS
+    SCRIPTS
+    SCRIPT_SCHEDULES
+    POLICIES
+    QUERIES
+    INCIDENTS
+    LOGS
+    SOFTWARE
+    VULNERABILITIES
+    KNOWLEDGE_BASE
+    CLOUD_TENANTS
+    TIME_ENTRIES
+}
+
+input ResolveApprovalRequestInput {
+    id: ID!
+    approve: Boolean!
+}
+
+input ContextItemInput {
+    type: ContextItemType!
+    id: ID!
+}
+
+type MessagePayload {
+    message: Message
+    userErrors: [ChatUserError!]!
+}
+
+type Message implements Node @key(fields: "id") {
+    id: ID!
+    dialogId: ID!
+    chatType: ChatType!
+    dialogMode: DialogMode!
+    owner: MessageOwner!
+    parts: [MessageData!]!
+    lastChunkStreamSeq: Long
+    createdAt: Instant!
+}
+
+interface MessageOwner {
+    type: MessageOwnerEnum!
+}
+
+type ClientOwner implements MessageOwner {
+    type: MessageOwnerEnum!
+    machineId: String!
+    machine: Machine!
+}
+
+type AssistantOwner implements MessageOwner {
+    type: MessageOwnerEnum!
+    model: String
+    modelName: String
+    providerName: String
+    contextWindow: Int
+}
+
+type AdminOwner implements MessageOwner {
+    type: MessageOwnerEnum!
+    userId: String @auth(requires: "ADMIN")
+    user: User
+}
+
+type SystemOwner implements MessageOwner {
+    type: MessageOwnerEnum!
+    triggeredBy: String
+}
+
+interface MessageData {
+    type: MessageDataType!
+}
+
+type TextData implements MessageData {
+    type: MessageDataType!
+    text: String!
+    contextItems: [ContextItem!]
+}
+
+type ContextItem {
+    type: ContextItemType!
+    id: ID!
+}
+
+type ExecutingToolData implements MessageData {
+    type: MessageDataType!
+    toolExecutionRequestId: String
+    integratedToolType: ToolType
+    toolFunction: String!
+    title: String
+    toolExplanation: String
+    parameters: JSON
+    requiresApproval: Boolean
+    approvalStatus: ToolApprovalStatus
+    policyReview: PolicyReview
+}
+
+type ExecutedToolData implements MessageData {
+    type: MessageDataType!
+    toolExecutionRequestId: String
+    integratedToolType: ToolType
+    toolFunction: String!
+    result: String
+    success: Boolean
+    requiredApproval: Boolean
+    approvalStatus: ToolApprovalStatus
+}
+
+type ErrorData implements MessageData {
+    type: MessageDataType!
+    error: String
+    details: String
+}
+
+type ApprovalRequestData implements MessageData {
+    type: MessageDataType!
+    approvalType: ApprovalType
+    command: String
+    explanation: String
+    approvalRequestId: String
+    toolCalls: [PendingToolCall!]
+}
+
+type PendingToolCall {
+    toolExecutionRequestId: String
+    toolName: String!
+    toolTitle: String
+    toolExplanation: String
+    toolType: ToolType
+    requiresApproval: Boolean!
+    approvalType: ApprovalType
+    toolCallArguments: JSON
+    policyReview: PolicyReview
+}
+
+# Why the security policy gave a tool call its approval level.
+type PolicyReview {
+    source: PolicyReviewSource
+    decision: PolicyReviewDecision
+    approvalLevel: SecurityApprovalLevel
+    policyLevel: SecurityApprovalLevel
+    operationCodes: [String!]
+    matchedRules: [PolicyReviewRule!]
+    reason: String
+}
+
+enum PolicyReviewSource {
+    REGEX
+    CLASSIFIER
+}
+
+enum PolicyReviewDecision {
+    POLICY
+    FALLBACK
+    DENY
+}
+
+type PolicyReviewRule {
+    code: String!
+    label: String!
+}
+
+type ApprovalResultData implements MessageData {
+    type: MessageDataType!
+    approvalRequestId: String
+    approved: Boolean
+    approvalType: ApprovalType
+    resolvedByUserId: String
+    resolvedByName: String
+}
+
+type EscalationOfferData implements MessageData {
+    type: MessageDataType!
+    offerId: String
+    state: EscalationOfferState
+    text: String
+    origin: String
+    resolvedByUserId: String
+    resolvedByName: String
+    resolvedAt: Instant
+}
+
+enum EscalationOfferState {
+    PENDING
+    APPROVED
+    DECLINED
+    SUPERSEDED
+}
+
+type TicketEscalatedData implements MessageData {
+    type: MessageDataType!
+    ticketId: String
+    ticketNumber: Int
+    reason: TicketEscalationReason
+    text: String
+}
+
+type TicketEventData implements MessageData {
+    type: MessageDataType!
+    kind: String
+    actorId: String
+    actorName: String
+    actorType: String
+    reason: String
+    targetStatusKind: String
+}
+
+enum TicketEscalationReason {
+    INACTIVITY
+}
+
+type SystemData implements MessageData {
+    type: MessageDataType!
+    text: String!
+}
+
+type ContextCompactionStartData implements MessageData {
+    type: MessageDataType!
+}
+
+type ContextCompactionEndData implements MessageData {
+    type: MessageDataType!
+    summary: String
+}
+
+type ThinkingData implements MessageData {
+    type: MessageDataType!
+    text: String!
+}
+
+type RecordData implements MessageData {
+    type: MessageDataType!
+    sources: [ChatSourceAttachment!]!
+}
+
+"A record an answer drew on, as a source part: type is source-url or source-document, sourceId the record URI."
+type ChatSourceAttachment {
+    type: String
+    sourceId: String
+    url: String
+    title: String
+    mediaType: String
+    filename: String
+}
+
+"The records an answer shows as cards (the assistant's showRecords call), as record URIs, drawn where the part sits among the message's parts."
+type RecordCardsData implements MessageData {
+    type: MessageDataType!
+    records: [String!]!
+}
+
+type AskData implements MessageData {
+    type: MessageDataType!
+    text: String
+    question: String!
+    options: [AskOption!]!
+}
+
+type AskOption {
+    label: String!
+    description: String
+}
+
+type MessageConnection {
+    edges: [MessageEdge!]!
+    pageInfo: PageInfo!
+}
+
+type MessageEdge {
+    cursor: String!
+    node: Message!
+}
+
+enum MessageOwnerEnum {
+    CLIENT
+    ASSISTANT
+    ADMIN
+    SYSTEM
+}
+
+enum ChatType {
+    CLIENT_CHAT
+    ADMIN_AI_CHAT
+}
+
+enum ContextItemType {
+    DEVICE
+    SCRIPT
+    TICKET
+    ORGANIZATION
+    USER
+    KB_ARTICLE
+    KB_FOLDER
+    POLICY
+    QUERY
+    SCHEDULED_SCRIPT
+    INSIGHT
+    SOFTWARE
+    VULNERABILITY
+    SOFTWARE_ACTION
+    CLOUD_TENANT
+    TIME_ENTRY
+}
+
+enum MessageDataType {
+    TEXT
+    EXECUTING_TOOL
+    EXECUTED_TOOL
+    ERROR
+    APPROVAL_REQUEST
+    APPROVAL_RESULT
+    ESCALATION_OFFER
+    TICKET_ESCALATED
+    TICKET_EVENT
+    SYSTEM
+    CONTEXT_COMPACTION_START
+    CONTEXT_COMPACTION_END
+    THINKING
+    ATTACHMENTS
+    ASK
+    RECORD_CARDS
+}
+
+enum ToolApprovalStatus {
+    PENDING
+    APPROVED
+    REJECTED
+}
+
+enum ToolType {
+    MESHCENTRAL
+    FLEET_MDM
+    OPENFRAME_RMM
+    MICROSOFT_365
+    GOOGLE_WORKSPACE
+}
+
+enum ApprovalType {
+    CLIENT
+    ADMIN
+}
+extend type Query {
+    "Effective client AI config for a customer organization (tenant default when inheriting)."
+    organizationClientAiConfig(organizationId: ID!): OrganizationClientAiConfig!
+}
+
+extend type Mutation {
+    """
+    Gives the organization its own client AI config (breaks inheritance from the tenant default).
+    Creating the override without a quickActions list keeps quick actions inherited: the
+    organization follows the tenant's actions live (quickActionsIsDefault=true) until a list is
+    provided. input.quickActionsIsDefault is ignored for organizations — use
+    resetOrganizationClientAiQuickActions instead.
+    """
+    updateOrganizationClientAiConfig(organizationId: ID!, input: AgentAiConfigInput!): OrganizationClientAiConfigPayload!
+
+    "Removes the override so the organization inherits the tenant default again. Idempotent."
+    resetOrganizationClientAiConfig(organizationId: ID!): OrganizationClientAiConfigPayload!
+
+    """
+    Clears the organization's own quick actions so it follows the tenant's live again
+    (quickActionsIsDefault becomes true), keeping the rest of the override intact. No-op
+    returning the inherited view when the organization has no override.
+    """
+    resetOrganizationClientAiQuickActions(organizationId: ID!): OrganizationClientAiConfigPayload!
+}
+
+"""
+Effective per-organization client AI config. inheritDefault=true means the organization has no
+override and the field values come from the tenant default — or, when no tenant default is
+configured either, from the synthetic default built from the tenant's active model configuration
+(what the chat runtime actually uses). The view part (assistant name, avatar, theme, accent
+color) lives on ClientView and keeps its own per-organization override
+(updateClientView/resetClientView).
+"""
+type OrganizationClientAiConfig {
+    organizationId: ID!
+    "True when the organization has no override and inherits the tenant default."
+    inheritDefault: Boolean!
+    llmProvider: AIProvider
+    providerModel: String
+    answerStyle: AnswerStyle
+    customPrompt: String
+    "The effective quick actions to display: the organization's own list when customized, else the tenant's current list. Null means the frontend shows the built-in MPH defaults."
+    quickActions: [QuickAction!]
+    """
+    State of the "use default quick actions" checkbox: true when the organization follows the
+    tenant's quick actions live (no own list stored — tenant edits propagate automatically),
+    false when it keeps its own customized list.
+    """
+    quickActionsIsDefault: Boolean!
+    "When this organization's override was last modified. Null while inheriting the tenant default."
+    updatedAt: Instant
+}
+
+type OrganizationClientAiConfigPayload {
+    config: OrganizationClientAiConfig
+    userErrors: [ChatUserError!]!
+}
+extend type Query {
+    "Effective guardrails view for a customer organization (tenant rules when inheriting/absent)."
+    organizationGuardrails(organizationId: ID!): OrganizationGuardrails!
+}
+
+extend type Mutation {
+    """
+    Gives the organization its own guardrails, materialized from a preset template
+    (templateId = the raw or global GuardrailPolicy id of a TEMPLATE policy from guardrailPolicies)
+    plus per-operation approval-level overrides.
+    """
+    updateOrganizationGuardrails(organizationId: ID!, input: OrganizationGuardrailsInput!): OrganizationGuardrailsPayload!
+
+    "Resets the organization to inherit the tenant default guardrails."
+    resetOrganizationGuardrails(organizationId: ID!): OrganizationGuardrailsPayload!
+}
+
+"Effective per-organization guardrails. inheritDefault=true means the tenant default applies (rules show the tenant rules)."
+type OrganizationGuardrails {
+    organizationId: ID!
+    inheritDefault: Boolean!
+    "Server id of the TEMPLATE policy this org's policy was materialized from (null when inheriting and never configured)."
+    sourceTemplate: String
+    active: Boolean!
+    rules: [GuardrailRule!]!
+    overrides: [GuardrailOverride!]!
+}
+
+type GuardrailRule {
+    tool: String!
+    function: String
+    policyGroup: String
+    category: String
+    operation: String
+    commandPattern: String
+    approvalLevel: SecurityApprovalLevel!
+    naturalKey: String!
+}
+
+type GuardrailOverride {
+    naturalKey: String!
+    approvalLevel: SecurityApprovalLevel!
+}
+
+input OrganizationGuardrailsInput {
+    "Raw or global (GuardrailPolicy) id of the base TEMPLATE policy from guardrailPolicies."
+    templateId: ID!
+    overrides: [GuardrailOverrideInput!]
+}
+
+input GuardrailOverrideInput {
+    naturalKey: String!
+    approvalLevel: SecurityApprovalLevel!
+}
+
+"Mirrors com.openframe.data.document.ai.guardrails.enums.SecurityApprovalLevel (declaration order)."
+enum SecurityApprovalLevel {
+    ALLOW
+    ASK_USER
+    ASK_TECHNICIAN
+    DENY
+}
+
+type OrganizationGuardrailsPayload {
+    guardrails: OrganizationGuardrails
+    userErrors: [ChatUserError!]!
+}
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@shareable", "@override"])
+
+
+directive @auth(requires: String!) on FIELD_DEFINITION
+
+interface Node {
+    id: ID!
+}
+
+
+type Query {
+    "Relay: refetch any ai-agent Node by its global id. Foreign, unknown, missing or inaccessible ids resolve to null."
+    node(id: ID!): Node
+    "Relay: batch form of node; one slot per id, null where node would be null."
+    nodes(ids: [ID!]!): [Node]!
+}
+
+type Mutation {
+
+}
+
+scalar Instant
+scalar JSON
+scalar Long
+
+type PageInfo @shareable {
+    hasNextPage: Boolean!
+    hasPreviousPage: Boolean!
+    startCursor: String
+    endCursor: String
+}
+
+input SortInput {
+    field: String
+    direction: SortDirection
+}
+
+enum SortDirection {
+    ASC
+    DESC
+}
+
+enum DialogMode {
+    AI
+    DIRECT
+}
+
+type Machine implements Node @key(fields: "machineId", resolvable: false) @shareable {
+    id: ID!
+    machineId: String!
+    hostname: String!
+    nickname: String
+    organizationId: String!
+    organization: Organization
+}
+
+type Organization @key(fields: "organizationId", resolvable: false) @shareable {
+    id: ID!
+    organizationId: String!
+    name: String!
+}
+
+type User implements Node @key(fields: "id", resolvable: false) @shareable {
+    id: ID!
+    firstName: String
+    lastName: String
+    status: UserStatus
+    image: UserImage
+}
+
+"Mirrors the api subgraph's enum, which owns it: a shared field must resolve to the same type in every subgraph."
+enum UserStatus {
+    ACTIVE
+    "Deleted by an admin; personal data is kept and a re-invite revives the account."
+    DELETED
+    "Deleted by the user; personal data is anonymized."
+    SELF_DELETED
+}
+
+type UserImage @shareable {
+    imageUrl: String!
+    hash: String
+}
+type SupportTeam {
+    technicians: [User!]!
+    count: Int!
+}
+
+extend type Query {
+    supportTeam(limit: Int! = 3): SupportTeam!
+}
+extend type Query {
+    ticketFilters(filter: TicketFilterInput): TicketFilters!
+    tickets(
+        filter: TicketFilterInput
+        first: Int
+        after: String
+        search: String
+        sort: SortInput
+    ): TicketConnection!
+    ticket(id: ID!): Ticket
+    ticketTags: [TicketTag!]!
+    ticketStatistics: TicketStatistics!
+    ticketAttachmentDownloadUrl(attachmentId: ID!): String!
+    ticketStatuses: [TicketStatusDefinition!]!
+    # Allowed-transition matrix over every status, custom and system alike (Tech Required is a
+    # valid target from any non-terminal status).
+    ticketStatusTransitionRules: [TicketStatusTransitionRule!]!
+}
+
+extend type Mutation {
+    createTicket(input: CreateTicketInput!): TicketPayload!
+    updateTicket(input: UpdateTicketInput!): TicketPayload!
+    assignTicket(input: AssignTicketInput!): TicketPayload!
+    unassignTicket(input: TicketIdInput!): TicketPayload!
+    unlinkDeviceFromTicket(input: TicketIdInput!): TicketPayload!
+    unlinkOrganizationFromTicket(input: TicketIdInput!): TicketPayload!
+    reorderTicket(input: ReorderTicketInput!): TicketPayload!
+    archiveResolvedTickets(filter: TicketFilterInput): BulkOperationPayload!
+
+    addTicketTag(input: TicketTagAssignmentInput!): TicketPayload!
+    removeTicketTag(input: TicketTagAssignmentInput!): TicketPayload!
+
+    addTicketNote(input: AddTicketNoteInput!): TicketNotePayload!
+    updateTicketNote(input: UpdateTicketNoteInput!): TicketNotePayload!
+    deleteTicketNote(input: DeleteByIdInput!): DeletePayload!
+
+    createTempAttachmentUploadUrl(input: CreateTempAttachmentInput!): TempAttachmentPayload!
+    deleteTempAttachment(input: DeleteByIdInput!): DeletePayload!
+    createTicketAttachmentUploadUrl(input: CreateTicketAttachmentInput!): TicketAttachmentUploadPayload!
+    deleteTicketAttachment(input: DeleteByIdInput!): DeletePayload!
+
+    # A transition the rules matrix does not allow comes back as a userError, not a top-level error.
+    transitionTicket(input: TransitionTicketInput!): TicketPayload!
+    takeOverTicket(input: TakeOverTicketInput!): TicketPayload!
+    createTicketStatus(input: CreateTicketStatusInput!): TicketStatusDefinition!
+    updateTicketStatus(input: UpdateTicketStatusInput!): TicketStatusDefinition!
+    deleteTicketStatus(input: DeleteTicketStatusInput!): Boolean!
+    reorderTicketStatus(input: ReorderTicketStatusInput!): TicketStatusDefinition!
+
+    # ===== Escalation =====
+    # Client-initiated escalation: publishes the escalation offer block (ESCALATION_OFFER) into the
+    # ticket's client chat; the handoff happens only once the client approves it. Idempotent while
+    # an escalation offer is already pending. Already-escalated tickets error with TICKET_AI_DISABLED.
+    requestTicketEscalation(input: TicketIdInput!): TicketEscalationPayload!
+    # Resolves the pending escalation offer. Approve performs the handoff (ticket moves to Tech
+    # Required, Fae goes silent); decline just records the choice. Both publish the resolved
+    # ESCALATION_OFFER block carrying the resolver's name. No pending offer errors as a userError.
+    approveTicketEscalation(input: TicketIdInput!): TicketEscalationPayload!
+    declineTicketEscalation(input: TicketIdInput!): TicketEscalationPayload!
+    # Client-initiated reopen of a closed (RESOLVED/ARCHIVED) ticket. The destination is not chosen
+    # by the caller: a ticket the client closed through the assistant returns to AI Handling, one
+    # a technician closed goes to Tech Required. Idempotent for an already-open ticket. Publishes
+    # the TICKET_EVENT REOPENED card carrying targetStatusKind.
+    requestTicketReopen(input: TicketReopenInput!): TicketReopenPayload!
+}
+
+type Ticket implements Node @key(fields: "id") @shareable {
+    id: ID!
+    "Raw database id of the ticket: matches the ticketId in notifications, push and board events. Use id for GraphQL."
+    ticketId: String!
+    ticketNumber: Int!
+    title: String
+    description: String
+    creationSource: TicketCreationSource
+    owner: TicketOwner!
+
+    # Device
+    deviceId: String
+    deviceHostname: String
+
+    # Organization
+    organizationId: String
+    organizationName: String
+
+    # Reporter
+    reporterId: String
+    reporterName: String
+
+    # Assignee
+    assignedTo: String
+    assignedName: String
+    assignee: User
+    assigneeImage: Image
+
+    # True when the client confirmed the handoff to a human (button, direct ask, or an approved
+    # auto-detected offer). Null on inactivity auto-escalations and on tickets predating the field —
+    # treat null as false. Replaces the former "Escalated by user" tag.
+    escalatedByUser: Boolean
+
+    # Images
+    reporterImage: Image
+    organizationImage: Image
+
+    "How many notifications about this ticket the caller has not read. Batched across the page."
+    unreadNotificationCount: Int!
+
+    "How many client-chat messages the caller's side has not read, taken from the ticket's dialog. 0 when the ticket has no dialog."
+    unreadMessageCount: Int!
+
+    # Related entities
+    tags: [TicketTag!]!
+    attachments: [TicketAttachment!]!
+    notes: [TicketNote!]!
+
+    # Dialog (1:1)
+    dialog: Dialog
+
+    # Latest pending tool-approval request for this ticket's dialog (null when none awaits approval)
+    pendingApproval: PendingApproval
+
+    # Manual sort order (drag-and-drop)
+    order: String
+
+    # Timestamps
+    createdAt: Instant!
+    updatedAt: Instant
+    resolvedAt: Instant
+
+    lastActivityAt: Instant!
+    activityState: TicketActivityState!
+    hasNewMessage: Boolean!
+
+    # Who resolved the ticket. Open vocabulary (END_USER, TECHNICIAN, AI_AGENT), null while open.
+    # The client reopen modal picks its variant off this: END_USER -> the assistant continues.
+    resolvedBy: String
+
+    statusDefinition: TicketStatusDefinition
+    statusKind: TicketStatusKind
+    aiDisabled: Boolean
+    # Statuses this ticket may move to right now, per the same rules as ticketStatusTransitionRules.
+    availableTransitions: [TicketStatusDefinition!]
+}
+
+# A tool-approval request awaiting an admin decision.
+# `toolCalls` / `approvalType` reuse the types declared in the message schema.
+type PendingApproval {
+    id: ID!
+    approvalType: ApprovalType
+    command: String
+    explanation: String
+    toolCalls: [PendingToolCall!]
+    createdAt: Instant!
+}
+
+type TicketTag {
+    id: ID!
+    key: String!
+    description: String
+    color: String
+    createdAt: Instant!
+    createdBy: String
+}
+
+type TicketNote implements Node @key(fields: "id") {
+    id: ID!
+    ticketId: ID!
+    content: String!
+    authorId: String!
+    author: User
+    authorImage: Image
+    createdAt: Instant!
+    updatedAt: Instant
+}
+
+type TicketAttachment implements Node @key(fields: "id") {
+    id: ID!
+    ticketId: ID!
+    fileName: String!
+    contentType: String
+    fileSize: Long
+    thumbnailUrl: String
+    uploadedAt: Instant!
+    uploadedBy: String
+    uploader: User
+}
+
+type TempAttachment @shareable {
+    id: ID!
+    fileName: String!
+    contentType: String
+    fileSize: Long
+    uploadUrl: String!
+    createdAt: Instant!
+}
+
+enum TicketActivityState {
+    AI_WORKING
+    AWAITING_EXTERNAL
+    IDLE
+}
+
+enum TicketActivityFilter {
+    ACTIVE
+    STALE
+    AWAITING_EXTERNAL
+}
+
+enum TicketCreationSource {
+    FAE_FORM
+    FAE_DIALOG
+    ADMIN_DASHBOARD
+}
+
+enum TicketOwnerEnum {
+    CLIENT
+    ADMIN
+}
+
+interface TicketOwner {
+    type: TicketOwnerEnum!
+}
+
+type ClientTicketOwner implements TicketOwner {
+    type: TicketOwnerEnum!
+    machineId: String!
+    machine: Machine
+}
+
+type AdminTicketOwner implements TicketOwner {
+    type: TicketOwnerEnum!
+    userId: String!
+    user: User
+}
+
+type TicketConnection {
+    edges: [TicketEdge!]!
+    pageInfo: PageInfo!
+    filteredCount: Int!
+}
+
+type TicketEdge {
+    cursor: String!
+    node: Ticket!
+}
+
+type TicketFilters {
+    statuses: [TicketFilterOption!]!
+    organizationIds: [TicketFilterOption!]!
+    assigneeIds: [TicketFilterOption!]!
+    tagIds: [TicketFilterOption!]!
+}
+
+type TicketFilterOption {
+    value: String!
+    label: String!
+}
+
+type TicketStatistics {
+    totalCount: Int!
+    statusDefinitionCounts: [TicketStatusDefinitionCount!]!
+    averageResolutionTimeFormatted: String
+    averageRating: Float
+    # Phase 2:
+    # averageResponseTimeFormatted: String
+    # overdueCount: Int
+}
+
+type TicketStatusDefinitionCount {
+    status: TicketStatusDefinition!
+    count: Int!
+}
+
+type TicketPayload {
+    ticket: Ticket
+    userErrors: [ChatUserError!]!
+}
+
+type TicketNotePayload {
+    note: TicketNote
+    userErrors: [ChatUserError!]!
+}
+
+type TempAttachmentPayload {
+    tempAttachment: TempAttachment
+    userErrors: [ChatUserError!]!
+}
+
+type TicketAttachmentUploadPayload {
+    attachment: TicketAttachment
+    uploadUrl: String
+    userErrors: [ChatUserError!]!
+}
+
+type TicketAttachmentUpload {
+    attachment: TicketAttachment!
+    uploadUrl: String!
+}
+
+type DeletePayload {
+    deletedId: ID
+    userErrors: [ChatUserError!]!
+}
+
+type TicketEscalationPayload {
+    ticketId: ID
+    userErrors: [ChatUserError!]!
+}
+
+# The client reopen modal: an optional free-text reason and, for tickets the assistant
+# resolved, an optional handoff checkbox that forces the ticket to a technician instead
+# of back to the assistant.
+input TicketReopenInput {
+    id: ID!
+    reason: String
+    handoffToTechnician: Boolean
+}
+
+type TicketReopenPayload {
+    ticketId: ID
+    targetStatusKind: String
+    userErrors: [ChatUserError!]!
+}
+
+type BulkOperationPayload {
+    count: Int!
+    userErrors: [ChatUserError!]!
+}
+
+type ChatUserError {
+    field: [String!]
+    message: String!
+    "Machine-readable error code, equal to the REST ErrorResponse.code for the same failure. Null on operations that do not report codes yet."
+    code: String
+}
+
+input TicketFilterInput {
+    statusIds: [ID!]
+    organizationIds: [ID!]
+    "Tickets linked to these devices, by machine id (the id updateTicket.deviceId takes). A ticket whose device was unlinked no longer matches."
+    deviceIds: [ID!]
+    assigneeIds: [ID!]
+    tagIds: [ID!]
+    "true keeps only tickets with client-chat messages the caller's side has not read (see unreadMessageCount); false and null do not filter."
+    hasUnreadNotifications: Boolean
+    activity: [TicketActivityFilter!]
+    "true keeps only tickets the client escalated (see Ticket.escalatedByUser); false keeps the others, a null value counting as false."
+    escalatedByUser: Boolean
+    "true keeps only tickets whose chat waits on an approval request (see Ticket.pendingApproval); false keeps the others; omitted does not filter."
+    hasPendingApproval: Boolean
+}
+
+input CreateTicketInput {
+    title: String!
+    description: String
+    # Initial status for manually created tickets — any custom status, or the TECH_REQUIRED system
+    # status to file straight into the Tech Required queue. The other system statuses
+    # (AI_ASSISTANCE, RESOLVED, ARCHIVED) come back as a userError. Defaults to the first custom
+    # status when omitted.
+    statusId: ID
+    deviceId: ID
+    organizationId: ID
+    assigneeId: ID
+    "Insight id (raw or Relay global) when the ticket is filed from an insight; links the two on create."
+    insightId: ID
+    tagIds: [ID!]
+    tempAttachmentIds: [ID!]
+    assignedOrganizationIds: [ID!]
+    assignedDeviceIds: [ID!]
+    assignedTicketIds: [ID!]
+    assignedKnowledgeArticleIds: [ID!]
+}
+
+input UpdateTicketInput {
+    id: ID!
+    title: String
+    description: String
+    deviceId: ID
+    organizationId: ID
+    assigneeId: ID
+    tagIds: [ID!]
+    tempAttachmentIds: [ID!]
+}
+
+input TicketIdInput {
+    id: ID!
+}
+
+input AssignTicketInput {
+    id: ID!
+    assigneeId: ID!
+}
+
+input ReorderTicketInput {
+    id: ID!
+    afterTicketId: ID
+    beforeTicketId: ID
+    # Target column; absent means "same column"
+    statusId: ID
+}
+
+input TicketTagAssignmentInput {
+    ticketId: ID!
+    tagId: ID!
+}
+
+input AddTicketNoteInput {
+    ticketId: ID!
+    content: String!
+}
+
+input UpdateTicketNoteInput {
+    id: ID!
+    content: String!
+}
+
+input CreateTempAttachmentInput {
+    fileName: String!
+    contentType: String
+    fileSize: Long
+}
+
+input CreateTicketAttachmentInput {
+    ticketId: ID!
+    fileName: String!
+    contentType: String
+    fileSize: Long
+}
+
+input DeleteByIdInput {
+    id: ID!
+}
+
+# TODO(lifecycle-rollout): rename `TicketStatusDefinition` → `TicketStatus`
+type TicketStatusDefinition implements Node @key(fields: "id") @shareable {
+    id: ID!
+    name: String!
+    color: String!
+    position: String!
+    staleAfterMinutes: Int!
+    kind: TicketStatusKind!
+    isSystem: Boolean!
+    systemKey: String
+    createdAt: Instant
+    updatedAt: Instant
+}
+
+type TicketStatusTransitionRule {
+    from: TicketStatusDefinition!
+    to: [TicketStatusDefinition!]!
+}
+
+enum TicketStatusKind {
+    AI_ASSISTANCE
+    TECH_REQUIRED
+    RESOLVED
+    ARCHIVED
+    CUSTOM
+}
+
+input TransitionTicketInput {
+    ticketId: ID!
+    toStatusId: ID!
+    reason: String
+    reopenReason: String
+}
+
+input TakeOverTicketInput {
+    ticketId: ID!
+    toStatusId: ID!
+    assigneeId: ID!
+}
+
+input CreateTicketStatusInput {
+    name: String!
+    color: String!
+    staleAfterMinutes: Int
+}
+
+input UpdateTicketStatusInput {
+    id: ID!
+    name: String
+    color: String
+    staleAfterMinutes: Int
+}
+
+input DeleteTicketStatusInput {
+    id: ID!
+    replacementStatusId: ID
+}
+
+input ReorderTicketStatusInput {
+    id: ID!
+    afterStatusId: ID
+    beforeStatusId: ID
+}
+
+"""
+Image projection (metadata, not bytes) shared by image-bearing GraphQL types
+(e.g. TenantInfo.image, the AI assistant avatar, User.image).
+Maps to com.openframe.data.document.image.Image; resolved via ImageService.
+Image bytes/upload are served over REST (ImageController), not GraphQL.
+"""
+type Image @shareable {
+    imageUrl: String!
+    presignedImageUrl: String
+    sourceType: String!
+    hash: String
+}
+"""
+Editable tenant profile (name, website, image). Shared read model served by both
+saas-api and the AI agent. The `image` field reuses the `Image` type defined by the
+consuming service (saas-api / ai-agent) and is resolved via ImageService for ImageEntityType.TENANT.
+"""
+type TenantInfo @shareable {
+    id: ID!
+    name: String
+    website: String
+    image: Image
+}
+
+extend type Query {
+    """Current authenticated tenant's info (name, website, image)."""
+    tenantInfo: TenantInfo @shareable
+}

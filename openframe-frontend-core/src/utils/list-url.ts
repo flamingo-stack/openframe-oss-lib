@@ -117,6 +117,8 @@ const BUILDERS: Record<string, (ids: string[], base: string) => string> = {
   design_doc: (ids, b) => `${b}/api/design-docs?ids=${ids.join(',')}`,
   openframe_tenant: (ids, b) => `${b}/api/openframe-tenants?ids=${ids.join(',')}`,
   recorded_call: (ids, b) => `${b}/api/recorded-calls?ids=${ids.join(',')}`,
+  // One story of the AI daily digest (people-hub and product-hub), ChatRef-shaped like the objects above.
+  ai_digest_story: (ids, b) => `${b}/api/ai-digest/cards?ids=${ids.join(',')}`,
   // The public website's own pages (live source; ChatRef-shaped items like the objects above).
   site_page: (ids, b) => `${b}/api/site-pages?ids=${ids.join(',')}`,
   openframe_price: (ids, b) => `${b}/api/openframe-pricing?ids=${ids.join(',')}`,

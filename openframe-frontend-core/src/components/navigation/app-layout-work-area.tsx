@@ -25,8 +25,12 @@ import { PanelResizeGrip, PanelResizeHandle } from '../ui/panel-resize-handle';
  * - `page`: the page column takes the whole area, the chat column is hidden.
  *
  * The host decides it (from its route and its own state). A hidden column stays
- * mounted — `hidden`, `inert` and `aria-hidden` — so a thread keeps its scroll and
- * a page its state while the other side has the room.
+ * mounted, `inert` and `aria-hidden`, so a page keeps its state while the other side
+ * has the room. Once it has been on screen it also stays laid out, unpainted, at the
+ * width it last had: a `display: none` box measures 0, which a stick-to-bottom thread
+ * reads as a jump to its end (it pulls the reader back down when the column returns),
+ * a page's breakpoints read as a phone, and every enter animation in it replays on the
+ * way back. Its scrollers keep their offsets. A column never shown yet is `display: none`.
  */
 export type AppLayoutWorkAreaMode = 'chat' | 'split' | 'page';
 
@@ -59,7 +63,26 @@ interface Squeeze {
   page: boolean;
 }
 
-const NOT_SQUEEZED: Squeeze = { chat: false, page: false };
+/** The width each column last had on screen, px; `null` for a column never shown. */
+interface KeptWidths {
+  chat: number | null;
+  page: number | null;
+}
+
+const NO_KEPT_WIDTHS: KeptWidths = { chat: null, page: null };
+
+/**
+ * A hidden column that has been on screen: out of the row's flow, at the width it kept (its
+ * style), never wider than the row, pinned to its side of the row, painted at `opacity-0`.
+ * Not `invisible`: a descendant may set `visibility: visible` (a remote screen's canvas, an
+ * expanded list) and paint through it, and every descendant with a `duration-*` and the
+ * default `transition-property: all` transitions the inherited visibility on the way back,
+ * which keeps it hidden for the first frame (a blink). `inert` and `aria-hidden` (on the
+ * column) take it out of focus, the accessibility tree and find-in-page; `-z-10` stacks it
+ * under the column on screen, which spans the row, so nothing in it wins a hit test, a
+ * descendant's own `pointer-events: auto` included, even where `inert` is not supported.
+ */
+const KEPT_HIDDEN_CLASS = 'pointer-events-none absolute inset-y-0 -z-10 max-w-full opacity-0';
 
 /** Which sides of a sideways scroller's content are out of view. */
 interface HiddenSides {
@@ -308,11 +331,37 @@ export function AppLayoutWorkArea({
 
   const chatHidden = shown === 'page';
   const pageHidden = shown === 'chat';
-  // Which column is narrower than `minColumnWidth` at the width on screen.
-  const squeeze: Squeeze =
-    shown === 'split' && shownChatWidth !== null && measured
-      ? { chat: shownChatWidth < minColumnWidth, page: rowWidth - shownChatWidth < minColumnWidth }
-      : NOT_SQUEEZED;
+  // Each column's width on screen, px; `null` while it is hidden or the row is not measured.
+  const chatOnScreen = !measured ? null : shown === 'chat' ? rowWidth : shown === 'split' ? shownChatWidth : null;
+  const pageOnScreen = !measured
+    ? null
+    : shown === 'page'
+      ? rowWidth
+      : shown === 'split' && shownChatWidth !== null
+        ? rowWidth - shownChatWidth
+        : null;
+  // The width each column last had on screen. A hidden column stays laid out at it (see
+  // `AppLayoutWorkAreaMode`); one never shown has none and is `display: none`. Not while the
+  // divider is dragged: this setState re-runs the render, which would double every drag frame,
+  // and the width the drag ends at lands with its release.
+  const [lastWidths, setLastWidths] = useState<KeptWidths>(NO_KEPT_WIDTHS);
+  if (
+    dragWidth === null &&
+    ((chatOnScreen !== null && chatOnScreen !== lastWidths.chat) ||
+      (pageOnScreen !== null && pageOnScreen !== lastWidths.page))
+  ) {
+    setLastWidths({ chat: chatOnScreen ?? lastWidths.chat, page: pageOnScreen ?? lastWidths.page });
+  }
+  const chatKeptWidth = chatHidden ? lastWidths.chat : null;
+  const pageKeptWidth = pageHidden ? lastWidths.page : null;
+  // Which column is narrower than `minColumnWidth`: on screen in `split`, or kept hidden at
+  // such a width (its content keeps the min width, so it does not reflow on the way).
+  const chatLaidOut = chatKeptWidth ?? (shown === 'split' ? chatOnScreen : null);
+  const pageLaidOut = pageKeptWidth ?? (shown === 'split' ? pageOnScreen : null);
+  const squeeze: Squeeze = {
+    chat: squeezes && chatLaidOut !== null && chatLaidOut < minColumnWidth,
+    page: squeezes && pageLaidOut !== null && pageLaidOut < minColumnWidth,
+  };
   const chatColumnState = useMemo<WorkAreaColumnState>(
     () => ({ squeezed: squeeze.chat, minWidth: minColumnWidth }),
     [squeeze.chat, minColumnWidth],
@@ -328,8 +377,8 @@ export function AppLayoutWorkArea({
     if (!pageElement) return;
     setPageScroller(pageElement.querySelector<HTMLElement>('[data-work-area-scroller]') ?? pageElement);
   }, [pageElement, squeeze.page]);
-  const chatHiddenSides = useHiddenSides(chatElement, squeeze.chat);
-  const pageHiddenSides = useHiddenSides(pageScroller, squeeze.page);
+  const chatHiddenSides = useHiddenSides(chatElement, squeeze.chat && !chatHidden);
+  const pageHiddenSides = useHiddenSides(pageScroller, squeeze.page && !pageHidden);
   // The width a squeezed column's content keeps, for its scroller (`[&>*]:min-w-[var(--work-area-min-width)]`).
   const minWidthVar = { '--work-area-min-width': `${minColumnWidth}px` } as CSSProperties;
 
@@ -358,7 +407,7 @@ export function AppLayoutWorkArea({
               : 'overflow-hidden',
             shown === 'chat' && 'flex-1',
             shown === 'split' && 'shrink-0',
-            chatHidden && 'hidden',
+            chatHidden && (chatKeptWidth === null ? 'hidden' : cn(KEPT_HIDDEN_CLASS, 'left-0')),
           )}
           style={
             shown === 'split'
@@ -367,7 +416,13 @@ export function AppLayoutWorkArea({
                   width: shownChatWidth ?? `${DEFAULT_CHAT_SHARE * 100}%`,
                   '--work-area-visible-width': shownChatWidth === null ? '100%' : `${shownChatWidth}px`,
                 } as CSSProperties)
-              : minWidthVar
+              : chatKeptWidth !== null
+                ? ({
+                    ...minWidthVar,
+                    width: chatKeptWidth,
+                    '--work-area-visible-width': `${chatKeptWidth}px`,
+                  } as CSSProperties)
+                : minWidthVar
           }
         >
           <WorkAreaColumnContext.Provider value={chatColumnState}>
@@ -418,14 +473,15 @@ export function AppLayoutWorkArea({
         ref={setPageElement}
         aria-hidden={pageHidden || undefined}
         inert={pageHidden}
+        data-testid="work-area-page-column"
         data-work-area-column="page"
         data-squeezed={squeeze.page || undefined}
-        style={minWidthVar}
+        style={pageKeptWidth !== null ? { ...minWidthVar, width: pageKeptWidth } : minWidthVar}
         className={cn(
           // `group/work-area-page`: `AppLayout`'s `<main>` widens its content while squeezed.
           'group/work-area-page relative isolate flex min-h-0 min-w-0 flex-1',
           shown === 'split' && 'border-l border-ods-border',
-          pageHidden && 'hidden',
+          pageHidden && (pageKeptWidth === null ? 'hidden' : cn(KEPT_HIDDEN_CLASS, 'right-0')),
           pageClassName,
         )}
       >

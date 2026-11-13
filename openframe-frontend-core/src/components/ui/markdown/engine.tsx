@@ -44,6 +44,7 @@ import { LoadingItems, useLoadingScope } from '../loading-scope';
 import { buildBaseComponents, MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
 import { MarkdownMediaOriginsContext } from './external-media-notice';
 import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
+import { remarkRecordLinksInlineOnly } from './record-links-inline-only';
 import {
   buildEffectiveTagSet,
   buildSanitizeSchema,
@@ -321,7 +322,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
   const headingIds = useHeadingIdMap(processedContent, sectionIds);
 
   const remarkPlugins = useMemo<PluggableList>(
-    () => [remarkGfm, remarkBreaks, ...(additionalRemarkPlugins ?? [])],
+    () => [remarkGfm, remarkBreaks, remarkRecordLinksInlineOnly, ...(additionalRemarkPlugins ?? [])],
     [additionalRemarkPlugins],
   );
 
