@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useRef, type ReactNode } from 'react';
 import type { DocNode } from '../../types/doc-source';
+import { docTreePathOfRoute } from '../../utils/doc-path-utils';
 
 // =============================================================================
 // Types
@@ -24,10 +25,10 @@ interface DocNavigationContextValue {
    */
   register: (nav: DocNavigator) => () => void;
   /**
-   * Navigate to a path inside whichever registered navigator owns its baseRoute prefix.
-   * Returns true if handled, false otherwise (caller falls back to opening in a new tab).
+   * Navigate to a route under a registered navigator's baseRoute (`/knowledge-base/docs/setup.md`), or a storage path
+   * (`docs/setup.md`). Returns true if handled, false otherwise (caller falls back to opening it as a link).
    */
-  navigate: (path: string) => boolean;
+  navigate: (pathOrRoute: string) => boolean;
   /** Whether ANY navigator is currently mounted. */
   isAvailable: () => boolean;
 }
@@ -63,34 +64,26 @@ export function DocNavigationProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const findOwningNavigator = useCallback((path: string): DocNavigator | null => {
-    // First try: a navigator whose baseRoute is a prefix of `path`. Walks the
-    // longest match first so nested routes win over a parent.
+  const navigate = useCallback((pathOrRoute: string): boolean => {
+    // A route under a navigator's baseRoute (walked longest first, so nested routes win over a parent) is that
+    // navigator's page: the tree is keyed by the path after the baseRoute, as the address spells it decoded.
     const baseRoutes = Array.from(navMap.current.keys()).sort((a, b) => b.length - a.length);
     for (const baseRoute of baseRoutes) {
-      if (path === baseRoute || path.startsWith(`${baseRoute}/`)) {
-        return navMap.current.get(baseRoute) ?? null;
-      }
-    }
-    // Fallback: a single navigator handles any path (existing behavior — chat
-    // chips emit storage paths, not absolute URLs, so prefix matching misses).
-    if (navMap.current.size === 1) {
-      return navMap.current.values().next().value ?? null;
-    }
-    return null;
-  }, []);
-
-  const navigate = useCallback(
-    (path: string): boolean => {
-      const nav = findOwningNavigator(path);
-      if (!nav) return false;
-      const node = nav.findNodeByPath(path);
-      if (!node) return false;
+      if (pathOrRoute !== baseRoute && !pathOrRoute.startsWith(`${baseRoute}/`)) continue;
+      const nav = navMap.current.get(baseRoute);
+      const node = nav?.findNodeByPath(docTreePathOfRoute(pathOrRoute.slice(baseRoute.length + 1)));
+      if (!nav || !node) return false;
       nav.selectNode(node);
       return true;
-    },
-    [findOwningNavigator],
-  );
+    }
+    // A storage path (`openframe-cli/README.md`): the single navigator handles it.
+    if (navMap.current.size !== 1) return false;
+    const nav = navMap.current.values().next().value;
+    const node = nav?.findNodeByPath(pathOrRoute);
+    if (!nav || !node) return false;
+    nav.selectNode(node);
+    return true;
+  }, []);
 
   const isAvailable = useCallback(() => navMap.current.size > 0, []);
 

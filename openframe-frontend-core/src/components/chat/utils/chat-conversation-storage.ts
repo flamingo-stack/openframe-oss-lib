@@ -2,10 +2,10 @@
  * Chat conversation-id persistence — the SSE/Guide chat's ONLY local state.
  *
  * The stored value is the SERVER-minted conversation id echoed in the chat
- * stream's leading metadata frame; the client never generates ids. Message
+ * stream's `message-metadata` chunk; the client never generates ids. Message
  * history itself lives server-side (`chat_conversations` / `chat_messages`)
- * and is rehydrated via the history endpoint — see
- * `use-chat-history-hydration.ts`.
+ * and is read again through the history endpoint when the engine reopens the
+ * conversation (`hubChatHistory` in `use-sse-chat-adapter.ts`).
  *
  * Built on the lib-standard `createLocalStorageAdapter` (SSR guard,
  * try/catch, quota-failure logging, dynamic namespacing) instead of raw

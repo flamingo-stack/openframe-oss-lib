@@ -14,7 +14,7 @@ import type { ChatRef } from '../chat-ref.types';
  * routing, native fullscreen, captions, posters.
  *
  * Stripped-chrome rendering: just the player + tabs, no title, no
- * date, no Ask button. The inline pill at the marker position (in the
+ * date, no Ask button. The inline pill at the record link (in the
  * paragraph above) already shows the title, date, and Ask affordance
  * via the host's existing compact entity card. Duplicating those
  * here doubles the UX and steals vertical space inside the chat

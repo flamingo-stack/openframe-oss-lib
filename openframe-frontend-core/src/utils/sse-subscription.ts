@@ -46,7 +46,7 @@
  * never-terminating reconnect loop re-opens the finished stream.
  */
 
-import { embedAuthedFetch, subscribeEmbedCredentialChange } from './embed-authed-fetch';
+import { embedAuthedFetch, isRetryableStatus, subscribeEmbedCredentialChange } from './embed-authed-fetch';
 
 /** Transport-level status. `suspended` = paused by `pauseWhenHidden`
  *  after the hidden grace elapsed (resumes automatically on visible).
@@ -365,8 +365,7 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
       return;
     }
     if (!response.ok) {
-      const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
-      if (retryable) {
+      if (isRetryableStatus(response.status)) {
         scheduleReconnect();
         return;
       }

@@ -1,14 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 
+import type { ChatMessage } from '../chat-protocol/chat-message';
 import { ChatContainer, ChatContent, ChatFooter, ChatHeader } from '../components/chat/chat-container';
 import { ChatInput } from '../components/chat/chat-input';
 import { ChatMessageList } from '../components/chat/chat-message-list';
 import { ModelDisplay } from '../components/chat/model-display';
 import type { QuickActionChip } from '../components/chat/quick-action-chip';
 import { QuickActionWall } from '../components/chat/quick-action-wall';
-import type { Message } from '../components/chat/types/message.types';
 import { cn } from '../utils/cn';
+import { type StoryRow, storyMessage, textPart } from './__fixtures__/chat-messages';
 
 const SAMPLE_QUICK_ACTIONS: QuickActionChip[] = [
   { id: 'slow', label: 'Computer slow' },
@@ -20,20 +21,20 @@ const SAMPLE_QUICK_ACTIONS: QuickActionChip[] = [
 // Mock messages — sample client-facing Fae conversation
 // =============================================================================
 
-const FAE_MESSAGES: Message[] = [
+const FAE_ROWS: StoryRow[] = [
   {
     id: '1',
     role: 'assistant',
     name: 'Fae',
     assistantType: 'fae',
-    content: "Hi! I'm Fae, your personal assistant. How can I help you today?",
+    parts: textPart("Hi! I'm Fae, your personal assistant. How can I help you today?"),
     timestamp: new Date('2026-05-28T10:00:00Z'),
   },
   {
     id: '2',
     role: 'user',
     name: 'You',
-    content: 'My printer stopped working this morning — can you open a ticket?',
+    parts: textPart('My printer stopped working this morning — can you open a ticket?'),
     timestamp: new Date('2026-05-28T10:00:30Z'),
   },
   {
@@ -41,18 +42,20 @@ const FAE_MESSAGES: Message[] = [
     role: 'assistant',
     name: 'Fae',
     assistantType: 'fae',
-    content:
+    parts: textPart(
       "Of course — I'll get that opened right away. Could you tell me which printer it is (model or location) and what happens when you try to print?",
+    ),
     timestamp: new Date('2026-05-28T10:00:45Z'),
   },
   {
     id: '4',
     role: 'user',
     name: 'You',
-    content: "It's the HP LaserJet by the front desk. It blinks orange and nothing prints.",
+    parts: textPart("It's the HP LaserJet by the front desk. It blinks orange and nothing prints."),
     timestamp: new Date('2026-05-28T10:01:10Z'),
   },
 ];
+const FAE_MESSAGES = FAE_ROWS.map(storyMessage);
 
 // =============================================================================
 // StoryShell — wires up controlled `ChatInput` and `ChatMessageList` so the
@@ -75,19 +78,19 @@ function FaeChatShell({
   fullWidth?: boolean;
   modelLoading?: boolean;
 }) {
-  const [messages, setMessages] = useState<Message[]>(FAE_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>(FAE_MESSAGES);
 
   const handleSend = (text: string) => {
     if (!text.trim()) return;
     setMessages(prev => [
       ...prev,
-      {
+      storyMessage({
         id: `local-${prev.length + 1}`,
         role: 'user',
         name: 'You',
-        content: text,
+        parts: textPart(text),
         timestamp: new Date(),
-      },
+      }),
     ]);
   };
 

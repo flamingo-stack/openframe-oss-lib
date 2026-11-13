@@ -54,15 +54,14 @@ export interface ChunkData {
   error?: string;
   details?: string;
   approvalRequestId?: string;
-  approval_request_id?: string;
   approvalType?: string;
   command?: string;
   explanation?: string;
   approved?: boolean;
   /** On APPROVAL_RESULT chunks: display name of the user who resolved the request. */
   resolvedByName?: string;
-  /** Batch-approval rows. Coerced by `normalizeToolCalls` in the NATS decoder
-   *  — the wire shape is per-backend, so entries stay opaque here. */
+  /** Batch-approval rows. Read by `createMingoDecoder`: the wire shape is
+   *  per-backend, so entries stay opaque here. */
   toolCalls?: unknown[];
   /** Opaque per-chunk payload some backends attach beside `text`. */
   payload?: Record<string, unknown>;

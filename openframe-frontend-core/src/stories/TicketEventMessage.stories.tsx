@@ -4,7 +4,7 @@ import type React from 'react';
 import { TicketEventMessage } from '../components/chat/ticket-event-message';
 
 /**
- * `ticket_event` message segment — the ticket lifecycle receipt (Figma:
+ * `data-ticket-event` part — the ticket lifecycle receipt (Figma:
  * `ai-assistant-info`, types resolved-fae / resolved-tech / reopened-fae /
  * reopened-tech / reopened-reason).
  *

@@ -13,7 +13,7 @@ import type { AskDisplayProps } from './types';
 const LOCKED_HINT = 'This question was already answered';
 
 /**
- * `ASK` segment — the assistant asking WHICH reading of an ambiguous question it
+ * `data-ask` part — the assistant asking WHICH reading of an ambiguous question it
  * should answer, as a card of numbered options instead of prose bullets
  * (Figma 1:13775).
  *
@@ -28,7 +28,7 @@ const LOCKED_HINT = 'This question was already answered';
  * label into a conversation that moved on. Same state on observer surfaces,
  * where a click would post into someone else's dialog.
  *
- * A run of consecutive `ask` segments is one card with a pager ("1 of 2"), so a
+ * A run of consecutive `data-ask` parts is one card with a pager ("1 of 2"), so a
  * turn that asks twice reads as a single block. With one card the pager is
  * absent entirely — there is nothing to page through.
  */
@@ -36,7 +36,7 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(({ className, car
   const [index, setIndex] = useState(0);
   const lockedHintId = useId();
 
-  // A shrinking run (segments replaced mid-stream) must not strand the pager
+  // A shrinking run (parts replaced mid-stream) must not strand the pager
   // past the end — clamp instead of rendering an undefined card.
   useEffect(() => {
     setIndex(current => (current < cards.length ? current : Math.max(0, cards.length - 1)));

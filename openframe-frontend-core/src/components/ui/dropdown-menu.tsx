@@ -4,6 +4,7 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronRight, Circle } from 'lucide-react';
 import { type ComponentPropsWithoutRef, type ElementRef, type HTMLAttributes, forwardRef } from 'react';
 
+import { useViewportCollisionPadding, withViewportPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { COLLISION_PADDING_PX, useCollisionBoundary, usePortalContainer } from './portal-container';
 
@@ -57,12 +58,17 @@ const DropdownMenuSubContent = forwardRef<
   // its parent menu is confined to.
   const boundary = useCollisionBoundary();
   const resolvedBoundary = collisionBoundary ?? boundary ?? undefined;
+  const viewportPadding = useViewportCollisionPadding();
   return (
     <DropdownMenuPrimitive.Portal container={container ?? undefined}>
       <DropdownMenuPrimitive.SubContent
         ref={ref}
         collisionBoundary={resolvedBoundary}
-        collisionPadding={collisionPadding ?? (resolvedBoundary ? COLLISION_PADDING_PX : undefined)}
+        collisionPadding={
+          resolvedBoundary
+            ? (collisionPadding ?? COLLISION_PADDING_PX)
+            : withViewportPadding(collisionPadding, viewportPadding)
+        }
         // Only defaulted ON where a boundary was published (i.e. inside a panel
         // that owns its menus) — see `DropdownMenuContent`.
         hideWhenDetached={hideWhenDetached ?? (resolvedBoundary ? true : undefined)}
@@ -90,13 +96,19 @@ const DropdownMenuContent = forwardRef<
   // explicit prop still wins; no provider → viewport, Radix's own default.
   const boundary = useCollisionBoundary();
   const resolvedBoundary = collisionBoundary ?? boundary ?? undefined;
+  // Against the viewport, the mobile shell's status bar and keyboard are its edges (useViewportCollisionPadding).
+  const viewportPadding = useViewportCollisionPadding();
   return (
     <DropdownMenuPrimitive.Portal container={container ?? undefined}>
       <DropdownMenuPrimitive.Content
         ref={ref}
         sideOffset={sideOffset}
         collisionBoundary={resolvedBoundary}
-        collisionPadding={collisionPadding ?? (resolvedBoundary ? COLLISION_PADDING_PX : undefined)}
+        collisionPadding={
+          resolvedBoundary
+            ? (collisionPadding ?? COLLISION_PADDING_PX)
+            : withViewportPadding(collisionPadding, viewportPadding)
+        }
         // A menu tracks its trigger for as long as it is open. When the trigger
         // scrolls out of its clipping ancestor — a chat card carried away by the
         // thread's auto-scroll while the menu is open — Radix keeps the menu

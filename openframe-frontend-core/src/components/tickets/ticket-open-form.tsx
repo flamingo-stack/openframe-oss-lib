@@ -18,10 +18,10 @@
 
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import type { ChatAttachment } from '../../chat-protocol/attachment';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
 import { ChatAttachmentAddButton, ChatAttachmentChipStrip } from '../chat/chat-attachment-bar';
 import { useChatAttachments } from '../chat/hooks/use-chat-attachments';
-import type { ChatAttachment } from '../chat/utils/chat-attachment-markdown';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';

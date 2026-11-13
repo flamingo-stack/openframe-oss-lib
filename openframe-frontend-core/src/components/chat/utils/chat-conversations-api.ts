@@ -16,7 +16,7 @@
  * `Date` so the list's Today/Yesterday/Older grouping is deterministic.
  */
 
-import { readServerErrorMessage } from '../../../chat-protocol/confirm-tool';
+import { readServerErrorMessage } from '../../../chat-protocol/server-error';
 import { isRecord, unwrapEnvelope } from '../../../chat-protocol/wire-narrow';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import type { DialogItem } from '../types/component.types';
