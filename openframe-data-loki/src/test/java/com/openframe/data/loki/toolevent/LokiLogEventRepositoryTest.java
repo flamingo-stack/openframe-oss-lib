@@ -293,7 +293,7 @@ class LokiLogEventRepositoryTest {
     @Test
     void find_lineWithUnknownFieldsAndNoOptionalOnes_readsWhatItKnows() {
         whenLookedUp().thenReturn(List.of(new LokiLogEntry(EVENT_NANOS,
-                "{\"toolEventId\":\"evt-1\",\"eventTimestamp\":1790848800123,\"origin\":\"backfill\"}", Map.of())));
+                "{\"toolEventId\":\"evt-1\",\"eventTimestamp\":1790848800123,\"origin\":\"cassandra\"}", Map.of())));
 
         Optional<LokiLogEvent> found = find();
 
@@ -357,7 +357,7 @@ class LokiLogEventRepositoryTest {
 
     private static LokiLogEntry copiedPart(int part, int parts, String line) {
         Map<String, String> labels = new HashMap<>(part(part, parts, line).labels());
-        labels.put("origin", "backfill");
+        labels.put("origin", "cassandra");
         return new LokiLogEntry(EVENT_NANOS + part, line, labels);
     }
 

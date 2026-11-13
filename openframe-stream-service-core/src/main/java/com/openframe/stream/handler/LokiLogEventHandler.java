@@ -12,7 +12,6 @@ import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.RetryContext;
 import org.springframework.retry.RetryListener;
@@ -25,8 +24,6 @@ import java.util.Map;
 
 @Slf4j
 @Component
-// On by default: a missing key must not silently stop the event detail writes; only another value turns it off.
-@ConditionalOnProperty(name = "openframe.tool-events.store", havingValue = "loki", matchIfMissing = true)
 public class LokiLogEventHandler extends DebeziumMessageHandler<LokiLogEvent, DeserializedDebeziumMessage> {
 
     private static final int ATTEMPTS = 6;
