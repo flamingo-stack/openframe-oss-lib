@@ -57,6 +57,9 @@ extend type Query {
     Mirrors softwareFilters; scoped to the devices that have this software installed."""
     softwareDeviceFilters(softwareId: ID!, filter: SoftwareOnDeviceFilterInput, search: String): SoftwareOnDeviceFilters!
 
+    """Auto-update of a software title, for its Auto-update form: on or off, the settings and the devices."""
+    softwareAutoUpdatePolicy(softwareId: ID!): SoftwareAutoUpdatePolicy!
+
     """Single global CVE record by id (e.g. "CVE-2024-38063"). Null when Fleet has no record.
     Populates the vulnerability detail page — includes affected-software list."""
     vulnerability(cveId: String!): Vulnerability
@@ -140,6 +143,9 @@ type Software {
 
     """Package-manager source — WINGET / CHOCOLATEY / BREW / UNMANAGED."""
     source: SoftwareSource
+
+    """OS column, from the inventory source. Null = a kind several systems have (browser extensions, npm, …)."""
+    os: OsType
 
     """Most-recent version installed anywhere in the fleet — shown as CURRENT VERSION."""
     currentVersion: String
@@ -282,6 +288,7 @@ transition (SCHEDULED_UPDATE / UNINSTALLING / SCHEDULED_UNINSTALL)."""
 enum SoftwareOnDeviceStatus {
     UP_TO_DATE
     OUTDATED
+    "An active schedule will update this software on the device; shown instead of UP_TO_DATE / OUTDATED."
     SCHEDULED_UPDATE
     UNINSTALLING
     SCHEDULED_UNINSTALL
@@ -361,6 +368,8 @@ input SoftwareFilterInput {
     """True: only software a package manager manages (source WINGET / CHOCOLATEY / BREW); false: the rest.
     Null = no filter. Fleet-wide it needs the software read model; with Fleet paging it is left out, like sources."""
     manageable: Boolean
+    """The OS filter (Software.os). With Fleet paging it is left out, like sources."""
+    osTypes: [OsType!]
 }
 
 input SoftwareOnDeviceFilterInput {
@@ -478,8 +487,13 @@ extend type Mutation {
     (each its own execution, shown as an ADOPT row in Software Actions)."""
     adoptSoftware(input: AdoptSoftwareInput!): [SoftwareDispatchResult!]!
 
+    """Save the Auto-update form: on with these settings for the bundle's devices, off for the title's other
+    devices. Runs no update; the bundle becomes COMPLETED."""
+    turnOnSoftwareAutoUpdate(input: TurnOnSoftwareAutoUpdateInput!): Software!
+
     """Turn off auto-update for a software title on every device ("Turn Off Auto-Update"). Running updates
-    finish; no new version is installed automatically. Turned on again through Update Software (autoUpdate).
+    finish; no new version is installed automatically. Turned on again through turnOnSoftwareAutoUpdate or Update
+    Software (autoUpdate).
     Idempotent: a title that has no auto-update is returned as it is. Unknown softwareId → NOT_FOUND."""
     turnOffSoftwareAutoUpdate(softwareId: ID!): Software!
 }
@@ -518,8 +532,9 @@ input SoftwareManagementInput {
 
 """One package chosen from the catalog, identified exactly as package search returns it."""
 input SoftwarePackageInput {
-    packageManager: PackageManagerType!
-    packageName: String!
+    "Omit packageManager and packageName together to let the server pick the package that manages softwareId."
+    packageManager: PackageManagerType
+    packageName: String
     "Brew-only sub-type (CASK/FORMULA). Required for brew (enforced server-side), ignored by managers that do not distinguish."
     brewPackageType: BrewPackageType
     version: String
@@ -573,4 +588,22 @@ input SoftwareAutoUpdateInput {
     enabled: Boolean!
     "Null = the update's own settings (\"Same settings for auto-update\"). Ignored while enabled is false."
     settings: PackageUpdateSettingsInput
+}
+
+"""Auto-update of one software title across its devices."""
+type SoftwareAutoUpdatePolicy {
+    "On for at least one device."
+    enabled: Boolean!
+    "The settings saved last. Null while off."
+    settings: PackageUpdateSettings
+    "The devices it is on for (Machine.machineId)."
+    machineIds: [String!]!
+}
+
+input TurnOnSoftwareAutoUpdateInput {
+    "The software title (Software.id)."
+    softwareId: ID!
+    "A PENDING SoftwareBundle with the devices to keep updated, at least one."
+    bundleId: ID!
+    settings: PackageUpdateSettingsInput!
 }

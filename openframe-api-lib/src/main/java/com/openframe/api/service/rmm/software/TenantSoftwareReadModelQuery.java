@@ -1,8 +1,10 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareType;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
@@ -10,19 +12,24 @@ import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
+import com.openframe.api.service.rmm.fleet.FleetSoftwareOs;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.PackageAutoUpdatePolicyRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareTitleQuery;
+import com.openframe.data.repository.rmm.software.SoftwareTitleQuery.SoftwareTitleQueryBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +46,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Component
 @RequiredArgsConstructor
@@ -55,6 +63,7 @@ public class TenantSoftwareReadModelQuery {
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final VulnerabilityRepository vulnerabilityRepository;
     private final MachineRepository machineRepository;
+    private final PackageAutoUpdatePolicyRepository packageAutoUpdatePolicyRepository;
 
     public boolean exists(String tenantId, String softwareId) {
         Long titleId = parseLong(softwareId);
@@ -185,24 +194,88 @@ public class TenantSoftwareReadModelQuery {
     }
 
     public PageResult<SoftwareResponse> listSoftware(String tenantId, String search, int page, Integer perPage,
-                                                     SortInput sort, Boolean vulnerable, Boolean manageable) {
+                                                     SortInput sort, Boolean vulnerable, SoftwareFilterInput filter) {
         int size = perPage == null || perPage <= 0 ? DEFAULT_PER_PAGE : perPage;
         int pageIndex = Math.max(page, 0);
         Pageable pageable = PageRequest.of(pageIndex, size, sortOf(sort));
 
-        SoftwareTitleQuery titles = titles(tenantId, search, vulnerable, manageable);
+        SoftwareTitleQuery titles = titles(tenantId, search, vulnerable, filter);
         Page<Software> result = softwareRepository.findTitles(titles, pageable);
 
         List<SoftwareResponse> rows = result.getContent().stream().map(TenantSoftwareReadModelQuery::toResponse).toList();
         return new PageResult<>(rows, result.hasNext(), pageIndex > 0, (int) result.getTotalElements(), pageIndex);
     }
 
-    // "manageable" reads the match the projector stored, the same one the catalog status resolves on the rows
-    private static SoftwareTitleQuery titles(String tenantId, String search, Boolean vulnerable, Boolean manageable) {
+    // the filters read the match the projector stored, the same one the catalog status resolves on the rows
+    private SoftwareTitleQuery titles(String tenantId, String search, Boolean vulnerable, SoftwareFilterInput filter) {
         String nameLower = isBlank(search) ? null : search.toLowerCase();
         boolean vulnerableOnly = Boolean.TRUE.equals(vulnerable);
         Set<String> managerSources = FleetSoftwareCategory.managerSources();
-        return new SoftwareTitleQuery(tenantId, nameLower, vulnerableOnly, manageable, managerSources);
+        SoftwareTitleQueryBuilder titles = SoftwareTitleQuery.builder()
+                .tenantId(tenantId)
+                .nameLower(nameLower)
+                .vulnerableOnly(vulnerableOnly)
+                .managerSources(managerSources);
+        if (filter == null) {
+            return titles.build();
+        }
+        Boolean manageable = filter.getManageable();
+        titles.manageable(manageable);
+        chooseOsTypes(titles, filter);
+        chooseSources(titles, filter);
+        chooseAutoUpdateStatuses(titles, tenantId, filter);
+        return titles.build();
+    }
+
+    private static void chooseOsTypes(SoftwareTitleQueryBuilder titles, SoftwareFilterInput filter) {
+        List<OsType> osTypes = filter.getOsTypes();
+        if (isEmpty(osTypes)) {
+            return;
+        }
+        Set<String> osSources = FleetSoftwareOs.fleetSources(osTypes);
+        titles.osSources(osSources);
+    }
+
+    // a stored match is a winget package, so WINGET takes the matched titles too
+    private static void chooseSources(SoftwareTitleQueryBuilder titles, SoftwareFilterInput filter) {
+        List<SoftwareSource> sources = filter.getSources();
+        if (isEmpty(sources)) {
+            return;
+        }
+        Set<String> installerSources = FleetSoftwareCategory.managerSources().stream()
+                .filter(fleetSource -> isInstalledBy(fleetSource, sources))
+                .collect(Collectors.toSet());
+        boolean matchedChosen = sources.contains(SoftwareSource.WINGET);
+        boolean unmanagedChosen = sources.contains(SoftwareSource.UNMANAGED);
+        titles.installerSources(installerSources).matchedChosen(matchedChosen).unmanagedChosen(unmanagedChosen);
+    }
+
+    private static boolean isInstalledBy(String fleetSource, List<SoftwareSource> sources) {
+        SoftwareSource source = FleetSoftwareCategory.of(fleetSource).source();
+        return sources.contains(source);
+    }
+
+    private void chooseAutoUpdateStatuses(SoftwareTitleQueryBuilder titles, String tenantId,
+                                          SoftwareFilterInput filter) {
+        List<SoftwareAutoUpdateStatus> autoUpdateStatuses = filter.getAutoUpdateStatuses();
+        if (isEmpty(autoUpdateStatuses)) {
+            return;
+        }
+        List<String> enabledSoftwareIds = packageAutoUpdatePolicyRepository.findEnabledSoftwareIds(tenantId);
+        List<String> softwareIds = packageAutoUpdatePolicyRepository.findSoftwareIds(tenantId);
+        Set<Long> enabledPolicyTitleIds = titleIds(enabledSoftwareIds);
+        Set<Long> policyTitleIds = titleIds(softwareIds);
+        titles.autoUpdateStatuses(autoUpdateStatuses)
+                .enabledPolicyTitleIds(enabledPolicyTitleIds)
+                .policyTitleIds(policyTitleIds);
+    }
+
+    // a policy names the Software by its id as text; the read model keys a title by the same id as a number
+    private static Set<Long> titleIds(List<String> softwareIds) {
+        return softwareIds.stream()
+                .map(TenantSoftwareReadModelQuery::parseLong)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     private Sort sortOf(SortInput sort) {

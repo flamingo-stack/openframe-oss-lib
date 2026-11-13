@@ -42,6 +42,7 @@ public class PackageUpdateDeviceState implements TenantScoped {
     private String waitingReason;
     private String waitingPhase;
     private Instant closesAt;
+    private Instant askAgainAt;
     private List<Holder> holders;
 
     private String doneResult;

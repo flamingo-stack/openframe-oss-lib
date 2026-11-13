@@ -33,6 +33,7 @@ public class PackageUpdateDeliverySpec implements DeliverySpec<PackageUpdateDeli
         message.setPackageRef(seed.getPackageRef());
         message.setMode(seed.getMode());
         message.setCountdownSeconds(seed.getCountdownSeconds());
+        message.setDeadlineSeconds(seed.getDeadlineSeconds());
         return DeliveryRequest.<PackageUpdateMessage>builder()
                 .type(DeliveryType.PACKAGE_UPDATE)
                 .targetId(seed.getTargetId())

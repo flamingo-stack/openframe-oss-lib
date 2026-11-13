@@ -5,9 +5,12 @@ import com.openframe.api.dto.rmm.software.SoftwareActionDeviceResponse;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.SoftwareScheduleMachineAssigned;
+import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
+import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -141,7 +144,13 @@ public class SoftwareActionDetailService {
                 .findByTenantIdAndRequestIdIn(tenantId, new HashSet<>(requestByMachine.values()))) {
             if (state.getStatus() == SoftwareActionStatus.WAITING
                     && state.getRequestId().equals(requestByMachine.get(state.getMachineId()))) {
-                byMachine.get(state.getMachineId()).setStatus(SoftwareActionStatus.WAITING);
+                SoftwareActionDeviceResponse row = byMachine.get(state.getMachineId());
+                row.setStatus(SoftwareActionStatus.WAITING);
+                row.setWaitingReason(state.getWaitingReason());
+                row.setWaitingPhase(state.getWaitingPhase());
+                row.setClosesAt(state.getClosesAt());
+                row.setAskAgainAt(state.getAskAgainAt());
+                row.setDeadlineAt(state.getDeadlineAt());
             }
         }
     }
@@ -209,6 +218,7 @@ public class SoftwareActionDetailService {
     private static SoftwareActionDeviceResponse fromLeaf(ScriptExecution leaf) {
         return SoftwareActionDeviceResponse.builder()
                 .machineId(leaf.getMachineId())
+                .kind(kindOf(leaf))
                 .status(deviceStatus(leaf.getStatus()))
                 .exitCode(leaf.getExitCode())
                 .stdout(leaf.getStdout())
@@ -219,6 +229,14 @@ public class SoftwareActionDetailService {
                 .dispatchedAt(leaf.getDispatchedAt())
                 .finishedAt(leaf.getFinishedAt())
                 .build();
+    }
+
+    private static SoftwareActionKind kindOf(ScriptExecution leaf) {
+        SoftwareAction action = leaf.getSoftwareAction();
+        if (action == null) {
+            return null;
+        }
+        return leaf.getSource() == ExecutionSource.PACKAGE_AUTO_UPDATE ? SoftwareActionKind.AUTO_UPDATE : action.kind();
     }
 
     private static SoftwareActionDeviceResponse pending(String machineId, SoftwareActionStatus status, String error) {

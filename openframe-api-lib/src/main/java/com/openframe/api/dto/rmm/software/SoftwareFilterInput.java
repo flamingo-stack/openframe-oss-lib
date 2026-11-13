@@ -1,5 +1,6 @@
 package com.openframe.api.dto.rmm.software;
 
+import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import lombok.Data;
 
@@ -18,4 +19,5 @@ public class SoftwareFilterInput {
 
     private List<SoftwareAutoUpdateStatus> autoUpdateStatuses;
     private Boolean manageable;
+    private List<OsType> osTypes;
 }

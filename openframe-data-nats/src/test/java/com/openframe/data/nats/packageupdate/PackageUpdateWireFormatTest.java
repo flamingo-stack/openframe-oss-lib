@@ -80,7 +80,8 @@ class PackageUpdateWireFormatTest {
 
         DeliveryRequest<PackageUpdateMessage> force = spec.request(PackageUpdateWire.deadlineForce("m1", request));
         DeliveryRequest<PackageUpdateMessage> wait = spec.request(PackageUpdateWire.seed("m1", "req-1",
-                PackageUpdateSource.AUTO, PackageManagerType.WINGET, "Google.Chrome", null, PackageUpdateMode.WAIT, 300));
+                PackageUpdateSource.AUTO, PackageManagerType.WINGET, "Google.Chrome", null, PackageUpdateMode.WAIT, 300,
+                604800L));
 
         assertThat(force.getTargetId()).isEqualTo("req-1:deadline");     // never takes over the WAIT's row
         assertThat(wait.getTargetId()).isEqualTo("req-1");
@@ -88,6 +89,8 @@ class PackageUpdateWireFormatTest {
         assertThat(force.getPayload().getRequestId()).isEqualTo("req-1"); // the agent finds the request by it
         assertThat(force.getPayload().getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(force.getPayload().getCountdownSeconds()).isEqualTo(300);
+        assertThat(force.getPayload().getDeadlineSeconds()).isNull();    // nothing left to postpone at the deadline
+        assertThat(wait.getPayload().getDeadlineSeconds()).isEqualTo(604800L); // the prompt's "postpone until"
     }
 
     @Test
@@ -140,6 +143,50 @@ class PackageUpdateWireFormatTest {
                 PackageUpdateStatusMessage.class);
         assertThat(failed.getFailed().getReason()).isEqualTo(PackageUpdateStatusMessage.Failed.Reason.SUPERSEDED);
         assertThat(failed.getFailed().getExitCode()).isEqualTo(1L);
+    }
+
+    @Test
+    void status_failed_withTheManagerOutput_parses() {
+        PackageUpdateStatusMessage msg = mapper.readValue("""
+                {"state":"FAILED","failed":{"reason":"MANAGER_ERROR","exitCode":1},"stdout":"==> Upgrading slack","stderr":"Error: locked"}""",
+                PackageUpdateStatusMessage.class);
+
+        assertThat(msg.getStdout()).isEqualTo("==> Upgrading slack");
+        assertThat(msg.getStderr()).isEqualTo("Error: locked");
+    }
+
+    @Test
+    void approvedForce_theDeadlineForceRow_withNoCountdown() {
+        PackageUpdateRequest request = PackageUpdateRequest.builder()
+                .requestId("req-1").source(PackageUpdateSource.AUTO)
+                .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome")
+                .forceCountdownSeconds(300).build();
+
+        DeliveryRequest<PackageUpdateMessage> force = new PackageUpdateDeliverySpec()
+                .request(PackageUpdateWire.approvedForce("m1", request));
+
+        assertThat(force.getTargetId()).isEqualTo("req-1:deadline");     // replaces the force held for the deadline
+        assertThat(force.getPayload().getRequestId()).isEqualTo("req-1");
+        assertThat(force.getPayload().getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(force.getPayload().getCountdownSeconds()).isZero();
+    }
+
+    @Test
+    void status_waiting_approvedByTheUser_parses() {
+        PackageUpdateStatusMessage msg = mapper.readValue("""
+                {"state":"WAITING","waiting":{"reason":"APP_RUNNING","phase":"APPROVED"}}""",
+                PackageUpdateStatusMessage.class);
+
+        assertThat(msg.getWaiting().getPhase()).isEqualTo(PackageUpdateStatusMessage.Waiting.Phase.APPROVED);
+    }
+
+    @Test
+    void status_waiting_postponedByTheUser_parses() {
+        PackageUpdateStatusMessage msg = mapper.readValue("""
+                {"state":"WAITING","waiting":{"reason":"APP_RUNNING","phase":"POSTPONED"}}""",
+                PackageUpdateStatusMessage.class);
+
+        assertThat(msg.getWaiting().getPhase()).isEqualTo(PackageUpdateStatusMessage.Waiting.Phase.POSTPONED);
     }
 
     @Test

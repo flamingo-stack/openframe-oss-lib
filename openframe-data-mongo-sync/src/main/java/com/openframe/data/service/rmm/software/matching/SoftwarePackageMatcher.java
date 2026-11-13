@@ -29,7 +29,8 @@ public class SoftwarePackageMatcher {
 
     // the osquery table Fleet took a row from, and the package manager that can match such a row
     private static final Map<FleetSource, PackageManagerType> MANAGER_BY_FLEET_SOURCE =
-            Map.of(FleetSource.PROGRAMS, PackageManagerType.WINGET);
+            Map.of(FleetSource.PROGRAMS, PackageManagerType.WINGET,
+                    FleetSource.HOMEBREW_PACKAGES, PackageManagerType.BREW);
 
     private final Map<PackageManagerType, PackageMatcher> matchers;
     private final PackageCatalogRepository catalogRepository;

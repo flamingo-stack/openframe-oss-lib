@@ -6,13 +6,17 @@ import com.openframe.api.dto.rmm.software.SoftwareAutoUpdateInput;
 import com.openframe.api.dto.rmm.software.SoftwareBundleResponse;
 import com.openframe.api.dto.rmm.software.SoftwareBundleScheduleInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
+import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareScheduleResponse;
 import com.openframe.api.dto.rmm.software.SubmitSoftwareBundleInput;
+import com.openframe.api.dto.rmm.software.TurnOnSoftwareAutoUpdateInput;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionResult;
@@ -43,7 +47,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -60,6 +66,10 @@ class SoftwareBundleServiceTest {
     private static final String USER = "user-1";
     private static final String BUNDLE_ID = "b1";
     private static final long RECONNECT_WINDOW = 604800L;
+    private static final PackageUpdateSettings AUTO_UPDATE_SETTINGS = PackageUpdateSettings.builder()
+            .mode(PackageUpdateMode.WAIT).deadlineSeconds(3600L).countdownSeconds(120).build();
+    private static final PackageCatalogEntry WINGET_CHROME = PackageCatalogEntry.builder()
+            .manager(PackageManagerType.WINGET).packageId("Google.Chrome").build();
 
     @Mock private SoftwareBundleRepository bundleRepository;
     @Mock private SoftwareBundleOnlineDispatchRepository onlineDispatchRepository;
@@ -68,13 +78,15 @@ class SoftwareBundleServiceTest {
     @Mock private MachinePlatformResolver machinePlatformResolver;
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private PackageManagerAvailability packageManagerAvailability;
+    @Mock private SoftwareInventoryService softwareInventoryService;
 
     private SoftwareBundleService service;
 
     @BeforeEach
     void setUp() {
         service = new SoftwareBundleService(bundleRepository, onlineDispatchRepository, softwareScheduleService,
-                softwareActionResultRepository, machinePlatformResolver, tenantIdProvider, packageManagerAvailability);
+                softwareActionResultRepository, machinePlatformResolver, tenantIdProvider, packageManagerAvailability,
+                new SoftwarePackageSelectionResolver(softwareInventoryService), softwareInventoryService);
         ReflectionTestUtils.setField(service, "pendingTtl", Duration.ofHours(1));
         ReflectionTestUtils.setField(service, "scheduleReconnectWindowSeconds", RECONNECT_WINDOW);
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -278,6 +290,168 @@ class SoftwareBundleServiceTest {
         assertThat(created.getValue().getAutoUpdate()).isSameAs(autoUpdate);
         assertThat(created.getValue().getPackages()).singleElement()
                 .satisfies(p -> assertThat(p.getSoftwareId()).isEqualTo("title-7"));
+    }
+
+    @Test
+    @DisplayName("submit: a package given only by its Software is stored as the package that manages the title")
+    void submit_softwareIdOnly_storesTheManagingPackage() {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(machinePlatformResolver.osTypesByMachineId(any())).thenReturn(java.util.Map.of("m1", OsType.MAC_OS));
+        when(onlineDispatchRepository.findByTenantIdAndMachineIdAndBundleId(eq(TENANT), anyString(), eq(BUNDLE_ID)))
+                .thenReturn(Optional.empty());
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(PackageCatalogEntry.builder()
+                .manager(PackageManagerType.BREW).packageId("slack").brewType(BrewPackageType.CASK).build());
+        SoftwarePackageInput bySoftware = new SoftwarePackageInput();
+        bySoftware.setSoftwareId("title-7");
+        SubmitSoftwareBundleInput input = submitInput(bySoftware);
+        input.setAction(SoftwareAction.UPDATE);
+
+        service.submit(input, USER);
+
+        ArgumentCaptor<SoftwareBundle> saved = ArgumentCaptor.forClass(SoftwareBundle.class);
+        verify(bundleRepository).save(saved.capture());
+        assertThat(saved.getValue().getPackages())
+                .extracting(SoftwareBundlePackage::getPackageManager, SoftwareBundlePackage::getPackageName,
+                        SoftwareBundlePackage::getBrewPackageType, SoftwareBundlePackage::getSoftwareId)
+                .containsExactly(tuple(PackageManagerType.BREW, "slack", BrewPackageType.CASK, "title-7"));
+    }
+
+    @Test
+    @DisplayName("submit: a Software no package manager manages is rejected before anything is saved")
+    void submit_softwareNoPackageManages_rejectedNothingSaved() {
+        SoftwareBundle draft = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(softwareInventoryService.getManagingPackage("title-7"))
+                .thenThrow(new BadRequestException("No package manager manages Adobe Acrobat"));
+        SoftwarePackageInput bySoftware = new SoftwarePackageInput();
+        bySoftware.setSoftwareId("title-7");
+
+        assertThatThrownBy(() -> service.submit(submitInput(bySoftware), USER))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("No package manager manages Adobe Acrobat");
+        verify(bundleRepository, never()).save(any());
+        verifyNoInteractions(onlineDispatchRepository, softwareActionResultRepository, softwareScheduleService);
+    }
+
+    @Test
+    @DisplayName("turnOnAutoUpdate: the bundle's devices and the settings go to the Software, the bundle is COMPLETED, no update runs")
+    void turnOnAutoUpdate_pendingBundleWithDevices_turnsOnForItsDevicesAndCompletesTheBundle() {
+        SoftwareBundle draft = pending(null, null, List.of("m1", "m2"));
+        draft.setExpireAt(Instant.now().plusSeconds(3600));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(WINGET_CHROME);
+        when(machinePlatformResolver.osTypesByMachineId(List.of("m1", "m2")))
+                .thenReturn(java.util.Map.of("m1", OsType.WINDOWS, "m2", OsType.WINDOWS));
+        SoftwareResponse chrome = SoftwareResponse.builder().id("title-7").name("Chrome").build();
+        when(softwareInventoryService.turnOnAutoUpdate("title-7", List.of("m1", "m2"), AUTO_UPDATE_SETTINGS, USER))
+                .thenReturn(chrome);
+
+        SoftwareResponse result = service.turnOnAutoUpdate(turnOnInput(), USER);
+
+        assertThat(result).isSameAs(chrome);
+        ArgumentCaptor<SoftwareBundle> saved = ArgumentCaptor.forClass(SoftwareBundle.class);
+        verify(bundleRepository).save(saved.capture());
+        SoftwareBundle completed = saved.getValue();
+        assertThat(completed.getStatus()).isEqualTo(SoftwareBundleStatus.COMPLETED);
+        assertThat(completed.getCompletedAt()).isNotNull();
+        assertThat(completed.getUpdatedAt()).isEqualTo(completed.getCompletedAt());
+        assertThat(completed.getExpireAt()).isNull();
+        verifyNoInteractions(onlineDispatchRepository, softwareActionResultRepository, softwareScheduleService);
+    }
+
+    @Test
+    @DisplayName("turnOnAutoUpdate: a bundle without devices is rejected, nothing is turned on")
+    void turnOnAutoUpdate_bundleWithoutDevices_rejectedNothingTurnedOn() {
+        SoftwareBundle draft = pending(null, null, List.of());
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        TurnOnSoftwareAutoUpdateInput input = turnOnInput();
+
+        assertThatThrownBy(() -> service.turnOnAutoUpdate(input, USER))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Cannot turn on auto-update from software bundle b1: no devices assigned");
+        verify(bundleRepository, never()).save(any());
+        verifyNoInteractions(softwareInventoryService);
+    }
+
+    @Test
+    @DisplayName("turnOnAutoUpdate: a COMPLETED bundle is rejected, nothing is turned on")
+    void turnOnAutoUpdate_completedBundle_rejectedNothingTurnedOn() {
+        SoftwareBundle completed = pending(SoftwareBundleMode.NOW, null, List.of("m1"));
+        completed.setStatus(SoftwareBundleStatus.COMPLETED);
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(completed));
+        TurnOnSoftwareAutoUpdateInput input = turnOnInput();
+
+        assertThatThrownBy(() -> service.turnOnAutoUpdate(input, USER))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Software bundle b1 is COMPLETED and can no longer be modified or run");
+        verify(bundleRepository, never()).save(any());
+        verifyNoInteractions(softwareInventoryService);
+    }
+
+    @Test
+    @DisplayName("turnOnAutoUpdate: a Software no package manager manages is rejected, the bundle stays PENDING")
+    void turnOnAutoUpdate_softwareNoPackageManages_rejectedBundleLeftPending() {
+        SoftwareBundle draft = pending(null, null, List.of("m1"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(softwareInventoryService.getManagingPackage("title-7"))
+                .thenThrow(new BadRequestException("No package manager manages Adobe Acrobat"));
+        TurnOnSoftwareAutoUpdateInput input = turnOnInput();
+
+        assertThatThrownBy(() -> service.turnOnAutoUpdate(input, USER))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("No package manager manages Adobe Acrobat");
+        verify(softwareInventoryService, never())
+                .turnOnAutoUpdate(anyString(), anyList(), any(PackageUpdateSettings.class), anyString());
+        verify(bundleRepository, never()).save(any());
+        assertThat(draft.getStatus()).isEqualTo(SoftwareBundleStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("turnOnAutoUpdate: a device whose OS the Software's package cannot run is rejected, nothing is turned on")
+    void turnOnAutoUpdate_deviceOfAnotherOs_rejectedNothingTurnedOn() {
+        SoftwareBundle draft = pending(null, null, List.of("m-win", "m-mac"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(WINGET_CHROME);
+        when(machinePlatformResolver.osTypesByMachineId(List.of("m-win", "m-mac")))
+                .thenReturn(java.util.Map.of("m-win", OsType.WINDOWS, "m-mac", OsType.MAC_OS));
+        TurnOnSoftwareAutoUpdateInput input = turnOnInput();
+
+        assertThatThrownBy(() -> service.turnOnAutoUpdate(input, USER))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("[m-mac]");
+        verify(softwareInventoryService, never())
+                .turnOnAutoUpdate(anyString(), anyList(), any(PackageUpdateSettings.class), anyString());
+        verify(bundleRepository, never()).save(any());
+        assertThat(draft.getStatus()).isEqualTo(SoftwareBundleStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("turnOnAutoUpdate: a device without a usable package manager is rejected, nothing is turned on")
+    void turnOnAutoUpdate_unmanageableDevice_rejectedNothingTurnedOn() {
+        SoftwareBundle draft = pending(null, null, List.of("m-intel"));
+        when(bundleRepository.findByTenantIdAndId(TENANT, BUNDLE_ID)).thenReturn(Optional.of(draft));
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(WINGET_CHROME);
+        doThrow(new BadRequestException("These devices have no supported package manager: [m-intel]"))
+                .when(packageManagerAvailability)
+                .requireSoftwareManageable(List.of("m-intel"), List.of(PackageManagerType.WINGET));
+        TurnOnSoftwareAutoUpdateInput input = turnOnInput();
+
+        assertThatThrownBy(() -> service.turnOnAutoUpdate(input, USER))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("[m-intel]");
+        verify(softwareInventoryService, never())
+                .turnOnAutoUpdate(anyString(), anyList(), any(PackageUpdateSettings.class), anyString());
+        verify(bundleRepository, never()).save(any());
+        assertThat(draft.getStatus()).isEqualTo(SoftwareBundleStatus.PENDING);
+    }
+
+    private static TurnOnSoftwareAutoUpdateInput turnOnInput() {
+        TurnOnSoftwareAutoUpdateInput input = new TurnOnSoftwareAutoUpdateInput();
+        input.setSoftwareId("title-7");
+        input.setBundleId(BUNDLE_ID);
+        input.setSettings(settingsInput(PackageUpdateMode.WAIT, 3600L, 120));
+        return input;
     }
 
     private static PackageUpdateSettingsInput settingsInput(PackageUpdateMode mode, Long deadlineSeconds, int countdownSeconds) {

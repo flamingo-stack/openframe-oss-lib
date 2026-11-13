@@ -60,8 +60,10 @@ type SoftwareActionRun {
     respondedMachineCount: Int!
     "Devices whose update waits on the device — a user prompt or an open app (the N WAITING chip)."
     waitingMachineCount: Int!
-    "When a SCHEDULED action will fire. Null once dispatched / for NOW."
+    "When a SCHEDULED action will fire. Null once dispatched / for NOW. For DEVICE_LOCAL: the date and time with no zone offset, each device runs at it by its own clock."
     scheduledAt: Instant
+    "How scheduledAt reads: SERVER (an absolute instant) or DEVICE_LOCAL (each device's own clock). Null unless SCHEDULED."
+    timeReference: ScheduleTimeReference
     "When the action was dispatched. Null while SCHEDULED."
     dispatchedAt: Instant
     finishedAt: Instant
@@ -98,7 +100,7 @@ type SoftwareActionDevice {
     hostname: String
     organizationId: String
     organizationName: String
-    "What ran on this device: UPDATE, or ADOPT for a device that had the title installed manually."
+    "What ran on this device: INSTALL, UPDATE or AUTO_UPDATE. Null for a device the action has not reached yet."
     kind: SoftwareActionKind
     "Device lifecycle status."
     deviceStatus: DeviceStatus
@@ -107,6 +109,16 @@ type SoftwareActionDevice {
     "Last time the device was seen, shown while it is offline."
     lastSeen: Instant
     status: SoftwareActionStatus!
+    "Why the update waits on this device: APP_RUNNING, MANAGER_BUSY or NO_USER_SESSION. Null unless WAITING."
+    waitingReason: String
+    "Where the device user is: PROMPT (asked), COUNTDOWN (the app closes at closesAt), POSTPONED (pressed Ask Later) or APPROVED (pressed Update Now, the forced update is on its way). Null unless WAITING."
+    waitingPhase: String
+    "When the countdown closes the app. Set only in COUNTDOWN."
+    closesAt: Instant
+    "When the device user is asked again after Ask Later. Null when the deadline comes first."
+    askAgainAt: Instant
+    "When a waiting update is forced. Null when the update has no deadline or has not waited on an open app yet."
+    deadlineAt: Instant
     exitCode: Int
     stdout: String
     stdoutTruncated: Boolean

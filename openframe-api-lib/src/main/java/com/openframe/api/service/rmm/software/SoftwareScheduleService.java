@@ -47,6 +47,7 @@ public class SoftwareScheduleService {
     private final SoftwareScheduleTargetResolver targetResolver;
     private final TenantIdProvider tenantIdProvider;
     private final PackageManagerAvailability packageManagerAvailability;
+    private final SoftwarePackageSelectionResolver softwarePackageSelectionResolver;
 
     public SoftwareScheduleResponse create(CreateSoftwareScheduleInput input, String createdBy) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -276,7 +277,8 @@ public class SoftwareScheduleService {
         ScheduleGrid.validateGrid(startAt, repeatSeconds);
     }
 
-    private static List<SoftwareSchedulePackage> toPackages(List<SoftwareSchedulePackageInput> packages) {
+    private List<SoftwareSchedulePackage> toPackages(List<SoftwareSchedulePackageInput> packages) {
+        softwarePackageSelectionResolver.resolve(packages);
         List<String> brewMissingType = packages.stream()
                 .filter(p -> p.getPackageManager() == PackageManagerType.BREW && p.getBrewPackageType() == null)
                 .map(SoftwareSchedulePackageInput::getPackageName)

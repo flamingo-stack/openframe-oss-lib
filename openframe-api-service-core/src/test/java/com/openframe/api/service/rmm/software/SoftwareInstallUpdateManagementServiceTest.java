@@ -10,15 +10,21 @@ import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.SoftwareAction;
+import com.openframe.data.document.rmm.software.SoftwareActionKind;
+import com.openframe.data.document.rmm.software.SoftwareActionResult;
+import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundleMode;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.rmm.SoftwareActionResultRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
@@ -38,6 +44,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -64,6 +71,8 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Mock private PackageUpdateEligibilityService packageUpdateEligibility;
     @Mock private PackageUpdateDispatchService packageUpdateDispatchService;
     @Mock private DeviceService deviceService;
+    @Mock private SoftwareInventoryService softwareInventoryService;
+    @Mock private SoftwareActionResultRepository softwareActionResultRepository;
 
     private SoftwareInstallUpdateManagementService service;
 
@@ -74,7 +83,9 @@ class SoftwareInstallUpdateManagementServiceTest {
         MachinePlatformResolver platformResolver =
                 new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
         service = new SoftwareInstallUpdateManagementService(registry, scriptService, softwareDispatchService,
-                platformResolver, packageUpdateEligibility, packageUpdateDispatchService, deviceService);
+                platformResolver, packageUpdateEligibility, packageUpdateDispatchService, deviceService,
+                new SoftwarePackageSelectionResolver(softwareInventoryService), softwareActionResultRepository,
+                tenantIdProvider);
         // A real brew handler so we exercise real script-code + arg building.
         when(registry.handlerFor(PackageManagerType.BREW)).thenReturn(new BrewPackageManagerHandler());
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -215,6 +226,21 @@ class SoftwareInstallUpdateManagementServiceTest {
         assertThat(rows.getPackageName()).isEqualTo("slack");
         assertThat(rows.getSoftwareAction()).isEqualTo(SoftwareAction.UPDATE);
         verify(deviceService).verifyDispatchable(List.of("m1"));   // the script path checks m2 itself
+
+        ArgumentCaptor<SoftwareActionResult> action = ArgumentCaptor.forClass(SoftwareActionResult.class);
+        verify(softwareActionResultRepository).save(action.capture());
+        SoftwareActionResult row = action.getValue();
+        assertThat(row.getId()).isEqualTo(rows.getExecutionId());
+        assertThat(row.getExecutionId()).isEqualTo(rows.getExecutionId());
+        assertThat(row.getTenantId()).isEqualTo(TENANT);
+        assertThat(row.getKind()).isEqualTo(SoftwareActionKind.UPDATE);
+        assertThat(row.getPackageName()).isEqualTo("slack");
+        assertThat(row.getStatus()).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
+        assertThat(row.getMode()).isEqualTo(SoftwareBundleMode.NOW);
+        assertThat(row.getMachineIds()).containsExactly("m1", "m2");
+        assertThat(row.getTotalMachineCount()).isEqualTo(2);
+        assertThat(row.getInitiatedBy()).isEqualTo(USER);
+        assertThat(row.getDispatchedAt()).isNotNull();
     }
 
     @Test
@@ -230,7 +256,28 @@ class SoftwareInstallUpdateManagementServiceTest {
                         input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER, ExecutionSource.MANUAL))
                 .isInstanceOf(BadRequestException.class);
 
-        verifyNoInteractions(softwareDispatchService, packageUpdateDispatchService);
+        verifyNoInteractions(softwareDispatchService, packageUpdateDispatchService, softwareActionResultRepository);
+    }
+
+    @Test
+    @DisplayName("update: a package given only by its Software is dispatched as the package that manages the title")
+    void update_softwareIdOnly_dispatchesTheManagingPackage() {
+        allMacTargets();
+        ScriptResponse updateScript = systemScript("brew-update-id");
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
+        when(softwareInventoryService.getManagingPackage("title-7")).thenReturn(PackageCatalogEntry.builder()
+                .manager(PackageManagerType.BREW).packageId("slack").brewType(BrewPackageType.CASK).build());
+        SoftwarePackageInput bySoftware = new SoftwarePackageInput();
+        bySoftware.setSoftwareId("title-7");
+
+        List<SoftwareDispatchResult> results = service.update(input(bySoftware), USER, ExecutionSource.PACKAGE_UPDATE);
+
+        verify(softwareDispatchService).dispatch(any(), eq(updateScript), eq(MACHINES),
+                eq(List.of("--cask", "slack")), eq(USER), eq(ExecutionSource.PACKAGE_UPDATE),
+                eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.UPDATE));
+        assertThat(results)
+                .extracting(SoftwareDispatchResult::getPackageManager, SoftwareDispatchResult::getPackageName)
+                .containsExactly(tuple(PackageManagerType.BREW, "slack"));
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {

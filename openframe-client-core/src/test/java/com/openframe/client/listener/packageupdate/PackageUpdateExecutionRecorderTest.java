@@ -134,6 +134,46 @@ class PackageUpdateExecutionRecorderTest {
     }
 
     @Test
+    void done_withManagerOutput_keepsItUnderTheSummary() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        PackageUpdateStatusMessage done = done(Done.Result.UPGRADED, "4.36.140", false);
+        done.setStdout("==> Upgrading slack");
+
+        recorder.record(request, "m1", done);
+
+        assertThat(row.getStdout()).isEqualTo("Updated (4.36.140).\n\n==> Upgrading slack");
+        assertThat(row.getStdoutTruncated()).isFalse();
+        assertThat(row.getStderr()).isNull();
+    }
+
+    @Test
+    void failed_withManagerOutput_keepsBothStreams_longOnesCut() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        PackageUpdateStatusMessage failed = failed(Failed.Reason.MANAGER_ERROR, "brew exited 1", 1L);
+        failed.setStdout("==> Upgrading slack");
+        failed.setStderr("e".repeat(ScriptExecution.MAX_OUTPUT_BYTES + 1));
+
+        recorder.record(request, "m1", failed);
+
+        assertThat(row.getError()).isEqualTo("MANAGER_ERROR: brew exited 1");
+        assertThat(row.getStdout()).isEqualTo("==> Upgrading slack");
+        assertThat(row.getStderr()).hasSize(ScriptExecution.MAX_OUTPUT_BYTES);
+        assertThat(row.getStderrTruncated()).isTrue();
+    }
+
+    @Test
+    void waiting_afterAFailedAttemptWithOutput_clearsTheOutput() {
+        ScriptExecution row = rowFound(ExecutionStatus.FAILED);
+        row.setStderr("old output");
+        row.setStderrTruncated(true);
+
+        recorder.record(request, "m1", event(State.WAITING));
+
+        assertThat(row.getStderr()).isNull();
+        assertThat(row.getStderrTruncated()).isNull();
+    }
+
+    @Test
     void done_alreadyLatest_succeeds() {
         ScriptExecution row = rowFound(ExecutionStatus.QUEUED);
 

@@ -22,6 +22,7 @@ import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
 import com.openframe.api.service.rmm.fleet.FleetCalls;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
+import com.openframe.api.service.rmm.fleet.FleetSoftwareOs;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareType;
 import com.openframe.api.service.rmm.fleet.HostInventory;
 import com.openframe.api.service.rmm.fleet.HostInventory.CveHit;
@@ -29,7 +30,16 @@ import com.openframe.api.service.rmm.vulnerability.FleetGlobalVulnerabilityMappe
 import com.openframe.api.util.FleetSoftwareMapper;
 import com.openframe.core.util.SoftwareVersions;
 import com.openframe.api.util.FleetVulnerabilityMapper;
+import com.openframe.data.document.rmm.schedule.ScheduleLocalMachineTimeDispatch;
+import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
+import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
+import com.openframe.data.document.rmm.schedule.SoftwareSchedule;
+import com.openframe.data.document.rmm.schedule.SoftwareSchedulePackage;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.document.rmm.software.FleetSource;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -38,8 +48,11 @@ import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.tool.IntegratedToolId;
+import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.FleetTenantHeader;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
@@ -53,6 +66,7 @@ import com.openframe.sdk.fleetmdm.model.SoftwareTitleRequest;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitleVersion;
 import com.openframe.sdk.fleetmdm.model.SoftwareTitlesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import lombok.RequiredArgsConstructor;
@@ -61,8 +75,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -109,6 +125,9 @@ public class SoftwareInventoryService {
     private final SoftwareCatalogStatus catalogStatus;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final OrganizationRepository organizationRepository;
+    private final SoftwareScheduleRepository softwareScheduleRepository;
+    private final SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
+    private final ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -166,6 +185,30 @@ public class SoftwareInventoryService {
         return Optional.of(row);
     }
 
+    public PackageCatalogEntry getManagingPackage(String softwareId) {
+        SoftwareResponse software = getManagedSoftware(softwareId);
+        return software.getManagingPackage();
+    }
+
+    private SoftwareResponse getManagedSoftware(String softwareId) {
+        SoftwareResponse software = findById(softwareId)
+                .orElseThrow(() -> new NotFoundException("Software not found: " + softwareId));
+        if (software.getManagingPackage() == null) {
+            throw new BadRequestException("No package manager manages " + software.getName());
+        }
+        return software;
+    }
+
+    public SoftwareResponse turnOnAutoUpdate(String softwareId, List<String> machineIds, PackageUpdateSettings settings,
+                                             String actor) {
+        SoftwareResponse software = getManagedSoftware(softwareId);
+        PackageCatalogEntry managingPackage = software.getManagingPackage();
+        autoUpdateService.turnOn(softwareId, managingPackage, machineIds, settings, actor);
+        List<SoftwareResponse> rows = List.of(software);
+        applyStatuses(rows);
+        return software;
+    }
+
     // Fleet lists a title only after its periodic host count, so a title just seen on a device can be unknown there
     // while a policy already names it: the policy is enough to turn off, and nothing is written for an unknown id.
     public SoftwareResponse turnOffAutoUpdate(String softwareId, String actor) {
@@ -186,9 +229,9 @@ public class SoftwareInventoryService {
     }
 
     // manageable: the titles a package manager manages (true) or the others (false). A Fleet page cannot be narrowed
-    // by it and leaves it out, like the other catalog filters; the read model and the full fetch apply it
+    // by it, sources, autoUpdateStatuses or osTypes and leaves them out; the read model and the full fetch apply them
     public PageResult<SoftwareResponse> listSoftware(String search, int page, Integer perPage,
-                                                     SortInput sort, Boolean vulnerable, Boolean manageable) {
+                                                     SortInput sort, Boolean vulnerable, SoftwareFilterInput filter) {
         String field = sort == null ? null : sort.getField();
         boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
         if (field != null && !SORTABLE.contains(field)) {
@@ -197,7 +240,7 @@ public class SoftwareInventoryService {
         if (softwareReadModel) {
             String tenantId = tenantIdProvider.getTenantId();
             PageResult<SoftwareResponse> readModelPage = tenantSoftwareReadModelQuery.listSoftware(tenantId, search,
-                    page, perPage, sort, vulnerable, manageable);
+                    page, perPage, sort, vulnerable, filter);
             return withStatuses(readModelPage);
         }
         if (fleetPaging) {
@@ -211,19 +254,25 @@ public class SoftwareInventoryService {
         List<SoftwareResponse> withDevices = all.stream()
                 .filter(row -> deviceCount(row) > 0)
                 .toList();
-        boolean statusesOnEveryRow = manageable != null;
+        boolean statusesOnEveryRow = readsStatuses(filter);
         if (statusesOnEveryRow) {
-            // the filter reads the source the catalog sets, so the statuses go on every row before the page is cut
+            // the filter reads the source and the auto-update the statuses set, so they go on every row before the
+            // page is cut
             applyStatuses(withDevices);
         }
         List<SoftwareResponse> chosen = withDevices.stream()
-                .filter(row -> manageable(manageable, row.getSource()))
+                .filter(row -> matchesCatalogFilter(row, filter))
                 .toList();
         List<SoftwareResponse> ordered = field == null
                 ? chosen
                 : chosen.stream().sorted(comparatorFor(field, desc)).toList();
         PageResult<SoftwareResponse> result = paginateList(ordered, page, perPage);
         return statusesOnEveryRow ? result : withStatuses(result);
+    }
+
+    private static boolean readsStatuses(SoftwareFilterInput filter) {
+        return filter != null && (filter.getManageable() != null || !isEmpty(filter.getSources())
+                || !isEmpty(filter.getAutoUpdateStatuses()));
     }
 
     private PageResult<SoftwareResponse> withStatuses(PageResult<SoftwareResponse> page) {
@@ -459,7 +508,69 @@ public class SoftwareInventoryService {
         List<SoftwareOnDeviceResponse> rows = tenantSoftwareReadModelQuery
                 .devicesForSoftwareRows(tenantId, softwareId, search, latestVersion);
         rows.forEach(row -> row.setInstalledBy(managedByOn(row.getDevice(), installedBy)));
+        markScheduledUpdates(softwareId, titleRow, rows);
         return rows;
+    }
+
+    // scheduled = an active update schedule with a run still ahead on the device
+    private void markScheduledUpdates(String softwareId, SoftwareResponse title, List<SoftwareOnDeviceResponse> rows) {
+        String tenantId = tenantIdProvider.getTenantId();
+        Instant now = Instant.now();
+        PackageCatalogEntry managingPackage = title.getManagingPackage();
+        List<String> atServerTime = softwareScheduleRepository
+                .findByTenantIdAndStatusAndNextRunAtGreaterThanOrderByNextRunAtAsc(tenantId, ScriptStatus.ACTIVE, now)
+                .stream()
+                .filter(schedule -> updates(schedule, softwareId, managingPackage))
+                .map(softwareScheduleTargetResolver::resolveMachineIds)
+                .flatMap(List::stream)
+                .toList();
+        List<String> atDeviceTime = softwareScheduleRepository
+                .findByTenantIdAndStatusAndTriggerAndTimeReference(tenantId, ScriptStatus.ACTIVE,
+                        ScheduleScriptTrigger.DATE_TIME, ScheduleTimeReference.DEVICE_LOCAL)
+                .stream()
+                .filter(schedule -> updates(schedule, softwareId, managingPackage))
+                .map(this::machinesAwaitingDeviceTime)
+                .flatMap(List::stream)
+                .toList();
+        Set<String> scheduled = new HashSet<>(atServerTime);
+        scheduled.addAll(atDeviceTime);
+        rows.stream()
+                .filter(row -> isOn(row, scheduled))
+                .forEach(row -> row.setStatus(SoftwareOnDeviceStatus.SCHEDULED_UPDATE));
+    }
+
+    // a device-time schedule keeps no nextRunAt: its one-off run is ahead until the device's own run is recorded
+    private List<String> machinesAwaitingDeviceTime(SoftwareSchedule schedule) {
+        List<String> machineIds = softwareScheduleTargetResolver.resolveMachineIds(schedule);
+        if (schedule.getRepeat() != null || machineIds.isEmpty()) {
+            return machineIds;
+        }
+        String scheduleId = schedule.getId();
+        Set<String> ran = scheduleDeviceLocalDispatchRepository
+                .findByScheduleIdAndMachineIdIn(scheduleId, machineIds).stream()
+                .filter(run -> run.getLastOccurrenceAt() != null)
+                .map(ScheduleLocalMachineTimeDispatch::getMachineId)
+                .collect(Collectors.toSet());
+        return machineIds.stream().filter(machineId -> !ran.contains(machineId)).toList();
+    }
+
+    private static boolean updates(SoftwareSchedule schedule, String softwareId, PackageCatalogEntry managingPackage) {
+        List<SoftwareSchedulePackage> packages = schedule.getPackages();
+        return schedule.getAction() == SoftwareAction.UPDATE && !isEmpty(packages)
+                && packages.stream().anyMatch(scheduled -> isOf(scheduled, softwareId, managingPackage));
+    }
+
+    // a schedule made from the package search carries no softwareId: it names the package that manages the title
+    private static boolean isOf(SoftwareSchedulePackage scheduled, String softwareId,
+                                PackageCatalogEntry managingPackage) {
+        return softwareId.equals(scheduled.getSoftwareId())
+                || (managingPackage != null && managingPackage.getManager() == scheduled.getPackageManager()
+                && managingPackage.getPackageId().equals(scheduled.getPackageName()));
+    }
+
+    private static boolean isOn(SoftwareOnDeviceResponse row, Set<String> machineIds) {
+        String machineId = row.getDevice().getMachineId();
+        return machineIds.contains(machineId);
     }
 
     private static Comparator<SoftwareOnDeviceResponse> deviceOrder(SortInput sort) {
@@ -639,7 +750,13 @@ public class SoftwareInventoryService {
         return filter == null
                 || (selected(filter.getSources(), row.getSource())
                 && selected(filter.getAutoUpdateStatuses(), row.getAutoUpdate())
+                && selected(filter.getOsTypes(), osOf(row))
                 && manageable(filter.getManageable(), row.getSource()));
+    }
+
+    private static OsType osOf(SoftwareResponse row) {
+        FleetSource fleetSource = row.getFleetSource();
+        return FleetSoftwareOs.of(fleetSource);
     }
 
     private static boolean meetsMinSeverity(SoftwareResponse row, SoftwareCveSeverity min) {
@@ -726,10 +843,12 @@ public class SoftwareInventoryService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(row -> row.getDevice().getMachineId(),
                         java.util.LinkedHashMap::new, Collectors.toList()));
-        return rowsByMachine.values().stream()
+        List<SoftwareOnDeviceResponse> rows = rowsByMachine.values().stream()
                 .map(SoftwareInventoryService::mergeDeviceRows)
                 .filter(row -> matchesDeviceSearch(row, search))
                 .toList();
+        markScheduledUpdates(softwareId, titleRow, rows);
+        return rows;
     }
 
     private static SoftwareOnDeviceResponse mergeDeviceRows(List<SoftwareOnDeviceResponse> rows) {

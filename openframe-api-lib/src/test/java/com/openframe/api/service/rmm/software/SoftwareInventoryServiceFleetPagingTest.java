@@ -1,9 +1,12 @@
 package com.openframe.api.service.rmm.software;
 
+import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareFilters;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
+import com.openframe.api.dto.rmm.software.SoftwareSource;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.shared.PageResult;
 import com.openframe.api.dto.shared.SortDirection;
@@ -12,11 +15,20 @@ import com.openframe.api.service.rmm.fleet.DeviceHostInventoryLoader;
 import com.openframe.api.service.rmm.fleet.FleetDeviceCountEnricher;
 import com.openframe.api.service.rmm.fleet.FleetHostMachineResolver;
 import com.openframe.api.service.rmm.fleet.HostInventory;
+import com.openframe.data.document.packagesearch.PackageCatalogEntry;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.software.PackageUpdateMode;
+import com.openframe.data.document.rmm.software.PackageUpdateSettings;
+import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
 import com.openframe.data.repository.tool.IntegratedToolRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.rmm.ScheduleDeviceLocalDispatchRepository;
+import com.openframe.data.repository.rmm.SoftwareScheduleRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.SoftwareScheduleTargetResolver;
 import com.openframe.sdk.fleetmdm.FleetMdmClient;
 import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.FleetVulnerability;
@@ -30,6 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -46,6 +59,8 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -55,6 +70,8 @@ import static org.mockito.Mockito.when;
 class SoftwareInventoryServiceFleetPagingTest {
 
     private static final String MACHINE_ID = "machine-1";
+    private static final PackageUpdateSettings WAIT = PackageUpdateSettings.builder()
+            .mode(PackageUpdateMode.WAIT).deadlineSeconds(604_800L).countdownSeconds(300).build();
 
     @Mock private FleetMdmClient fleet;
     @Mock private FleetDeviceCountEnricher deviceCountEnricher;
@@ -68,6 +85,9 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private SoftwareCatalogStatus catalogStatus;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private OrganizationRepository organizationRepository;
+    @Mock private SoftwareScheduleRepository softwareScheduleRepository;
+    @Mock private SoftwareScheduleTargetResolver softwareScheduleTargetResolver;
+    @Mock private ScheduleDeviceLocalDispatchRepository scheduleDeviceLocalDispatchRepository;
 
     private SoftwareInventoryService service;
 
@@ -75,7 +95,9 @@ class SoftwareInventoryServiceFleetPagingTest {
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
                 tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery,
-                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository);
+                autoUpdateService, catalogStatus, tagAssignmentRepository, organizationRepository,
+                softwareScheduleRepository, softwareScheduleTargetResolver,
+                scheduleDeviceLocalDispatchRepository);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }
@@ -103,6 +125,27 @@ class SoftwareInventoryServiceFleetPagingTest {
         assertThat(result.hasPrevious()).isTrue();
         verifyNoInteractions(deviceCountEnricher);
         verify(autoUpdateService).applyToSoftware(result.items());   // AUTO-UPDATE for the page only
+    }
+
+    @Test
+    void listSoftware_catalogFilters_leftOutOfTheFleetPage() {
+        // setup
+        SoftwareTitle chrome = fleetTitle("Chrome", 42L, 31);
+        SoftwareTitle node = fleetTitle("node", 43L, 2);
+        when(fleet.listSoftwareTitles(any(SoftwareTitleRequest.class))).thenReturn(titlesPage(2, false, chrome, node));
+        SoftwareFilterInput filter = new SoftwareFilterInput();
+        filter.setSources(List.of(SoftwareSource.BREW));
+        filter.setAutoUpdateStatuses(List.of(SoftwareAutoUpdateStatus.ON));
+        filter.setOsTypes(List.of(OsType.MAC_OS));
+        filter.setManageable(true);
+
+        // execution
+        PageResult<SoftwareResponse> result = service.listSoftware(null, 0, 20, null, null, filter);
+
+        // verifications
+        assertThat(result.items()).extracting(SoftwareResponse::getId).containsExactly("42", "43");
+        assertThat(result.filteredCount()).isEqualTo(2);
+        verify(autoUpdateService).applyToSoftware(result.items());
     }
 
     @Test
@@ -145,6 +188,54 @@ class SoftwareInventoryServiceFleetPagingTest {
     }
 
     @Test
+    void turnOnAutoUpdate_titleACatalogPackageManages_turnsOnWithThePackageThenReturnsTheTitle() {
+        // setup
+        PackageCatalogEntry chrome = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.WINGET).packageId("Google.Chrome").build();
+        when(fleet.getSoftwareTitle(42L)).thenReturn(fleetTitle("Chrome", 42L, 7));
+        doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setManagingPackage(chrome));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+        List<String> machineIds = List.of("m1", "m2");
+
+        // execution
+        SoftwareResponse result = service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x");
+
+        // verifications
+        assertThat(result.getName()).isEqualTo("Chrome");
+        InOrder order = inOrder(autoUpdateService);
+        order.verify(autoUpdateService).turnOn("42", chrome, machineIds, WAIT, "admin@x");
+        order.verify(autoUpdateService).applyToSoftware(List.of(result));
+    }
+
+    @Test
+    void turnOnAutoUpdate_titleNoPackageManages_badRequestNothingTurnedOn() {
+        // setup
+        when(fleet.getSoftwareTitle(42L)).thenReturn(fleetTitle("Adobe Acrobat", 42L, 7));
+        List<String> machineIds = List.of("m1");
+
+        // execution / verifications
+        assertThatThrownBy(() -> service.turnOnAutoUpdate("42", machineIds, WAIT, "admin@x"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("No package manager manages Adobe Acrobat");
+        verify(autoUpdateService, never()).turnOn(anyString(), any(), anyList(), any(), anyString());
+    }
+
+    @Test
+    void turnOnAutoUpdate_notATitle_notFoundNothingTurnedOn() {
+        // setup
+        List<String> machineIds = List.of("m1");
+
+        // execution / verifications
+        assertThatThrownBy(() -> service.turnOnAutoUpdate("not-a-title", machineIds, WAIT, "admin@x"))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Software not found: not-a-title");
+        verify(autoUpdateService, never()).turnOn(anyString(), any(), anyList(), any(), anyString());
+    }
+
+    @Test
     void listSoftware_cveCountSort_leftToFleetDefaultOrder() {
         // setup
         ArgumentCaptor<SoftwareTitleRequest> request = ArgumentCaptor.forClass(SoftwareTitleRequest.class);
@@ -178,6 +269,33 @@ class SoftwareInventoryServiceFleetPagingTest {
         // execution + verifications
         assertThat(service.findById("42")).map(SoftwareResponse::getDevicesCount).contains(7);
         verifyNoInteractions(deviceCountEnricher);
+    }
+
+    @Test
+    void getManagingPackage_titleACatalogPackageManages_returnsThePackage() {
+        // setup
+        PackageCatalogEntry chrome = PackageCatalogEntry.builder()
+                .manager(PackageManagerType.WINGET).packageId("Google.Chrome").build();
+        when(fleet.getSoftwareTitle(42L)).thenReturn(fleetTitle("Chrome", 42L, 7));
+        doAnswer(inv -> {
+            List<SoftwareResponse> rows = inv.getArgument(0);
+            rows.forEach(row -> row.setManagingPackage(chrome));
+            return null;
+        }).when(catalogStatus).apply(anyList());
+
+        // execution
+        PackageCatalogEntry result = service.getManagingPackage("42");
+
+        // verifications
+        assertThat(result).isSameAs(chrome);
+    }
+
+    @Test
+    void getManagingPackage_notATitle_notFound() {
+        // execution / verifications
+        assertThatThrownBy(() -> service.getManagingPackage("not-a-title"))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("Software not found: not-a-title");
     }
 
     @Test

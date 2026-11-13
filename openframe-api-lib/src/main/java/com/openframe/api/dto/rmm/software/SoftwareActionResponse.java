@@ -1,6 +1,7 @@
 package com.openframe.api.dto.rmm.software;
 
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.schedule.ScheduleTimeReference;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionKind;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
@@ -28,6 +29,7 @@ public class SoftwareActionResponse {
     private int waitingMachineCount;
 
     private Instant scheduledAt;
+    private ScheduleTimeReference timeReference;
     private Instant dispatchedAt;
     private Instant finishedAt;
     private String initiatedBy;
