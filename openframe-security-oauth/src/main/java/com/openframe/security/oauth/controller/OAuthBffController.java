@@ -46,7 +46,7 @@ public class OAuthBffController {
 
     @Value("${openframe.gateway.oauth.state-cookie-ttl-seconds:180}")
     private int stateCookieTtlSeconds;
-    @Value("${openframe.gateway.oauth.dev-ticket-enabled:true}")
+    @Value("${openframe.gateway.oauth.dev-ticket-enabled:false}")
     private boolean devTicketEnabled;
     @Value("${openframe.gateway.oauth.mobile-auth-enabled:true}")
     private boolean mobileAuthEnabled;
@@ -371,11 +371,15 @@ public class OAuthBffController {
     }
 
     private Mono<String> computeTargetWithOptionalDevTicketReactive(String baseTarget, boolean includeDevTicket, TokenResponse tokens) {
-        if (!includeDevTicket) {
+        if (!canAppendDevTicket(includeDevTicket, baseTarget)) {
             return Mono.just(baseTarget);
         }
         return devTicketStore.createTicket(tokens)
                 .map(ticket -> baseTarget + (baseTarget.contains("?") ? "&" : "?") + "devTicket=" + ticket);
+    }
+
+    private boolean canAppendDevTicket(boolean includeDevTicket, String target) {
+        return includeDevTicket && redirectTargetResolver.canReceiveDevTicket(target);
     }
 
     private ResponseEntity<Void> buildFound(String target, String stateToClear) {

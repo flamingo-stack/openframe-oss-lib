@@ -7,6 +7,7 @@ import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredException;
 import com.openframe.security.oauth.service.InMemoryOAuthDevTicketStore;
+import com.openframe.security.oauth.service.MutableClock;
 import com.openframe.security.oauth.service.OAuthBffService;
 import com.openframe.security.oauth.service.OAuthDevTicketStore;
 import com.openframe.security.oauth.service.redirect.RedirectTargetResolver;
@@ -22,6 +23,10 @@ import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 
+import org.springframework.beans.factory.annotation.Value;
+
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -50,7 +55,8 @@ class OAuthBffControllerFlowTest {
     @Mock
     private RedirectTargetResolver redirectTargetResolver;
 
-    private final OAuthDevTicketStore devTicketStore = new InMemoryOAuthDevTicketStore();
+    private final MutableClock clock = new MutableClock(Instant.parse("2026-11-13T10:00:00Z"));
+    private final OAuthDevTicketStore devTicketStore = new InMemoryOAuthDevTicketStore(Duration.ofSeconds(120), clock);
     private OAuthBffController controller;
     private final ServerHttpRequest request = MockServerHttpRequest.get("/oauth/x").build();
 
@@ -142,6 +148,7 @@ class OAuthBffControllerFlowTest {
 
     @Test
     void shouldAppendSingleUseDevTicketForMobileCallback() {
+        when(redirectTargetResolver.canReceiveDevTicket(NATIVE_APP + "?x=1")).thenReturn(true);
         when(oauthBffService.handleCallback("code", "st", request))
                 .thenReturn(Mono.just(new OAuthCallbackResult("acme", NATIVE_APP + "?x=1", TOKENS, true)));
 
@@ -161,6 +168,54 @@ class OAuthBffControllerFlowTest {
                 .thenReturn(Mono.just(new OAuthCallbackResult("acme", "https://acme.openframe.ai/", TOKENS, false)));
 
         assertThat(location(controller.callback("code", "st", request).block())).doesNotContain("devTicket");
+    }
+
+    @Test
+    void shouldKeepIneligibleTargetWithoutDevTicket() {
+        ReflectionTestUtils.setField(controller, "devTicketEnabled", true);
+        when(redirectTargetResolver.canReceiveDevTicket("https://acme.openframe.ai/")).thenReturn(false);
+        when(oauthBffService.handleCallback("code", "st", request))
+                .thenReturn(Mono.just(new OAuthCallbackResult("acme", "https://acme.openframe.ai/", TOKENS, false)));
+
+        ResponseEntity<Void> response = controller.callback("code", "st", request).block();
+
+        assertThat(location(response)).isEqualTo("https://acme.openframe.ai/");
+        assertThat(setCookies(response)).anyMatch(c -> c.startsWith("access_token=" + ACCESS));
+    }
+
+    @Test
+    void shouldAppendDevTicketToRelativeTargetWhenDevTicketsAreOn() {
+        ReflectionTestUtils.setField(controller, "devTicketEnabled", true);
+        when(redirectTargetResolver.canReceiveDevTicket("/devices")).thenReturn(true);
+        when(oauthBffService.handleCallback("code", "st", request))
+                .thenReturn(Mono.just(new OAuthCallbackResult("acme", "/devices", TOKENS, false)));
+
+        assertThat(location(controller.callback("code", "st", request).block())).startsWith("/devices?devTicket=");
+    }
+
+    @Test
+    void shouldNotAppendDevTicketForMobileCallbackWhenTargetIsIneligible() {
+        when(redirectTargetResolver.canReceiveDevTicket("https://evil.example/x")).thenReturn(false);
+        when(oauthBffService.handleCallback("code", "st", request))
+                .thenReturn(Mono.just(new OAuthCallbackResult("acme", "https://evil.example/x", TOKENS, true)));
+
+        assertThat(location(controller.callback("code", "st", request).block())).isEqualTo("https://evil.example/x");
+        verify(redirectTargetResolver).canReceiveDevTicket("https://evil.example/x");
+    }
+
+    @Test
+    void shouldDefaultDevTicketEnabledToFalse() throws NoSuchFieldException {
+        Value value = OAuthBffController.class.getDeclaredField("devTicketEnabled").getAnnotation(Value.class);
+
+        assertThat(value.value()).isEqualTo("${openframe.gateway.oauth.dev-ticket-enabled:false}");
+    }
+
+    @Test
+    void shouldAnswerNotFoundForExpiredDevTicket() {
+        String ticket = devTicketStore.createTicket(TOKENS).block();
+        clock.advance(Duration.ofSeconds(120));
+
+        assertThat(controller.devExchange(ticket).block().getStatusCode().value()).isEqualTo(404);
     }
 
     @Test
