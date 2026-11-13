@@ -130,7 +130,10 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
 
     private static boolean isOpen(CommandExecution row) {
         ExecutionStatus status = row.getStatus();
-        return status != null && !status.isFinal(row.getFailureReason());
+        if (status == ExecutionStatus.RUNNING) {
+            return true;
+        }
+        return status != null && status.isTerminal() && !status.isFinal(row.getFailureReason());
     }
 
     /** Truncate to {@link CommandExecution#MAX_OUTPUT_BYTES} on UTF-8 codepoint boundaries. */

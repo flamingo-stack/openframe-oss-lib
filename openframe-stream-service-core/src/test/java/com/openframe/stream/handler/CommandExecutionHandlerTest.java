@@ -185,6 +185,20 @@ class CommandExecutionHandlerTest {
     }
 
     @Test
+    @DisplayName("handle: row not RUNNING and not terminal (QUEUED) → save NOT called")
+    void handle_queuedRow_doesNotTakeTheResult() {
+        CommandExecution row = runningRow();
+        row.setStatus(ExecutionStatus.QUEUED);
+        when(commandExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(0, false, null, null, null, null), new IntegratedToolEnrichedData());
+
+        verify(commandExecutionRepository, never()).save(any());
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.QUEUED);
+    }
+
+    @Test
     @DisplayName("handle: no CommandExecution row (ad-hoc/legacy command) → save NOT called, no exception")
     void handle_rowMissing_skipsSaveQuietly() {
         when(commandExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
