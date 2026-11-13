@@ -22,6 +22,7 @@ public class Machine {
     private String osUuid;
     private String agentVersion;
     private DeviceStatus status;
+    private DeviceConnectivity connectivity;
     private String lastSeen;
     private String organizationId;
     private String hostname;

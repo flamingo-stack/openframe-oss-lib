@@ -21,6 +21,11 @@ export interface DataTableColumnFilterProps {
   align?: 'left' | 'center' | 'right';
   /** Options are still loading — see `meta.filter.pending`. */
   pending?: boolean;
+  /**
+   * The trigger's look. `grid` is the grid layout's header cell: the label stays on one line and stays grey on hover
+   * (the cell's fill is what changes), and an applied filter turns the label primary and the glyph accent.
+   */
+  variant?: 'cards' | 'grid';
 }
 
 /** Filter dropdown wrapper that reads/writes TanStack column filter state. */
@@ -31,6 +36,7 @@ export function DataTableColumnFilter({
   label,
   align = 'left',
   pending = false,
+  variant = 'cards',
 }: DataTableColumnFilterProps) {
   const currentValue = column.getFilterValue() as string[] | undefined;
   const activeCount = currentValue?.length ?? 0;
@@ -74,7 +80,27 @@ export function DataTableColumnFilter({
   //    keeps its 48px box — only the glyph goes.
   const isEmpty = options.length === 0;
 
-  const trigger = (
+  const applied = activeCount > 0;
+  const gridTrigger = (
+    <div
+      className={cn(
+        'flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)]',
+        alignJustify(align),
+        isEmpty ? 'cursor-default' : 'cursor-pointer',
+      )}
+      aria-label={isEmpty ? undefined : `Filter by ${label}`}
+    >
+      <span className={cn('whitespace-nowrap text-h5', applied ? 'text-ods-text-primary' : 'text-ods-text-secondary')}>
+        {label}
+      </span>
+      {(!isEmpty || pending) && (
+        // The same glyph as the card header's funnel; applied, it takes the accent.
+        <Filter02Icon className={cn('h-4 w-4 shrink-0', applied ? 'text-ods-accent' : 'text-ods-text-secondary')} />
+      )}
+    </div>
+  );
+
+  const cardsTrigger = (
     <div
       className={cn(
         // Fixed 48px per design, same as the plain header cell next to it —
@@ -115,6 +141,8 @@ export function DataTableColumnFilter({
     </div>
   );
 
+  const trigger = variant === 'grid' ? gridTrigger : cardsTrigger;
+
   // Same box, no dropdown: opening onto an empty list would be a worse answer
   // than not opening at all.
   if (isEmpty) {
@@ -131,6 +159,8 @@ export function DataTableColumnFilter({
       onReset={handleReset}
       placement={placement}
       dropdownClassName="min-w-60"
+      // The grid header is its own clipping viewport: the panel must leave it.
+      floating={variant === 'grid'}
     />
   );
 }

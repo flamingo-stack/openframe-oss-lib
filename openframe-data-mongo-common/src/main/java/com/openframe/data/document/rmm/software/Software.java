@@ -21,6 +21,8 @@ import java.util.List;
 @CompoundIndex(name = "tenant_name", def = "{'tenantId': 1, 'nameLower': 1}")
 @CompoundIndex(name = "tenant_devices", def = "{'tenantId': 1, 'devicesCount': -1}")
 @CompoundIndex(name = "tenant_cveCount", def = "{'tenantId': 1, 'cveCount': -1}")
+@CompoundIndex(name = "tenant_source", def = "{'tenantId': 1, 'source': 1}")
+@CompoundIndex(name = "tenant_match_state", def = "{'tenantId': 1, 'packageMatch.state': 1}")
 public class Software implements TenantScoped {
 
     @Id

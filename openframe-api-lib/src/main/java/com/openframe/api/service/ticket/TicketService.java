@@ -378,6 +378,37 @@ public class TicketService {
         return archivedIds.size();
     }
 
+    public Ticket getById(String ticketId) {
+        return ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new TicketNotFoundException(ticketId));
+    }
+
+    public Machine requireMachine(String machineId) {
+        return machineRepository.findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Device not found by machineId: " + machineId));
+    }
+
+    public Organization requireOrganization(String organizationId) {
+        return organizationRepository.findByOrganizationId(organizationId)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.ORGANIZATION_NOT_FOUND, "Organization not found by organizationId: " + organizationId));
+    }
+
+    public User requireAssignee(String assigneeId) {
+        return userRepository.findById(assigneeId)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND, "User not found: " + assigneeId));
+    }
+
+    public void requireCreationReferences(CreateTicketInput input) {
+        String organizationId = input.getOrganizationId();
+        String deviceId = input.getDeviceId();
+        if (deviceId != null) {
+            Machine device = requireMachine(deviceId);
+            organizationId = organizationId == null ? device.getOrganizationId() : organizationId;
+        }
+        Optional.ofNullable(organizationId).ifPresent(this::requireOrganization);
+        Optional.ofNullable(input.getAssigneeId()).ifPresent(this::requireAssignee);
+    }
+
     // ---------- internals ----------
 
     // Columns are grouped by statusId, so a new ticket's top rank is computed against its statusId
@@ -392,11 +423,6 @@ public class TicketService {
 
     private void applyManualStatusIfLifecycle(Ticket ticket, String requestedStatusId) {
         ticketLifecycleService.applyManualInitialStatus(ticket, requestedStatusId);
-    }
-
-    private Ticket getById(String ticketId) {
-        return ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new TicketNotFoundException(ticketId));
     }
 
     private TicketOwner buildTicketOwner(AuthPrincipal principal) {
@@ -467,7 +493,7 @@ public class TicketService {
 
         Machine device = requireMachine(machineId);
         ticket.setDeviceId(device.getMachineId());
-        ticket.setDeviceHostname(device.getHostname());
+        ticket.setDeviceHostname(device.preferredName());
 
         if (device.getOrganizationId() != null) {
             Organization org = requireOrganization(device.getOrganizationId());
@@ -475,7 +501,7 @@ public class TicketService {
             ticket.setOrganizationName(org.getName());
         }
         log.debug("Auto-populated device {} and org {} for AGENT ticket",
-                device.getHostname(), ticket.getOrganizationName());
+                device.preferredName(), ticket.getOrganizationName());
     }
 
     private void populateAdminFields(Ticket ticket, CreateTicketInput input) {
@@ -491,7 +517,7 @@ public class TicketService {
         if (deviceId != null) {
             Machine device = requireMachine(deviceId);
             ticket.setDeviceId(device.getMachineId());
-            ticket.setDeviceHostname(device.getHostname());
+            ticket.setDeviceHostname(device.preferredName());
             if (resolvedOrgId == null) {
                 resolvedOrgId = device.getOrganizationId();
             } else if (!resolvedOrgId.equals(device.getOrganizationId())) {
@@ -507,20 +533,9 @@ public class TicketService {
     }
 
     private void populateAssignee(Ticket ticket, String assigneeId) {
-        User user = userRepository.findById(assigneeId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.USER_NOT_FOUND, "User not found: " + assigneeId));
+        User user = requireAssignee(assigneeId);
         ticket.setAssignedTo(user.getId());
         ticket.setAssignedName(TicketUserNames.displayName(user));
-    }
-
-    private Machine requireMachine(String machineId) {
-        return machineRepository.findByMachineId(machineId)
-                .orElseThrow(() -> new DeviceNotFoundException("Device not found by machineId: " + machineId));
-    }
-
-    private Organization requireOrganization(String organizationId) {
-        return organizationRepository.findByOrganizationId(organizationId)
-                .orElseThrow(() -> new NotFoundException(ErrorCode.ORGANIZATION_NOT_FOUND, "Organization not found by organizationId: " + organizationId));
     }
 
     private boolean hasAssignee(Ticket ticket) {

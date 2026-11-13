@@ -106,6 +106,8 @@ export const EP = {
   // Private-storage view proxy base — ClaudeEmbed derives artifact
   // mirror urls under it, through the same /content reverse proxy.
   storageView: `${CONTENT}/storage/view`,
+  // YouTube poster resolver: `<base>/<videoId>` redirects to the sharpest poster the video really has.
+  youtubePoster: `${CONTENT}/youtube-poster`,
   accessValidate: `${CONTENT}/validate-access-code`,
   accessConsume: `${CONTENT}/consume-access-code`,
   // Rich-markdown embedded surfaces (reddit/twitter cards + OG link preview).

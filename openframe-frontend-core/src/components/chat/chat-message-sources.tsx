@@ -13,7 +13,7 @@ import type { ChatMessage } from '../../chat-protocol/chat-message';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import { formatCitationIndices, type SourceGroup } from '../../utils/source-grouping';
 import { Button } from '../ui/button';
-import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { loadingItemProps } from '../ui/loading-scope';
 import type { ChatRef } from './chat-ref.types';
 import { RecordAnchor, recordDiscussAction } from './entity-cards/dispatch';
@@ -32,7 +32,8 @@ import {
 /**
  * A source's chip, two affordances:
  *  1. Open: click → where the record's card and its citation open it (`resolveRecordDestination` through
- *     `RecordAnchor`, so a route of the host's own stays on the host in every mode).
+ *     `RecordAnchor`, so a route of the host's own stays on the host in every mode). A table's chip opens a menu of
+ *     its rows, each with both.
  *  2. Ask: the record's "Ask Mingo"/"Display" (`recordDiscussAction`, the row its "⋯" menu offers), to drill into THIS
  *     row.
  */
@@ -58,49 +59,74 @@ function SourceChip(props: {
   const numbered = (label: string) => (numbers.length > 0 ? `[${formatCitationIndices(numbers)}] ${label}` : label);
   const actionOf = (ref: ChatRef | null) => (ref ? recordDiscussAction(ref, handlers) : undefined);
 
-  // A table's chip: hover/click reveals a dropdown with Open + Ask per row.
+  // A table's chip: a click opens a menu with Open + Ask per row. The menu is the shared `DropdownMenu`, portalled out
+  // of the thread: drawn inside it, it faded with the thread's end and sat under the composer dock.
   if (group.tableId) {
     const rowLabels = groupedRowLabels(group.rows);
-    const targets = new Map<string, NonNullable<ReturnType<typeof recordLinkTargetOf>>>();
-    const dropdownItems: HoverDropdownItem[] = group.rows.map((row, i) => {
+    const rows = group.rows.map((row, i) => {
       const destination = resolveRecordDestination(sourceRowInputOf(row), runtime);
-      const target = recordLinkTargetOf(destination);
-      if (target) targets.set(target.url, target);
       const ItemIcon = destination.cta.icon;
       const action = actionOf(destination.cta.chatRef);
       return {
+        key: row.sourceId,
         label: rowLabels[i],
-        icon: <ItemIcon className="h-3.5 w-3.5" />,
-        href: target?.url,
-        targetPlatform: target?.targetPlatform ?? null,
-        path: target?.path ?? null,
-        secondaryAction:
-          action && !action.disabled
-            ? { icon: action.icon, label: `${action.label}: ${sourceTitleOf(row)}`, onClick: action.run }
-            : undefined,
+        icon: <ItemIcon />,
+        target: recordLinkTargetOf(destination),
+        ask: action && !action.disabled ? { ...action, label: `${action.label}: ${sourceTitleOf(row)}` } : undefined,
       };
     });
+    const rowLabelClass = 'min-w-0 flex-1 truncate';
 
     return (
       <span className="inline-flex" {...marks}>
-        <HoverDropdown
-          items={dropdownItems}
-          renderAnchor={({ href, className, children }) => {
-            const target = targets.get(href);
-            return target ? (
-              <RecordAnchor destination={target} className={className}>
-                {children}
-              </RecordAnchor>
-            ) : (
-              <span className={className}>{children}</span>
-            );
-          }}
-        >
-          <span className={`${chipClass} cursor-pointer`}>
+        {/* Not modal: the thread keeps scrolling under an open menu, and the menu leaves with its chip. */}
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger className={`${chipClass} cursor-pointer`}>
             {icon}
             <span className="max-w-[160px] truncate">{numbered(group.label)}</span>
-          </span>
-        </HoverDropdown>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            className="max-h-[min(420px,var(--radix-dropdown-menu-content-available-height))] min-w-[220px] max-w-[340px] overflow-y-auto"
+          >
+            {rows.map(row => (
+              <div
+                key={row.key}
+                data-testid="source-group-row"
+                className="flex items-center gap-[var(--spacing-system-xxs)]"
+              >
+                {row.target ? (
+                  <DropdownMenuItem
+                    asChild
+                    className="min-w-0 flex-1 text-ods-text-secondary no-underline [&_svg]:size-3.5"
+                  >
+                    <RecordAnchor destination={row.target}>
+                      {row.icon}
+                      <span className={rowLabelClass}>{row.label}</span>
+                    </RecordAnchor>
+                  </DropdownMenuItem>
+                ) : (
+                  // Nothing to open: the label only, out of the keyboard's way; its Ask still works.
+                  <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-ods-text-secondary text-h6 [&_svg]:size-3.5 [&_svg]:shrink-0">
+                    {row.icon}
+                    <span className={rowLabelClass}>{row.label}</span>
+                  </span>
+                )}
+                {row.ask && (
+                  <DropdownMenuItem
+                    aria-label={row.ask.label}
+                    title={row.ask.label}
+                    onSelect={row.ask.run}
+                    className="shrink-0 px-1.5 text-ods-text-secondary"
+                  >
+                    {row.ask.icon}
+                  </DropdownMenuItem>
+                )}
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </span>
     );
   }

@@ -15,6 +15,7 @@ import {
   useDataTable,
 } from '../../ui/data-table';
 import { useLoadingScope } from '../../ui/loading-scope';
+import { dataTableLayoutProps, type FeatureTableLayoutProps } from '../feature-table-layout';
 import {
   SingleCustomerTenantsTableView,
   type SingleCustomerTenantsTableViewProps,
@@ -77,7 +78,7 @@ export interface TenantsTableFilters {
  * Click handler that opens `href` in a new tab. The row is itself the details
  * link and an `<a>` cannot be nested in an `<a>`, so the button opens it by script.
  */
-interface MultiCustomerTenantsTableViewProps {
+interface MultiCustomerTenantsTableViewProps extends FeatureTableLayoutProps {
   /** A directory per row that serves any number of customers, with its licences and the column funnels. */
   variant: 'multi-customer';
   rows: MultiCustomerTenantRow[];
@@ -129,6 +130,9 @@ function MultiCustomerTenantsTableView({
   isFetchingNextPage = false,
   onLoadMore,
   now,
+  layout = 'cards',
+  tableMaxHeight,
+  tableSettings,
 }: MultiCustomerTenantsTableViewProps) {
   const filterOptions = filters?.options;
   const filtersPending = filters?.pending ?? false;
@@ -231,14 +235,18 @@ function MultiCustomerTenantsTableView({
     },
   });
 
+  const rowCount = <DataTable.RowCount itemName="result" totalCount={totalCount ?? rows.length} loading={loading} />;
+
   return (
     // Dim, don't unmount, the stale rows while a deferred search refetches.
     <div className={cn('transition-opacity duration-200', isPending && 'opacity-60')}>
-      <DataTable table={table}>
+      <DataTable table={table} {...dataTableLayoutProps({ layout, tableMaxHeight, tableSettings })}>
+        {/* The grid's results count sits above the table; the card header carries its own (`rightSlot`). */}
+        {layout === 'grid' && <DataTable.Meta>{rowCount}</DataTable.Meta>}
         <DataTable.Header
           stickyHeader={stickyHeaderOffset !== undefined}
           stickyHeaderOffset={stickyHeaderOffset}
-          rightSlot={<DataTable.RowCount itemName="result" totalCount={totalCount ?? rows.length} loading={loading} />}
+          rightSlot={rowCount}
         />
         <DataTable.Body
           loadingCells

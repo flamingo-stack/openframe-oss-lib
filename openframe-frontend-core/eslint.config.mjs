@@ -252,6 +252,8 @@ export default defineConfig([
       // A page drawn only in the browser loads the complete stylesheet: the contract is the <link> RouteStyle appends
       // to <head>, outside anything it renders, which no `screen` query reaches.
       'src/__tests__/route-styles-client.test.tsx',
+      // FadePreview's item mode: the contract is the height it measures onto its role-less clamp box.
+      'src/components/ui/__tests__/fade-preview.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',

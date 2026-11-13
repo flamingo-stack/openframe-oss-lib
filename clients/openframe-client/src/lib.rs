@@ -202,6 +202,7 @@ pub struct Client {
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     update_handler_service: UpdateHandlerService,
+    tool_agent_update_service: ToolAgentUpdateService,
     openframe_client_info_service: OpenFrameClientInfoService,
     last_known_good_service: LastKnownGoodService,
     // Services needed for log streaming initialization
@@ -584,7 +585,7 @@ impl Client {
         );
         let tool_update_listener = CommandListener::new(
             ToolUpdateHandler::new(
-                tool_agent_update_service,
+                tool_agent_update_service.clone(),
                 tool_ops.clone(),
                 tool_run_manager.client_update_pending(),
             ),
@@ -697,6 +698,7 @@ impl Client {
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             update_handler_service,
+            tool_agent_update_service,
             openframe_client_info_service,
             last_known_good_service,
             initial_configuration_service,
@@ -742,6 +744,7 @@ impl Client {
             &self.agent_configuration_service,
             &self.installed_tools_service,
             &self.directory_manager,
+            &self.log_key_service,
         )?
         .start()
         .await?;
@@ -751,7 +754,9 @@ impl Client {
         self.auth_processor.process().await?;
 
         // Needs the agent token, so only after authentication.
-        self.log_key_service.clone().start();
+        self.log_key_service
+            .clone()
+            .start(self.restart_gate.clone());
 
         self.token_refresh_run_manager.start();
 
@@ -763,6 +768,9 @@ impl Client {
         self.nats_connection_manager.start_connection_watchdog();
 
         self.update_handler_service.publish_running_version().await;
+        self.tool_agent_update_service
+            .publish_installed_versions()
+            .await;
 
         // Handle any pending update from previous run (after NATS is connected)
         if let Err(e) = self.update_handler_service.handle_pending_update().await {

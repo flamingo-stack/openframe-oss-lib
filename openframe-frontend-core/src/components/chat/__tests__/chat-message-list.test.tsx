@@ -54,6 +54,7 @@ vi.mock('../chat-message-enhanced', async () => {
   };
 });
 
+import { CHAT_MESSAGE_LIST_COLUMN_CLASS } from '../chat-message-layout';
 import { ChatMessageList } from '../chat-message-list';
 
 // jsdom ships neither observer; the component instantiates both (load-more
@@ -117,6 +118,15 @@ describe('ChatMessageList thread owner', () => {
     render(<ChatMessageList messages={[msg('m1', 'user'), msg('m2', 'assistant')]} selfAuthorType="user" />);
     expect(screen.getByText('body of m1').getAttribute('data-self-author-type')).toBe('user');
     expect(screen.getByText('body of m2').getAttribute('data-self-author-type')).toBe('user');
+  });
+});
+
+describe('ChatMessageList thread column', () => {
+  // The column is a flex item of the scroller with min-height 100%: one that may shrink stops at that height while
+  // its messages overflow it, and its bottom padding (the fadeEnd inset) lands under the messages instead of after
+  // them, so the last message ends on the scroller's edge, under the fade into the composer.
+  it.each(['full', 'narrow'] as const)('does not shrink, so its end padding follows the last message (%s)', width => {
+    expect(CHAT_MESSAGE_LIST_COLUMN_CLASS[width].split(' ')).toContain('shrink-0');
   });
 });
 

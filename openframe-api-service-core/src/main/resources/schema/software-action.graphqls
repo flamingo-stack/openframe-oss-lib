@@ -100,8 +100,10 @@ type SoftwareActionDevice {
     organizationName: String
     "What ran on this device: UPDATE, or ADOPT for a device that had the title installed manually."
     kind: SoftwareActionKind
-    "Device connectivity (ONLINE / OFFLINE / ...), for the online dot."
+    "Device lifecycle status."
     deviceStatus: DeviceStatus
+    "Device connectivity (ONLINE / OFFLINE), for the online dot."
+    connectivity: DeviceConnectivity
     "Last time the device was seen, shown while it is offline."
     lastSeen: Instant
     status: SoftwareActionStatus!

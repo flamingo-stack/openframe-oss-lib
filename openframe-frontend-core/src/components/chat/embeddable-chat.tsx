@@ -100,7 +100,7 @@ import { MingoHistoryRail } from './mingo-history-rail';
 import { MINGO_ONBOARDING_SKELETON_ROWS, MingoOnboardingCard } from './mingo-onboarding-card';
 import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
-import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
+import { type QuickActionAccent, accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { RecordActionsProvider } from './record-actions';
 import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
@@ -364,6 +364,13 @@ export interface EmbeddableChatProps {
    * slash-command list `children` are wired internally and not overridable.
    */
   guideWelcome?: Omit<GuideWelcomeProps, 'onQuickAction' | 'children'>;
+  /**
+   * The icon tint of the quick actions this chat reads itself (the Guide-mode ones, from the runtime's
+   * `emptyStateUrl`), for a host whose design fixes it. `'currentColor'` draws them in the tag's own text colour, as
+   * the row's "All" glyph is. Default: the colour set on the assistant's identity, else the built-in agent's
+   * (fae pink, mingo cyan). An action's own `iconProps.color` still wins.
+   */
+  quickActionAccent?: QuickActionAccent;
 
   /**
    * Entity-context picker config (Figma 31:28708 / 1:5699). When provided, the
@@ -609,6 +616,9 @@ const withoutRecordLink = (value: string, href: string): string =>
 /** Persists the user's rail collapse choice across drawer open/close + reloads. */
 const RAIL_COLLAPSED_STORAGE_KEY = 'mingo-chat-history-collapsed';
 
+/** The header over a new chat holding only the "What to ask Mingo?" answer. */
+const WHAT_TO_ASK_TITLE = 'What to ask Mingo?';
+
 /** One shared empty list, so "nothing staged" keeps a stable identity. */
 const NO_CONTEXT_ITEMS: ChatContextItem[] = [];
 
@@ -801,6 +811,14 @@ export interface EmbeddableChatHandle {
    * `contextPicker`.
    */
   openContextPicker: () => void;
+  /**
+   * Puts the keyboard focus in the composer, and keeps it owed to the composer until the user's next press or key:
+   * a send that follows mounts the composer anew, and that one takes the focus. For a host that sends from a control
+   * of its own outside the chat (its quick actions over a docked composer): the control goes away with the send, and
+   * the user types the next message here. The chat's own quick actions do it themselves. Nothing where the pointer
+   * is a finger (it would raise the on-screen keyboard over the answer).
+   */
+  focusComposer: () => void;
 }
 
 export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableChatProps>(
@@ -840,6 +858,7 @@ function EmbeddableChatInner({
   mingoWelcome,
   historyPageSize,
   guideWelcome,
+  quickActionAccent,
   contextPicker,
   renderRecordChip,
   renderContextItem,
@@ -969,6 +988,38 @@ function EmbeddableChatInner({
 
   // Imperative handle to the chat input.
   const chatInputRef = useRef<ChatInputRef | null>(null);
+
+  // The keyboard goes to the composer after a quick action (the chat's own, or a host's through `focusComposer`):
+  // the tag goes away with the send, and the next message is typed here. The send that follows mounts the composer
+  // anew (a new chat's thread takes the place of the welcome), so the focus is OWED until the user does something
+  // else: the composer that mounts takes it. Not where the pointer is a finger: focus there raises the on-screen
+  // keyboard over the answer the user just asked for.
+  const composerFocusOwedRef = useRef(false);
+  const settleComposerFocusRef = useRef<(() => void) | null>(null);
+  const focusComposer = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches) return;
+    chatInputRef.current?.focus();
+    if (composerFocusOwedRef.current) return;
+    composerFocusOwedRef.current = true;
+    // Captured: the event that asked for the focus is already past the document's capture phase, so it does not
+    // settle its own debt. The next press or key does, wherever it lands.
+    const settle = () => {
+      composerFocusOwedRef.current = false;
+      settleComposerFocusRef.current = null;
+      document.removeEventListener('pointerdown', settle, true);
+      document.removeEventListener('keydown', settle, true);
+    };
+    settleComposerFocusRef.current = settle;
+    document.addEventListener('pointerdown', settle, true);
+    document.addEventListener('keydown', settle, true);
+  }, []);
+  // The debt ends with the chat: its listeners do not outlive it.
+  useEffect(() => () => settleComposerFocusRef.current?.(), []);
+  const attachChatInput = useCallback((input: ChatInputRef | null) => {
+    chatInputRef.current = input;
+    if (input && composerFocusOwedRef.current) input.focus();
+  }, []);
 
   // The slash-command registry (Guide onboarding cards) is loaded via
   // react-query below, after `activeMode` is resolved — gated on Guide mode and
@@ -1655,7 +1706,7 @@ function EmbeddableChatInner({
         // agent/persona (`icon_props.color`) wins; the built-in slug map
         // (fae→pink, mingo→cyan) is only the fallback for unconfigured
         // built-in agents.
-        accent: accentFromIdentityIcon(effectiveAssistantIcon) ?? getAgentAccent(activeAgentSlug),
+        accent: quickActionAccent ?? accentFromIdentityIcon(effectiveAssistantIcon) ?? getAgentAccent(activeAgentSlug),
       }));
     }
     return (effectiveSuggestedQueries ?? []).map((q, i) => ({
@@ -1663,7 +1714,7 @@ function EmbeddableChatInner({
       label: q,
       prompt: q,
     }));
-  }, [effectiveQuickActions, effectiveSuggestedQueries, effectiveAssistantIcon, activeAgentSlug]);
+  }, [effectiveQuickActions, effectiveSuggestedQueries, effectiveAssistantIcon, activeAgentSlug, quickActionAccent]);
 
   // Dialog-history concerns (archive page, read-only archived conversation,
   // rename/archive/unarchive modals) live in one hook so this component stays
@@ -2066,8 +2117,11 @@ function EmbeddableChatInner({
    * assistant name; anywhere else a draft is a "New Chat".
    */
   const freshConversationTitle = isGuideEmpty ? (headerAssistantName ?? 'Mingo Guide') : 'New Chat';
+  // The chat's own header over a new chat that holds only "What to ask?" exchanges: it is that
+  // answer, not a chat the user started. The list's draft row keeps `freshConversationTitle`.
+  const draftHeaderTitle = isWhatToAskDraft ? WHAT_TO_ASK_TITLE : freshConversationTitle;
   const headerTitle = hasConversation
-    ? activeDialog?.title || freshConversationTitle
+    ? activeDialog?.title || draftHeaderTitle
     : isGuideEmpty
       ? freshConversationTitle
       : 'Current Chats';
@@ -2279,8 +2333,9 @@ function EmbeddableChatInner({
       openContextPicker: () => {
         if (contextPicker) openContextPicker();
       },
+      focusComposer,
     }),
-    [resetToNewChat, contextMaxItems, contextPicker, openContextPicker],
+    [resetToNewChat, contextMaxItems, contextPicker, openContextPicker, focusComposer],
   );
 
   // Desktop split header ⋯ menu (active, non-archived conversation only).
@@ -2335,7 +2390,7 @@ function EmbeddableChatInner({
     ? composeOpen || hostOwnsList
       ? {
           showBack: !hostOwnsList,
-          title: freshConversationTitle,
+          title: draftHeaderTitle,
           subtitle: headerUserName,
           avatar: headerAvatar,
           backAriaLabel: 'Back to chats',
@@ -2426,7 +2481,7 @@ function EmbeddableChatInner({
         <MingoChatHeader
           // Over the archive the header is the archive's: the chat still open
           // underneath is not on screen, so neither its name nor its actions are.
-          title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+          title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : draftHeaderTitle}
           subtitle={archiveOpen ? undefined : headerPersonName}
           avatar={archiveOpen ? undefined : headerAvatar}
           // Wide: shows / hides the list beside the chat. Narrow: back to the
@@ -2596,6 +2651,7 @@ function EmbeddableChatInner({
               onClick: () => {
                 handleSend(action.prompt ?? action.label);
                 action.onClick?.();
+                focusComposer();
               },
             }))}
           />
@@ -2636,7 +2692,10 @@ function EmbeddableChatInner({
                 : (guideWelcome?.quickActions ?? guideSuggestedActions)
             }
             // A quick action sends its prompt at once.
-            onQuickAction={action => handleSend(action.prompt ?? action.label)}
+            onQuickAction={action => {
+              handleSend(action.prompt ?? action.label);
+              focusComposer();
+            }}
           >
             {/* Figma node 7363:205938 — single-column slash-command
                 list. No own scroll (GuideWelcome's region scrolls); the
@@ -2699,7 +2758,7 @@ function EmbeddableChatInner({
       key={composerKey}
       archived={isViewingArchived}
       lock={composerLock}
-      inputRef={chatInputRef}
+      inputRef={attachChatInput}
       onSend={handleSend}
       onStop={stopMessage}
       sending={chatLoading || hasInflightUploads}
@@ -2947,7 +3006,7 @@ function EmbeddableChatInner({
                       <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
                         <div className="flex min-w-0 flex-col">
                           <p className="truncate leading-tight text-ods-text-primary text-h3">
-                            {headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+                            {headerShowBack || isGuideEmpty ? headerTitle : draftHeaderTitle}
                           </p>
                           {headerPersonName && (
                             <p className="truncate leading-tight text-ods-text-secondary text-h6">{headerPersonName}</p>
@@ -3141,7 +3200,7 @@ function EmbeddableChatInner({
       look={threadHeaderLook === 'column' ? 'column' : 'default'}
       avatar={threadHeaderLook === 'column' && !archiveOpen && hasConversation ? headerAvatar : undefined}
       // Over the archive the header is the archive's (see the v2 header).
-      title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+      title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : draftHeaderTitle}
       meta={archiveOpen || !hasConversation ? undefined : [headerPersonName, chatDayLabel(activeDialog?.timestamp)]}
       menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? mingoHeaderMenuItems : []}
       extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}

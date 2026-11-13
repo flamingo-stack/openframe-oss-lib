@@ -30,7 +30,7 @@
  */
 
 import type React from 'react';
-import type { ReactNode } from 'react';
+import { type AnchorHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { type ChatRuntime, useChatRuntime, useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
@@ -86,6 +86,7 @@ import { ProductReleaseCard } from '../../shared/product-release/product-release
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../../ui/actions-menu';
 import { Button } from '../../ui/button';
 import { FloatingTooltip } from '../../ui/floating-tooltip';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { ExternalMediaNotice } from '../../ui/markdown/external-media-notice';
 import { tagVariantForBadgeColor } from '../../ui/tag';
 import { VendorIcon } from '../../vendor-icon';
@@ -1984,42 +1985,34 @@ export function recordMenuActions(
  * A record's link: the anchor every surface that opens a record draws (a citation, a row of the sources strip, a chip in
  * a sentence, a search result), over the destination `resolveRecordDestination` answered. The card's own click router
  * (`RecordNavWrap`) routes the primary click with the destination's `hostRoute`, so a route of the host's own stays on
- * the host in every mode, embed included; the anchor's `target`/`rel` carry the same new-tab decision.
+ * the host in every mode, embed included; the anchor's `target`/`rel` carry the same new-tab decision. The ref and any
+ * other anchor attributes reach the `<a>`, so a menu row can be the anchor itself (`DropdownMenuItem asChild`).
  */
-export function RecordAnchor({
-  destination,
-  className,
-  title,
-  ariaLabel,
-  ariaHidden,
-  tabIndex,
-  children,
-}: {
-  destination: RecordLinkTarget;
-  className?: string;
-  title?: string;
-  ariaLabel?: string;
-  ariaHidden?: boolean;
-  tabIndex?: number;
-  children: ReactNode;
-}) {
+export const RecordAnchor = forwardRef<
+  HTMLAnchorElement,
+  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'target' | 'rel'> & {
+    destination: RecordLinkTarget;
+    ariaLabel?: string;
+    ariaHidden?: boolean;
+    children: ReactNode;
+  }
+>(function RecordAnchorLink({ destination, ariaLabel, ariaHidden, children, ...anchorProps }, ref) {
   const { url, targetPlatform, path, hostRoute, isNewTab } = destination;
   return (
     <RecordNavWrap href={url} path={path} targetPlatform={targetPlatform} isNewTab={isNewTab} hostRoute={hostRoute}>
       <Link
+        ref={ref}
+        {...anchorProps}
         href={url}
-        className={className}
-        title={title}
-        aria-label={ariaLabel}
-        aria-hidden={ariaHidden || undefined}
-        tabIndex={tabIndex}
+        aria-label={ariaLabel ?? anchorProps['aria-label']}
+        aria-hidden={ariaHidden || anchorProps['aria-hidden'] || undefined}
         {...newTabAnchorAttrs(isNewTab, url, targetPlatform)}
       >
         {children}
       </Link>
     </RecordNavWrap>
   );
-}
+});
 
 /**
  * A record chip's "⋯": the button that opens the record's menu, set in the chip's `trailing` slot (`InlineChip`), so
@@ -2241,10 +2234,17 @@ export function useRecordDestination(chatRef: ChatRef) {
   // `contentRefType` is empty so the hook returns `isLoading=false` and
   // `item=undefined`, which we ignore.
   const fetchEntry = entry && entry.contentRefType ? entry : null;
-  const { item, isLoading, isError, isFetched, notFound } = useChatCardItem<ChatCardItem>(
-    fetchEntry?.contentRefType ?? '',
-    fetchEntry ? chatRef.id : '',
-  );
+  // In a loading scope (the host itself still being read) the card draws its loading form and reads nothing: the
+  // record it will show is not known yet, so its id may be empty.
+  const inLoadingScope = useLoadingScope();
+  const {
+    item,
+    isLoading: fetching,
+    isError,
+    isFetched,
+    notFound,
+  } = useChatCardItem<ChatCardItem>(fetchEntry?.contentRefType ?? '', fetchEntry && !inLoadingScope ? chatRef.id : '');
+  const isLoading = inLoadingScope || fetching;
 
   // THE destination, decided in one place (`resolveCardDestination`): the source chip's resolver with the url the
   // server answers, on the ref or on the fetched row. Computed BEFORE `isNewTab` so the click sees the page it visits.

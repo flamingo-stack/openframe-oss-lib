@@ -20,6 +20,7 @@ import {
 import { AppLayoutSidePanel, type AppLayoutSidePanelConfig, useAppLayoutSidePanel } from './app-layout-side-panel';
 import { AppLayoutWorkArea, type AppLayoutWorkAreaMode } from './app-layout-work-area';
 import { MobileBurgerMenu, type MobileBurgerMenuProps } from './mobile-burger-menu';
+import { MobileSidePanel } from './mobile-side-panel';
 import { NavigationSidebar } from './navigation-sidebar';
 
 export interface AppLayoutProps {
@@ -168,6 +169,8 @@ export interface AppLayoutProps {
   workAreaStorageKey?: string;
   /** How far the divider may squeeze a column below its min width (`AppLayoutWorkArea` `squeezeFloor`). */
   workAreaSqueezeFloor?: number;
+  /** The columns actually on screen, whenever they change (`AppLayoutWorkArea` `onShownModeChange`). */
+  onWorkAreaShownModeChange?: (shown: AppLayoutWorkAreaMode) => void;
   /**
    * A bar at the top of the page column, over `<main>` and outside its scroll (e.g. an
    * `AppColumnHeader` with the page's title and the work area's layout buttons). Keep it
@@ -195,6 +198,12 @@ export interface AppLayoutProps {
    * navigation in `endSidebarConfig`) hands the menu a config that has both.
    */
   mobileMenuConfig?: NavigationSidebarConfig;
+  /**
+   * A phone panel from the left, below the top bar, the burger menu's twin for other content (the three-column
+   * shell's chat list): `MobileSidePanel`, 320px, the whole width under 400px, closing on the scrim, Escape and a
+   * swipe left. The host owns `open` and closes it in `onClose`. Phone only; omitted, nothing is drawn.
+   */
+  mobileStartPanel?: { open: boolean; onClose: () => void; label: string; content: ReactNode };
 }
 
 /** The floating dock's height on `<main>`, for a page that runs on under it (`composerDockFloats`). */
@@ -223,10 +232,12 @@ export function AppLayout({
   workAreaMode = 'page',
   workAreaStorageKey,
   workAreaSqueezeFloor,
+  onWorkAreaShownModeChange,
   pageHeader,
   endSidebarConfig,
   animateSidebars = false,
   mobileMenuConfig,
+  mobileStartPanel,
 }: AppLayoutProps) {
   const menuControlled = mobileMenuOpenProp !== undefined;
   const [uncontrolledMenuOpen, setUncontrolledMenuOpen] = useState(false);
@@ -516,6 +527,15 @@ export function AppLayout({
               config={mobileMenuConfig ?? sidebarConfig}
               disabled={disabled}
             />
+            {mobileStartPanel && (
+              <MobileSidePanel
+                open={mobileStartPanel.open}
+                onClose={mobileStartPanel.onClose}
+                label={mobileStartPanel.label}
+              >
+                {mobileStartPanel.content}
+              </MobileSidePanel>
+            )}
 
             {/* Main Content Area */}
             <div className="flex flex-1 flex-col overflow-hidden">
@@ -547,6 +567,7 @@ export function AppLayout({
                     page={pageColumn}
                     storageKey={workAreaStorageKey}
                     squeezeFloor={workAreaSqueezeFloor}
+                    onShownModeChange={onWorkAreaShownModeChange}
                   />
                 ) : (
                   pageColumn

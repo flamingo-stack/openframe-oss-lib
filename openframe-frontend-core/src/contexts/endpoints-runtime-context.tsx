@@ -50,6 +50,12 @@ export interface EndpointsRuntime {
    *  block from it, for the page's topic (`usePageTopic`). OPTIONAL: a host whose layout draws every page's FAQ itself
    *  (the hub) leaves it unset, and `FaqSection` then asks the same-origin `/api/faqs`. */
   faqsUrl?: string;
+  /** GET base of the host's YouTube poster resolver (`<base>/<videoId>` answers the sharpest poster that video
+   *  really has, as a redirect). The player draws it instead of `youtubePosterUrl` (`hqdefault`, 480px), because
+   *  only a server can tell which sizes exist: YouTube answers a missing size with a 404 that still carries a
+   *  120x90 placeholder image, so a browser's `onError` never fires. OPTIONAL: without it the player draws
+   *  `hqdefault`, which every public video has. */
+  youtubePosterBaseUrl?: string;
 }
 
 export const EndpointsRuntimeContext = createContext<EndpointsRuntime | null>(null);

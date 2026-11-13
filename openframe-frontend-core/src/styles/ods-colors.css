@@ -128,6 +128,7 @@
   --ods-backgrounds-openframe-background-action: #272727;
   --ods-backgrounds-panel: #191919;
   --ods-backgrounds-overlay: #272727;
+  --ods-backgrounds-overlay-hover: #2e2e2e;
   --ods-borders-subtle: #2e2e2e;
   --ods-borders-default: #393939;
   --ods-borders-strong: #4a4a4a;
@@ -243,6 +244,7 @@
   --ods-backgrounds-openframe-background-action: #f0f0f0;
   --ods-backgrounds-panel: #ffffff;
   --ods-backgrounds-overlay: #f5f5f5;
+  --ods-backgrounds-overlay-hover: #f0f0f0;
   --ods-borders-subtle: #f0f0f0;
   --ods-borders-default: #e7e7e7;
   --ods-borders-strong: #d3d3d3;
@@ -311,6 +313,7 @@
   --social-stripe: #635bff;
   --social-reddit: #ff4500;
   --social-g2: #ff492c;
+  --social-alpaca: #fcd72b;
 }
 
 /* ===================================================================== */
@@ -375,6 +378,11 @@
    * secondary grey (icons, category labels) and the active entry's tint. */
   --color-bg-panel: var(--ods-backgrounds-panel);
   --color-border-panel: var(--ods-borders-subtle);
+  /* A menu that floats over the page (ODS v2 Dropdown-menu): its ground
+   * (backgrounds/overlay) and a hovered row's (backgrounds/overlay hover).
+   * `--color-bg-overlay` is the dimmed BACKDROP behind a dialog, not this. */
+  --color-bg-menu: var(--ods-backgrounds-overlay);
+  --color-bg-menu-hover: var(--ods-backgrounds-overlay-hover);
   --color-text-panel-secondary: var(--ods-shell-system-greys-grey);
   --color-accent-tint: var(--ods-shell-open-yellow-sec);
   --color-accent-tint-hover: var(--ods-shell-open-yellow-sec-hover);

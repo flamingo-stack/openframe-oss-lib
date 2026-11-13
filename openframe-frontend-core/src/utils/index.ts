@@ -119,6 +119,7 @@ export * from './shell-utils';
 // Video-bite element identity (id stamping + the ONE matching predicate) —
 // isomorphic; used by the admin bites editor AND the hub's Mux sweep/writers.
 export * from './video-bite-id';
+export * from './youtube-poster';
 // OS type utilities
 export * from './os-utils';
 export * from './visitor-os';

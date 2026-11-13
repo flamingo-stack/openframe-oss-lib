@@ -131,8 +131,19 @@ export interface AppLayoutWorkAreaProps {
    * edges that hides content (scrolled out of view) marks it: at first its far edge, the
    * page's right one, the chat's at the divider. Omit (default): no column gets narrower
    * than `minColumnWidth`.
+   *
+   * With it the split also holds in a row narrower than two `minColumnWidth`s (down to two
+   * floors): the chat column keeps `minColumnWidth` there and the page column is the one
+   * squeezed, until the user drags the divider in this mount. Without it such a row shows
+   * the page column alone.
    */
   squeezeFloor?: number;
+  /**
+   * Called with the columns actually on screen whenever they change: `mode`, or `page`
+   * when there is no chat or no room for a split. A host that draws chrome per column
+   * (a composer under the page alone, a header's Full screen) follows this, not `mode`.
+   */
+  onShownModeChange?: (shown: AppLayoutWorkAreaMode) => void;
   /**
    * `localStorage` key for the divider position, kept as the chat column's share
    * of the area (so a wider window widens both). Omit to keep it for the mount only.
@@ -182,7 +193,7 @@ function useContentWidth(element: HTMLElement | null): number | null {
  * click for the middle. Neither column gets narrower than `minColumnWidth` —
  * unless `squeezeFloor` lets the divider fold one further, its content kept at
  * `minColumnWidth` and scrolled sideways, a shadow on each side it hides; with no room
- * for two such columns the area shows the page column alone.
+ * for two such columns the area shows the page column alone (`onShownModeChange` says so).
  *
  * Both columns are content areas (`ods-content-area`): their tokens, their
  * `content-md:` / `content-lg:` classes and `useContentBreakpoint()` follow the
@@ -194,6 +205,7 @@ export function AppLayoutWorkArea({
   page,
   minColumnWidth = WORK_AREA_MIN_COLUMN_WIDTH,
   squeezeFloor,
+  onShownModeChange,
   storageKey,
   chatLabel = 'Chat',
   pageClassName,
@@ -229,20 +241,36 @@ export function AppLayoutWorkArea({
   );
   const storedShare = useMemo(() => (hydrated ? (storage?.load()?.share ?? null) : null), [hydrated, storage]);
   const [chosenShare, setChosenShare] = useState<number | null>(null);
+  // The divider was moved in this mount (and not reset since): its share holds in a narrow row too.
+  const [moved, setMoved] = useState(false);
   const share = chosenShare ?? storedShare ?? DEFAULT_CHAT_SHARE;
 
   const measured = rowWidth > 0;
-  const canSplit = !measured || rowWidth >= 2 * minColumnWidth;
+  const squeezes = squeezeFloor !== undefined && squeezeFloor > 0 && squeezeFloor < 1;
+  // The narrowest a column gets on screen: `minColumnWidth`, or its squeeze floor.
+  const floor = squeezes ? Math.round(minColumnWidth * squeezeFloor) : minColumnWidth;
+  // Room for two columns at their narrowest: two min widths, or two floors when they squeeze.
+  const canSplit = !measured || rowWidth >= 2 * floor;
   const hasChat = chat !== null;
   const shown: AppLayoutWorkAreaMode = !hasChat ? 'page' : mode === 'split' && !canSplit ? 'page' : mode;
-  // The narrowest a column gets on screen: `minColumnWidth`, or its squeeze floor.
-  const floor =
-    squeezeFloor !== undefined && squeezeFloor > 0 && squeezeFloor < 1
-      ? Math.round(minColumnWidth * squeezeFloor)
-      : minColumnWidth;
   const maxChatWidth = Math.max(floor, rowWidth - floor);
   const clampChatWidth = useCallback((next: number) => clamp(next, floor, maxChatWidth), [floor, maxChatWidth]);
-  const chatWidth = measured ? Math.round(clampChatWidth(share * rowWidth)) : null;
+  // A row too narrow for two min widths: the chat keeps its min width and the page is the one
+  // squeezed, whatever share an earlier, wider row left — until the divider is moved here.
+  const narrowRow = squeezes && measured && rowWidth < 2 * minColumnWidth;
+  const chatWidth = measured
+    ? Math.round(clampChatWidth(narrowRow && !moved ? Math.max(share * rowWidth, minColumnWidth) : share * rowWidth))
+    : null;
+
+  // The latest callback, for an effect that runs only when the columns change. Before paint:
+  // a host drawing chrome per column (the composer's place) moves it in the same frame.
+  const onShownModeChangeRef = useRef(onShownModeChange);
+  useIsomorphicLayoutEffect(() => {
+    onShownModeChangeRef.current = onShownModeChange;
+  });
+  useIsomorphicLayoutEffect(() => {
+    onShownModeChangeRef.current?.(shown);
+  }, [shown]);
 
   // The width the drag has reached, until it is released: what the chat column draws while it
   // is dragged. State, not a write to the DOM: the row can change under a drag (a sidebar
@@ -259,6 +287,7 @@ export function AppLayoutWorkArea({
       if (!measured) return;
       const nextShare = clampChatWidth(next) / rowWidth;
       setChosenShare(nextShare);
+      setMoved(true);
       storage?.save({ share: nextShare });
     },
     [measured, clampChatWidth, rowWidth, storage],
@@ -266,6 +295,7 @@ export function AppLayoutWorkArea({
   const resetWidth = useCallback(() => {
     setDragWidth(null);
     setChosenShare(DEFAULT_CHAT_SHARE);
+    setMoved(false);
     storage?.clear();
   }, [storage]);
 

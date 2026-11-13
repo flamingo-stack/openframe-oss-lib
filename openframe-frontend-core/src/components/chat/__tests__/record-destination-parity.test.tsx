@@ -6,7 +6,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChatSourcePart } from '../../../chat-protocol/chat-message';
@@ -92,9 +92,11 @@ describe('an embedded guest keeps a route the host claimed on the host', () => {
     const runtime = runtimeOf('embed');
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     inChat(runtime, <ChatMessageSources message={{ id: 'a', role: 'assistant', parts: [guide] }} />);
-    // The guide's table chip opens its rows; the row is the record's link.
-    fireEvent.click(screen.getByText(/Onboarding/));
-    const link = screen.getByRole('link', { name: /Mac guide/ });
+    // The guide's table chip opens its rows (Radix opens a menu on the pointer going down); the row is the record's
+    // link. `hidden`: jsdom lays nothing out, so Radix hides the rows from the accessibility tree.
+    fireEvent.pointerDown(screen.getByRole('button', { name: /Onboarding/ }), { button: 0, pointerType: 'mouse' });
+    const link = within(screen.getByRole('menu')).getByRole('menuitem', { name: /Mac guide/, hidden: true });
+    expect(link.tagName).toBe('A');
     expect(link.getAttribute('href')).toBe('/help-center/onboarding-guides/mac-guide');
     expect(link.getAttribute('target')).toBeNull();
     fireEvent.click(link);

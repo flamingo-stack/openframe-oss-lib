@@ -2,6 +2,7 @@ package com.openframe.external.dto.device;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
+import com.openframe.data.document.device.TelemetryStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -45,8 +46,11 @@ public class DeviceResponse {
     @Schema(description = "Agent version", example = "1.2.3")
     private String agentVersion;
 
-    @Schema(description = "Device status")
+    @Schema(description = "Device lifecycle status")
     private DeviceStatus status;
+
+    @Schema(description = "Whether the agent is talking to us right now (ONLINE or OFFLINE), independent of status. Null until the first heartbeat.")
+    private TelemetryStatus connectivity;
 
     @Schema(description = "Last seen timestamp")
     private Instant lastSeen;
