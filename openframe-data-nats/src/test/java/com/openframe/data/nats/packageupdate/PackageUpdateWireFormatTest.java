@@ -80,7 +80,8 @@ class PackageUpdateWireFormatTest {
 
         DeliveryRequest<PackageUpdateMessage> force = spec.request(PackageUpdateWire.deadlineForce("m1", request));
         DeliveryRequest<PackageUpdateMessage> wait = spec.request(PackageUpdateWire.seed("m1", "req-1",
-                PackageUpdateSource.AUTO, PackageManagerType.WINGET, "Google.Chrome", null, PackageUpdateMode.WAIT, 300));
+                PackageUpdateSource.AUTO, PackageManagerType.WINGET, "Google.Chrome", null, PackageUpdateMode.WAIT, 300,
+                604800L));
 
         assertThat(force.getTargetId()).isEqualTo("req-1:deadline");     // never takes over the WAIT's row
         assertThat(wait.getTargetId()).isEqualTo("req-1");
@@ -88,6 +89,8 @@ class PackageUpdateWireFormatTest {
         assertThat(force.getPayload().getRequestId()).isEqualTo("req-1"); // the agent finds the request by it
         assertThat(force.getPayload().getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(force.getPayload().getCountdownSeconds()).isEqualTo(300);
+        assertThat(force.getPayload().getDeadlineSeconds()).isNull();    // nothing left to postpone at the deadline
+        assertThat(wait.getPayload().getDeadlineSeconds()).isEqualTo(604800L); // the prompt's "postpone until"
     }
 
     @Test

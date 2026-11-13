@@ -29,7 +29,8 @@ public class PackageUpdateWire {
 
     public PackageUpdateDeliverySeed seed(String machineId, String requestId, PackageUpdateSource source,
                                           PackageManagerType manager, String packageName, BrewPackageType brewPackageType,
-                                          PackageUpdateMode mode, Integer forceCountdownSeconds) {
+                                          PackageUpdateMode mode, Integer forceCountdownSeconds,
+                                          Long deadlineSeconds) {
         return PackageUpdateDeliverySeed.builder()
                 .machineId(machineId)
                 .requestId(requestId)
@@ -37,13 +38,14 @@ public class PackageUpdateWire {
                 .packageRef(reference(manager, packageName, brewPackageType))
                 .mode(mode)
                 .countdownSeconds(mode == PackageUpdateMode.FORCE ? forceCountdownSeconds : null)
+                .deadlineSeconds(mode == PackageUpdateMode.WAIT ? deadlineSeconds : null)
                 .build();
     }
 
     public PackageUpdateDeliverySeed deadlineForce(String machineId, PackageUpdateRequest request) {
         return seed(machineId, request.getRequestId(), request.getSource(), request.getPackageManager(),
                 request.getPackageName(), request.getBrewPackageType(), PackageUpdateMode.FORCE,
-                request.getForceCountdownSeconds())
+                request.getForceCountdownSeconds(), null)
                 .toBuilder()
                 .deadlineForce(true)
                 .build();

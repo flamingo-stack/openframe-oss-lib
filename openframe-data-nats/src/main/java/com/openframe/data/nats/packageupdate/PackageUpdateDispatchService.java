@@ -116,7 +116,7 @@ public class PackageUpdateDispatchService {
 
         targets.forEach(machineId -> deliveryRouter.dispatch(PackageUpdateWire.seed(
                 machineId, requestId, source, execution.getPackageManager(), execution.getPackageName(),
-                brewPackageType, mode, forceCountdownSeconds)));
+                brewPackageType, mode, forceCountdownSeconds, deadlineSeconds)));
 
         log.info("Package-update dispatched requestId={} executionId={} source={} mode={} machines={} package={}/{}",
                 requestId, execution.getExecutionId(), source, mode, targets.size(), execution.getPackageManager(),
