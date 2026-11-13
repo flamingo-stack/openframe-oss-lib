@@ -341,11 +341,14 @@ export function AppLayoutWorkArea({
         ? rowWidth - shownChatWidth
         : null;
   // The width each column last had on screen. A hidden column stays laid out at it (see
-  // `AppLayoutWorkAreaMode`); one never shown has none and is `display: none`.
+  // `AppLayoutWorkAreaMode`); one never shown has none and is `display: none`. Not while the
+  // divider is dragged: this setState re-runs the render, which would double every drag frame,
+  // and the width the drag ends at lands with its release.
   const [lastWidths, setLastWidths] = useState<KeptWidths>(NO_KEPT_WIDTHS);
   if (
-    (chatOnScreen !== null && chatOnScreen !== lastWidths.chat) ||
-    (pageOnScreen !== null && pageOnScreen !== lastWidths.page)
+    dragWidth === null &&
+    ((chatOnScreen !== null && chatOnScreen !== lastWidths.chat) ||
+      (pageOnScreen !== null && pageOnScreen !== lastWidths.page))
   ) {
     setLastWidths({ chat: chatOnScreen ?? lastWidths.chat, page: pageOnScreen ?? lastWidths.page });
   }

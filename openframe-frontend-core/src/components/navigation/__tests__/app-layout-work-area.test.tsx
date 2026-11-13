@@ -201,6 +201,22 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     expect(shadowSides()).toEqual(['page-end']);
   });
 
+  it('keeps the width a drag ends at for a column hidden after it', () => {
+    rowWidth(1000);
+    const { rerender } = render(squeezable());
+    const grip = divider();
+    grip.setPointerCapture = vi.fn();
+    grip.releasePointerCapture = vi.fn();
+    fireEvent.pointerDown(divider(), { clientX: 500, pointerId: 1, button: 0 });
+    fireEvent.pointerMove(divider(), { clientX: 560, pointerId: 1 });
+    fireEvent.pointerMove(divider(), { clientX: 600, pointerId: 1 });
+    fireEvent.pointerUp(divider(), { clientX: 600, pointerId: 1 });
+    expect(chatColumn()).toHaveStyle({ width: '600px' });
+    // The kept width is recorded once the drag lands, not on its frames.
+    rerender(squeezable('page'));
+    expect(chatColumn()).toHaveStyle({ width: '600px' });
+  });
+
   it('shades the side a squeezed column hides as it is scrolled: its end, both, then its start', () => {
     rowWidth(1000);
     render(squeezable());
