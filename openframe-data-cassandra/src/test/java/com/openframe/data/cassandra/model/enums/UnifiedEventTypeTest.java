@@ -36,4 +36,23 @@ class UnifiedEventTypeTest {
         assertThat(severity).isEqualTo(Severity.INFO);
         assertThat(summary).isEqualTo(expectedSummary);
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "IDENTITY_PROFILE_CREATED, Profile created",
+            "IDENTITY_ACCOUNT_LINKED, Account linked",
+            "IDENTITY_ACCOUNT_UNLINKED, Account unlinked"
+    })
+    void identityEventTypes_allInfoSeverityWithTheirSummaries(String name, String expectedSummary) {
+        // setup
+        UnifiedEventType type = UnifiedEventType.valueOf(name);
+
+        // execution
+        Severity severity = type.getSeverity();
+        String summary = type.getSummary();
+
+        // verifications
+        assertThat(severity).isEqualTo(Severity.INFO);
+        assertThat(summary).isEqualTo(expectedSummary);
+    }
 }

@@ -63,6 +63,8 @@ export interface MingoGraphqlDialogsOptions {
   chatType?: MingoChatType;
   /** Each row's pending approval rides along, for a list that draws row status. */
   pendingApproval?: boolean;
+  /** Each row's unread replies (`unreadMessageCount`) ride along, for a list that marks a chat with a new reply. */
+  unread?: boolean;
   /** A face's absolute address, from the stored image (the host's image service). */
   imageUrlOf?: (image: MingoImage) => string | null;
 }
@@ -129,7 +131,7 @@ function tokenUsageOf(node: MingoDialogNode, chatType: MingoChatType | undefined
  */
 export function createMingoGraphqlDialogs(
   post: MingoGraphqlPost,
-  { agentTypes, statuses, chatType, pendingApproval = false, imageUrlOf }: MingoGraphqlDialogsOptions,
+  { agentTypes, statuses, chatType, pendingApproval = false, unread = false, imageUrlOf }: MingoGraphqlDialogsOptions,
 ): Required<
   Pick<
     ChatHistoryBackend,
@@ -162,7 +164,7 @@ export function createMingoGraphqlDialogs(
     throwOnUserErrors(data[field]);
   };
   return {
-    fetchDialogs: page(mingoDialogsQuery({ pendingApproval }), statuses),
+    fetchDialogs: page(mingoDialogsQuery({ pendingApproval, unread }), statuses),
     fetchArchivedDialogs: page(mingoDialogsQuery({ pendingApproval: false }), ['ARCHIVED']),
     fetchDialog: async (dialogId: string): Promise<ChatDialogRecord | null> => {
       const data = await post<{ dialog: MingoDialogNode | null }>(MINGO_DIALOG_QUERY, { id: dialogId });
