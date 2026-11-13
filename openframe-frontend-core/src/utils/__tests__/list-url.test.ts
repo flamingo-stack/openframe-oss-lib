@@ -57,6 +57,7 @@ const BASELINE: Record<string, string> = {
   design_doc: '/api/design-docs?ids=a,b',
   openframe_tenant: '/api/openframe-tenants?ids=a,b',
   recorded_call: '/api/recorded-calls?ids=a,b',
+  ai_digest_story: '/api/ai-digest/cards?ids=a,b',
   site_page: '/api/site-pages?ids=a,b',
   openframe_price: '/api/openframe-pricing?ids=a,b',
   vendor: '/api/vendors/cards?ids=a,b',

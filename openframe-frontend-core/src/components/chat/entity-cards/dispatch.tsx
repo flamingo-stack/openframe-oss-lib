@@ -1459,6 +1459,8 @@ interface GlyphCardConfig {
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   openframe_tenant: { label: 'OpenFrame tenant' },
   recorded_call: { label: 'Call', media: true },
+  // One story of the AI daily digest: a glyph card (a story has no cover), opening the digest screen.
+  ai_digest_story: { label: 'AI digest story' },
   // Code intelligence (product-hub internal): the review rules a repository is
   // held to, the repositories themselves, and one row per deployment
   // environment. Glyph cards like their siblings — none of the three has a
@@ -2069,10 +2071,12 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
   // In a loading scope (the host itself still being read) the card draws its loading form and reads nothing: the
   // record it will show is not known yet, so its id may be empty.
   const inLoadingScope = useLoadingScope();
-  const { item, isLoading: fetching, isError, isFetched } = useChatCardItem<ChatCardItem>(
-    fetchEntry?.contentRefType ?? '',
-    fetchEntry && !inLoadingScope ? chatRef.id : '',
-  );
+  const {
+    item,
+    isLoading: fetching,
+    isError,
+    isFetched,
+  } = useChatCardItem<ChatCardItem>(fetchEntry?.contentRefType ?? '', fetchEntry && !inLoadingScope ? chatRef.id : '');
   const isLoading = inLoadingScope || fetching;
   if (!entry) return null;
 

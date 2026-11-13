@@ -96,6 +96,7 @@ export const SOURCE_ICON_NAMES: Record<string, string> = {
   'what-i-shipped': 'rocket-02',
   'how-i-work': 'clipboard-list',
   'ai-prompts': 'chat-quote',
+  'ai-digest-stories': 'newspaper',
 
   // Product-hub internal
   'design-docs': 'file-text',
@@ -195,6 +196,7 @@ export const SOURCE_LABELS_BY_TABLE: Record<string, string> = {
   'what-i-shipped': 'What I Shipped',
   'how-i-work': 'How I Work',
   'ai-prompts': 'Squawkbox',
+  'ai-digest-stories': 'AI Digest',
 
   // Product-hub internal
   'design-docs': 'Design Docs',
@@ -296,6 +298,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
   what_i_shipped: 'what-i-shipped',
   how_i_work: 'how-i-work',
   ai_prompt: 'ai-prompts',
+  ai_digest_story: 'ai-digest-stories',
 
   // Product-hub internal
   design_doc: 'design-docs',
