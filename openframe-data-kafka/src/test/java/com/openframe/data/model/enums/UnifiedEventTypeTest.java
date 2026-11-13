@@ -1,4 +1,4 @@
-package com.openframe.data.cassandra.model.enums;
+package com.openframe.data.model.enums;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

@@ -154,7 +154,7 @@ class ScriptResultDeserializerTest {
     }
 
     @Test
-    @DisplayName("getEventToolId: appends scriptId so two scripts of one schedule run (shared executionId+machineId) get DISTINCT ids — the fix for the Cassandra/Pinot tool_event_id collision")
+    @DisplayName("getEventToolId: appends scriptId so two scripts of one schedule run (shared executionId+machineId) get DISTINCT ids — the fix for the Loki/Pinot tool_event_id collision")
     void getEventToolId_appendsScriptId_distinguishesScriptsOfOneScheduleRun() {
         ObjectNode scriptA = mapper.createObjectNode()
                 .put("executionId", EXECUTION_ID).put("machineId", "m-1").put("scriptId", "script-A");

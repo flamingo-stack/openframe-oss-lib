@@ -32,7 +32,6 @@ jobs:
                 "openframe-config-core/**",
                 "openframe-core/**",
                 "openframe-core-crypto/**",
-                "openframe-data-cassandra/**",
                 "openframe-data-device-aspect/**",
                 "openframe-data-kafka/**",
                 "openframe-data-loki/**",

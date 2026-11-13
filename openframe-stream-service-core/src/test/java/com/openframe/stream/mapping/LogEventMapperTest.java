@@ -1,7 +1,6 @@
 package com.openframe.stream.mapping;
 
-import com.openframe.data.cassandra.model.CassandraLogEvent;
-import com.openframe.data.cassandra.model.enums.UnifiedEventType;
+import com.openframe.data.model.enums.UnifiedEventType;
 import com.openframe.data.loki.toolevent.LokiLogEvent;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.IntegratedToolEvent;
@@ -13,41 +12,12 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mapstruct.factory.Mappers;
 
-import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class LogEventMapperTest {
 
     private final LogEventMapper mapper = Mappers.getMapper(LogEventMapper.class);
-
-    @Test
-    void toCassandraLogEvent_eventWithEnrichment_mapsEveryField() {
-        CassandraLogEvent row = mapper.toCassandraLogEvent(event("Login from 10.0.0.1"), enriched());
-
-        CassandraLogEvent.CassandraLogEventKey key = new CassandraLogEvent.CassandraLogEventKey();
-        key.setIngestDay("2026-10-01");
-        key.setToolType("FLEET");
-        key.setTenantId("tenant-event");
-        key.setEventType("LOGIN_FAILED");
-        key.setEventTimestamp(Instant.parse("2026-10-01T10:00:00.123Z"));
-        key.setToolEventId("evt-1");
-        CassandraLogEvent expected = new CassandraLogEvent();
-        expected.setKey(key);
-        expected.setUserId("user-enriched");
-        expected.setDeviceId("machine-enriched");
-        expected.setHostname("host-7");
-        expected.setNickname("Reception iMac");
-        expected.setExecutionSource("MANUAL");
-        expected.setScriptCreationSource("AI_ASSISTANT");
-        expected.setOrganizationId("org-enriched");
-        expected.setOrganizationName("Acme");
-        expected.setSeverity("WARNING");
-        expected.setMessage("Login from 10.0.0.1");
-        expected.setDebeziumMessage("{\"op\":\"c\"}");
-        expected.setDetails("{\"ip\":\"10.0.0.1\"}");
-        assertThat(row).isEqualTo(expected);
-    }
 
     @Test
     void toLokiLogEvent_eventWithEnrichment_mapsEveryField() {
@@ -96,15 +66,6 @@ class LogEventMapperTest {
         expected.setSummary("Login from 10.0.0.1");
         expected.setEventTimestamp(1_790_848_800_123L);
         assertThat(listEvent).isEqualTo(expected);
-    }
-
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = "  ")
-    void toCassandraLogEvent_noMessage_usesTheEventTypeSummary(String message) {
-        CassandraLogEvent row = mapper.toCassandraLogEvent(event(message), enriched());
-
-        assertThat(row.getMessage()).isEqualTo("Failed login attempt");
     }
 
     @ParameterizedTest

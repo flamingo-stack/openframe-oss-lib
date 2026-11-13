@@ -47,7 +47,7 @@ public class RmmEnrichmentService implements DataEnrichmentService<DeserializedD
     private static final String FIELD_EXECUTION_ID = "executionId";
     private static final String FIELD_SCRIPT_ID = "scriptId";
 
-    private static final Set<Destination> TEST_RUN_HIDDEN_DESTINATIONS = Set.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+    private static final Set<Destination> TEST_RUN_HIDDEN_DESTINATIONS = Set.of(Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
 
     private final MachineIdCacheService machineIdCacheService;
     private final ClusterTenantIdResolver clusterTenantIdResolver;

@@ -15,7 +15,7 @@ class MessageTypeTest {
     void getDestinationList_eventLoggedTypes_saveDetailsBeforePublishingToTheList(MessageType type) {
         List<String> destinations = type.getDestinationList().stream().map(Destination::name).toList();
         if (destinations.contains("KAFKA_PINOT")) {
-            assertThat(destinations).startsWith("CASSANDRA_EVENT_LOG", "LOKI_EVENT_LOG", "KAFKA_PINOT");
+            assertThat(destinations).startsWith("LOKI_EVENT_LOG", "KAFKA_PINOT");
         }
     }
 
@@ -31,7 +31,7 @@ class MessageTypeTest {
         assertThat(toolType).isEqualTo(IntegratedToolType.MESHCENTRAL);
         assertThat(type.getDataEnrichmentServiceType()).isEqualTo(DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS);
         assertThat(type.getDestinationList())
-                .containsExactly(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+                .containsExactly(Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
         assertThat(type.getEventHandlerType()).isEqualTo(EventHandlerType.COMMON_TYPE);
     }
 
@@ -69,8 +69,8 @@ class MessageTypeTest {
         List<Destination> destinations = type.getDestinationList();
 
         // verifications
-        assertThat(destinations).containsExactly(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG,
-                Destination.KAFKA_PINOT, Destination.TENANT_REMOTE_SESSION_EVENT);
+        assertThat(destinations).containsExactly(Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT,
+                Destination.TENANT_REMOTE_SESSION_EVENT);
         assertThat(type.getEventHandlerType()).isEqualTo(EventHandlerType.COMMON_TYPE);
     }
 }

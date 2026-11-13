@@ -2,14 +2,11 @@ package com.openframe.stream.handler;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import com.openframe.data.cassandra.model.CassandraLogEvent;
-import com.openframe.data.cassandra.model.enums.UnifiedEventType;
-import com.openframe.data.cassandra.repository.CassandraLogEventRepository;
+import com.openframe.data.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.IntegratedToolEvent;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
-import com.openframe.stream.config.ToolEventProperties;
 import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
@@ -34,47 +31,9 @@ class LogEventExecutionSourcePropagationTest {
     private static final String MACHINE_ID = "6d925893-702a-4223-b62f-2f80b927cbaa";
     private static final String ADMIN_ID = "admin-7";
 
-    @Mock private CassandraLogEventRepository repository;
     @Mock private OssTenantRetryingKafkaProducer producer;
 
-    @Captor private ArgumentCaptor<CassandraLogEvent> logEventCaptor;
     @Captor private ArgumentCaptor<IntegratedToolEvent> toolEventCaptor;
-
-    @Test
-    @DisplayName("Cassandra sink: executionSource, scriptCreationSource and the initiator reach unified_logs")
-    void cassandraHandler_writesRunOriginFields() {
-        // setup
-        CassandraLogEventHandler handler = new CassandraLogEventHandler(
-                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
-                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
-
-        // execution
-        handler.handle(message(), enriched("AI_ASSISTANT", "MANUAL"));
-
-        // verifications
-        verify(repository).save(logEventCaptor.capture());
-        assertThat(logEventCaptor.getValue())
-                .extracting(CassandraLogEvent::getExecutionSource, CassandraLogEvent::getScriptCreationSource, CassandraLogEvent::getUserId)
-                .containsExactly("AI_ASSISTANT", "MANUAL", ADMIN_ID);
-    }
-
-    @Test
-    @DisplayName("Cassandra sink: a non-script event leaves both origin fields null")
-    void cassandraHandler_noOrigin_writesNulls() {
-        // setup
-        CassandraLogEventHandler handler = new CassandraLogEventHandler(
-                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
-                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
-
-        // execution
-        handler.handle(message(), enriched(null, null));
-
-        // verifications
-        verify(repository).save(logEventCaptor.capture());
-        assertThat(logEventCaptor.getValue())
-                .extracting(CassandraLogEvent::getExecutionSource, CassandraLogEvent::getScriptCreationSource)
-                .containsExactly(null, null);
-    }
 
     @Test
     @DisplayName("Kafka/Pinot sink: executionSource and scriptCreationSource reach the published message")

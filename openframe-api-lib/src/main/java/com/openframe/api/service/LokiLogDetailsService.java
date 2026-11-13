@@ -6,7 +6,7 @@ import com.openframe.data.loki.toolevent.LokiLogEventRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -15,7 +15,7 @@ import java.util.Optional;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-@ConditionalOnExpression("'${openframe.tool-events.store:}' matches '(?i)loki|both'")
+@ConditionalOnProperty(name = "openframe.tool-events.store", havingValue = "loki")
 public class LokiLogDetailsService implements LogDetailsService {
 
     private final LokiLogEventRepository lokiLogEventRepository;

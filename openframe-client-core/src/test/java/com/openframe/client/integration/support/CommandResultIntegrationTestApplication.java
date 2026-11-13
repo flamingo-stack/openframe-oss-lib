@@ -21,7 +21,7 @@ import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
  * Minimal Spring context for the {@link CommandResultListener} integration test.
  *
  * <p>Deliberately avoids {@code @EnableAutoConfiguration} so that the Mongo /
- * Cassandra / Redis machinery pulled in transitively by {@code client-core}
+ * Redis machinery pulled in transitively by {@code client-core}
  * does not try to connect. Only the beans on the command-result NATS→Kafka path
  * are wired; the Kafka producer boundary is a Mockito mock so the test needs a
  * NATS broker but not a Kafka broker.
