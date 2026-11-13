@@ -156,6 +156,31 @@ class PackageUpdateWireFormatTest {
     }
 
     @Test
+    void approvedForce_theDeadlineForceRow_withNoCountdown() {
+        PackageUpdateRequest request = PackageUpdateRequest.builder()
+                .requestId("req-1").source(PackageUpdateSource.AUTO)
+                .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome")
+                .forceCountdownSeconds(300).build();
+
+        DeliveryRequest<PackageUpdateMessage> force = new PackageUpdateDeliverySpec()
+                .request(PackageUpdateWire.approvedForce("m1", request));
+
+        assertThat(force.getTargetId()).isEqualTo("req-1:deadline");     // replaces the force held for the deadline
+        assertThat(force.getPayload().getRequestId()).isEqualTo("req-1");
+        assertThat(force.getPayload().getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(force.getPayload().getCountdownSeconds()).isZero();
+    }
+
+    @Test
+    void status_waiting_approvedByTheUser_parses() {
+        PackageUpdateStatusMessage msg = mapper.readValue("""
+                {"state":"WAITING","waiting":{"reason":"APP_RUNNING","phase":"APPROVED"}}""",
+                PackageUpdateStatusMessage.class);
+
+        assertThat(msg.getWaiting().getPhase()).isEqualTo(PackageUpdateStatusMessage.Waiting.Phase.APPROVED);
+    }
+
+    @Test
     void status_waiting_postponedByTheUser_parses() {
         PackageUpdateStatusMessage msg = mapper.readValue("""
                 {"state":"WAITING","waiting":{"reason":"APP_RUNNING","phase":"POSTPONED"}}""",

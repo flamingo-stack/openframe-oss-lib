@@ -111,7 +111,7 @@ type SoftwareActionDevice {
     status: SoftwareActionStatus!
     "Why the update waits on this device: APP_RUNNING, MANAGER_BUSY or NO_USER_SESSION. Null unless WAITING."
     waitingReason: String
-    "Where the device user is: PROMPT (asked), COUNTDOWN (the app closes at closesAt) or POSTPONED (pressed Ask Later). Null unless WAITING."
+    "Where the device user is: PROMPT (asked), COUNTDOWN (the app closes at closesAt), POSTPONED (pressed Ask Later) or APPROVED (pressed Update Now, the forced update is on its way). Null unless WAITING."
     waitingPhase: String
     "When the countdown closes the app. Set only in COUNTDOWN."
     closesAt: Instant

@@ -70,7 +70,8 @@ public class PackageUpdateStatusMessage {
         public enum Phase {
             PROMPT,
             COUNTDOWN,
-            POSTPONED
+            POSTPONED,
+            APPROVED
         }
     }
 

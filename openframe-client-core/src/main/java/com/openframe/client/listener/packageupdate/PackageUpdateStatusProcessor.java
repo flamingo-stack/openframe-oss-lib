@@ -137,10 +137,15 @@ public class PackageUpdateStatusProcessor {
             return;
         }
         String requestId = state.getRequestId();
-        if (deadlineBefore == null) {
-            deliveryDispatcher.schedule(PackageUpdateWire.deadlineForce(machineId, request), deadlineAt);
-            log.info("[package-update] deadline force scheduled requestId={} machineId={} deadlineAt={}",
-                    requestId, machineId, deadlineAt);
+        if (!deadlineAt.equals(deadlineBefore)) {
+            boolean approved = Waiting.Phase.APPROVED.name().equals(state.getWaitingPhase());
+            PackageUpdateDeliverySeed force = approved
+                    ? PackageUpdateWire.approvedForce(machineId, request)
+                    : PackageUpdateWire.deadlineForce(machineId, request);
+            // the same row as the force held for the deadline: this dispatch replaces it
+            deliveryDispatcher.schedule(force, deadlineAt);
+            log.info("[package-update] force scheduled requestId={} machineId={} deadlineAt={} approvedByTheUser={}",
+                    requestId, machineId, deadlineAt, approved);
             return;
         }
         if (!isTerminal(state)) {

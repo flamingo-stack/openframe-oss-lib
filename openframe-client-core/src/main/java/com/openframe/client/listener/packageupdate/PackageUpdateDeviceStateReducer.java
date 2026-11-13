@@ -26,6 +26,7 @@ public class PackageUpdateDeviceStateReducer {
     public void apply(PackageUpdateDeviceState state, PackageUpdateRequest request, PackageUpdateStatusMessage event) {
         applyEvent(state, event);
         armDeadline(state, request, event);
+        bringDeadlineToNow(state, request, event);
     }
 
     // the order never reached the device; the event clock stays untouched, so a late status from the agent still applies
@@ -113,6 +114,18 @@ public class PackageUpdateDeviceStateReducer {
         if (event.getState() == State.WAITING && event.getWaiting() != null
                 && event.getWaiting().getReason() == Waiting.Reason.APP_RUNNING) {
             state.setDeadlineAt(event.getAt().plusSeconds(request.getDeadlineSeconds()));
+        }
+    }
+
+    // the device user chose Update Now: the forced update is due at once, whatever deadline was armed.
+    // The server's clock, not the device's: a device clock running ahead would hold the order back
+    private void bringDeadlineToNow(PackageUpdateDeviceState state, PackageUpdateRequest request, PackageUpdateStatusMessage event) {
+        if (request == null || request.getMode() != PackageUpdateMode.WAIT || event.getState() != State.WAITING) {
+            return;
+        }
+        Waiting waiting = event.getWaiting();
+        if (waiting != null && waiting.getPhase() == Waiting.Phase.APPROVED) {
+            state.setDeadlineAt(Instant.now());
         }
     }
 

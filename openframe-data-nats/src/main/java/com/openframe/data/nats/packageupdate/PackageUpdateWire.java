@@ -50,4 +50,12 @@ public class PackageUpdateWire {
                 .deadlineForce(true)
                 .build();
     }
+
+    // the device user chose Update Now: the same forced order as at the deadline, with no countdown left to wait
+    public PackageUpdateDeliverySeed approvedForce(String machineId, PackageUpdateRequest request) {
+        return deadlineForce(machineId, request)
+                .toBuilder()
+                .countdownSeconds(0)
+                .build();
+    }
 }

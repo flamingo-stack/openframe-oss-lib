@@ -372,6 +372,66 @@ class PackageUpdateStatusProcessorTest {
         verifyNoInteractions(deliveryDispatcher);
     }
 
+    @Test
+    void updateNowByTheUser_deadlineArmedEarlier_theForceGoesOutAtOnceOnTheDeadlineRow_noCountdown() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(Instant.now().plusSeconds(3600));
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L);
+        req.setForceCountdownSeconds(300);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+
+        processor.process("m1", waiting("e2", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.APPROVED));
+
+        assertThat(st.getDeadlineAt()).isBeforeOrEqualTo(Instant.now());
+        assertThat(st.getWaitingPhase()).isEqualTo("APPROVED");
+        InOrder order = inOrder(deliveryDispatcher, deviceStateRepository);
+        order.verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(st.getDeadlineAt()));
+        order.verify(deviceStateRepository).save(st);
+        PackageUpdateDeliverySeed seed = seedCaptor.getValue();
+        assertThat(seed.getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(seed.getCountdownSeconds()).isZero();
+        assertThat(seed.getRequestId()).isEqualTo("req-1");
+        assertThat(seed.getTargetId()).isEqualTo("req-1:deadline");      // replaces the force held for the deadline
+        verifyNoInteractions(deliveryTracker);
+    }
+
+    @Test
+    void updateNowByTheUser_requestWithoutADeadline_theForceGoesOutAtOnce() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+
+        processor.process("m1", waiting("e2", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.APPROVED));
+
+        verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(st.getDeadlineAt()));
+        assertThat(st.getDeadlineAt()).isBeforeOrEqualTo(Instant.now());
+        assertThat(seedCaptor.getValue().getMode()).isEqualTo(PackageUpdateMode.FORCE);
+    }
+
+    @Test
+    void updateNowByTheUser_requestAlreadyForced_nothingIsSent() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.FORCE, null)));
+
+        processor.process("m1", waiting("e2", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.APPROVED));
+
+        assertThat(st.getDeadlineAt()).isNull();
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+    }
+
     // the force's row takes the agent's result; the WAIT row would wait for one until its timeout
     @Test
     void finishedPastTheDeadline_theForceDidIt_theWaitRowIsWithdrawn() {
