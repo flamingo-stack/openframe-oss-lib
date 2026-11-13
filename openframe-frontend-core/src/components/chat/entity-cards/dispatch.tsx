@@ -32,6 +32,7 @@
 import type React from 'react';
 import type { ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { useLoadingScope } from '../../ui/loading-scope';
 import Image from '../../../embed-shims/next-image';
 import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
@@ -2065,10 +2066,14 @@ export function ChatCardLoader({ chatRef, onDiscuss, onDisplay, extras }: ChatCa
   // `contentRefType` is empty so the hook returns `isLoading=false` and
   // `item=undefined`, which we ignore.
   const fetchEntry = entry && entry.contentRefType ? entry : null;
-  const { item, isLoading, isError, isFetched } = useChatCardItem<ChatCardItem>(
+  // In a loading scope (the host itself still being read) the card draws its loading form and reads nothing: the
+  // record it will show is not known yet, so its id may be empty.
+  const inLoadingScope = useLoadingScope();
+  const { item, isLoading: fetching, isError, isFetched } = useChatCardItem<ChatCardItem>(
     fetchEntry?.contentRefType ?? '',
-    fetchEntry ? chatRef.id : '',
+    fetchEntry && !inLoadingScope ? chatRef.id : '',
   );
+  const isLoading = inLoadingScope || fetching;
   if (!entry) return null;
 
   // THE card's destination, decided in one place (`resolveCardDestination`):
