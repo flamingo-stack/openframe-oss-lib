@@ -21,6 +21,11 @@ import { useLoadingScope } from './loading-scope';
 export interface FilterPillRowOption {
   value: string;
   label: string;
+  /**
+   * How many records the option holds, drawn as "Label (n)". `null` while it is read: the pill keeps the count's
+   * place (a bar), so the pills do not widen and rewrap when the counts land. Leave it out for a pill with no count.
+   */
+  count?: number | null;
 }
 
 export interface FilterPillRowProps {
@@ -58,7 +63,20 @@ function FilterPillRowFrame({ label, children, inert }: { label: string; childre
   );
 }
 
-function FilterPill({ label, selected, onClick }: { label: string; selected: boolean; onClick?: () => void }) {
+/** A count's place in a pill while it is read: about three digits and the brackets. */
+const FILTER_PILL_COUNT_SKELETON_CLASS = 'ml-1 inline-block w-8 align-middle';
+
+function FilterPill({
+  label,
+  count,
+  selected,
+  onClick,
+}: {
+  label: string;
+  count?: number | null;
+  selected: boolean;
+  onClick?: () => void;
+}) {
   return (
     <Button
       type="button"
@@ -69,6 +87,13 @@ function FilterPill({ label, selected, onClick }: { label: string; selected: boo
       className="text-h3"
     >
       {label}
+      {count === null ? (
+        <span className={FILTER_PILL_COUNT_SKELETON_CLASS}>
+          <TextLineSkeleton type="inherit" />
+        </span>
+      ) : count !== undefined ? (
+        ` (${count})`
+      ) : null}
     </Button>
   );
 }
@@ -88,7 +113,7 @@ export function FilterPillRow({
     return (
       <FilterPillRowSkeleton
         label={label}
-        options={options.length > 0 ? options.map(opt => opt.label) : undefined}
+        options={options.length > 0 ? options : undefined}
         count={countLabel !== undefined}
       />
     );
@@ -100,6 +125,7 @@ export function FilterPillRow({
           <FilterPill
             key={opt.value}
             label={opt.label}
+            count={opt.count}
             selected={selectedValue === opt.value}
             onClick={() => onValueChange(opt.value)}
           />
@@ -125,15 +151,17 @@ function FilterPillRowSkeleton({
   count = false,
 }: {
   label: string;
-  /** Option labels the page states itself: real pills in place of the boxes. */
-  options?: string[];
+  /** Options the page states itself: real pills in place of the boxes (a count, read data, is its bar). */
+  options?: FilterPillRowOption[];
   pills?: number;
   count?: boolean;
 }) {
   return (
     <FilterPillRowFrame label={label} inert>
       {options
-        ? options.map(option => <FilterPill key={option} label={option} selected={false} />)
+        ? options.map(option => (
+            <FilterPill key={option.value} label={option.label} count={option.count === undefined ? undefined : null} selected={false} />
+          ))
         : Array.from({ length: pills }, (_, i) => <InteractiveSkeleton.Button key={i} size={FILTER_PILL_SIZE} />)}
       {count && (
         <div className={FILTER_COUNT_CLASS}>
