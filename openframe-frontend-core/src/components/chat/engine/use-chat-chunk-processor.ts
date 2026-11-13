@@ -44,15 +44,26 @@ export interface ChatDirectMessageRules {
   ownDirectOwnerType?: string;
   /**
    * The signed-in viewer, when people of the same owner type write into one chat (two technicians are both ADMIN): a
-   * direct message that names another author is theirs, and draws its row. One that names no author is the viewer's.
-   * A thunk, read on every chunk.
+   * direct message that names another author is theirs, and draws its row. A thunk, read on every chunk.
+   *
+   * One that names no author (the backend's direct messages carry no `userId`) is the viewer's only when it answers one
+   * of their own sends, matched by text once, as a `MESSAGE_REQUEST` echo is; otherwise it is another person's.
    */
   ownUserId?: () => string | undefined;
   /** What a direct message naming nobody is shown as. */
   otherDisplayName?: string;
 }
 
-function isOwnDirectEcho(chunk: UiChunk, rules: ChatDirectMessageRules): boolean {
+/**
+ * Whether a chunk is the viewer's own direct message coming back. `answersOwnSend` decides one that names no author: it
+ * consumes the matching armed send, so call this once per chunk. Without it such a message is not the viewer's (a
+ * duplicate of their own bubble is the lesser loss than another person's message going missing).
+ */
+function isOwnDirectEcho(
+  chunk: UiChunk,
+  rules: ChatDirectMessageRules,
+  answersOwnSend?: (text: string) => boolean,
+): boolean {
   if (
     rules.ownDirectOwnerType === undefined ||
     chunk.type !== 'data-chat-participant' ||
@@ -62,8 +73,18 @@ function isOwnDirectEcho(chunk: UiChunk, rules: ChatDirectMessageRules): boolean
     return false;
   }
   const author = chunk.data.userId;
+  if (!author) return answersOwnSend?.(chunk.data.text) ?? false;
   const own = rules.ownUserId?.();
-  return !author || own === undefined || author === own;
+  return own === undefined || author === own;
+}
+
+/** The chunks of an entry that are the viewer's own direct echo, decided once (see `isOwnDirectEcho`). */
+export function ownDirectEchoesOf(
+  entry: ChatStreamEntry,
+  rules: ChatDirectMessageRules,
+  answersOwnSend?: (text: string) => boolean,
+): ReadonlySet<UiChunk> {
+  return new Set(entry.chunks.filter(chunk => isOwnDirectEcho(chunk, rules, answersOwnSend)));
 }
 
 function withOtherName(chunk: UiChunk, rules: ChatDirectMessageRules): UiChunk {
@@ -78,10 +99,14 @@ function withOtherName(chunk: UiChunk, rules: ChatDirectMessageRules): UiChunk {
   return { ...chunk, data: { ...chunk.data, displayName: rules.otherDisplayName } };
 }
 
-/** The entry the thread gets: the viewer's own echo left out, a nameless direct message named. */
-export function threadEntryOf(entry: ChatStreamEntry, rules: ChatDirectMessageRules): ChatStreamEntry {
+/** The entry the thread gets: the viewer's own echo (`ownEchoes`) left out, a nameless direct message named. */
+export function threadEntryOf(
+  entry: ChatStreamEntry,
+  rules: ChatDirectMessageRules,
+  ownEchoes: ReadonlySet<UiChunk> = ownDirectEchoesOf(entry, rules),
+): ChatStreamEntry {
   if (rules.ownDirectOwnerType === undefined && rules.otherDisplayName === undefined) return entry;
-  const chunks = entry.chunks.filter(chunk => !isOwnDirectEcho(chunk, rules)).map(chunk => withOtherName(chunk, rules));
+  const chunks = entry.chunks.filter(chunk => !ownEchoes.has(chunk)).map(chunk => withOtherName(chunk, rules));
   return { ...entry, chunks };
 }
 
@@ -90,6 +115,7 @@ export function observeChatEntry(
   entry: ChatStreamEntry,
   observers: ChatChunkObservers,
   rules: ChatDirectMessageRules = {},
+  ownEchoes: ReadonlySet<UiChunk> = ownDirectEchoesOf(entry, rules),
 ): void {
   for (const chunk of entry.chunks) {
     switch (chunk.type) {
@@ -103,7 +129,7 @@ export function observeChatEntry(
         observers.onTicketEvent?.(chunk.data);
         break;
       case 'data-chat-participant':
-        if (isOwnDirectEcho(chunk, rules)) observers.onOwnDirectEcho?.(entry.seq);
+        if (ownEchoes.has(chunk)) observers.onOwnDirectEcho?.(entry.seq);
         else if (chunk.data.kind === 'direct-message') observers.onOtherDirectMessage?.();
         break;
       case 'data-escalation-offer':
@@ -187,8 +213,17 @@ export function useChatChunkProcessor({
     }
     if (entry.chunks.length === 0) return;
 
-    bound.apply(threadEntryOf(entry, entryRules));
-    if (observe) observeChatEntry(entry, observe, entryRules);
+    // A nameless direct message is the viewer's own only when it answers one of their sends: decided once, here, because
+    // it consumes that send's armed echo.
+    const ownEchoes = ownDirectEchoesOf(entry, entryRules, text => {
+      let answered = false;
+      bound.mutate(reducer => {
+        answered = reducer.consumeOwnEcho(text);
+      });
+      return answered;
+    });
+    bound.apply(threadEntryOf(entry, entryRules, ownEchoes));
+    if (observe) observeChatEntry(entry, observe, entryRules, ownEchoes);
 
     if (logging && entry.chunks.some(decoded => decoded.type === 'tool-approval-request')) {
       bound.mutate(reducer => {
