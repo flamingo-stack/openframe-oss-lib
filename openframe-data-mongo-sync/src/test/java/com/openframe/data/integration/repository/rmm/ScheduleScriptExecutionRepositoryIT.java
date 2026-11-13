@@ -133,6 +133,26 @@ class ScheduleScriptExecutionRepositoryIT extends BaseMongoIntegrationTest {
         assertThat(repository.countForSchedule(TENANT_A, SCHEDULE_1, filter(ExecutionStatus.SUCCESS), null)).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("reviseSettledStatus: rewrites a settled header of its own fire, leaves RUNNING headers and other tenants alone")
+    void reviseSettledStatus_onlySettledHeaderOfItsFire() {
+        saveWithExecutionId(TENANT_A, SCHEDULE_1, ExecutionStatus.FAILED, "alice", "run-settled");
+        saveWithExecutionId(TENANT_A, SCHEDULE_1, ExecutionStatus.RUNNING, "alice", "run-open");
+        saveWithExecutionId(TENANT_B, SCHEDULE_1, ExecutionStatus.FAILED, "alice", "run-settled");
+
+        long revised = repository.reviseSettledStatus(TENANT_A, "run-settled", ExecutionStatus.SCRIPT_ERROR);
+        long untouched = repository.reviseSettledStatus(TENANT_A, "run-open", ExecutionStatus.SUCCESS);
+
+        assertThat(revised).isEqualTo(1);
+        assertThat(untouched).isZero();
+        assertThat(repository.findByTenantIdAndExecutionId(TENANT_A, "run-settled")).get()
+                .extracting(ScheduleScriptExecution::getStatus).isEqualTo(ExecutionStatus.SCRIPT_ERROR);
+        assertThat(repository.findByTenantIdAndExecutionId(TENANT_A, "run-open")).get()
+                .extracting(ScheduleScriptExecution::getStatus).isEqualTo(ExecutionStatus.RUNNING);
+        assertThat(repository.findByTenantIdAndExecutionId(TENANT_B, "run-settled")).get()
+                .extracting(ScheduleScriptExecution::getStatus).isEqualTo(ExecutionStatus.FAILED);
+    }
+
     private static ScheduleRunQueryFilter filter(ExecutionStatus... statuses) {
         return ScheduleRunQueryFilter.builder().statuses(List.of(statuses)).build();
     }
