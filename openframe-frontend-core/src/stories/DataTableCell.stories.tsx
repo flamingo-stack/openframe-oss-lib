@@ -7,7 +7,7 @@
 
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ReactNode } from 'react';
-import { MonitorIcon } from '../components/icons-v2-generated';
+import { LockIcon, MonitorIcon } from '../components/icons-v2-generated';
 import { DataTable } from '../components/ui/data-table';
 import { Tag } from '../components/ui/tag';
 
@@ -75,6 +75,23 @@ export const Shapes: Story = {
       </Sample>
       <Sample title="Text + secondary text" minWidth={148}>
         <DataTable.Cell text="OpenFrame agent" secondary="v2.4.1" />
+      </Sample>
+      <Sample title="Short text + long secondary text: the secondary text is cut (min 148)" minWidth={148}>
+        <DataTable.Cell
+          leading={{ type: 'icon', icon: <LockIcon size={20} /> }}
+          text="Kept"
+          secondary="Kept by Jerome Park · Legal hold until the audit closes"
+        />
+      </Sample>
+      <Sample title="Long text + long secondary text: the text keeps its first characters (min 160)" minWidth={160}>
+        <DataTable.Cell
+          leading={{ type: 'avatar', name: 'Roman Khutornoy' }}
+          text="Roman Khutornoy"
+          secondary="roman.khutornoy@greenvalleymanufacturing.com"
+        />
+      </Sample>
+      <Sample title="Muted text: a row whose subject is gone" minWidth={148}>
+        <DataTable.Cell text="12 Nov 2026" tone="secondary" secondary="14:05" />
       </Sample>
       <Sample title="Text + trailing mark" minWidth={148}>
         <DataTable.Cell
