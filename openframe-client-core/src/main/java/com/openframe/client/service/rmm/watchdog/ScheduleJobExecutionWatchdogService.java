@@ -34,12 +34,10 @@ public class ScheduleJobExecutionWatchdogService {
         if (counts.inProgress() > 0) {
             return false;// still in flight → header stays RUNNING
         }
-        ExecutionStatus finalStatus;
-        if (counts.failed() > 0) {
+        ExecutionStatus finalStatus = counts.settledStatus();
+        if (finalStatus == ExecutionStatus.SUCCESS
+                && scriptExecutionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId).isEmpty()) {
             finalStatus = ExecutionStatus.FAILED;
-        } else {
-            boolean hasAnyLeaf = scriptExecutionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId).isPresent();
-            finalStatus = hasAnyLeaf ? ExecutionStatus.SUCCESS : ExecutionStatus.FAILED;
         }
 
         long modified = scheduleScriptExecutionRepository.transitionIfRunning(tenantId, executionId, finalStatus, Instant.now());

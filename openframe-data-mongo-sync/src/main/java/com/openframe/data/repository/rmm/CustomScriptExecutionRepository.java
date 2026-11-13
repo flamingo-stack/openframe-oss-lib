@@ -3,6 +3,7 @@ package com.openframe.data.repository.rmm;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
+import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import org.springframework.data.domain.Sort;
@@ -109,5 +110,13 @@ public interface CustomScriptExecutionRepository {
      * Leaf counts for one schedule fire. {@code inProgress} is the not-yet-terminal count — leaves that
      * are QUEUED (awaiting agent ack) or RUNNING; the header stays open while it is &gt; 0.
      */
-    record LeafStatusCounts(long inProgress, long failed) {}
+    record LeafStatusCounts(long inProgress, long failed, long scriptErrors) {
+
+        public ExecutionStatus settledStatus() {
+            if (failed > 0) {
+                return ExecutionStatus.FAILED;
+            }
+            return scriptErrors > 0 ? ExecutionStatus.SCRIPT_ERROR : ExecutionStatus.SUCCESS;
+        }
+    }
 }

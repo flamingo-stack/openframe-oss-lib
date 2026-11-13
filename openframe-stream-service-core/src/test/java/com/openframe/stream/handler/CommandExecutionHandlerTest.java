@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.command.CommandExecution;
+import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptShell;
@@ -15,6 +16,7 @@ import com.openframe.stream.handler.rmm.CommandExecutionHandler;
 import com.openframe.stream.metrics.RmmExecutionMetrics;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
+import com.openframe.stream.service.rmm.ExecutionOutcomeClassifier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,7 +53,8 @@ class CommandExecutionHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new CommandExecutionHandler(commandExecutionRepository, new RmmExecutionMetrics(meterRegistry));
+        handler = new CommandExecutionHandler(commandExecutionRepository, new RmmExecutionMetrics(meterRegistry),
+                new ExecutionOutcomeClassifier(true));
     }
 
     @Test
@@ -85,8 +88,8 @@ class CommandExecutionHandlerTest {
     }
 
     @Test
-    @DisplayName("handle: non-zero exitCode → FAILED")
-    void handle_nonZeroExit_transitionsRowToFailing() {
+    @DisplayName("handle: non-zero exitCode → SCRIPT_ERROR, no reason")
+    void handle_nonZeroExit_transitionsRowToScriptError() {
         CommandExecution row = runningRow();
         when(commandExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(row));
@@ -95,11 +98,48 @@ class CommandExecutionHandlerTest {
 
         ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
         verify(commandExecutionRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SCRIPT_ERROR);
+        assertThat(captor.getValue().getFailureReason()).isNull();
+        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "command", "status", "SCRIPT_ERROR", "reason", "NONE")
+                .counter().count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("handle: timedOut=true → FAILED even with null/zero exitCode")
+    @DisplayName("handle: the agent's failure_reason → FAILED with that reason")
+    void handle_agentFailureReason_transitionsRowToFailedWithReason() {
+        CommandExecution row = runningRow();
+        when(commandExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(row));
+        DeserializedDebeziumMessage message = messageWith(85, false, "spawn failed", null, null, null);
+        ((ObjectNode) message.getPayload().getAfter()).put("failureReason", "COULD_NOT_LAUNCH");
+
+        handler.handle(message, new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
+        verify(commandExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getFailureReason()).isEqualTo(ExecutionFailureReason.COULD_NOT_LAUNCH);
+    }
+
+    @Test
+    @DisplayName("handle: a real result after a watchdog verdict overrides it")
+    void handle_lateResultAfterWatchdogVerdict_overridesIt() {
+        CommandExecution row = runningRow();
+        row.setStatus(ExecutionStatus.FAILED);
+        row.setFailureReason(ExecutionFailureReason.NO_AGENT_RESULT);
+        when(commandExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(0, false, null, null, null, null), new IntegratedToolEnrichedData());
+
+        ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
+        verify(commandExecutionRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        assertThat(captor.getValue().getFailureReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("handle: timedOut=true → FAILED / AGENT_TIMED_OUT even with null/zero exitCode")
     void handle_timedOut_transitionsRowToFailing() {
         CommandExecution row = runningRow();
         when(commandExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
@@ -110,21 +150,23 @@ class CommandExecutionHandlerTest {
         ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
         verify(commandExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getFailureReason()).isEqualTo(ExecutionFailureReason.AGENT_TIMED_OUT);
         assertThat(captor.getValue().getTimedOut()).isTrue();
     }
 
     @Test
-    @DisplayName("handle: agent-level error set → FAILED (even with exitCode=0)")
-    void handle_agentError_transitionsRowToFailing() {
+    @DisplayName("handle: an agent without failure_reason, exit 85 with a launch error → FAILED / COULD_NOT_LAUNCH")
+    void handle_legacyLaunchError_transitionsRowToCouldNotLaunch() {
         CommandExecution row = runningRow();
         when(commandExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
                 .thenReturn(Optional.of(row));
 
-        handler.handle(messageWith(0, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
+        handler.handle(messageWith(85, false, "SHELL_UNAVAILABLE", null, null, null), new IntegratedToolEnrichedData());
 
         ArgumentCaptor<CommandExecution> captor = ArgumentCaptor.forClass(CommandExecution.class);
         verify(commandExecutionRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(captor.getValue().getFailureReason()).isEqualTo(ExecutionFailureReason.COULD_NOT_LAUNCH);
         assertThat(captor.getValue().getError()).isEqualTo("SHELL_UNAVAILABLE");
     }
 
@@ -140,6 +182,20 @@ class CommandExecutionHandlerTest {
 
         verify(commandExecutionRepository, never()).save(any());
         assertThat(meterRegistry.find(COMPLETED_COUNTER).counter()).isNull();
+    }
+
+    @Test
+    @DisplayName("handle: row not RUNNING and not terminal (QUEUED) → save NOT called")
+    void handle_queuedRow_doesNotTakeTheResult() {
+        CommandExecution row = runningRow();
+        row.setStatus(ExecutionStatus.QUEUED);
+        when(commandExecutionRepository.findByMachineIdAndExecutionId(MACHINE_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(0, false, null, null, null, null), new IntegratedToolEnrichedData());
+
+        verify(commandExecutionRepository, never()).save(any());
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.QUEUED);
     }
 
     @Test

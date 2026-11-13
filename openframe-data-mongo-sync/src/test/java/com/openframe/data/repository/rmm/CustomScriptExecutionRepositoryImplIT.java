@@ -71,12 +71,15 @@ class CustomScriptExecutionRepositoryImplIT extends BaseMongoIntegrationTest {
         saveLeaf(EXEC, "script-b", ExecutionStatus.RUNNING);
         saveLeaf(EXEC, "script-c", ExecutionStatus.FAILED);
         saveLeaf(EXEC, "script-d", ExecutionStatus.SUCCESS);   // neither running nor failed
+        saveLeaf(EXEC, "script-e", ExecutionStatus.SCRIPT_ERROR);
+        saveLeaf(EXEC, "script-f", ExecutionStatus.SCRIPT_ERROR);
         saveLeaf("other-exec", "script-a", ExecutionStatus.RUNNING);   // different fire — must not leak in
 
         CustomScriptExecutionRepository.LeafStatusCounts counts = repository.countLeavesByStatus(TENANT, EXEC);
 
         assertThat(counts.inProgress()).isEqualTo(2L);
         assertThat(counts.failed()).isEqualTo(1L);
+        assertThat(counts.scriptErrors()).isEqualTo(2L);
     }
 
     @Test

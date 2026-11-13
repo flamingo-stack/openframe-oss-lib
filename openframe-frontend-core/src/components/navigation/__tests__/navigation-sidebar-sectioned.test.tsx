@@ -113,6 +113,45 @@ describe('NavigationSidebar sectioned', () => {
   });
 });
 
+describe('NavigationSidebar sectioned loading', () => {
+  const sections = [
+    { id: 'service-desk', rows: 2 },
+    { id: 'fleet', rows: 3 },
+  ];
+  /** The placeholder rows a landmark draws: 32px category rows and 40px entry rows, and its section boxes. */
+  const shape = (name: string) => {
+    const html = screen.getByRole('navigation', { name, hidden: true }).innerHTML;
+    const count = (pattern: RegExp) => html.match(pattern)?.length ?? 0;
+    return {
+      sections: count(/class="flex flex-col [^"]*border-t border-ods-border/g),
+      categories: count(/class="flex w-full items-center[^"]* h-8"/g),
+      rows: count(/class="flex w-full items-center[^"]* h-10"/g),
+    };
+  };
+
+  it('draws the sections the host states, each a category row over its rows, and the bottom section', () => {
+    renderSidebar({ loading: true, loadingRows: { sections, secondary: 3 } });
+    expect(shape('Primary navigation')).toEqual({ sections: 2, categories: 2, rows: 5 });
+    expect(shape('Secondary navigation')).toEqual({ sections: 1, categories: 0, rows: 3 });
+    expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument();
+  });
+
+  it('draws a section the user folded folded, as the loaded navigation does', () => {
+    window.localStorage.setItem('test.sections', JSON.stringify(['fleet']));
+    renderSidebar({ loading: true, loadingRows: { sections, secondary: 0 }, groupsStorageKey: 'test.sections' });
+    expect(shape('Primary navigation')).toEqual({ sections: 2, categories: 2, rows: 2 });
+    expect(screen.getByRole('navigation', { name: 'Primary navigation', hidden: true }).innerHTML).toContain(
+      'data-folded="true"',
+    );
+  });
+
+  it('draws the primary rows as one section when the host states no sections', () => {
+    renderSidebar({ loading: true, loadingRows: { primary: 4, secondary: 2 } });
+    expect(shape('Primary navigation')).toEqual({ sections: 1, categories: 0, rows: 4 });
+    expect(shape('Secondary navigation')).toEqual({ sections: 1, categories: 0, rows: 2 });
+  });
+});
+
 describe('NavigationSidebar icon toggle', () => {
   it('draws an icon button that collapses and expands', () => {
     const onCollapsedChange = vi.fn();
