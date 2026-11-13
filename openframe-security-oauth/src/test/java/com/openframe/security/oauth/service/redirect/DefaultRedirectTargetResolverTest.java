@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -78,6 +79,44 @@ class DefaultRedirectTargetResolverTest {
         assertThat(resolve(redirectTo)).isEqualTo("/");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "/\t\\evil.example",
+            "/ /evil.example", "/devices\u007f"})
+    void shouldReplacePathsWithControlCharactersWithRoot(String redirectTo) {
+        assertThat(resolve(redirectTo)).isEqualTo("/");
+        assertThat(resolveFromReferer(redirectTo)).isEqualTo("/");
+        assertThat(resolver.canReceiveDevTicket(redirectTo)).isFalse();
+    }
+
+    @Test
+    void shouldHonorLocalhostOnlyWhenDevTicketsAreOn() {
+        assertThat(resolve("http://localhost:3000/devices")).isEqualTo("/");
+        assertThat(resolver.canReceiveDevTicket("http://localhost:3000/devices")).isFalse();
+
+        ReflectionTestUtils.setField(resolver, "devTicketEnabled", true);
+
+        assertThat(resolve("http://localhost:3000/devices")).isEqualTo("http://localhost:3000/devices");
+        assertThat(resolver.canReceiveDevTicket("http://localhost:3000/devices")).isTrue();
+        assertThat(resolver.canReceiveDevTicket("http://localhost/")).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"http://localhost@evil.example/", "http://localhost.evil.example/", "http://localhostevil.example/",
+            "http://localhost:3000@evil.example/", "https://localhost:3000/", "http://localhost/a b"})
+    void shouldNotTreatLookalikeHostsAsLocalhostEvenWithDevTicketsOn(String redirectTo) {
+        ReflectionTestUtils.setField(resolver, "devTicketEnabled", true);
+
+        assertThat(resolve(redirectTo)).isEqualTo("/");
+        assertThat(resolver.canReceiveDevTicket(redirectTo)).isFalse();
+    }
+
+    @Test
+    void shouldDefaultDevTicketEnabledToFalse() throws NoSuchFieldException {
+        Value value = DefaultRedirectTargetResolver.class.getDeclaredField("devTicketEnabled").getAnnotation(Value.class);
+
+        assertThat(value.value()).isEqualTo("${openframe.gateway.oauth.dev-ticket-enabled:false}");
+    }
+
     @Test
     void shouldReturnOnlyExactlyAllowListedUrisAsGiven() {
         assertThat(resolve(NATIVE_APP)).isEqualTo(NATIVE_APP);
@@ -106,10 +145,10 @@ class DefaultRedirectTargetResolverTest {
     }
 
     @Test
-    void shouldLetOnlyAllowListedOrRelativeTargetsReceiveDevTicket() {
+    void shouldLetOnlyAllowListedTargetsReceiveDevTicket() {
         assertThat(resolver.canReceiveDevTicket(NATIVE_APP)).isTrue();
-        assertThat(resolver.canReceiveDevTicket("/devices")).isTrue();
-        assertThat(resolver.canReceiveDevTicket("/")).isTrue();
+        assertThat(resolver.canReceiveDevTicket("/devices")).isFalse();
+        assertThat(resolver.canReceiveDevTicket("/")).isFalse();
         assertThat(resolver.canReceiveDevTicket("//evil.example/x")).isFalse();
         assertThat(resolver.canReceiveDevTicket("/\\evil.example/x")).isFalse();
         assertThat(resolver.canReceiveDevTicket("https://acme.openframe.ai/")).isFalse();
