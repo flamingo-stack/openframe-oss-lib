@@ -32,7 +32,9 @@ public class DefaultRedirectTargetResolver implements RedirectTargetResolver {
     @Override
     public Mono<String> resolve(String tenantId, String userId, String requestedRedirectTo, ServerHttpRequest request) {
         String target = hasText(requestedRedirectTo) ? requestedRedirectTo : request.getHeaders().getFirst(REFERER);
-        return Mono.just(sanitize(target, request.getURI()));
+        URI requestUri = request.getURI();
+        String safeTarget = sanitize(target, requestUri);
+        return Mono.just(safeTarget);
     }
 
     @Override
