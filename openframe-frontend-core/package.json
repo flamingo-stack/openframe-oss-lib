@@ -601,10 +601,6 @@
     "vitest": "^4.0.16",
     "zod": "^4.4.3"
   },
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org",
-    "access": "public"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/flamingo-stack/openframe-oss-lib.git",
