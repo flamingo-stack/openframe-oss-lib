@@ -1,7 +1,8 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
-
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
@@ -94,7 +95,7 @@ public class DeviceOnlineDispatchService {
                 }
 
                 Machine machine = machinesById.get(row.getMachineId());
-                if (!DeviceDispatchEligibility.isDispatchable(machine)) {
+                if (!isDispatchable(machine)) {
                     continue;   // still offline -> leave NEW for a later tick (until it reconnects or expires)
                 }
 
@@ -116,4 +117,10 @@ public class DeviceOnlineDispatchService {
         return changed;
     }
 
+    // D1: dispatch needs a managed device (status in CONNECTED) that is online right now (telemetryStatus).
+    private static boolean isDispatchable(Machine machine) {
+        return machine != null
+                && DeviceStatus.CONNECTED.contains(machine.getStatus())
+                && machine.getTelemetryStatus() == TelemetryStatus.ONLINE;
+    }
 }

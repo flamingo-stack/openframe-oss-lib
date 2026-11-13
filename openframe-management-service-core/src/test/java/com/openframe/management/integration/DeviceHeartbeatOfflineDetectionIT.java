@@ -91,7 +91,7 @@ class DeviceHeartbeatOfflineDetectionIT {
         Machine machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setTenantId("tenant-1");
-        machine.setStatus(DeviceStatus.MANAGED);
+        machine.setStatus(DeviceStatus.ONLINE);
         machine.setTelemetryStatus(TelemetryStatus.ONLINE);
         machine.setLastSeen(LONG_AGO);
         template.save(machine);
@@ -114,7 +114,7 @@ class DeviceHeartbeatOfflineDetectionIT {
         // verifications
         Machine stored = storedMachines.findByMachineId(MACHINE_ID).orElseThrow();
         assertThat(stored).extracting(Machine::getStatus, Machine::getTelemetryStatus)
-                .containsExactly(DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
+                .containsExactly(DeviceStatus.OFFLINE, TelemetryStatus.OFFLINE);
         assertThat(stored).extracting(Machine::getDirectorySources, Machine::getDirectoryUserLink,
                         Machine::getDirectoryUserIds, Machine::getDirectoryUserName, Machine::getComputerName)
                 .containsExactly(List.of(DirectorySource.MICROSOFT_365), DirectoryUserLink.PRIMARY,
@@ -134,7 +134,7 @@ class DeviceHeartbeatOfflineDetectionIT {
         // verifications
         Machine stored = storedMachines.findByMachineId(MACHINE_ID).orElseThrow();
         assertThat(stored).extracting(Machine::getStatus, Machine::getTelemetryStatus)
-                .containsExactly(DeviceStatus.MANAGED, TelemetryStatus.ONLINE);
+                .containsExactly(DeviceStatus.ONLINE, TelemetryStatus.ONLINE);
     }
 
     @Test

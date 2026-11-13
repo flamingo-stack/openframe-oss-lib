@@ -71,15 +71,8 @@ public class OpenApiConfig {
                     - `403` - Forbidden (valid API key but insufficient permissions)
                     - `429` - Too Many Requests (rate limit exceeded)
                     - `500` - Internal Server Error
-                    
-                    ## Changelog
-                    
-                    - **1.3.0** – Device `status` is lifecycle only (`PENDING`, `MANAGED`, `PENDING_DELETION`, `DELETED`, `ARCHIVED`);
-                      a device is `MANAGED` once its agent and required tools are connected. `ONLINE`/`OFFLINE` in `statuses`
-                      no longer match any device and are removed in the next release: filter on `connectivity` instead.
-                    - **1.2.0** – `connectivity` (`ONLINE`/`OFFLINE`) on devices, as a list filter and on `/devices/filters`.
                     """)
-                .version("1.3.0")
+                .version("1.2.0")
                 .contact(new Contact()
                     .name("OpenFrame Team")
                     .email("support@openframe.com")

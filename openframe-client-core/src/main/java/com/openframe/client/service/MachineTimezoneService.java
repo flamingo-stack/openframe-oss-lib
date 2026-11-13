@@ -45,7 +45,7 @@ public class MachineTimezoneService {
 
         Machine machine = foundMachine.get();
         DeviceStatus status = machine.getStatus();
-        if (DeviceStatus.FROZEN.contains(status)) {
+        if (DeviceStatus.DELETING_OR_DELETED.contains(status)) {
             log.debug("Ignoring timezone update for machineId={} in status {}", machineId, status);
             return;
         }

@@ -92,7 +92,7 @@ public class GraphQLDeviceMapper {
                 .registeredAt(machine.getRegisteredAt())
                 .connectedAt(connectedAt)
                 .inventoryConnectedAt(inventoryConnectedAt)
-                .ready(machine.getStatus() != DeviceStatus.PENDING)
+                .ready(connectedAt != null && inventoryConnectedAt != null)
                 .build();
     }
 

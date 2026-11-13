@@ -17,8 +17,6 @@ import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 import java.time.Instant;
 import java.util.List;
@@ -29,8 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The setup wizard's enrollment milestones are derived here, from the machine document and its tool
  * connections: registered (machine exists), connected (first NATS connection), inventory connected
- * (Fleet confirmed the host, i.e. the FLEET_MDM connection is CONNECTED with a numeric Fleet host id),
- * ready (the device has left PENDING, i.e. it was promoted to MANAGED).
+ * (Fleet confirmed the host, i.e. the FLEET_MDM connection is CONNECTED with a numeric Fleet host id).
  */
 class GraphQLDeviceMapperTest {
 
@@ -135,6 +132,7 @@ class GraphQLDeviceMapperTest {
                 List.of(fleet(ConnectionStatus.CONNECTED, "0f1d4c2e-7b3a-4c1d-9e2f-5a6b7c8d9e0f")));
 
         assertThat(enrollment.getInventoryConnectedAt()).isNull();
+        assertThat(enrollment.isReady()).isFalse();
     }
 
     @Test
@@ -161,26 +159,18 @@ class GraphQLDeviceMapperTest {
         DeviceEnrollmentResponse enrollment = mapper.toEnrollment(machine(CONNECTED), null);
 
         assertThat(enrollment.getInventoryConnectedAt()).isNull();
+        assertThat(enrollment.isReady()).isFalse();
     }
 
     @Test
-    @DisplayName("ready is false while the device is PENDING, whatever its timestamps and tool connections say")
-    void toEnrollment_pendingDevice_notReady() {
+    @DisplayName("ready only when both connectedAt and inventoryConnectedAt are set")
+    void toEnrollment_readyOnlyWhenBothTimestampsSet() {
         List<ToolConnection> inventory = List.of(fleet(ConnectionStatus.CONNECTED, "42"));
-        Machine pending = machine(CONNECTED);
-        pending.setStatus(DeviceStatus.PENDING);
 
-        assertThat(mapper.toEnrollment(pending, inventory).isReady()).isFalse();
-    }
-
-    @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"PENDING"}, mode = EnumSource.Mode.EXCLUDE)
-    @DisplayName("ready follows the lifecycle status: anything promoted past PENDING is ready, even without a Fleet row")
-    void toEnrollment_promotedDevice_readyRegardlessOfConnections(DeviceStatus status) {
-        Machine promoted = machine(null);
-        promoted.setStatus(status);
-
-        assertThat(mapper.toEnrollment(promoted, List.of()).isReady()).isTrue();
+        assertThat(mapper.toEnrollment(machine(CONNECTED), inventory).isReady()).as("both").isTrue();
+        assertThat(mapper.toEnrollment(machine(CONNECTED), List.of()).isReady()).as("connected only").isFalse();
+        assertThat(mapper.toEnrollment(machine(null), inventory).isReady()).as("inventory only").isFalse();
+        assertThat(mapper.toEnrollment(machine(null), List.of()).isReady()).as("neither").isFalse();
     }
 
     @Test

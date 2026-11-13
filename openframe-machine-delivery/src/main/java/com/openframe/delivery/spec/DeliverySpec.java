@@ -23,7 +23,7 @@ public interface DeliverySpec<S extends DeliverySeed, P extends DeliveryPayload>
 
     // a machine that never connected is still waiting for its first commands; one that is gone or leaving gets none
     default Set<DeviceStatus> getDeliverableStatuses() {
-        return EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING);
+        return EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING);
     }
 
     // only a type whose payload is the same for every machine (an update, a toggle) may be rolled out; a command
