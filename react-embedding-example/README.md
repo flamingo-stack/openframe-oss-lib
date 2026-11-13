@@ -150,7 +150,7 @@ Two lib surfaces still hardcode bare `/api` with no override prop today:
 prefixes to the hub. Everything else rides `/content`. The clean fix (recommended) is a small
 lib change so these read their base from the runtime — forward a `searchEndpoint` prop from
 `OnboardingGuidesCatalogView`, and derive the tickets paths from a single `agentBaseUrl` on
-`ChatRuntime.endpoints` (sibling of `approvalToolUrl`). After that, drop the fallback rules.
+`ChatRuntime.endpoints`. After that, drop the fallback rules.
 
 ## Configuring URL endpoints
 
@@ -188,29 +188,29 @@ land on the same place.
 
 When the chat renders an entity card (release, roadmap item, …) or a page lists links, the
 lib asks **one resolver** "where does this go?". Wire it once → chat cards and page links
-agree. Resolution order: `overrides[type]` → `hostedTypes` (relative) → row `externalUrl` →
-`contentOrigin`.
+agree. The server answers every record's address; the lib's one embedder composer opens a record
+on the page this app names for it, and every other record at the server's address.
 
 ```ts
-composeContentUrl: makeComposeContentUrl({
-  // (a) Types YOU host on a slugged detail route → relative in-app href (soft-nav).
-  hostedTypes: new Set(['onboarding_guide', 'product_release']),
-  // (b) Fallback origin for everything else → opens on the hub in a new tab.
+composeContentUrl: makeEmbedderComposeContentUrl({
+  // A record with no address of its own opens the hub.
   contentOrigin: HUB_PUBLIC_ORIGIN,
-  // (c) Per-type override — full control. List-filter types (no detail page) deep-link
-  //     into a list route with the query param the page reads (`?search=<id>`).
-  overrides: {
-    roadmap_item:  (id) => ({ href: `/roadmap?search=${id}`,  targetPlatform: null }),
-    delivery_item: (id) => ({ href: `/delivery?search=${id}`, targetPlatform: null }),
+  // The pages this app has: each one named, every other record opens on the hub in a new tab.
+  routes: {
+    onboardingGuide: slug => `/onboarding-guides/${slug}`,
+    release: slug => `/releases/${slug}`,
+    knowledgeBase: '/knowledge-base',
+    roadmap: '/roadmap',
+    delivery: '/delivery',
   },
 }),
 ```
 
 | Content type | Resolution | Lands at |
 |---|---|---|
-| `onboarding_guide`, `product_release` | `hostedTypes` | in-app `/<suffix>/<slug>` |
-| `roadmap_item`, `delivery_item` | `overrides` | in-app `/<route>?search=<id>` (filtered to that item) |
-| `podcast`, `webinar`, `blog_post`, `author`, … | default | hub origin, new tab |
+| `onboarding_guide`, `product_release` | a detail route | in-app, by slug |
+| `roadmap_item`, `delivery_item` | a list route | in-app `/<route>?search=<id>` (filtered to that item) |
+| `podcast`, `webinar`, `blog_post`, `author`, … | the server's address | hub, new tab |
 
 ### 3. Where *doc chips* navigate — `docPlatformTargets` (in `content-runtime.ts`)
 

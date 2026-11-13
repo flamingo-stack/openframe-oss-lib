@@ -407,7 +407,11 @@ export function NavigationSidebar({
   // Until then the config width stands, as for a sidebar that is not resizable;
   // on desktop the seeded width shows throughout, so nothing moves.
   const markupExpandedWidth = hydrated ? chosenExpandedWidth : (configExpandedWidth ?? EXPANDED_WIDTH);
-  const customExpandedWidth = resize !== undefined ? markupExpandedWidth : configExpandedWidth;
+  // An open drawer floats over the content: its own width (`drawerWidth`), not the desktop one, which the resize
+  // clamp narrows to keep room for the content beside it.
+  const drawerWidth = drawer ? config.drawerWidth : undefined;
+  const customExpandedWidth =
+    drawerWidth !== undefined ? drawerWidth : resize !== undefined ? markupExpandedWidth : configExpandedWidth;
   const expandedWidthStyle =
     customExpandedWidth === null ? undefined : ({ [EXPANDED_WIDTH_VAR]: `${customExpandedWidth}px` } as CSSProperties);
 
@@ -705,15 +709,18 @@ export function NavigationSidebar({
   return (
     <>
       {/* Backdrop scrim — only visible on tablet while the overlay is open */}
+      {/* A drawer's scrim covers its own row only, under the host's top bar (the burger menu's way): the top bar and
+          what stands above it stay visible and usable while it is open. */}
       <div
         className={cn(
-          'fixed inset-0 z-[40] bg-ods-overlay',
+          drawer ? 'absolute inset-0 z-[40] bg-ods-overlay' : 'fixed inset-0 z-[40] bg-ods-overlay',
           forcedOverlay ? 'hidden md:block' : desktopFromMd ? 'hidden' : 'hidden md:block lg:hidden',
           'transition-opacity duration-300',
           isOverlayOpen && !pushOnTablet ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         onClick={closeOverlay}
         aria-hidden="true"
+        data-testid="navigation-sidebar-scrim"
       />
 
       {/* Flex-flow placeholder — reserves the collapsed 56px slot on tablet so

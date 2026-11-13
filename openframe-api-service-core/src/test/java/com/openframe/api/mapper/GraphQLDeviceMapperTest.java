@@ -1,11 +1,17 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.AvailableDeviceEdge;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
+import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DirectorySource;
 import com.openframe.data.document.device.DirectoryUserLink;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.tool.ConnectionStatus;
 import com.openframe.data.document.tool.ToolConnection;
 import com.openframe.data.document.tool.ToolType;
@@ -14,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -50,6 +57,48 @@ class GraphQLDeviceMapperTest {
 
     private static ToolConnection fleet(ConnectionStatus status, String agentToolId) {
         return connection(ToolType.FLEET_MDM, status, agentToolId);
+    }
+
+    @Test
+    @DisplayName("toDeviceFilterCriteria carries connectivity next to statuses")
+    void toDeviceFilterCriteria_carriesConnectivity() {
+        // setup
+        DeviceFilterInput input = DeviceFilterInput.builder()
+                .statuses(List.of(DeviceStatus.ONLINE))
+                .connectivity(List.of(TelemetryStatus.OFFLINE))
+                .build();
+
+        // execution
+        DeviceFilterCriteria criteria = mapper.toDeviceFilterCriteria(input);
+
+        // verifications
+        assertThat(criteria.getStatuses()).containsExactly(DeviceStatus.ONLINE);
+        assertThat(criteria.getConnectivity()).containsExactly(TelemetryStatus.OFFLINE);
+    }
+
+    @Test
+    @DisplayName("available-device cursor buckets by telemetryStatus: status ONLINE with telemetry OFFLINE is the not-online bucket")
+    void toAvailableDeviceConnection_bucketReadsTelemetryStatus() {
+        // setup
+        Machine staleStatus = machine(CONNECTED);
+        staleStatus.setId("64f000000000000000000001");
+        staleStatus.setStatus(DeviceStatus.ONLINE);
+        staleStatus.setTelemetryStatus(TelemetryStatus.OFFLINE);
+        Machine online = machine(CONNECTED);
+        online.setId("64f000000000000000000002");
+        online.setMachineId("m-2");
+        online.setStatus(DeviceStatus.OFFLINE);
+        online.setTelemetryStatus(TelemetryStatus.ONLINE);
+        CountedGenericQueryResult<Machine> result = CountedGenericQueryResult.<Machine>builder()
+                .items(List.of(staleStatus, online)).build();
+
+        // execution
+        CountedGenericConnection<AvailableDeviceEdge> connection = mapper.toAvailableDeviceConnection(result, Set.of("m-1"));
+
+        // verifications
+        assertThat(connection.getEdges())
+                .extracting(edge -> CursorCodec.decode(edge.getCursor()))
+                .containsExactly("1|64f000000000000000000001", "2|64f000000000000000000002");
     }
 
     @Test

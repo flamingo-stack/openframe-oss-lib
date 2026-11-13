@@ -38,6 +38,7 @@ public class Machine implements TenantScoped {
     private Instant firstConnectedAt;
     @Indexed
     private String organizationId;
+    private Instant organizationAssignedAt;
     private String userId;      // User who installed the agent; optional, absent for older registrations
     private String hostname;
     private String computerName;    // Fleet computer_name, filled where blank; not exposed in GraphQL
@@ -74,4 +75,8 @@ public class Machine implements TenantScoped {
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
     @Version
     private Long version;
+
+    public String preferredName() {
+        return MachineName.preferred(nickname, hostname);
+    }
 }

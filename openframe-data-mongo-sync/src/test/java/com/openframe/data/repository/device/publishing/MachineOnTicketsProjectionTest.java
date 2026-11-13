@@ -32,9 +32,18 @@ class MachineOnTicketsProjectionTest {
             machineRepository);
 
     @Test
-    void anEvent_setsTheHostnameOnTheTicketsOfTheDeviceInItsTenant() {
+    void anEventWithANickname_setsTheNicknameOnTheTicketsOfTheDeviceInItsTenant() {
         // execution
         projection.apply(buildRecord("tenant-a", "machine-1", "host-new", "Front desk"));
+
+        // verifications
+        verify(ticketProjectionRepository).updateDeviceHostname("tenant-a", "machine-1", "Front desk");
+    }
+
+    @Test
+    void anEventWithoutANickname_setsTheHostname() {
+        // execution
+        projection.apply(buildRecord("tenant-a", "machine-1", "host-new", " "));
 
         // verifications
         verify(ticketProjectionRepository).updateDeviceHostname("tenant-a", "machine-1", "host-new");
@@ -69,6 +78,24 @@ class MachineOnTicketsProjectionTest {
         // verifications
         assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t2");
         assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("doc-tenant-b");
+    }
+
+    @Test
+    void aHostnameCopy_isAMismatch_whenTheMachineHasANickname() {
+        // setup
+        Machine named = buildMachine("tenant-a", "machine-1", "host-a");
+        named.setNickname("Front desk");
+        when(machineRepository.findByTenantIdInAndMachineIdIn(Set.of("tenant-a"), Set.of("machine-1", "machine-2")))
+                .thenReturn(List.of(named, buildMachine("tenant-a", "machine-2", "host-b")));
+
+        // execution
+        ReconciliationResult result = projection.reconcile(List.of(
+                new TicketDeviceView("t1", "tenant-a", "machine-1", "host-a"),
+                new TicketDeviceView("t2", "tenant-a", "machine-1", "Front desk"),
+                new TicketDeviceView("t3", "tenant-a", "machine-2", "host-b")));
+
+        // verifications
+        assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t1");
     }
 
     @Test

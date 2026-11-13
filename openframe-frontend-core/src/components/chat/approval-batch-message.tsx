@@ -16,19 +16,26 @@ import { useCollapsible } from './hooks/use-collapsible';
 import { PolicyEscalationAlert, PolicyReviewRows, hasPolicyReviewRows, isPolicyEscalated } from './policy-review';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
 import type {
+  ApprovalBatchData,
   ApprovalBlockVariant,
   AssistantType,
   ApprovalBatchExecutionState,
-  ApprovalBatchSegment,
+  ChatApprovalPartStatus,
   PendingToolCallData,
 } from './types';
 import { COMMAND_BODY_ARG_KEYS, getCommandText } from './utils/tool-call-helpers';
 
+/**
+ * THE approval card: every approval a chat, a board or a notification draws. A single gated call is a batch of one, and a
+ * ticket-escalation offer is a client card of one row (`EscalationOfferMessage`).
+ */
 export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement> {
   /** The batch. `null` is a batch still being read (a list's loading row): the block draws its own loading form, as
    *  it does in a loading scope. */
-  data: ApprovalBatchSegment['data'] | null;
-  status?: ApprovalBatchSegment['status'];
+  data: ApprovalBatchData | null;
+  status?: ChatApprovalPartStatus;
+  /** A row's answer was sent and the server has not said how it went: the buttons stay, inert, so the click moves nothing. */
+  answerPending?: boolean;
   onApprove?: (requestId?: string) => void | boolean | Promise<void | boolean>;
   onReject?: (requestId?: string) => void | boolean | Promise<void | boolean>;
   /**
@@ -76,30 +83,90 @@ export interface ApprovalBatchMessageProps extends HTMLAttributes<HTMLDivElement
 const COMMAND_BODY_KEYS = new Set<string>(COMMAND_BODY_ARG_KEYS);
 
 export interface ApprovalStatusTagProps {
-  status: ApprovalBatchSegment['status'];
+  status?: ChatApprovalPartStatus;
   resolvedByName?: string | null;
   inlineResolver?: boolean;
 }
 
 /**
- * Terminal-status badge for a resolved approval batch (approved / rejected /
- * cancelled); renders nothing while pending. With `inlineResolver` the
+ * Status badge for an answered approval batch (approving / approved / rejected /
+ * cancelled / failed / unknown); renders nothing while pending. With `inlineResolver` the
  * resolver's name is baked into the tag as a single full-text pill
  * ("Approved by {name}"); otherwise callers render "by {name}" as a separate
- * muted span. Also used by the approval notification tile, which hosts the
- * actions row itself (`showFooterActions={false}`).
+ * muted span. `approving`, `failed` and `unknown` name nobody: whoever approved it did not fail it. Also
+ * used by the approval notification tile, which hosts the actions row itself
+ * (`showFooterActions={false}`).
  */
 export function ApprovalStatusTag({ status, resolvedByName, inlineResolver = false }: ApprovalStatusTagProps) {
   const suffix = inlineResolver && resolvedByName ? ` by ${resolvedByName}` : '';
+  if (status === 'approving') return <StatusLine tone="working" label="Approving" />;
   if (status === 'approved') return <StatusLine tone="success" label={`Approved${suffix}`} />;
   if (status === 'cancelled') return <StatusLine tone="muted" label={`Canceled${suffix}`} />;
   if (status === 'rejected') return <StatusLine tone="error" label={`Rejected${suffix}`} />;
+  if (status === 'failed') return <StatusLine tone="error" label="Failed" />;
+  if (status === 'unknown') return <StatusLine tone="muted" label="Outcome unknown" />;
   return null;
 }
 
 /** What a pending approval says while it waits: the one place the wording lives. */
 export function ApprovalWaitingLine() {
   return <StatusLine tone="waiting" label="Waiting for you" />;
+}
+
+/**
+ * A card's status and why, as ONE live region, read whole when it changes. It is mounted from the first render, while the
+ * card waits too: a screen reader says nothing of a region that appears with its words already in it, and a click on Approve
+ * has nothing else to say. `inlineResolver` as on {@link ApprovalStatusTag}; without it the name stands beside the tag.
+ */
+export function ApprovalFootStatus({
+  status,
+  resolvedByName,
+  inlineResolver = false,
+  notices,
+}: ApprovalStatusTagProps & { notices: readonly string[] }) {
+  return (
+    <div role="status" aria-atomic="true" className="flex w-full flex-col items-start gap-[var(--spacing-system-xxs)]">
+      {status === 'pending' ? (
+        <ApprovalWaitingLine />
+      ) : (
+        <div className="flex items-center gap-[var(--spacing-system-xsf)]">
+          <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver={inlineResolver} />
+          {!inlineResolver &&
+            resolvedByName &&
+            status !== 'approving' &&
+            status !== 'failed' &&
+            status !== 'unknown' && <span className="text-ods-text-secondary text-h6">by {resolvedByName}</span>}
+        </div>
+      )}
+      {notices.map(notice => (
+        <p key={notice} className="break-words text-ods-text-secondary text-h6">
+          {notice}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** What a row is called on a batch's foot: the words its card shows a person, never a command. */
+function footTitleOf(call: PendingToolCallData): string | undefined {
+  return call.toolTitle?.trim() || call.toolExplanation?.trim() || undefined;
+}
+
+/**
+ * What a card's foot says with no row opened, once however many rows it is about. A tool's own output stays in its row: it
+ * can be long, and an end client must not see it. Two different sentences each name their rows, or "this one" has no referent
+ * and "ask again" reads as being about the row that may have run.
+ */
+function batchFootNotices(data: ApprovalBatchData): string[] {
+  const rowsByNotice = new Map<string, string[]>();
+  for (const call of data.toolCalls) {
+    const row = data.executions?.[call.toolExecutionRequestId];
+    if (!row || !(row.outcomeUnknown || row.refused) || !row.result) continue;
+    const title = footTitleOf(call);
+    rowsByNotice.set(row.result, [...(rowsByNotice.get(row.result) ?? []), ...(title ? [title] : [])]);
+  }
+  if (rowsByNotice.size < 2) return [...rowsByNotice.keys()];
+  return [...rowsByNotice].map(([notice, titles]) => (titles.length > 0 ? `${titles.join(', ')}: ${notice}` : notice));
 }
 
 function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
@@ -114,34 +181,41 @@ function getArgEntries(call: PendingToolCallData): Array<[string, unknown]> {
  * Status icon for one tool call inside an approved/done batch.
  *  - pending batch     → null (chevron-only row, no status icon); a warning circle when Mingo escalated the call
  *  - approved, no exec → DotsLoaderIcon (queued / waiting for backend)
+ *  - approving         → as approved: no row can have its check yet, and one refused has its cross
  *  - executing         → DotsLoaderIcon
  *  - done + success    → green check
- *  - done + failure    → red cross
+ *  - done + failure    → red cross, in a failed batch and one nobody knows the end of too
+ *  - nobody knows       → null: a cross would say it failed, and it may have gone through
+ *  - failed, no exec   → null (a row with no gate of its own that never started: nothing runs it now)
  */
 function ExecutionStatusIcon({
   batchStatus,
   execution,
   escalated,
 }: {
-  batchStatus: ApprovalBatchSegment['status'];
+  batchStatus?: ChatApprovalPartStatus;
   execution: ApprovalBatchExecutionState | undefined;
   escalated: boolean;
 }) {
   if (batchStatus === 'pending' && escalated)
     // Decorative: the "Mingo Escalated" band under the row says it in words.
     return <AlertCircleIcon className="h-4 w-4 text-ods-warning" aria-hidden />;
-  if (batchStatus !== 'approved') return null;
+  const cross = <XmarkCircleIcon role="img" aria-label="Failed" className="h-4 w-4 text-ods-error" />;
+  if (batchStatus === 'unknown') return execution?.success === false ? cross : null;
+  if (batchStatus !== 'approved' && batchStatus !== 'approving' && batchStatus !== 'failed') return null;
+  if (!execution && batchStatus === 'failed') return null;
+  if (execution?.outcomeUnknown) return null;
   if (!execution || execution.status === 'executing')
     return <DotsLoaderIcon size={16} className="text-ods-text-secondary" />;
-  if (execution.success === false) return <XmarkCircleIcon className="h-4 w-4 text-ods-error" />;
-  return <CheckCircleIcon className="h-4 w-4 text-ods-success" />;
+  if (execution.success === false) return cross;
+  return <CheckCircleIcon role="img" aria-label="Done" className="h-4 w-4 text-ods-success" />;
 }
 
 interface ToolCallRowProps {
   call: PendingToolCallData;
   expanded: boolean;
   onToggle: () => void;
-  batchStatus: ApprovalBatchSegment['status'];
+  batchStatus?: ChatApprovalPartStatus;
   execution: ApprovalBatchExecutionState | undefined;
   showExecutionStatus: boolean;
   showEscalationAlert: boolean;
@@ -327,6 +401,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
       onApprove,
       onReject,
       status = 'pending',
+      answerPending = false,
       maxBodyHeight,
       resolvedByName,
       showExecutionStatus = true,
@@ -357,6 +432,10 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
     }
 
     const explanations = data.toolCalls.map(c => c.toolExplanation?.trim()).filter((s): s is string => !!s);
+    // Said with no row opened: the rows of an answered batch stay collapsed.
+    const notices = batchFootNotices(data);
+    // A click moves nothing: the foot keeps its height until the server has said how every row went.
+    const keepsButtons = status === 'pending' || answerPending;
     // An approval Mingo escalated is approved in the warning colour (Figma 1374-105483), the admin view only.
     const escalated = !isClient && data.toolCalls.some(c => isPolicyEscalated(c.policyReview));
 
@@ -384,7 +463,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
           size="small-legacy"
           variant={escalated ? 'warning' : 'accent'}
           onClick={handleApprove}
-          disabled={isProcessing}
+          disabled={isProcessing || answerPending || !onApprove}
           className={cn(
             !escalated && 'bg-ods-accent text-ods-bg hover:bg-ods-accent/90',
             'text-h5',
@@ -397,7 +476,7 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
           size="small-legacy"
           variant="outline"
           onClick={handleReject}
-          disabled={isProcessing}
+          disabled={isProcessing || answerPending || !onReject}
           className={cn(
             'border-ods-border bg-ods-card',
             'text-ods-text-primary text-h5',
@@ -428,15 +507,12 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
           ) : (
             <p className="w-full text-ods-text-primary text-h4">Approval required</p>
           )}
-          {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
-          {showFooterActions &&
-            (status === 'pending' ? (
-              <div className="flex w-full items-center gap-[var(--spacing-system-xsf)]">{actionButtons}</div>
-            ) : (
-              <div className="flex w-full">
-                <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver />
-              </div>
-            ))}
+          {showFooterActions && (
+            <ApprovalFootStatus status={status} resolvedByName={resolvedByName} inlineResolver notices={notices} />
+          )}
+          {showFooterActions && keepsButtons && (
+            <div className="flex w-full items-center gap-[var(--spacing-system-xsf)]">{actionButtons}</div>
+          )}
         </div>
       );
     }
@@ -483,16 +559,12 @@ const ApprovalBatchMessage = forwardRef<HTMLDivElement, ApprovalBatchMessageProp
               </ul>
             )}
 
-            {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
-            {showFooterActions &&
-              (status === 'pending' ? (
-                <div className="flex items-center gap-[var(--spacing-system-xsf)]">{actionButtons}</div>
-              ) : (
-                <div className="flex items-center gap-[var(--spacing-system-xsf)]">
-                  <ApprovalStatusTag status={status} resolvedByName={resolvedByName} />
-                  {resolvedByName && <span className="text-ods-text-secondary text-h6">by {resolvedByName}</span>}
-                </div>
-              ))}
+            {showFooterActions && (
+              <ApprovalFootStatus status={status} resolvedByName={resolvedByName} notices={notices} />
+            )}
+            {showFooterActions && keepsButtons && (
+              <div className="flex items-center gap-[var(--spacing-system-xsf)]">{actionButtons}</div>
+            )}
           </div>
         )}
       </div>

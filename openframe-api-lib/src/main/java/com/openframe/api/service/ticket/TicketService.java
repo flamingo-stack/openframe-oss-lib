@@ -12,6 +12,7 @@ import com.openframe.api.dto.ticket.UpdateTicketInput;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.service.AssignmentService;
+import com.openframe.api.service.device.ClientOwnerScopeResolver;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
@@ -25,10 +26,10 @@ import com.openframe.data.document.ticket.AdminTicketOwner;
 import com.openframe.data.document.ticket.ClientTicketOwner;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketCreationSource;
-import com.openframe.data.document.ticket.TicketOwner;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.document.user.User;
+import com.openframe.data.model.ClientOwnerScope;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -78,24 +79,27 @@ public class TicketService {
     private final AssignmentService assignmentService;
     private final TicketLifecycleService ticketLifecycleService;
     private final TicketResolverStamp ticketResolverStamp;
+    private final ClientOwnerScopeResolver clientOwnerScopeResolver;
     private final List<TicketEventListener> listeners;
 
     /**
      * Cursor-paginated ticket listing. Cursors are raw ticket ids. AGENT principals only see the
-     * tickets owned by their machine.
+     * tickets their machine owns under its current organization ({@link ClientOwnerScope}).
      */
     public CountedGenericQueryResult<Ticket> getTickets(AuthPrincipal principal,
                                                         TicketFilterInput filter,
                                                         CursorPaginationCriteria pagination,
                                                         String search,
                                                         SortInput sort) {
-        String ownerMachineId = isAgent(principal) ? principal.getMachineId() : null;
+        ClientOwnerScope ownerScope = clientOwnerScopeResolver.isOwnerScoped(principal)
+                ? clientOwnerScopeResolver.scopeOf(principal)
+                : null;
 
         log.debug("Querying tickets for {} with filter: {}, pagination: {}, search: '{}', sort: {}",
                 principal.getActorType(), filter, pagination, search, sort);
 
         CursorPaginationCriteria paging = (pagination != null ? pagination : new CursorPaginationCriteria()).normalize();
-        Query query = buildTicketQuery(principal, filter, search, ownerMachineId);
+        Query query = buildTicketQuery(principal, filter, search, ownerScope);
         long filteredCount = ticketRepository.countTickets(query);
 
         String sortField = validateSortField(sort);
@@ -118,19 +122,23 @@ public class TicketService {
     public Optional<Ticket> getTicket(AuthPrincipal principal, @NotBlank String ticketId) {
         log.debug("Getting ticket: {} for {}", ticketId, principal.getActorType());
 
-        if (isAgent(principal)) {
-            return ticketRepository.findByIdAndOwnerMachineId(ticketId, principal.getMachineId());
+        if (!clientOwnerScopeResolver.isOwnerScoped(principal)) {
+            return ticketRepository.findById(ticketId);
         }
-        return ticketRepository.findById(ticketId);
+        ClientOwnerScope scope = clientOwnerScopeResolver.scopeOf(principal);
+        return ticketRepository.findByIdAndOwnerMachineId(ticketId, scope.getMachineId())
+                .filter(ticket -> scope.allows(ticket.getOwner(), ticket.getCreatedAt()));
     }
 
     public Optional<Ticket> getTicketByNumber(AuthPrincipal principal, Integer ticketNumber) {
         log.debug("Getting ticket #{} for {}", ticketNumber, principal.getActorType());
 
-        if (isAgent(principal)) {
-            return ticketRepository.findByTicketNumberAndOwnerMachineId(ticketNumber, principal.getMachineId());
+        if (!clientOwnerScopeResolver.isOwnerScoped(principal)) {
+            return ticketRepository.findByTicketNumber(ticketNumber);
         }
-        return ticketRepository.findByTicketNumber(ticketNumber);
+        ClientOwnerScope scope = clientOwnerScopeResolver.scopeOf(principal);
+        return ticketRepository.findByTicketNumberAndOwnerMachineId(ticketNumber, scope.getMachineId())
+                .filter(ticket -> scope.allows(ticket.getOwner(), ticket.getCreatedAt()));
     }
 
     public Optional<Ticket> findByIdOrNumber(AuthPrincipal principal, String ticketId, Integer ticketNumber) {
@@ -154,13 +162,13 @@ public class TicketService {
                 .title(input.getTitle())
                 .description(input.getDescription())
                 .creationSource(isAgentCreated ? TicketCreationSource.FAE_FORM : TicketCreationSource.ADMIN_DASHBOARD)
-                .owner(buildTicketOwner(principal))
                 .build();
 
         if (isAgentCreated) {
-            populateDeviceFromPrincipal(ticket, principal);
+            populateClientOrigin(ticket, principal);
             applyInitialStatus(ticket, TicketStatusKind.TECH_REQUIRED);
         } else {
+            ticket.setOwner(new AdminTicketOwner(principal.getId()));
             populateAdminFields(ticket, input);
             // Manually (admin) created tickets pick a custom status (default: first custom),
             // never AI_ASSISTANCE which is reserved for the AI assistant.
@@ -197,10 +205,9 @@ public class TicketService {
         Ticket ticket = Ticket.builder()
                 .ticketNumber(ticketNumberService.getNextTicketNumber())
                 .creationSource(TicketCreationSource.FAE_DIALOG)
-                .owner(buildTicketOwner(principal))
                 .build();
 
-        populateDeviceFromPrincipal(ticket, principal);
+        populateClientOrigin(ticket, principal);
         applyInitialStatus(ticket, TicketStatusKind.AI_ASSISTANCE);
 
         ticket.setOrder(computeTopOrder(ticket));
@@ -224,10 +231,9 @@ public class TicketService {
                 .title(title)
                 .description(description)
                 .creationSource(TicketCreationSource.FAE_DIALOG)
-                .owner(buildTicketOwner(principal))
                 .build();
 
-        populateDeviceFromPrincipal(ticket, principal);
+        populateClientOrigin(ticket, principal);
         applyInitialStatus(ticket, TicketStatusKind.TECH_REQUIRED);
 
         ticket.setOrder(computeTopOrder(ticket));
@@ -425,18 +431,11 @@ public class TicketService {
         ticketLifecycleService.applyManualInitialStatus(ticket, requestedStatusId);
     }
 
-    private TicketOwner buildTicketOwner(AuthPrincipal principal) {
-        return switch (principal.getActorType()) {
-            case AGENT -> new ClientTicketOwner(principal.getMachineId());
-            case ADMIN -> new AdminTicketOwner(principal.getId());
-        };
-    }
-
     private Query buildTicketQuery(AuthPrincipal principal, TicketFilterInput filter,
-                                   String search, String ownerMachineId) {
+                                   String search, ClientOwnerScope ownerScope) {
         TicketQueryFilter queryFilter = toQueryFilter(filter);
         List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filter);
-        return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
+        return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerScope);
     }
 
     private TicketQueryFilter toQueryFilter(TicketFilterInput filter) {
@@ -484,16 +483,19 @@ public class TicketService {
         return trimmedField;
     }
 
-    private void populateDeviceFromPrincipal(Ticket ticket, AuthPrincipal principal) {
+    // The owner keeps the machine and the customer it belongs to right now: the snapshot the visibility rule compares.
+    private void populateClientOrigin(Ticket ticket, AuthPrincipal principal) {
         String machineId = principal.getMachineId();
         if (machineId == null || machineId.isBlank()) {
             log.warn("AGENT token missing machineId for ticket creation");
+            ticket.setOwner(new ClientTicketOwner(machineId, null));
             return;
         }
 
         Machine device = requireMachine(machineId);
+        ticket.setOwner(new ClientTicketOwner(device.getMachineId(), device.getOrganizationId()));
         ticket.setDeviceId(device.getMachineId());
-        ticket.setDeviceHostname(device.getHostname());
+        ticket.setDeviceHostname(device.preferredName());
 
         if (device.getOrganizationId() != null) {
             Organization org = requireOrganization(device.getOrganizationId());
@@ -501,7 +503,7 @@ public class TicketService {
             ticket.setOrganizationName(org.getName());
         }
         log.debug("Auto-populated device {} and org {} for AGENT ticket",
-                device.getHostname(), ticket.getOrganizationName());
+                device.preferredName(), ticket.getOrganizationName());
     }
 
     private void populateAdminFields(Ticket ticket, CreateTicketInput input) {
@@ -517,7 +519,7 @@ public class TicketService {
         if (deviceId != null) {
             Machine device = requireMachine(deviceId);
             ticket.setDeviceId(device.getMachineId());
-            ticket.setDeviceHostname(device.getHostname());
+            ticket.setDeviceHostname(device.preferredName());
             if (resolvedOrgId == null) {
                 resolvedOrgId = device.getOrganizationId();
             } else if (!resolvedOrgId.equals(device.getOrganizationId())) {

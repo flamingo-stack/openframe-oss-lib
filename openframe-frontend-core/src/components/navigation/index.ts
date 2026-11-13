@@ -98,6 +98,8 @@ export type { AppLayoutDrawerContentProps } from './app-layout-drawer';
 
 export { MobileBurgerMenu } from './mobile-burger-menu';
 export type { MobileBurgerMenuProps } from './mobile-burger-menu';
+export { MOBILE_SIDE_PANEL_SWIPE_CLOSE_PX, MobileSidePanel } from './mobile-side-panel';
+export type { MobileSidePanelProps } from './mobile-side-panel';
 
 export { HeaderButton } from './header-button';
 export type { HeaderButtonProps } from './header-button';

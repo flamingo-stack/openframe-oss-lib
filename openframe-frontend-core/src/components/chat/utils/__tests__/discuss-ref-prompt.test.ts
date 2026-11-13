@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFetchedCardTitle } from '../card-destination';
 import { buildDiscussPrompt } from '../discuss-ref-prompt';
-import { readFetchedCardTitle } from '../resolve-fetched-card-href';
 
 const ROADMAP_REF = {
   type: 'roadmap_item',

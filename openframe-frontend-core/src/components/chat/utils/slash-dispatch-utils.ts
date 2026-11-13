@@ -167,15 +167,16 @@ export function buildDiscussAddendum(args: { tableId: string; id: string }): str
     `Ask drill-in for row id="${args.id}" in table "${args.tableId}". Focus the ` +
     `answer on this single record. If retrieval returns 0 rows (privacy ` +
     `filter), say so plainly per Rule 5b.\n\n` +
-    `OPEN with the inline card on the FIRST line, immediately followed by ` +
-    `the chip and a mono-font id tag — no prose before the card:\n` +
-    `    [card://<type>:${args.id}] [N] \`${args.tableId} · ${idTag}\`\n` +
-    `Use the EXACT <type> from the row's <document type="..." id="${args.id}"> tag.\n\n` +
+    `OPEN by naming the record with its record link (the \`record-link\` of its record header), then a mono-font ` +
+    `id tag, no prose before it:\n` +
+    `    [<its name>](<its record-link>) \`${args.tableId} · ${idTag}\`\n` +
+    `Copy the record-link exactly. Show the record as a card first: call show_records with its record-link before ` +
+    `you write.\n\n` +
     `SURFACE EVERY FIELD PRESENT in the retrieved record — the user already ` +
-    `knows the title from the card; the value of Ask is the BODY (description, ` +
+    `knows the title from the link and its card; the value of Ask is the BODY (description, ` +
     `status, vote counts, dates, linked URLs, …). Walk each non-empty field. ` +
     `Don't invent fields, don't hallucinate values, silently omit absent fields.\n\n` +
-    `FORMAT: card+chip+id-tag opener, then ONE framing sentence, then a compact ` +
+    `FORMAT: link+id-tag opener, then ONE framing sentence, then a compact ` +
     `bulleted "**Field** — value" list. Don't restate fields already in the list.`
   );
 }

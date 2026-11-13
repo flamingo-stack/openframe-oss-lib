@@ -4,6 +4,9 @@ import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.Ticket.Fields;
+import com.openframe.data.document.ticket.TicketOwnerType;
+import com.openframe.data.document.ticket.TicketStatusDefinition;
+import com.openframe.data.document.ticket.TicketStatusKind;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoOperations;
@@ -12,8 +15,11 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 // The projections' ticket writes; TicketRepository is tenant-aware and absent in the shared stream, so each names the tenant.
 @Repository
@@ -22,6 +28,10 @@ public class TicketProjectionRepository {
 
     // From the primary: a lagging secondary could count 0 or miss items, and the event would skip a real update.
     private static final ReadPreference PRIMARY = ReadPreference.primary();
+    private static final String FIELD_KIND = "kind";
+    private static final String FIELD_OWNER_TYPE = "owner.ticketOwnerType";
+    private static final String FIELD_OWNER_MACHINE_ID = "owner.machineId";
+    private static final String FIELD_OWNER_ORGANIZATION_ID = "owner.organizationId";
 
     private final MongoOperations mongoOperations;
 
@@ -102,32 +112,32 @@ public class TicketProjectionRepository {
         return batchIds.getLast();
     }
 
-    public long updateDeviceHostname(String tenantId, String machineId, String hostname) {
-        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
+    public long updateDeviceHostname(String tenantId, String machineId, String deviceName) {
+        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, deviceName);
         Query query = new Query(ticketsToUpdate);
-        Update update = new Update().set(Fields.deviceHostname, hostname);
+        Update update = new Update().set(Fields.deviceHostname, deviceName);
         UpdateResult result = mongoOperations.updateMulti(query, update, Ticket.class);
         return result.getModifiedCount();
     }
 
-    public long countTicketsToUpdateDeviceHostname(String tenantId, String machineId, String hostname, int limit) {
-        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
+    public long countTicketsToUpdateDeviceHostname(String tenantId, String machineId, String deviceName, int limit) {
+        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, deviceName);
         Query query = new Query(ticketsToUpdate).limit(limit);
         query.withReadPreference(PRIMARY);
         return mongoOperations.count(query, Ticket.class);
     }
 
     // One batch in _id order after lastId (null for the first); returns its last _id, or null when none is left.
-    public String updateDeviceHostnameBatch(String tenantId, String machineId, String hostname, String lastId, int batchSize) {
-        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
+    public String updateDeviceHostnameBatch(String tenantId, String machineId, String deviceName, String lastId, int batchSize) {
+        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, deviceName);
         List<String> batchIds = findIdsAfter(ticketsToUpdate, lastId, batchSize);
         if (batchIds.isEmpty()) {
             return null;
         }
-        Criteria batchTickets = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname)
+        Criteria batchTickets = matchTicketsToUpdateDeviceHostname(tenantId, machineId, deviceName)
                 .and(Fields.id).in(batchIds);
         Query query = new Query(batchTickets);
-        Update update = new Update().set(Fields.deviceHostname, hostname);
+        Update update = new Update().set(Fields.deviceHostname, deviceName);
         mongoOperations.updateMulti(query, update, Ticket.class);
         return batchIds.getLast();
     }
@@ -140,6 +150,62 @@ public class TicketProjectionRepository {
         query.fields().include(Fields.id, Fields.tenantId, Fields.title);
         query.withReadPreference(PRIMARY);
         return mongoOperations.find(query, Ticket.class);
+    }
+
+    /** The tenant's status of the given kind, for example its ARCHIVED status; empty when the tenant has none. */
+    public Optional<String> findStatusId(String tenantId, TicketStatusKind kind) {
+        Criteria status = Criteria.where(Fields.tenantId).is(tenantId).and(FIELD_KIND).is(kind);
+        Query query = new Query(status);
+        query.withReadPreference(PRIMARY);
+        TicketStatusDefinition found = mongoOperations.findOne(query, TicketStatusDefinition.class);
+        return Optional.ofNullable(found).map(TicketStatusDefinition::getId);
+    }
+
+    // The client tickets a machine opened under a customer other than its current one, not archived yet.
+    public long archiveClientTicketsOfOtherOrganizations(String tenantId, String machineId, String organizationId,
+                                                         String archivedStatusId) {
+        Criteria leftBehind = matchOpenClientTicketsOfOtherOrganizations(tenantId, machineId, organizationId);
+        UpdateResult result = mongoOperations.updateMulti(new Query(leftBehind), archive(archivedStatusId), Ticket.class);
+        return result.getModifiedCount();
+    }
+
+    public long countClientTicketsOfOtherOrganizations(String tenantId, String machineId, String organizationId, int limit) {
+        Criteria leftBehind = matchOpenClientTicketsOfOtherOrganizations(tenantId, machineId, organizationId);
+        Query query = new Query(leftBehind).limit(limit);
+        query.withReadPreference(PRIMARY);
+        return mongoOperations.count(query, Ticket.class);
+    }
+
+    // One batch in _id order after lastId (null for the first); returns its last _id, or null when none is left.
+    public String archiveClientTicketsOfOtherOrganizationsBatch(String tenantId, String machineId, String organizationId,
+                                                                String archivedStatusId, String lastId, int batchSize) {
+        Criteria leftBehind = matchOpenClientTicketsOfOtherOrganizations(tenantId, machineId, organizationId);
+        List<String> batchIds = findIdsAfter(leftBehind, lastId, batchSize);
+        if (batchIds.isEmpty()) {
+            return null;
+        }
+        Criteria batchTickets = matchOpenClientTicketsOfOtherOrganizations(tenantId, machineId, organizationId)
+                .and(Fields.id).in(batchIds);
+        mongoOperations.updateMulti(new Query(batchTickets), archive(archivedStatusId), Ticket.class);
+        return batchIds.getLast();
+    }
+
+    // The same write as the bulk archive of the lifecycle service: status, kind and the update stamp.
+    private static Update archive(String archivedStatusId) {
+        return new Update()
+                .set(Fields.statusId, archivedStatusId)
+                .set(Fields.statusKind, TicketStatusKind.ARCHIVED)
+                .set(Fields.updatedAt, Instant.now());
+    }
+
+    private static Criteria matchOpenClientTicketsOfOtherOrganizations(String tenantId, String machineId,
+                                                                        String organizationId) {
+        return Criteria.where(Fields.tenantId).is(tenantId)
+                .and(FIELD_OWNER_TYPE).is(TicketOwnerType.CLIENT)
+                .and(FIELD_OWNER_MACHINE_ID).is(machineId)
+                // $nin, not two $ne: a second ne on the same field replaces the first; null also matches a missing snapshot.
+                .and(FIELD_OWNER_ORGANIZATION_ID).nin(Arrays.asList(null, organizationId))
+                .and(Fields.statusKind).ne(TicketStatusKind.ARCHIVED);
     }
 
     private List<String> findIdsAfter(Criteria criteria, String lastId, int batchSize) {
@@ -161,10 +227,10 @@ public class TicketProjectionRepository {
                 .and(Fields.organizationName).ne(organizationName);
     }
 
-    private static Criteria matchTicketsToUpdateDeviceHostname(String tenantId, String machineId, String hostname) {
+    private static Criteria matchTicketsToUpdateDeviceHostname(String tenantId, String machineId, String deviceName) {
         return Criteria.where(Fields.tenantId).is(tenantId)
                 .and(Fields.deviceId).is(machineId)
-                .and(Fields.deviceHostname).ne(hostname);
+                .and(Fields.deviceHostname).ne(deviceName);
     }
 
     private static Criteria matchTicketsToUpdateAssignedName(String tenantId, String userId, String userName) {
