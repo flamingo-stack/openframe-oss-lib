@@ -8,13 +8,11 @@ import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import org.bson.Document;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -34,70 +32,70 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class DeviceHeartbeatOfflineDetectionServiceTest {
 
-    private static final String MACHINE_ID = "m-1";
-
     @Mock private MachineRepository machineRepository;
     @Mock private MachineWriter machineWriter;
 
     @Captor private ArgumentCaptor<Criteria> guardCaptor;
     @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
 
-    private DeviceHeartbeatOfflineDetectionService service;
-    private DeviceHeartbeatOfflineDetectionService managedStatusOff;
-
-    @BeforeEach
-    void setUp() {
-        service = new DeviceHeartbeatOfflineDetectionService(machineRepository, machineWriter, true);
-        managedStatusOff = new DeviceHeartbeatOfflineDetectionService(machineRepository, machineWriter, false);
-    }
+    @InjectMocks private DeviceHeartbeatOfflineDetectionService service;
 
     @Test
-    void markStaleDevicesOffline_silentOnlineMachine_connectivityOfflineGuardedOnStillOnline() {
+    void markStaleDevicesOffline_silentOnlineMachine_statusAndTelemetryOfflineWhileStillOnline() {
         // setup
-        Machine machine = machine(MACHINE_ID, DeviceStatus.MANAGED);
-        stubStale(machine);
-        stubWritten(MACHINE_ID, machine);
+        Machine machine = machine("m-1", DeviceStatus.ONLINE, TelemetryStatus.ONLINE);
+        when(machineRepository.findByStatusAndLastSeenBefore(eq(DeviceStatus.ONLINE), any(Instant.class))).thenReturn(List.of(machine));
+        when(machineRepository.findByTelemetryStatusAndLastSeenBefore(eq(TelemetryStatus.ONLINE), any(Instant.class))).thenReturn(List.of(machine));
+        when(machineWriter.update(eq("m-1"), any(Criteria.class), any(MachineUpdate.class))).thenReturn(written(machine));
 
         // execution
         service.markStaleDevicesOffline();
 
         // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), guardCaptor.capture(), updateCaptor.capture());
-        assertThat(updateCaptor.getValue().paths()).containsExactly("telemetryStatus");
-        assertThat(applied(updateCaptor.getValue()).getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
+        verify(machineWriter).update(eq("m-1"), guardCaptor.capture(), updateCaptor.capture());
+        assertThat(updateCaptor.getValue().paths()).containsExactlyInAnyOrder("telemetryStatus", "status");
+        Machine updated = applied(updateCaptor.getValue());
+        assertThat(updated.getStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        assertThat(updated.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
         Document guard = guardCaptor.getValue().getCriteriaObject();
         assertThat(guard.get("lastSeen", Document.class)).containsKey("$lt");
-        assertThat(guard)
-                .containsEntry("telemetryStatus", TelemetryStatus.ONLINE)
-                .doesNotContainKey("status");
+        assertThat(guard.get("status")).isEqualTo(DeviceStatus.ONLINE);
+        assertThat(guard).doesNotContainKey("telemetryStatus");
         verify(machineRepository, never()).saveAll(any());
     }
 
-    @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "MANAGED", "ONLINE", "PENDING_DELETION", "ARCHIVED"})
-    void markStaleDevicesOffline_anyLifecycleStatus_statusNeverWritten(DeviceStatus status) {
+    @Test
+    void markStaleDevicesOffline_silentMachineBeingDeleted_onlyTelemetryOfflineWhileTelemetryStillOnline() {
         // setup
-        Machine machine = machine(MACHINE_ID, status);
-        stubStale(machine);
-        stubWritten(MACHINE_ID, machine);
+        Machine machine = machine("m-1", DeviceStatus.PENDING_DELETION, TelemetryStatus.ONLINE);
+        when(machineRepository.findByStatusAndLastSeenBefore(eq(DeviceStatus.ONLINE), any(Instant.class))).thenReturn(List.of());
+        when(machineRepository.findByTelemetryStatusAndLastSeenBefore(eq(TelemetryStatus.ONLINE), any(Instant.class))).thenReturn(List.of(machine));
+        when(machineWriter.update(eq("m-1"), any(Criteria.class), any(MachineUpdate.class))).thenReturn(written(machine));
 
         // execution
         service.markStaleDevicesOffline();
 
         // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), guardCaptor.capture(), updateCaptor.capture());
-        assertThat(updateCaptor.getValue().paths()).doesNotContain("status");
-        assertThat(guardCaptor.getValue().getCriteriaObject()).doesNotContainKey("status");
+        verify(machineWriter).update(eq("m-1"), guardCaptor.capture(), updateCaptor.capture());
+        assertThat(updateCaptor.getValue().paths()).containsExactly("telemetryStatus");
+        Document guard = guardCaptor.getValue().getCriteriaObject();
+        assertThat(guard.get("lastSeen", Document.class)).containsKey("$lt");
+        assertThat(guard.get("telemetryStatus")).isEqualTo(TelemetryStatus.ONLINE);
+        assertThat(guard).doesNotContainKey("status");
+        Machine updated = applied(machine, updateCaptor.getValue());
+        assertThat(updated.getStatus()).isEqualTo(DeviceStatus.PENDING_DELETION);
+        assertThat(updated.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
     }
 
     @Test
     void markStaleDevicesOffline_heartbeatLandedMeanwhile_otherMachinesStillMarked() {
         // setup
-        Machine fresh = machine("m-1", DeviceStatus.MANAGED);
-        Machine silent = machine("m-2", DeviceStatus.MANAGED);
-        stubStale(fresh, silent);
+        Machine fresh = machine("m-1", DeviceStatus.ONLINE, TelemetryStatus.ONLINE);
+        Machine silent = machine("m-2", DeviceStatus.ONLINE, TelemetryStatus.ONLINE);
+        when(machineRepository.findByStatusAndLastSeenBefore(eq(DeviceStatus.ONLINE), any(Instant.class))).thenReturn(List.of(fresh, silent));
+        when(machineRepository.findByTelemetryStatusAndLastSeenBefore(eq(TelemetryStatus.ONLINE), any(Instant.class))).thenReturn(List.of());
         when(machineWriter.update(eq("m-1"), any(Criteria.class), any(MachineUpdate.class))).thenReturn(Optional.empty());
-        stubWritten("m-2", silent);
+        when(machineWriter.update(eq("m-2"), any(Criteria.class), any(MachineUpdate.class))).thenReturn(written(silent));
 
         // execution
         service.markStaleDevicesOffline();
@@ -109,7 +107,8 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
     @Test
     void markStaleDevicesOffline_nothingStale_nothingWritten() {
         // setup
-        stubStale();
+        when(machineRepository.findByStatusAndLastSeenBefore(eq(DeviceStatus.ONLINE), any(Instant.class))).thenReturn(List.of());
+        when(machineRepository.findByTelemetryStatusAndLastSeenBefore(eq(TelemetryStatus.ONLINE), any(Instant.class))).thenReturn(List.of());
 
         // execution
         service.markStaleDevicesOffline();
@@ -119,67 +118,25 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
         verify(machineRepository, never()).saveAll(any());
     }
 
-    @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"ONLINE", "MANAGED"})
-    void markStaleDevicesOffline_flagOffConnectedStatus_statusAndConnectivityOfflineGuardedOnStatusRead(DeviceStatus status) {
-        // setup
-        Machine machine = machine(MACHINE_ID, status);
-        stubStale(machine);
-        stubWritten(MACHINE_ID, machine);
-
-        // execution
-        managedStatusOff.markStaleDevicesOffline();
-
-        // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), guardCaptor.capture(), updateCaptor.capture());
-        Machine applied = applied(updateCaptor.getValue());
-        assertThat(applied.getStatus()).isEqualTo(DeviceStatus.OFFLINE);
-        assertThat(applied.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
-        Document guard = guardCaptor.getValue().getCriteriaObject();
-        assertThat(guard.get("lastSeen", Document.class)).containsKey("$lt");
-        assertThat(guard)
-                .containsEntry("telemetryStatus", TelemetryStatus.ONLINE)
-                .containsEntry("status", status);
-    }
-
-    @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "OFFLINE", "PENDING_DELETION", "DELETED", "ARCHIVED"})
-    void markStaleDevicesOffline_flagOffNotConnectedStatus_connectivityOnlyStatusKept(DeviceStatus status) {
-        // setup
-        Machine machine = machine(MACHINE_ID, status);
-        stubStale(machine);
-        stubWritten(MACHINE_ID, machine);
-
-        // execution
-        managedStatusOff.markStaleDevicesOffline();
-
-        // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), guardCaptor.capture(), updateCaptor.capture());
-        assertThat(updateCaptor.getValue().paths()).containsExactly("telemetryStatus");
-        assertThat(guardCaptor.getValue().getCriteriaObject()).doesNotContainKey("status");
-    }
-
-    private void stubStale(Machine... machines) {
-        when(machineRepository.findByTelemetryStatusAndLastSeenBefore(eq(TelemetryStatus.ONLINE), any(Instant.class)))
-                .thenReturn(List.of(machines));
-    }
-
-    private void stubWritten(String machineId, Machine machine) {
-        when(machineWriter.update(eq(machineId), any(Criteria.class), any(MachineUpdate.class)))
-                .thenReturn(Optional.of(new MachineWriteResult(machine, machine)));
+    private static Optional<MachineWriteResult> written(Machine machine) {
+        return Optional.of(new MachineWriteResult(machine, machine));
     }
 
     private static Machine applied(MachineUpdate update) {
-        Machine machine = new Machine();
-        update.applyTo(machine);
-        return machine;
+        return applied(new Machine(), update);
     }
 
-    private static Machine machine(String machineId, DeviceStatus status) {
+    private static Machine applied(Machine stored, MachineUpdate update) {
+        Machine copy = machine("copy", stored.getStatus(), stored.getTelemetryStatus());
+        update.applyTo(copy);
+        return copy;
+    }
+
+    private static Machine machine(String machineId, DeviceStatus status, TelemetryStatus telemetryStatus) {
         Machine machine = new Machine();
         machine.setMachineId(machineId);
         machine.setStatus(status);
-        machine.setTelemetryStatus(TelemetryStatus.ONLINE);
+        machine.setTelemetryStatus(telemetryStatus);
         machine.setLastSeen(Instant.parse("2026-01-01T00:00:00Z"));
         return machine;
     }

@@ -2,7 +2,6 @@ package com.openframe.test.data.dto.device;
 
 public enum DeviceStatus {
     PENDING,
-    MANAGED,
     ACTIVE,
     INACTIVE,
     MAINTENANCE,

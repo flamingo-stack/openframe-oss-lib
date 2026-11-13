@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 class CustomMachineRepositoryStatusSortTest {
 
     private static final String TENANT_ID = "tenant-1";
-    private static final List<String> DESC_ORDER = List.of("MANAGED", "ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
+    private static final List<String> DESC_ORDER = List.of("ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
     private static final int UNKNOWN_RANK = 0;
 
     @Mock private MongoTemplate mongoTemplate;
@@ -60,7 +60,7 @@ class CustomMachineRepositoryStatusSortTest {
         List<?> cond = rank.getList("$cond", Object.class);
         Document index = new Document("$indexOfArray", List.of(DESC_ORDER, "$status"));
         assertThat(cond.get(0)).isEqualTo(new Document("$in", List.of("$status", DESC_ORDER)));
-        assertThat(cond.get(1)).isEqualTo(new Document("$subtract", List.of(5, index)));
+        assertThat(cond.get(1)).isEqualTo(new Document("$subtract", List.of(4, index)));
         assertThat(cond.get(2)).isEqualTo(UNKNOWN_RANK);
         assertThat(stages.get(2).get("$sort", Document.class))
                 .containsExactly(entry("_statusRank", 1), entry("_id", 1));
@@ -69,7 +69,7 @@ class CustomMachineRepositoryStatusSortTest {
     }
 
     @Test
-    @DisplayName("status DESC: the same rank, sorted by (rank, _id) descending = MANAGED, ONLINE, OFFLINE, PENDING, PENDING_DELETION")
+    @DisplayName("status DESC: the same rank, sorted by (rank, _id) descending = ONLINE, OFFLINE, PENDING, PENDING_DELETION")
     void statusDesc_reversesExplicitOrder() {
         // setup
         stubAggregate(List.of());
@@ -183,9 +183,8 @@ class CustomMachineRepositoryStatusSortTest {
     }
 
     @Test
-    @DisplayName("statusRank: MANAGED > ONLINE > OFFLINE > PENDING > PENDING_DELETION > missing status, so DESC puts MANAGED first")
+    @DisplayName("statusRank: ONLINE > OFFLINE > PENDING > PENDING_DELETION > missing status, so DESC puts ONLINE first")
     void statusRank_followsExplicitOrder() {
-        assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.MANAGED)).isEqualTo(5);
         assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.ONLINE)).isEqualTo(4);
         assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.OFFLINE)).isEqualTo(3);
         assertThat(CustomMachineRepositoryImpl.statusRank(DeviceStatus.PENDING)).isEqualTo(2);
@@ -194,7 +193,7 @@ class CustomMachineRepositoryStatusSortTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"MANAGED", "ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION"},
+    @EnumSource(value = DeviceStatus.class, names = {"ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION"},
             mode = EnumSource.Mode.EXCLUDE)
     @DisplayName("statusRank: every status outside the explicit order ranks below PENDING_DELETION")
     void statusRank_otherStatusesRankLast(DeviceStatus status) {

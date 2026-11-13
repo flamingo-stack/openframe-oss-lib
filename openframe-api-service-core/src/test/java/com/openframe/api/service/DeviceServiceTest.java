@@ -30,9 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -46,7 +44,6 @@ import static com.openframe.data.document.rmm.script.OsType.MAC_OS;
 import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -76,7 +73,6 @@ class DeviceServiceTest {
     private TenantIdProvider tenantIdProvider;
     @Mock
     private ApplicationEventPublisher eventPublisher;
-    @Captor private ArgumentCaptor<MachineUpdate> statusUpdateCaptor;
 
     private DeviceService service() {
         DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, deviceSoftwareConnectivitySync,
@@ -367,16 +363,16 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("updateStatusByMachineId: archiving a MANAGED device does not touch schedule assignments")
-    void archiving_noAssignmentCleanup() {
+    @DisplayName("updateStatusByMachineId: a non-DELETE status change does NOT touch schedule assignments")
+    void nonDeleteStatus_noAssignmentCleanup() {
         Machine m = new Machine();
-        m.setMachineId("m-arc");
+        m.setMachineId("m-off");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
-        service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
+        service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
         verify(deletedMachineCleanup, never()).cleanUpDeletedMachine(any(), any());
     }
@@ -387,47 +383,44 @@ class DeviceServiceTest {
         Machine m = new Machine();
         m.setMachineId("m-arc");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.MANAGED);
+        m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
         service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
 
         verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-arc", false);
-        verify(machineWriter).update(eq("m-arc"), statusUpdateCaptor.capture());
-        assertThat(statusUpdateCaptor.getValue().paths()).containsExactly("status");
-        verify(machineRepository, never()).save(any());
+        verify(deletedMachineCleanup, never()).cleanUpDeletedMachine(any(), any());
     }
 
     @Test
-    @DisplayName("updateStatusByMachineId: archiving a PENDING device was never CONNECTED, so the counters are not touched")
-    void archivingPending_noConnectivitySync() {
+    @DisplayName("updateStatusByMachineId: restoring an archived device re-enters CONNECTED, so it counts again")
+    void restoringArchived_syncsConnectivityOn() {
         Machine m = new Machine();
-        m.setMachineId("m-pen");
+        m.setMachineId("m-arc");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.PENDING);
-        when(machineRepository.findByMachineId("m-pen")).thenReturn(Optional.of(m));
+        m.setStatus(DeviceStatus.ARCHIVED);
+        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
-        service().updateStatusByMachineId("m-pen", DeviceStatus.ARCHIVED);
+        service().updateStatusByMachineId("m-arc", DeviceStatus.ONLINE);
 
-        verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
-        verify(machineWriter).update(eq("m-pen"), any(MachineUpdate.class));
+        verify(deviceSoftwareConnectivitySync).onConnectivityChanged("t-1", "m-arc", true);
     }
 
-    @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"DELETED", "ARCHIVED"}, mode = EnumSource.Mode.EXCLUDE)
-    @DisplayName("updateStatusByMachineId: only DELETED and ARCHIVED can be set through the API")
-    void updateStatus_outsideWhitelist_badRequestAndNothingRead(DeviceStatus status) {
-        DeviceService s = service();
+    @Test
+    @DisplayName("updateStatusByMachineId: ONLINE<->OFFLINE stays within CONNECTED, so the counters are not touched")
+    void onlineToOffline_noConnectivitySync() {
+        Machine m = new Machine();
+        m.setMachineId("m-off");
+        m.setTenantId("t-1");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
+        stubStatusWrite(m);
 
-        BadRequestException ex = assertThrows(BadRequestException.class,
-                () -> s.updateStatusByMachineId("m-1", status));
+        service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
-        assertThat(ex.getMessage()).contains("only be set to DELETED or ARCHIVED");
-        verify(machineRepository, never()).findByMachineId(any());
-        verify(machineRepository, never()).save(any());
-        verifyNoInteractions(deletedMachineCleanup, deviceSoftwareConnectivitySync, deviceStatusProcessor);
+        verify(deviceSoftwareConnectivitySync, never()).onConnectivityChanged(any(), any(), anyBoolean());
     }
 
     @Test
@@ -450,19 +443,20 @@ class DeviceServiceTest {
     @DisplayName("updateStatusByMachineId: writes only the status field and post-processes the stored result")
     void statusChange_fieldLevelWrite_postProcessesTheWrittenMachine() {
         Machine m = new Machine();
-        m.setMachineId("m-arc");
+        m.setMachineId("m-off");
         m.setTenantId("t-1");
-        m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
         stubStatusWrite(m);
 
-        service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED);
+        service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
-        verify(machineWriter).update(eq("m-arc"), statusUpdateCaptor.capture());
-        assertThat(statusUpdateCaptor.getValue().paths()).containsExactly("status");
+        ArgumentCaptor<MachineUpdate> update = ArgumentCaptor.forClass(MachineUpdate.class);
+        verify(machineWriter).update(eq("m-off"), update.capture());
+        assertThat(update.getValue().paths()).containsExactly("status");
         ArgumentCaptor<Machine> processed = ArgumentCaptor.forClass(Machine.class);
         verify(deviceStatusProcessor).postProcessStatusUpdated(processed.capture());
-        assertThat(processed.getValue().getStatus()).isEqualTo(DeviceStatus.ARCHIVED);
+        assertThat(processed.getValue().getStatus()).isEqualTo(DeviceStatus.OFFLINE);
         verify(machineRepository, never()).save(any());
     }
 
@@ -470,12 +464,12 @@ class DeviceServiceTest {
     @DisplayName("updateStatusByMachineId: a device removed between the read and the write is not found")
     void statusChange_deviceGoneBeforeTheWrite_notFound() {
         Machine m = new Machine();
-        m.setMachineId("m-arc");
-        m.setStatus(DeviceStatus.MANAGED);
-        when(machineRepository.findByMachineId("m-arc")).thenReturn(Optional.of(m));
-        when(machineWriter.update(eq("m-arc"), any(MachineUpdate.class))).thenReturn(Optional.empty());
+        m.setMachineId("m-off");
+        m.setStatus(DeviceStatus.ONLINE);
+        when(machineRepository.findByMachineId("m-off")).thenReturn(Optional.of(m));
+        when(machineWriter.update(eq("m-off"), any(MachineUpdate.class))).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service().updateStatusByMachineId("m-arc", DeviceStatus.ARCHIVED))
+        assertThatThrownBy(() -> service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE))
                 .isInstanceOf(DeviceNotFoundException.class);
 
         verifyNoInteractions(deviceStatusProcessor);

@@ -4,7 +4,6 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.service.AgentUninstallService;
-import com.openframe.client.service.DeviceLifecycleService;
 import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.MachineHostnameService;
 import com.openframe.client.service.MachineStatusService;
@@ -125,10 +124,9 @@ class MachineFieldLevelWritesIT {
 
     static Stream<Arguments> postRegistrationWriters() {
         return Stream.of(
-                path("first connectivity flip of a pending machine", DeviceStatus.PENDING,
-                        s -> s.status().updateToOffline(MACHINE_ID, LATER),
-                        m -> m.getStatus() == DeviceStatus.PENDING && m.getTelemetryStatus() == TelemetryStatus.OFFLINE
-                                && LATER.equals(m.getFirstConnectedAt())),
+                path("status transition PENDING -> ONLINE", DeviceStatus.PENDING,
+                        s -> s.status().updateToOnline(MACHINE_ID, LATER),
+                        m -> m.getStatus() == DeviceStatus.ONLINE && LATER.equals(m.getFirstConnectedAt())),
                 path("connectivity flip of a deleted machine", DeviceStatus.DELETED,
                         s -> s.status().updateToOffline(MACHINE_ID, LATER),
                         m -> m.getTelemetryStatus() == TelemetryStatus.OFFLINE && m.getStatus() == DeviceStatus.DELETED),
@@ -219,8 +217,7 @@ class MachineFieldLevelWritesIT {
                     AgentUninstallService uninstall, AgentRegistrationService registration) {
 
         Services(MachineRepository machines) {
-            this(new MachineStatusService(machines, machineWriter, mock(DeviceLifecycleService.class),
-                            mock(ApplicationEventPublisher.class), true),
+            this(new MachineStatusService(machines, machineWriter, mock(ApplicationEventPublisher.class)),
                     new MachineTimezoneService(machines, machineWriter),
                     new MachineHostnameService(machines, machineWriter),
                     uninstallService(machines),

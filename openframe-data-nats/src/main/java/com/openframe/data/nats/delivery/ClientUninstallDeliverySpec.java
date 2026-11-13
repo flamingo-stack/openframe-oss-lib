@@ -51,7 +51,6 @@ public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstall
     // the uninstall is the one command a machine marked for deletion is still waiting for
     @Override
     public Set<DeviceStatus> getDeliverableStatuses() {
-        return EnumSet.of(DeviceStatus.MANAGED, DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING,
-                DeviceStatus.PENDING_DELETION);
+        return EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING, DeviceStatus.PENDING_DELETION);
     }
 }

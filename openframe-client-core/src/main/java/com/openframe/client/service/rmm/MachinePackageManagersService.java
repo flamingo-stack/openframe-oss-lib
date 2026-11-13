@@ -41,7 +41,7 @@ public class MachinePackageManagersService {
             return;
         }
         Machine machine = foundMachine.get();
-        if (isFrozen(machine)) {
+        if (isDeletionInProgress(machine)) {
             log.debug("Ignoring package-managers report for machineId={} in status {}", machineId, machine.getStatus());
             return;
         }
@@ -76,8 +76,8 @@ public class MachinePackageManagersService {
         }
     }
 
-    private static boolean isFrozen(Machine machine) {
-        return DeviceStatus.FROZEN.contains(machine.getStatus());
+    private static boolean isDeletionInProgress(Machine machine) {
+        return DeviceStatus.DELETING_OR_DELETED.contains(machine.getStatus());
     }
 
     private static Map<PackageManagerType, PackageManagerState> toStates(String machineId,

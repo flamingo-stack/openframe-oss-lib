@@ -2,26 +2,18 @@ package com.openframe.client.listener;
 
 import com.openframe.client.event.DeviceCameOnlineEvent;
 import com.openframe.client.listener.rmm.DeviceOnlineCriteriaArmingListener;
-import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
-import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
-import com.openframe.data.document.rmm.schedule.ScheduleDeviceSelectionMode;
 import com.openframe.data.document.rmm.schedule.ScheduleScript;
 import com.openframe.data.document.rmm.schedule.ScheduleScriptTrigger;
 import com.openframe.data.document.rmm.script.ScriptStatus;
-import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
-import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleRepository;
-import com.openframe.data.service.rmm.ScheduleCriteriaDeviceResolver;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -33,7 +25,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -117,30 +108,6 @@ class DeviceOnlineCriteriaArmingListenerTest {
 
         verify(dispatchRepository, never()).findByTenantIdAndMachineIdAndScheduleId(any(), any(), any());
         verify(dispatchRepository, never()).save(any());
-    }
-
-    @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"PENDING_DELETION", "DELETED", "ARCHIVED", "PENDING"})
-    @DisplayName("a device outside the managed statuses flipping online arms nothing, through the real criteria resolver")
-    void doesNotArm_whenDeviceIsNotManaged(DeviceStatus status) {
-        ScheduleDeviceTargetResolver realResolver = new ScheduleDeviceTargetResolver(
-                mock(MachineRepository.class), mock(ScriptScheduleMachineAssignedRepository.class),
-                new ScheduleCriteriaDeviceResolver(mock(MachineRepository.class)));
-        DeviceOnlineCriteriaArmingListener realListener =
-                new DeviceOnlineCriteriaArmingListener(scheduleRepository, realResolver, dispatchRepository);
-        ScheduleScript schedule = ScheduleScript.builder().id(SCHEDULE).tenantId(TENANT)
-                .selectionMode(ScheduleDeviceSelectionMode.CRITERIA)
-                .deviceCriteria(ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build())
-                .build();
-        when(scheduleRepository.findByTenantIdAndTriggerAndStatus(TENANT, ScheduleScriptTrigger.DEVICE_ONLINE, ScriptStatus.ACTIVE))
-                .thenReturn(List.of(schedule));
-        Machine machine = machine();
-        machine.setOrganizationId("org-1");
-        machine.setStatus(status);
-
-        realListener.onDeviceCameOnline(new DeviceCameOnlineEvent(this, machine));
-
-        verifyNoInteractions(dispatchRepository);
     }
 
     @Test

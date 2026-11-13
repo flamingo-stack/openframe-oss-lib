@@ -25,7 +25,6 @@ public class ToolConnectionService {
     private final ToolConnectionRepository toolConnectionRepository;
     private final MachineRepository machineRepository;
     private final ToolAgentIdTransformerService toolAgentIdTransformerService;
-    private final DeviceLifecycleService deviceLifecycleService;
 
     @Transactional
     public void disconnectAll(String machineId) {
@@ -65,7 +64,6 @@ public class ToolConnectionService {
                         ),
                         () -> addNewToolConnection(openframeAgentId, toolType, agentToolId, lastAttempt)
                 );
-        deviceLifecycleService.promoteIfReady(openframeAgentId);
     }
 
     private void processExistingToolConnection(

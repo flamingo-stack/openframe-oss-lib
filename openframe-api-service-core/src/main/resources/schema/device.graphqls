@@ -137,7 +137,6 @@ type MachinePackageManagers {
 
 enum DeviceStatus {
     PENDING,
-    MANAGED,
     ACTIVE
     INACTIVE
     MAINTENANCE
