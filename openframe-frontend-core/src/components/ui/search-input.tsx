@@ -561,7 +561,7 @@ export function SearchInput({
 
         <PopoverPrimitive.Content
           className={cn(
-            'z-50 mt-1 w-[var(--radix-popover-trigger-width)]',
+            'z-50 w-[var(--radix-popover-trigger-width)]',
             'overflow-hidden rounded-[6px] border border-ods-border bg-ods-card shadow-lg',
             'flex max-h-[var(--radix-popper-available-height)] flex-col',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -570,12 +570,15 @@ export function SearchInput({
             'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
             dropdownClassName,
           )}
-          sideOffset={4}
+          // The gap is an offset, not a margin, so the collision padding counts it.
+          sideOffset={8}
           align="start"
           // The anchor is the search field that raises the software keyboard,
           // so these suggestions are always positioned with the keyboard up —
           // see useViewportCollisionPadding.
           collisionPadding={viewportPadding}
+          // Every frame: iOS scrolls the field into view as the keyboard rises, and the list must follow it.
+          updatePositionStrategy="always"
           onOpenAutoFocus={e => {
             e.preventDefault();
             inputRef.current?.focus();
