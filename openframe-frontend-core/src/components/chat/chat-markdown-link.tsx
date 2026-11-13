@@ -9,8 +9,7 @@
 
 import type React from 'react';
 import { useChatRuntime } from '../../contexts/chat-runtime-context';
-import { BrowserWindowIcon } from '../icons-v2-generated/coding/browser-window-icon';
-import { InlineChip } from './inline-chip';
+import { INLINE_CHIP_LINKED_CLASS, InlineChip } from './inline-chip';
 import type { NavLinkAnchorComponent } from './types/component.types';
 import { navLinkTarget } from './utils/nav-anchor-props';
 
@@ -36,7 +35,7 @@ export function ChatMarkdownLink({
   }
   return (
     <Anchor href={href} {...anchorProps} className="no-underline">
-      <InlineChip icon={<BrowserWindowIcon />} label={children} className="hover:bg-ods-bg-hover" />
+      <InlineChip label={children} className={INLINE_CHIP_LINKED_CLASS} />
     </Anchor>
   );
 }

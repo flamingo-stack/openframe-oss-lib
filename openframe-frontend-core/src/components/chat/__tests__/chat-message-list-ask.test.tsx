@@ -12,7 +12,8 @@
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Message } from '../types/message.types';
+import type { ChatMessage } from '../../../chat-protocol/chat-message';
+import type { ChatMessageActions } from '../types/message.types';
 
 // The library hands back CALLBACK refs and the list invokes them on attach —
 // object refs would throw "scrollRef is not a function" during layout effects.
@@ -27,18 +28,17 @@ vi.mock('use-stick-to-bottom', () => ({
   }),
 }));
 
-/** Records the `onAskSelect` each row received, keyed by message id. */
+/** Records the ask handler each row received, keyed by message id. */
 const askHandlers = new Map<string, unknown>();
 vi.mock('../chat-message-enhanced', async () => {
   const { forwardRef } = await import('react');
   return {
-    ChatMessageEnhanced: forwardRef<
-      HTMLDivElement,
-      { name?: string; content: unknown; onAskSelect?: (label: string) => void }
-    >(({ name, onAskSelect }, ref) => {
-      askHandlers.set(name ?? '', onAskSelect);
-      return <div ref={ref} />;
-    }),
+    ChatMessageEnhanced: forwardRef<HTMLDivElement, { name?: string; actions?: ChatMessageActions }>(
+      ({ name, actions }, ref) => {
+        askHandlers.set(name ?? '', actions?.selectAsk);
+        return <div ref={ref} />;
+      },
+    ),
   };
 });
 
@@ -52,23 +52,31 @@ class ObserverStub {
 vi.stubGlobal('IntersectionObserver', ObserverStub);
 vi.stubGlobal('ResizeObserver', ObserverStub);
 
-const askMessage = (id: string): Message => ({
+const askMessage = (id: string): ChatMessage => ({
   id,
-  name: id,
   role: 'assistant',
-  content: [
-    { type: 'ask', question: 'What would you like to do with tickets?', options: [{ label: 'Ticket features' }] },
+  metadata: { author: { name: id } },
+  parts: [
+    {
+      type: 'data-ask',
+      data: { question: 'What would you like to do with tickets?', options: [{ label: 'Ticket features' }] },
+    },
   ],
 });
 
-const userMessage = (id: string): Message => ({ id, name: id, role: 'user', content: 'Ticket features' });
+const userMessage = (id: string): ChatMessage => ({
+  id,
+  role: 'user',
+  metadata: { author: { name: id } },
+  parts: [{ type: 'text', text: 'Ticket features' }],
+});
 
 describe('ChatMessageList — ask cards lock after a reply', () => {
   beforeEach(() => askHandlers.clear());
 
   it('keeps the trailing card interactive while nothing follows it', () => {
     const onAskSelect = vi.fn();
-    render(<ChatMessageList messages={[userMessage('u1'), askMessage('a1')]} onAskSelect={onAskSelect} />);
+    render(<ChatMessageList messages={[userMessage('u1'), askMessage('a1')]} actions={{ selectAsk: onAskSelect }} />);
 
     expect(askHandlers.get('a1')).toBe(onAskSelect);
   });
@@ -77,8 +85,17 @@ describe('ChatMessageList — ask cards lock after a reply', () => {
     const onAskSelect = vi.fn();
     render(
       <ChatMessageList
-        messages={[askMessage('a1'), userMessage('u1'), { id: 'a2', name: 'a2', role: 'assistant', content: 'answer' }]}
-        onAskSelect={onAskSelect}
+        messages={[
+          askMessage('a1'),
+          userMessage('u1'),
+          {
+            id: 'a2',
+            role: 'assistant',
+            metadata: { author: { name: 'a2' } },
+            parts: [{ type: 'text', text: 'answer' }],
+          },
+        ]}
+        actions={{ selectAsk: onAskSelect }}
       />,
     );
 
@@ -92,7 +109,7 @@ describe('ChatMessageList — ask cards lock after a reply', () => {
     render(
       <ChatMessageList
         messages={[askMessage('a1'), userMessage('u1'), askMessage('a2'), userMessage('u2')]}
-        onAskSelect={onAskSelect}
+        actions={{ selectAsk: onAskSelect }}
       />,
     );
 

@@ -223,16 +223,15 @@ export {
 // instead of src/components/chat/utils/ so server-side hub callers like
 // doc-chat-utils can use them without tripping the 'use client' boundary)
 export { SOURCE_ICON_NAMES, getSourceIconName, SOURCE_LABELS_BY_TABLE, getSourceLabel } from './source-icons';
-// Grouped source chips: the one rule + the one constructor, for the hub
-// (server) and the chat strip (client) alike.
+// Grouped source chips: the one rule, for the hub (server) and the chat strip (client) alike.
 export {
   DOC_TABLE_TYPES,
   groupsByTable,
   recordCountLabel,
-  buildGroupedSource,
   groupSourcesByTable,
   formatCitationIndices,
-  type GroupedSourceRow,
+  type SourceGroup,
+  type SourceRow,
 } from './source-grouping';
 
 // Embed-surface auth — generic across chat AND ticket center (and any
@@ -268,11 +267,6 @@ export {
   applyProxyAuth,
 } from './embed-proxy-auth-storage';
 
-// SSE leading-frame reader for the chat-agent `confirm-tool` route.
-// Used by the ticket center to drain the single `decision_resolved`
-// frame the server emits when `messages: []` is in the request body.
-export { readLeadingDecisionFrame, type DecisionResolvedFrame } from './sse-decision-frame';
-
 // Pure text/wire helpers that originated under components/chat/utils/
 // but are needed by SERVER-SIDE hub callers (doc-chat-utils,
 // hubspot-files-utils, rag-mappers). Re-exporting through utils/ keeps
@@ -280,23 +274,14 @@ export { readLeadingDecisionFrame, type DecisionResolvedFrame } from './sse-deci
 // stays intact for client consumers via components/chat barrel.
 export {
   escapeMarkdownInline,
-  type ChatAttachment,
-  buildChatAttachmentViewUrl,
-  formatChatAttachmentMarkdownForBubble,
-  CHAT_ATTACHMENT_VIEW_URL_PREFIX,
-  CHAT_ATTACHMENT_VIEW_TOKEN_QUERY_PARAM,
-  ANTHROPIC_SUPPORTED_IMAGE_MIME,
   CHAT_ATTACHMENT_VIEW_URL_PREFIX_REGEX_ESCAPED,
-  CHAT_ATTACHMENT_MARKDOWN_PATTERN,
-  stripChatAttachmentMarkdown,
 } from '../components/chat/utils/chat-attachment-markdown';
 export {
   AUTO_CONTINUATION_DIRECTIVE_PREFIX,
   buildAutoContinuationDirective,
   type BuildAutoContinuationOptions,
 } from '../components/chat/utils/auto-continuation-directive';
-export { flattenAssistantContent } from '../components/chat/utils/flatten-assistant-content';
-export { SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from '../components/chat/utils/scroll-anchor';
+export { SCROLL_ANCHOR_WIRE_KEY } from '../components/chat/utils/scroll-anchor';
 export { SCROLL_ANCHOR, type ScrollAnchor } from '../components/chat/types/message.types';
 export {
   type WireCommandOverride,
@@ -405,14 +390,12 @@ export { extractItems, extractItemId, extractCardItems } from './extract-items';
 export { FullscreenSwitchController, type FullscreenSwitchOptions } from './fullscreen-switch';
 export { buildSuggestionUrl, type SuggestionUrlOptions } from './suggestion-url';
 
-// Embedder-configurable content-URL composer for the existing
-// `runtime.composeContentUrl` seam — relative href for host-served types,
-// hub origin for the rest. Pure + server-safe.
+// The one embedder composer for the `runtime.composeContentUrl` seam: the host's own page for a record it has one
+// for, the server's address for every other. Pure + server-safe.
 export {
-  DEFAULT_CONTENT_SUFFIXES,
-  makeComposeContentUrl,
+  makeEmbedderComposeContentUrl,
+  type EmbedderContentRoutes,
   buildDefaultHref,
-  type ContentHrefOptions,
   type ComposeContentUrl,
   type ComposedContentUrl,
 } from './content-href';

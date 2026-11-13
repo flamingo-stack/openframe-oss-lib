@@ -2,6 +2,7 @@ package com.openframe.api.service.ticket;
 
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.service.AssignmentService;
+import com.openframe.api.service.device.ClientOwnerScopeResolver;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,6 +49,7 @@ class TicketServiceDeviceFilterTest {
     @Mock private AssignmentService assignmentService;
     @Mock private TicketLifecycleService ticketLifecycleService;
     @Mock private TicketResolverStamp ticketResolverStamp;
+    @Mock private ClientOwnerScopeResolver clientOwnerScopeResolver;
 
     private final Query query = new Query();
 
@@ -56,7 +59,7 @@ class TicketServiceDeviceFilterTest {
     void setUp() {
         service = new TicketService(ticketRepository, ticketNumberService, ticketTagService, ticketIdsForFilter,
                 ticketStalenessResolver, machineRepository, organizationRepository, userRepository, assignmentService,
-                ticketLifecycleService, ticketResolverStamp, List.of());
+                ticketLifecycleService, ticketResolverStamp, clientOwnerScopeResolver, List.of());
         when(ticketRepository.buildTicketQuery(any(), any(), any(), any())).thenReturn(query);
         when(ticketRepository.findTicketsWithCursor(eq(query), any(), anyInt(), any(), any())).thenReturn(List.of());
     }

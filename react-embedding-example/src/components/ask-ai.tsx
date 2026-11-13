@@ -100,7 +100,6 @@ export function AskAi() {
         defaultActiveMode="guide"
         showInternalTrigger={false}
         activeAgentSlug={activeAgentSlug}
-        onAgentChange={setActiveAgentSlug}
       />
     </>
   )
