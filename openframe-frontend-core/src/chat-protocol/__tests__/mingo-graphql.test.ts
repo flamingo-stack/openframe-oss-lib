@@ -2,7 +2,9 @@
  * The one OpenFrame chat history document, and the read of its answer.
  */
 
-import { parse } from 'graphql';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { buildSchema, parse, validate } from 'graphql';
 import { describe, expect, it } from 'vitest';
 import {
   historicalMessageOfNode,
@@ -11,12 +13,30 @@ import {
   mingoMessagesVariables,
 } from '../mingo-graphql';
 
+/** A federation subgraph's SDL as a plain schema: its `@link` header and empty root types dropped, the federation
+ *  directives declared. */
+function subgraphSchema(sdl: string) {
+  const plain = sdl.replace(/^extend schema @link\(.*\)\s*$/m, '').replace(/^(type \w+)\s*\{\s*\}/gm, '$1');
+  const federation = ['key(fields: String!)', 'shareable', 'override(from: String!)']
+    .map(directive => `directive @${directive} repeatable on OBJECT | FIELD_DEFINITION`)
+    .join('\n');
+  return buildSchema(`${federation}\n${plain}`, { assumeValidSDL: true });
+}
+
 describe('the document', () => {
   it('parses, and selects the parts by their own name', () => {
     const document = parse(MINGO_MESSAGES_QUERY);
     expect(document.definitions).toHaveLength(1);
     expect(MINGO_MESSAGES_QUERY).toMatch(/\bparts \{/);
     expect(MINGO_MESSAGES_QUERY).not.toMatch(/\bmessageData\b/);
+  });
+
+  // A fragment on a type the ai-agent no longer has (`AttachmentsData`) only worked through its frozen-client converter;
+  // the document has to stand on the schema itself.
+  it("is valid against the ai-agent's schema", () => {
+    const sdl = readFileSync(resolve(__dirname, '../__fixtures__/ai-agent-schema.graphqls'), 'utf8');
+    const errors = validate(subgraphSchema(sdl), parse(MINGO_MESSAGES_QUERY));
+    expect(errors.map(error => error.message)).toEqual([]);
   });
 
   it('asks for one page newest first', () => {

@@ -28,6 +28,7 @@ export {
 } from './chat-thread-reducer-options';
 export {
   observeChatEntry,
+  ownDirectEchoesOf,
   threadEntryOf,
   useChatChunkProcessor,
   type ChatChunkObservers,

@@ -148,9 +148,27 @@ function textOf(node: Nodes): string {
   return '';
 }
 
+/**
+ * The last texts parsed, with what they hold. A message renders several readers of its links (the chip names, the cards
+ * a link leaves out, the cited sources), and a streamed answer renders on every chunk: each frame parses its text once.
+ */
+const PARSED_TEXTS_KEPT = 32;
+const parsedTexts = new Map<string, readonly RecordLinkMatch[]>();
+
 /** Every record link a text draws, in document order: what the parsed markdown holds as a link to a record. */
 export function extractRecordLinks(text: string): RecordLinkMatch[] {
   if (!text || !text.includes(RECORD_LINK_SCHEME)) return [];
+  let found = parsedTexts.get(text);
+  if (!found) {
+    found = parseRecordLinks(text);
+    if (parsedTexts.size >= PARSED_TEXTS_KEPT) parsedTexts.delete(parsedTexts.keys().next().value as string);
+    parsedTexts.set(text, found);
+  }
+  // Copies: what a caller does with its answer never reaches the next caller's.
+  return found.map(match => ({ ...match }));
+}
+
+function parseRecordLinks(text: string): RecordLinkMatch[] {
   parser ??= createParser();
   const tree = parser.runSync(parser.parse(text), text) as Root;
   const found: RecordLinkMatch[] = [];
