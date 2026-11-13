@@ -4,8 +4,10 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.service.AssignmentService;
+import com.openframe.api.service.device.ClientOwnerScopeResolver;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
+import com.openframe.data.model.ClientOwnerScope;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.organization.OrganizationRepository;
 import com.openframe.data.repository.ticket.TicketRepository;
@@ -46,6 +48,7 @@ class TicketServiceGetTicketsTest {
     @Mock private AssignmentService assignmentService;
     @Mock private TicketLifecycleService ticketLifecycleService;
     @Mock private TicketResolverStamp ticketResolverStamp;
+    @Mock private ClientOwnerScopeResolver clientOwnerScopeResolver;
 
     private final Query query = new Query();
 
@@ -55,7 +58,7 @@ class TicketServiceGetTicketsTest {
     void setUp() {
         ticketService = new TicketService(ticketRepository, ticketNumberService, ticketTagService, ticketIdsForFilter,
                 ticketStalenessResolver, machineRepository, organizationRepository, userRepository, assignmentService,
-                ticketLifecycleService, ticketResolverStamp, List.of());
+                ticketLifecycleService, ticketResolverStamp, clientOwnerScopeResolver, List.of());
     }
 
     @ParameterizedTest
@@ -132,7 +135,7 @@ class TicketServiceGetTicketsTest {
     @Test
     void getTickets_agentPrincipal_queryScopedToOwnMachine() {
         AuthPrincipal agent = AuthPrincipal.builder().machineId("machine-1").actorType(ActorType.AGENT).build();
-        stubQuery("machine-1");
+        stubQuery(new ClientOwnerScope("machine-1", "org-b", null));
         when(ticketRepository.findTicketsWithCursor(eq(query), isNull(), eq(3), isNull(), eq("DESC")))
                 .thenReturn(tickets(1));
 
@@ -141,8 +144,12 @@ class TicketServiceGetTicketsTest {
         assertThat(result.getItems()).extracting(Ticket::getId).containsExactly("id-1");
     }
 
-    private void stubQuery(String ownerMachineId) {
-        when(ticketRepository.buildTicketQuery(any(TicketQueryFilter.class), isNull(), eq(List.of()), eq(ownerMachineId)))
+    private void stubQuery(ClientOwnerScope ownerScope) {
+        when(clientOwnerScopeResolver.isOwnerScoped(any())).thenReturn(ownerScope != null);
+        if (ownerScope != null) {
+            when(clientOwnerScopeResolver.scopeOf(any())).thenReturn(ownerScope);
+        }
+        when(ticketRepository.buildTicketQuery(any(TicketQueryFilter.class), isNull(), eq(List.of()), eq(ownerScope)))
                 .thenReturn(query);
     }
 
