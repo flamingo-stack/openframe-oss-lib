@@ -6,7 +6,8 @@ public enum IntegratedToolType {
     MESHCENTRAL ("meshcentral"),
     FLEET ("fleet-mdm"),
     MICROSOFT_365("microsoft-365"),
-    GOOGLE_WORKSPACE("google-workspace");
+    GOOGLE_WORKSPACE("google-workspace"),
+    OPENFRAME("openframe");
 
     private final String dbName;
 
