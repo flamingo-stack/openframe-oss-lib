@@ -3,6 +3,9 @@ package com.openframe.security.oauth.service.redirect;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 public interface RedirectTargetResolver {
 
     /**
@@ -24,17 +27,38 @@ public interface RedirectTargetResolver {
         return false;
     }
 
-    /**
-     * Whether the login callback may append a devTicket to this target. The ticket buys the user's
-     * tokens, so only an exact allow-listed URI or a same-site path may carry it.
-     */
+    // The ticket buys the user's tokens: only an exact allow-listed URI may carry it. The same site
+    // already gets the auth cookies in this response, so a path never needs one.
     default boolean canReceiveDevTicket(String target) {
-        return target != null && (isSafeRelativePath(target) || isAllowedRedirectUri(target));
+        return target != null && isAllowedRedirectUri(target);
     }
 
-    /** A path on this site: one leading slash, never {@code //host} or {@code /\host}. */
+    // One leading slash and no whitespace, control characters or backslashes anywhere: browsers drop
+    // tab/CR/LF from URLs, so "/\t/evil.com" would otherwise leave the site.
     static boolean isSafeRelativePath(String url) {
-        return url != null && url.startsWith("/")
-                && (url.length() == 1 || (url.charAt(1) != '/' && url.charAt(1) != '\\'));
+        if (url == null || !url.startsWith("/") || url.startsWith("//")) {
+            return false;
+        }
+        return url.chars().noneMatch(RedirectTargetResolver::isUnsafePathChar);
+    }
+
+    // Plain http on the host localhost (any port); rejects lookalikes such as localhost@evil.com.
+    static boolean isLocalhostOrigin(String target) {
+        if (target == null) {
+            return false;
+        }
+        try {
+            URI uri = new URI(target);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            String userInfo = uri.getRawUserInfo();
+            return "http".equalsIgnoreCase(scheme) && userInfo == null && "localhost".equalsIgnoreCase(host);
+        } catch (URISyntaxException e) {
+            return false;
+        }
+    }
+
+    private static boolean isUnsafePathChar(int c) {
+        return c <= 0x20 || c == 0x7f || c == '\\';
     }
 }
