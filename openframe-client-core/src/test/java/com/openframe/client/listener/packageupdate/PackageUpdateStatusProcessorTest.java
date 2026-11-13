@@ -281,6 +281,46 @@ class PackageUpdateStatusProcessorTest {
     }
 
     @Test
+    void postponedByTheUser_storesTheTime_theDeadlineArmedEarlierStays() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(T.plusSeconds(3600));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, 3600L)));
+        PackageUpdateStatusMessage postponed = waiting("e2", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.POSTPONED);
+        postponed.getWaiting().setPostponedUntil(T.plusSeconds(1800));
+
+        processor.process("m1", postponed);
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.WAITING);
+        assertThat(st.getWaitingPhase()).isEqualTo("POSTPONED");
+        assertThat(st.getPostponedUntil()).isEqualTo(T.plusSeconds(1800));
+        assertThat(st.getDeadlineAt()).isEqualTo(T.plusSeconds(3600));
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+    }
+
+    @Test
+    void promptShownAgainAfterPostponed_clearsThePostponedTime() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setWaitingPhase("POSTPONED");
+        st.setPostponedUntil(T.plusSeconds(1800));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+
+        processor.process("m1", waiting("e3", T.plusSeconds(1800),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
+
+        assertThat(st.getWaitingPhase()).isEqualTo("PROMPT");
+        assertThat(st.getPostponedUntil()).isNull();
+    }
+
+    @Test
     void doneBeforeTheDeadline_withdrawsTheScheduledForce() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);

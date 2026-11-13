@@ -64,6 +64,7 @@ public class PackageUpdateDeviceStateReducer {
         state.setWaitingReason(name(waiting.getReason()));
         state.setWaitingPhase(name(waiting.getPhase()));
         state.setClosesAt(waiting.getClosesAt());
+        state.setPostponedUntil(waiting.getPostponedUntil());
         state.setHolders(waiting.getHolders() == null ? null : waiting.getHolders().stream()
                 .map(h -> PackageUpdateDeviceState.Holder.builder().app(h.getApp()).user(h.getUser()).build())
                 .toList());
@@ -93,6 +94,7 @@ public class PackageUpdateDeviceStateReducer {
         state.setWaitingReason(null);
         state.setWaitingPhase(null);
         state.setClosesAt(null);
+        state.setPostponedUntil(null);
         state.setHolders(null);
         state.setDoneResult(null);
         state.setRebootRequired(null);
