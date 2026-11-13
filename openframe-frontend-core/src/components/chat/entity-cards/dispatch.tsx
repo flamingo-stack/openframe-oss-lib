@@ -32,7 +32,6 @@
 import type React from 'react';
 import type { ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
-import { useLoadingScope } from '../../ui/loading-scope';
 import Image from '../../../embed-shims/next-image';
 import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
@@ -84,6 +83,7 @@ import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/tr
 import type { LoadedProductReleaseCardProps } from '../../shared/product-release/product-release-card';
 import { ProductReleaseCard } from '../../shared/product-release/product-release-card';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { ExternalMediaNotice } from '../../ui/markdown/external-media-notice';
 import { tagVariantForBadgeColor } from '../../ui/tag';
 import { VendorIcon } from '../../vendor-icon';
