@@ -8,6 +8,7 @@ import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Done;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Failed;
+import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.State;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,25 +37,14 @@ public class PackageUpdateExecutionRecorder {
         if (row == null) {
             return;
         }
+        if (event.getState() == State.WAITING && isWaiting(row)) {
+            return;
+        }
         Instant now = Instant.now();
         switch (event.getState()) {
-            case WAITING -> {
-                if (row.getStatus() == ExecutionStatus.RUNNING && Boolean.TRUE.equals(row.getWaiting())) {
-                    return;
-                }
-                if (row.getStatus() != ExecutionStatus.RUNNING) {
-                    update(row, ExecutionStatus.RUNNING, null, null, null, null, null);
-                }
-                row.setWaiting(true);
-            }
+            case WAITING -> markWaiting(row);
             case DONE -> update(row, ExecutionStatus.SUCCESS, null, now, null, summary(event), null);
-            case FAILED -> {
-                Failed failed = event.getFailed();
-                ExecutionFailureReason failureReason = failureReason(failed);
-                Integer exitCode = exitCode(failed);
-                String error = error(failed);
-                update(row, ExecutionStatus.FAILED, failureReason, now, exitCode, null, error);
-            }
+            case FAILED -> markFailed(row, event.getFailed(), now);
         }
         row.setStatusChangedAt(now);
         scriptExecutionRepository.save(row);
@@ -84,6 +74,24 @@ public class PackageUpdateExecutionRecorder {
                     request.getRequestId(), request.getExecutionId(), machineId);
         }
         return row;
+    }
+
+    private static boolean isWaiting(ScriptExecution row) {
+        return row.getStatus() == ExecutionStatus.RUNNING && Boolean.TRUE.equals(row.getWaiting());
+    }
+
+    private static void markWaiting(ScriptExecution row) {
+        if (row.getStatus() != ExecutionStatus.RUNNING) {
+            update(row, ExecutionStatus.RUNNING, null, null, null, null, null);
+        }
+        row.setWaiting(true);
+    }
+
+    private static void markFailed(ScriptExecution row, Failed failed, Instant now) {
+        ExecutionFailureReason failureReason = failureReason(failed);
+        Integer exitCode = exitCode(failed);
+        String error = error(failed);
+        update(row, ExecutionStatus.FAILED, failureReason, now, exitCode, null, error);
     }
 
     private static void update(ScriptExecution row, ExecutionStatus status, ExecutionFailureReason failureReason,
