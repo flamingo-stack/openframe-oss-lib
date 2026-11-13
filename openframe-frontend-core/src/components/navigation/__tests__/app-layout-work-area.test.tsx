@@ -88,6 +88,40 @@ describe('AppLayoutWorkArea', () => {
     expect(shownHeading('Page body')).toBeInTheDocument();
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
   });
+
+  it('keeps a hidden column laid out, invisible, at the width it last had on screen', () => {
+    rowWidth(1000);
+    const pageColumn = () => screen.getByTestId('work-area-page-column');
+    const { rerender } = render(area('split'));
+    // The page full screen: the chat keeps its split width out of the flow, so nothing in it
+    // measures 0 (a stick-to-bottom thread would take that for a jump to its end).
+    rerender(area('page'));
+    expect(chatColumn()).not.toHaveClass('hidden');
+    // Painted at opacity 0, not `invisible`: a descendant's own `visibility: visible` (a remote
+    // screen's canvas) would paint through that, and the inherited visibility would transition back.
+    expect(chatColumn()).toHaveClass('opacity-0', 'absolute', 'left-0', 'pointer-events-none');
+    expect(chatColumn()).not.toHaveClass('invisible');
+    expect(chatColumn()).toHaveStyle({ width: '500px', maxWidth: '100%' });
+    expect(chatColumn()).toHaveAttribute('inert');
+    expect(shownHeading('Thread')).not.toBeInTheDocument();
+    // The chat full screen: the page keeps the whole row it last had.
+    rerender(area('chat'));
+    expect(pageColumn()).toHaveClass('opacity-0', 'absolute', 'right-0');
+    expect(pageColumn()).toHaveStyle({ width: '1000px', maxWidth: '100%' });
+    expect(shownHeading('Page body')).not.toBeInTheDocument();
+    // Back side by side: both in the flow again, the chat at the width it left at.
+    rerender(area('split'));
+    expect(chatColumn()).not.toHaveClass('opacity-0', 'absolute');
+    expect(pageColumn()).not.toHaveClass('opacity-0', 'absolute');
+    expect(chatColumn()).toHaveStyle({ width: '500px' });
+  });
+
+  it('leaves a column never shown yet out of the layout (display: none)', () => {
+    rowWidth(1000);
+    render(area('page'));
+    expect(chatColumn()).toHaveClass('hidden');
+    expect(chatColumn()).not.toHaveClass('opacity-0');
+  });
 });
 
 describe('AppLayoutWorkArea squeezeFloor', () => {
@@ -285,6 +319,23 @@ describe('AppLayoutWorkArea squeezeFloor', () => {
     expect(screen.queryByRole('separator')).not.toBeInTheDocument();
     expect(chatColumn()).toHaveAttribute('inert');
     expect(shown).toHaveBeenLastCalledWith('page');
+  });
+
+  it('keeps a squeezed column squeezed while it is hidden, and shades it only on screen', () => {
+    rowWidth(1000);
+    const squeezableIn = (mode: AppLayoutWorkAreaMode) => (
+      <AppLayoutWorkArea mode={mode} chat={<Column name="chat" />} page={<Column name="page" />} squeezeFloor={0.3} />
+    );
+    const { rerender } = render(squeezableIn('split'));
+    fireEvent.keyDown(divider(), { key: 'Home' });
+    expect(screen.getByText('chat: squeezed at 360')).toBeInTheDocument();
+    // Hidden at its squeezed width, its content keeps the min width: it does not reflow on the way.
+    rerender(squeezableIn('page'));
+    expect(chatColumn()).toHaveStyle({ width: '108px' });
+    expect(screen.getByText('chat: squeezed at 360')).toBeInTheDocument();
+    expect(shadow()).not.toBeInTheDocument();
+    rerender(squeezableIn('split'));
+    expect(shadowSides()).toEqual(['chat-end']);
   });
 
   it('without squeezeFloor no column is ever squeezed', () => {
