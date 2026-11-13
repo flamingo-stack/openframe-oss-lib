@@ -107,7 +107,8 @@ public class MachineStatusService {
             return;
         }
         // MANAGED left behind by the flag having been on only says "offline" through its connectivity
-        boolean wasOffline = previousStatus == DeviceStatus.OFFLINE || machine.getTelemetryStatus() == OFFLINE;
+        boolean wasOffline = previousStatus == DeviceStatus.OFFLINE
+                || previousStatus == DeviceStatus.MANAGED && machine.getTelemetryStatus() == OFFLINE;
         announceStatusChange(written.get().after(), previousStatus, newStatus, wasOffline);
     }
 

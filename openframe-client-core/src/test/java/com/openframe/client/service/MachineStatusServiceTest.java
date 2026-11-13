@@ -458,6 +458,38 @@ class MachineStatusServiceTest {
         verify(eventPublisher, never()).publishEvent(any(DeviceFirstConnectedEvent.class));
     }
 
+    @Test
+    void updateToOffline_flagOffManagedDeviceOffline_statusOfflineWithoutCameOnline() {
+        // setup
+        stubMachine(DeviceStatus.MANAGED, TelemetryStatus.OFFLINE);
+        stubGuardedWriter();
+
+        // execution
+        managedStatusOff.updateToOffline(MACHINE_ID, LATER);
+
+        // verifications
+        Machine written = guardedWritten();
+        assertThat(written.getStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        assertThat(guardCaptor.getValue().getCriteriaObject()).containsEntry("status", DeviceStatus.MANAGED);
+        verifyNoInteractions(eventPublisher, deviceLifecycleService);
+    }
+
+    @Test
+    void processHeartbeat_flagOffPendingDeviceWithStaleOfflineConnectivity_firstConnectedOnly() {
+        // setup
+        stubMachine(DeviceStatus.PENDING, TelemetryStatus.OFFLINE);
+        stubGuardedWriter();
+
+        // execution
+        managedStatusOff.processHeartbeat(MACHINE_ID, LATER);
+
+        // verifications
+        assertThat(guardedWritten().getStatus()).isEqualTo(DeviceStatus.ONLINE);
+        verify(eventPublisher).publishEvent(any(DeviceFirstConnectedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(DeviceCameOnlineEvent.class));
+        verifyNoInteractions(deviceLifecycleService);
+    }
+
     @ParameterizedTest
     @EnumSource(value = DeviceStatus.class, names = {"PENDING_DELETION", "DELETED", "ARCHIVED"})
     void updateToOnline_flagOffFrozenDevice_connectivityMovesStatusStaysNoEvents(DeviceStatus frozen) {

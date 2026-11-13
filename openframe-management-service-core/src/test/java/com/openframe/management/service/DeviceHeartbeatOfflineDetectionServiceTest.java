@@ -119,10 +119,11 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
         verify(machineRepository, never()).saveAll(any());
     }
 
-    @Test
-    void markStaleDevicesOffline_flagOffOnlineStatus_statusAndConnectivityOfflineGuardedOnStillOnline() {
+    @ParameterizedTest
+    @EnumSource(value = DeviceStatus.class, names = {"ONLINE", "MANAGED"})
+    void markStaleDevicesOffline_flagOffConnectedStatus_statusAndConnectivityOfflineGuardedOnStatusRead(DeviceStatus status) {
         // setup
-        Machine machine = machine(MACHINE_ID, DeviceStatus.ONLINE);
+        Machine machine = machine(MACHINE_ID, status);
         stubStale(machine);
         stubWritten(MACHINE_ID, machine);
 
@@ -138,12 +139,12 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
         assertThat(guard.get("lastSeen", Document.class)).containsKey("$lt");
         assertThat(guard)
                 .containsEntry("telemetryStatus", TelemetryStatus.ONLINE)
-                .containsEntry("status", DeviceStatus.ONLINE);
+                .containsEntry("status", status);
     }
 
     @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "MANAGED", "OFFLINE", "PENDING_DELETION", "DELETED", "ARCHIVED"})
-    void markStaleDevicesOffline_flagOffNotOnlineStatus_connectivityOnlyStatusKept(DeviceStatus status) {
+    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "OFFLINE", "PENDING_DELETION", "DELETED", "ARCHIVED"})
+    void markStaleDevicesOffline_flagOffNotConnectedStatus_connectivityOnlyStatusKept(DeviceStatus status) {
         // setup
         Machine machine = machine(MACHINE_ID, status);
         stubStale(machine);
