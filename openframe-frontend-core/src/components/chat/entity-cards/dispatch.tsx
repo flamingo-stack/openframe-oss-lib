@@ -1427,6 +1427,8 @@ interface GlyphCardConfig {
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
   openframe_tenant: { label: 'OpenFrame tenant' },
   recorded_call: { label: 'Call', media: true },
+  // One story of the AI daily digest: a glyph card (a story has no cover), opening the digest screen.
+  ai_digest_story: { label: 'AI digest story' },
   // Code intelligence (product-hub internal): the review rules a repository is
   // held to, the repositories themselves, and one row per deployment
   // environment. Glyph cards like their siblings — none of the three has a
