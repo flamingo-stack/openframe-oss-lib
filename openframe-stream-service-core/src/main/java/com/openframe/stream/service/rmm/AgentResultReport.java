@@ -1,4 +1,14 @@
 package com.openframe.stream.service.rmm;
 
-public record AgentResultReport(Integer exitCode, Boolean timedOut, String error, String failureReason) {
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
+public class AgentResultReport {
+
+    private final Integer exitCode;
+    private final Boolean timedOut;
+    private final String error;
+    private final String failureReason;
 }

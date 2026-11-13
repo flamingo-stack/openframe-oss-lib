@@ -2,7 +2,6 @@ package com.openframe.stream.handler.rmm;
 
 import tools.jackson.databind.JsonNode;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
-import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
@@ -167,11 +166,7 @@ public class ScriptExecutionHandler implements MessageHandler<DeserializedDebezi
 
     private static boolean isFinal(ScriptExecution row) {
         ExecutionStatus status = row.getStatus();
-        if (status == null || !status.isTerminal()) {
-            return false;
-        }
-        ExecutionFailureReason reason = row.getFailureReason();
-        return status != ExecutionStatus.FAILED || reason == null || !reason.isWatchdogVerdict();
+        return status != null && status.isFinal(row.getFailureReason());
     }
 
     private static boolean isSystemOwned(ScriptExecution row) {

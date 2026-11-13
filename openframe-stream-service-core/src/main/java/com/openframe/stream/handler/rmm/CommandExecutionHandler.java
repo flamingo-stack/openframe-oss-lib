@@ -2,7 +2,6 @@ package com.openframe.stream.handler.rmm;
 
 import tools.jackson.databind.JsonNode;
 import com.openframe.data.document.rmm.command.CommandExecution;
-import com.openframe.data.document.rmm.script.ExecutionFailureReason;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
@@ -130,11 +129,8 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
     }
 
     private static boolean isOpen(CommandExecution row) {
-        if (row.getStatus() == ExecutionStatus.RUNNING) {
-            return true;
-        }
-        ExecutionFailureReason reason = row.getFailureReason();
-        return row.getStatus() == ExecutionStatus.FAILED && reason != null && reason.isWatchdogVerdict();
+        ExecutionStatus status = row.getStatus();
+        return status != null && !status.isFinal(row.getFailureReason());
     }
 
     /** Truncate to {@link CommandExecution#MAX_OUTPUT_BYTES} on UTF-8 codepoint boundaries. */

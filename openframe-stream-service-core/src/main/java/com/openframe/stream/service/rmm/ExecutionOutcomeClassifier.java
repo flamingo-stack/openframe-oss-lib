@@ -25,7 +25,7 @@ public class ExecutionOutcomeClassifier {
         if (agentFailure != null) {
             return new ExecutionOutcome(ExecutionStatus.FAILED, agentFailure);
         }
-        Integer exitCode = report.exitCode();
+        Integer exitCode = report.getExitCode();
         if (exitCode == null || exitCode == 0) {
             return new ExecutionOutcome(ExecutionStatus.SUCCESS, null);
         }
@@ -36,21 +36,21 @@ public class ExecutionOutcomeClassifier {
     }
 
     private static ExecutionFailureReason agentFailure(AgentResultReport report) {
-        if (hasText(report.failureReason())) {
-            return ExecutionFailureReason.fromAgent(report.failureReason());
+        if (hasText(report.getFailureReason())) {
+            return ExecutionFailureReason.fromAgent(report.getFailureReason());
         }
-        if (Boolean.TRUE.equals(report.timedOut())) {
+        if (Boolean.TRUE.equals(report.getTimedOut())) {
             return ExecutionFailureReason.AGENT_TIMED_OUT;
         }
         if (isLegacyNotLaunched(report)) {
-            return legacyNotLaunchedReason(report.error());
+            return legacyNotLaunchedReason(report.getError());
         }
         return null;
     }
 
     private static boolean isLegacyNotLaunched(AgentResultReport report) {
-        Integer exitCode = report.exitCode();
-        String error = report.error();
+        Integer exitCode = report.getExitCode();
+        String error = report.getError();
         return exitCode != null && exitCode == LEGACY_NOT_LAUNCHED_EXIT_CODE
                 && hasText(error) && !TRUNCATION_MARKER.equals(error);
     }
