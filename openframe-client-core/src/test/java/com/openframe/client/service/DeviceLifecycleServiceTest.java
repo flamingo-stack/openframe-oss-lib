@@ -22,7 +22,6 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -57,13 +56,14 @@ class DeviceLifecycleServiceTest {
     @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
     @Captor private ArgumentCaptor<DeviceFirstConnectedEvent> eventCaptor;
 
-    @InjectMocks private DeviceLifecycleService service;
+    private DeviceLifecycleService service;
 
     private Machine machine;
     private Machine promoted;
 
     @BeforeEach
     void setUp() {
+        service = new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, true);
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setStatus(DeviceStatus.PENDING);
@@ -231,6 +231,19 @@ class DeviceLifecycleServiceTest {
         verify(toolConnectionRepository).findByMachineIdAndToolTypeInAndStatus(
                 MACHINE_ID, RequiredTools.REQUIRED_TOOL_TYPES, ConnectionStatus.CONNECTED);
         verify(machineWriter, never()).update(anyString(), any(Criteria.class), any(MachineUpdate.class));
+    }
+
+    @Test
+    void promoteIfReady_flagOffSeenAndBothToolsConnected_noop() {
+        // setup
+        DeviceLifecycleService managedStatusOff =
+                new DeviceLifecycleService(machineRepository, toolConnectionRepository, machineWriter, eventPublisher, false);
+
+        // execution
+        managedStatusOff.promoteIfReady(MACHINE_ID);
+
+        // verifications
+        verifyNoInteractions(machineRepository, toolConnectionRepository, machineWriter, eventPublisher);
     }
 
     private void stubMachineFound() {
