@@ -145,12 +145,10 @@ class PackageUpdateWireFormatTest {
     @Test
     void status_waiting_postponedByTheUser_parses() {
         PackageUpdateStatusMessage msg = mapper.readValue("""
-                {"state":"WAITING","waiting":{"reason":"APP_RUNNING","phase":"POSTPONED",
-                                              "postponedUntil":"2026-10-21T09:00:00Z"}}""",
+                {"state":"WAITING","waiting":{"reason":"APP_RUNNING","phase":"POSTPONED"}}""",
                 PackageUpdateStatusMessage.class);
 
         assertThat(msg.getWaiting().getPhase()).isEqualTo(PackageUpdateStatusMessage.Waiting.Phase.POSTPONED);
-        assertThat(msg.getWaiting().getPostponedUntil()).isEqualTo(Instant.parse("2026-10-21T09:00:00Z"));
     }
 
     @Test

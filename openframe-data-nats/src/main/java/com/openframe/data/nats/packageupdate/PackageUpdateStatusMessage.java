@@ -58,8 +58,6 @@ public class PackageUpdateStatusMessage {
 
         private Instant closesAt;
 
-        private Instant postponedUntil;
-
         public enum Reason {
             APP_RUNNING,
             MANAGER_BUSY,
