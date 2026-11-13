@@ -24,13 +24,16 @@ import { DeviceConnectivityIcon } from '../device-connectivity-icon';
 import { formatLastOnline } from '../device-last-online';
 import { DeviceLifecycleTag } from '../device-lifecycle-tag';
 import { getDeviceName } from '../device-name';
+import { useDeviceStatusDisplay } from '../device-status-display';
 import {
   DEVICE_CONNECTIVITY_FILTER_SECTION,
   DEVICE_STATUS,
+  deviceStatusFilterGroups,
   joinStatusFilterValue,
   splitStatusFilterValue,
   toUiDeviceStatus,
 } from '../device-statuses';
+import { DeviceTypeTile } from '../device-type-tile';
 import { DevicesFilterToolbar } from '../devices-filter-toolbar';
 import { getDeviceFilterColumns } from '../devices-table-columns';
 import { useDeviceImageUrl } from '../devices-view-config';
@@ -73,7 +76,11 @@ function DeviceCell({ device }: { device: DeviceRow }) {
   const loading = useLoadingScope();
   return (
     <div className="flex h-20 items-center gap-3">
-      <DeviceConnectivityIcon connectivity={device.connectivity} lastSeen={device.last_seen || device.lastSeen} />
+      <DeviceConnectivityIcon
+        connectivity={device.connectivity}
+        lastSeen={device.last_seen || device.lastSeen}
+        legacyIcon={<DeviceTypeTile type={device.type} />}
+      />
       <div className="flex min-w-0 flex-col">
         <TruncateText>{getDeviceName(device)}</TruncateText>
         <TruncateText variant="h6" tone="secondary" loading={loading}>
@@ -85,9 +92,9 @@ function DeviceCell({ device }: { device: DeviceRow }) {
 }
 
 /** The STATUS cell: the device's status as its tag; the tag's loading form while the device is read. */
-function StatusCell({ status }: { status: string | null | undefined }) {
+function StatusCell({ device }: { device: DeviceRow }) {
   if (useLoadingScope()) return <Tag loading label="" className="w-min" />;
-  return <DeviceLifecycleTag status={status} className="w-min" />;
+  return <DeviceLifecycleTag status={device.status} connectivity={device.connectivity ?? null} className="w-min" />;
 }
 
 /** The add / remove control: static chrome, drawn real and inert while the device is read. */
@@ -429,14 +436,15 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   // Counts ride along only when the facets are the server's. The client-side
   // ones describe the page in hand, which is not what a count claims to answer.
   const serverFaceted = Boolean(server?.filterOptions);
+  const statusDisplay = useDeviceStatusDisplay();
   const filterColumns = useMemo(() => {
-    const columns = getDeviceFilterColumns(deviceFilters);
+    const columns = getDeviceFilterColumns(deviceFilters, { statusDisplay });
     if (serverFaceted) return columns;
     return columns.map(column => ({
       ...column,
       filterOptions: column.filterOptions?.map(({ count: _count, ...option }) => option),
     }));
-  }, [deviceFilters, serverFaceted]);
+  }, [deviceFilters, serverFaceted, statusDisplay]);
 
   // The column funnels read `deviceFilters`, the SERVER's facets whenever the
   // consumer is server-narrowed, rather than the rows in hand.
@@ -511,18 +519,14 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   const tagOptions = useMemo(() => selectedTags.map(t => ({ label: t, value: t })), [selectedTags]);
 
   // Map column filters → `{ status, os, organization }` shape that FilterModal expects on mobile.
-  const tableFilters = useMemo(
-    () => ({
-      status: splitStatusFilterValue(columnFilters.find(f => f.id === 'status')?.value as string[] | undefined)
-        .statuses,
-      [DEVICE_CONNECTIVITY_FILTER_SECTION]: splitStatusFilterValue(
-        columnFilters.find(f => f.id === 'status')?.value as string[] | undefined,
-      ).connectivity,
+  const tableFilters = useMemo(() => {
+    const status = splitStatusFilterValue(columnFilters.find(f => f.id === 'status')?.value as string[] | undefined);
+    return {
+      ...deviceStatusFilterGroups(status.statuses, status.connectivity, statusDisplay),
       os: (columnFilters.find(f => f.id === 'os')?.value as string[]) ?? [],
       organization: (columnFilters.find(f => f.id === 'organization')?.value as string[]) ?? [],
-    }),
-    [columnFilters],
-  );
+    };
+  }, [columnFilters, statusDisplay]);
 
   const handleTagRemove = useCallback(
     (value: string) => {
@@ -574,7 +578,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         id: 'status',
         accessorKey: 'status',
         header: 'STATUS',
-        cell: ({ row }: { row: Row<T> }) => <StatusCell status={row.original.status} />,
+        cell: ({ row }: { row: Row<T> }) => <StatusCell device={row.original} />,
         enableSorting: false,
         meta: {
           width: 'w-auto shrink-0 content-md:w-[160px]',

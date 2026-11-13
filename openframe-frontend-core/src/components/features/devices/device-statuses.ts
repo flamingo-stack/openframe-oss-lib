@@ -1,4 +1,5 @@
 import { filterSectionValue, splitFilterSectionValues } from '../../ui/data-table/types';
+import type { DeviceStatusDisplay } from './device-status-display';
 import type { DeviceFilterInput, DeviceFilterValue } from './types';
 
 /**
@@ -110,6 +111,21 @@ export function splitStatusFilterValue(values: readonly string[] | undefined): {
 } {
   const { own, sections } = splitFilterSectionValues(values, [DEVICE_CONNECTIVITY_FILTER_SECTION]);
   return { statuses: own, connectivity: sections[DEVICE_CONNECTIVITY_FILTER_SECTION] ?? [] };
+}
+
+/**
+ * The STATUS and Connectivity picks as a filter window or the grid's dropdowns take them, by group. The lifecycle
+ * display has a Connectivity group of its own; the legacy one (`DeviceStatusDisplay`) offers Online / Offline inside
+ * STATUS, so its picks ride there as `connectivity:ONLINE`, as they do in the table's funnel.
+ */
+export function deviceStatusFilterGroups(
+  statuses: readonly string[],
+  connectivity: readonly string[],
+  display: DeviceStatusDisplay,
+): { status: string[]; [DEVICE_CONNECTIVITY_FILTER_SECTION]?: string[] } {
+  return display === 'legacy'
+    ? { status: joinStatusFilterValue(statuses, connectivity) }
+    : { status: [...statuses], [DEVICE_CONNECTIVITY_FILTER_SECTION]: [...connectivity] };
 }
 
 /** The connectivity filter's options, in order. */

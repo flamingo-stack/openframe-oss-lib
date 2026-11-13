@@ -155,6 +155,22 @@ export function getDeviceStatusConfig(status: string | null | undefined): Device
 }
 
 /**
+ * How a device's status reads in the legacy display (`DeviceStatusDisplay`): one tag, as before the lifecycle /
+ * connectivity split. A managed device (MANAGED, or the legacy ONLINE / OFFLINE) reads ONLINE or OFFLINE from its
+ * `connectivity`, since a MANAGED device carries no ONLINE / OFFLINE status of its own; null connectivity (never
+ * reported) reads OFFLINE. Only a row that does not carry the field at all (`undefined`) falls back to its status.
+ */
+export function getLegacyDeviceStatusConfig(
+  status: string | null | undefined,
+  connectivity?: string | null,
+): DeviceStatusConfig {
+  if (isManagedStatus(status) && connectivity !== undefined) {
+    return getDeviceStatusConfig(isDeviceConnected(connectivity) ? 'ONLINE' : 'OFFLINE');
+  }
+  return getDeviceStatusConfig(status);
+}
+
+/**
  * Get operating system type for DeviceCard component
  * Uses centralized OS type system from ui-kit
  */

@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
 import { formatDate, formatTime } from '../../utils/format-date';
 import type { OSPlatformId } from '../../utils/os-platforms';
 import { DeviceConnectivityIcon } from '../features/devices/device-connectivity-icon';
+import { useDeviceStatusDisplay } from '../features/devices/device-status-display';
 import { OSTypeIcon } from '../features/os-type-badge';
 import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon';
 import { Ellipsis01Icon } from '../icons-v2-generated/interface';
@@ -74,7 +75,7 @@ export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
    * Whether the device is online right now (ONLINE / OFFLINE; null = never reported, offline). Given, the device icon
    * says so (Figma 3324-6819: a green or grey dot on the monitor, the state and last seen on hover). Omitted, the icon
-   * is the plain monitor, as before.
+   * is the plain monitor, as before; so it is in the legacy display (`DeviceStatusDisplay`).
    */
   connectivity?: string | null;
   onDeviceClick?: (device: Device) => void;
@@ -107,6 +108,7 @@ export function DeviceCard({
   // ONE switch: in a page's loading state (or while the host reads the device) the card draws its read values as
   // skeletons, in the same boxes; its static parts stay real and the whole card is inert.
   const loading = useLoadingScope() || !!loadingProp;
+  const display = useDeviceStatusDisplay();
   // "Last seen" is read as "your local time", the same way the devices table
   // column renders it: the viewer's zone and locale, never UTC.
   const formatLastSeen = (lastSeen?: string | Date) => {
@@ -127,7 +129,7 @@ export function DeviceCard({
       <div className={DEVICE_CARD_HEAD_ROW_CLASS}>
         {/* Device type icon */}
         <div className={DEVICE_CARD_ICON_BOX_CLASS}>
-          {connectivity !== undefined && !loading ? (
+          {connectivity !== undefined && display === 'lifecycle' && !loading ? (
             <DeviceConnectivityIcon
               connectivity={connectivity}
               lastSeen={device.lastSeen instanceof Date ? device.lastSeen.toISOString() : device.lastSeen}

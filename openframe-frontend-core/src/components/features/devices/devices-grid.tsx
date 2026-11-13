@@ -8,6 +8,7 @@ import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { deviceLifecycleTagProps } from './device-lifecycle-tag';
 import { getDeviceName } from './device-name';
 import { getDeviceOperatingSystem } from './device-status';
+import { useDeviceStatusDisplay } from './device-status-display';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
 import { useDevicesViewConfig } from './devices-view-config';
 import type { DeviceRow } from './types';
@@ -62,6 +63,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   const isLoading = useLoadingScope() || isLoadingProp;
   const router = useRouter();
   const { getDeviceHref } = useDevicesViewConfig();
+  const display = useDeviceStatusDisplay();
 
   const handleDeviceClick = (device: T) => {
     const href = device.machineId || device.id ? getDeviceHref?.(device) : undefined;
@@ -94,7 +96,11 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                     lastSeen: device.lastSeen,
                     operatingSystem: getDeviceOperatingSystem(device.osType),
                   }}
-                  statusTag={device.status ? deviceLifecycleTagProps(device.status) : undefined}
+                  statusTag={
+                    device.status
+                      ? deviceLifecycleTagProps(device.status, { connectivity: device.connectivity ?? null, display })
+                      : undefined
+                  }
                   connectivity={device.connectivity ?? null}
                   onDeviceClick={() => handleDeviceClick(device)}
                   actions={

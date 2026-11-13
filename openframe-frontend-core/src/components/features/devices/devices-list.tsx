@@ -11,7 +11,8 @@ import {
   type OnChangeFn,
 } from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { DEVICE_CONNECTIVITY_FILTER_SECTION, joinStatusFilterValue, splitStatusFilterValue } from './device-statuses';
+import { useDeviceStatusDisplay } from './device-status-display';
+import { deviceStatusFilterGroups, joinStatusFilterValue, splitStatusFilterValue } from './device-statuses';
 import { DevicesFilterToolbar } from './devices-filter-toolbar';
 import { DevicesTableBody, getDeviceActionsColumn, getDeviceFilterColumns } from './devices-table-columns';
 import type { DeviceFilters, DeviceRow } from './types';
@@ -217,10 +218,11 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
     [narrowing, onNarrowingChange],
   );
 
+  const statusDisplay = useDeviceStatusDisplay();
   const filterColumns = useMemo(() => {
     const hidden = new Set(hideFilters ?? []);
-    return getDeviceFilterColumns(deviceFilters).filter(column => !hidden.has(column.key));
-  }, [deviceFilters, hideFilters]);
+    return getDeviceFilterColumns(deviceFilters, { statusDisplay }).filter(column => !hidden.has(column.key));
+  }, [deviceFilters, hideFilters, statusDisplay]);
 
   // The column funnels speak in column ids; the narrowing speaks in the backend's
   // field names. This pair is the only place that translation lives.
@@ -281,12 +283,11 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
   // The modal reads the current selection back in column-keyed form.
   const tableFilters = useMemo(
     () => ({
-      status: narrowing.statuses,
-      [DEVICE_CONNECTIVITY_FILTER_SECTION]: narrowing.connectivity ?? [],
+      ...deviceStatusFilterGroups(narrowing.statuses, narrowing.connectivity ?? [], statusDisplay),
       os: narrowing.osTypes,
       organization: narrowing.organizationIds,
     }),
-    [narrowing.statuses, narrowing.connectivity, narrowing.osTypes, narrowing.organizationIds],
+    [narrowing.statuses, narrowing.connectivity, narrowing.osTypes, narrowing.organizationIds, statusDisplay],
   );
 
   const handleTagRemove = useCallback(
