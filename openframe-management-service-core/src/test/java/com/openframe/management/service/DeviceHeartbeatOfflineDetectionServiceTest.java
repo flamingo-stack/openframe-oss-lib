@@ -8,13 +8,13 @@ import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import org.bson.Document;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -42,14 +42,7 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
     @Captor private ArgumentCaptor<Criteria> guardCaptor;
     @Captor private ArgumentCaptor<MachineUpdate> updateCaptor;
 
-    private DeviceHeartbeatOfflineDetectionService service;
-    private DeviceHeartbeatOfflineDetectionService managedStatusOff;
-
-    @BeforeEach
-    void setUp() {
-        service = new DeviceHeartbeatOfflineDetectionService(machineRepository, machineWriter, true);
-        managedStatusOff = new DeviceHeartbeatOfflineDetectionService(machineRepository, machineWriter, false);
-    }
+    @InjectMocks private DeviceHeartbeatOfflineDetectionService service;
 
     @Test
     void markStaleDevicesOffline_silentOnlineMachine_connectivityOfflineGuardedOnStillOnline() {
@@ -117,46 +110,6 @@ class DeviceHeartbeatOfflineDetectionServiceTest {
         // verifications
         verify(machineWriter, never()).update(anyString(), any(Criteria.class), any(MachineUpdate.class));
         verify(machineRepository, never()).saveAll(any());
-    }
-
-    @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"ONLINE", "MANAGED"})
-    void markStaleDevicesOffline_flagOffConnectedStatus_statusAndConnectivityOfflineGuardedOnStatusRead(DeviceStatus status) {
-        // setup
-        Machine machine = machine(MACHINE_ID, status);
-        stubStale(machine);
-        stubWritten(MACHINE_ID, machine);
-
-        // execution
-        managedStatusOff.markStaleDevicesOffline();
-
-        // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), guardCaptor.capture(), updateCaptor.capture());
-        Machine applied = applied(updateCaptor.getValue());
-        assertThat(applied.getStatus()).isEqualTo(DeviceStatus.OFFLINE);
-        assertThat(applied.getTelemetryStatus()).isEqualTo(TelemetryStatus.OFFLINE);
-        Document guard = guardCaptor.getValue().getCriteriaObject();
-        assertThat(guard.get("lastSeen", Document.class)).containsKey("$lt");
-        assertThat(guard)
-                .containsEntry("telemetryStatus", TelemetryStatus.ONLINE)
-                .containsEntry("status", status);
-    }
-
-    @ParameterizedTest
-    @EnumSource(value = DeviceStatus.class, names = {"PENDING", "OFFLINE", "PENDING_DELETION", "DELETED", "ARCHIVED"})
-    void markStaleDevicesOffline_flagOffNotConnectedStatus_connectivityOnlyStatusKept(DeviceStatus status) {
-        // setup
-        Machine machine = machine(MACHINE_ID, status);
-        stubStale(machine);
-        stubWritten(MACHINE_ID, machine);
-
-        // execution
-        managedStatusOff.markStaleDevicesOffline();
-
-        // verifications
-        verify(machineWriter).update(eq(MACHINE_ID), guardCaptor.capture(), updateCaptor.capture());
-        assertThat(updateCaptor.getValue().paths()).containsExactly("telemetryStatus");
-        assertThat(guardCaptor.getValue().getCriteriaObject()).doesNotContainKey("status");
     }
 
     private void stubStale(Machine... machines) {

@@ -159,7 +159,7 @@ class DeviceHeartbeatOfflineDetectionIT {
             concurrentWrite.run();
             return read;
         }).when(machines).findByTelemetryStatusAndLastSeenBefore(eq(TelemetryStatus.ONLINE), any(Instant.class));
-        DeviceHeartbeatOfflineDetectionService service = new DeviceHeartbeatOfflineDetectionService(machines, machineWriter, true);
+        DeviceHeartbeatOfflineDetectionService service = new DeviceHeartbeatOfflineDetectionService(machines, machineWriter);
         ReflectionTestUtils.setField(service, "offlineThresholdSeconds", 130L);
         return service;
     }

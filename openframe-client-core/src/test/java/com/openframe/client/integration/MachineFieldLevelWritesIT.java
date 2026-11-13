@@ -220,7 +220,7 @@ class MachineFieldLevelWritesIT {
 
         Services(MachineRepository machines) {
             this(new MachineStatusService(machines, machineWriter, mock(DeviceLifecycleService.class),
-                            mock(ApplicationEventPublisher.class), true),
+                            mock(ApplicationEventPublisher.class)),
                     new MachineTimezoneService(machines, machineWriter),
                     new MachineHostnameService(machines, machineWriter),
                     uninstallService(machines),

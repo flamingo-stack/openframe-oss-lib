@@ -13,7 +13,6 @@ import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
@@ -39,14 +38,7 @@ public class DeviceLifecycleService {
     private final MachineWriter machineWriter;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Value("${openframe.features.devices.managed-status.enabled:false}")
-    private final boolean managedStatusEnabled;
-
-    // With the managed-status flag off nothing is ever promoted: MANAGED would be unreadable after a rollback
     public void promoteIfReady(String machineId) {
-        if (!managedStatusEnabled) {
-            return;
-        }
         Optional<Machine> found = machineRepository.findByMachineId(machineId);
         if (found.isEmpty()) {
             log.warn("Promotion check for unknown machine {}, ignoring", machineId);
