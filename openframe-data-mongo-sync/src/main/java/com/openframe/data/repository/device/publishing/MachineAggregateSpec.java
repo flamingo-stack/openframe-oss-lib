@@ -16,6 +16,7 @@ public class MachineAggregateSpec implements AggregateSpec<Machine, MachineEvent
     public static final String TYPE = "machines";
 
     private final MachineOnTicketsProjection machineOnTickets;
+    private final MachineOnClientTicketsProjection machineOnClientTickets;
 
     @Override
     public String getType() {
@@ -28,11 +29,12 @@ public class MachineAggregateSpec implements AggregateSpec<Machine, MachineEvent
                 .machineId(machine.getMachineId())
                 .hostname(machine.getHostname())
                 .nickname(machine.getNickname())
+                .organizationId(machine.getOrganizationId())
                 .build();
     }
 
     @Override
     public List<Projection<MachineEvent, ?>> projections() {
-        return List.of(machineOnTickets);
+        return List.of(machineOnTickets, machineOnClientTickets);
     }
 }

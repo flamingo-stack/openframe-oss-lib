@@ -8,7 +8,7 @@
  * (URL composition + cross-app routing) are made in the consumer's
  * runtime layer, not inside this card.
  *
- * Renders `[card://data_room_doc:<id>]` and `[card://markdown:<id>]` markers
+ * Renders `record://data_room_doc/<id>` and record links (`record://markdown/<id>`)
  * — both use this card because their viewer surface is structurally
  * identical; where each one's viewer lives is the host composer's decision.
  */

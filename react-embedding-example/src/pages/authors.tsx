@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArticleAuthorByline, AuthorDetailView } from '@flamingo-stack/openframe-frontend-core/components'
 import { RelatedContentSection } from '@flamingo-stack/openframe-frontend-core/components/related-content'
-import { useChatRuntime } from '@flamingo-stack/openframe-frontend-core/contexts'
 import { extractItems } from '@flamingo-stack/openframe-frontend-core/utils'
 import type { EntityAuthor } from '@flamingo-stack/openframe-frontend-core/types'
 import { CONTENT_PREFIX } from '../../proxy/content-prefix.mjs'
@@ -33,11 +32,8 @@ import { PageError } from '../components/page-state'
  * avatar_url, job_title, `about` (the bio) and the publicly-gated author-page
  * `slug` — there is no dedicated public authors-list endpoint today.
  *
- * The byline's name link composes through the SAME unified content-URL seam
- * as every other content type — `runtime.composeContentUrl({ type: 'author' })`
- * (the lib's `DEFAULT_CONTENT_SUFFIXES.author = 'authors'`): not in this
- * app's `hostedTypes`, so it resolves to the hub origin's `/authors/<slug>`
- * page and opens out.
+ * The byline's name is plain text: this app has no author page, and an author
+ * payload carries no address of its own for the content-URL composer to open.
  */
 
 /** Discover authors from the hydrated release list payload (50 newest). */
@@ -67,7 +63,6 @@ function useDiscoveredAuthors() {
 export function AuthorsPage() {
   const { data: authors, error, isLoading } = useDiscoveredAuthors()
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const runtime = useChatRuntime()
 
   // Memoized — a fresh object every render would re-render every card.
   const extras = useMemo(
@@ -87,15 +82,6 @@ export function AuthorsPage() {
   }
 
   const selected = authors.find((a) => a.id === selectedId) ?? authors[0]
-
-  // Unified content-URL seam — same resolver every content type uses. The
-  // 'author' type is not in this app's hostedTypes, so this composes the hub
-  // origin's /authors/<slug> URL (DEFAULT_CONTENT_SUFFIXES.author). The slug
-  // is only present when the hub's public-author gate passes; absent ⇒ plain
-  // text name.
-  const authorHref = selected.slug
-    ? runtime?.composeContentUrl?.({ type: 'author', identifier: selected.slug })?.href
-    : undefined
 
   return (
     <div className="space-y-8 p-6">
@@ -158,15 +144,12 @@ export function AuthorsPage() {
         />
       </AuthorDetailView>
 
-      {/* 2. The standalone byline card (end-of-article author description) —
-            name linking out to the hub's author page via the unified
-            composeContentUrl seam. */}
+      {/* 2. The standalone byline card (end-of-article author description), its name plain text. */}
       <ArticleAuthorByline
         author={selected.full_name}
         avatar={selected.avatar_url}
         jobTitle={selected.job_title}
         bio={selected.about}
-        href={authorHref}
         fallbackBio="Contributing author."
       />
     </div>

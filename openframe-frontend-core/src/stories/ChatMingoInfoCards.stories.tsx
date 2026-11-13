@@ -32,7 +32,7 @@ import { ChatColumnDecorator, makeAnchorProps } from './__fixtures__/chat-card-d
 /**
  * Chat entity-cards re-skinned with `MingoInfoCard`.
  *
- * As each `[card://type:id]` registry entry in `entity-cards/dispatch.tsx` is
+ * As each `[id](record://type/id)` registry entry in `entity-cards/dispatch.tsx` is
  * migrated to render a `MingoInfoCard`, its variants are mirrored here so the
  * compact in-chat appearance can be reviewed in isolation — same column width
  * and background the dispatch renders into, without booting the chat runtime.

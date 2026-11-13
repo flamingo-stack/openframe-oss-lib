@@ -35,7 +35,7 @@ export function extractItems(data: unknown): unknown[] {
 
 /** Extract a stable id from a fetched item — different shapes use
  *  `id` vs `external_id`. Used by the chat loader to match the fetched
- *  array element back to the marker's id. */
+ *  array element back to the record's id. */
 export function extractItemId(type: string, item: unknown): string | null {
   if (!item || typeof item !== 'object') return null;
   const obj = item as Record<string, unknown>;

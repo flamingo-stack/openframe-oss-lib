@@ -252,6 +252,7 @@ export function OnboardingGuideDetailView({
       slug: g.slug,
       basePath,
       platforms: g.onboarding_guide_platforms,
+      url: g.url,
     });
     return <OnboardingGuideCard guide={g} href={cta.href} targetPlatform={cta.targetPlatform} />;
   };
