@@ -50,8 +50,10 @@ public class PackageUpdateExecutionRecorder {
             case DONE -> update(row, ExecutionStatus.SUCCESS, null, now, null, summary(event), null);
             case FAILED -> {
                 Failed failed = event.getFailed();
-                update(row, ExecutionStatus.FAILED, ExecutionFailureReason.SYSTEM_SCRIPT_ERROR, now, exitCode(failed), null,
-                        error(failed));
+                ExecutionFailureReason failureReason = failureReason(failed);
+                Integer exitCode = exitCode(failed);
+                String error = error(failed);
+                update(row, ExecutionStatus.FAILED, failureReason, now, exitCode, null, error);
             }
         }
         row.setStatusChangedAt(now);
@@ -117,6 +119,18 @@ public class PackageUpdateExecutionRecorder {
         }
         String reason = failed.getReason() == null ? FAILED_ERROR : failed.getReason().name();
         return hasText(failed.getMessage()) ? reason + ": " + failed.getMessage() : reason;
+    }
+
+    private static ExecutionFailureReason failureReason(Failed failed) {
+        if (failed == null || failed.getReason() == null) {
+            return ExecutionFailureReason.SYSTEM_SCRIPT_ERROR;
+        }
+        return switch (failed.getReason()) {
+            case TIMEOUT -> ExecutionFailureReason.AGENT_TIMED_OUT;
+            case MANAGER_MISSING, NOT_SUPPORTED -> ExecutionFailureReason.COULD_NOT_LAUNCH;
+            case SUPERSEDED -> null;
+            case MANAGER_ERROR, CLOSE_FAILED, NOT_INSTALLED, NOT_UPGRADABLE -> ExecutionFailureReason.SYSTEM_SCRIPT_ERROR;
+        };
     }
 
     private static Integer exitCode(Failed failed) {

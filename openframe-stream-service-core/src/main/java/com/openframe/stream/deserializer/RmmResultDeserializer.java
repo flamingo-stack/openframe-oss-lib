@@ -105,11 +105,10 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
 
     protected AgentResultReport agentReport(JsonNode after) {
         Integer exitCode = parseStringField(after, FIELD_EXIT_CODE).map(RmmResultDeserializer::intOrNull).orElse(null);
-        return new AgentResultReport(
-                exitCode,
-                hasTimedOut(after),
-                parseStringField(after, FIELD_ERROR).orElse(null),
-                parseStringField(after, FIELD_FAILURE_REASON).orElse(null));
+        boolean timedOut = hasTimedOut(after);
+        String error = parseStringField(after, FIELD_ERROR).orElse(null);
+        String failureReason = parseStringField(after, FIELD_FAILURE_REASON).orElse(null);
+        return new AgentResultReport(exitCode, timedOut, error, failureReason);
     }
 
     private static Integer intOrNull(String value) {

@@ -11,6 +11,7 @@ import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.stream.mapping.SourceEventTypes;
+import com.openframe.stream.service.rmm.AgentResultReport;
 import com.openframe.stream.service.rmm.ExecutionOutcomeClassifier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -68,7 +69,8 @@ public final class ScriptResultDeserializer extends RmmResultDeserializer {
     }
 
     private boolean isFailed(JsonNode after) {
-        return !outcomeClassifier.classify(agentReport(after), false).succeeded();
+        AgentResultReport report = agentReport(after);
+        return !outcomeClassifier.classify(report, false).succeeded();
     }
 
     @Override

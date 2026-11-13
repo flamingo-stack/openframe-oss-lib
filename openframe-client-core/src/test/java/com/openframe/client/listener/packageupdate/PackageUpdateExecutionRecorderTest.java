@@ -12,6 +12,8 @@ import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.State;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -179,6 +181,45 @@ class PackageUpdateExecutionRecorderTest {
 
         assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(row.getError()).isEqualTo(PackageUpdateExecutionRecorder.SUPERSEDED_ERROR);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "TIMEOUT, AGENT_TIMED_OUT",
+            "MANAGER_MISSING, COULD_NOT_LAUNCH",
+            "NOT_SUPPORTED, COULD_NOT_LAUNCH",
+            "MANAGER_ERROR, SYSTEM_SCRIPT_ERROR",
+            "CLOSE_FAILED, SYSTEM_SCRIPT_ERROR",
+            "NOT_INSTALLED, SYSTEM_SCRIPT_ERROR",
+            "NOT_UPGRADABLE, SYSTEM_SCRIPT_ERROR"
+    })
+    void failed_mapsTheUpdateReasonToTheFailureReason(Failed.Reason reason, ExecutionFailureReason expected) {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+
+        recorder.record(request, "m1", failed(reason, null, null));
+
+        assertThat(row.getStatus()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(row.getFailureReason()).isEqualTo(expected);
+    }
+
+    @Test
+    void superseded_hasNoFailureReason() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+        row.setFailureReason(ExecutionFailureReason.NO_ACK);
+
+        recorder.record(request, "m1", failed(Failed.Reason.SUPERSEDED, null, null));
+
+        assertThat(row.getFailureReason()).isNull();
+    }
+
+    @Test
+    void failedWithoutAReason_isASystemScriptError() {
+        ScriptExecution row = rowFound(ExecutionStatus.RUNNING);
+
+        recorder.record(request, "m1", failed(null, null, null));
+
+        assertThat(row.getError()).isEqualTo(PackageUpdateExecutionRecorder.FAILED_ERROR);
+        assertThat(row.getFailureReason()).isEqualTo(ExecutionFailureReason.SYSTEM_SCRIPT_ERROR);
     }
 
     @Test
