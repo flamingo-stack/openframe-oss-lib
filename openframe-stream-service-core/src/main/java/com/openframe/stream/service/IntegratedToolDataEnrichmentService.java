@@ -102,7 +102,7 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
             case MESHCENTRAL -> ToolType.MESHCENTRAL;
             case RMM -> ToolType.OPENFRAME_RMM;
             // Directory events (pre-enriched, no agent machine) — no machine-cache tool scope.
-            case MICROSOFT_365, GOOGLE_WORKSPACE -> null;
+            case MICROSOFT_365, GOOGLE_WORKSPACE, OPENFRAME -> null;
         };
     }
 
