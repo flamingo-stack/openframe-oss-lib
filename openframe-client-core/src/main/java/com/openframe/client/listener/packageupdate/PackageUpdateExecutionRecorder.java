@@ -46,10 +46,14 @@ public class PackageUpdateExecutionRecorder {
                 }
                 row.setWaiting(true);
             }
-            case DONE -> update(row, ExecutionStatus.SUCCESS, now, null, summary(event), null);
+            case DONE -> {
+                update(row, ExecutionStatus.SUCCESS, now, null, summary(event), null);
+                keepManagerOutput(row, event);
+            }
             case FAILED -> {
                 Failed failed = event.getFailed();
                 update(row, ExecutionStatus.FAILED, now, exitCode(failed), null, error(failed));
+                keepManagerOutput(row, event);
             }
         }
         row.setStatusChangedAt(now);
@@ -88,7 +92,32 @@ public class PackageUpdateExecutionRecorder {
         row.setFinishedAt(finishedAt);
         row.setExitCode(exitCode);
         row.setStdout(stdout);
+        row.setStdoutTruncated(null);
+        row.setStderr(null);
+        row.setStderrTruncated(null);
         row.setError(error);
+    }
+
+    // the package manager's own output of the run; the summary line stays first
+    private static void keepManagerOutput(ScriptExecution row, PackageUpdateStatusMessage event) {
+        String stdout = event.getStdout();
+        if (hasText(stdout)) {
+            String summary = row.getStdout();
+            String shown = hasText(summary) ? summary + "\n\n" + stdout : stdout;
+            row.setStdout(capped(shown));
+            row.setStdoutTruncated(shown.length() > ScriptExecution.MAX_OUTPUT_BYTES);
+        }
+        String stderr = event.getStderr();
+        if (hasText(stderr)) {
+            row.setStderr(capped(stderr));
+            row.setStderrTruncated(stderr.length() > ScriptExecution.MAX_OUTPUT_BYTES);
+        }
+    }
+
+    private static String capped(String output) {
+        return output.length() > ScriptExecution.MAX_OUTPUT_BYTES
+                ? output.substring(0, ScriptExecution.MAX_OUTPUT_BYTES)
+                : output;
     }
 
     private static String summary(PackageUpdateStatusMessage event) {

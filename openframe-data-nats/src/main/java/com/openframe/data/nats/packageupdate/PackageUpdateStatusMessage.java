@@ -37,6 +37,9 @@ public class PackageUpdateStatusMessage {
     private Done done;
     private Failed failed;
 
+    private String stdout;
+    private String stderr;
+
     public enum State {
         WAITING,
         DONE,

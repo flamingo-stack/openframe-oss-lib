@@ -146,6 +146,16 @@ class PackageUpdateWireFormatTest {
     }
 
     @Test
+    void status_failed_withTheManagerOutput_parses() {
+        PackageUpdateStatusMessage msg = mapper.readValue("""
+                {"state":"FAILED","failed":{"reason":"MANAGER_ERROR","exitCode":1},"stdout":"==> Upgrading slack","stderr":"Error: locked"}""",
+                PackageUpdateStatusMessage.class);
+
+        assertThat(msg.getStdout()).isEqualTo("==> Upgrading slack");
+        assertThat(msg.getStderr()).isEqualTo("Error: locked");
+    }
+
+    @Test
     void status_waiting_postponedByTheUser_parses() {
         PackageUpdateStatusMessage msg = mapper.readValue("""
                 {"state":"WAITING","waiting":{"reason":"APP_RUNNING","phase":"POSTPONED"}}""",
