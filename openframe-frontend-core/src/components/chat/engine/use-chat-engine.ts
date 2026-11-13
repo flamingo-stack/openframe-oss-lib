@@ -175,6 +175,13 @@ export interface ChatEngineRefresh {
   /** Sooner while a dialog the list or the record shows waits for its generated title (`DialogItem.awaitsTitle`). */
   awaitingTitleMs?: number;
   /**
+   * Sooner while the host expects the list to change with no event to say so (`expecting`): a row it draws as being
+   * answered, whose end only the next read shows.
+   */
+  expectingMs?: number;
+  /** The host's own state, passed as it changes. Without `expectingMs` it does nothing. */
+  expecting?: boolean;
+  /**
    * While the composer is locked, the open dialog's record is read this often, and one that says no answer is being
    * written (`streamState: 'IDLE'`), read after the lock and after the last chunk, releases it.
    */
@@ -189,6 +196,19 @@ export type ChatEngineAction = 'approve' | 'reject' | 'approveEscalation' | 'rej
 export interface UseChatEngineOptions {
   /** When false the engine goes idle (no tail, no back-fill, no list); its thread is kept. Default true. */
   active?: boolean;
+}
+
+/**
+ * How often the list is read again: the shortest of the sooner intervals whose reason holds now (a title awaited, the
+ * host expecting a change), else the usual one. A reason with no interval set, or one that does not hold, is passed as
+ * `undefined`.
+ */
+export function soonestRefreshMs(
+  intervalMs: number | undefined,
+  sooner: ReadonlyArray<number | undefined>,
+): number | undefined {
+  const due = sooner.filter((ms): ms is number => typeof ms === 'number' && ms > 0);
+  return due.length > 0 ? Math.min(...due) : intervalMs;
 }
 
 /** The key of the "no dialog selected" thread. */
@@ -1285,13 +1305,23 @@ export function useChatEngine(config: UseChatEngineConfig, options: UseChatEngin
   const activeDialog: DialogItem | null = openRecord?.record?.dialog ?? null;
 
   // ─── Asked again on a timer ───────────────────────────────────────────────
-  const { intervalMs: refreshMs, awaitingTitleMs, busyMs, allowed: refreshAllowed } = refresh ?? {};
+  const {
+    intervalMs: refreshMs,
+    awaitingTitleMs,
+    expectingMs,
+    expecting,
+    busyMs,
+    allowed: refreshAllowed,
+  } = refresh ?? {};
   const refreshAllowedRef = useRef(refreshAllowed);
   useEffect(() => {
     refreshAllowedRef.current = refreshAllowed;
   });
   const awaitingTitle = dialogs.some(dialog => dialog.awaitsTitle) || activeDialog?.awaitsTitle === true;
-  const listRefreshMs = awaitingTitle && awaitingTitleMs ? awaitingTitleMs : refreshMs;
+  const listRefreshMs = soonestRefreshMs(refreshMs, [
+    awaitingTitle ? awaitingTitleMs : undefined,
+    expecting ? expectingMs : undefined,
+  ]);
   const listSearch = searchQuery || undefined;
   useEffect(() => {
     if (!active || !listRefreshMs) return undefined;
