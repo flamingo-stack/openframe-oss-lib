@@ -22,6 +22,7 @@ import { NavigationSidebarItemButton } from './navigation-sidebar-item';
 import { resolveNavigationActive } from './navigation-sidebar-match';
 import {
   NavigationSidebarSectionedEntries,
+  NavigationSidebarSectionedSkeleton,
   SECTIONED_PRIMARY_NAV_CLASSES,
   useFoldedNavigationSections,
 } from './navigation-sidebar-sectioned';
@@ -655,9 +656,21 @@ export function NavigationSidebar({
   // One `<nav>` block's rows: placeholders while loading, else the entries in
   // the variant's geometry.
   const renderEntries = (placeholders: string[] | null, items: NavigationSidebarItem[]): ReactNode => {
+    if (placeholders && sectioned) {
+      // The sections' own shape: the primary block as the host states it, the secondary one
+      // (and a host with no sections) as one section of entry rows.
+      const sections = placeholders === loadingRows?.primary ? config.loadingRows?.sections : undefined;
+      return (
+        <NavigationSidebarSectionedSkeleton
+          sections={sections}
+          leaves={placeholders.length}
+          foldedIds={foldedSectionIds}
+        />
+      );
+    }
     if (placeholders) {
       return placeholders.map(key =>
-        grouped || sectioned ? (
+        grouped ? (
           <NavigationSidebarGroupedSkeleton key={key} />
         ) : (
           <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />

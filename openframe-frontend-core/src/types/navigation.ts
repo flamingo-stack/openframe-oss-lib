@@ -175,8 +175,14 @@ export interface NavigationSidebarConfig {
    * How many placeholder rows `loading` draws, per section. Defaults to 7 primary
    * and 2 secondary — the shape of a typical console nav. Pass the counts the host
    * expects so the placeholder and the loaded nav are the same height.
+   *
+   * `sections` is the sectioned variant's shape (`variant: 'sectioned'`): the sections the
+   * loaded nav draws, in order, each a category row over `rows` entry rows. A section the
+   * user folded (`groupsStorageKey`) is drawn folded, as the loaded nav draws it. Given, it
+   * replaces `primary`; without it the sectioned placeholder is `primary` entry rows in one
+   * section.
    */
-  loadingRows?: { primary?: number; secondary?: number };
+  loadingRows?: { primary?: number; secondary?: number; sections?: readonly NavigationSidebarLoadingSection[] };
   /**
    * Host-owned content rendered above the primary navigation — an action that
    * belongs in the nav's position but is not a nav entry, such as the desktop
@@ -431,6 +437,15 @@ export type NavigationSidebarMatch =
   | NavigationSidebarMatchRule
   | ReadonlyArray<string | NavigationSidebarMatchRule>
   | ((location: NavigationSidebarLocation) => boolean);
+
+/**
+ * One section of the sectioned variant's placeholder (`NavigationSidebarConfig.loadingRows.sections`):
+ * the section's `id` (the loaded section's, so a stored fold applies) and the entry rows under its category row.
+ */
+export interface NavigationSidebarLoadingSection {
+  id: string;
+  rows: number;
+}
 
 /**
  * Navigation sidebar item interface

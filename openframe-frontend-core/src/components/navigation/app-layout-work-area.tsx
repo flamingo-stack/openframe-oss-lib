@@ -16,6 +16,7 @@ import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-
 import { cn } from '../../utils/cn';
 import { clamp } from '../../utils/common';
 import { createLocalStorageAdapter } from '../../utils/local-storage-adapter';
+import { WORK_AREA_SHARE_CSS_VAR } from '../../utils/work-area-share';
 import { PanelResizeGrip, PanelResizeHandle } from '../ui/panel-resize-handle';
 
 /**
@@ -38,6 +39,15 @@ export type AppLayoutWorkAreaMode = 'chat' | 'split' | 'page';
 export const WORK_AREA_MIN_COLUMN_WIDTH = 360;
 /** Where the divider starts until the user moves it: the middle. */
 const DEFAULT_CHAT_SHARE = 0.5;
+
+/**
+ * The chat column's width in `split` before the row is measured: the seeded share
+ * (`WORK_AREA_SHARE_CSS_VAR`, the middle without one), kept between the two columns'
+ * narrowest widths as the measured width is.
+ */
+function unmeasuredChatWidth(floor: number): string {
+  return `clamp(${floor}px, calc(var(${WORK_AREA_SHARE_CSS_VAR}, ${DEFAULT_CHAT_SHARE}) * 100%), calc(100% - ${floor}px))`;
+}
 
 /**
  * What a column of the work area knows about its own width: whether it is squeezed
@@ -413,7 +423,7 @@ export function AppLayoutWorkArea({
             shown === 'split'
               ? ({
                   ...minWidthVar,
-                  width: shownChatWidth ?? `${DEFAULT_CHAT_SHARE * 100}%`,
+                  width: shownChatWidth ?? unmeasuredChatWidth(floor),
                   '--work-area-visible-width': shownChatWidth === null ? '100%' : `${shownChatWidth}px`,
                 } as CSSProperties)
               : chatKeptWidth !== null

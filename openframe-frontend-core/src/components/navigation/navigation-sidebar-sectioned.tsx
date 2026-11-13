@@ -4,10 +4,11 @@ import { type MouseEvent, useCallback, useId, useMemo, useState } from 'react';
 import Link from '../../embed-shims/next-link';
 import { useClippedLabelTooltip } from '../../hooks/ui/use-clipped-label-tooltip';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
-import type { NavigationSidebarItem } from '../../types/navigation';
+import type { NavigationSidebarItem, NavigationSidebarLoadingSection } from '../../types/navigation';
 import { cn } from '../../utils';
 import { createLocalStorageAdapter } from '../../utils/local-storage-adapter';
 import { Chevron02DownIcon } from '../icons-v2-generated';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FloatingTooltip } from '../ui/floating-tooltip';
 import { CountPill } from './count-pill';
 import { accessibleName, EASE, EXPANDED_ONLY, FOCUS_RING, HOVER_LAYER, sizedIcon } from './navigation-sidebar-grouped';
@@ -373,6 +374,74 @@ export function NavigationSidebarSectionedEntries({
           </div>
         ),
       )}
+    </>
+  );
+}
+
+/** A placeholder icon and label, inset as a row's (`EXPANDED_ONLY` hides the label in the rail). */
+function SkeletonRow({ height }: { height: 'h-8' | 'h-10' }) {
+  return (
+    <div
+      className={cn(
+        'flex w-full items-center overflow-hidden pl-[var(--spacing-system-xsf)] @[140px]/of-nav-sidebar:pr-[var(--spacing-system-xsf)]',
+        height,
+      )}
+      aria-hidden="true"
+    >
+      <UnifiedSkeleton className="size-5 shrink-0 rounded" />
+      {/* The fade rides a wrapper, not the bar (see `NavigationSidebarGroupedSkeleton`). */}
+      <div className={cn('ml-[var(--spacing-system-xsf)] min-w-0 flex-1', EXPANDED_ONLY)}>
+        <UnifiedSkeleton className="h-4 w-full rounded" />
+      </div>
+    </div>
+  );
+}
+
+export interface NavigationSidebarSectionedSkeletonProps {
+  /** The sections to draw, each a category row over `rows` entry rows; omitted, one section of `leaves` rows. */
+  sections?: readonly NavigationSidebarLoadingSection[];
+  /** Entry rows in one section without a category row: the secondary block, or a host that states no sections. */
+  leaves?: number;
+  foldedIds: ReadonlySet<string>;
+}
+
+/**
+ * The sectioned variant's placeholder (`NavigationSidebarConfig.loadingRows`): the loaded
+ * sections' own box (`SECTION_CLASSES`, the 32px category row, the 40px rows 4px apart) and
+ * their folds, so the handoff to the loaded navigation moves nothing.
+ */
+export function NavigationSidebarSectionedSkeleton({
+  sections,
+  leaves = 0,
+  foldedIds,
+}: NavigationSidebarSectionedSkeletonProps) {
+  if (!sections) {
+    if (leaves <= 0) return null;
+    return (
+      <div className={SECTION_CLASSES} aria-hidden="true">
+        {Array.from({ length: leaves }, (_, i) => (
+          <SkeletonRow key={i} height="h-10" />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <>
+      {sections.map(section => {
+        const folded = foldedIds.has(section.id);
+        return (
+          <div
+            key={section.id}
+            className={cn(SECTION_CLASSES, folded && 'gap-0')}
+            data-folded={folded || undefined}
+            aria-hidden="true"
+          >
+            <SkeletonRow height="h-8" />
+            {!folded &&
+              Array.from({ length: Math.max(0, section.rows) }, (_, i) => <SkeletonRow key={i} height="h-10" />)}
+          </div>
+        );
+      })}
     </>
   );
 }

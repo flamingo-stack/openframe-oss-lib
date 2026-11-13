@@ -4,9 +4,11 @@
  * `workAreaMode`, `endSidebarConfig`).
  */
 
+import { runInThisContext } from 'node:vm';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { WORK_AREA_SHARE_CSS_VAR, workAreaShareSeedScript } from '../../../utils/work-area-share';
 import { Collapse02Icon } from '../../icons-v2-generated';
 import { AppColumnHeader } from '../app-column-header';
 import { AppLayout } from '../app-layout';
@@ -57,6 +59,14 @@ describe('AppLayoutWorkArea', () => {
     expect(chatColumn()).toHaveStyle({ width: '500px' });
     expect(divider()).toHaveAttribute('aria-valuemin', '360');
     expect(divider()).toHaveAttribute('aria-valuemax', '640');
+  });
+
+  it('before the row is measured (the first paint), draws the seeded share between the two min widths', () => {
+    rowWidth(0);
+    render(area('split'));
+    expect(chatColumn().style.width).toBe(
+      'clamp(360px, calc(var(--work-area-chat-share, 0.5) * 100%), calc(100% - 360px))',
+    );
   });
 
   it('keeps both columns at least 360px wide', () => {
@@ -583,5 +593,40 @@ describe('AppLayout chatColumn null', () => {
     rerender(layout(<h2>Thread</h2>, 'split'));
     expect(screen.getByRole('heading', { name: 'Thread' })).toBeInTheDocument();
     expect(mounts.count).toBe(1);
+  });
+});
+
+describe('workAreaShareSeedScript', () => {
+  afterEach(() => document.documentElement.style.removeProperty(WORK_AREA_SHARE_CSS_VAR));
+
+  // Run as the document's own <head> script: plain JS in the global scope (jsdom runs no inline
+  // <script>), where the test environment's `localStorage` and `document` are.
+  const seed = (key: string) => {
+    runInThisContext(workAreaShareSeedScript(key));
+  };
+  const seeded = () => document.documentElement.style.getPropertyValue(WORK_AREA_SHARE_CSS_VAR);
+
+  it('sets the share the work area stored under the key', () => {
+    window.localStorage.setItem('test.share', JSON.stringify({ share: 0.32 }));
+    seed('test.share');
+    expect(seeded()).toBe('0.32');
+  });
+
+  it('is the share the work area saves when the divider is moved', () => {
+    rowWidth(1000);
+    render(area('split', 'test.saved'));
+    fireEvent.keyDown(divider(), { key: 'ArrowLeft' });
+    const saved = (JSON.parse(window.localStorage.getItem('test.saved') ?? '{}') as { share: number }).share;
+    seed('test.saved');
+    expect(Number(seeded())).toBe(saved);
+  });
+
+  it('sets nothing for no share, a share out of range or a value that is not one', () => {
+    seed('test.none');
+    window.localStorage.setItem('test.out', JSON.stringify({ share: 1.4 }));
+    seed('test.out');
+    window.localStorage.setItem('test.bad', 'not json');
+    seed('test.bad');
+    expect(seeded()).toBe('');
   });
 });
