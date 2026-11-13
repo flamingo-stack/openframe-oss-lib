@@ -68,6 +68,9 @@ public class AccessChangeEventDeserializer implements KafkaMessageDeserializer {
     public DeserializedDebeziumMessage deserialize(CommonDebeziumMessage message, MessageType type) {
         DebeziumMessage.Payload<JsonNode> payload = message.getPayload();
         JsonNode after = payload.getAfter();
+        if (after == null || after.isNull()) {
+            return skipped(payload, null);
+        }
         String action = text(after, FIELD_ACTION);
         Instant occurredAt = occurredAtOf(after);
         if (occurredAt == null) {

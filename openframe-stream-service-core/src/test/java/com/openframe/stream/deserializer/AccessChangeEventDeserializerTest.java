@@ -9,14 +9,18 @@ import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.NullNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -203,6 +207,22 @@ class AccessChangeEventDeserializerTest {
                 .returns("DIRECTORY_ACCOUNT_LINKED", DeserializedDebeziumMessage::getSourceEventType);
     }
 
+    @ParameterizedTest
+    @MethodSource("absentAfterNodes")
+    void deserialize_absentAfterNode_skippedWithoutThrowing(JsonNode absentAfter) {
+        // setup
+        CommonDebeziumMessage message = message(absentAfter);
+
+        // execution
+        DeserializedDebeziumMessage result = deserializer.deserialize(message, MessageType.ACCESS_CHANGE_EVENT);
+
+        // verifications
+        assertThat(result)
+                .returns(true, DeserializedDebeziumMessage::getSkipProcessing)
+                .returns(UnifiedEventType.UNKNOWN, DeserializedDebeziumMessage::getUnifiedEventType)
+                .returns(null, DeserializedDebeziumMessage::getSourceEventType);
+    }
+
     @Test
     void deserialize_anyAction_noMachineNoAgentVisible() {
         // setup
@@ -248,6 +268,12 @@ class AccessChangeEventDeserializerTest {
         assertThat(result)
                 .returns(ACCESS_CHANGE_ID, DeserializedDebeziumMessage::getToolEventId)
                 .returns(null, DeserializedDebeziumMessage::getOrganizationId);
+    }
+
+    private static Stream<Arguments> absentAfterNodes() {
+        JsonNode missing = null;
+        JsonNode jsonNull = NullNode.getInstance();
+        return Stream.of(Arguments.of(missing), Arguments.of(jsonNull));
     }
 
     private static CommonDebeziumMessage message(JsonNode after) {
