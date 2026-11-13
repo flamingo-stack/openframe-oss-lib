@@ -69,6 +69,11 @@ public class PackageUpdateStatusProcessor {
                     event.getEventId(), requestId, machineId);
             return;
         }
+        if (isWaitingAfterCompleted(state, event)) {
+            log.info("[package-update] waiting status after the update completed requestId={} machineId={} eventId={} — ignored",
+                    requestId, machineId, event.getEventId());
+            return;
+        }
 
         PackageUpdateRequest request = requestRepository.findByTenantIdAndRequestId(tenantId, requestId).orElse(null);
         Instant deadlineBefore = state.getDeadlineAt();
@@ -178,6 +183,11 @@ public class PackageUpdateStatusProcessor {
 
     private boolean isStale(PackageUpdateDeviceState state, PackageUpdateStatusMessage event) {
         return state.getLastEventAt() != null && event.getAt() != null && event.getAt().isBefore(state.getLastEventAt());
+    }
+
+    // a device holds two orders of one request once the force is out: the wait one may still report after the force finished it
+    private boolean isWaitingAfterCompleted(PackageUpdateDeviceState state, PackageUpdateStatusMessage event) {
+        return state.getStatus() == SoftwareActionStatus.COMPLETED && event.getState() == State.WAITING;
     }
 
     private void rollUp(String tenantId, String requestId, PackageUpdateRequest request) {

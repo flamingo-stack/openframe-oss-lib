@@ -212,6 +212,45 @@ class PackageUpdateStatusProcessorTest {
     }
 
     @Test
+    void waitingAfterTheUpdateCompleted_isIgnored_theActionStaysCompleted() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.COMPLETED);
+        st.setLastEventId("e2");
+        st.setLastEventAt(T);
+        st.setDoneResult("UPGRADED");
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+
+        PackageUpdateStatusMessage late = waiting("e3", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING, PackageUpdateStatusMessage.Waiting.Phase.PROMPT);
+        processor.process("m1", late);
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.COMPLETED);
+        assertThat(st.getDoneResult()).isEqualTo("UPGRADED");
+        assertThat(st.getWaitingReason()).isNull();
+        verify(deviceStateRepository, never()).save(any());
+        verifyNoInteractions(executionRecorder, deliveryDispatcher, deliveryTracker, requestRepository);
+    }
+
+    @Test
+    void waitingAfterTheUpdateFailed_stillApplies() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.FAILED);
+        st.setLastEventId("e2");
+        st.setLastEventAt(T);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.FORCE, null)));
+        when(deviceStateRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(List.of(st));
+
+        PackageUpdateStatusMessage again = waiting("e3", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.MANAGER_BUSY, PackageUpdateStatusMessage.Waiting.Phase.PROMPT);
+        processor.process("m1", again);
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.WAITING);
+        verify(deviceStateRepository).save(st);
+    }
+
+    @Test
     void done_completesAndClearsWaitingDetail() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
