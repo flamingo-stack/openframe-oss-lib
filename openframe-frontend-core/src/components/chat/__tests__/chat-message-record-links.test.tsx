@@ -57,6 +57,22 @@ describe('ChatMessageEnhanced — record links', () => {
     expect(screen.queryByTestId('chat-record-cards')).toBeNull();
   });
 
+  // Only the inline form is a chip: it is what every check of an answer reads (`extractRecordLinks`, the hub's and the
+  // agent's link sanitizers), so a chip never stands for a record those checks did not see.
+  it('draws a reference-style link to a record as its plain label, not a chip', () => {
+    show('See [the Mac][m] first.\n\n[m]: record://device/mac-1');
+    expect(screen.queryByTestId('inline-chip')).toBeNull();
+    expect(screen.queryByTestId('chip-device-mac-1')).toBeNull();
+    expect(screen.getByText(/See the Mac first\./)).toBeTruthy();
+  });
+
+  it('draws a record address in raw HTML as no link at all', () => {
+    show('Open <a href="record://script/6aad91a3b776f95ad7491bd9">this script</a> now.');
+    expect(screen.queryByTestId('inline-chip')).toBeNull();
+    expect(screen.queryByTestId('chip-script-6aad91a3b776f95ad7491bd9')).toBeNull();
+    expect(screen.queryByRole('link', { name: /this script/ })).toBeNull();
+  });
+
   it('draws a linked record as a chip with its name in the sentence, and no card from the link', () => {
     show('The [Mac guide](record://onboarding_guide/mac-guide) covers it.');
     expect(within(screen.getByTestId('inline-chip')).getByText('Mac guide')).toBeTruthy();

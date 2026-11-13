@@ -336,6 +336,13 @@ export interface ChatStreamReducer {
    * in flight across the eviction renders a duplicate user bubble.
    */
   getPendingEchoes(): readonly PendingEcho[];
+
+  /**
+   * Consume the armed echo of one of the viewer's own sends with this text (one-shot, within `OWN_ECHO_TTL_MS`), as a
+   * `MESSAGE_REQUEST` echo does. For a direct message that names no author: it is the viewer's own only when it answers
+   * a send of theirs; otherwise it is someone else's and draws its row.
+   */
+  consumeOwnEcho(text: string): boolean;
 }
 
 /** Chunks allowed through once the dialog is in direct mode. Everything else is the AI assistant's and gets dropped: an
@@ -1221,6 +1228,9 @@ export function createChatStreamReducer(options: ChatStreamReducerOptions = {}):
       // the `readonly` return type a lie and let a parked copy mutate under
       // its holder.
       return pendingEchoTexts.slice();
+    },
+    consumeOwnEcho(text) {
+      return consumeOwnEcho(text);
     },
   };
 }

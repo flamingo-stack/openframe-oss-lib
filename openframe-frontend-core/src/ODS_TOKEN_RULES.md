@@ -17,7 +17,9 @@ Source of truth: `src/styles/` + `tailwind.config.ts`. Use the Tailwind `ods-*` 
 semantic layer). Never reach into the raw palette vars such as `var(--ods-attention-red-error)` —
 the semantic layer (`--color-*`) exists so theming and renames don't break.
 
-- **Backgrounds:** `bg-ods-bg` (page), `bg-ods-card`, `bg-ods-overlay`, `bg-ods-skeleton`
+- **Backgrounds:** `bg-ods-bg` (page), `bg-ods-card`, `bg-ods-overlay`, `bg-ods-skeleton`,
+  `bg-ods-bg-base` (backgrounds/openframe-background: the deepest ground, which a `data-surface`
+  such as Mingo's does not tint, unlike `bg-ods-bg`)
 - **Text:** `text-ods-text-primary`, `-secondary`, `-tertiary`, `-muted`, `-on-accent`
 - **Borders:** `border-ods-border` (+ `-hover`, `-active`, `-focus`)
 - **Accent:** `bg-ods-accent`, `text-ods-accent` (+ `-hover`, `-active`)
