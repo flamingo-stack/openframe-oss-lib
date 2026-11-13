@@ -5,6 +5,7 @@ import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import { Check } from 'lucide-react';
 import React, { useCallback } from 'react';
 import Link from '../../embed-shims/next-link';
+import { useViewportCollisionPadding, withViewportPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { Chevron02RightIcon, Ellipsis01Icon } from '../icons-v2-generated';
 import { ActionsMenuHeaderContext } from './actions-menu-header-context';
@@ -31,6 +32,11 @@ export interface ActionsMenuItemIconAction {
 export interface ActionsMenuItem {
   id: string;
   label: string;
+  /**
+   * Secondary text under the label: information about the item, not part of its name (e.g. "last poked 2h ago" on a
+   * Poke item). Drawn in the secondary colour, smaller than the label; never fold it into `label`.
+   */
+  description?: string;
   icon?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
@@ -207,6 +213,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
   // root menu (`DropdownMenuContent`). Read unconditionally — hooks first.
   const portalContainer = usePortalContainer();
   const collisionBoundary = useCollisionBoundary();
+  const viewportPadding = useViewportCollisionPadding();
   const { variant, keyboardMoved } = React.useContext(ActionsMenuRowContext);
   const skin = MENU_SKIN[variant];
   const activate = useCallback(() => {
@@ -282,14 +289,28 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
         </div>
       )}
 
-      <span
-        className={cn(
-          skin.label,
-          item.disabled ? 'text-ods-text-secondary' : item.danger ? 'text-ods-error' : 'text-ods-text-primary',
-        )}
-      >
-        {item.label}
-      </span>
+      {item.description ? (
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span
+            className={cn(
+              skin.label,
+              item.disabled ? 'text-ods-text-secondary' : item.danger ? 'text-ods-error' : 'text-ods-text-primary',
+            )}
+          >
+            {item.label}
+          </span>
+          <span className="text-ods-text-secondary text-h6">{item.description}</span>
+        </span>
+      ) : (
+        <span
+          className={cn(
+            skin.label,
+            item.disabled ? 'text-ods-text-secondary' : item.danger ? 'text-ods-error' : 'text-ods-text-primary',
+          )}
+        >
+          {item.label}
+        </span>
+      )}
 
       {item.type === 'radio' && item.checked && (
         <Check className="h-4 w-4 shrink-0 text-ods-accent md:h-6 md:w-6" strokeWidth={3} aria-hidden="true" />
@@ -343,7 +364,9 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
               // Confine flip/shift (and the available-height this menu sizes
               // itself by) to the owning surface — see `useCollisionBoundary`.
               collisionBoundary={collisionBoundary ?? undefined}
-              collisionPadding={collisionBoundary ? COLLISION_PADDING_PX : undefined}
+              collisionPadding={
+                collisionBoundary ? COLLISION_PADDING_PX : withViewportPadding(undefined, viewportPadding)
+              }
               hideWhenDetached
               className={cn(
                 'z-[1500] max-h-[var(--radix-popper-available-height)] min-w-[256px] overflow-y-auto rounded-md border p-0 shadow-xl',

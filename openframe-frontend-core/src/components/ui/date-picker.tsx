@@ -5,6 +5,7 @@ import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { DayPicker, type DateRange, type DayPickerProps, type Matcher } from 'react-day-picker';
 import { useMdUp } from '../../hooks';
+import { useViewportCollisionPadding, withViewportPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { Button } from './button';
@@ -654,6 +655,12 @@ const timeSelectTriggerStyles = cn(
  * Radix measures and scrolls inside instead.
  */
 const DATE_POPOVER_COLLISION_PADDING = 16;
+
+/** The 16px, or the mobile shell's status bar and keyboard where they are larger (useViewportCollisionPadding). */
+function useDatePopoverPadding() {
+  return withViewportPadding(DATE_POPOVER_COLLISION_PADDING, useViewportCollisionPadding());
+}
+
 const datePopoverBounds = 'max-h-[var(--radix-popover-content-available-height)]';
 
 // ============================================================================
@@ -675,6 +682,7 @@ export function DatePicker(props: DatePickerProps) {
     invalid = false,
     id,
   } = props;
+  const datePopoverPadding = useDatePopoverPadding();
 
   const [open, setOpen] = useState(false);
   const portalContainer = usePortalContainer();
@@ -741,7 +749,7 @@ export function DatePicker(props: DatePickerProps) {
             'data-[side=top]:slide-in-from-bottom-2',
           )}
           sideOffset={8}
-          collisionPadding={DATE_POPOVER_COLLISION_PADDING}
+          collisionPadding={datePopoverPadding}
           align="start"
         >
           <DatePickerCalendar
@@ -811,6 +819,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
     invalid = false,
     id,
   } = props;
+  const datePopoverPadding = useDatePopoverPadding();
   const [open, setOpen] = useState(false);
   const portalContainer = usePortalContainer();
   const isInvalid = invalid || !!error;
@@ -931,7 +940,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
               'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
-            collisionPadding={DATE_POPOVER_COLLISION_PADDING}
+            collisionPadding={datePopoverPadding}
             align="start"
           >
             <DatePickerCalendar
@@ -1066,6 +1075,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
     invalid = false,
     id,
   } = props;
+  const datePopoverPadding = useDatePopoverPadding();
   const [open, setOpen] = useState(false);
   const portalContainer = usePortalContainer();
   const isInvalid = invalid || !!error;
@@ -1164,7 +1174,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
               'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
-            collisionPadding={DATE_POPOVER_COLLISION_PADDING}
+            collisionPadding={datePopoverPadding}
             align="start"
           >
             <DatePickerCalendar
@@ -1365,6 +1375,7 @@ export function DateFilterMenu({
   className,
   'aria-label': ariaLabel = 'Open date filter',
 }: DateFilterMenuProps) {
+  const datePopoverPadding = useDatePopoverPadding();
   const [open, setOpen] = useState(false);
   const portalContainer = usePortalContainer();
 
@@ -1441,7 +1452,7 @@ export function DateFilterMenu({
             'data-[side=top]:slide-in-from-bottom-2',
           )}
           sideOffset={8}
-          collisionPadding={DATE_POPOVER_COLLISION_PADDING}
+          collisionPadding={datePopoverPadding}
           align={align}
         >
           {/* Sort + calendar (shared panel). Scrolls when the window is short, so the actions stay on screen. */}
