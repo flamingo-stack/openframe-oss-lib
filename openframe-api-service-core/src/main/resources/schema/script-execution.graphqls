@@ -91,6 +91,14 @@ enum ExecutionSource {
     SCHEDULED
     "The Mingo AI runner invoked the dispatch on the technician's behalf."
     AI_ASSISTANT
+    "The platform installed a package manager on the device."
+    SYSTEM_BOOTSTRAP
+    "A software install from Software Management."
+    PACKAGE_INSTALLATION
+    "A software update an admin started or scheduled."
+    PACKAGE_UPDATE
+    "A software update the auto-update policy started."
+    PACKAGE_AUTO_UPDATE
 }
 
 input ScriptExecutionFilterInput {
