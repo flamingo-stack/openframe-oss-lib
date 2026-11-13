@@ -52,6 +52,8 @@ export interface FilterChipData {
   id: string;
   label: string;
   variant?: 'selected' | 'category' | 'subcategory' | 'tag';
+  /** The chip's label is still being read (an id the host is naming): the chip draws its loading form. */
+  loading?: boolean;
 }
 
 export interface SearchInputProps {
@@ -496,6 +498,7 @@ export function SearchInput({
                   key={chip.id}
                   variant={chipVariantToTagVariant(chip.variant)}
                   label={chip.label}
+                  loading={chip.loading}
                   labelClassName="max-w-[120px] truncate"
                   onClose={onFilterRemove && !disabled ? () => onFilterRemove(chip.id) : undefined}
                 />
@@ -624,6 +627,7 @@ export function SearchInput({
             key={`m-${chip.id}`}
             variant={chipVariantToTagVariant(chip.variant)}
             label={chip.label}
+            loading={chip.loading}
             labelClassName="max-w-[120px] truncate"
             onClose={() => {}}
           />
