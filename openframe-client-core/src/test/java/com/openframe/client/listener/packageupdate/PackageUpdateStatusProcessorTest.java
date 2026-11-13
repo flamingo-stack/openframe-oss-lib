@@ -24,6 +24,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -281,7 +283,8 @@ class PackageUpdateStatusProcessorTest {
     }
 
     @Test
-    void postponedByTheUser_keepsWaitingWithThePhase_theDeadlineArmedEarlierStays() {
+    void postponedByTheUser_nextPromptIsTheIntervalLater_theDeadlineArmedEarlierStays() {
+        ReflectionTestUtils.setField(processor, "askAgainSeconds", 1800L);
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
         st.setDeadlineAt(T.plusSeconds(3600));
@@ -295,9 +298,61 @@ class PackageUpdateStatusProcessorTest {
 
         assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.WAITING);
         assertThat(st.getWaitingPhase()).isEqualTo("POSTPONED");
-        assertThat(st.getLastEventAt()).isEqualTo(T.plusSeconds(60));
+        assertThat(st.getAskAgainAt()).isEqualTo(T.plusSeconds(1860));
         assertThat(st.getDeadlineAt()).isEqualTo(T.plusSeconds(3600));
         verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+    }
+
+    @Test
+    void postponedByTheUser_theDeadlineComesFirst_noNextPrompt() {
+        ReflectionTestUtils.setField(processor, "askAgainSeconds", 86400L);
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(T.plusSeconds(3600));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", waiting("e2", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.POSTPONED));
+
+        assertThat(st.getWaitingPhase()).isEqualTo("POSTPONED");
+        assertThat(st.getAskAgainAt()).isNull();
+    }
+
+    @Test
+    void postponedByTheUser_noDeadline_nextPromptIsTheIntervalLater() {
+        ReflectionTestUtils.setField(processor, "askAgainSeconds", 86400L);
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+
+        processor.process("m1", waiting("e2", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.POSTPONED));
+
+        assertThat(st.getAskAgainAt()).isEqualTo(T.plusSeconds(86400));
+    }
+
+    @Test
+    void promptShownAgainAfterPostponed_clearsTheNextPromptTime() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setWaitingPhase("POSTPONED");
+        st.setAskAgainAt(T.plusSeconds(1800));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+
+        processor.process("m1", waiting("e3", T.plusSeconds(1800),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
+
+        assertThat(st.getWaitingPhase()).isEqualTo("PROMPT");
+        assertThat(st.getAskAgainAt()).isNull();
     }
 
     @Test

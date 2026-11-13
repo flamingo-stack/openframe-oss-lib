@@ -8,6 +8,8 @@ import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
+import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.State;
+import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Waiting;
 import com.openframe.data.nats.packageupdate.PackageUpdateWire;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
@@ -17,6 +19,7 @@ import com.openframe.delivery.track.DeliveryTracker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -39,6 +42,9 @@ public class PackageUpdateStatusProcessor {
     private final DeliveryDispatcher deliveryDispatcher;
     private final DeliveryTracker deliveryTracker;
     private final PackageAutoUpdateRetry autoUpdateRetry;
+
+    @Value("${openframe.rmm.software.package-update.ask-again-seconds:86400}")
+    private long askAgainSeconds;
 
     public void process(String machineId, PackageUpdateStatusMessage event) {
         Machine machine = machineRepository.findByMachineId(machineId).orElse(null);
@@ -67,18 +73,20 @@ public class PackageUpdateStatusProcessor {
         PackageUpdateRequest request = requestRepository.findByTenantIdAndRequestId(tenantId, requestId).orElse(null);
         Instant deadlineBefore = state.getDeadlineAt();
         PackageUpdateDeviceStateReducer.apply(state, request, event);
+        timeNextPrompt(state, event);
         driveDeadlineForce(state, request, deadlineBefore, machineId);
         autoUpdateRetry.scheduleIfDue(state, request);
         autoUpdateRetry.turnOffIfPackageRemoved(state, request);
         executionRecorder.record(request, machineId, event);
         deviceStateRepository.save(state);
         log.info("[package-update] status applied requestId={} machineId={} eventId={} state={} status={} "
-                        + "waitingReason={} waitingPhase={} closesAt={} doneResult={} rebootRequired={} relaunched={} "
+                        + "waitingReason={} waitingPhase={} closesAt={} askAgainAt={} doneResult={} "
+                        + "rebootRequired={} relaunched={} "
                         + "failedReason={} exitCode={} failedMessage={} deadlineAt={}",
                 requestId, machineId, event.getEventId(), state.getState(), state.getStatus(),
-                state.getWaitingReason(), state.getWaitingPhase(), state.getClosesAt(), state.getDoneResult(),
-                state.getRebootRequired(), state.getRelaunched(), state.getFailedReason(), state.getExitCode(),
-                state.getFailedMessage(), state.getDeadlineAt());
+                state.getWaitingReason(), state.getWaitingPhase(), state.getClosesAt(), state.getAskAgainAt(),
+                state.getDoneResult(), state.getRebootRequired(), state.getRelaunched(), state.getFailedReason(),
+                state.getExitCode(), state.getFailedMessage(), state.getDeadlineAt());
 
         rollUp(tenantId, requestId, request);
     }
@@ -107,6 +115,20 @@ public class PackageUpdateStatusProcessor {
         log.warn("[package-update] order not delivered requestId={} machineId={} reason={}", requestId, machineId, failure);
 
         rollUp(tenantId, requestId, request);
+    }
+
+    // no time once the deadline comes first: the forced update is next then, not another prompt
+    private void timeNextPrompt(PackageUpdateDeviceState state, PackageUpdateStatusMessage event) {
+        Waiting waiting = event.getWaiting();
+        if (event.getState() != State.WAITING || waiting == null || waiting.getPhase() != Waiting.Phase.POSTPONED
+                || event.getAt() == null) {
+            return;
+        }
+        Instant askAgainAt = event.getAt().plusSeconds(askAgainSeconds);
+        Instant deadlineAt = state.getDeadlineAt();
+        if (deadlineAt == null || askAgainAt.isBefore(deadlineAt)) {
+            state.setAskAgainAt(askAgainAt);
+        }
     }
 
     private void driveDeadlineForce(PackageUpdateDeviceState state, PackageUpdateRequest request, Instant deadlineBefore, String machineId) {

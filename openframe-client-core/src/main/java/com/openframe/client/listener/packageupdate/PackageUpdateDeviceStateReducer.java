@@ -93,6 +93,7 @@ public class PackageUpdateDeviceStateReducer {
         state.setWaitingReason(null);
         state.setWaitingPhase(null);
         state.setClosesAt(null);
+        state.setAskAgainAt(null);
         state.setHolders(null);
         state.setDoneResult(null);
         state.setRebootRequired(null);
