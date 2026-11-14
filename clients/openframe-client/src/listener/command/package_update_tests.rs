@@ -122,10 +122,14 @@ async fn an_order_without_a_sequence_fails() {
 #[tokio::test]
 async fn an_unsupported_manager_is_refused_on_the_status_stream() {
     let f = fixture();
+    #[cfg(target_os = "windows")]
+    let package = json!({"manager": "BREW", "kind": "FORMULA", "name": "git"});
+    #[cfg(not(target_os = "windows"))]
+    let package = json!({"manager": "WINGET", "id": "Git.Git"});
     let command: PackageUpdateMessage = serde_json::from_value(json!({
         "requestId": "req-1",
         "source": {"kind": "AUTO"},
-        "package": {"manager": "CHOCO", "id": "git"},
+        "package": package,
         "mode": "WAIT",
     }))
     .unwrap();

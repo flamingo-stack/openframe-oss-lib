@@ -389,10 +389,12 @@ impl Client {
         let package_upgrades = InProgress::default();
         let agent_restart = Latch::default();
 
-        let feature_flags_service = Arc::new(FeatureFlagsService::load(
-            directory_manager.secured_dir().join("feature_flags.json"),
-            env!("OPENFRAME_VERSION").to_string(),
-        ));
+        let feature_flags_service = Arc::new(FeatureFlagsService::load_saved(&directory_manager));
+        crate::services::package_manager::enable_chocolatey(
+            feature_flags_service
+                .flags()
+                .is_enabled(Feature::Chocolatey),
+        );
         let package_auto_update_enabled = feature_flags_service
             .flags()
             .is_enabled(Feature::PackageAutoUpdate);
@@ -875,6 +877,10 @@ impl Client {
         if let Some(package_update) = &self.package_update {
             package_update.manager.start();
         }
+        tokio::spawn(crate::doctor::prerequisites::heal_on_start(
+            crate::doctor::prerequisites::record_path(&self.directory_manager),
+            crate::services::package_manager::chocolatey_enabled(),
+        ));
 
         if let Err(e) = self.tool_run_manager.run().await {
             error!("Failed to start tool run manager: {:#}", e);

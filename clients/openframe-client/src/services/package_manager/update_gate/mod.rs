@@ -1,6 +1,10 @@
 #[cfg(target_os = "macos")]
 mod brew;
+#[cfg(target_os = "windows")]
+mod choco;
 mod decide;
+#[cfg(target_os = "windows")]
+mod windows_app;
 #[cfg(target_os = "windows")]
 mod winget;
 
@@ -94,6 +98,8 @@ pub async fn resolve(package: &PackageRef) -> Result<AppIdentity, Undetermined> 
         } => Ok(AppIdentity::NoApp),
         #[cfg(target_os = "windows")]
         PackageRef::Winget { id } => winget::resolve(id).await,
+        #[cfg(target_os = "windows")]
+        PackageRef::Choco { id, .. } => choco::resolve(id).await,
         #[cfg(target_os = "macos")]
         PackageRef::Brew {
             kind: BrewKind::Cask,

@@ -108,7 +108,7 @@ impl Worker {
             p.identity = None;
         }
         let manager = ManagerId::of(&order.package);
-        if !self.machine.console_user_present().await {
+        if self.lacks_session(manager).await {
             return self.no_session(machine_id, order, p, now).await;
         }
         if p.present_at.is_none_or(|at| now >= at + PROBE_TTL_SECS) {
@@ -474,7 +474,7 @@ impl Worker {
         now: u64,
         reason: &str,
     ) -> Verdict {
-        if !self.machine.console_user_present().await {
+        if self.lacks_session(ManagerId::of(&order.package)).await {
             return self.no_session(machine_id, order, p, now).await;
         }
         p.held = Hold::Busy;
@@ -507,7 +507,11 @@ impl Worker {
         }
     }
 
-    /// Nothing can be probed or installed without a user; waits for a logon, outside the busy budget.
+    async fn lacks_session(&self, manager: ManagerId) -> bool {
+        manager.needs_user_session() && !self.machine.console_user_present().await
+    }
+
+    /// A manager that needs the user's session waits for a logon, outside the busy budget.
     async fn no_session(
         &self,
         machine_id: &str,

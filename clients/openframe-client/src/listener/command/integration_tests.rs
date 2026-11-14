@@ -1132,11 +1132,25 @@ fn package_order(
 
 #[tokio::test]
 async fn a_package_update_order_is_acked_done_and_stored_for_the_worker() {
-    let package = if cfg!(windows) {
+    assert_order_stored(if cfg!(windows) {
         json!({"manager": "WINGET", "id": "Vendor.App"})
     } else {
         json!({"manager": "BREW", "kind": "CASK", "name": "vendor-app"})
-    };
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn a_choco_order_is_stored_with_its_feed() {
+    assert_order_stored(json!({
+        "manager": "CHOCO",
+        "id": "googlechrome",
+        "feed": "https://feed.openframe.build/choco/index.json",
+    }))
+    .await;
+}
+
+async fn assert_order_stored(package: serde_json::Value) {
     let parsed: PackageRef = serde_json::from_value(package.clone()).unwrap();
     if !is_supported(ManagerId::of(&parsed)) {
         return;
@@ -1166,11 +1180,16 @@ async fn an_unsupported_package_update_is_refused_on_the_status_stream() {
         return;
     };
     let (orders, mut statuses) = launch_package_update(&mut agent).await;
+    let package = if cfg!(windows) {
+        json!({"manager": "BREW", "kind": "FORMULA", "name": "git"})
+    } else {
+        json!({"manager": "WINGET", "id": "Git.Git"})
+    };
 
     agent
         .send_to(
             format!("machine.{MACHINE}.package-update"),
-            package_order("p2", "req-2", json!({"manager": "CHOCO", "id": "git"})),
+            package_order("p2", "req-2", package),
         )
         .await;
 
