@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use nix::unistd::User;
 use tokio::process::Command;
 
-use crate::executor::Privilege;
+use crate::executor::{NoInteractiveUser, Privilege};
 
 pub(crate) enum RunAs {
     Current,
@@ -27,9 +27,9 @@ pub(crate) async fn resolve_run_as(privilege: Privilege) -> Result<RunAs> {
     match privilege {
         Privilege::Agent => Ok(RunAs::Current),
         Privilege::User => {
-            let username = console_user()
-                .await
-                .ok_or_else(|| anyhow!("no active interactive user (USER privilege)"))?;
+            let username = console_user().await.ok_or(NoInteractiveUser(
+                "no active interactive user (USER privilege)",
+            ))?;
             Ok(RunAs::User(lookup_user(&username)?))
         }
     }

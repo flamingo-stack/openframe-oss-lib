@@ -156,9 +156,20 @@ pub struct RmmResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub failure_reason: Option<FailureReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub script_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schedule_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum FailureReason {
+    AgentTimedOut,
+    NoUserSession,
+    CouldNotLaunch,
+    Interrupted,
 }
 
 #[derive(Debug, Clone, Serialize)]

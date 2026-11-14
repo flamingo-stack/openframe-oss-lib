@@ -17,14 +17,14 @@ use run_as_user::{configure_preexec, resolve_run_as, RunAs};
 pub async fn execute_script(params: ScriptParams<'_>) -> ExecResult {
     let run_as = match resolve_run_as(params.privilege).await {
         Ok(run_as) => run_as,
-        Err(e) => return spawn_error(e),
+        Err(e) => return ExecResult::not_launched(e),
     };
 
     let code = normalize_line_endings(params.code);
 
     let tmp_file = match create_temp_script(&code, &run_as) {
         Ok(path) => path,
-        Err(e) => return spawn_error(e),
+        Err(e) => return ExecResult::not_launched(e),
     };
     let _cleanup = TempFileGuard {
         path: tmp_file.clone(),
@@ -34,19 +34,10 @@ pub async fn execute_script(params: ScriptParams<'_>) -> ExecResult {
     apply_env_vars(&mut cmd, params.env_vars);
 
     if let Err(e) = configure_preexec(&mut cmd, &run_as) {
-        return spawn_error(e);
+        return ExecResult::not_launched(e);
     }
 
     execute_with_timeout(cmd, params.timeout_secs).await
-}
-
-fn spawn_error(e: anyhow::Error) -> ExecResult {
-    ExecResult {
-        stdout: String::new(),
-        stderr: e.to_string(),
-        retcode: 85,
-        timed_out: false,
-    }
 }
 
 fn normalize_line_endings(code: &str) -> String {

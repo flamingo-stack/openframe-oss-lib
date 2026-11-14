@@ -28,7 +28,7 @@ use super::Interpreter;
 use crate::executor::env::split_env;
 use crate::executor::output::{clean_string, MAX_OUTPUT_SIZE};
 use crate::executor::tempfile::{temp_script_name, TempFileGuard};
-use crate::executor::{ExecResult, ScriptParams};
+use crate::executor::{ExecResult, NoInteractiveUser, ScriptParams};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Elevation {
@@ -45,7 +45,7 @@ pub(super) async fn run_as_interactive(
     let command_line = build_command_line(interpreter, tmp_file, params.args);
     let dir = match tmp_file.parent() {
         Some(dir) => dir.to_path_buf(),
-        None => return super::spawn_error("temp script has no parent directory".to_string()),
+        None => return ExecResult::not_launched(anyhow!("temp script has no parent directory")),
     };
     let out_path = dir.join(temp_script_name("out"));
     let err_path = dir.join(temp_script_name("err"));
@@ -66,8 +66,8 @@ pub(super) async fn run_as_interactive(
 
     match result {
         Ok(Ok(exec)) => exec,
-        Ok(Err(e)) => super::spawn_error(e.to_string()),
-        Err(e) => super::spawn_error(format!("run-as task failed: {e}")),
+        Ok(Err(e)) => ExecResult::not_launched(e),
+        Err(e) => ExecResult::not_launched(anyhow!("run-as task failed: {e}")),
     }
 }
 
@@ -218,6 +218,7 @@ fn run_as_blocking(
         stderr,
         retcode: exit_code,
         timed_out,
+        agent_failure: None,
     })
 }
 
@@ -312,8 +313,9 @@ struct InteractiveToken(HANDLE);
 
 impl InteractiveToken {
     fn acquire(elevation: Elevation) -> Result<Self> {
-        let token = Self::token_for_active_session()
-            .ok_or_else(|| anyhow!("run_as_user requested but no active interactive session"))?;
+        let token = Self::token_for_active_session().ok_or(NoInteractiveUser(
+            "run_as_user requested but no active interactive session",
+        ))?;
 
         match elevation {
             Elevation::AsLoggedOn => Self::to_primary(token),
