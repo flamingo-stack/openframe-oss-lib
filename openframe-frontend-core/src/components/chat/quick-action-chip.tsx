@@ -189,6 +189,9 @@ export interface QuickActionChipButtonProps {
    *  48px chip (h3 bold label, 24px icon box); `'compact'` is the 28px tag the
    *  chat's quick actions row draws. Default `'default'` (32px). */
   size?: 'default' | 'large' | 'compact';
+  /** The label wraps onto more lines instead of ending in "…" (the `Tag`'s `wrap`): for chips stacked in a column,
+   *  where each is a task's name. A row of chips keeps one line. */
+  wrap?: boolean;
   onSelect?: () => void;
   /** Pointer/keyboard focus enters the chip — e.g. preview the full prompt. */
   onHoverStart?: () => void;
@@ -295,6 +298,7 @@ export function QuickActionChipButton({
   selected = false,
   selectedAccent,
   size = 'default',
+  wrap = false,
   onSelect,
   onHoverStart,
   onHoverEnd,
@@ -340,6 +344,7 @@ export function QuickActionChipButton({
         {...markers}
         variant={tagVariant}
         size={tagSize}
+        wrap={wrap}
         icon={resolvedIcon}
         label={resolvedLabel}
         className={className}
@@ -359,7 +364,7 @@ export function QuickActionChipButton({
       aria-pressed={selected || undefined}
       className={cn(
         // A question may be longer than a narrow column: it shrinks and clips there, read from its start.
-        question ? 'w-auto min-w-0 max-w-full' : 'w-auto shrink-0',
+        question || wrap ? 'w-auto min-w-0 max-w-full' : 'w-auto shrink-0',
         // The row's tag is exactly the tag's height: as a block, the button adds the line's descender under it.
         size === 'compact' && 'flex',
         className,
@@ -368,9 +373,10 @@ export function QuickActionChipButton({
       <Tag
         variant={tagVariant}
         size={tagSize}
+        wrap={wrap}
         icon={resolvedIcon}
         label={resolvedLabel}
-        className={question ? 'max-w-full' : undefined}
+        className={question || wrap ? 'max-w-full' : undefined}
       />
     </Button>
   );
@@ -428,6 +434,7 @@ export function QuickActionChipFromData({
   defaultLozenge,
   interactive = true,
   size,
+  wrap,
   className,
   ...props
 }: {
@@ -437,6 +444,8 @@ export function QuickActionChipFromData({
   interactive?: boolean;
   /** See {@link QuickActionChipButtonProps.size}. */
   size?: QuickActionChipButtonProps['size'];
+  /** See {@link QuickActionChipButtonProps.wrap}: a property of the wall's layout, never of one chip. */
+  wrap?: boolean;
   className?: string;
   /** The list's markers (`data-loading-item`), forwarded to the chip. */
   [marker: `data-${string}`]: unknown;
@@ -456,6 +465,7 @@ export function QuickActionChipFromData({
       onHoverEnd={chip.onHoverEnd}
       interactive={interactive}
       size={size}
+      wrap={wrap}
       className={className}
     />
   );
