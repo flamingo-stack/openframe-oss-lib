@@ -29,6 +29,14 @@ export const TAG_SIZE_CLASS = {
   sentence: 'h-9 gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h6',
 } as const;
 
+/** A tag that wraps (`wrap`): its size's height becomes the least it is, so a second line grows it. */
+const TAG_WRAP_HEIGHT_CLASS: Record<keyof typeof TAG_SIZE_CLASS, string> = {
+  default: 'h-auto min-h-8',
+  compact: 'h-auto min-h-7',
+  large: 'h-auto min-h-12',
+  sentence: 'h-auto min-h-9',
+};
+
 /** The box a tag's icon sits in, per size. */
 const TAG_ICON_BOX_CLASS: Record<keyof typeof TAG_SIZE_CLASS, string> = {
   default: 'size-5',
@@ -118,6 +126,12 @@ export interface TagProps
    * `<a>` — don't combine `as="span"` + `onClose` inside an anchor.
    */
   as?: 'div' | 'span';
+  /**
+   * The label wraps onto more lines (balanced, a long word breaks) instead of ending in "…", and the tag grows to hold
+   * it. For a tag that names something in a list or a column (a task, a title), where a cut name cannot be read on a
+   * touch screen; a row of tags keeps the default single line.
+   */
+  wrap?: boolean;
   /** The label is still being read: the tag draws its `TagSkeleton` (the tag's own frame and size). In a loading
    *  scope a tag with an EMPTY label does the same (its label is read data not here yet); a tag whose label is
    *  written ("Beta", "Coming Soon") is static copy and stays real. */
@@ -133,9 +147,24 @@ export interface TagProps
  * The trigger is a `span` so the tag stays valid phrasing content (`as="span"`
  * exists precisely for tags inside a `<p>`).
  */
-function TagLabel({ label, labelClassName }: { label: React.ReactNode; labelClassName?: string }) {
+function TagLabel({
+  label,
+  labelClassName,
+  wrap,
+}: {
+  label: React.ReactNode;
+  labelClassName?: string;
+  wrap?: boolean;
+}) {
   const isString = typeof label === 'string';
-  const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(isString ? label : null);
+  const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(isString && !wrap ? label : null);
+
+  // A wrapping label is never cut, so it needs no tooltip.
+  if (wrap) {
+    return (
+      <span className={cn('min-w-0 text-balance text-left [overflow-wrap:anywhere]', labelClassName)}>{label}</span>
+    );
+  }
 
   if (!isString) {
     return <span className={cn('truncate', labelClassName)}>{label}</span>;
@@ -168,6 +197,7 @@ function Tag({
   disabled,
   as: Comp = 'div',
   loading,
+  wrap,
   ...props
 }: TagProps) {
   // ONE switch: while the host reads the label, or in a page's loading state when the label is not here yet, the tag
@@ -178,7 +208,12 @@ function Tag({
     return <TagSkeleton size={size ?? 'default'} className={className} {...loadingItemProps(props)} />;
   return (
     <Comp
-      className={cn(tagVariants({ variant, size }), disabled && disabledTagClasses, className)}
+      className={cn(
+        tagVariants({ variant, size }),
+        wrap && TAG_WRAP_HEIGHT_CLASS[size ?? 'default'],
+        disabled && disabledTagClasses,
+        className,
+      )}
       aria-disabled={disabled || undefined}
       {...props}
     >
@@ -187,7 +222,7 @@ function Tag({
           {icon}
         </span>
       )}
-      <TagLabel label={label} labelClassName={labelClassName} />
+      <TagLabel label={label} labelClassName={labelClassName} wrap={wrap} />
       {onClose && (
         <Button
           variant="transparent"
