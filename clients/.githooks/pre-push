@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# OpenFrame Rust client: run clippy (deny warnings) before pushing.
-# Only fires when the pushed commits touch the Rust client; skips gracefully
-# when cargo is unavailable so non-Rust contributors are not blocked.
+# OpenFrame Rust crates: run every crate's clippy target (deny warnings) before pushing,
+# since one crate builds on another. Only fires when the pushed commits touch Rust under
+# clients/; skips gracefully without cargo or make so non-Rust contributors are not blocked.
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
@@ -23,11 +23,13 @@ if ! echo "$changed" | grep -qE '\.(rs|toml)$'; then
     exit 0
 fi
 
-if ! command -v cargo >/dev/null 2>&1; then
-    echo "[pre-push] cargo not found; skipping Rust clippy check." >&2
+if ! command -v cargo >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
+    echo "[pre-push] cargo or make not found; skipping Rust clippy check." >&2
     exit 0
 fi
 
-cd "$root/clients/openframe-client"
-echo "[pre-push] cargo clippy --all-targets -- -D warnings"
-OPENFRAME_VERSION="${OPENFRAME_VERSION:-0.0.0-dev}" cargo clippy --all-targets -- -D warnings
+for manifest in "$root"/clients/*/Cargo.toml; do
+    crate="$(dirname "$manifest")"
+    echo "[pre-push] $(basename "$crate"): make clippy"
+    make -C "$crate" clippy
+done

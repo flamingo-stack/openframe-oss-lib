@@ -1530,7 +1530,6 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 name = "openframe-agent-lib"
 version = "0.1.0"
 dependencies = [
- "aes-gcm",
  "anyhow",
  "async-nats",
  "async-trait",
@@ -1550,6 +1549,7 @@ dependencies = [
  "libc",
  "log",
  "nix",
+ "openframe-common",
  "plist",
  "redb",
  "regex",
@@ -1576,6 +1576,17 @@ dependencies = [
  "windows-service",
  "winreg 0.52.0",
  "zip",
+]
+
+[[package]]
+name = "openframe-common"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "base64 0.21.7",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

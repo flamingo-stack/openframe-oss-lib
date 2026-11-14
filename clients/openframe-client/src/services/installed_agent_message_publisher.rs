@@ -1,6 +1,6 @@
-use crate::models::InstalledAgentMessage;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use anyhow::Context;
+use openframe_common::protocol::InstalledAgentMessage;
 
 #[derive(Clone)]
 pub struct InstalledAgentMessagePublisher {

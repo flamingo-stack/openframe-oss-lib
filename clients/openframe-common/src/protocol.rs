@@ -6,3 +6,7 @@ pub struct InstalledAgentMessage {
     pub agent_type: String,
     pub version: String,
 }
+
+#[cfg(test)]
+#[path = "protocol_tests.rs"]
+mod tests;

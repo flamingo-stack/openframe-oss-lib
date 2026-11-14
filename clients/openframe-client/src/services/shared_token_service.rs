@@ -1,25 +1,21 @@
 use crate::platform::directories::DirectoryManager;
-use crate::services::EncryptionService;
 use crate::utils::fs::atomic_write;
 use anyhow::Result;
+use openframe_common::auth::shared_token;
 
 #[derive(Clone)]
 pub struct SharedTokenService {
     dir_manager: DirectoryManager,
-    encryption_service: EncryptionService,
 }
 
 impl SharedTokenService {
-    pub fn new(dir_manager: DirectoryManager, encryption_service: EncryptionService) -> Self {
-        Self {
-            dir_manager,
-            encryption_service,
-        }
+    pub fn new(dir_manager: DirectoryManager) -> Self {
+        Self { dir_manager }
     }
 
     pub fn update(&self, token: String) -> Result<()> {
-        let token_file_path = self.dir_manager.secured_dir().join("shared_token.enc");
-        let encrypted_token = self.encryption_service.encrypt(&token)?;
+        let token_file_path = self.dir_manager.secured_dir().join(shared_token::FILE_NAME);
+        let encrypted_token = shared_token::encrypt(shared_token::KEY.as_bytes(), &token)?;
         atomic_write(&token_file_path, encrypted_token)?;
         Ok(())
     }

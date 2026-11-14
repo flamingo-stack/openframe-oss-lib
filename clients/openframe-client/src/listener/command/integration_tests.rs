@@ -16,11 +16,10 @@ use crate::clients::AuthClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
 use crate::models::{
     DeliveryRef, DeliveryResult, DeliveryResultMessage, FailReason, Feature, FeatureFlagsState,
-    InstalledAgentMessage, InstalledAsset, InstalledTool, OpenFrameClientUpdateMessage, PackageRef,
+    InstalledAsset, InstalledTool, OpenFrameClientUpdateMessage, PackageRef,
     PackageUpdateStatusMessage, ToolRecordState, UpdateStatus,
 };
 use crate::platform::{DirectoryManager, DmgExtractor};
-use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
 use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
@@ -48,6 +47,7 @@ use crate::services::{
 use crate::test_support::NatsServer;
 use crate::utils::in_progress::InProgress;
 use crate::utils::latch::Latch;
+use openframe_common::protocol::InstalledAgentMessage;
 
 const MACHINE: &str = "it-machine";
 const BOUND: Duration = Duration::from_secs(10);
@@ -107,7 +107,7 @@ impl Agent {
                 deactivation.clone(),
             ),
             config.clone(),
-            SharedTokenService::new(directories.clone(), EncryptionService::new()),
+            SharedTokenService::new(directories.clone()),
         );
         let manager = NatsConnectionManager::new(
             server.url(),
