@@ -1,5 +1,6 @@
 package com.openframe.data.config;
 
+import com.openframe.data.document.audit.AuditEvent;
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -86,6 +87,11 @@ public class MongoIndexConfig implements SmartLifecycle {
         mongoTemplate.indexOps("application_events")
             .ensureIndex(new Index().on("type", Sort.Direction.ASC)
                                   .on("metadata.tags", Sort.Direction.ASC));
+
+        mongoTemplate.indexOps(AuditEvent.class)
+            .createIndex(new Index().on("occurredAt", Sort.Direction.ASC)
+                                    .expire(AuditEvent.RETENTION)
+                                    .named("audit_events_ttl"));
 
         // Drop stale 'name' unique index from tags collection (legacy schema)
         dropStaleIndex("tags", "name");

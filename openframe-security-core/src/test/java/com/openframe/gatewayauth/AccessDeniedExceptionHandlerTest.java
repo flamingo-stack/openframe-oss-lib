@@ -1,13 +1,16 @@
 package com.openframe.gatewayauth;
 
 import com.openframe.core.dto.ErrorResponse;
+import com.openframe.core.exception.ErrorCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationDeniedException;
@@ -16,6 +19,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -23,7 +30,11 @@ class AccessDeniedExceptionHandlerTest {
 
     private static final String REASON = "Denied by hasAuthority('OWNER')";
 
-    private final AccessDeniedExceptionHandler handler = new AccessDeniedExceptionHandler();
+    private final List<String> told = new ArrayList<>();
+    private final AccessDeniedObserver observer = (ErrorCode code, AccessDeniedException denied) ->
+            told.add(code.getCode() + ": " + denied.getMessage());
+    private final AccessDeniedExceptionHandler handler = new AccessDeniedExceptionHandler(
+            new StaticListableBeanFactory(Map.of("observer", observer)).getBeanProvider(AccessDeniedObserver.class));
 
     @AfterEach
     void signOut() {
@@ -68,6 +79,26 @@ class AccessDeniedExceptionHandlerTest {
         assertThat(output.getOut())
                 .containsPattern("WARN .*Access denied \\(FORBIDDEN\\): Denied by hasAuthority\\('OWNER'\\)")
                 .doesNotContain("AuthorizationDeniedException");
+    }
+
+    @Test
+    void handleAccessDenied_signedInCallerRefused_tellsTheObserversTheCodeAndTheRefusal() {
+        signIn();
+
+        handler.handleAccessDenied(refused());
+
+        assertThat(told).containsExactly("FORBIDDEN: " + REASON);
+    }
+
+    @Test
+    void handleAccessDenied_noObserverRegistered_stillAnswersForbidden() {
+        signIn();
+        AccessDeniedExceptionHandler withoutObservers = new AccessDeniedExceptionHandler(
+                new StaticListableBeanFactory().getBeanProvider(AccessDeniedObserver.class));
+
+        ResponseEntity<ErrorResponse> response = withoutObservers.handleAccessDenied(refused());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     private static AuthorizationDeniedException refused() {

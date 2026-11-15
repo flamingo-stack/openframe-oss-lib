@@ -1,8 +1,10 @@
 package com.openframe.authz.service.auth;
 
+import com.openframe.core.util.Sha256;
 import com.openframe.data.document.oauth.MongoOAuth2Authorization;
 import com.openframe.data.document.oauth.RetiredRefreshToken;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +16,8 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -41,6 +45,9 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
         log.debug("Saving authorization: {}", authorization.getId());
 
         MongoOAuth2Authorization entity = MongoAuthorizationMapper.toEntity(authorization);
+        if (entity.getSessionId() == null && entity.getAccessTokenValue() == null) {
+            entity.setSessionId(loginSessionId());
+        }
         List<RetiredRefreshToken> retiredRefreshTokens = retiredTokensAfterSaving(entity);
         entity.setRetiredRefreshTokens(retiredRefreshTokens);
         repository.save(entity);
@@ -72,6 +79,14 @@ public class MongoAuthorizationService implements OAuth2AuthorizationService {
             retired.add(new RetiredRefreshToken(replaced, now));
         }
         return retired.isEmpty() ? null : retired;
+    }
+
+    private static String loginSessionId() {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+            return null;
+        }
+        HttpSession session = attributes.getRequest().getSession(false);
+        return session == null ? null : Sha256.hex(session.getId());
     }
 
     private boolean isWithinGrace(RetiredRefreshToken token, Instant now) {
