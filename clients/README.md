@@ -39,7 +39,8 @@ This enables the committed git hooks:
 Both hooks only fire when the change touches Rust under `clients/`, and skip
 cleanly if `cargo` (or `make`, for pre-push) is not installed, so they do not get
 in the way of Java-only work. CI (`.github/workflows/build.yml`) runs the same
-gate authoritatively.
+checks on PRs with the `build` label and in the merge queue. They are not
+required checks: `main` requires only `Flamingo Code Review / reviewed`.
 
 Requires a stable Rust toolchain (`rustup` recommended) with the `rustfmt` and
 `clippy` components.

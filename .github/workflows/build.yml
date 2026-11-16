@@ -239,6 +239,7 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-hack@0.6.46
+          fallback: none
 
       - name: Lint (cargo fmt --check + cargo clippy -D warnings)
         run: make -C clients/openframe-common lint
