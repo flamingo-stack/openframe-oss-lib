@@ -2,7 +2,17 @@
 
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { type ComponentPropsWithoutRef, type ComponentRef, type ElementRef, forwardRef, type ReactNode } from 'react';
+import {
+  type ComponentPropsWithoutRef,
+  type ComponentRef,
+  type ElementRef,
+  forwardRef,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { useViewportCollisionPadding, withViewportPadding } from '../../hooks/ui/use-viewport-collision-padding';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
@@ -118,18 +128,100 @@ const SelectScrollDownButton = forwardRef<
 ));
 SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayName;
 
+interface ScrollEdges {
+  readonly up: boolean;
+  readonly down: boolean;
+}
+
+const NO_EDGES: ScrollEdges = { up: false, down: false };
+
+/** Which ends of the list still have rows past them, kept current on scroll and whenever the list or its rows resize. */
+function useScrollEdges(viewport: HTMLElement | null): ScrollEdges {
+  const [edges, setEdges] = useState<ScrollEdges>(NO_EDGES);
+  useIsomorphicLayoutEffect(() => {
+    if (!viewport) return undefined;
+    const measure = () => {
+      const max = viewport.scrollHeight - viewport.clientHeight;
+      const up = viewport.scrollTop > 0;
+      // `ceil`: a zoomed page reports fractional scroll positions, and the end must still read as the end.
+      const down = Math.ceil(viewport.scrollTop) < max;
+      setEdges(previous => (previous.up === up && previous.down === down ? previous : { up, down }));
+    };
+    measure();
+    viewport.addEventListener('scroll', measure, { passive: true });
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    resize?.observe(viewport);
+    // Rows that arrive or leave change the scroll height without resizing the (capped) viewport.
+    const rows = new MutationObserver(measure);
+    rows.observe(viewport, { childList: true, subtree: true });
+    return () => {
+      viewport.removeEventListener('scroll', measure);
+      resize?.disconnect();
+      rows.disconnect();
+    };
+  }, [viewport]);
+  return edges;
+}
+
+/** Auto-scroll period while the pointer rests on an arrow, as Radix's own arrows do. */
+const AUTO_SCROLL_MS = 50;
+
+/**
+ * A scroll arrow drawn OVER the list's edge, never in its flow. Radix's own arrows took a row of their own: each time
+ * one appeared or went, every row moved by its height against the scroll, and on mounting Radix scrolled the focused
+ * row back into view, which pulled a list the user had just scrolled back to that row. These come and go with the
+ * scroll position and move nothing. `z-10` because Radix positions the viewport (`position: relative`), which would
+ * otherwise paint its rows over the up arrow; `bg-inherit` takes the list's background, so a row under an arrow stays
+ * hidden behind it. Decorative for assistive tech: the list scrolls by keyboard on its own.
+ */
+function SelectScrollArrow({ direction, viewport }: { direction: 'up' | 'down'; viewport: HTMLElement | null }) {
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stop = () => {
+    if (timer.current === null) return;
+    clearInterval(timer.current);
+    timer.current = null;
+  };
+  const start = () => {
+    if (timer.current !== null || !viewport) return;
+    timer.current = setInterval(() => {
+      const step = viewport.querySelector<HTMLElement>('[role="option"]')?.offsetHeight ?? 0;
+      viewport.scrollBy(0, direction === 'up' ? -step : step);
+    }, AUTO_SCROLL_MS);
+  };
+  useEffect(() => stop, []);
+  return (
+    <div
+      aria-hidden
+      data-select-scroll-arrow={direction}
+      className={cn(
+        'absolute inset-x-0 z-10 flex h-6 cursor-default items-center justify-center bg-inherit',
+        direction === 'up' ? 'top-0' : 'bottom-0',
+      )}
+      onPointerDown={start}
+      onPointerMove={start}
+      onPointerLeave={stop}
+    >
+      {direction === 'up' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+    </div>
+  );
+}
+
 const SelectContent = forwardRef<
   ComponentRef<typeof SelectPrimitive.Content>,
   ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = 'popper', collisionPadding, ...props }, ref) => {
   const container = usePortalContainer();
   const viewportPadding = useViewportCollisionPadding();
+  const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
+  const edges = useScrollEdges(viewport);
   return (
     <SelectPrimitive.Portal container={container ?? undefined}>
       <SelectPrimitive.Content
         ref={ref}
         className={cn(
-          'relative z-[9999] max-h-[min(24rem,var(--radix-select-content-available-height,24rem))] overflow-hidden rounded-[4px] border border-ods-border bg-ods-card text-ods-text-primary',
+          // 24rem of ROWS: the 2px are the 1px border on each side, which border-box takes out of the height. Without
+          // them a list of exactly 24rem (eight desktop rows) overflowed by 2px and grew scroll arrows over its last row.
+          'relative z-[9999] max-h-[min(calc(24rem+2px),var(--radix-select-content-available-height,24rem))] overflow-hidden rounded-[4px] border border-ods-border bg-ods-card text-ods-text-primary',
           'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
           className,
         )}
@@ -144,9 +236,12 @@ const SelectContent = forwardRef<
         }}
         {...props}
       >
-        <SelectScrollUpButton />
-        <SelectPrimitive.Viewport className="w-full">{children}</SelectPrimitive.Viewport>
-        <SelectScrollDownButton />
+        {/* The scroll padding is the arrows' height: a row reached by keyboard is scrolled clear of an arrow, not under it. */}
+        <SelectPrimitive.Viewport ref={setViewport} className="w-full scroll-py-6">
+          {children}
+        </SelectPrimitive.Viewport>
+        {edges.up && <SelectScrollArrow direction="up" viewport={viewport} />}
+        {edges.down && <SelectScrollArrow direction="down" viewport={viewport} />}
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   );
