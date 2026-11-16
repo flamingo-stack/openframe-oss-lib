@@ -269,16 +269,16 @@ impl ToolInstallationService {
                 // Match the tool folder path (not just agent.exe) so child processes like the
                 // orbit-spawned osqueryd are killed too; on Windows their locked binaries would
                 // otherwise block the directory removal below with "Access is denied".
-                if let Err(e) = self
-                    .tool_kill_service
+                self.tool_kill_service
                     .stop_tool_by_path(&tool_folder_path.to_string_lossy())
                     .await
-                {
-                    warn!(
-                        "Failed to kill processes locking tool directory for {}: {:#}",
-                        tool_agent_id, e
-                    );
-                }
+                    .with_context(|| {
+                        format!(
+                            "Aborting reinstall of {}: processes under {} could not be stopped; existing installation kept, will retry",
+                            tool_agent_id,
+                            tool_folder_path.display()
+                        )
+                    })?;
 
                 info!(
                     "Removing existing tool directory: {}",
