@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -76,7 +77,7 @@ class SoftwareActionDetailServiceTest {
     }
 
     @Test
-    @DisplayName("NOW: leaves map their status, offline NEW sentinels become SCHEDULED, OS-skip is hidden")
+    @DisplayName("NOW: leaves map their status, NEW sentinels are IN_PROGRESS, OS-skip is hidden")
     void bundleDevices() {
         when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of(
                 leaf("m-success", ExecutionStatus.SUCCESS),
@@ -91,7 +92,23 @@ class SoftwareActionDetailServiceTest {
                 .containsExactlyInAnyOrder("m-success", "m-running", "m-offline");
         assertThat(status(rows, "m-success")).isEqualTo(SoftwareActionStatus.COMPLETED);
         assertThat(status(rows, "m-running")).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
-        assertThat(status(rows, "m-offline")).isEqualTo(SoftwareActionStatus.SCHEDULED);
+        assertThat(status(rows, "m-offline")).isEqualTo(SoftwareActionStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void devices_nowBundleDeviceAwaitingDispatch_inProgress() {
+        // setup
+        when(scriptExecutionRepository.findByTenantIdAndExecutionId(TENANT, EXEC)).thenReturn(List.of());
+        when(bundleOnlineDispatchRepository.findByTenantIdAndBundleId(TENANT, "b1")).thenReturn(List.of(
+                bundleSentinel("m-waiting", DeviceOnlineDispatchStatus.NEW)));
+
+        // execution
+        List<SoftwareActionDeviceResponse> rows = service.devices(EXEC, "b1", null, null, null);
+
+        // verifications
+        assertThat(rows)
+                .extracting(SoftwareActionDeviceResponse::getMachineId, SoftwareActionDeviceResponse::getStatus)
+                .containsExactly(tuple("m-waiting", SoftwareActionStatus.IN_PROGRESS));
     }
 
     @Test

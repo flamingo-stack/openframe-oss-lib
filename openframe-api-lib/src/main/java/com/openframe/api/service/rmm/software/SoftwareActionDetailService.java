@@ -111,7 +111,7 @@ public class SoftwareActionDetailService {
         if (hasText(bundleId)) {
             bundleOnlineDispatchRepository.findByTenantIdAndBundleId(tenantId, bundleId).forEach(s -> {
                 if (s.getStatus() == DeviceOnlineDispatchStatus.NEW) {
-                    byMachine.put(s.getMachineId(), pending(s.getMachineId(), SoftwareActionStatus.SCHEDULED, null));
+                    byMachine.put(s.getMachineId(), pending(s.getMachineId(), SoftwareActionStatus.IN_PROGRESS, null));
                 }
                 // DISPATCHED without a leaf = the package's OS did not apply to this device → not shown.
             });
