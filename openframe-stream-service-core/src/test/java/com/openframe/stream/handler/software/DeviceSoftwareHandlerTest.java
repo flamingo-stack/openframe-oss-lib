@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -429,6 +430,23 @@ class DeviceSoftwareHandlerTest {
         verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
         DeviceSoftware saved = deviceSoftwareCaptor.getValue();
         assertThat(saved.getBundleIdentifier()).isEqualTo("com.tinyspeck.slackmacgap");
+        assertThat(saved.getAppFileNames()).isEmpty();
+        assertThat(saved.getTopLevelApp()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " "})
+    void handle_macAppWithABlankInstalledPath_topLevelUnknownAndNoAppFileNames(String blankPath) {
+        // setup
+        HostSoftwareTitle slack = app("com.tinyspeck.slackmacgap", blankPath);
+        stubHostSoftware(slack);
+
+        // execution
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        // verifications
+        verify(deviceSoftwareRepository).save(deviceSoftwareCaptor.capture());
+        DeviceSoftware saved = deviceSoftwareCaptor.getValue();
         assertThat(saved.getAppFileNames()).isEmpty();
         assertThat(saved.getTopLevelApp()).isNull();
     }

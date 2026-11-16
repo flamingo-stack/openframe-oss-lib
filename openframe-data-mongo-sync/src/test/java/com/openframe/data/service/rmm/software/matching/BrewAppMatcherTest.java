@@ -342,6 +342,21 @@ class BrewAppMatcherTest {
     }
 
     @Test
+    void match_exactBundleIdUnderAnotherNameSharingAThreeLetterWord_theCaskOfTheId() {
+        // setup
+        PackageCatalogEntry arc = cask("arc", "Arc").appNames(List.of("arc"))
+                .bundleIds(List.of("company.thebrowser.browser")).build();
+        stubCatalog(arc, slack().build());
+        List<InstalledProgram> apps = List.of(app("Arc Browser", "company.thebrowser.Browser"));
+
+        // execution
+        List<PackageMatch> matches = matcher.match(apps);
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(arc);
+    }
+
+    @Test
     void match_exactBundleIdOfACaskSharingNoWordWithTheApp_noPackage() {
         // setup
         stubCatalog(cask("wechatwebdevtools", "Wechat Web DevTools").appNames(List.of("wechatwebdevtools"))

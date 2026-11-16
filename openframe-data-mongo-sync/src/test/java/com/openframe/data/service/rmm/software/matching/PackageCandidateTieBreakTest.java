@@ -58,6 +58,19 @@ class PackageCandidateTieBreakTest {
     }
 
     @Test
+    void narrow_packageOfTheMajorNextToOneOfTheMinorVersion_theOneOfTheLongerVersion() {
+        // setup
+        List<PackageCatalogEntry> runtimes = packages("Microsoft.WindowsAppRuntime.2", "Microsoft.WindowsAppRuntime.2.0");
+
+        // execution
+        List<PackageCatalogEntry> narrowed = PackageCandidateTieBreak.narrow("Windows App Runtime 2.0.1", runtimes);
+
+        // verifications
+        assertThat(narrowed).extracting(PackageCatalogEntry::getPackageId)
+                .containsExactly("Microsoft.WindowsAppRuntime.2.0");
+    }
+
+    @Test
     void narrow_installedVersionOfNoPackage_allCandidates() {
         // setup
         List<PackageCatalogEntry> pythons = packages("Python.Python.3.10", "Python.Python.3.11", "Python.Python.3.12");
