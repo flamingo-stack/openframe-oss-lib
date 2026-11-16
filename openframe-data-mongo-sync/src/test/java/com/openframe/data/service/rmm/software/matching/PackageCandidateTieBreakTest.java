@@ -133,6 +133,18 @@ class PackageCandidateTieBreakTest {
         assertThat(narrowed).extracting(PackageCatalogEntry::getPackageId).containsExactly("Microsoft.Teams.Free");
     }
 
+    @Test
+    void narrow_personalEditionWithoutAFreePackage_allCandidates() {
+        // setup
+        List<PackageCatalogEntry> teams = packages("Microsoft.Teams", "Microsoft.Teams.Classic");
+
+        // execution
+        List<PackageCatalogEntry> narrowed = PackageCandidateTieBreak.narrow("Microsoft Teams (personal)", teams);
+
+        // verifications
+        assertThat(narrowed).isEqualTo(teams);
+    }
+
     @ParameterizedTest
     @MethodSource("basesNextToTheirEditions")
     void narrow_baseNextToItsEditions_theBase(String programName, List<String> ids, String baseId) {

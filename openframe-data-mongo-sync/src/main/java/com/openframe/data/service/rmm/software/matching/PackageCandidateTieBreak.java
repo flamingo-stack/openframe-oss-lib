@@ -100,11 +100,17 @@ class PackageCandidateTieBreak {
     }
 
     private static Optional<String> personalEdition(String programName, List<String> ids) {
-        boolean personal = PERSONAL_EDITION.matcher(programName).find();
-        return personal ? onlyOneEndingWith(FREE_EDITION_SUFFIX, ids) : Optional.empty();
+        return isPersonal(programName) ? onlyOneEndingWith(FREE_EDITION_SUFFIX, ids) : Optional.empty();
+    }
+
+    private static boolean isPersonal(String programName) {
+        return PERSONAL_EDITION.matcher(programName).find();
     }
 
     private static Optional<String> baseOfEditions(String programName, List<String> ids) {
+        if (isPersonal(programName)) {
+            return Optional.empty();
+        }
         boolean versionInName = !versionsIn(programName).isEmpty();
         String nameLetters = lettersAndDigits(programName);
         return baseOf(ids)
