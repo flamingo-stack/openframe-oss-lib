@@ -79,6 +79,7 @@ export function AnnouncementBar({
   dismissible = true,
   surface = 'web',
   className,
+  onExpandedChange,
 }: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
   // NEXT_PUBLIC_APP_TYPE (matching the server's currentPlatform(), which the
@@ -164,6 +165,11 @@ export function AnnouncementBar({
   const expanded = previewMode
     ? announcement != null
     : announcement != null && expandedState && !dismissed && !excludedHere;
+
+  // Reported after commit: a host's state update belongs in an effect, never in this render.
+  useEffect(() => {
+    onExpandedChange?.(expanded);
+  }, [expanded, onExpandedChange]);
 
   // Cleanup of the pre-refactor localStorage announcement cache. Keyed on
   // `platform` rather than `[]`: the cache is per-platform, so a platform
