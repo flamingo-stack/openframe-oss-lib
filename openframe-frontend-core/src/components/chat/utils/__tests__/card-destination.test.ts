@@ -159,6 +159,20 @@ describe('resolveCardDestination: what a host claims', () => {
     });
   });
 
+  it('a doc shown again from history opens by the tree path on its row, with no url', () => {
+    const { id, url } = answerOf('markdown');
+    const first = resolveCardDestination({
+      chatRef: { ...bare('markdown', id), url },
+      ctx: { composeContentUrl: appCompose },
+    });
+    const again = resolveCardDestination({
+      chatRef: bare('markdown', id),
+      item: { id, url: null, metadata: { path: id } },
+      ctx: { composeContentUrl: appCompose },
+    });
+    expect(again).toEqual({ ...first, path: id });
+  });
+
   it('a type the host does not serve opens out, on the server url', () => {
     const url = `${FLAMINGO}/blog/openframe-vs-atera`;
     const out = resolveCardDestination({

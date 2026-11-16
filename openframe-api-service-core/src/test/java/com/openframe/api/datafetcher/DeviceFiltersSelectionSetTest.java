@@ -11,6 +11,7 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.FleetVulnerabilityStatusService;
 import com.openframe.api.service.NotificationRecipientResolver;
 import com.openframe.api.service.TagService;
+import com.openframe.data.config.ClientVersionThreshold;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
@@ -33,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static com.openframe.api.dto.device.DeviceFilterFacet.CLIENT_OUTDATED;
 import static com.openframe.api.dto.device.DeviceFilterFacet.CONNECTIVITY;
 import static com.openframe.api.dto.device.DeviceFilterFacet.DEVICE_TYPES;
 import static com.openframe.api.dto.device.DeviceFilterFacet.DIRECTORY_SOURCES;
@@ -66,6 +68,7 @@ class DeviceFiltersSelectionSetTest {
             type DeviceFilters {
                 statuses: [DeviceFilterOption]
                 connectivity: [DeviceFilterOption]
+                clientOutdated: [DeviceFilterOption]
                 deviceTypes: [DeviceFilterOption]
                 osTypes: [DeviceFilterOption]
                 organizationIds: [DeviceFilterOption]
@@ -93,7 +96,7 @@ class DeviceFiltersSelectionSetTest {
     void setUp() {
         DeviceDataFetcher dataFetcher = new DeviceDataFetcher(deviceService, deviceFilterService, tagService,
                 fleetVulnerabilityStatusService, mapper, packageManagerAvailability, new RelayIdCodec(),
-                new NotificationRecipientResolver());
+                new NotificationRecipientResolver(), new ClientVersionThreshold("1.6.0"));
 
         TypeDefinitionRegistry registry = new SchemaParser().parse(SDL);
         RuntimeWiring wiring = RuntimeWiring.newRuntimeWiring()
@@ -142,6 +145,7 @@ class DeviceFiltersSelectionSetTest {
                 { deviceFilters {
                     statuses { value count }
                     connectivity { value count }
+                    clientOutdated { value count }
                     deviceTypes { value count }
                     osTypes { value count }
                     organizationIds { value count }
@@ -150,8 +154,14 @@ class DeviceFiltersSelectionSetTest {
                     userLinks { value count }
                     filteredCount
                 } }"""))
-                .containsExactlyInAnyOrder(STATUSES, CONNECTIVITY, DEVICE_TYPES, OS_TYPES, ORGANIZATION_IDS, TAG_KEYS,
-                        DIRECTORY_SOURCES, USER_LINKS, FILTERED_COUNT);
+                .containsExactlyInAnyOrder(STATUSES, CONNECTIVITY, CLIENT_OUTDATED, DEVICE_TYPES, OS_TYPES,
+                        ORGANIZATION_IDS, TAG_KEYS, DIRECTORY_SOURCES, USER_LINKS, FILTERED_COUNT);
+    }
+
+    @Test
+    void outdatedClientBannerSelection_narrowsToOneFacet() {
+        assertThat(facetsFor("{ deviceFilters { clientOutdated { value count } } }"))
+                .containsExactly(CLIENT_OUTDATED);
     }
 
     @Test

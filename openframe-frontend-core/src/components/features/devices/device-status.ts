@@ -5,6 +5,8 @@
 
 import type { OSPlatformId } from '../../../utils/os-platforms';
 import { getOSPlatformId } from '../../../utils/os-utils';
+import { DEVICE_FILTER_OUTDATED } from './device-statuses';
+import type { DeviceRow } from './types';
 
 export type DeviceStatusVariant = 'success' | 'error' | 'warning' | 'grey' | 'critical';
 export type DeviceCardStatus = 'active' | 'inactive' | 'offline' | 'warning' | 'error';
@@ -14,6 +16,13 @@ export interface DeviceStatusConfig {
   variant: DeviceStatusVariant;
   cardStatus: DeviceCardStatus;
 }
+
+/** An outdated OpenFrame client: the device lists show it in place of the status. */
+const OUTDATED_STATUS_CONFIG: DeviceStatusConfig = {
+  label: 'OUTDATED',
+  variant: 'warning',
+  cardStatus: 'warning',
+};
 
 /**
  * Get status configuration for display
@@ -82,6 +91,8 @@ export function getDeviceStatusConfig(status: string | null | undefined): Device
         variant: 'error',
         cardStatus: 'offline',
       };
+    case DEVICE_FILTER_OUTDATED:
+      return OUTDATED_STATUS_CONFIG;
     default:
       return {
         label: known,
@@ -89,6 +100,15 @@ export function getDeviceStatusConfig(status: string | null | undefined): Device
         cardStatus: 'inactive',
       };
   }
+}
+
+/**
+ * The tag a device list draws for a row: OUTDATED when the server flags the device's client
+ * (`clientOutdated`), otherwise the device's status. The outdated client is what the user has to
+ * act on, so it takes the place of the status rather than sitting beside it.
+ */
+export function getDeviceRowStatusConfig(device: Pick<DeviceRow, 'status' | 'clientOutdated'>): DeviceStatusConfig {
+  return device.clientOutdated === true ? OUTDATED_STATUS_CONFIG : getDeviceStatusConfig(device.status);
 }
 
 /**

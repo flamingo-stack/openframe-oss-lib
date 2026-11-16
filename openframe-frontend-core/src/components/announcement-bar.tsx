@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useChatRuntime } from '../contexts/chat-runtime-context';
 import { useEndpointsRuntime } from '../contexts/endpoints-runtime-context';
 import { usePathname } from '../embed-shims/next-navigation';
@@ -79,6 +79,7 @@ export function AnnouncementBar({
   dismissible = true,
   surface = 'web',
   className,
+  onExpandedChange,
 }: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
   // NEXT_PUBLIC_APP_TYPE (matching the server's currentPlatform(), which the
@@ -164,6 +165,17 @@ export function AnnouncementBar({
   const expanded = previewMode
     ? announcement != null
     : announcement != null && expandedState && !dismissed && !excludedHere;
+
+  // Reported after commit (a host's state update belongs in an effect, never in this render), and only
+  // when `expanded` changes: the callback is read from a ref, so a host passing an inline function is
+  // not called again on every one of its renders. A ref rather than `useEffectEvent`: React 18 hosts too.
+  const onExpandedChangeRef = useRef(onExpandedChange);
+  useEffect(() => {
+    onExpandedChangeRef.current = onExpandedChange;
+  });
+  useEffect(() => {
+    onExpandedChangeRef.current?.(expanded);
+  }, [expanded]);
 
   // Cleanup of the pre-refactor localStorage announcement cache. Keyed on
   // `platform` rather than `[]`: the cache is per-platform, so a platform

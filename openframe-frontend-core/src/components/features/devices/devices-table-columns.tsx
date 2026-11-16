@@ -31,8 +31,8 @@ import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { OSTypeBadge } from '../os-type-badge';
 import { directorySourceLabel, directoryUserLines, directoryUserLinkLabel } from './device-directory';
 import { getDeviceName } from './device-name';
-import { getDeviceStatusConfig } from './device-status';
-import { DEFAULT_VISIBLE_STATUSES } from './device-statuses';
+import { getDeviceRowStatusConfig, getDeviceStatusConfig } from './device-status';
+import { DEFAULT_VISIBLE_STATUSES, DEVICE_FILTER_OUTDATED } from './device-statuses';
 import { renderDeviceTypeIcon } from './device-type-icon';
 import { DeviceTypeTile } from './device-type-tile';
 import { DeviceUnreadIndicator } from './device-unread-indicator';
@@ -393,7 +393,7 @@ function DeviceNameGridCell({ device }: { device: DeviceRow }) {
 /** The status tag with when the device was last seen beside it. */
 function DeviceStatusGridCell({ device }: { device: DeviceRow }) {
   const loading = useLoadingScope();
-  const statusConfig = getDeviceStatusConfig(device.status);
+  const statusConfig = getDeviceRowStatusConfig(device);
   // While the row is read there is no "last seen" to print: the tag's own skeleton is the cell.
   const lastSeen =
     loading && !device.last_seen ? undefined : device.last_seen ? formatDateTime(device.last_seen) : 'Never';
@@ -457,6 +457,15 @@ function buildDeviceFilterOptions(deviceFilters?: DeviceFilters | null): {
   const status = (deviceFilters?.statuses ?? [])
     .filter(s => (DEFAULT_VISIBLE_STATUSES as readonly string[]).includes(s.value))
     .map(s => ({ id: s.value, label: getDeviceStatusConfig(s.value).label, value: s.value, count: s.count }));
+  // OUTDATED rides in the Status funnel, counted by its own facet; a host without that facet gets no option.
+  if (deviceFilters?.clientOutdated) {
+    status.push({
+      id: DEVICE_FILTER_OUTDATED,
+      label: getDeviceStatusConfig(DEVICE_FILTER_OUTDATED).label,
+      value: DEVICE_FILTER_OUTDATED,
+      count: deviceFilters.clientOutdated.find(option => option.value === 'true')?.count ?? 0,
+    });
+  }
 
   const os = (deviceFilters?.osTypes ?? []).map(o => ({ id: o.value, label: o.value, value: o.value, count: o.count }));
 
@@ -615,7 +624,7 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
       header: 'STATUS',
       cell: ({ row }: { row: Row<T> }) => {
         const device = row.original;
-        const statusConfig = getDeviceStatusConfig(device.status);
+        const statusConfig = getDeviceRowStatusConfig(device);
         return (
           <div className="flex shrink-0 flex-col items-start gap-1">
             <div className="inline-flex">

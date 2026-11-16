@@ -19,6 +19,7 @@ public enum DeviceFilterFacet {
 
     STATUSES("statuses"),
     CONNECTIVITY("connectivity"),
+    CLIENT_OUTDATED("clientOutdated"),
     DEVICE_TYPES("deviceTypes"),
     OS_TYPES("osTypes"),
     ORGANIZATION_IDS("organizationIds"),
@@ -42,7 +43,8 @@ public enum DeviceFilterFacet {
      */
     public static final Set<DeviceFilterFacet> REST =
             Collections.unmodifiableSet(EnumSet.of(
-                    STATUSES, DEVICE_TYPES, OS_TYPES, ORGANIZATION_IDS, TAG_KEYS, FILTERED_COUNT));
+                    STATUSES, CONNECTIVITY, CLIENT_OUTDATED, DEVICE_TYPES, OS_TYPES, ORGANIZATION_IDS, TAG_KEYS,
+                    FILTERED_COUNT));
 
     private final String graphQlField;
 
