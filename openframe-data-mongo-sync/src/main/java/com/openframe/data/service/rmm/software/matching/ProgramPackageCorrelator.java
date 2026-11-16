@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 import static java.util.stream.Collectors.toSet;
+import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.springframework.util.StringUtils.hasText;
 
 // winget's own correlation of an installed program (CompositeSource + the 2.0 index search), run over the packages of
@@ -26,7 +27,8 @@ import static org.springframework.util.StringUtils.hasText;
 // - a SystemComponent entry is not a program winget lists, so it has no package;
 // - one search for the program's PackageFamilyName, ProductCode, UpgradeCode and normalized name + publisher together;
 // - the name is first searched with the architecture it carries, and only when that finds nothing, without it;
-// - one package found is the match; of several, the single one found by a code or PFN is; otherwise there is none.
+// - one package found is the match; of several, the single one found by a code or PFN is; otherwise the one
+//   PackageCandidateTieBreak decides for, or none; a package of another version than the program is never the match.
 @Component
 @RequiredArgsConstructor
 public class ProgramPackageCorrelator {
@@ -81,10 +83,11 @@ public class ProgramPackageCorrelator {
             if (program.hasArchitecture()) {
                 Map<String, Candidate> withArchitecture = candidates(program, program.getNameWithArchitecture());
                 if (!withArchitecture.isEmpty()) {
-                    return pick(withArchitecture);
+                    return pick(program, withArchitecture);
                 }
             }
-            return pick(candidates(program, program.getPlainName()));
+            Map<String, Candidate> plain = candidates(program, program.getPlainName());
+            return pick(program, plain);
         }
 
         private Map<String, Candidate> candidates(ProgramKeys program, String name) {
@@ -101,21 +104,33 @@ public class ProgramPackageCorrelator {
             return candidates;
         }
 
-        private static PackageMatch pick(Map<String, Candidate> candidates) {
+        private static PackageMatch pick(ProgramKeys program, Map<String, Candidate> candidates) {
             if (candidates.isEmpty()) {
                 return PackageMatch.noPackage();
             }
-            if (candidates.size() == 1) {
-                Candidate only = candidates.values().iterator().next();
-                return PackageMatch.of(only.getEntry());
+            String programName = program.getDisplayName();
+            List<PackageCatalogEntry> closest = closest(candidates.values());
+            List<PackageCatalogEntry> decided = PackageCandidateTieBreak.narrow(programName, closest);
+            if (decided.size() > 1) {
+                PackageCatalogEntry best = decided.stream().min(BEST_FIRST).orElseThrow();
+                return PackageMatch.ambiguous(best);
             }
-            List<Candidate> strong = candidates.values().stream().filter(Candidate::isStrong).toList();
-            if (strong.size() == 1) {
-                return PackageMatch.of(strong.getFirst().getEntry());
+            PackageCatalogEntry only = decided.getFirst();
+            if (PackageCandidateTieBreak.isOfAnotherVersion(programName, only)) {
+                return candidates.size() == 1 ? PackageMatch.noPackage() : PackageMatch.ambiguous();
             }
-            Collection<Candidate> closest = strong.isEmpty() ? candidates.values() : strong;
-            PackageCatalogEntry best = closest.stream().map(Candidate::getEntry).min(BEST_FIRST).orElseThrow();
-            return PackageMatch.ambiguous(best);
+            return PackageMatch.of(only);
+        }
+
+        private static List<PackageCatalogEntry> closest(Collection<Candidate> candidates) {
+            List<PackageCatalogEntry> strong = candidates.stream()
+                    .filter(Candidate::isStrong)
+                    .map(Candidate::getEntry)
+                    .toList();
+            if (!strong.isEmpty()) {
+                return strong;
+            }
+            return candidates.stream().map(Candidate::getEntry).toList();
         }
 
         private static boolean hasNameAndPublisher(PackageCatalogEntry entry, String name, String publisher) {
@@ -147,6 +162,7 @@ public class ProgramPackageCorrelator {
         private final List<String> upgradeCodes;
         private final List<String> packageFamilyNames;
         private final List<String> names;
+        private final String displayName;
         private final String publisher;
         private final boolean systemComponent;
 
@@ -155,6 +171,8 @@ public class ProgramPackageCorrelator {
             this.upgradeCodes = folded(List.of(program.getUpgradeCode() == null ? "" : program.getUpgradeCode()));
             this.packageFamilyNames = folded(program.getPackageFamilyNames());
             this.names = program.getName() == null ? List.of() : WingetNameNormalizer.searchNames(program.getName());
+            String name = program.getName();
+            this.displayName = defaultString(name);
             this.publisher = hasText(program.getPublisher())
                     ? WingetNameNormalizer.searchPublisher(program.getPublisher()) : "";
             this.systemComponent = program.isSystemComponent();

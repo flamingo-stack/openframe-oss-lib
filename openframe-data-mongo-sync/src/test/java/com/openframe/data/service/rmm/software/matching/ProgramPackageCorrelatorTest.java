@@ -126,12 +126,12 @@ class ProgramPackageCorrelatorTest {
     @Test
     void correlate_severalByNameNoneByCode_ambiguous() {
         // setup
-        InstalledProgram chrome = program("Google Chrome", "Google LLC", null, null);
-        stubCatalog(wingetPackage("Google.Chrome", List.of("googlechrome"), List.of("google")),
-                wingetPackage("Google.Chrome.EXE", List.of("googlechrome"), List.of("google")));
+        InstalledProgram chromium = program("Chromium", "The Chromium Authors", null, null);
+        stubCatalog(wingetPackage("eloston.ungoogled-chromium", List.of("chromium"), List.of("thechromiumauthors")),
+                wingetPackage("Hibbiki.Chromium", List.of("chromium"), List.of("thechromiumauthors")));
 
         // execution
-        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(chrome));
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(chromium));
 
         // verifications
         assertThat(matches)
@@ -160,16 +160,17 @@ class ProgramPackageCorrelatorTest {
     @Test
     void correlate_severalPackagesEquallyInstalled_bestCandidateHasTheShortestId() {
         // setup
-        InstalledProgram chrome = program("Google Chrome", "Google LLC", null, null);
-        PackageCatalogEntry exe = wingetPackage("Google.Chrome.EXE", List.of("googlechrome"), List.of("google"));
-        PackageCatalogEntry base = wingetPackage("Google.Chrome", List.of("googlechrome"), List.of("google"));
-        stubCatalog(exe, base);
+        InstalledProgram chromium = program("Chromium", "The Chromium Authors", null, null);
+        PackageCatalogEntry ungoogled =
+                wingetPackage("eloston.ungoogled-chromium", List.of("chromium"), List.of("thechromiumauthors"));
+        PackageCatalogEntry hibbiki = wingetPackage("Hibbiki.Chromium", List.of("chromium"), List.of("thechromiumauthors"));
+        stubCatalog(ungoogled, hibbiki);
 
         // execution
-        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(chrome));
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(chromium));
 
         // verifications
-        assertThat(matches.getFirst().getBestCandidate()).isSameAs(base);
+        assertThat(matches.getFirst().getBestCandidate()).isSameAs(hibbiki);
     }
 
     @Test
@@ -180,7 +181,7 @@ class ProgramPackageCorrelatorTest {
         byName.setPopularity(9000);
         PackageCatalogEntry first = wingetPackage("Contoso.Tool", List.of(), List.of());
         first.setUpgradeCodes(List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"));
-        PackageCatalogEntry second = wingetPackage("Contoso.Tool.Beta", List.of(), List.of());
+        PackageCatalogEntry second = wingetPackage("Fabrikam.Tool", List.of(), List.of());
         second.setUpgradeCodes(List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"));
         stubCatalog(byName, second, first);
 
@@ -190,6 +191,101 @@ class ProgramPackageCorrelatorTest {
         // verifications
         assertThat(matches).extracting(PackageMatch::isMatched).containsExactly(false);
         assertThat(matches.getFirst().getBestCandidate()).isSameAs(first);
+    }
+
+    @Test
+    void correlate_baseNextToItsVariant_theBase() {
+        // setup
+        InstalledProgram chrome = program("Google Chrome", "Google LLC", null, null);
+        PackageCatalogEntry exe = wingetPackage("Google.Chrome.EXE", List.of("googlechrome"), List.of("google"));
+        PackageCatalogEntry base = wingetPackage("Google.Chrome", List.of("googlechrome"), List.of("google"));
+        stubCatalog(exe, base);
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(chrome));
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(base);
+    }
+
+    @Test
+    void correlate_severalByCodeAndOneByName_decidedAmongTheOnesByCode() {
+        // setup
+        InstalledProgram tool = program("Tool", "Contoso", ACROBAT_UPGRADE_CODE, null);
+        PackageCatalogEntry byName = wingetPackage("A.Tool", List.of("tool"), List.of("contoso"));
+        PackageCatalogEntry base = wingetPackage("Contoso.Tool", List.of(), List.of());
+        base.setUpgradeCodes(List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"));
+        PackageCatalogEntry beta = wingetPackage("Contoso.Tool.Beta", List.of(), List.of());
+        beta.setUpgradeCodes(List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"));
+        stubCatalog(byName, beta, base);
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(tool));
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(base);
+    }
+
+    @Test
+    void correlate_packagesOfEveryVersion_theOneOfTheInstalledVersion() {
+        // setup
+        InstalledProgram runtime = program("Microsoft .NET Runtime - 8.0.34 (x64)", "Microsoft Corporation", null, null);
+        PackageCatalogEntry runtime6 = wingetPackage("Microsoft.DotNet.Runtime.6",
+                List.of("microsoftnetruntime(X64)", "microsoftnetruntime"), List.of("microsoft"));
+        PackageCatalogEntry runtime8 = wingetPackage("Microsoft.DotNet.Runtime.8",
+                List.of("microsoftnetruntime(X64)", "microsoftnetruntime"), List.of("microsoft"));
+        stubCatalog(runtime6, runtime8);
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(runtime));
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(runtime8);
+    }
+
+    @Test
+    void correlate_onePackageOfAnotherVersion_noPackage() {
+        // setup
+        InstalledProgram sdk = program("Microsoft .NET Framework 4.8 SDK", "Microsoft Corporation", null, null);
+        stubCatalog(wingetPackage("Microsoft.DotNet.Framework.DeveloperPack.4.6",
+                List.of("microsoftnetframeworksdk"), List.of("microsoft")));
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(sdk));
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::hasNoPackage).containsExactly(true);
+    }
+
+    @Test
+    void correlate_onePackageOfTheInstalledVersion_thatPackage() {
+        // setup
+        InstalledProgram sdk = program("Microsoft .NET Framework 4.6.2 SDK", "Microsoft Corporation", null, null);
+        PackageCatalogEntry developerPack = wingetPackage("Microsoft.DotNet.Framework.DeveloperPack.4.6",
+                List.of("microsoftnetframeworksdk"), List.of("microsoft"));
+        stubCatalog(developerPack);
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(sdk));
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::getEntry).containsExactly(developerPack);
+    }
+
+    @Test
+    void correlate_decidedPackageOfAnotherVersion_ambiguousWithoutABestCandidate() {
+        // setup
+        InstalledProgram sublime = program("Sublime Text Build 3126", "Sublime HQ Pty Ltd", null, null);
+        stubCatalog(wingetPackage("SublimeHQ.SublimeText.4", List.of("sublimetext"), List.of("sublimehq")),
+                wingetPackage("SublimeHQ.SublimeText.4.Dev", List.of("sublimetext"), List.of("sublimehq")));
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(sublime));
+
+        // verifications
+        assertThat(matches)
+                .extracting(PackageMatch::isMatched, PackageMatch::hasNoPackage, PackageMatch::getBestCandidate)
+                .containsExactly(tuple(false, false, null));
     }
 
     @Test
