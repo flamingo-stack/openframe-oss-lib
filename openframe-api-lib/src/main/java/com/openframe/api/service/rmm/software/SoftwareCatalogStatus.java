@@ -12,6 +12,7 @@ import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -154,7 +155,13 @@ public class SoftwareCatalogStatus {
     private static void applyAdoptionPackage(SoftwareResponse row, PackageCatalogEntry entry) {
         String latest = versionOf(entry);
         applyLatest(row, latest);
-        row.setAdoptionPackage(entry);
+        SoftwareBundlePackage adoptionPackage = SoftwareBundlePackage.builder()
+                .packageManager(entry.getManager())
+                .packageName(entry.getPackageId())
+                .brewPackageType(entry.getBrewType())
+                .version(latest)
+                .build();
+        row.setAdoptionPackage(adoptionPackage);
         if (row.getAutoUpdate() == null) {
             row.setAutoUpdate(SoftwareAutoUpdateStatus.NEEDS_ADOPTION);
         }

@@ -140,6 +140,59 @@ class ProgramPackageCorrelatorTest {
     }
 
     @Test
+    void correlate_severalPackages_bestCandidateIsTheMostInstalled() {
+        // setup
+        InstalledProgram vlc = program("VLC media player", "VideoLAN", null, null);
+        PackageCatalogEntry nightly = wingetPackage("VideoLAN.VLC.Nightly", List.of("vlcmediaplayer"), List.of("videolan"));
+        nightly.setPopularity(40);
+        PackageCatalogEntry stable = wingetPackage("VideoLAN.VLC.Stable", List.of("vlcmediaplayer"), List.of("videolan"));
+        stable.setPopularity(9000);
+        stubCatalog(nightly, stable);
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(vlc));
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::isMatched).containsExactly(false);
+        assertThat(matches.getFirst().getBestCandidate()).isSameAs(stable);
+    }
+
+    @Test
+    void correlate_severalPackagesEquallyInstalled_bestCandidateHasTheShortestId() {
+        // setup
+        InstalledProgram chrome = program("Google Chrome", "Google LLC", null, null);
+        PackageCatalogEntry exe = wingetPackage("Google.Chrome.EXE", List.of("googlechrome"), List.of("google"));
+        PackageCatalogEntry base = wingetPackage("Google.Chrome", List.of("googlechrome"), List.of("google"));
+        stubCatalog(exe, base);
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(chrome));
+
+        // verifications
+        assertThat(matches.getFirst().getBestCandidate()).isSameAs(base);
+    }
+
+    @Test
+    void correlate_packagesByCodeAndByName_bestCandidateIsOneFoundByCode() {
+        // setup
+        InstalledProgram tool = program("Tool", "Contoso", ACROBAT_UPGRADE_CODE, null);
+        PackageCatalogEntry byName = wingetPackage("A.Tool", List.of("tool"), List.of("contoso"));
+        byName.setPopularity(9000);
+        PackageCatalogEntry first = wingetPackage("Contoso.Tool", List.of(), List.of());
+        first.setUpgradeCodes(List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"));
+        PackageCatalogEntry second = wingetPackage("Contoso.Tool.Beta", List.of(), List.of());
+        second.setUpgradeCodes(List.of("{ac76ba86-1033-ffff-7760-bc15014ea700}"));
+        stubCatalog(byName, second, first);
+
+        // execution
+        List<PackageMatch> matches = programPackageCorrelator.correlate(PackageManagerType.WINGET, List.of(tool));
+
+        // verifications
+        assertThat(matches).extracting(PackageMatch::isMatched).containsExactly(false);
+        assertThat(matches.getFirst().getBestCandidate()).isSameAs(first);
+    }
+
+    @Test
     void correlate_twoPackagesByCode_ambiguous() {
         // setup
         InstalledProgram tool = program("Tool", "Contoso", ACROBAT_UPGRADE_CODE, null);

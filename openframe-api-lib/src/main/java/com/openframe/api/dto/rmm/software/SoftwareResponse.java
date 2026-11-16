@@ -3,6 +3,7 @@ package com.openframe.api.dto.rmm.software;
 import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.rmm.software.FleetSource;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.document.rmm.software.SoftwarePackageMatch;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -41,5 +42,5 @@ public class SoftwareResponse {
     private SoftwarePackageMatch adoptionMatch;
     private PackageCatalogEntry managingPackage;
     // the package the program can be adopted into; set only where no package manages it
-    private PackageCatalogEntry adoptionPackage;
+    private SoftwareBundlePackage adoptionPackage;
 }

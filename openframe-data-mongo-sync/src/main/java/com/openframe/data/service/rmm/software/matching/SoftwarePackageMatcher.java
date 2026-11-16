@@ -49,7 +49,11 @@ public class SoftwarePackageMatcher {
     // the package a program can be adopted into, whatever match() says about it: which of the two counts is decided
     // per device, by the managers that run there
     public Map<InstalledProgram, PackageMatch> matchForAdoption(List<InstalledProgram> programs) {
-        return match(programs, adoptionMatchers, InstalledProgram::getStoredAdoptionMatch);
+        Map<InstalledProgram, PackageMatch> matches =
+                match(programs, adoptionMatchers, InstalledProgram::getStoredAdoptionMatch);
+        // the admin confirms an adoption, so of several packages the best one is offered
+        matches.replaceAll((program, match) -> match.orBestCandidate());
+        return matches;
     }
 
     private Map<InstalledProgram, PackageMatch> match(List<InstalledProgram> programs,

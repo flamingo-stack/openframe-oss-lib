@@ -13,6 +13,7 @@ import com.openframe.data.document.packagesearch.PackageCatalogEntry;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.SoftwareAutoUpdateStatus;
+import com.openframe.data.document.rmm.software.SoftwareBundlePackage;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.packagesearch.PackageCatalogRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -47,6 +48,8 @@ class SoftwareCatalogStatusTest {
 
     private static final String TENANT_ID = "t1";
     private static final String MACHINE_ID = "m1";
+    private static final SoftwareBundlePackage ADOPTION_INTO_CHOCO_7ZIP = SoftwareBundlePackage.builder()
+            .packageManager(PackageManagerType.CHOCO).packageName("7zip").version("24.09").build();
 
     @Mock private PackageCatalogRepository catalogRepository;
     @Mock private SoftwarePackageMatcher packageMatcher;
@@ -369,7 +372,7 @@ class SoftwareCatalogStatusTest {
                         SoftwareResponse::getVersionStatus, SoftwareResponse::getAutoUpdate,
                         SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
                 .containsExactly(SoftwareSource.UNMANAGED, "24.09", SoftwareVersionStatus.OUTDATED,
-                        SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, choco7zip);
+                        SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, ADOPTION_INTO_CHOCO_7ZIP);
     }
 
     @Test
@@ -443,7 +446,8 @@ class SoftwareCatalogStatusTest {
         assertThat(sevenZip)
                 .extracting(SoftwareResponse::getSource, SoftwareResponse::getAutoUpdate,
                         SoftwareResponse::getManagingPackage, SoftwareResponse::getAdoptionPackage)
-                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null, choco7zip);
+                .containsExactly(SoftwareSource.UNMANAGED, SoftwareAutoUpdateStatus.NEEDS_ADOPTION, null,
+                        ADOPTION_INTO_CHOCO_7ZIP);
     }
 
     @Test

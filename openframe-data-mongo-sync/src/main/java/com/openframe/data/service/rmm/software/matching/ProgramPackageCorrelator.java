@@ -8,6 +8,8 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -28,6 +30,12 @@ import static org.springframework.util.StringUtils.hasText;
 @Component
 @RequiredArgsConstructor
 public class ProgramPackageCorrelator {
+
+    // the most installed package first; among equals the shortest id, which is the package itself and not its variant
+    private static final Comparator<PackageCatalogEntry> BEST_FIRST = Comparator
+            .comparing(PackageCatalogEntry::getPopularity, Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(entry -> entry.getPackageId().length())
+            .thenComparing(PackageCatalogEntry::getPackageId);
 
     private final PackageCatalogRepository catalogRepository;
 
@@ -102,7 +110,12 @@ public class ProgramPackageCorrelator {
                 return PackageMatch.of(only.getEntry());
             }
             List<Candidate> strong = candidates.values().stream().filter(Candidate::isStrong).toList();
-            return strong.size() == 1 ? PackageMatch.of(strong.getFirst().getEntry()) : PackageMatch.ambiguous();
+            if (strong.size() == 1) {
+                return PackageMatch.of(strong.getFirst().getEntry());
+            }
+            Collection<Candidate> closest = strong.isEmpty() ? candidates.values() : strong;
+            PackageCatalogEntry best = closest.stream().map(Candidate::getEntry).min(BEST_FIRST).orElseThrow();
+            return PackageMatch.ambiguous(best);
         }
 
         private static boolean hasNameAndPublisher(PackageCatalogEntry entry, String name, String publisher) {

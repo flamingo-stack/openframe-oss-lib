@@ -124,6 +124,40 @@ class SoftwarePackageMatcherTest {
     }
 
     @Test
+    void matchForAdoption_severalPackages_theBestCandidateIsTheMatch() {
+        // setup
+        InstalledProgram vlc = program("VLC media player", FleetSource.PROGRAMS);
+        PackageCatalogEntry best = chocoPackage("vlc");
+        PackageMatch several = PackageMatch.ambiguous(best);
+        stubAdoptionMatcher();
+        when(chocoMatcher.match(List.of(vlc))).thenReturn(List.of(several));
+
+        // execution
+        PackageMatch match = matcher(chocoMatcher).matchForAdoption(List.of(vlc)).get(vlc);
+
+        // verifications
+        assertThat(match.isMatched()).isTrue();
+        assertThat(match.getEntry()).isSameAs(best);
+    }
+
+    @Test
+    void match_severalPackages_staysAmbiguousWhateverTheBestCandidate() {
+        // setup
+        InstalledProgram vlc = program("VLC media player", FleetSource.PROGRAMS);
+        PackageCatalogEntry best = wingetPackage("VideoLAN.VLC");
+        PackageMatch several = PackageMatch.ambiguous(best);
+        when(wingetMatcher.getFleetSource()).thenReturn(FleetSource.PROGRAMS);
+        when(wingetMatcher.match(List.of(vlc))).thenReturn(List.of(several));
+
+        // execution
+        PackageMatch match = matcher(wingetMatcher).match(List.of(vlc)).get(vlc);
+
+        // verifications
+        assertThat(match.isMatched()).isFalse();
+        assertThat(match.hasNoPackage()).isFalse();
+    }
+
+    @Test
     void match_adoptionMatcherOfTheSameTable_notAsked() {
         // setup
         InstalledProgram sevenZip = program("7-Zip", FleetSource.PROGRAMS);
