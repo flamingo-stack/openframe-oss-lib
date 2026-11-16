@@ -85,6 +85,13 @@
  * is undefined) and is drawn exactly as `loading` draws it: its bar inside the
  * real `h1`/`p`. A given title or subtitle is the page's own words, drawn as
  * is. Outside a scope every caller is byte-identical.
+ *
+ * SANCTIONED EXCEPTION (2026-11, explicit human sign-off — ClickUp CU-17tkuw670yr):
+ * column Back. Inside an enabled `ColumnBackSlot` (a work-area page column whose
+ * header draws the page's Back) the `backButton` is handed to the slot and not
+ * drawn above the title, so a narrow column (where `content-md:` hid it) still has
+ * a Back and a wide one never shows two. Outside a slot every caller is
+ * byte-identical.
  * ========================================================================== */
 
 import type React from 'react';
@@ -101,6 +108,7 @@ import { FloatingTooltip } from '../ui/floating-tooltip';
 import { useLoadingScope } from '../ui/loading-scope';
 import { PageActions, type PageActionButton } from '../ui/page-actions';
 import { BackButton } from './back-button';
+import { useHandColumnBack } from './column-back-slot';
 import { PageTitle } from './page-picture';
 
 /**
@@ -224,6 +232,8 @@ export function TitleBlock({
 }: TitleBlockProps) {
   // In a loading scope a read title / subtitle ('' there) is drawn as `loading` draws it.
   const scoped = useLoadingScope();
+  // In a column whose header draws the page's Back, the header has it.
+  const backInColumnHeader = useHandColumnBack(backButton);
   const titleLoading = !!loading || (scoped && title === '');
   const subtitleLoading = !!loading || (scoped && subtitle === '');
   const hasSubtitleRow =
@@ -310,7 +320,7 @@ export function TitleBlock({
           titleLoading && titleWrap && titleSkeletonLines && 'content-md:w-full',
         )}
       >
-        {backButton && (
+        {backButton && !backInColumnHeader && (
           <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden content-md:inline-flex" />
         )}
         {image || hasSubtitleRow || titleLoading ? (
