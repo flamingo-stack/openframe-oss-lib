@@ -185,6 +185,24 @@ class ApiSubgraphSchemaTest {
         assertThat(sdlNames).containsExactlyInAnyOrderElementsOf(javaNames);
     }
 
+    @Test
+    void ticketCreationSource_sdlEnum_hasEmail() {
+        // execution
+        List<String> sdlNames = sdlEnumNames("TicketCreationSource");
+
+        // verifications
+        assertThat(sdlNames).contains("EMAIL");
+    }
+
+    @Test
+    void ticketCreationSource_javaEnum_hasEmail() {
+        // execution
+        List<String> javaNames = javaEnumNames(TicketCreationSource.class);
+
+        // verifications
+        assertThat(javaNames).contains("EMAIL");
+    }
+
     @ParameterizedTest
     @MethodSource("machineDirectoryFields")
     void machineDirectoryField_typedLikeTheContract(String field, String type) {
