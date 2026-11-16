@@ -374,3 +374,22 @@ async fn real_loop_refreshes_once_at_start_and_then_waits_out_the_lifetime() {
 
     assert_eq!(server.hits().len(), 1);
 }
+
+// Suspension only exists where self-uninstall is supported.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[tokio::test]
+async fn real_loop_goes_quiet_once_the_token_endpoint_keeps_answering_403() {
+    use crate::test_support::{mock_server, wait_until};
+
+    let server = mock_server(&[403]).await;
+    let dir = tempfile::tempdir().unwrap();
+    let manager = registered_manager(&dir, server.url.clone()).await;
+    manager.start();
+
+    // Five 403s pause the client; the sixth request is the client-credentials fallback already under way.
+    wait_until(|| server.requests().len() >= 6).await;
+    tokio::time::sleep(FAST.retry_interval * 10).await;
+
+    assert_eq!(server.requests().len(), 6, "token requests after the pause");
+    assert!(manager.deactivation.is_suspended());
+}

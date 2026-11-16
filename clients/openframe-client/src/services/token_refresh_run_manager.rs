@@ -113,14 +113,10 @@ impl TokenRefreshRunManager {
             let mut schedule = RefreshSchedule::now();
 
             loop {
-                // Tenant-gone suspension: this loop is the single backoff probe. Its outcome is
-                // recorded inside AuthClient (410 -> stay gone / advance uninstall; 2xx -> recover).
+                // Suspended: this loop is the single backoff probe; AuthClient records its outcome (2xx recovers).
                 if deactivation.is_suspended() {
                     let wait = deactivation.next_probe_delay().await;
-                    debug!(
-                        "Tenant-gone suspension active; next probe in {}s",
-                        wait.as_secs()
-                    );
+                    debug!("Suspension active; next probe in {}s", wait.as_secs());
                     sleep(wait).await;
                     let (sent_wall, sent_boot) = (Utc::now().timestamp(), boot_clock::now());
                     if let Ok(Ok(response)) =
@@ -153,7 +149,7 @@ impl TokenRefreshRunManager {
                             timing.retry_interval.as_secs()
                         ),
                     }
-                    // Tenant went gone mid-retry — hand control to the backoff probe above.
+                    // Suspended mid-retry — hand control to the backoff probe above.
                     if deactivation.is_suspended() {
                         schedule = RefreshSchedule::now();
                         break;

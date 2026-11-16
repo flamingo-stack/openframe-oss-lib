@@ -12,12 +12,14 @@ use tracing::{error, info, warn};
 use crate::platform::DirectoryManager;
 use crate::services::tool_run_manager::ToolRunManager;
 
-/// Consecutive `410 Gone` responses before we stop tools and gate outbound calls.
-const STOP_TOOLS_AFTER_CONSECUTIVE_GONE: u32 = 5;
+/// `410 Gone`s, or `403 Forbidden`s, with no 2xx between them before we stop tools and gate outbound calls.
+const STOP_TOOLS_AFTER_CONSECUTIVE: u32 = 5;
 /// First delay between probes once suspended.
 const PROBE_BACKOFF_INITIAL: Duration = Duration::from_secs(60);
-/// Cap on the exponential probe backoff.
+/// Cap on the exponential probe backoff once a 410 was seen.
 const PROBE_BACKOFF_MAX: Duration = Duration::from_secs(30 * 60);
+/// Cap on the probe backoff while only 403s were seen.
+const FORBIDDEN_PROBE_BACKOFF_MAX: Duration = Duration::from_secs(10 * 60);
 /// Total time the tenant must stay gone (since the first 410) before self-uninstall.
 const UNINSTALL_AFTER: Duration = Duration::from_secs(2 * 60 * 60);
 /// After any (re)start, require this much fresh confirmation before uninstalling, so a
@@ -50,6 +52,7 @@ enum Phase {
 struct State {
     phase: Phase,
     consecutive_gone: u32,
+    consecutive_forbidden: u32,
     /// First 410 of the current gone episode (persisted, reset on recovery).
     gone_since: Option<DateTime<Utc>>,
     probe_backoff: Duration,
@@ -61,8 +64,7 @@ struct State {
     process_started: Instant,
 }
 
-/// Detects the gateway's `410 Gone` (tenant deleted), backs off, stops tools, and — after
-/// the tenant has stayed gone for [`UNINSTALL_AFTER`] — triggers client self-uninstall.
+/// Pauses on the token endpoint's repeated 410 (self-uninstall after [`UNINSTALL_AFTER`]) or 403 (pause only).
 pub struct DeactivationService {
     suspended: AtomicBool,
     state: AsyncMutex<State>,
@@ -95,6 +97,7 @@ impl DeactivationService {
             state: AsyncMutex::new(State {
                 phase: Phase::Healthy,
                 consecutive_gone: 0,
+                consecutive_forbidden: 0,
                 gone_since,
                 probe_backoff: PROBE_BACKOFF_INITIAL,
                 uninstall_triggered: false,
@@ -106,29 +109,35 @@ impl DeactivationService {
         })
     }
 
-    /// True while outbound calls are gated (tenant presumed gone). Always false when disabled.
+    /// True while outbound calls are gated. Always false when disabled.
     pub fn is_suspended(&self) -> bool {
         self.suspended.load(Ordering::Acquire)
     }
 
-    /// Feed a gateway HTTP status: `410` confirms gone, `2xx` confirms healthy, everything
-    /// else (5xx / timeouts / auth errors) is transient and leaves the state unchanged.
+    /// Feed a token endpoint status: `410` and `403` count toward a pause, `2xx` ends it, the rest is transient.
     pub async fn on_gateway_status(&self, status: StatusCode) {
         if !ENABLED {
             return;
         }
         if status == StatusCode::GONE {
             self.record_gone().await;
+        } else if status == StatusCode::FORBIDDEN {
+            self.record_forbidden().await;
         } else if status.is_success() {
             self.record_healthy().await;
         }
     }
 
-    /// Delay before the next suspension probe, doubling up to [`PROBE_BACKOFF_MAX`].
+    /// Delay before the next suspension probe, doubling up to the cap of the current pause.
     pub async fn next_probe_delay(&self) -> Duration {
         let mut st = self.state.lock().await;
+        let max = if st.consecutive_gone > 0 {
+            PROBE_BACKOFF_MAX
+        } else {
+            FORBIDDEN_PROBE_BACKOFF_MAX
+        };
         let delay = st.probe_backoff;
-        st.probe_backoff = (st.probe_backoff * 2).min(PROBE_BACKOFF_MAX);
+        st.probe_backoff = (st.probe_backoff * 2).min(max);
         delay
     }
 
@@ -189,24 +198,19 @@ impl DeactivationService {
                     target: "deactivation",
                     reason = "backoff_started",
                     "First 410 Gone from gateway (tenant may be deleted); will stop tools after {} consecutive",
-                    STOP_TOOLS_AFTER_CONSECUTIVE_GONE
+                    STOP_TOOLS_AFTER_CONSECUTIVE
                 );
             }
             st.consecutive_gone = st.consecutive_gone.saturating_add(1);
 
-            if st.phase == Phase::Healthy
-                && st.consecutive_gone >= STOP_TOOLS_AFTER_CONSECUTIVE_GONE
-            {
-                st.phase = Phase::Suspended;
-                st.probe_backoff = PROBE_BACKOFF_INITIAL;
-                self.suspended.store(true, Ordering::Release);
+            if st.phase == Phase::Healthy && st.consecutive_gone >= STOP_TOOLS_AFTER_CONSECUTIVE {
                 warn!(
                     target: "deactivation",
                     reason = "calls_stopped",
                     consecutive = st.consecutive_gone,
                     "Tenant gone confirmed; stopping all tools and gating outbound calls to a single backoff probe"
                 );
-                let _ = self.commands_tx.send(DeactivationCommand::StopTools);
+                self.suspend(&mut st);
             }
 
             Self::uninstall_due(&st, now)
@@ -216,6 +220,30 @@ impl DeactivationService {
         if due {
             self.request_uninstall().await;
         }
+    }
+
+    async fn record_forbidden(&self) {
+        let mut st = self.state.lock().await;
+        if st.uninstall_triggered {
+            return;
+        }
+        st.consecutive_forbidden = st.consecutive_forbidden.saturating_add(1);
+        if st.phase == Phase::Healthy && st.consecutive_forbidden >= STOP_TOOLS_AFTER_CONSECUTIVE {
+            warn!(
+                target: "deactivation",
+                reason = "forbidden_paused",
+                consecutive = st.consecutive_forbidden,
+                "Token endpoint keeps answering 403; stopping all tools and gating outbound calls to a single backoff probe"
+            );
+            self.suspend(&mut st);
+        }
+    }
+
+    fn suspend(&self, st: &mut State) {
+        st.phase = Phase::Suspended;
+        st.probe_backoff = PROBE_BACKOFF_INITIAL;
+        self.suspended.store(true, Ordering::Release);
+        let _ = self.commands_tx.send(DeactivationCommand::StopTools);
     }
 
     async fn record_healthy(&self) {
@@ -228,6 +256,7 @@ impl DeactivationService {
         let had_marker = st.gone_since.is_some();
 
         st.consecutive_gone = 0;
+        st.consecutive_forbidden = 0;
         st.gone_since = None;
         st.probe_backoff = PROBE_BACKOFF_INITIAL;
         if had_marker {
@@ -240,7 +269,7 @@ impl DeactivationService {
             warn!(
                 target: "deactivation",
                 reason = "recovered",
-                "Gateway healthy again (tenant restored); resuming outbound calls and restarting tools"
+                "Gateway healthy again; resuming outbound calls and restarting tools"
             );
             let _ = self.commands_tx.send(DeactivationCommand::RestartTools);
         } else if had_marker {
@@ -252,11 +281,9 @@ impl DeactivationService {
         }
     }
 
-    /// Whether the tenant has been gone past [`UNINSTALL_AFTER`] and the post-restart grace.
-    /// Only ever evaluated on a fresh 410 (a network outage produces none), so a stale marker
-    /// alone can't trigger uninstall.
+    /// Whether five 410s confirmed the tenant gone past [`UNINSTALL_AFTER`] and the post-restart grace; checked only on a fresh 410.
     fn uninstall_due(st: &State, now: DateTime<Utc>) -> bool {
-        if st.phase != Phase::Suspended {
+        if st.consecutive_gone < STOP_TOOLS_AFTER_CONSECUTIVE {
             return false;
         }
         let Some(gone_since) = st.gone_since else {
@@ -327,3 +354,7 @@ fn remove_marker(secured_dir: &Path) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "deactivation_service_tests.rs"]
+mod tests;
