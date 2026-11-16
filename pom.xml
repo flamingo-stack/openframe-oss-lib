@@ -71,7 +71,6 @@
         <module>openframe-graphql-relay</module>
         <module>openframe-graphql-node</module>
         <module>openframe-api-lib</module>
-        <module>openframe-data-cassandra</module>
         <module>openframe-data-pinot</module>
         <module>openframe-data-loki</module>
         <module>openframe-data-nats</module>
@@ -206,11 +205,6 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-api-lib</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.openframe.oss</groupId>
-                <artifactId>openframe-data-cassandra</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
